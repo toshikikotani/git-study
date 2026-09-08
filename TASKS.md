@@ -115,6 +115,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-11 | AI が救済したメールの書式をラベル辞書へ還元する | AI に回った本文を残しておけば、辞書に語を足して費用ゼロの経路へ戻せる(ADR-019) |
 | T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
 | T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
+| T-15 | Vercel プロジェクトと GitHub リポジトリを連携する | 現在は CLI からの手動デプロイのみ。https://github.com/apps/vercel を `toshikikotani/git-study` にインストールすれば、main への push で自動デプロイになる(本人の operation) |
 
 **T-12 は refactor(責務分離)の一環として認識しているが未着手。他は2026-09-08 の refactor セッションで着手した3画面の重複解消と mail-sync の分割のみ完了(下記 Done)。** 全体的な「5行ルール」適用は際限がないので、次に触る画面・関数から都度直す方針にする(一括では手を出さない)。
 
@@ -156,6 +157,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-14 | リファクタ:取り込み3画面(CSV/貼り付け/Gmail設定)の重複排除と mail-sync の分割 | `DETECTION_RULES` の複製を `DEFAULT_DETECTION_RULES`(rules.ts)に一本化、共通 `<Card>`(components/ui)を切り出して9箇所のインライン複製を解消、「分類→StoredTransaction化→保存」を `features/transactions/import-pipeline.ts` に集約(CSV・貼り付け・mail-sync の3箇所が同じロジックを持っていた)。`syncFromMailbox`(82行)を `parseMessage` / `pushWarnings` に分割し、`import-pipeline.ts` の `buildPreview` を呼ぶ形にして3つ目の複製も解消。テスト10件追加、既存317件は無変更で通過。2026-09-08 |
 | D-8 | `docs/glossary.md` — DB列名↔TS識別子↔画面表示名の対応表、接尾辞規約(`...Yen`/`...On`/`...At`/`...Id`/`is...`/`...Rate`)、型の置き場所、データアクセス層の命名規約(list/get/create/update)を制定。既存コードは無改修、以後のコードが従う基準 | 2026-09-08 |
 | M1-2 | 負債の登録・編集画面。`src/features/debts/store.ts`(Supabase 読み書き、この機能で最初に本物の DB を使う層)、`src/domain/debt.ts`(借入先・返済日の検証)、`money.ts` に `parseAnnualRate()` を追加。Server Action(`app/(app)/debts/actions.ts`)経由で作成・更新。実際の Supabase プロジェクトに対して認証込みで読み書き・RLS を検証済み(本セッション内で一時セッションを発行して確認)。あわせて `seed_defaults()` に ADR-006 の負債3件が投入されていない欠落を発見・修正(新規マイグレーション、schema.sql 反映、decisions.md 追記)。本番へ適用し、既存ユーザーに対して `seed_defaults()` を再実行してカードA・カードB・消費者金融Cの3件を投入済み | 2026-09-08 |
+| ADR-012 | Vercel(Hobby)へ初回デプロイ。プロジェクト作成、環境変数3件(`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`)を production に設定、CLI から本番デプロイ。認証ガードが本番でも効くことを確認(未ログインで `/login` へリダイレクト)。公開 URL: `https://git-study-lemon.vercel.app`。GitHub 連携は未設定(T-15) | 2026-09-08 |
 
 ---
 
