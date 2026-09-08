@@ -46,6 +46,11 @@ function parseDebtInput(formData: FormData): DebtInput {
     parseYen(String(formData.get('currentBalanceYen') ?? '')),
     '残高',
   );
+
+  const originalPrincipalRaw = String(formData.get('originalPrincipalYen') ?? '').trim();
+  const originalPrincipalYen =
+    originalPrincipalRaw === '' ? null : assertYen(parseYen(originalPrincipalRaw), '当初元本');
+
   const minimumPaymentYen = assertYen(
     parseYen(String(formData.get('minimumPaymentYen') ?? '')),
     '最低返済額',
@@ -59,6 +64,7 @@ function parseDebtInput(formData: FormData): DebtInput {
     lenderName,
     kind: kindRaw as DebtKind,
     currentBalanceYen,
+    originalPrincipalYen,
     minimumPaymentYen,
     annualRate,
     paymentDay,

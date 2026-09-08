@@ -5,7 +5,6 @@ import {
   MAX_HOME_TILES,
   buildHomeTiles,
   computePayoffSummary,
-  loadHomeSummary,
   type HomeCategory,
 } from '@/features/home/summary';
 
@@ -189,16 +188,8 @@ describe('computePayoffSummary', () => {
   });
 });
 
-describe('loadHomeSummary', () => {
-  it('ホームに出す数字は完済カウントダウン + 枠2件(FR-61)', async () => {
-    const summary = await loadHomeSummary(new Date('2026-09-08T00:00:00Z'));
-    expect(summary.tiles).toHaveLength(2);
-    expect(summary.payoff.remainingYen).toBe(1_000_000);
-  });
-
-  it('仮置きデータでもラベルはカテゴリ由来', async () => {
-    const summary = await loadHomeSummary(new Date('2026-09-08T00:00:00Z'));
-    expect(summary.tiles.map((t) => t.code)).toEqual(['living', 'sanctuary']);
-    expect(summary.tiles.every((t) => t.label.length > 0)).toBe(true);
-  });
-});
+// loadHomeSummary() は M0-3 以降 Supabase(次に next/headers の cookies())に
+// 触れる関数になったため、ここではユニットテストしない。実データでの検証は
+// リクエストスコープ(実際の画面・ブラウザ経由)で行う。ここでテストし続ける
+// のは、Supabase に触れない buildHomeTiles / computePayoffSummary という
+// 純粋関数の側。この2つが緑であるかぎり、ホームの計算ロジック自体は保証される。

@@ -37,6 +37,8 @@ export type DebtInput = {
   lenderName: string;
   kind: DebtKind;
   currentBalanceYen: number;
+  /** 当初元本。任意入力(ホームの進捗ゲージの分母になる。無ければ現在残高で代用)。 */
+  originalPrincipalYen: number | null;
   minimumPaymentYen: number;
   annualRate: number;
   paymentDay: number;
@@ -102,6 +104,7 @@ export async function createDebt(input: DebtInput): Promise<Debt> {
       lender_name: input.lenderName,
       kind: input.kind,
       current_balance_yen: input.currentBalanceYen,
+      original_principal_yen: input.originalPrincipalYen,
       minimum_payment_yen: input.minimumPaymentYen,
       annual_rate: input.annualRate,
       payment_day: input.paymentDay,
@@ -128,6 +131,7 @@ export async function updateDebt(id: string, input: DebtInput): Promise<Debt> {
       lender_name: input.lenderName,
       kind: input.kind,
       current_balance_yen: input.currentBalanceYen,
+      original_principal_yen: input.originalPrincipalYen,
       minimum_payment_yen: input.minimumPaymentYen,
       annual_rate: input.annualRate,
       payment_day: input.paymentDay,
