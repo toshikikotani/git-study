@@ -8,6 +8,7 @@ import {
   formatSpendable,
   formatYen,
   monthlyInterest,
+  parseAnnualRate,
   parseYen,
 } from '@/domain/money';
 
@@ -122,5 +123,53 @@ describe('formatAnnualRate', () => {
     expect(formatAnnualRate(0.15)).toBe('15%');
     expect(formatAnnualRate(0.1825)).toBe('18.25%');
     expect(formatAnnualRate(0)).toBe('0%');
+  });
+});
+
+describe('parseAnnualRate(formatAnnualRate の逆変換)', () => {
+  it('「15」を 0.15 にする', () => {
+    expect(parseAnnualRate('15')).toBe(0.15);
+  });
+
+  it('% が付いていても解釈する', () => {
+    expect(parseAnnualRate('15%')).toBe(0.15);
+    expect(parseAnnualRate('18.25％')).toBeCloseTo(0.1825);
+  });
+
+  it('全角数字を吸収する', () => {
+    expect(parseAnnualRate('１５')).toBe(0.15);
+  });
+
+  it('前後の空白を無視する', () => {
+    expect(parseAnnualRate('  15 ')).toBe(0.15);
+  });
+
+  it('0% を許容する', () => {
+    expect(parseAnnualRate('0')).toBe(0);
+  });
+
+  it('100% を許容する(境界値)', () => {
+    expect(parseAnnualRate('100')).toBe(1);
+  });
+
+  it('100% を超える値は拒否する(桁間違いの防止)', () => {
+    expect(() => parseAnnualRate('150')).toThrow(/0〜100%/);
+  });
+
+  it('負の値は拒否する', () => {
+    expect(() => parseAnnualRate('-5')).toThrow(/解釈できません/);
+  });
+
+  it('空文字は拒否する', () => {
+    expect(() => parseAnnualRate('')).toThrow(/空/);
+  });
+
+  it('数値でない入力は拒否する', () => {
+    expect(() => parseAnnualRate('高い')).toThrow(/解釈できません/);
+  });
+
+  it('formatAnnualRate と往復できる', () => {
+    const rate = 0.1825;
+    expect(parseAnnualRate(formatAnnualRate(rate).replace('%', ''))).toBeCloseTo(rate);
   });
 });
