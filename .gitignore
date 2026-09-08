@@ -9,3 +9,6 @@ build/
 next-env.d.ts
 .DS_Store
 coverage/
+
+# Supabase CLI のローカルキャッシュ(supabase コマンド実行で自動生成)
+supabase/.temp/

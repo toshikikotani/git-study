@@ -1,6 +1,9 @@
-import { ProgressGauge, StatTile } from '@/components/ui/stat-tile';
+import { CountUp } from '@/components/ui/count-up';
+import { ProgressGauge } from '@/components/ui/meter';
+import { StatTile } from '@/components/ui/stat-tile';
+import { budgetTone } from '@/domain/budget';
+import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { loadHomeSummary } from '@/features/home/summary';
-import { formatSpendable, formatYen } from '@/domain/money';
 import { formatDateJa } from '@/lib/date';
 
 // 金額は常に最新でなければならない。App Router のキャッシュに乗せない(ADR-001)。
@@ -11,77 +14,176 @@ export default async function HomePage() {
   const { payoff, tiles } = summary;
 
   return (
-    <div className="space-y-4">
-      {/* FR-03: 完済カウントダウンは最上部に固定。スクロールせずに見えること */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-neutral-500 dark:text-neutral-400">完済まで</span>
-          {payoff.isEstimated ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-              推定
+    <div className="space-y-3">
+      {/* FR-03:完済カウントダウンは最上部に固定。
+          この画面で 48px 超の数字はここだけ(dataviz:ヒーロー figure は1画面に1つ)。 */}
+      <section
+        className="rise relative overflow-hidden rounded-[28px] p-6 pb-7"
+        style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
+      >
+        {/* 数字の背後の淡い光。視線を最上部へ引く */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-28 -right-20 size-64 rounded-full blur-3xl"
+          style={{ background: 'var(--hero-glow)' }}
+        />
+
+        <div className="relative">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[11px] font-medium tracking-[0.1em] uppercase"
+              style={{ color: 'var(--ink-muted)' }}
+            >
+              完済まで
             </span>
+            {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
+            {payoff.isEstimated ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+              >
+                推定
+              </span>
+            ) : null}
+          </div>
+
+          {payoff.daysRemaining === null ? (
+            <p
+              className="mt-2 text-[56px] leading-none font-semibold tracking-[-0.03em]"
+              style={{ color: 'var(--income)' }}
+            >
+              完済済み
+            </p>
+          ) : (
+            <>
+              <p className="mt-1.5 flex items-baseline gap-2">
+                <CountUp
+                  value={payoff.daysRemaining}
+                  className="text-[80px] leading-[0.88] font-semibold tracking-[-0.05em]"
+                  style={{ color: 'var(--ink)' }}
+                />
+                <span className="text-xl font-medium" style={{ color: 'var(--ink-secondary)' }}>
+                  日
+                </span>
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                <span style={{ color: 'var(--ink-secondary)' }}>
+                  残り
+                  <span className="tabular ml-0.5 font-semibold" style={{ color: 'var(--ink)' }}>
+                    {formatYen(payoff.remainingYen)}
+                  </span>
+                </span>
+                {payoff.payoffOn ? (
+                  <span style={{ color: 'var(--ink-muted)' }}>
+                    {formatDateJa(payoff.payoffOn)} 完済見込み
+                  </span>
+                ) : null}
+              </div>
+
+              {/* 残高のスナップショットだけでは「進んでいる」ことが伝わらない。
+                  減った分を出すことが、返済アプリの正のフィードバックそのもの。 */}
+              {payoff.reducedThisMonthYen > 0 ? (
+                <p
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                >
+                  <span aria-hidden>↓</span>
+                  今月{formatYen(payoff.reducedThisMonthYen)}減らした
+                </p>
+              ) : null}
+            </>
+          )}
+
+          <div className="mt-5">
+            <ProgressGauge
+              ratio={payoff.progressRatio}
+              label="返済済み"
+              nextMilestone={payoff.nextMilestone}
+            />
+          </div>
+
+          {/* リンクを本文に混ぜると行をまたいで割れる。行を分けて動線として立てる。 */}
+          {payoff.isEstimated ? (
+            <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+                残高と金利に推定値が含まれています。正確な値を入れると、この日付が確定します。
+              </p>
+              <a
+                href="/debts"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
+                style={{ color: 'var(--accent)' }}
+              >
+                負債を入力する
+                <span aria-hidden>→</span>
+              </a>
+            </div>
           ) : null}
         </div>
-
-        {payoff.daysRemaining === null ? (
-          <p className="mt-1 text-4xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
-            完済済み
-          </p>
-        ) : (
-          <>
-            <p className="mt-1 text-4xl font-semibold tracking-tight">
-              残り{payoff.daysRemaining.toLocaleString('ja-JP')}日
-            </p>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              残り{formatYen(payoff.remainingYen)}
-              {payoff.payoffOn ? ` ・ ${formatDateJa(payoff.payoffOn)}` : null}
-            </p>
-          </>
-        )}
-
-        <div className="mt-4">
-          <ProgressGauge ratio={payoff.progressRatio} label="返済済み" />
-        </div>
-
-        {/* ADR-006: 推定値が残るあいだ、完済予定日を確定値として見せない */}
-        {payoff.isEstimated ? (
-          <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-            残高と金利に推定値が含まれています。
-            <a href="/debts" className="underline underline-offset-2">
-              正確な値を入力する
-            </a>
-            と、この日付が確定します。
-          </p>
-        ) : null}
       </section>
 
-      {/* FR-14 / FR-64: 残額は肯定形で示す。責める文言を使わない。
+      {/* FR-14 / FR-64:残額は肯定形で示す。責める文言を使わない。
           ラベルも表示対象も categories から来る。ここに枠の名前を書かない(ADR-016)。 */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {tiles.map((tile) => (
-          <StatTile
-            key={tile.categoryId}
-            label={tile.label}
-            value={tile.remainingYen === null ? '予算なし' : formatSpendable(tile.remainingYen)}
-            sub={tile.budgetYen === null ? undefined : `予算 ${formatYen(tile.budgetYen)}`}
-            tone={tile.remainingYen === null || tile.remainingYen >= 0 ? 'neutral' : 'warn'}
-          />
-        ))}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {tiles.map((tile, index) => {
+          const tone = budgetTone(
+            {
+              categoryId: tile.categoryId,
+              code: tile.code,
+              budgetYen: tile.budgetYen,
+              carryOverYen: 0,
+              spentYen: tile.spentYen,
+              remainingYen: tile.remainingYen,
+              usageRatio: tile.usageRatio,
+              transactionCount: 0,
+            },
+            tile.code === 'sanctuary' ? 'sanctuary' : 'other',
+          );
+
+          return (
+            <div
+              key={tile.categoryId}
+              className="rise"
+              style={{ animationDelay: `${100 + index * 70}ms` }}
+            >
+              <StatTile
+                label={tile.label}
+                value={tile.remainingYen === null ? '予算なし' : formatSpendable(tile.remainingYen)}
+                valueParts={
+                  tile.remainingYen === null ? undefined : spendableParts(tile.remainingYen)
+                }
+                sub={
+                  tile.budgetYen === null
+                    ? undefined
+                    : `${formatYen(tile.spentYen)} / ${formatYen(tile.budgetYen)}`
+                }
+                ratio={tile.usageRatio}
+                tone={tone}
+                note={
+                  tile.usageRatio === null ? undefined : `${Math.round(tile.usageRatio * 100)}%`
+                }
+              />
+            </div>
+          );
+        })}
       </div>
 
       {tiles.length === 0 ? (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
           ホームに出す枠が選ばれていません。
-          <a href="/rules" className="underline underline-offset-2">
+          <a
+            href="/rules"
+            className="underline decoration-dotted underline-offset-4"
+            style={{ color: 'var(--accent)' }}
+          >
             カテゴリの設定
           </a>
           で表示したい枠を選んでください。
         </p>
       ) : null}
 
-      <p className="pt-2 text-xs text-neutral-400 dark:text-neutral-500">
-        表示中の数値は ADR-006 の仮置きです。Supabase 接続(M0-2 /
-        M0-3)後に実データへ切り替わります。
+      <p className="px-1 pt-0.5 text-[10px] opacity-70" style={{ color: 'var(--ink-muted)' }}>
+        数値は仮置き(ADR-006)。Supabase 接続後に実データへ切り替わります。
       </p>
     </div>
   );

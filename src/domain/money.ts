@@ -46,11 +46,35 @@ export function formatYen(value: number, options?: { sign?: 'auto' | 'never' }):
  * 残額がマイナスでも責めない文言にする(設計原則5)。
  */
 export function formatSpendable(remainingYen: number): string {
+  const { prefix, amount, suffix } = spendableParts(remainingYen);
+  return `${prefix}${amount}${suffix}`;
+}
+
+/**
+ * 同じ文言を、金額とそれ以外に分けて返す。
+ *
+ * 画面では金額だけを大きく組みたい。文字列を組み立ててから分解し直すと
+ * 文言の変更に追従できないため、分割はここで一度だけ行う。
+ * 文言そのものは formatSpendable と共通で、二重管理にならない。
+ */
+export function spendableParts(remainingYen: number): {
+  prefix: string;
+  amount: string;
+  suffix: string;
+} {
   assertYen(remainingYen, '残額');
   if (remainingYen >= 0) {
-    return `あと${remainingYen.toLocaleString('ja-JP')}円使える`;
+    return {
+      prefix: 'あと',
+      amount: `${remainingYen.toLocaleString('ja-JP')}円`,
+      suffix: '使える',
+    };
   }
-  return `予算を${Math.abs(remainingYen).toLocaleString('ja-JP')}円超えている`;
+  return {
+    prefix: '予算を',
+    amount: `${Math.abs(remainingYen).toLocaleString('ja-JP')}円`,
+    suffix: '超えている',
+  };
 }
 
 /**

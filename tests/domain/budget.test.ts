@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   budgetStatusFor,
+  budgetTone,
   hasReachedAlertThreshold,
   netAmountYen,
   summarizeBudgets,
@@ -196,5 +197,51 @@ describe('netAmountYen / totalSpentYen', () => {
   it('空なら 0', () => {
     expect(netAmountYen([])).toBe(0);
     expect(totalSpentYen([])).toBe(0);
+  });
+});
+
+describe('budgetTone(FR-20 / FR-64)', () => {
+  function status(budgetYen: number | null, spentYen: number) {
+    return budgetStatusFor(
+      { categoryId: 'c', code: 'x', budgetYen, carryOverYen: 0 },
+      budgetYen === null ? [] : [spend('c', -spentYen)],
+    );
+  }
+
+  it('余裕があれば normal', () => {
+    expect(budgetTone(status(20_000, 5_000), 'other')).toBe('normal');
+  });
+
+  it('閾値(既定70%)に達したら attention', () => {
+    expect(budgetTone(status(20_000, 14_000), 'other')).toBe('attention');
+  });
+
+  it('予算を超えたら over', () => {
+    expect(budgetTone(status(20_000, 25_000), 'other')).toBe('over');
+  });
+
+  it('聖域は閾値を超えても normal のまま(設計原則5・FR-64)', () => {
+    // 削減対象ではない枠を警告色に振ると「叱る家計簿」になる
+    expect(budgetTone(status(40_000, 31_200), 'sanctuary')).toBe('normal');
+    expect(budgetTone(status(40_000, 39_999), 'sanctuary')).toBe('normal');
+  });
+
+  it('聖域でも超過は隠さない(設計原則3は「叱らず見せる」)', () => {
+    expect(budgetTone(status(40_000, 45_000), 'sanctuary')).toBe('over');
+  });
+
+  it('同じ消化率でも、聖域とそれ以外で扱いが変わる', () => {
+    const usage78 = status(40_000, 31_200);
+    expect(budgetTone(usage78, 'other')).toBe('attention');
+    expect(budgetTone(usage78, 'sanctuary')).toBe('normal');
+  });
+
+  it('閾値は差し替えられる(app_settings.waste_alert_threshold)', () => {
+    expect(budgetTone(status(20_000, 11_000), 'other', 0.5)).toBe('attention');
+    expect(budgetTone(status(20_000, 11_000), 'other', 0.9)).toBe('normal');
+  });
+
+  it('予算未設定の枠は normal(超過の概念が無い)', () => {
+    expect(budgetTone(status(null, 100_000), 'other')).toBe('normal');
   });
 });

@@ -110,6 +110,40 @@ export function hasReachedAlertThreshold(status: BudgetStatus, threshold: number
 }
 
 /**
+ * 枠の状態。メーターの色と、添えるラベルを決める。
+ *
+ *   normal    まだ余裕がある
+ *   attention 閾値に達した(FR-20。既定 70%)
+ *   over      予算を超えた
+ */
+export type BudgetTone = 'normal' | 'attention' | 'over';
+
+/**
+ * 枠の状態を判定する。
+ *
+ * ── 聖域カテゴリを警告色にしない理由 ──────────────────────────
+ * 設計原則5「欲を敵にしない」と FR-64(残額は肯定形で表示)により、
+ * 聖域支出は削減対象ではない。使うために確保した枠であって、
+ * 70% 到達を咎める対象ではない。ここで警告色を出すと、
+ * 本システムが最も避けたい「叱る家計簿」になる。
+ *
+ * FR-20 の 70% 通知は浪費カテゴリを対象とした要件であり、聖域には及ばない。
+ *
+ * 超過だけは聖域でも隠さない。設計原則3は「叱らず見せる」であって、
+ * 「見せない」ではない。事実は出し、文言で咎めない(formatSpendable)。
+ */
+export function budgetTone(
+  status: BudgetStatus,
+  kind: 'sanctuary' | 'other',
+  threshold = 0.7,
+): BudgetTone {
+  if (status.remainingYen !== null && status.remainingYen < 0) return 'over';
+  if (kind === 'sanctuary') return 'normal';
+  if (status.usageRatio !== null && status.usageRatio >= threshold) return 'attention';
+  return 'normal';
+}
+
+/**
  * 収支の合計。振替と対象外を除いた実質の増減を返す。
  * 支出が負のまま返す(ADR-008 の符号規約を画面の手前まで保つ)。
  */

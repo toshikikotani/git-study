@@ -1,15 +1,143 @@
 @import 'tailwindcss';
 
+/* =============================================================================
+   デザイントークン
+
+   ── 面の作り方 ─────────────────────────────────────────────
+   境界線ではなく、同一色相の階調で層を作る。深紺のキャンバスに、
+   一段ずつ明るいサーフェスを重ねる。線が減ると画面が静かになり、
+   数字が前に出る。
+
+   ── 色は「お金の役割」に予約する ────────────────────────────
+   カテゴリごとに色を割り当てる案は捨てた。暗いサーフェスでは
+   紫と青が識別できず(通常視 ΔE 9.8)、マゼンタは超過の赤と衝突する
+   (ΔE 7.8)。カテゴリは本人が増やせるため、固定の色順も破綻する。
+   色が運ぶのは役割だけにし、カテゴリの識別はアイコンと名前で行う。
+
+     青   返済・予算の残り(進捗)
+     赤   予算超過・支出
+     緑   収入
+     琥珀 閾値到達の合図(点のみ。必ず文字を伴う)
+
+   同時に画面へ出る組み合わせを実測して全ペア PASS を確認している:
+     ホーム  青 × 赤   dark CVD ΔE 19.2 / 通常視 29.0、light 21.6 / 32.3
+     明細    緑 × 赤   dark CVD ΔE  6.5 / 通常視 27.5、light  8.3 / 29.8
+   CVD が 6〜8 の帯に入る緑×赤は、必ず符号か文字を併記して補う。
+   ============================================================================= */
+
+/* 書体は app/layout.tsx が next/font でセルフホストし、CSS 変数として渡す。
+   Inter を先に置くことで、英数字と数字は Inter、日本語は M PLUS 2 が受け持つ。
+   フォント取得前でも読めるよう、末尾に端末の既定を残す。 */
 @theme {
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    var(--font-inter), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
+    sans-serif;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+
+  /* 面(青みを含んだ階調) */
+  --plane: #eef1f6;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --hairline: rgba(10, 16, 32, 0.08);
+
+  /* 文字 */
+  --ink: #0a1020;
+  --ink-secondary: #4a5568;
+  --ink-muted: #78849b;
+
+  /* 役割の色 */
+  --accent: #2a78d6; /* 返済・残り */
+  --accent-track: #dceafc; /* 空のトラック(同一ランプの明るい段) */
+  --income: #0f8f60; /* 収入 */
+  --over: #e34948; /* 超過・支出 */
+  --over-track: #f9dfdf;
+  --attention: #b8860b; /* 閾値到達。点で使い、必ず文字を伴う */
+
+  --hero-glow: rgba(42, 120, 214, 0.09);
+  --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
 }
 
-html {
-  /* 数字を等幅にして、桁が変わっても金額が横に揺れないようにする */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --plane: #070b14;
+    --surface: #0d1424;
+    --surface-raised: #131c31;
+    --hairline: rgba(255, 255, 255, 0.07);
+
+    /* 純白は目が疲れる。少し落とす */
+    --ink: rgba(255, 255, 255, 0.93);
+    --ink-secondary: #9aa6bf;
+    --ink-muted: #6b7791;
+
+    --accent: #3987e5;
+    --accent-track: #16294a;
+    --income: #199e70;
+    --over: #e66767;
+    --over-track: #3d2027;
+    --attention: #fab219;
+
+    --hero-glow: rgba(57, 135, 229, 0.2);
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane: #070b14;
+  --surface: #0d1424;
+  --surface-raised: #131c31;
+  --hairline: rgba(255, 255, 255, 0.07);
+
+  --ink: rgba(255, 255, 255, 0.93);
+  --ink-secondary: #9aa6bf;
+  --ink-muted: #6b7791;
+
+  --accent: #3987e5;
+  --accent-track: #16294a;
+  --income: #199e70;
+  --over: #e66767;
+  --over-track: #3d2027;
+  --attention: #fab219;
+
+  --hero-glow: rgba(57, 135, 229, 0.2);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+body {
+  background: var(--plane);
+  color: var(--ink);
+}
+
+/* 大きな数字は比例数字で組む。tabular-nums は桁を 0 幅に揃えるため、
+   ヒーロー級のサイズだと字間が間延びして見える。等幅が要るのは
+   縦に並ぶ表と軸だけ(dataviz: marks-and-anatomy)。 */
+.tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
 }

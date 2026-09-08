@@ -51,6 +51,16 @@ export type HomeSummary = {
      * true のあいだ、完済予定日を確定値として表示してはならない。
      */
     isEstimated: boolean;
+    /**
+     * 今月これまでに減った残債(円、正の数)。
+     *
+     * 残高のスナップショットだけでは「進んでいる」ことが伝わらない。
+     * 負債返済アプリが例外なく持つ正のフィードバックはここから来る。
+     * 実績が無い月は 0。
+     */
+    reducedThisMonthYen: number;
+    /** 次に到達するマイルストーン(0.25 / 0.5 / 0.75 / 1)。達成済みなら null。 */
+    nextMilestone: number | null;
   };
   /** show_on_home が立っているカテゴリ。FR-61 のため最大2件に切る。 */
   tiles: HomeBudgetTile[];
@@ -102,7 +112,17 @@ export type PayoffInput = {
   /** 当初の負債総額。進捗ゲージの分母に使う。 */
   originalTotalYen: number;
   isEstimated: boolean;
+  /** 今月これまでの返済実績(円、正の数)。 */
+  reducedThisMonthYen: number;
 };
+
+/** 進捗ゲージに刻むマイルストーン。到達を祝うための節目。 */
+export const MILESTONES = [0.25, 0.5, 0.75, 1] as const;
+
+/** まだ到達していない最初のマイルストーン。全て達成済みなら null。 */
+export function nextMilestone(progressRatio: number): number | null {
+  return MILESTONES.find((m) => progressRatio < m) ?? null;
+}
 
 export function computePayoffSummary(
   input: PayoffInput,
@@ -119,6 +139,8 @@ export function computePayoffSummary(
       daysRemaining: null,
       progressRatio: 1,
       isEstimated: false,
+      reducedThisMonthYen: input.reducedThisMonthYen,
+      nextMilestone: null,
     };
   }
 
@@ -135,6 +157,8 @@ export function computePayoffSummary(
     daysRemaining: daysBetween(todayJst(now), summary.payoffOn),
     progressRatio,
     isEstimated: input.isEstimated,
+    reducedThisMonthYen: input.reducedThisMonthYen,
+    nextMilestone: nextMilestone(progressRatio),
   };
 }
 
@@ -194,6 +218,18 @@ const PLACEHOLDER_CATEGORIES: HomeCategory[] = [
   },
 ];
 
+/**
+ * 当月の支出の仮データ。M0-3 で transactions の読み出しに置き換わって消える。
+ *
+ * 意図的に「生活費は閾値超え・聖域は同程度でも平常」になる値にしてある。
+ * 聖域は削減対象ではないため警告色に振らない(設計原則5, FR-64)という
+ * budgetTone の分岐が、画面を開いた時点で目に見えるようにするため。
+ */
+const PLACEHOLDER_TRANSACTIONS: BudgetTransaction[] = [
+  { categoryId: 'cat-living', amountYen: -44_600, isTransfer: false, reviewStatus: 'auto_ok' },
+  { categoryId: 'cat-sanctuary', amountYen: -31_200, isTransfer: false, reviewStatus: 'auto_ok' },
+];
+
 export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSummary> {
   // TODO(M0-3): Supabase から debts / app_settings / categories / transactions を読む
   return {
@@ -201,11 +237,12 @@ export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSumma
       {
         debts: PLACEHOLDER_DEBTS,
         monthlyBudgetYen: 100_000, // app_settings.monthly_repayment_target_yen
-        originalTotalYen: 1_000_000,
+        originalTotalYen: 1_240_000, // 完済シミュレーション開始前の総額(既に一部返済済み)
         isEstimated: true,
+        reducedThisMonthYen: 96_400, // TODO(M1-6): debt_payments から集計する
       },
       now,
     ),
-    tiles: buildHomeTiles(PLACEHOLDER_CATEGORIES, []),
+    tiles: buildHomeTiles(PLACEHOLDER_CATEGORIES, PLACEHOLDER_TRANSACTIONS),
   };
 }

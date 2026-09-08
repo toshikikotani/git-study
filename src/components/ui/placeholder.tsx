@@ -12,13 +12,34 @@ export function Placeholder({
   description: string;
 }) {
   return (
-    <div className="space-y-3">
-      <h1 className="text-xl font-semibold">{title}</h1>
-      <p className="text-sm text-neutral-600 dark:text-neutral-300">{description}</p>
-      <p className="rounded-xl border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-        この画面は未実装です。<span className="font-mono">{taskId}</span> で実装します(TASKS.md
-        参照)。
+    <div className="rise space-y-4">
+      <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
+        {title}
+      </h1>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        {description}
       </p>
+      <div
+        className="rounded-2xl p-5"
+        style={{ background: 'var(--surface)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="size-1.5 rounded-full"
+            style={{ background: 'var(--ink-muted)' }}
+            aria-hidden
+          />
+          <span
+            className="text-[11px] font-medium tracking-[0.08em] uppercase"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            未実装
+          </span>
+        </div>
+        <p className="mt-2 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          <span className="font-mono font-medium">{taskId}</span> で実装します(TASKS.md 参照)。
+        </p>
+      </div>
     </div>
   );
 }

@@ -28,8 +28,26 @@ const serverSchema = z.object({
   CRON_SECRET: z.string().min(32, 'CRON_SECRET は 32 文字以上にしてください'),
 });
 
+/**
+ * Gmail 自動取得(ADR-018)。未設定でもアプリは動く。
+ * 設定されていれば取り込みジョブが有効になる。
+ *
+ * アプリパスワードは 16 文字。通常の Gmail パスワードでは接続できない
+ * (Google は 2025年5月に通常パスワードでの third-party アクセスを停止)。
+ */
+const gmailSchema = z.object({
+  GMAIL_ADDRESS: z.email({ error: 'Gmail のアドレスを設定してください' }),
+  GMAIL_APP_PASSWORD: z
+    .string()
+    .transform((v) => v.replace(/\s/g, ''))
+    .refine((v) => v.length === 16, {
+      error: 'アプリパスワードは16文字です。通常のパスワードでは接続できません',
+    }),
+});
+
 export type PublicEnv = z.infer<typeof publicSchema>;
 export type ServerEnv = z.infer<typeof serverSchema>;
+export type GmailEnv = z.infer<typeof gmailSchema>;
 
 function parseOrThrow<T extends z.ZodType>(schema: T, source: unknown, label: string): z.infer<T> {
   const result = schema.safeParse(source);
@@ -74,5 +92,22 @@ export function getServerEnv(): ServerEnv {
   );
 }
 
+/**
+ * Gmail の資格情報。未設定なら null を返す(機能が無効なだけで、エラーではない)。
+ * 中途半端に片方だけ設定されている場合は、黙って無効化せずエラーにする。
+ */
+export function getGmailEnv(): GmailEnv | null {
+  const address = process.env.GMAIL_ADDRESS;
+  const password = process.env.GMAIL_APP_PASSWORD;
+
+  if (!address && !password) return null;
+
+  return parseOrThrow(
+    gmailSchema,
+    { GMAIL_ADDRESS: address, GMAIL_APP_PASSWORD: password },
+    'Gmail 連携の設定',
+  );
+}
+
 /** テスト用に schema を公開する。実行時の検証には getPublicEnv / getServerEnv を使う。 */
-export const schemas = { publicSchema, serverSchema };
+export const schemas = { publicSchema, serverSchema, gmailSchema };
