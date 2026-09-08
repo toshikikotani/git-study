@@ -11,9 +11,9 @@ export function StatTile({
 }: {
   label: string;
   value: string;
-  sub?: string;
-  tone?: 'neutral' | 'positive' | 'warn';
-  badge?: string;
+  sub?: string | undefined;
+  tone?: 'neutral' | 'positive' | 'warn' | undefined;
+  badge?: string | undefined;
 }) {
   const toneClass = {
     neutral: 'text-neutral-900 dark:text-neutral-50',

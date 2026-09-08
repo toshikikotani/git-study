@@ -67,19 +67,24 @@ begin
   values (p_user_id)
   on conflict (user_id) do nothing;
 
-  -- カテゴリ(FR-11 の初期値8種)
+  -- カテゴリ(FR-11 の初期値)。
+  --
+  -- name はあくまで初期値であり、本人がいつでも変更できる(FR-13, ADR-016)。
+  -- 変えても壊れないのは、コードとルールが参照するのが code と kind だけだからである。
+  -- 予算額もここに置く。app_settings 側には持たない(二重定義を避ける)。
+  -- show_on_home はホーム最上部に残額を出す枠。これも本人が選び直せる(FR-61)。
   insert into public.categories
-    (user_id, code, name, kind, default_monthly_budget_yen, sort_order, is_system)
+    (user_id, code, name, kind, default_monthly_budget_yen, sort_order, is_system, show_on_home)
   values
-    (p_user_id, 'fixed_cost',          '固定費',       'fixed_cost',          100000, 10, true),
-    (p_user_id, 'living',              '生活費',       'living',               60000, 20, true),
-    (p_user_id, 'sanctuary',           '女遊び(聖域)', 'sanctuary',           40000, 30, true),
-    (p_user_id, 'waste',               '浪費',         'waste',                20000, 40, true),
-    (p_user_id, 'investment_spending', '投資的支出',   'investment_spending',  10000, 50, true),
-    (p_user_id, 'repayment',           '返済',         'repayment',              null, 60, true),
-    (p_user_id, 'investment',          '投資',         'investment',             null, 70, true),
-    (p_user_id, 'income',              '収入',         'income',                 null, 80, true),
-    (p_user_id, 'transfer',            '口座間振替',   'transfer',               null, 90, true)
+    (p_user_id, 'fixed_cost',          '固定費',       'fixed_cost',          100000, 10, true, false),
+    (p_user_id, 'living',              '生活費',       'living',               60000, 20, true, true),
+    (p_user_id, 'sanctuary',           '聖域',         'sanctuary',            40000, 30, true, true),
+    (p_user_id, 'waste',               '浪費',         'waste',                20000, 40, true, false),
+    (p_user_id, 'investment_spending', '投資的支出',   'investment_spending',  10000, 50, true, false),
+    (p_user_id, 'repayment',           '返済',         'repayment',              null, 60, true, false),
+    (p_user_id, 'investment',          '投資',         'investment',             null, 70, true, false),
+    (p_user_id, 'income',              '収入',         'income',                 null, 80, true, false),
+    (p_user_id, 'transfer',            '口座間振替',   'transfer',               null, 90, true, false)
   on conflict (user_id, code) do nothing;
 
   select id into v_cat_sanctuary from public.categories
@@ -108,7 +113,7 @@ begin
   values
     (p_user_id, '返済へ',       'payday', 1, 'fixed',     100000, null),
     (p_user_id, '投資へ',       'payday', 2, 'fixed',      20000, null),
-    (p_user_id, '女遊び枠へ',   'payday', 3, 'fixed',      40000, v_cat_sanctuary),
+    (p_user_id, '聖域枠へ',     'payday', 3, 'fixed',      40000, v_cat_sanctuary),
     (p_user_id, '生活費へ',     'payday', 4, 'remainder',   null, v_cat_living)
   on conflict (user_id, name) do nothing;
 

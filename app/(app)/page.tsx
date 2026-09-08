@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const summary = await loadHomeSummary();
-  const { payoff, living, sanctuary } = summary;
+  const { payoff, tiles } = summary;
 
   return (
     <div className="space-y-4">
@@ -55,21 +55,29 @@ export default async function HomePage() {
         ) : null}
       </section>
 
-      {/* FR-14 / FR-64: 残額は肯定形で示す。責める文言を使わない */}
+      {/* FR-14 / FR-64: 残額は肯定形で示す。責める文言を使わない。
+          ラベルも表示対象も categories から来る。ここに枠の名前を書かない(ADR-016)。 */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatTile
-          label="生活費"
-          value={formatSpendable(living.remainingYen)}
-          sub={`予算 ${formatYen(living.budgetYen)}`}
-          tone={living.remainingYen >= 0 ? 'neutral' : 'warn'}
-        />
-        <StatTile
-          label="女遊び枠"
-          value={formatSpendable(sanctuary.remainingYen)}
-          sub={`予算 ${formatYen(sanctuary.budgetYen)}`}
-          tone={sanctuary.remainingYen >= 0 ? 'positive' : 'warn'}
-        />
+        {tiles.map((tile) => (
+          <StatTile
+            key={tile.categoryId}
+            label={tile.label}
+            value={tile.remainingYen === null ? '予算なし' : formatSpendable(tile.remainingYen)}
+            sub={tile.budgetYen === null ? undefined : `予算 ${formatYen(tile.budgetYen)}`}
+            tone={tile.remainingYen === null || tile.remainingYen >= 0 ? 'neutral' : 'warn'}
+          />
+        ))}
       </div>
+
+      {tiles.length === 0 ? (
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          ホームに出す枠が選ばれていません。
+          <a href="/rules" className="underline underline-offset-2">
+            カテゴリの設定
+          </a>
+          で表示したい枠を選んでください。
+        </p>
+      ) : null}
 
       <p className="pt-2 text-xs text-neutral-400 dark:text-neutral-500">
         表示中の数値は ADR-006 の仮置きです。Supabase 接続(M0-2 /

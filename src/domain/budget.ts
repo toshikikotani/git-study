@@ -87,7 +87,7 @@ export function summarizeBudgets(
   });
 }
 
-/** 1カテゴリ分だけを出す。ホームの生活費・女遊び枠で使う。 */
+/** 1カテゴリ分だけを出す。ホームに並べる枠(categories.show_on_home)で使う。 */
 export function budgetStatusFor(
   budget: CategoryBudget,
   transactions: readonly BudgetTransaction[],

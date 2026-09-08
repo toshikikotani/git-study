@@ -295,9 +295,9 @@ create table public.app_settings (
   payday                              smallint     not null default 25,
   timezone                            text         not null default 'Asia/Tokyo',
 
-  -- 予算(ADR-004)
-  sanctuary_monthly_budget_yen        bigint       not null default 40000,
-  living_monthly_budget_yen           bigint       not null default 60000,
+  -- カテゴリ別の月次予算はここに置かない。categories.default_monthly_budget_yen と
+  -- budgets テーブルが正(ADR-016)。設定側にも金額を持つと二重定義になり、
+  -- 本人が片方だけ直したときに残額表示が静かにずれる。
 
   -- 返済・投資のルール(ADR-003, ADR-013)
   repayment_strategy                  repayment_strategy not null default 'avalanche',
@@ -339,8 +339,6 @@ create table public.app_settings (
        and classification_confidence_threshold between 0 and 1),
   constraint ck_app_settings_amounts
     check (monthly_take_home_yen        >= 0
-       and sanctuary_monthly_budget_yen >= 0
-       and living_monthly_budget_yen    >= 0
        and monthly_repayment_target_yen >= 0),
   constraint ck_app_settings_inactivity
     check (inactivity_alert_days between 1 and 30),
@@ -409,8 +407,11 @@ create table public.categories (
   id                 uuid primary key default gen_random_uuid(),
   user_id            uuid          not null references auth.users(id) on delete cascade,
 
-  code               text          not null,  -- 安定した識別子。ルールやコードから参照する
-  name               text          not null,  -- 表示名。本人が自由に変更してよい
+  -- 安定した識別子。コード・ルール・シードから参照する。画面には出さない。
+  code               text          not null,
+  -- 表示名。画面に出るのは常にこの値で、本人が自由に変更してよい(FR-13, ADR-016)。
+  -- アプリ側は名前で分岐してはならない。分岐は code と kind だけを見ること。
+  name               text          not null,
   kind               category_kind not null,
   parent_id          uuid          references public.categories(id) on delete set null,
 
@@ -420,6 +421,10 @@ create table public.categories (
   color              text,
   sort_order         smallint      not null default 100,
   is_active          boolean       not null default true,
+
+  -- ホーム画面に残額を出すカテゴリ(FR-14, FR-61)。
+  -- どの枠を最上位に置くかは本人が決める。表示は sort_order の先頭2件まで。
+  show_on_home       boolean       not null default false,
 
   -- 統廃合(FR-13):消さずに移行先を指す
   merged_into_id     uuid          references public.categories(id) on delete set null,
@@ -444,6 +449,16 @@ create unique index ux_categories_user_code on public.categories (user_id, code)
 create index ix_categories_user_active      on public.categories (user_id, is_active, sort_order);
 create index ix_categories_user_kind        on public.categories (user_id, kind);
 create index ix_categories_parent           on public.categories (parent_id) where parent_id is not null;
+-- ホームは毎回開かれる画面。表示対象だけを引く部分索引で小さく保つ。
+create index ix_categories_show_on_home     on public.categories (user_id, sort_order)
+  where show_on_home and is_active;
+
+comment on column public.categories.name is
+  '画面に出る表示名。本人がいつでも変更できる(FR-13)。アプリ側はこの値で分岐してはならない。';
+comment on column public.categories.code is
+  'コードとルールが参照する不変の識別子。画面には出さないため、表示名を変えてもここは変わらない。';
+comment on column public.categories.show_on_home is
+  'ホーム最上部に残額を出すか。どの枠を見たいかは本人が決める(FR-14, FR-61)。';
 
 
 -- -----------------------------------------------------------------------------
@@ -1817,19 +1832,24 @@ begin
   values (p_user_id)
   on conflict (user_id) do nothing;
 
-  -- カテゴリ(FR-11 の初期値8種)
+  -- カテゴリ(FR-11 の初期値)。
+  --
+  -- name はあくまで初期値であり、本人がいつでも変更できる(FR-13, ADR-016)。
+  -- 変えても壊れないのは、コードとルールが参照するのが code と kind だけだからである。
+  -- 予算額もここに置く。app_settings 側には持たない(二重定義を避ける)。
+  -- show_on_home はホーム最上部に残額を出す枠。これも本人が選び直せる(FR-61)。
   insert into public.categories
-    (user_id, code, name, kind, default_monthly_budget_yen, sort_order, is_system)
+    (user_id, code, name, kind, default_monthly_budget_yen, sort_order, is_system, show_on_home)
   values
-    (p_user_id, 'fixed_cost',          '固定費',       'fixed_cost',          100000, 10, true),
-    (p_user_id, 'living',              '生活費',       'living',               60000, 20, true),
-    (p_user_id, 'sanctuary',           '女遊び(聖域)', 'sanctuary',           40000, 30, true),
-    (p_user_id, 'waste',               '浪費',         'waste',                20000, 40, true),
-    (p_user_id, 'investment_spending', '投資的支出',   'investment_spending',  10000, 50, true),
-    (p_user_id, 'repayment',           '返済',         'repayment',              null, 60, true),
-    (p_user_id, 'investment',          '投資',         'investment',             null, 70, true),
-    (p_user_id, 'income',              '収入',         'income',                 null, 80, true),
-    (p_user_id, 'transfer',            '口座間振替',   'transfer',               null, 90, true)
+    (p_user_id, 'fixed_cost',          '固定費',       'fixed_cost',          100000, 10, true, false),
+    (p_user_id, 'living',              '生活費',       'living',               60000, 20, true, true),
+    (p_user_id, 'sanctuary',           '聖域',         'sanctuary',            40000, 30, true, true),
+    (p_user_id, 'waste',               '浪費',         'waste',                20000, 40, true, false),
+    (p_user_id, 'investment_spending', '投資的支出',   'investment_spending',  10000, 50, true, false),
+    (p_user_id, 'repayment',           '返済',         'repayment',              null, 60, true, false),
+    (p_user_id, 'investment',          '投資',         'investment',             null, 70, true, false),
+    (p_user_id, 'income',              '収入',         'income',                 null, 80, true, false),
+    (p_user_id, 'transfer',            '口座間振替',   'transfer',               null, 90, true, false)
   on conflict (user_id, code) do nothing;
 
   select id into v_cat_sanctuary from public.categories
@@ -1858,7 +1878,7 @@ begin
   values
     (p_user_id, '返済へ',       'payday', 1, 'fixed',     100000, null),
     (p_user_id, '投資へ',       'payday', 2, 'fixed',      20000, null),
-    (p_user_id, '女遊び枠へ',   'payday', 3, 'fixed',      40000, v_cat_sanctuary),
+    (p_user_id, '聖域枠へ',     'payday', 3, 'fixed',      40000, v_cat_sanctuary),
     (p_user_id, '生活費へ',     'payday', 4, 'remainder',   null, v_cat_living)
   on conflict (user_id, name) do nothing;
 
