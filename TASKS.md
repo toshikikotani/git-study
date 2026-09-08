@@ -62,7 +62,6 @@ M1-2 が終わったことで M1-3 が Next の先頭に上がった。上から
 ### S2 明細の取り込みと分類
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M2-4 | Claude Haiku 4.5 によるバッチ分類 | M | M2-3 |
 | M2-5 | 確認待ちキューと修正のルール化(学習) | M | M2-4 |
 | M2-6 | カテゴリ・ルール編集画面(改名 / 予算 / ホーム表示枠の選択 / 統廃合) | M | M2-5 |
 
@@ -108,7 +107,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-5 | `/transactions` `/payday` `/rules` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定(`/debts` は M1-2 で実画面化済み) |
 | T-6 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証する | 現在は手で揃えている。`supabase gen types` が入ったら派生させる(M0-2 後) |
 | T-7 | `TransactionStore` の Supabase 実装を足す | 現在は sessionStorage 実装。画面は差し替えだけで動く(M0-3) |
-| T-8 | 取り込んだ明細を AI 分類へ回す | いまはルールに当たらないものが全て「確認待ち」。M2-4 で分類する |
+| T-8 | 取り込んだ明細を AI 分類へ回す | 分類する関数自体(M2-4)は完成。取り込み経路への接続は M2-3b で行う。それまではルールに当たらないものが全て「確認待ち」のまま |
 | T-9 | 列マッピングを `import_adapters` に保存して再利用する | 現在は毎回推測。同じ形式を繰り返すなら保存した方が早い(M0-3 後) |
 | T-11 | AI が救済したメールの書式をラベル辞書へ還元する | AI に回った本文を残しておけば、辞書に語を足して費用ゼロの経路へ戻せる(ADR-019) |
 | T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
@@ -160,6 +159,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-17 | Magic Link のリンク先が localhost になるバグを修正。原因は Supabase の Site URL が既定値 `http://localhost:3000` のままだったこと。`config/auth` API で `site_url` を本番 URL へ、`uri_allow_list` に本番 URL とローカル開発用ポートを設定。実際にリンクを発行して本番 URL へリダイレクトされることを確認 | 2026-09-08 |
 | T-18 | 負債タブ等の切り替えが遅い不具合を修正。原因は Vercel の Function リージョンが `iad1`(米国東部)、Supabase が Tokyo で、動的ページ1回の描画のたびに太平洋を2往復していたこと。`serverlessFunctionRegion` と `functionDefaultRegions` を `hnd1`(東京)へ変更し再デプロイ | 2026-09-08 |
 | T-19 | タブ切り替え直後にローディング表示を出す。`src/components/ui/skeleton.tsx` と、ホーム・`/debts` それぞれの `loading.tsx`(Next.js の規約、データ取得中は自動でこちらが出る)を追加。Playwright で実際にクリック直後スケルトンが出て、データ到着後に本来の内容(カードA・推定バッジ)へ差し替わることを確認 | 2026-09-08 |
+| M2-4 | `src/features/classification/ai.ts` — Claude Haiku 4.5 によるバッチ分類。**関数自体のみ**(本人の選択により、取り込み経路への接続は M2-3b で別途行う)。`ClaudeTransactionClassifier.classifyMany()` が既定40件ずつに分けてリクエストし(100件は3リクエスト以内)、カテゴリは uuid でなく `code` でやり取り(トークン節約・改名耐性)。応答件数が入力と不一致なら当て推量せずバッチ全体を確認待ちにする、選択肢に無い code は null 扱いにするなど、モデルの出力を信用しきらない設計はメール抽出(ADR-019)と同型。`applyConfidenceThreshold()` で「AI がどう思ったか」と「閾値を信用するかどうか」を分離(ADR-010)。テスト13件追加(偽 client によるバッチ分割・失敗時の握り潰さない挙動・閾値境界)。あわせて `app_settings.classification_model` の既定値に日付サフィックス付きモデル ID(`claude-haiku-4-5-20251001`)が紛れ込んでいた誤りを発見し、修正マイグレーションと `docs/schema.sql` を追加(本番 DB への適用は未実施。既存の分類コードはこの設定値を参照せず定数で動くため、現時点でこのバグが機能をブロックすることはない) | 2026-09-08 |
 | M4-2 | ホームの残額表示を実データに接続。`loadHomeSummary()` が Supabase から debts / app_settings / categories / budgets(当月分。無ければ `default_monthly_budget_yen` で代用)/ transactions(当月・対象カテゴリ)/ debt_payments(当月の元本減少)を読むよう差し替え、`PLACEHOLDER_*` を削除。あわせて `debts.original_principal_yen` をフォームに追加(任意入力。進捗ゲージの分母。未入力なら現在残高で代用し、その負債単体の進捗は0%からになる)。`loadHomeSummary()` は Supabase(`next/headers` の `cookies()`)に触れる関数になったためユニットテストの対象から外し(純粋関数の `buildHomeTiles`/`computePayoffSummary` は継続してテスト)、実データでの検証は本セッション内で一時セッションを発行してホーム画面を実際に描画し確認した(残債合計1,000,000円、生活費・聖域タイルとも実データ(0円)で表示) | 2026-09-08 |
 
 ---
