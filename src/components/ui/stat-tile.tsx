@@ -1,60 +1,90 @@
+import type { BudgetTone } from '@/domain/budget';
+import { Meter } from './meter';
+
 /**
- * ホームに並ぶ数字1個分の枠(FR-61)。
- * 数字が主役。ラベルと補足は小さく、視線が数字に落ちるようにする。
+ * 残額タイル(FR-14, FR-64)。
+ *
+ * dataviz の stat tile 契約に沿う: label(そのまま文、コロンなし)・value・
+ * 補足・メーター。値が主役で、ラベルと補足は退く。
+ *
+ * 状態は色だけで運ばない。閾値に達したときも超過したときも、
+ * 必ず文字のバッジを添える(ステータス色は単独で意味を持たせない)。
  */
 export function StatTile({
   label,
   value,
   sub,
-  tone = 'neutral',
-  badge,
+  ratio,
+  tone,
+  note,
 }: {
   label: string;
   value: string;
   sub?: string | undefined;
-  tone?: 'neutral' | 'positive' | 'warn' | undefined;
-  badge?: string | undefined;
+  ratio?: number | null | undefined;
+  tone?: BudgetTone | undefined;
+  /** バッジに出す短い注記。「予算の 75%」など。 */
+  note?: string | undefined;
 }) {
-  const toneClass = {
-    neutral: 'text-neutral-900 dark:text-neutral-50',
-    positive: 'text-emerald-700 dark:text-emerald-400',
-    warn: 'text-amber-700 dark:text-amber-400',
-  }[tone];
+  const resolvedTone: BudgetTone = tone ?? 'normal';
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-neutral-500 dark:text-neutral-400">{label}</span>
-        {badge ? (
-          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-            {badge}
-          </span>
-        ) : null}
+    <div
+      className="rounded-2xl p-5 ring-1"
+      style={{
+        background: 'var(--surface)',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          {label}
+        </span>
+        {note ? <ToneBadge tone={resolvedTone} text={note} /> : null}
       </div>
-      <p className={`mt-1 text-3xl font-semibold tracking-tight ${toneClass}`}>{value}</p>
-      {sub ? <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{sub}</p> : null}
+
+      <p
+        className="mt-2 text-2xl leading-tight font-semibold tracking-tight"
+        style={{ color: 'var(--ink)' }}
+      >
+        {value}
+      </p>
+
+      {ratio !== undefined ? (
+        <div className="mt-4">
+          <Meter ratio={ratio} tone={resolvedTone} label={`${label}の消化`} />
+        </div>
+      ) : null}
+
+      {sub ? (
+        <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          {sub}
+        </p>
+      ) : null}
     </div>
   );
 }
 
-/** 完済の進捗ゲージ(FR-63)。 */
-export function ProgressGauge({ ratio, label }: { ratio: number; label: string }) {
-  const percent = Math.round(Math.min(Math.max(ratio, 0), 1) * 100);
+/**
+ * 状態バッジ。ステータス色は必ずこの文字ラベルと対で出す。
+ * 色覚特性や強制カラーモードで色が落ちても、意味が残るようにするため。
+ */
+function ToneBadge({ tone, text }: { tone: BudgetTone; text: string }) {
+  const color = {
+    normal: 'var(--ink-muted)',
+    attention: 'var(--warning)',
+    over: 'var(--critical)',
+  }[tone];
+
   return (
-    <div>
-      <div
-        className="h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"
-        role="progressbar"
-        aria-valuenow={percent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={label}
-      >
-        <div className="h-full rounded-full bg-emerald-600" style={{ width: `${percent}%` }} />
-      </div>
-      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-        {label} {percent}%
-      </p>
-    </div>
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium">
+      <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
+      <span style={{ color: tone === 'normal' ? 'var(--ink-muted)' : 'var(--ink-secondary)' }}>
+        {text}
+      </span>
+    </span>
   );
 }

@@ -194,6 +194,18 @@ const PLACEHOLDER_CATEGORIES: HomeCategory[] = [
   },
 ];
 
+/**
+ * 当月の支出の仮データ。M0-3 で transactions の読み出しに置き換わって消える。
+ *
+ * 意図的に「生活費は閾値超え・聖域は同程度でも平常」になる値にしてある。
+ * 聖域は削減対象ではないため警告色に振らない(設計原則5, FR-64)という
+ * budgetTone の分岐が、画面を開いた時点で目に見えるようにするため。
+ */
+const PLACEHOLDER_TRANSACTIONS: BudgetTransaction[] = [
+  { categoryId: 'cat-living', amountYen: -44_600, isTransfer: false, reviewStatus: 'auto_ok' },
+  { categoryId: 'cat-sanctuary', amountYen: -31_200, isTransfer: false, reviewStatus: 'auto_ok' },
+];
+
 export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSummary> {
   // TODO(M0-3): Supabase から debts / app_settings / categories / transactions を読む
   return {
@@ -201,11 +213,11 @@ export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSumma
       {
         debts: PLACEHOLDER_DEBTS,
         monthlyBudgetYen: 100_000, // app_settings.monthly_repayment_target_yen
-        originalTotalYen: 1_000_000,
+        originalTotalYen: 1_240_000, // 完済シミュレーション開始前の総額(既に一部返済済み)
         isEstimated: true,
       },
       now,
     ),
-    tiles: buildHomeTiles(PLACEHOLDER_CATEGORIES, []),
+    tiles: buildHomeTiles(PLACEHOLDER_CATEGORIES, PLACEHOLDER_TRANSACTIONS),
   };
 }

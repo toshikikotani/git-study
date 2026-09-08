@@ -1,15 +1,132 @@
 @import 'tailwindcss';
 
+/* =============================================================================
+   デザイントークン
+
+   配色は検証済みパレットに準拠し、実際に使う組み合わせを
+   scripts/validate_palette.js(dataviz)に通して確認している。
+
+     メーター2段  青 #2a78d6 / 赤 #e34948(light)、#3987e5 / #e66767(dark)
+       → CVD 分離 ΔE 21.6 / 19.2、通常視 ΔE 32.3 / 29.0、対サーフェス 3:1 以上
+     ステータス   good #0ca30c / warning #fab219 / critical #d03b3b(固定・非テーマ)
+       → 色だけで意味を運ばない。必ずラベルを添える
+
+   dark 値は light の自動反転ではなく、暗いサーフェス用に選び直したもの。
+   ============================================================================= */
+
 @theme {
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+
+  /* 面 */
+  --plane: #f4f4f1; /* ページの地 */
+  --surface: #fcfcfb; /* カード */
+  --surface-raised: #ffffff; /* ヒーローカード */
+  --hairline: rgba(11, 11, 11, 0.1);
+
+  /* 文字 */
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+
+  /* データ */
+  --accent: #2a78d6;
+  --accent-soft: #dceafc; /* メーターの残り部分(同一ランプの明るい段) */
+  --over: #e34948; /* 予算超過 */
+  --over-soft: #f8dcdc;
+
+  /* ステータス(固定・必ずラベルと併記) */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+
+  --hero-glow: rgba(42, 120, 214, 0.1);
 }
 
-html {
-  /* 数字を等幅にして、桁が変わっても金額が横に揺れないようにする */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --plane: #0b0b0b;
+    --surface: #141413;
+    --surface-raised: #1a1a19;
+    --hairline: rgba(255, 255, 255, 0.1);
+
+    --ink: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+
+    --accent: #3987e5;
+    --accent-soft: #10233f;
+    --over: #e66767;
+    --over-soft: #3a1c1c;
+
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #d03b3b;
+
+    --hero-glow: rgba(57, 135, 229, 0.16);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane: #0b0b0b;
+  --surface: #141413;
+  --surface-raised: #1a1a19;
+  --hairline: rgba(255, 255, 255, 0.1);
+
+  --ink: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+
+  --accent: #3987e5;
+  --accent-soft: #10233f;
+  --over: #e66767;
+  --over-soft: #3a1c1c;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+
+  --hero-glow: rgba(57, 135, 229, 0.16);
+}
+
+body {
+  background: var(--plane);
+  color: var(--ink);
+}
+
+/* 大きな数字は比例数字で組む。tabular-nums は桁を 0 幅に揃えるため、
+   ヒーロー級のサイズだと字間が間延びして見える。等幅が要るのは
+   縦に並ぶ表と軸だけ(dataviz: marks-and-anatomy)。 */
+.tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* 入場。数字が「立ち上がる」ことで、開いた瞬間に視線が最上部へ向く。 */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
 }
