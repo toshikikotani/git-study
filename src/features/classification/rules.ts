@@ -69,6 +69,43 @@ export class RuleError extends Error {
 }
 
 /**
+ * FR-21 の検知ルール(seed_defaults が投入するものと同じ定義。docs/schema.sql §8)。
+ *
+ * CSV 取り込み・メール貼り付けのどちらも、Supabase 未接続のいま DB からは
+ * 読めないため、ここに1箇所だけ持つ。取り込み経路が増えても、ここを
+ * 直せば全員に効く(以前は取り込み画面ごとに複製されていた)。
+ */
+export const DEFAULT_DETECTION_RULES: readonly ClassificationRule[] = [
+  {
+    id: 'd1',
+    name: 'リボ払いの検知',
+    priority: 1,
+    matchType: 'regex',
+    pattern: '(リボ|ﾘﾎﾞ|revolving|リボルビング)',
+    setPaymentMethod: 'revolving',
+    isActive: true,
+  },
+  {
+    id: 'd2',
+    name: 'キャッシングの検知',
+    priority: 2,
+    matchType: 'regex',
+    pattern: '(キャッシング|ｷｬｯｼﾝｸﾞ|CASHING|カードローン|ATM借入)',
+    setPaymentMethod: 'cashing',
+    isActive: true,
+  },
+  {
+    id: 'd3',
+    name: '分割払いの検知',
+    priority: 3,
+    matchType: 'regex',
+    pattern: '(分割|[0-9]+回払|ボーナス払)',
+    setPaymentMethod: 'installment',
+    isActive: true,
+  },
+];
+
+/**
  * ルールを適用する。
  *
  * どのルールにも当たらなければ categoryId は null のまま返る。

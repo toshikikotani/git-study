@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { Card } from '@/components/ui/card';
+
 /**
  * Gmail 自動取得の設定案内(ADR-018)。
  *
@@ -24,10 +26,7 @@ export default function GmailSettingsPage() {
         キャッシングを月末を待たずにその日のうちに検知できます。
       </p>
 
-      <section
-        className="rounded-3xl p-5"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      >
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           設定手順
         </h2>
@@ -62,12 +61,9 @@ export default function GmailSettingsPage() {
           <br />
           アプリパスワードはメールの読み取りにのみ使われ、同じ画面からいつでも 失効させられます。
         </div>
-      </section>
+      </Card>
 
-      <section
-        className="rounded-3xl p-5"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      >
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           安全のために
         </h2>
@@ -77,7 +73,7 @@ export default function GmailSettingsPage() {
           <li>・読み取りは指定したカード会社の差出人に限定できます</li>
           <li>・取り込み済みのメールは二度読みません</li>
         </ul>
-      </section>
+      </Card>
 
       <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
         現在は未設定です。設定が済むまでは

@@ -113,6 +113,10 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-8 | 取り込んだ明細を AI 分類へ回す | いまはルールに当たらないものが全て「確認待ち」。M2-4 で分類する |
 | T-9 | 列マッピングを `import_adapters` に保存して再利用する | 現在は毎回推測。同じ形式を繰り返すなら保存した方が早い(M0-3 後) |
 | T-11 | AI が救済したメールの書式をラベル辞書へ還元する | AI に回った本文を残しておけば、辞書に語を足して費用ゼロの経路へ戻せる(ADR-019) |
+| T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
+| T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
+
+**T-12 は refactor(責務分離)の一環として認識しているが未着手。他は2026-09-08 の refactor セッションで着手した3画面の重複解消と mail-sync の分割のみ完了(下記 Done)。** 全体的な「5行ルール」適用は際限がないので、次に触る画面・関数から都度直す方針にする(一括では手を出さない)。
 
 ## Blocked
 
@@ -149,6 +153,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M2-7b | `ImapMailSource` の実装(imapflow + mailparser で `MailSource` を満たす。テストは偽クライアントで資格情報なしに実行) | 2026-09-08 |
 | M0-2 | Supabase プロジェクト作成(Tokyo リージョン)、マイグレーション9本を Management API 経由で適用、本人のアカウントで `seed_defaults()` 実行(カテゴリ9・ルール3・振替ルール4・シナリオ2)、`gen types typescript` で `src/lib/supabase/types.ts` 生成 | 2026-09-08 |
 | M0-3 | 認証(Magic Link、`shouldCreateUser: false` でサインアップ拒否)、`proxy.ts` による認証ガード(画面は `/login` へリダイレクト、API は 401)、`src/lib/supabase/{client,server,admin}.ts` の分離。副作用として T-10(`/api/import/email` の無認証呼び出し)を解消 | 2026-09-08 |
+| T-14 | リファクタ:取り込み3画面(CSV/貼り付け/Gmail設定)の重複排除と mail-sync の分割 | `DETECTION_RULES` の複製を `DEFAULT_DETECTION_RULES`(rules.ts)に一本化、共通 `<Card>`(components/ui)を切り出して9箇所のインライン複製を解消、「分類→StoredTransaction化→保存」を `features/transactions/import-pipeline.ts` に集約(CSV・貼り付け・mail-sync の3箇所が同じロジックを持っていた)。`syncFromMailbox`(82行)を `parseMessage` / `pushWarnings` に分割し、`import-pipeline.ts` の `buildPreview` を呼ぶ形にして3つ目の複製も解消。テスト10件追加、既存317件は無変更で通過。2026-09-08 |
 
 ---
 
