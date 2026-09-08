@@ -13,14 +13,16 @@
  * 直書きすると、本人が改名しても画面が変わらない。
  * ラベルは必ずデータから来る。分岐が要るときは code か kind を見る。
  *
- * ── データ源について ────────────────────────────────────────
- * 現在は ADR-006 の仮置き値を返す。Supabase 接続(M0-2/M0-3)が済んだら
- * loadHomeSummary() の中身だけを差し替える。呼び出し側と表示は変わらない。
+ * ── データ源について(M0-3 以降)────────────────────────────
+ * Supabase から実データを読む。RLS が本人の行だけに絞るので、
+ * ここでは user_id を意識しない(ADR-011)。
  */
 
 import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
 import { simulateTotalPayoff, summarizePayoff, type Debt } from '@/domain/payoff';
+import { listDebts } from '@/features/debts/store';
 import { daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
+import { createClient } from '@/lib/supabase/server';
 
 /** ホームに並ぶ残額タイル1枚分。 */
 export type HomeBudgetTile = {
@@ -162,87 +164,133 @@ export function computePayoffSummary(
   };
 }
 
-/**
- * ADR-006 の仮置きデータ。M0-2/M0-3 の完了後、ここを Supabase 読み出しに差し替える。
- * 仮値のまま画面を出すのは意図的で、この画面自体を棚卸しのフォームにするため。
- */
-const PLACEHOLDER_DEBTS: Debt[] = [
-  {
-    id: 'dddddddd-0000-0000-0000-000000000001',
-    balanceYen: 400_000,
-    annualRate: 0.15,
-    minimumPaymentYen: 10_000,
-    paymentDay: 27,
-  },
-  {
-    id: 'dddddddd-0000-0000-0000-000000000002',
-    balanceYen: 300_000,
-    annualRate: 0.15,
-    minimumPaymentYen: 8_000,
-    paymentDay: 27,
-  },
-  {
-    id: 'dddddddd-0000-0000-0000-000000000003',
-    balanceYen: 300_000,
-    annualRate: 0.18,
-    minimumPaymentYen: 9_000,
-    paymentDay: 5,
-  },
-];
-
-/**
- * DB の categories 行の代わり。M0-3 で Supabase 読み出しに置き換わって消える。
- * ここにある name は seed_defaults の初期値を写しただけで、本人が改名すれば
- * DB 側の値が使われる。表示名がコードに残るのはこの仮置きの間だけ(ADR-016)。
- */
-const PLACEHOLDER_CATEGORIES: HomeCategory[] = [
-  {
-    categoryId: 'cat-living',
-    code: 'living',
-    name: '生活費',
-    budgetYen: 60_000,
-    carryOverYen: 0,
-    sortOrder: 20,
-    showOnHome: true,
-    isActive: true,
-  },
-  {
-    categoryId: 'cat-sanctuary',
-    code: 'sanctuary',
-    name: '聖域',
-    budgetYen: 40_000,
-    carryOverYen: 0,
-    sortOrder: 30,
-    showOnHome: true,
-    isActive: true,
-  },
-];
-
-/**
- * 当月の支出の仮データ。M0-3 で transactions の読み出しに置き換わって消える。
- *
- * 意図的に「生活費は閾値超え・聖域は同程度でも平常」になる値にしてある。
- * 聖域は削減対象ではないため警告色に振らない(設計原則5, FR-64)という
- * budgetTone の分岐が、画面を開いた時点で目に見えるようにするため。
- */
-const PLACEHOLDER_TRANSACTIONS: BudgetTransaction[] = [
-  { categoryId: 'cat-living', amountYen: -44_600, isTransfer: false, reviewStatus: 'auto_ok' },
-  { categoryId: 'cat-sanctuary', amountYen: -31_200, isTransfer: false, reviewStatus: 'auto_ok' },
-];
-
 export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSummary> {
-  // TODO(M0-3): Supabase から debts / app_settings / categories / transactions を読む
+  const [payoffInput, categories] = await Promise.all([
+    loadPayoffInput(now),
+    listHomeCategories(now),
+  ]);
+  const transactions = await listMonthTransactions(
+    categories.map((c) => c.categoryId),
+    now,
+  );
+
   return {
-    payoff: computePayoffSummary(
-      {
-        debts: PLACEHOLDER_DEBTS,
-        monthlyBudgetYen: 100_000, // app_settings.monthly_repayment_target_yen
-        originalTotalYen: 1_240_000, // 完済シミュレーション開始前の総額(既に一部返済済み)
-        isEstimated: true,
-        reducedThisMonthYen: 96_400, // TODO(M1-6): debt_payments から集計する
-      },
-      now,
-    ),
-    tiles: buildHomeTiles(PLACEHOLDER_CATEGORIES, PLACEHOLDER_TRANSACTIONS),
+    payoff: computePayoffSummary(payoffInput, now),
+    tiles: buildHomeTiles(categories, transactions),
   };
+}
+
+/** 完済シミュレーションの入力を組み立てる。debts / app_settings / debt_payments を読む。 */
+async function loadPayoffInput(now: Date): Promise<PayoffInput> {
+  const [rows, monthlyBudgetYen, reducedThisMonthYen] = await Promise.all([
+    listDebts(),
+    loadMonthlyRepaymentTargetYen(),
+    loadReducedThisMonthYen(now),
+  ]);
+
+  return {
+    debts: rows.map((r) => ({
+      id: r.id,
+      balanceYen: r.currentBalanceYen,
+      annualRate: r.annualRate,
+      minimumPaymentYen: r.minimumPaymentYen,
+      paymentDay: r.paymentDay,
+    })),
+    monthlyBudgetYen,
+    // 当初元本が未入力の負債は、現在残高をそのまま分母に使う
+    // (その負債単体の進捗は 0% から始まり、実際に減った分だけ動く)。
+    originalTotalYen: rows.reduce(
+      (acc, r) => acc + (r.originalPrincipalYen ?? r.currentBalanceYen),
+      0,
+    ),
+    isEstimated: rows.some((r) => r.isEstimated),
+    reducedThisMonthYen,
+  };
+}
+
+async function loadMonthlyRepaymentTargetYen(): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('monthly_repayment_target_yen')
+    .single();
+  if (error) throw new Error(`設定を取得できませんでした: ${error.message}`);
+  return data.monthly_repayment_target_yen;
+}
+
+/** 今月の debt_payments 合計(元本部分)。M1-6 の返済記録が無ければ 0。 */
+async function loadReducedThisMonthYen(now: Date): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('debt_payments')
+    .select('principal_yen, amount_yen')
+    .gte('paid_on', monthStartJst(0, now));
+  if (error) throw new Error(`返済実績を取得できませんでした: ${error.message}`);
+  // 元本・利息の内訳が無い記録は、合計額をそのまま元本減少として扱う。
+  return data.reduce((acc, p) => acc + (p.principal_yen ?? p.amount_yen), 0);
+}
+
+/**
+ * ホームに出す候補カテゴリ(show_on_home = true)と、当月の予算額を組み立てる。
+ * budgets に当月の行が無いカテゴリは、categories.default_monthly_budget_yen を使う
+ * (毎月の予算行を作る仕組みはまだ無いため)。
+ */
+async function listHomeCategories(now: Date): Promise<HomeCategory[]> {
+  const supabase = await createClient();
+  const { data: categories, error } = await supabase
+    .from('categories')
+    .select('id, code, name, default_monthly_budget_yen, sort_order, show_on_home, is_active')
+    .eq('show_on_home', true)
+    .eq('is_active', true)
+    .order('sort_order');
+  if (error) throw new Error(`カテゴリを取得できませんでした: ${error.message}`);
+  if (categories.length === 0) return [];
+
+  const categoryIds = categories.map((c) => c.id);
+  const { data: budgets, error: budgetError } = await supabase
+    .from('budgets')
+    .select('category_id, amount_yen, carry_over_yen')
+    .eq('month', monthStartJst(0, now))
+    .in('category_id', categoryIds);
+  if (budgetError) throw new Error(`予算を取得できませんでした: ${budgetError.message}`);
+
+  const budgetByCategory = new Map(budgets.map((b) => [b.category_id, b]));
+
+  return categories.map((c) => {
+    const budget = budgetByCategory.get(c.id);
+    return {
+      categoryId: c.id,
+      code: c.code,
+      name: c.name,
+      budgetYen: budget?.amount_yen ?? c.default_monthly_budget_yen,
+      carryOverYen: budget?.carry_over_yen ?? 0,
+      sortOrder: c.sort_order,
+      showOnHome: c.show_on_home,
+      isActive: c.is_active,
+    };
+  });
+}
+
+/** 当月・指定カテゴリの明細。集計から外すもの(振替・対象外)は domain/budget.ts 側で判定する。 */
+async function listMonthTransactions(
+  categoryIds: readonly string[],
+  now: Date,
+): Promise<BudgetTransaction[]> {
+  if (categoryIds.length === 0) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('category_id, amount_yen, is_transfer, review_status')
+    .in('category_id', categoryIds)
+    .gte('occurred_on', monthStartJst(0, now))
+    .lt('occurred_on', monthStartJst(1, now));
+  if (error) throw new Error(`明細を取得できませんでした: ${error.message}`);
+
+  return data.map((t) => ({
+    categoryId: t.category_id,
+    amountYen: t.amount_yen,
+    isTransfer: t.is_transfer,
+    reviewStatus: t.review_status,
+  }));
 }

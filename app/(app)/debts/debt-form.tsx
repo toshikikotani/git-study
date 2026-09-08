@@ -62,6 +62,18 @@ export function DebtForm({
         />
       </Field>
 
+      <Field
+        label="当初元本(円・任意)"
+        hint="ホームの進捗表示に使います。分からなければ空欄で構いません"
+      >
+        <TextInput
+          name="originalPrincipalYen"
+          inputMode="numeric"
+          defaultValue={initial?.originalPrincipalYen ? String(initial.originalPrincipalYen) : ''}
+          required={false}
+        />
+      </Field>
+
       <Field label="最低返済額(円)">
         <TextInput
           name="minimumPaymentYen"

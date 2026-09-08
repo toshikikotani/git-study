@@ -41,7 +41,6 @@
 |---|---|---|---|
 | M1-3 | 完済シミュレーション画面(最低返済 vs 月X万円) | M | M1-1, M1-2 |
 | M3-2 | 残りの検知(FR-22 未取込 / FR-23 返済日前日)と alerts への積み上げ | M | M0-3 |
-| M4-2 | ホームの残額表示を実データに接続 | S | M4-1, M0-3 |
 | M4-3 | 振替ルール編集画面 | M | M0-3 |
 | M2-3b | 分類エンジンを取り込み経路へ接続する(ルール適用 → 保存) | S | M0-3, M2-2 |
 | M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3 |
@@ -106,8 +105,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 |---|---|---|
 | T-2 | CSV アダプタの fixture を実ファイル(匿名化)で用意する | 実フォーマットが判明してから |
 | T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
-| T-4 | ホームの数値を Supabase 読み出しに差し替える | 現在は `src/features/home/summary.ts` の仮置き。`loadHomeSummary()` の中身のみ差し替えれば済む |
-| T-5 | `/debts` `/transactions` `/payday` `/rules` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定 |
+| T-5 | `/transactions` `/payday` `/rules` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定(`/debts` は M1-2 で実画面化済み) |
 | T-6 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証する | 現在は手で揃えている。`supabase gen types` が入ったら派生させる(M0-2 後) |
 | T-7 | `TransactionStore` の Supabase 実装を足す | 現在は sessionStorage 実装。画面は差し替えだけで動く(M0-3) |
 | T-8 | 取り込んだ明細を AI 分類へ回す | いまはルールに当たらないものが全て「確認待ち」。M2-4 で分類する |
@@ -142,7 +140,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M0-4 | `src/lib/env.ts`(zod)、`.env.example`、CI(lint / format / typecheck / test / build / スキーマ検証) | 2026-09-08 |
 | M0-5 | ルートレイアウト、JST ヘルパ(`src/lib/date.ts`)、`formatYen()`、ホームの器 | 2026-09-08 |
 | M1-1 | `src/domain/payoff.ts` と SQL 関数の一致検証(golden fixture 方式、CI で乖離を検出) | 2026-09-08 |
-| M1-5 | ホームの完済カウントダウンと進捗ゲージ(数値は仮置き。T-4 で実データへ) | 2026-09-08 |
+| M1-5 | ホームの完済カウントダウンと進捗ゲージ(数値は仮置き。M4-2 で実データへ) | 2026-09-08 |
 | M2-1 | CSV パーサとアダプタ(Shift_JIS 自動判定 / RFC4180 / 和暦 / 出金入金2列 / 支払区分) | 2026-09-08 |
 | M2-2 | 明細タブ(一覧・CSV取り込み・列の自動推測・重複排除・リボ検知の表示) | 2026-09-08 |
 | M2-3 | ルールベース分類エンジン(5種のマッチ / 優先度 / FR-21 検知 / 修正からの学習) | 2026-09-08 |
@@ -162,6 +160,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-17 | Magic Link のリンク先が localhost になるバグを修正。原因は Supabase の Site URL が既定値 `http://localhost:3000` のままだったこと。`config/auth` API で `site_url` を本番 URL へ、`uri_allow_list` に本番 URL とローカル開発用ポートを設定。実際にリンクを発行して本番 URL へリダイレクトされることを確認 | 2026-09-08 |
 | T-18 | 負債タブ等の切り替えが遅い不具合を修正。原因は Vercel の Function リージョンが `iad1`(米国東部)、Supabase が Tokyo で、動的ページ1回の描画のたびに太平洋を2往復していたこと。`serverlessFunctionRegion` と `functionDefaultRegions` を `hnd1`(東京)へ変更し再デプロイ | 2026-09-08 |
 | T-19 | タブ切り替え直後にローディング表示を出す。`src/components/ui/skeleton.tsx` と、ホーム・`/debts` それぞれの `loading.tsx`(Next.js の規約、データ取得中は自動でこちらが出る)を追加。Playwright で実際にクリック直後スケルトンが出て、データ到着後に本来の内容(カードA・推定バッジ)へ差し替わることを確認 | 2026-09-08 |
+| M4-2 | ホームの残額表示を実データに接続。`loadHomeSummary()` が Supabase から debts / app_settings / categories / budgets(当月分。無ければ `default_monthly_budget_yen` で代用)/ transactions(当月・対象カテゴリ)/ debt_payments(当月の元本減少)を読むよう差し替え、`PLACEHOLDER_*` を削除。あわせて `debts.original_principal_yen` をフォームに追加(任意入力。進捗ゲージの分母。未入力なら現在残高で代用し、その負債単体の進捗は0%からになる)。`loadHomeSummary()` は Supabase(`next/headers` の `cookies()`)に触れる関数になったためユニットテストの対象から外し(純粋関数の `buildHomeTiles`/`computePayoffSummary` は継続してテスト)、実データでの検証は本セッション内で一時セッションを発行してホーム画面を実際に描画し確認した(残債合計1,000,000円、生活費・聖域タイルとも実データ(0円)で表示) | 2026-09-08 |
 
 ---
 
