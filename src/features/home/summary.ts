@@ -20,7 +20,8 @@
 
 import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
 import { simulateTotalPayoff, summarizePayoff, type Debt } from '@/domain/payoff';
-import { listDebts } from '@/features/debts/store';
+import { listDebts, toPayoffDebt } from '@/features/debts/store';
+import { getAppSettings } from '@/features/settings/store';
 import { daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 
@@ -182,21 +183,15 @@ export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSumma
 
 /** 完済シミュレーションの入力を組み立てる。debts / app_settings / debt_payments を読む。 */
 async function loadPayoffInput(now: Date): Promise<PayoffInput> {
-  const [rows, monthlyBudgetYen, reducedThisMonthYen] = await Promise.all([
+  const [rows, settings, reducedThisMonthYen] = await Promise.all([
     listDebts(),
-    loadMonthlyRepaymentTargetYen(),
+    getAppSettings(),
     loadReducedThisMonthYen(now),
   ]);
 
   return {
-    debts: rows.map((r) => ({
-      id: r.id,
-      balanceYen: r.currentBalanceYen,
-      annualRate: r.annualRate,
-      minimumPaymentYen: r.minimumPaymentYen,
-      paymentDay: r.paymentDay,
-    })),
-    monthlyBudgetYen,
+    debts: rows.map(toPayoffDebt),
+    monthlyBudgetYen: settings.monthlyRepaymentTargetYen,
     // 当初元本が未入力の負債は、現在残高をそのまま分母に使う
     // (その負債単体の進捗は 0% から始まり、実際に減った分だけ動く)。
     originalTotalYen: rows.reduce(
@@ -206,16 +201,6 @@ async function loadPayoffInput(now: Date): Promise<PayoffInput> {
     isEstimated: rows.some((r) => r.isEstimated),
     reducedThisMonthYen,
   };
-}
-
-async function loadMonthlyRepaymentTargetYen(): Promise<number> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('monthly_repayment_target_yen')
-    .single();
-  if (error) throw new Error(`設定を取得できませんでした: ${error.message}`);
-  return data.monthly_repayment_target_yen;
 }
 
 /** 今月の debt_payments 合計(元本部分)。M1-6 の返済記録が無ければ 0。 */
