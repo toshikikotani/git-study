@@ -39,11 +39,12 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M0-2 | Supabase 構築、`docs/schema.sql` を `supabase/migrations/` へ分割、型生成 | M | **B-4 待ち** |
+| M0-2 | Supabase プロジェクト作成、`db push`、`gen types` で型生成 | S | **B-4 待ち** |
 | M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
 
-DB に依存しない純粋ロジックは出し切った。ここから先は接続情報が要る。
-M0-2 のうち `supabase/migrations/` への分割だけはアカウント無しでも先行できる。
+アカウント無しで進められる作業は出し切った。ここから先は接続情報が要る。
+`supabase/migrations/` への分割は完了しているので、M0-2 に残っているのは
+アカウント作成・`db push`・型生成だけ。
 
 ## Backlog
 
@@ -110,7 +111,6 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 
 | ID | タスク | 理由 |
 |---|---|---|
-| T-1 | `supabase/migrations/` と `docs/schema.sql` の乖離を CI で検出する | 両方を正としているため、乖離すると事故る |
 | T-2 | CSV アダプタの fixture を実ファイル(匿名化)で用意する | 実フォーマットが判明してから |
 | T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
 | T-4 | ホームの数値を Supabase 読み出しに差し替える | 現在は `src/features/home/summary.ts` の仮置き。`loadHomeSummary()` の中身のみ差し替えれば済む |
@@ -145,6 +145,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M2-1 | CSV パーサとアダプタ(Shift_JIS 自動判定 / RFC4180 / 和暦 / 出金入金2列 / 支払区分) | 2026-09-08 |
 | M2-3 | ルールベース分類エンジン(5種のマッチ / 優先度 / FR-21 検知 / 修正からの学習) | 2026-09-08 |
 | M4-1 | `domain/budget.ts` 残額計算(振替・対象外の除外 / 繰越 / FR-20 の閾値判定) | 2026-09-08 |
+| T-1 | `docs/schema.sql` を `supabase/migrations/` へ分割し、乖離検出を CI に追加(890項目を比較) | 2026-09-08 |
 
 ---
 

@@ -64,6 +64,11 @@ jobs:
       - name: Verify schema
         run: ./scripts/verify-schema.sh
 
+      # docs/schema.sql と supabase/migrations/ は両方が正。片方だけ更新すると
+      # 本番と設計書が静かにずれるため、同じスキーマを作ることを毎回確かめる。
+      - name: Verify migrations match docs/schema.sql
+        run: ./scripts/verify-migrations.sh
+
       # SQL 版と TypeScript 版の完済シミュレーションが乖離していないかを見る。
       # fixture に差分が出るなら、どちらかの実装が変わったということ。
       - uses: actions/setup-node@v5

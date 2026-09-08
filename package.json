@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:schema": "./scripts/verify-schema.sh"
+    "verify:schema": "./scripts/verify-schema.sh",
+    "verify:migrations": "./scripts/verify-migrations.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.6",

@@ -61,14 +61,15 @@
 ├── supabase/
 │   ├── config.toml
 │   ├── migrations/                  # 実際に適用される正(docs/schema.sql を分割したもの)
-│   │   ├── 20260908000100_extensions_and_enums.sql
+│   │   ├── 20260908000100_extensions_enums_functions.sql
 │   │   ├── 20260908000200_core_tables.sql
 │   │   ├── 20260908000300_transactions.sql
-│   │   ├── 20260908000400_rules_and_transfers.sql
-│   │   ├── 20260908000500_briefs_and_alerts.sql
-│   │   ├── 20260908000600_functions_and_views.sql
-│   │   ├── 20260908000700_rls.sql
-│   │   └── 20260908000800_cron.sql
+│   │   ├── 20260908000400_rules_payments_transfers.sql
+│   │   ├── 20260908000500_side_investment_jobs.sql
+│   │   ├── 20260908000600_briefs_alerts_checkins.sql
+│   │   ├── 20260908000700_functions_and_views.sql
+│   │   ├── 20260908000800_rls_and_seed.sql
+│   │   └── 20260908000900_cron.sql
 │   └── seed.sql                     # seed_defaults() の呼び出し
 │
 ├── app/                             # Next.js App Router(ルーティングと画面だけ)
@@ -139,6 +140,9 @@
 │
 ├── scripts/
 │   ├── verify-schema.sh             # ローカル PostgreSQL でスキーマを検証
+│   ├── verify-migrations.sh         # migrations と docs/schema.sql の一致を検証
+│   ├── gen-payoff-golden.sh         # SQL 版シミュレーションの出力を fixture 化
+│   ├── lib/pg-sandbox.sh            # 使い捨て PostgreSQL の共通処理
 │   └── schema-test/
 │       ├── supabase-stub.sql
 │       └── verify.sql
@@ -307,9 +311,9 @@ transfer_runs + transfer_run_items を生成(status='pending')
 
 `docs/schema.sql` は **人間が全体像を読むための正**、`supabase/migrations/*.sql` は **実際に適用される正**。
 
-- 初回構築時、`docs/schema.sql` を上記の8ファイルに機械的に分割して `migrations/` へ置く
-- 以降の変更は `migrations/` に追加ファイルとして積み、`docs/schema.sql` にも同じ変更を反映する
-- 両者の乖離を防ぐため、CI で「まっさらな PostgreSQL に `migrations/` を全適用した結果」と「`docs/schema.sql` を適用した結果」のスキーマダンプを比較する
+- 初回構築時、`docs/schema.sql` を上記の9ファイルに行順どおりに分割して `migrations/` へ置いた。行順で切ることで、型 → テーブル → 外部キー → 関数 → RLS の依存関係が自然に保たれる
+- 以降の変更は `migrations/` に**追加ファイル**として積み、`docs/schema.sql` にも同じ変更を反映する。既存のマイグレーションを書き換えてはいけない(適用済みの環境と食い違う)
+- 両者の乖離は `scripts/verify-migrations.sh` が検出する。まっさらな PostgreSQL に両方を適用し、テーブル・列・制約・索引・関数・ビュー・RLS・ポリシー・ENUM・トリガの計 890 項目を比較する。CI で毎回実行する
 
 **スキーマ検証**:`scripts/verify-schema.sh` がローカルの PostgreSQL 16 に `docs/schema.sql` を流し、制約・シミュレーション関数・RLS が期待通りに動くことを確認する。Supabase 固有の `auth.users` / `auth.uid()` / `pg_cron` は `scripts/schema-test/supabase-stub.sql` で最小限に模す。CI(`ci.yml`)で毎回実行する。
 
