@@ -1,0 +1,13 @@
+.next/
+node_modules/
+package-lock.json
+
+# SQL とテスト用 SQL は整形対象外(桁揃えを手で管理している)
+docs/schema.sql
+scripts/schema-test/
+
+# 生成物。scripts/gen-payoff-golden.sh が書き出す
+tests/domain/fixtures/
+
+# Markdown は表の桁揃えを手で管理しているため対象外
+*.md
