@@ -161,6 +161,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-15 | Vercel プロジェクトと GitHub リポジトリを連携(本人が GitHub App をインストール)。`main` への push で自動デプロイになることを確認 | 2026-09-08 |
 | T-17 | Magic Link のリンク先が localhost になるバグを修正。原因は Supabase の Site URL が既定値 `http://localhost:3000` のままだったこと。`config/auth` API で `site_url` を本番 URL へ、`uri_allow_list` に本番 URL とローカル開発用ポートを設定。実際にリンクを発行して本番 URL へリダイレクトされることを確認 | 2026-09-08 |
 | T-18 | 負債タブ等の切り替えが遅い不具合を修正。原因は Vercel の Function リージョンが `iad1`(米国東部)、Supabase が Tokyo で、動的ページ1回の描画のたびに太平洋を2往復していたこと。`serverlessFunctionRegion` と `functionDefaultRegions` を `hnd1`(東京)へ変更し再デプロイ | 2026-09-08 |
+| T-19 | タブ切り替え直後にローディング表示を出す。`src/components/ui/skeleton.tsx` と、ホーム・`/debts` それぞれの `loading.tsx`(Next.js の規約、データ取得中は自動でこちらが出る)を追加。Playwright で実際にクリック直後スケルトンが出て、データ到着後に本来の内容(カードA・推定バッジ)へ差し替わることを確認 | 2026-09-08 |
 
 ---
 
