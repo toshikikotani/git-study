@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import {
   AdapterError,
   GENERIC_ADAPTER,
+  guessMapping,
   importCsv,
+  inspectCsv,
   readPaymentMethod,
   resolveColumnIndex,
   validateAdapter,
@@ -283,5 +285,77 @@ describe('readPaymentMethod(FR-21)', () => {
     expect(readPaymentMethod(undefined)).toBe('unknown');
     expect(readPaymentMethod('  ')).toBe('unknown');
     expect(readPaymentMethod('その他')).toBe('unknown');
+  });
+});
+
+describe('guessMapping — ヘッダから列を推測する(ADR-007)', () => {
+  it('カード明細のヘッダを推測する', () => {
+    const guess = guessMapping(['利用日', '利用店名・商品名', '利用者', '支払方法', '利用金額']);
+    expect(guess.dateColumn).toBe('利用日');
+    expect(guess.descriptionColumn).toBe('利用店名・商品名');
+    expect(guess.amountColumn).toBe('利用金額');
+    expect(guess.paymentMethodColumn).toBe('支払方法');
+  });
+
+  it('「利用金額」は支出が正の形式とみなす(カード明細の語彙)', () => {
+    expect(guessMapping(['利用日', '利用店名', '利用金額']).amountSign).toBe('expense_positive');
+  });
+
+  it('「金額」だけなら符号付きとみなす', () => {
+    expect(guessMapping(['日付', '摘要', '金額']).amountSign).toBe('as_is');
+  });
+
+  it('銀行明細の出金・入金2列を推測する', () => {
+    const guess = guessMapping(['日付', '摘要', 'お支払金額', 'お預り金額', '残高']);
+    expect(guess.amountOutColumn).toBe('お支払金額');
+    expect(guess.amountInColumn).toBe('お預り金額');
+    expect(guess.balanceColumn).toBe('残高');
+    // 2列形式では列で符号が決まるため反転しない
+    expect(guess.amountSign).toBe('as_is');
+    expect(guess.amountColumn).toBeUndefined();
+  });
+
+  it('2列形式が見つかれば単一列より優先する(符号の解釈で迷わない)', () => {
+    const guess = guessMapping(['日付', '摘要', '出金', '入金', '金額']);
+    expect(guess.amountOutColumn).toBe('出金');
+    expect(guess.amountColumn).toBeUndefined();
+  });
+
+  it('推測できない列は返さない(画面が埋める)', () => {
+    const guess = guessMapping(['col1', 'col2', 'col3']);
+    expect(guess.dateColumn).toBeUndefined();
+    expect(guess.descriptionColumn).toBeUndefined();
+  });
+
+  it('ヘッダが無ければ空を返す', () => {
+    expect(guessMapping(null)).toEqual({});
+    expect(guessMapping([])).toEqual({});
+  });
+
+  it('推測した結果がそのまま取り込みに使える', () => {
+    const csv = ['利用日,利用店名,利用金額', '2026/09/03,ローソン,3500'].join('\n');
+    const bytes = new TextEncoder().encode(csv);
+    const header = inspectCsv(bytes).header;
+    const result = importCsv(bytes, { ...GENERIC_ADAPTER, ...guessMapping(header) });
+    expect(result.errors).toEqual([]);
+    // 利用金額は支出が正なので、取り込み後は負になる
+    expect(result.transactions[0]!.amountYen).toBe(-3500);
+  });
+});
+
+describe('inspectCsv', () => {
+  it('文字コードとヘッダと行数を返す', () => {
+    const csv = ['日付,摘要,金額', '2026/09/03,A,-1', '2026/09/04,B,-2'].join('\n');
+    const info = inspectCsv(new TextEncoder().encode(csv));
+    expect(info.encoding).toBe('utf-8');
+    expect(info.header).toEqual(['日付', '摘要', '金額']);
+    expect(info.totalRows).toBe(2);
+  });
+
+  it('先頭5行までをサンプルとして返す', () => {
+    const rows = Array.from({ length: 20 }, (_, i) => `2026/09/${i + 1},店,-100`);
+    const info = inspectCsv(new TextEncoder().encode(['日付,摘要,金額', ...rows].join('\n')));
+    expect(info.sampleRows).toHaveLength(5);
+    expect(info.totalRows).toBe(20);
   });
 });

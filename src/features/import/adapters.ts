@@ -311,3 +311,88 @@ function tryParseYen(raw: string): number | undefined {
 function isSet(value: string | undefined): value is string {
   return value !== undefined && value !== null;
 }
+
+/**
+ * ヘッダから列を推測する(ADR-007)。
+ *
+ * 汎用マッピングは「本人が毎回列を指定する」設計だが、初回の手間が
+ * 取り込みを止める最大の理由になる。国内の明細 CSV はヘッダの語彙が
+ * 限られているため、当たれば手間がゼロになり、外れても本人が直せる。
+ *
+ * 推測できなかった項目は undefined を返す。埋めるのは画面の仕事。
+ */
+export function guessMapping(header: readonly string[] | null): Partial<ImportAdapter> {
+  if (!header || header.length === 0) return {};
+
+  const find = (patterns: RegExp[]): string | undefined =>
+    header.find((h) => patterns.some((p) => p.test(h.trim())));
+
+  const date = find([/^日付$/, /利用日/, /取引日/, /ご利用日/, /^日付/, /date/i]);
+  const description = find([
+    /摘要/,
+    /利用店名/,
+    /ご利用先/,
+    /内容/,
+    /店名/,
+    /品名/,
+    /description/i,
+    /memo/i,
+  ]);
+  const out = find([/お?支払金額/, /出金/, /引き?出し/, /^支出/, /withdraw/i]);
+  const income = find([/お?預り金額/, /入金/, /預入/, /^収入/, /deposit/i]);
+  const single = find([/利用金額/, /^金額$/, /ご利用金額/, /amount/i]);
+  const balance = find([/残高/, /balance/i]);
+  const method = find([/支払方法/, /支払区分/, /種別/, /区分/]);
+
+  const guess: Partial<ImportAdapter> = {};
+  if (date) guess.dateColumn = date;
+  if (description) guess.descriptionColumn = description;
+
+  // 出金・入金の2列がそろっていればそちらを優先する。
+  // 単一列より情報量が多く、符号の解釈で迷う余地がない。
+  if (out || income) {
+    if (out) guess.amountOutColumn = out;
+    if (income) guess.amountInColumn = income;
+    guess.amountSign = 'as_is';
+  } else if (single) {
+    guess.amountColumn = single;
+    // 「利用金額」はカード明細の語彙で、支出が正で入る。
+    // 「金額」だけの場合は符号付きのことが多いのでそのまま扱う。
+    guess.amountSign = /利用金額|ご利用金額/.test(single) ? 'expense_positive' : 'as_is';
+  }
+
+  if (balance) guess.balanceColumn = balance;
+  if (method) guess.paymentMethodColumn = method;
+
+  return guess;
+}
+
+/** 先頭数行だけを読んでヘッダと文字コードを調べる。列マッピング画面の入力に使う。 */
+export function inspectCsv(
+  bytes: Uint8Array,
+  options: {
+    encoding?: CsvEncoding;
+    delimiter?: string;
+    skipRows?: number;
+    hasHeader?: boolean;
+  } = {},
+): {
+  encoding: Exclude<CsvEncoding, 'auto'>;
+  header: string[] | null;
+  sampleRows: string[][];
+  totalRows: number;
+} {
+  const { text, encoding } = decodeCsv(bytes, options.encoding ?? 'auto');
+  const parsed = parseCsv(text, {
+    delimiter: options.delimiter ?? ',',
+    skipRows: options.skipRows ?? 0,
+    hasHeader: options.hasHeader ?? true,
+  });
+
+  return {
+    encoding,
+    header: parsed.header,
+    sampleRows: parsed.rows.slice(0, 5),
+    totalRows: parsed.rows.length,
+  };
+}
