@@ -158,6 +158,28 @@ function EmptyState() {
         <li>・列の並びは自動で推測し、違っていれば直せます</li>
         <li>・同じファイルを二度取り込んでも増えません</li>
       </ul>
+
+      {/* CSV は月次。日々の検知にはメールの自動取得が要る(ADR-018) */}
+      <div
+        className="rounded-2xl p-4"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      >
+        <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          毎回取り込むのは大変です
+        </p>
+        <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          Gmail 連携を設定すると、カードの利用通知メールが自動で取り込まれます。
+          リボやキャッシングを月末を待たずに検知できます。
+        </p>
+        <Link
+          href="/settings/gmail"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          自動取得を設定する
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
     </div>
   );
 }

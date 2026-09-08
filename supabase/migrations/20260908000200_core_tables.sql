@@ -56,9 +56,21 @@ create table public.app_settings (
   brief_send_at                       time         not null default '07:00',
   brief_channel                       notification_channel not null default 'discord',
 
+  -- Gmail 自動取得(ADR-018)。資格情報は環境変数に置き、ここには条件だけを持つ。
+  -- gmail_enabled が false でも設定は残す。止めたい月に消す必要はない。
+  gmail_enabled                       boolean      not null default false,
+  -- 対象とする差出人。空配列なら受信箱全体を解析にかける。
+  gmail_from_addresses                text[]       not null default '{}',
+  -- 前回どこまで読んだか。ここから先だけを取りに行く。
+  gmail_last_synced_on                date,
+  -- 1回の実行で読む上限。初回に受信箱を全部読まないための歯止め。
+  gmail_fetch_limit                   smallint     not null default 200,
+
   -- 秘密情報は値ではなく参照名を保存する(ADR-014)
   discord_webhook_env_key             text         not null default 'DISCORD_WEBHOOK_URL',
   line_token_env_key                  text,
+  gmail_address_env_key               text         not null default 'GMAIL_ADDRESS',
+  gmail_app_password_env_key          text         not null default 'GMAIL_APP_PASSWORD',
 
   created_at                          timestamptz  not null default now(),
   updated_at                          timestamptz  not null default now(),
@@ -76,10 +88,15 @@ create table public.app_settings (
        and monthly_repayment_target_yen >= 0),
   constraint ck_app_settings_inactivity
     check (inactivity_alert_days between 1 and 30),
+  constraint ck_app_settings_gmail_limit
+    check (gmail_fetch_limit between 1 and 1000),
   -- 秘密情報が誤って値ごと入るのを防ぐ。ここに入るのは環境変数名だけ。
   constraint ck_app_settings_env_key_is_name
     check (discord_webhook_env_key !~ '^https?://'
-       and (line_token_env_key is null or line_token_env_key !~ '^https?://'))
+       and (line_token_env_key is null or line_token_env_key !~ '^https?://')
+       -- アプリパスワードそのものが入るのを防ぐ。ここに入るのは環境変数名だけ。
+       and gmail_app_password_env_key ~ '^[A-Z][A-Z0-9_]*$'
+       and gmail_address_env_key      ~ '^[A-Z][A-Z0-9_]*$')
 );
 
 comment on table public.app_settings is
