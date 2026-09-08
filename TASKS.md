@@ -125,7 +125,6 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | B-1 | 負債の正確な内訳を `debts` に入力し `is_estimated` を落とす | **本人の棚卸し**(全借入先の残高・金利・件数・返済日)。仮値のままでも開発は進むが、完済予定日は確定表示できない |
 | B-2 | 実際の金融機関 CSV でアダプタを検証する | **本人が利用中の銀行・カードの明細ファイル**(1ヶ月分) |
 | B-3 | Discord Webhook URL を GitHub Secrets / Vercel に設定する | **本人による Webhook 発行**。M3-1 の着手前に必要 |
-| B-5 | `supabase/migrations/20260908001000_debts_seed.sql` を本番 Supabase へ適用する | **本人による適用**。前回発行の個人アクセストークンは失効済みで、この作業環境からは適用できなかった。Supabase ダッシュボード → SQL Editor に貼り付けて実行するか、新しいトークンを発行して伝えてもらえれば代わりに適用する。適用されるまで `/debts` にはシードの3件が表示されない(手で追加すれば動作はする) |
 
 ## Done
 
@@ -156,7 +155,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M0-3 | 認証(Magic Link、`shouldCreateUser: false` でサインアップ拒否)、`proxy.ts` による認証ガード(画面は `/login` へリダイレクト、API は 401)、`src/lib/supabase/{client,server,admin}.ts` の分離。副作用として T-10(`/api/import/email` の無認証呼び出し)を解消 | 2026-09-08 |
 | T-14 | リファクタ:取り込み3画面(CSV/貼り付け/Gmail設定)の重複排除と mail-sync の分割 | `DETECTION_RULES` の複製を `DEFAULT_DETECTION_RULES`(rules.ts)に一本化、共通 `<Card>`(components/ui)を切り出して9箇所のインライン複製を解消、「分類→StoredTransaction化→保存」を `features/transactions/import-pipeline.ts` に集約(CSV・貼り付け・mail-sync の3箇所が同じロジックを持っていた)。`syncFromMailbox`(82行)を `parseMessage` / `pushWarnings` に分割し、`import-pipeline.ts` の `buildPreview` を呼ぶ形にして3つ目の複製も解消。テスト10件追加、既存317件は無変更で通過。2026-09-08 |
 | D-8 | `docs/glossary.md` — DB列名↔TS識別子↔画面表示名の対応表、接尾辞規約(`...Yen`/`...On`/`...At`/`...Id`/`is...`/`...Rate`)、型の置き場所、データアクセス層の命名規約(list/get/create/update)を制定。既存コードは無改修、以後のコードが従う基準 | 2026-09-08 |
-| M1-2 | 負債の登録・編集画面。`src/features/debts/store.ts`(Supabase 読み書き、この機能で最初に本物の DB を使う層)、`src/domain/debt.ts`(借入先・返済日の検証)、`money.ts` に `parseAnnualRate()` を追加。Server Action(`app/(app)/debts/actions.ts`)経由で作成・更新。実際の Supabase プロジェクトに対して認証込みで読み書き・RLS を検証済み(本セッション内で一時セッションを発行して確認)。あわせて `seed_defaults()` に ADR-006 の負債3件が投入されていない欠落を発見・修正(新規マイグレーション、schema.sql 反映、decisions.md 追記)。本番適用は本人待ち(B-5) | 2026-09-08 |
+| M1-2 | 負債の登録・編集画面。`src/features/debts/store.ts`(Supabase 読み書き、この機能で最初に本物の DB を使う層)、`src/domain/debt.ts`(借入先・返済日の検証)、`money.ts` に `parseAnnualRate()` を追加。Server Action(`app/(app)/debts/actions.ts`)経由で作成・更新。実際の Supabase プロジェクトに対して認証込みで読み書き・RLS を検証済み(本セッション内で一時セッションを発行して確認)。あわせて `seed_defaults()` に ADR-006 の負債3件が投入されていない欠落を発見・修正(新規マイグレーション、schema.sql 反映、decisions.md 追記)。本番へ適用し、既存ユーザーに対して `seed_defaults()` を再実行してカードA・カードB・消費者金融Cの3件を投入済み | 2026-09-08 |
 
 ---
 
@@ -164,7 +163,6 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 
 実装を先に進めるうえで、いずれ必要になるもの。急ぎ順。
 
-1. **負債シードマイグレーションの適用**(B-5):`supabase/migrations/20260908001000_debts_seed.sql` を SQL Editor に貼るか、個人アクセストークンを再発行して伝える
-2. **Discord Webhook**(B-3):サーバーとチャンネルを1つ作り、Webhook URL を発行
-3. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。M1-2(債務の登録・編集画面)ができたので、`/debts` の「編集」から直接正確な値に直せる
-4. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
+1. **Discord Webhook**(B-3):サーバーとチャンネルを1つ作り、Webhook URL を発行
+2. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。`/debts` にシードの3件が表示されているので、「編集」から直接正確な値に直せる
+3. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
