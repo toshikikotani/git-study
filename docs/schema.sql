@@ -554,11 +554,17 @@ create table public.import_adapters (
   -- 列マッピング(0 始まりの列インデックス、またはヘッダ名)
   date_column        text        not null,
   description_column text        not null,
-  amount_column      text,        -- 単一列に符号付きで入る形式
+  amount_column      text,        -- 単一列に金額が入る形式
   amount_out_column  text,        -- 出金列(正の数で入る)
   amount_in_column   text,        -- 入金列(正の数で入る)
   balance_column     text,
   payment_method_column text,     -- 「支払区分」列があればリボ検知に使う
+
+  -- 単一金額列の符号規約。カード明細は「利用金額」を正で出すことが多く、
+  -- そのまま取り込むと支出が収入として集計される(ADR-008 の符号規約に反する)。
+  --   as_is            : 列の符号をそのまま使う(銀行の入出金列など)
+  --   expense_positive : 正の値を支出とみなして反転する(カード明細)
+  amount_sign        text        not null default 'as_is',
 
   date_formats       text[]      not null default array['YYYY/MM/DD','YYYY-MM-DD','YYYYMMDD'],
 
@@ -571,7 +577,13 @@ create table public.import_adapters (
     check (amount_column is not null
            or amount_out_column is not null
            or amount_in_column is not null),
-  constraint ck_import_adapters_skip_rows check (skip_rows >= 0)
+  constraint ck_import_adapters_skip_rows check (skip_rows >= 0),
+  constraint ck_import_adapters_amount_sign
+    check (amount_sign in ('as_is', 'expense_positive')),
+  -- 符号規約は単一金額列のときだけ意味を持つ。出金/入金の2列形式では
+  -- どちらの列かで符号が決まるため、設定できてしまうと誤解のもとになる。
+  constraint ck_import_adapters_amount_sign_scope
+    check (amount_sign = 'as_is' or amount_column is not null)
 );
 
 create unique index ux_import_adapters_user_name on public.import_adapters (user_id, name);

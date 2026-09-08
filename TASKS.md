@@ -39,7 +39,6 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M2-1 | CSV パーサとアダプタ(文字コード / 日付形式 / 出金入金2列) | L | M0-1 |
 | M2-3 | ルールベース分類エンジン(決定的) | M | M0-2 |
 | M4-1 | `domain/budget.ts` 残額計算 | S | M0-2 |
 | M0-2 | Supabase 構築、`docs/schema.sql` を `supabase/migrations/` へ分割、型生成 | M | **B-4 待ち** |
@@ -113,6 +112,7 @@ M0-2 はアカウント作成(B-4)を待つが、`supabase/migrations/` への�
 | T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
 | T-4 | ホームの数値を Supabase 読み出しに差し替える | 現在は `src/features/home/summary.ts` の仮置き。`loadHomeSummary()` の中身のみ差し替えれば済む |
 | T-5 | `/debts` `/transactions` `/payday` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定 |
+| T-6 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証する | 現在は手で揃えている。`supabase gen types` が入ったら派生させる(M0-2 後) |
 
 ## Blocked
 
@@ -139,6 +139,7 @@ M0-2 はアカウント作成(B-4)を待つが、`supabase/migrations/` への�
 | M0-5 | ルートレイアウト、JST ヘルパ(`src/lib/date.ts`)、`formatYen()`、ホームの器 | 2026-09-08 |
 | M1-1 | `src/domain/payoff.ts` と SQL 関数の一致検証(golden fixture 方式、CI で乖離を検出) | 2026-09-08 |
 | M1-5 | ホームの完済カウントダウンと進捗ゲージ(数値は仮置き。T-4 で実データへ) | 2026-09-08 |
+| M2-1 | CSV パーサとアダプタ(Shift_JIS 自動判定 / RFC4180 / 和暦 / 出金入金2列 / 支払区分) | 2026-09-08 |
 
 ---
 
