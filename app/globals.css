@@ -25,9 +25,13 @@
    CVD が 6〜8 の帯に入る緑×赤は、必ず符号か文字を併記して補う。
    ============================================================================= */
 
+/* 書体は app/layout.tsx が next/font でセルフホストし、CSS 変数として渡す。
+   Inter を先に置くことで、英数字と数字は Inter、日本語は M PLUS 2 が受け持つ。
+   フォント取得前でも読めるよう、末尾に端末の既定を残す。 */
 @theme {
   --font-sans:
-    system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    var(--font-inter), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
+    sans-serif;
 }
 
 :root {
