@@ -12,3 +12,6 @@ coverage/
 
 # Supabase CLI のローカルキャッシュ(supabase コマンド実行で自動生成)
 supabase/.temp/
+
+# Vercel CLI のプロジェクトリンク情報(vercel link/deploy で自動生成)
+.vercel
