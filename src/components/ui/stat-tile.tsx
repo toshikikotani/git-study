@@ -13,13 +13,17 @@ import { Meter } from './meter';
 export function StatTile({
   label,
   value,
+  valueParts,
   sub,
   ratio,
   tone,
   note,
 }: {
   label: string;
+  /** 単純な文字列表示。valueParts があればそちらが優先される。 */
   value: string;
+  /** 金額だけを大きく組みたいとき。文言の分割は domain 側で行う。 */
+  valueParts?: { prefix: string; amount: string; suffix: string } | undefined;
   sub?: string | undefined;
   ratio?: number | null | undefined;
   tone?: BudgetTone | undefined;
@@ -30,11 +34,8 @@ export function StatTile({
 
   return (
     <div
-      className="rounded-2xl p-5 ring-1"
-      style={{
-        background: 'var(--surface)',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-      }}
+      className="rounded-[22px] p-5"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-center justify-between gap-2">
         <span
@@ -46,11 +47,23 @@ export function StatTile({
         {note ? <ToneBadge tone={resolvedTone} text={note} /> : null}
       </div>
 
-      <p
-        className="mt-2 text-2xl leading-tight font-semibold tracking-tight"
-        style={{ color: 'var(--ink)' }}
-      >
-        {value}
+      {/* 金額を主役にする。FR-64 の肯定形は保ったまま、数字だけを大きく組む */}
+      <p className="mt-2.5 leading-tight" style={{ color: 'var(--ink)' }}>
+        {valueParts ? (
+          <>
+            <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
+              {valueParts.prefix}
+            </span>
+            <span className="text-[30px] font-semibold tracking-[-0.03em]">
+              {valueParts.amount}
+            </span>
+            <span className="ml-0.5 text-base" style={{ color: 'var(--ink-secondary)' }}>
+              {valueParts.suffix}
+            </span>
+          </>
+        ) : (
+          <span className="text-[26px] font-semibold tracking-[-0.02em]">{value}</span>
+        )}
       </p>
 
       {ratio !== undefined ? (
@@ -60,7 +73,7 @@ export function StatTile({
       ) : null}
 
       {sub ? (
-        <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+        <p className="tabular mt-2.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
           {sub}
         </p>
       ) : null}
@@ -75,8 +88,8 @@ export function StatTile({
 function ToneBadge({ tone, text }: { tone: BudgetTone; text: string }) {
   const color = {
     normal: 'var(--ink-muted)',
-    attention: 'var(--warning)',
-    over: 'var(--critical)',
+    attention: 'var(--attention)',
+    over: 'var(--over)',
   }[tone];
 
   return (

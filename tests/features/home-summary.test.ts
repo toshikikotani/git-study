@@ -143,7 +143,13 @@ describe('computePayoffSummary', () => {
 
   it('残り日数と残債を返す', () => {
     const payoff = computePayoffSummary(
-      { debts, monthlyBudgetYen: 100_000, originalTotalYen: 1_000_000, isEstimated: true },
+      {
+        debts,
+        monthlyBudgetYen: 100_000,
+        originalTotalYen: 1_000_000,
+        isEstimated: true,
+        reducedThisMonthYen: 0,
+      },
       now,
     );
     expect(payoff.remainingYen).toBe(400_000);
@@ -153,7 +159,13 @@ describe('computePayoffSummary', () => {
 
   it('返済済みの割合を進捗ゲージ用に返す', () => {
     const payoff = computePayoffSummary(
-      { debts, monthlyBudgetYen: 100_000, originalTotalYen: 1_000_000, isEstimated: true },
+      {
+        debts,
+        monthlyBudgetYen: 100_000,
+        originalTotalYen: 1_000_000,
+        isEstimated: true,
+        reducedThisMonthYen: 0,
+      },
       now,
     );
     expect(payoff.progressRatio).toBeCloseTo(0.6);
@@ -161,7 +173,13 @@ describe('computePayoffSummary', () => {
 
   it('完済していれば日付も日数も null(推定バッジも消える)', () => {
     const payoff = computePayoffSummary(
-      { debts: [], monthlyBudgetYen: 100_000, originalTotalYen: 1_000_000, isEstimated: true },
+      {
+        debts: [],
+        monthlyBudgetYen: 100_000,
+        originalTotalYen: 1_000_000,
+        isEstimated: true,
+        reducedThisMonthYen: 0,
+      },
       now,
     );
     expect(payoff.daysRemaining).toBeNull();

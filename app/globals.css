@@ -3,15 +3,26 @@
 /* =============================================================================
    デザイントークン
 
-   配色は検証済みパレットに準拠し、実際に使う組み合わせを
-   scripts/validate_palette.js(dataviz)に通して確認している。
+   ── 面の作り方 ─────────────────────────────────────────────
+   境界線ではなく、同一色相の階調で層を作る。深紺のキャンバスに、
+   一段ずつ明るいサーフェスを重ねる。線が減ると画面が静かになり、
+   数字が前に出る。
 
-     メーター2段  青 #2a78d6 / 赤 #e34948(light)、#3987e5 / #e66767(dark)
-       → CVD 分離 ΔE 21.6 / 19.2、通常視 ΔE 32.3 / 29.0、対サーフェス 3:1 以上
-     ステータス   good #0ca30c / warning #fab219 / critical #d03b3b(固定・非テーマ)
-       → 色だけで意味を運ばない。必ずラベルを添える
+   ── 色は「お金の役割」に予約する ────────────────────────────
+   カテゴリごとに色を割り当てる案は捨てた。暗いサーフェスでは
+   紫と青が識別できず(通常視 ΔE 9.8)、マゼンタは超過の赤と衝突する
+   (ΔE 7.8)。カテゴリは本人が増やせるため、固定の色順も破綻する。
+   色が運ぶのは役割だけにし、カテゴリの識別はアイコンと名前で行う。
 
-   dark 値は light の自動反転ではなく、暗いサーフェス用に選び直したもの。
+     青   返済・予算の残り(進捗)
+     赤   予算超過・支出
+     緑   収入
+     琥珀 閾値到達の合図(点のみ。必ず文字を伴う)
+
+   同時に画面へ出る組み合わせを実測して全ペア PASS を確認している:
+     ホーム  青 × 赤   dark CVD ΔE 19.2 / 通常視 29.0、light 21.6 / 32.3
+     明細    緑 × 赤   dark CVD ΔE  6.5 / 通常視 27.5、light  8.3 / 29.8
+   CVD が 6〜8 の帯に入る緑×赤は、必ず符号か文字を併記して補う。
    ============================================================================= */
 
 @theme {
@@ -22,79 +33,76 @@
 :root {
   color-scheme: light;
 
-  /* 面 */
-  --plane: #f4f4f1; /* ページの地 */
-  --surface: #fcfcfb; /* カード */
-  --surface-raised: #ffffff; /* ヒーローカード */
-  --hairline: rgba(11, 11, 11, 0.1);
+  /* 面(青みを含んだ階調) */
+  --plane: #eef1f6;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --hairline: rgba(10, 16, 32, 0.08);
 
   /* 文字 */
-  --ink: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
+  --ink: #0a1020;
+  --ink-secondary: #4a5568;
+  --ink-muted: #78849b;
 
-  /* データ */
-  --accent: #2a78d6;
-  --accent-soft: #dceafc; /* メーターの残り部分(同一ランプの明るい段) */
-  --over: #e34948; /* 予算超過 */
-  --over-soft: #f8dcdc;
+  /* 役割の色 */
+  --accent: #2a78d6; /* 返済・残り */
+  --accent-track: #dceafc; /* 空のトラック(同一ランプの明るい段) */
+  --income: #0f8f60; /* 収入 */
+  --over: #e34948; /* 超過・支出 */
+  --over-track: #f9dfdf;
+  --attention: #b8860b; /* 閾値到達。点で使い、必ず文字を伴う */
 
-  /* ステータス(固定・必ずラベルと併記) */
-  --good: #0ca30c;
-  --warning: #fab219;
-  --critical: #d03b3b;
-
-  --hero-glow: rgba(42, 120, 214, 0.1);
+  --hero-glow: rgba(42, 120, 214, 0.09);
+  --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --plane: #0b0b0b;
-    --surface: #141413;
-    --surface-raised: #1a1a19;
-    --hairline: rgba(255, 255, 255, 0.1);
+    --plane: #070b14;
+    --surface: #0d1424;
+    --surface-raised: #131c31;
+    --hairline: rgba(255, 255, 255, 0.07);
 
-    --ink: #ffffff;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
+    /* 純白は目が疲れる。少し落とす */
+    --ink: rgba(255, 255, 255, 0.93);
+    --ink-secondary: #9aa6bf;
+    --ink-muted: #6b7791;
 
     --accent: #3987e5;
-    --accent-soft: #10233f;
+    --accent-track: #16294a;
+    --income: #199e70;
     --over: #e66767;
-    --over-soft: #3a1c1c;
+    --over-track: #3d2027;
+    --attention: #fab219;
 
-    --good: #0ca30c;
-    --warning: #fab219;
-    --critical: #d03b3b;
-
-    --hero-glow: rgba(57, 135, 229, 0.16);
+    --hero-glow: rgba(57, 135, 229, 0.2);
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --plane: #0b0b0b;
-  --surface: #141413;
-  --surface-raised: #1a1a19;
-  --hairline: rgba(255, 255, 255, 0.1);
+  --plane: #070b14;
+  --surface: #0d1424;
+  --surface-raised: #131c31;
+  --hairline: rgba(255, 255, 255, 0.07);
 
-  --ink: #ffffff;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
+  --ink: rgba(255, 255, 255, 0.93);
+  --ink-secondary: #9aa6bf;
+  --ink-muted: #6b7791;
 
   --accent: #3987e5;
-  --accent-soft: #10233f;
+  --accent-track: #16294a;
+  --income: #199e70;
   --over: #e66767;
-  --over-soft: #3a1c1c;
+  --over-track: #3d2027;
+  --attention: #fab219;
 
-  --good: #0ca30c;
-  --warning: #fab219;
-  --critical: #d03b3b;
-
-  --hero-glow: rgba(57, 135, 229, 0.16);
+  --hero-glow: rgba(57, 135, 229, 0.2);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -109,11 +117,10 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* 入場。数字が「立ち上がる」ことで、開いた瞬間に視線が最上部へ向く。 */
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -122,7 +129,7 @@ body {
 }
 
 .rise {
-  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
