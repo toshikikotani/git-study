@@ -11,6 +11,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type { DateOnly } from '@/lib/date';
 import type { Database } from '@/lib/supabase/types';
+import type { Debt as PayoffDebt } from '@/domain/payoff';
 
 export type DebtKind = Database['public']['Enums']['debt_kind'];
 export type DebtStatus = Database['public']['Enums']['debt_status'];
@@ -144,4 +145,15 @@ export async function updateDebt(id: string, input: DebtInput): Promise<Debt> {
 
   if (error) throw new DebtStoreError(`負債を更新できませんでした: ${error.message}`);
   return fromRow(data);
+}
+
+/** 完済シミュレーション(domain/payoff.ts)が必要とする形へ絞る。 */
+export function toPayoffDebt(debt: Debt): PayoffDebt {
+  return {
+    id: debt.id,
+    balanceYen: debt.currentBalanceYen,
+    annualRate: debt.annualRate,
+    minimumPaymentYen: debt.minimumPaymentYen,
+    paymentDay: debt.paymentDay,
+  };
 }
