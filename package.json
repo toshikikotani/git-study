@@ -23,6 +23,8 @@
     "@anthropic-ai/sdk": "^0.124.0",
     "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.95.0",
+    "imapflow": "^2.0.0",
+    "mailparser": "^3.9.23",
     "next": "^16.3.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
