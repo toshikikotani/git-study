@@ -316,7 +316,7 @@ create table public.app_settings (
 
   -- AI 分類(ADR-010)
   classification_confidence_threshold numeric(4,3) not null default 0.800,
-  classification_model                text         not null default 'claude-haiku-4-5-20251001',
+  classification_model                text         not null default 'claude-haiku-4-5',
 
   -- 朝配信(FR-30)
   brief_send_at                       time         not null default '07:00',
