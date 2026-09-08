@@ -20,8 +20,9 @@
  * 通知メールと月次 CSV には必ず重なりが出る。片方だけでは支出が倍になる。
  */
 
-import { applyRules, type ClassificationRule } from '@/features/classification/rules';
-import { fingerprintOf, type StoredTransaction } from '@/features/transactions/store';
+import type { ClassificationRule } from '@/features/classification/rules';
+import { buildPreview } from '@/features/transactions/import-pipeline';
+import type { StoredTransaction } from '@/features/transactions/store';
 import type { AiEmailExtractor } from './email-ai';
 import { parseNotificationEmail, type EmailParseResult } from './email';
 import type { MailQuery, MailSource, RawMessage } from './mailbox';
@@ -77,63 +78,25 @@ export async function syncFromMailbox(input: SyncInput): Promise<SyncResult> {
     if (input.knownMessageIds.has(message.messageId)) continue;
     processedMessageIds.push(message.messageId);
 
-    let parsed: EmailParseResult = parseNotificationEmail(message.body);
+    const { parsed, usedAiCall } = await parseMessage(message, input.ai, aiCallCount);
+    if (usedAiCall) aiCallCount += 1;
 
-    // 辞書で1件も読めなかったときだけ AI に回す。
-    // 読めている大多数のメールでは API を叩かないので、通常運転の費用はゼロ。
-    if (parsed.transactions.length === 0 && input.ai && aiCallCount < input.ai.maxCalls) {
-      aiCallCount += 1;
-      const rescued = await input.ai.extractor.extract({
-        body: message.body,
-        subject: message.subject,
-      });
-      // 救済できたときだけ差し替える。駄目だったなら辞書側の理由も残したい。
-      parsed =
-        rescued.transactions.length > 0
-          ? rescued
-          : { transactions: [], warnings: [...parsed.warnings, ...rescued.warnings] };
-    }
+    pushWarnings(warnings, message, parsed.warnings);
 
-    for (const warning of parsed.warnings) {
-      warnings.push({
-        messageId: message.messageId,
-        subject: message.subject,
-        message: warning,
-      });
-    }
-
-    parsed.transactions.forEach((tx, index) => {
-      const fingerprint = fingerprintOf(tx);
-      if (seen.has(fingerprint)) {
+    const built = buildPreview(
+      parsed.transactions,
+      'gmail',
+      (index) => `${message.messageId}-${index}`,
+      input.rules,
+    );
+    for (const tx of built) {
+      if (seen.has(tx.fingerprint)) {
         duplicateCount += 1;
-        return;
+        continue;
       }
-      seen.add(fingerprint);
-
-      const classification = applyRules(
-        {
-          accountId: 'gmail',
-          description: tx.description,
-          amountYen: tx.amountYen,
-          paymentMethod: tx.paymentMethod,
-        },
-        input.rules,
-      );
-
-      transactions.push({
-        id: `${message.messageId}-${index}`,
-        occurredOn: tx.occurredOn,
-        description: tx.description,
-        amountYen: tx.amountYen,
-        paymentMethod: classification.paymentMethod,
-        categoryId: classification.categoryId,
-        categoryName: null,
-        classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
-        reviewStatus: classification.categoryId ? 'auto_ok' : 'pending',
-        fingerprint,
-        batchId: input.batchId,
-      });
-    });
+      seen.add(tx.fingerprint);
+      transactions.push({ ...tx, batchId: input.batchId });
+    }
   }
 
   return {
@@ -144,6 +107,38 @@ export async function syncFromMailbox(input: SyncInput): Promise<SyncResult> {
     duplicateCount,
     aiCallCount,
   };
+}
+
+/**
+ * 1通を解析する。ラベル辞書 → 1件も読めなければ AI(上限に達していなければ)。
+ * 戻り値の usedAiCall は「今回 AI を呼んだか」で、呼び出し側の集計に使う。
+ */
+async function parseMessage(
+  message: RawMessage,
+  ai: SyncInput['ai'],
+  aiCallCount: number,
+): Promise<{ parsed: EmailParseResult; usedAiCall: boolean }> {
+  const byLabels = parseNotificationEmail(message.body);
+  if (byLabels.transactions.length > 0) return { parsed: byLabels, usedAiCall: false };
+  if (!ai || aiCallCount >= ai.maxCalls) return { parsed: byLabels, usedAiCall: false };
+
+  const rescued = await ai.extractor.extract({ body: message.body, subject: message.subject });
+  // 救済できたときだけ差し替える。駄目だったなら辞書側の理由も残したい。
+  const parsed: EmailParseResult =
+    rescued.transactions.length > 0
+      ? rescued
+      : { transactions: [], warnings: [...byLabels.warnings, ...rescued.warnings] };
+  return { parsed, usedAiCall: true };
+}
+
+function pushWarnings(
+  target: SyncResult['warnings'],
+  message: RawMessage,
+  reasons: readonly string[],
+): void {
+  for (const reason of reasons) {
+    target.push({ messageId: message.messageId, subject: message.subject, message: reason });
+  }
 }
 
 /** テストと画面プレビュー用。決まった本文を返すだけの MailSource。 */

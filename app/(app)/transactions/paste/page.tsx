@@ -3,18 +3,15 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
-import { applyRules, type ClassificationRule } from '@/features/classification/rules';
 import {
   parseNotificationEmail,
   type EmailParseResult,
   type ParsedEmailTransaction,
 } from '@/features/import/email';
-import {
-  fingerprintOf,
-  transactionStore,
-  type StoredTransaction,
-} from '@/features/transactions/store';
+import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
+import type { StoredTransaction } from '@/features/transactions/store';
 
 /**
  * 通知メールの貼り付け取り込み。
@@ -30,37 +27,6 @@ import {
  *
  * 画面上でもその位置づけを明示し、自動取得への導線を必ず置く。
  */
-
-/** seed_defaults が投入する FR-21 の検知ルール(docs/schema.sql §8 と同じ定義)。 */
-const DETECTION_RULES: ClassificationRule[] = [
-  {
-    id: 'd1',
-    name: 'リボ払いの検知',
-    priority: 1,
-    matchType: 'regex',
-    pattern: '(リボ|ﾘﾎﾞ|revolving|リボルビング)',
-    setPaymentMethod: 'revolving',
-    isActive: true,
-  },
-  {
-    id: 'd2',
-    name: 'キャッシングの検知',
-    priority: 2,
-    matchType: 'regex',
-    pattern: '(キャッシング|ｷｬｯｼﾝｸﾞ|CASHING|カードローン|ATM借入)',
-    setPaymentMethod: 'cashing',
-    isActive: true,
-  },
-  {
-    id: 'd3',
-    name: '分割払いの検知',
-    priority: 3,
-    matchType: 'regex',
-    pattern: '(分割|[0-9]+回払|ボーナス払)',
-    setPaymentMethod: 'installment',
-    isActive: true,
-  },
-];
 
 export default function PastePage() {
   const [body, setBody] = useState('');
@@ -105,46 +71,15 @@ export default function PastePage() {
 
   const preview = useMemo<StoredTransaction[]>(() => {
     if (!parsed) return [];
-    return parsed.transactions.map((tx, index) => {
-      const classification = applyRules(
-        {
-          accountId: 'email',
-          description: tx.description,
-          amountYen: tx.amountYen,
-          paymentMethod: tx.paymentMethod,
-        },
-        DETECTION_RULES,
-      );
-      return {
-        id: `paste-${index}`,
-        occurredOn: tx.occurredOn,
-        description: tx.description,
-        amountYen: tx.amountYen,
-        paymentMethod: classification.paymentMethod,
-        categoryId: classification.categoryId,
-        categoryName: null,
-        classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
-        reviewStatus: classification.categoryId ? 'auto_ok' : 'pending',
-        fingerprint: fingerprintOf(tx),
-        batchId: '',
-      };
-    });
+    return buildPreview(parsed.transactions, 'email', (i) => `paste-${i}`);
   }, [parsed]);
 
   const save = async () => {
-    const batchId = `${Date.now()}`;
-    const outcome = await transactionStore.add(
-      preview.map((t) => ({ ...t, batchId, id: `${batchId}-${t.id}` })),
-      {
-        batchId,
-        fileName: 'メール貼り付け',
-        importedAt: new Date().toISOString(),
-        importedCount: preview.length,
-        duplicateCount: 0,
-        failedCount: parsed?.warnings.length ?? 0,
-      },
-    );
-    setSaved({ imported: outcome.imported.length, duplicates: outcome.duplicateCount });
+    const outcome = await saveBatch(preview, {
+      fileName: 'メール貼り付け',
+      failedCount: parsed?.warnings.length ?? 0,
+    });
+    setSaved(outcome);
     setBody('');
   };
 
@@ -180,10 +115,7 @@ export default function PastePage() {
       </div>
 
       {saved ? (
-        <section
-          className="rounded-3xl p-5"
-          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-        >
+        <Card>
           <p className="text-sm" style={{ color: 'var(--ink)' }}>
             {saved.imported} 件を取り込みました
             {saved.duplicates > 0 ? `(重複 ${saved.duplicates} 件を除外)` : ''}
@@ -195,13 +127,10 @@ export default function PastePage() {
           >
             明細を見る
           </Link>
-        </section>
+        </Card>
       ) : null}
 
-      <section
-        className="rounded-3xl p-5"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      >
+      <Card>
         <label
           className="text-[11px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
@@ -280,7 +209,7 @@ export default function PastePage() {
             ))}
           </ul>
         ) : null}
-      </section>
+      </Card>
     </div>
   );
 }

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
-import { applyRules, type ClassificationRule } from '@/features/classification/rules';
 import {
   GENERIC_ADAPTER,
   guessMapping,
@@ -12,11 +12,8 @@ import {
   inspectCsv,
   type ImportAdapter,
 } from '@/features/import/adapters';
-import {
-  fingerprintOf,
-  transactionStore,
-  type StoredTransaction,
-} from '@/features/transactions/store';
+import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
+import type { StoredTransaction } from '@/features/transactions/store';
 
 /**
  * CSV 取り込み(FR-10, M2-2)。
@@ -27,37 +24,6 @@ import {
  *   - 1行の失敗で全体を止めない。失敗行は行番号と理由を出す
  *   - 取り込む前に結果を見せる。確定は本人が押す
  */
-
-/** seed_defaults が投入する FR-21 の検知ルール(docs/schema.sql §8 と同じ定義)。 */
-const DETECTION_RULES: ClassificationRule[] = [
-  {
-    id: 'd1',
-    name: 'リボ払いの検知',
-    priority: 1,
-    matchType: 'regex',
-    pattern: '(リボ|ﾘﾎﾞ|revolving|リボルビング)',
-    setPaymentMethod: 'revolving',
-    isActive: true,
-  },
-  {
-    id: 'd2',
-    name: 'キャッシングの検知',
-    priority: 2,
-    matchType: 'regex',
-    pattern: '(キャッシング|ｷｬｯｼﾝｸﾞ|CASHING|カードローン|ATM借入)',
-    setPaymentMethod: 'cashing',
-    isActive: true,
-  },
-  {
-    id: 'd3',
-    name: '分割払いの検知',
-    priority: 3,
-    matchType: 'regex',
-    pattern: '(分割|[0-9]+回払|ボーナス払)',
-    setPaymentMethod: 'installment',
-    isActive: true,
-  },
-];
 
 type Loaded = {
   fileName: string;
@@ -105,53 +71,22 @@ export default function ImportPage() {
     }
   }, [loaded, adapter]);
 
-  const preview = useMemo(() => {
+  const preview = useMemo<StoredTransaction[]>(() => {
     if (!result || 'error' in result) return [];
-    return result.transactions.map<StoredTransaction>((t, i) => {
-      const classification = applyRules(
-        {
-          accountId: 'pending',
-          description: t.description,
-          amountYen: t.amountYen,
-          paymentMethod: t.paymentMethod,
-        },
-        DETECTION_RULES,
-      );
-      return {
-        id: `${t.lineNumber}-${i}`,
-        occurredOn: t.occurredOn,
-        description: t.description,
-        amountYen: t.amountYen,
-        paymentMethod: classification.paymentMethod,
-        categoryId: classification.categoryId,
-        categoryName: null,
-        classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
-        // 分類が付いていないものは本人の確認へ回す(FR-12)
-        reviewStatus: classification.categoryId ? 'auto_ok' : 'pending',
-        fingerprint: fingerprintOf(t),
-        batchId: '',
-      };
-    });
+    const rows = result.transactions;
+    return buildPreview(rows, 'pending', (i) => `${rows[i]!.lineNumber}-${i}`);
   }, [result]);
 
   const save = async () => {
     if (!loaded || preview.length === 0) return;
     setSaving(true);
-    const batchId = `${Date.now()}`;
-    const outcome = await transactionStore.add(
-      preview.map((t) => ({ ...t, batchId, id: `${batchId}-${t.id}` })),
-      {
-        batchId,
-        fileName: loaded.fileName,
-        importedAt: new Date().toISOString(),
-        importedCount: preview.length,
-        duplicateCount: 0,
-        failedCount: result && !('error' in result) ? result.errors.length : 0,
-      },
-    );
+    const outcome = await saveBatch(preview, {
+      fileName: loaded.fileName,
+      failedCount: result && !('error' in result) ? result.errors.length : 0,
+    });
     // 一覧へ飛ばさず結果を出す。重複で0件だったとき、黙って戻ると
     // 壊れているのか取り込めたのか区別が付かない。
-    setSaved({ imported: outcome.imported.length, duplicates: outcome.duplicateCount });
+    setSaved(outcome);
     setSaving(false);
   };
 
@@ -373,17 +308,6 @@ function SavedResult({ imported, duplicates }: { imported: number; duplicates: n
         </Link>
       </Card>
     </div>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <section
-      className="rounded-3xl p-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-    >
-      {children}
-    </section>
   );
 }
 
