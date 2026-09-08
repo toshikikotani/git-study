@@ -31,7 +31,7 @@
 
 ## Now
 
-なし(設計フェーズ完了。実装の着手指示待ち)
+なし
 
 ## Next
 
@@ -39,11 +39,12 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M0-1 | Next.js プロジェクト初期化(TS strict / Tailwind / ESLint / Vitest) | S | — |
-| M0-2 | Supabase 構築、`docs/schema.sql` を `supabase/migrations/` へ分割、型生成 | M | — |
-| M0-4 | `src/lib/env.ts`(zod)と CI(lint / typecheck / test / verify-schema) | S | M0-1 |
-| M0-5 | レイアウト・JST ヘルパ・`formatYen()`・ホームの器 | S | M0-1 |
 | M2-1 | CSV パーサとアダプタ(文字コード / 日付形式 / 出金入金2列) | L | M0-1 |
+| M2-3 | ルールベース分類エンジン(決定的) | M | M0-2 |
+| M4-1 | `domain/budget.ts` 残額計算 | S | M0-2 |
+| M0-2 | Supabase 構築、`docs/schema.sql` を `supabase/migrations/` へ分割、型生成 | M | **B-4 待ち** |
+
+M0-2 はアカウント作成(B-4)を待つが、`supabase/migrations/` への分割だけは先行できる。
 
 ## Backlog
 
@@ -56,18 +57,15 @@
 ### S1 負債と完済シミュレーション(最優先)
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M1-1 | `domain/payoff.ts` + SQL 関数との一致テスト | M | M0-1, M0-2 |
 | M1-2 | 債務の登録・編集画面、推定値バッジ | M | M0-3, M0-5 |
 | M1-3 | 完済シミュレーション画面(最低返済 vs 月X万円) | M | M1-1, M1-2 |
 | M1-4 | 借り換えシミュレーション(金利 Y%) | S | M1-3 |
-| M1-5 | ホームの完済カウントダウンと進捗ゲージ | S | M1-1, M1-3 |
 | M1-6 | 返済実績の記録と計画差分 | M | M1-2 |
 
 ### S2 明細の取り込みと分類
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
 | M2-2 | 取り込み画面(プレビュー → 列マッピング → 確定) | L | M2-1, M0-3 |
-| M2-3 | ルールベース分類エンジン(決定的) | M | M0-2 |
 | M2-4 | Claude Haiku 4.5 によるバッチ分類 | M | M2-3 |
 | M2-5 | 確認待ちキューと修正のルール化(学習) | M | M2-4 |
 | M2-6 | カテゴリ・ルール編集画面 | M | M2-5 |
@@ -82,8 +80,7 @@
 ### S4 給料日振替と使える残額
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M4-1 | `domain/budget.ts` 残額計算 | S | M0-2 |
-| M4-2 | ホームの残額表示(肯定形) | S | M4-1, M1-5 |
+| M4-2 | ホームの残額表示を実データに接続 | S | M4-1, M0-3 |
 | M4-3 | 振替ルール編集画面 | M | M0-3 |
 | M4-4 | 給料日チェックリスト | M | M4-3 |
 
@@ -113,6 +110,9 @@
 |---|---|---|
 | T-1 | `supabase/migrations/` と `docs/schema.sql` の乖離を CI で検出する | 両方を正としているため、乖離すると事故る |
 | T-2 | CSV アダプタの fixture を実ファイル(匿名化)で用意する | 実フォーマットが判明してから |
+| T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
+| T-4 | ホームの数値を Supabase 読み出しに差し替える | 現在は `src/features/home/summary.ts` の仮置き。`loadHomeSummary()` の中身のみ差し替えれば済む |
+| T-5 | `/debts` `/transactions` `/payday` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定 |
 
 ## Blocked
 
@@ -134,6 +134,11 @@
 | D-5 | `docs/mvp-plan.md` — 11章の MVP を1セッション粒度の28タスクへ分割 | 2026-09-08 |
 | D-6 | `scripts/verify-schema.sh` — スキーマをローカル PostgreSQL で検証(制約 / 関数 / RLS) | 2026-09-08 |
 | D-7 | `TASKS.md` — 本ボードの作成 | 2026-09-08 |
+| M0-1 | Next.js 16 / TS strict / Tailwind 4 / ESLint / Prettier / Vitest の初期化 | 2026-09-08 |
+| M0-4 | `src/lib/env.ts`(zod)、`.env.example`、CI(lint / format / typecheck / test / build / スキーマ検証) | 2026-09-08 |
+| M0-5 | ルートレイアウト、JST ヘルパ(`src/lib/date.ts`)、`formatYen()`、ホームの器 | 2026-09-08 |
+| M1-1 | `src/domain/payoff.ts` と SQL 関数の一致検証(golden fixture 方式、CI で乖離を検出) | 2026-09-08 |
+| M1-5 | ホームの完済カウントダウンと進捗ゲージ(数値は仮置き。T-4 で実データへ) | 2026-09-08 |
 
 ---
 

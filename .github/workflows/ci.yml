@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: lint / typecheck / test / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      # 環境変数は起動時に検証される(ADR-014)。ビルドが通ることだけを見るため、
+      # 形式だけ満たすダミー値を渡す。実値は Vercel / GitHub Secrets 側にある。
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key-for-build-only
+          SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key-for-build
+          ANTHROPIC_API_KEY: sk-ant-dummy-for-build-only
+          DISCORD_WEBHOOK_URL: https://discord.com/api/webhooks/0/dummy
+          CRON_SECRET: dummy-cron-secret-for-build-only-0123456789
+
+  schema:
+    name: schema (constraints / functions / RLS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # ランナーには PostgreSQL 16 が同梱されているが、無い場合に備えて入れる
+      - name: Ensure PostgreSQL
+        run: |
+          if ! ls -d /usr/lib/postgresql/*/bin >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-16
+          fi
+
+      - name: Verify schema
+        run: ./scripts/verify-schema.sh
+
+      # SQL 版と TypeScript 版の完済シミュレーションが乖離していないかを見る。
+      # fixture に差分が出るなら、どちらかの実装が変わったということ。
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Regenerate payoff golden fixture
+        run: ./scripts/gen-payoff-golden.sh
+
+      - name: Fail if fixture drifted
+        run: |
+          if ! git diff --quiet -- tests/domain/fixtures/payoff-golden.json; then
+            echo "::error::SQL 側のシミュレーション結果が fixture と一致しません。"
+            echo "scripts/gen-payoff-golden.sh を実行して差分を確認し、"
+            echo "src/domain/payoff.ts も併せて更新してください(docs/architecture.md §3.1)。"
+            git diff -- tests/domain/fixtures/payoff-golden.json
+            exit 1
+          fi

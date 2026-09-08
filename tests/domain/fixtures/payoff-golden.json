@@ -1,0 +1,1549 @@
+{
+    "note": "scripts/gen-payoff-golden.sh が生成。手で編集しないこと。",
+    "cases": [
+        {
+            "kind": "single",
+            "name": "single: カードA / 月20,000円",
+            "rows": [
+                {
+                    "due_on": "2026-10-27",
+                    "month_index": 1,
+                    "payment_yen": 20000,
+                    "interest_yen": 5000,
+                    "principal_yen": 15000,
+                    "closing_balance_yen": 385000,
+                    "opening_balance_yen": 400000
+                },
+                {
+                    "due_on": "2026-11-27",
+                    "month_index": 2,
+                    "payment_yen": 20000,
+                    "interest_yen": 4812,
+                    "principal_yen": 15188,
+                    "closing_balance_yen": 369812,
+                    "opening_balance_yen": 385000
+                },
+                {
+                    "due_on": "2026-12-27",
+                    "month_index": 3,
+                    "payment_yen": 20000,
+                    "interest_yen": 4622,
+                    "principal_yen": 15378,
+                    "closing_balance_yen": 354434,
+                    "opening_balance_yen": 369812
+                },
+                {
+                    "due_on": "2027-01-27",
+                    "month_index": 4,
+                    "payment_yen": 20000,
+                    "interest_yen": 4430,
+                    "principal_yen": 15570,
+                    "closing_balance_yen": 338864,
+                    "opening_balance_yen": 354434
+                },
+                {
+                    "due_on": "2027-02-27",
+                    "month_index": 5,
+                    "payment_yen": 20000,
+                    "interest_yen": 4235,
+                    "principal_yen": 15765,
+                    "closing_balance_yen": 323099,
+                    "opening_balance_yen": 338864
+                },
+                {
+                    "due_on": "2027-03-27",
+                    "month_index": 6,
+                    "payment_yen": 20000,
+                    "interest_yen": 4038,
+                    "principal_yen": 15962,
+                    "closing_balance_yen": 307137,
+                    "opening_balance_yen": 323099
+                },
+                {
+                    "due_on": "2027-04-27",
+                    "month_index": 7,
+                    "payment_yen": 20000,
+                    "interest_yen": 3839,
+                    "principal_yen": 16161,
+                    "closing_balance_yen": 290976,
+                    "opening_balance_yen": 307137
+                },
+                {
+                    "due_on": "2027-05-27",
+                    "month_index": 8,
+                    "payment_yen": 20000,
+                    "interest_yen": 3637,
+                    "principal_yen": 16363,
+                    "closing_balance_yen": 274613,
+                    "opening_balance_yen": 290976
+                },
+                {
+                    "due_on": "2027-06-27",
+                    "month_index": 9,
+                    "payment_yen": 20000,
+                    "interest_yen": 3432,
+                    "principal_yen": 16568,
+                    "closing_balance_yen": 258045,
+                    "opening_balance_yen": 274613
+                },
+                {
+                    "due_on": "2027-07-27",
+                    "month_index": 10,
+                    "payment_yen": 20000,
+                    "interest_yen": 3225,
+                    "principal_yen": 16775,
+                    "closing_balance_yen": 241270,
+                    "opening_balance_yen": 258045
+                },
+                {
+                    "due_on": "2027-08-27",
+                    "month_index": 11,
+                    "payment_yen": 20000,
+                    "interest_yen": 3015,
+                    "principal_yen": 16985,
+                    "closing_balance_yen": 224285,
+                    "opening_balance_yen": 241270
+                },
+                {
+                    "due_on": "2027-09-27",
+                    "month_index": 12,
+                    "payment_yen": 20000,
+                    "interest_yen": 2803,
+                    "principal_yen": 17197,
+                    "closing_balance_yen": 207088,
+                    "opening_balance_yen": 224285
+                },
+                {
+                    "due_on": "2027-10-27",
+                    "month_index": 13,
+                    "payment_yen": 20000,
+                    "interest_yen": 2588,
+                    "principal_yen": 17412,
+                    "closing_balance_yen": 189676,
+                    "opening_balance_yen": 207088
+                },
+                {
+                    "due_on": "2027-11-27",
+                    "month_index": 14,
+                    "payment_yen": 20000,
+                    "interest_yen": 2370,
+                    "principal_yen": 17630,
+                    "closing_balance_yen": 172046,
+                    "opening_balance_yen": 189676
+                },
+                {
+                    "due_on": "2027-12-27",
+                    "month_index": 15,
+                    "payment_yen": 20000,
+                    "interest_yen": 2150,
+                    "principal_yen": 17850,
+                    "closing_balance_yen": 154196,
+                    "opening_balance_yen": 172046
+                },
+                {
+                    "due_on": "2028-01-27",
+                    "month_index": 16,
+                    "payment_yen": 20000,
+                    "interest_yen": 1927,
+                    "principal_yen": 18073,
+                    "closing_balance_yen": 136123,
+                    "opening_balance_yen": 154196
+                },
+                {
+                    "due_on": "2028-02-27",
+                    "month_index": 17,
+                    "payment_yen": 20000,
+                    "interest_yen": 1701,
+                    "principal_yen": 18299,
+                    "closing_balance_yen": 117824,
+                    "opening_balance_yen": 136123
+                },
+                {
+                    "due_on": "2028-03-27",
+                    "month_index": 18,
+                    "payment_yen": 20000,
+                    "interest_yen": 1472,
+                    "principal_yen": 18528,
+                    "closing_balance_yen": 99296,
+                    "opening_balance_yen": 117824
+                },
+                {
+                    "due_on": "2028-04-27",
+                    "month_index": 19,
+                    "payment_yen": 20000,
+                    "interest_yen": 1241,
+                    "principal_yen": 18759,
+                    "closing_balance_yen": 80537,
+                    "opening_balance_yen": 99296
+                },
+                {
+                    "due_on": "2028-05-27",
+                    "month_index": 20,
+                    "payment_yen": 20000,
+                    "interest_yen": 1006,
+                    "principal_yen": 18994,
+                    "closing_balance_yen": 61543,
+                    "opening_balance_yen": 80537
+                },
+                {
+                    "due_on": "2028-06-27",
+                    "month_index": 21,
+                    "payment_yen": 20000,
+                    "interest_yen": 769,
+                    "principal_yen": 19231,
+                    "closing_balance_yen": 42312,
+                    "opening_balance_yen": 61543
+                },
+                {
+                    "due_on": "2028-07-27",
+                    "month_index": 22,
+                    "payment_yen": 20000,
+                    "interest_yen": 528,
+                    "principal_yen": 19472,
+                    "closing_balance_yen": 22840,
+                    "opening_balance_yen": 42312
+                },
+                {
+                    "due_on": "2028-08-27",
+                    "month_index": 23,
+                    "payment_yen": 20000,
+                    "interest_yen": 285,
+                    "principal_yen": 19715,
+                    "closing_balance_yen": 3125,
+                    "opening_balance_yen": 22840
+                },
+                {
+                    "due_on": "2028-09-27",
+                    "month_index": 24,
+                    "payment_yen": 3164,
+                    "interest_yen": 39,
+                    "principal_yen": 3125,
+                    "closing_balance_yen": 0,
+                    "opening_balance_yen": 3125
+                }
+            ],
+            "debtId": "dddddddd-0000-0000-0000-000000000001",
+            "monthlyPaymentYen": 20000
+        },
+        {
+            "kind": "single",
+            "name": "single: 消費者金融C / 月15,000円(金利18%)",
+            "rows": [
+                {
+                    "due_on": "2026-10-05",
+                    "month_index": 1,
+                    "payment_yen": 15000,
+                    "interest_yen": 4500,
+                    "principal_yen": 10500,
+                    "closing_balance_yen": 289500,
+                    "opening_balance_yen": 300000
+                },
+                {
+                    "due_on": "2026-11-05",
+                    "month_index": 2,
+                    "payment_yen": 15000,
+                    "interest_yen": 4342,
+                    "principal_yen": 10658,
+                    "closing_balance_yen": 278842,
+                    "opening_balance_yen": 289500
+                },
+                {
+                    "due_on": "2026-12-05",
+                    "month_index": 3,
+                    "payment_yen": 15000,
+                    "interest_yen": 4182,
+                    "principal_yen": 10818,
+                    "closing_balance_yen": 268024,
+                    "opening_balance_yen": 278842
+                },
+                {
+                    "due_on": "2027-01-05",
+                    "month_index": 4,
+                    "payment_yen": 15000,
+                    "interest_yen": 4020,
+                    "principal_yen": 10980,
+                    "closing_balance_yen": 257044,
+                    "opening_balance_yen": 268024
+                },
+                {
+                    "due_on": "2027-02-05",
+                    "month_index": 5,
+                    "payment_yen": 15000,
+                    "interest_yen": 3855,
+                    "principal_yen": 11145,
+                    "closing_balance_yen": 245899,
+                    "opening_balance_yen": 257044
+                },
+                {
+                    "due_on": "2027-03-05",
+                    "month_index": 6,
+                    "payment_yen": 15000,
+                    "interest_yen": 3688,
+                    "principal_yen": 11312,
+                    "closing_balance_yen": 234587,
+                    "opening_balance_yen": 245899
+                },
+                {
+                    "due_on": "2027-04-05",
+                    "month_index": 7,
+                    "payment_yen": 15000,
+                    "interest_yen": 3518,
+                    "principal_yen": 11482,
+                    "closing_balance_yen": 223105,
+                    "opening_balance_yen": 234587
+                },
+                {
+                    "due_on": "2027-05-05",
+                    "month_index": 8,
+                    "payment_yen": 15000,
+                    "interest_yen": 3346,
+                    "principal_yen": 11654,
+                    "closing_balance_yen": 211451,
+                    "opening_balance_yen": 223105
+                },
+                {
+                    "due_on": "2027-06-05",
+                    "month_index": 9,
+                    "payment_yen": 15000,
+                    "interest_yen": 3171,
+                    "principal_yen": 11829,
+                    "closing_balance_yen": 199622,
+                    "opening_balance_yen": 211451
+                },
+                {
+                    "due_on": "2027-07-05",
+                    "month_index": 10,
+                    "payment_yen": 15000,
+                    "interest_yen": 2994,
+                    "principal_yen": 12006,
+                    "closing_balance_yen": 187616,
+                    "opening_balance_yen": 199622
+                },
+                {
+                    "due_on": "2027-08-05",
+                    "month_index": 11,
+                    "payment_yen": 15000,
+                    "interest_yen": 2814,
+                    "principal_yen": 12186,
+                    "closing_balance_yen": 175430,
+                    "opening_balance_yen": 187616
+                },
+                {
+                    "due_on": "2027-09-05",
+                    "month_index": 12,
+                    "payment_yen": 15000,
+                    "interest_yen": 2631,
+                    "principal_yen": 12369,
+                    "closing_balance_yen": 163061,
+                    "opening_balance_yen": 175430
+                },
+                {
+                    "due_on": "2027-10-05",
+                    "month_index": 13,
+                    "payment_yen": 15000,
+                    "interest_yen": 2445,
+                    "principal_yen": 12555,
+                    "closing_balance_yen": 150506,
+                    "opening_balance_yen": 163061
+                },
+                {
+                    "due_on": "2027-11-05",
+                    "month_index": 14,
+                    "payment_yen": 15000,
+                    "interest_yen": 2257,
+                    "principal_yen": 12743,
+                    "closing_balance_yen": 137763,
+                    "opening_balance_yen": 150506
+                },
+                {
+                    "due_on": "2027-12-05",
+                    "month_index": 15,
+                    "payment_yen": 15000,
+                    "interest_yen": 2066,
+                    "principal_yen": 12934,
+                    "closing_balance_yen": 124829,
+                    "opening_balance_yen": 137763
+                },
+                {
+                    "due_on": "2028-01-05",
+                    "month_index": 16,
+                    "payment_yen": 15000,
+                    "interest_yen": 1872,
+                    "principal_yen": 13128,
+                    "closing_balance_yen": 111701,
+                    "opening_balance_yen": 124829
+                },
+                {
+                    "due_on": "2028-02-05",
+                    "month_index": 17,
+                    "payment_yen": 15000,
+                    "interest_yen": 1675,
+                    "principal_yen": 13325,
+                    "closing_balance_yen": 98376,
+                    "opening_balance_yen": 111701
+                },
+                {
+                    "due_on": "2028-03-05",
+                    "month_index": 18,
+                    "payment_yen": 15000,
+                    "interest_yen": 1475,
+                    "principal_yen": 13525,
+                    "closing_balance_yen": 84851,
+                    "opening_balance_yen": 98376
+                },
+                {
+                    "due_on": "2028-04-05",
+                    "month_index": 19,
+                    "payment_yen": 15000,
+                    "interest_yen": 1272,
+                    "principal_yen": 13728,
+                    "closing_balance_yen": 71123,
+                    "opening_balance_yen": 84851
+                },
+                {
+                    "due_on": "2028-05-05",
+                    "month_index": 20,
+                    "payment_yen": 15000,
+                    "interest_yen": 1066,
+                    "principal_yen": 13934,
+                    "closing_balance_yen": 57189,
+                    "opening_balance_yen": 71123
+                },
+                {
+                    "due_on": "2028-06-05",
+                    "month_index": 21,
+                    "payment_yen": 15000,
+                    "interest_yen": 857,
+                    "principal_yen": 14143,
+                    "closing_balance_yen": 43046,
+                    "opening_balance_yen": 57189
+                },
+                {
+                    "due_on": "2028-07-05",
+                    "month_index": 22,
+                    "payment_yen": 15000,
+                    "interest_yen": 645,
+                    "principal_yen": 14355,
+                    "closing_balance_yen": 28691,
+                    "opening_balance_yen": 43046
+                },
+                {
+                    "due_on": "2028-08-05",
+                    "month_index": 23,
+                    "payment_yen": 15000,
+                    "interest_yen": 430,
+                    "principal_yen": 14570,
+                    "closing_balance_yen": 14121,
+                    "opening_balance_yen": 28691
+                },
+                {
+                    "due_on": "2028-09-05",
+                    "month_index": 24,
+                    "payment_yen": 14332,
+                    "interest_yen": 211,
+                    "principal_yen": 14121,
+                    "closing_balance_yen": 0,
+                    "opening_balance_yen": 14121
+                }
+            ],
+            "debtId": "dddddddd-0000-0000-0000-000000000003",
+            "monthlyPaymentYen": 15000
+        },
+        {
+            "kind": "total",
+            "name": "total: アバランチ / 月100,000円",
+            "rows": [
+                {
+                    "month_on": "2026-10-01",
+                    "month_index": 1,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 913250,
+                    "opening_total_yen": 1000000,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 13250,
+                    "principal_total_yen": 86750
+                },
+                {
+                    "month_on": "2026-11-01",
+                    "month_index": 2,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 825220,
+                    "opening_total_yen": 913250,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 11970,
+                    "principal_total_yen": 88030
+                },
+                {
+                    "month_on": "2026-12-01",
+                    "month_index": 3,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 735894,
+                    "opening_total_yen": 825220,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 10674,
+                    "principal_total_yen": 89326
+                },
+                {
+                    "month_on": "2027-01-01",
+                    "month_index": 4,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 645251,
+                    "opening_total_yen": 735894,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 9357,
+                    "principal_total_yen": 90643
+                },
+                {
+                    "month_on": "2027-02-01",
+                    "month_index": 5,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 553316,
+                    "opening_total_yen": 645251,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 8065,
+                    "principal_total_yen": 91935
+                },
+                {
+                    "month_on": "2027-03-01",
+                    "month_index": 6,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 460231,
+                    "opening_total_yen": 553316,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 6915,
+                    "principal_total_yen": 93085
+                },
+                {
+                    "month_on": "2027-04-01",
+                    "month_index": 7,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 365983,
+                    "opening_total_yen": 460231,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 5752,
+                    "principal_total_yen": 94248
+                },
+                {
+                    "month_on": "2027-05-01",
+                    "month_index": 8,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 270556,
+                    "opening_total_yen": 365983,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 4573,
+                    "principal_total_yen": 95427
+                },
+                {
+                    "month_on": "2027-06-01",
+                    "month_index": 9,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 173937,
+                    "opening_total_yen": 270556,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 3381,
+                    "principal_total_yen": 96619
+                },
+                {
+                    "month_on": "2027-07-01",
+                    "month_index": 10,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 76111,
+                    "opening_total_yen": 173937,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 2174,
+                    "principal_total_yen": 97826
+                },
+                {
+                    "month_on": "2027-08-01",
+                    "month_index": 11,
+                    "debts_remaining": 0,
+                    "closing_total_yen": 0,
+                    "opening_total_yen": 76111,
+                    "payment_total_yen": 77062,
+                    "interest_total_yen": 951,
+                    "principal_total_yen": 76111
+                }
+            ],
+            "strategy": "avalanche",
+            "monthlyBudgetYen": 100000
+        },
+        {
+            "kind": "total",
+            "name": "total: スノーボール / 月100,000円",
+            "rows": [
+                {
+                    "month_on": "2026-10-01",
+                    "month_index": 1,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 913250,
+                    "opening_total_yen": 1000000,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 13250,
+                    "principal_total_yen": 86750
+                },
+                {
+                    "month_on": "2026-11-01",
+                    "month_index": 2,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 825403,
+                    "opening_total_yen": 913250,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 12153,
+                    "principal_total_yen": 87847
+                },
+                {
+                    "month_on": "2026-12-01",
+                    "month_index": 3,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 736446,
+                    "opening_total_yen": 825403,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 11043,
+                    "principal_total_yen": 88957
+                },
+                {
+                    "month_on": "2027-01-01",
+                    "month_index": 4,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 646366,
+                    "opening_total_yen": 736446,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 9920,
+                    "principal_total_yen": 90080
+                },
+                {
+                    "month_on": "2027-02-01",
+                    "month_index": 5,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 555112,
+                    "opening_total_yen": 646366,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 8746,
+                    "principal_total_yen": 91254
+                },
+                {
+                    "month_on": "2027-03-01",
+                    "month_index": 6,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 462502,
+                    "opening_total_yen": 555112,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 7390,
+                    "principal_total_yen": 92610
+                },
+                {
+                    "month_on": "2027-04-01",
+                    "month_index": 7,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 368516,
+                    "opening_total_yen": 462502,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 6014,
+                    "principal_total_yen": 93986
+                },
+                {
+                    "month_on": "2027-05-01",
+                    "month_index": 8,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 273133,
+                    "opening_total_yen": 368516,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 4617,
+                    "principal_total_yen": 95383
+                },
+                {
+                    "month_on": "2027-06-01",
+                    "month_index": 9,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 176547,
+                    "opening_total_yen": 273133,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 3414,
+                    "principal_total_yen": 96586
+                },
+                {
+                    "month_on": "2027-07-01",
+                    "month_index": 10,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 78753,
+                    "opening_total_yen": 176547,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 2206,
+                    "principal_total_yen": 97794
+                },
+                {
+                    "month_on": "2027-08-01",
+                    "month_index": 11,
+                    "debts_remaining": 0,
+                    "closing_total_yen": 0,
+                    "opening_total_yen": 78753,
+                    "payment_total_yen": 79737,
+                    "interest_total_yen": 984,
+                    "principal_total_yen": 78753
+                }
+            ],
+            "strategy": "snowball",
+            "monthlyBudgetYen": 100000
+        },
+        {
+            "kind": "total",
+            "name": "total: 最低返済のみ(比較の基準)",
+            "rows": [
+                {
+                    "month_on": "2026-10-01",
+                    "month_index": 1,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 986250,
+                    "opening_total_yen": 1000000,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 13250,
+                    "principal_total_yen": 13750
+                },
+                {
+                    "month_on": "2026-11-01",
+                    "month_index": 2,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 972315,
+                    "opening_total_yen": 986250,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 13065,
+                    "principal_total_yen": 13935
+                },
+                {
+                    "month_on": "2026-12-01",
+                    "month_index": 3,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 958195,
+                    "opening_total_yen": 972315,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 12880,
+                    "principal_total_yen": 14120
+                },
+                {
+                    "month_on": "2027-01-01",
+                    "month_index": 4,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 943887,
+                    "opening_total_yen": 958195,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 12692,
+                    "principal_total_yen": 14308
+                },
+                {
+                    "month_on": "2027-02-01",
+                    "month_index": 5,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 929388,
+                    "opening_total_yen": 943887,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 12501,
+                    "principal_total_yen": 14499
+                },
+                {
+                    "month_on": "2027-03-01",
+                    "month_index": 6,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 914696,
+                    "opening_total_yen": 929388,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 12308,
+                    "principal_total_yen": 14692
+                },
+                {
+                    "month_on": "2027-04-01",
+                    "month_index": 7,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 899809,
+                    "opening_total_yen": 914696,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 12113,
+                    "principal_total_yen": 14887
+                },
+                {
+                    "month_on": "2027-05-01",
+                    "month_index": 8,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 884722,
+                    "opening_total_yen": 899809,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 11913,
+                    "principal_total_yen": 15087
+                },
+                {
+                    "month_on": "2027-06-01",
+                    "month_index": 9,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 869434,
+                    "opening_total_yen": 884722,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 11712,
+                    "principal_total_yen": 15288
+                },
+                {
+                    "month_on": "2027-07-01",
+                    "month_index": 10,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 853943,
+                    "opening_total_yen": 869434,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 11509,
+                    "principal_total_yen": 15491
+                },
+                {
+                    "month_on": "2027-08-01",
+                    "month_index": 11,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 838245,
+                    "opening_total_yen": 853943,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 11302,
+                    "principal_total_yen": 15698
+                },
+                {
+                    "month_on": "2027-09-01",
+                    "month_index": 12,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 822338,
+                    "opening_total_yen": 838245,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 11093,
+                    "principal_total_yen": 15907
+                },
+                {
+                    "month_on": "2027-10-01",
+                    "month_index": 13,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 806219,
+                    "opening_total_yen": 822338,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 10881,
+                    "principal_total_yen": 16119
+                },
+                {
+                    "month_on": "2027-11-01",
+                    "month_index": 14,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 789885,
+                    "opening_total_yen": 806219,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 10666,
+                    "principal_total_yen": 16334
+                },
+                {
+                    "month_on": "2027-12-01",
+                    "month_index": 15,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 773333,
+                    "opening_total_yen": 789885,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 10448,
+                    "principal_total_yen": 16552
+                },
+                {
+                    "month_on": "2028-01-01",
+                    "month_index": 16,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 756560,
+                    "opening_total_yen": 773333,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 10227,
+                    "principal_total_yen": 16773
+                },
+                {
+                    "month_on": "2028-02-01",
+                    "month_index": 17,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 739564,
+                    "opening_total_yen": 756560,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 10004,
+                    "principal_total_yen": 16996
+                },
+                {
+                    "month_on": "2028-03-01",
+                    "month_index": 18,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 722341,
+                    "opening_total_yen": 739564,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 9777,
+                    "principal_total_yen": 17223
+                },
+                {
+                    "month_on": "2028-04-01",
+                    "month_index": 19,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 704888,
+                    "opening_total_yen": 722341,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 9547,
+                    "principal_total_yen": 17453
+                },
+                {
+                    "month_on": "2028-05-01",
+                    "month_index": 20,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 687202,
+                    "opening_total_yen": 704888,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 9314,
+                    "principal_total_yen": 17686
+                },
+                {
+                    "month_on": "2028-06-01",
+                    "month_index": 21,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 669280,
+                    "opening_total_yen": 687202,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 9078,
+                    "principal_total_yen": 17922
+                },
+                {
+                    "month_on": "2028-07-01",
+                    "month_index": 22,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 651120,
+                    "opening_total_yen": 669280,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 8840,
+                    "principal_total_yen": 18160
+                },
+                {
+                    "month_on": "2028-08-01",
+                    "month_index": 23,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 632717,
+                    "opening_total_yen": 651120,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 8597,
+                    "principal_total_yen": 18403
+                },
+                {
+                    "month_on": "2028-09-01",
+                    "month_index": 24,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 614069,
+                    "opening_total_yen": 632717,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 8352,
+                    "principal_total_yen": 18648
+                },
+                {
+                    "month_on": "2028-10-01",
+                    "month_index": 25,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 595171,
+                    "opening_total_yen": 614069,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 8102,
+                    "principal_total_yen": 18898
+                },
+                {
+                    "month_on": "2028-11-01",
+                    "month_index": 26,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 576021,
+                    "opening_total_yen": 595171,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 7850,
+                    "principal_total_yen": 19150
+                },
+                {
+                    "month_on": "2028-12-01",
+                    "month_index": 27,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 556615,
+                    "opening_total_yen": 576021,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 7594,
+                    "principal_total_yen": 19406
+                },
+                {
+                    "month_on": "2029-01-01",
+                    "month_index": 28,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 536951,
+                    "opening_total_yen": 556615,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 7336,
+                    "principal_total_yen": 19664
+                },
+                {
+                    "month_on": "2029-02-01",
+                    "month_index": 29,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 517023,
+                    "opening_total_yen": 536951,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 7072,
+                    "principal_total_yen": 19928
+                },
+                {
+                    "month_on": "2029-03-01",
+                    "month_index": 30,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 496829,
+                    "opening_total_yen": 517023,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 6806,
+                    "principal_total_yen": 20194
+                },
+                {
+                    "month_on": "2029-04-01",
+                    "month_index": 31,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 476365,
+                    "opening_total_yen": 496829,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 6536,
+                    "principal_total_yen": 20464
+                },
+                {
+                    "month_on": "2029-05-01",
+                    "month_index": 32,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 455629,
+                    "opening_total_yen": 476365,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 6264,
+                    "principal_total_yen": 20736
+                },
+                {
+                    "month_on": "2029-06-01",
+                    "month_index": 33,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 434616,
+                    "opening_total_yen": 455629,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 5987,
+                    "principal_total_yen": 21013
+                },
+                {
+                    "month_on": "2029-07-01",
+                    "month_index": 34,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 413322,
+                    "opening_total_yen": 434616,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 5706,
+                    "principal_total_yen": 21294
+                },
+                {
+                    "month_on": "2029-08-01",
+                    "month_index": 35,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 391743,
+                    "opening_total_yen": 413322,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 5421,
+                    "principal_total_yen": 21579
+                },
+                {
+                    "month_on": "2029-09-01",
+                    "month_index": 36,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 369876,
+                    "opening_total_yen": 391743,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 5133,
+                    "principal_total_yen": 21867
+                },
+                {
+                    "month_on": "2029-10-01",
+                    "month_index": 37,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 347717,
+                    "opening_total_yen": 369876,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 4841,
+                    "principal_total_yen": 22159
+                },
+                {
+                    "month_on": "2029-11-01",
+                    "month_index": 38,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 325261,
+                    "opening_total_yen": 347717,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 4544,
+                    "principal_total_yen": 22456
+                },
+                {
+                    "month_on": "2029-12-01",
+                    "month_index": 39,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 302505,
+                    "opening_total_yen": 325261,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 4244,
+                    "principal_total_yen": 22756
+                },
+                {
+                    "month_on": "2030-01-01",
+                    "month_index": 40,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 279445,
+                    "opening_total_yen": 302505,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 3940,
+                    "principal_total_yen": 23060
+                },
+                {
+                    "month_on": "2030-02-01",
+                    "month_index": 41,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 256076,
+                    "opening_total_yen": 279445,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 3631,
+                    "principal_total_yen": 23369
+                },
+                {
+                    "month_on": "2030-03-01",
+                    "month_index": 42,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 232395,
+                    "opening_total_yen": 256076,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 3319,
+                    "principal_total_yen": 23681
+                },
+                {
+                    "month_on": "2030-04-01",
+                    "month_index": 43,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 208396,
+                    "opening_total_yen": 232395,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 3001,
+                    "principal_total_yen": 23999
+                },
+                {
+                    "month_on": "2030-05-01",
+                    "month_index": 44,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 184077,
+                    "opening_total_yen": 208396,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 2681,
+                    "principal_total_yen": 24319
+                },
+                {
+                    "month_on": "2030-06-01",
+                    "month_index": 45,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 159432,
+                    "opening_total_yen": 184077,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 2355,
+                    "principal_total_yen": 24645
+                },
+                {
+                    "month_on": "2030-07-01",
+                    "month_index": 46,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 134457,
+                    "opening_total_yen": 159432,
+                    "payment_total_yen": 27000,
+                    "interest_total_yen": 2025,
+                    "principal_total_yen": 24975
+                },
+                {
+                    "month_on": "2030-08-01",
+                    "month_index": 47,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 113166,
+                    "opening_total_yen": 134457,
+                    "payment_total_yen": 22982,
+                    "interest_total_yen": 1691,
+                    "principal_total_yen": 21291
+                },
+                {
+                    "month_on": "2030-09-01",
+                    "month_index": 48,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 96579,
+                    "opening_total_yen": 113166,
+                    "payment_total_yen": 18000,
+                    "interest_total_yen": 1413,
+                    "principal_total_yen": 16587
+                },
+                {
+                    "month_on": "2030-10-01",
+                    "month_index": 49,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 79785,
+                    "opening_total_yen": 96579,
+                    "payment_total_yen": 18000,
+                    "interest_total_yen": 1206,
+                    "principal_total_yen": 16794
+                },
+                {
+                    "month_on": "2030-11-01",
+                    "month_index": 50,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 62781,
+                    "opening_total_yen": 79785,
+                    "payment_total_yen": 18000,
+                    "interest_total_yen": 996,
+                    "principal_total_yen": 17004
+                },
+                {
+                    "month_on": "2030-12-01",
+                    "month_index": 51,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 46253,
+                    "opening_total_yen": 62781,
+                    "payment_total_yen": 17312,
+                    "interest_total_yen": 784,
+                    "principal_total_yen": 16528
+                },
+                {
+                    "month_on": "2031-01-01",
+                    "month_index": 52,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 36831,
+                    "opening_total_yen": 46253,
+                    "payment_total_yen": 10000,
+                    "interest_total_yen": 578,
+                    "principal_total_yen": 9422
+                },
+                {
+                    "month_on": "2031-02-01",
+                    "month_index": 53,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 27291,
+                    "opening_total_yen": 36831,
+                    "payment_total_yen": 10000,
+                    "interest_total_yen": 460,
+                    "principal_total_yen": 9540
+                },
+                {
+                    "month_on": "2031-03-01",
+                    "month_index": 54,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 17632,
+                    "opening_total_yen": 27291,
+                    "payment_total_yen": 10000,
+                    "interest_total_yen": 341,
+                    "principal_total_yen": 9659
+                },
+                {
+                    "month_on": "2031-04-01",
+                    "month_index": 55,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 7852,
+                    "opening_total_yen": 17632,
+                    "payment_total_yen": 10000,
+                    "interest_total_yen": 220,
+                    "principal_total_yen": 9780
+                },
+                {
+                    "month_on": "2031-05-01",
+                    "month_index": 56,
+                    "debts_remaining": 0,
+                    "closing_total_yen": 0,
+                    "opening_total_yen": 7852,
+                    "payment_total_yen": 7950,
+                    "interest_total_yen": 98,
+                    "principal_total_yen": 7852
+                }
+            ],
+            "strategy": "minimum",
+            "monthlyBudgetYen": null
+        },
+        {
+            "kind": "total",
+            "name": "total: アバランチ / 月80,000円(端数が出る額)",
+            "rows": [
+                {
+                    "month_on": "2026-10-01",
+                    "month_index": 1,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 933250,
+                    "opening_total_yen": 1000000,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 13250,
+                    "principal_total_yen": 66750
+                },
+                {
+                    "month_on": "2026-11-01",
+                    "month_index": 2,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 865520,
+                    "opening_total_yen": 933250,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 12270,
+                    "principal_total_yen": 67730
+                },
+                {
+                    "month_on": "2026-12-01",
+                    "month_index": 3,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 796799,
+                    "opening_total_yen": 865520,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 11279,
+                    "principal_total_yen": 68721
+                },
+                {
+                    "month_on": "2027-01-01",
+                    "month_index": 4,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 727070,
+                    "opening_total_yen": 796799,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 10271,
+                    "principal_total_yen": 69729
+                },
+                {
+                    "month_on": "2027-02-01",
+                    "month_index": 5,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 656319,
+                    "opening_total_yen": 727070,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 9249,
+                    "principal_total_yen": 70751
+                },
+                {
+                    "month_on": "2027-03-01",
+                    "month_index": 6,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 584531,
+                    "opening_total_yen": 656319,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 8212,
+                    "principal_total_yen": 71788
+                },
+                {
+                    "month_on": "2027-04-01",
+                    "month_index": 7,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 511837,
+                    "opening_total_yen": 584531,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 7306,
+                    "principal_total_yen": 72694
+                },
+                {
+                    "month_on": "2027-05-01",
+                    "month_index": 8,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 438234,
+                    "opening_total_yen": 511837,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 6397,
+                    "principal_total_yen": 73603
+                },
+                {
+                    "month_on": "2027-06-01",
+                    "month_index": 9,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 363711,
+                    "opening_total_yen": 438234,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 5477,
+                    "principal_total_yen": 74523
+                },
+                {
+                    "month_on": "2027-07-01",
+                    "month_index": 10,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 288257,
+                    "opening_total_yen": 363711,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 4546,
+                    "principal_total_yen": 75454
+                },
+                {
+                    "month_on": "2027-08-01",
+                    "month_index": 11,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 211859,
+                    "opening_total_yen": 288257,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 3602,
+                    "principal_total_yen": 76398
+                },
+                {
+                    "month_on": "2027-09-01",
+                    "month_index": 12,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 134507,
+                    "opening_total_yen": 211859,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 2648,
+                    "principal_total_yen": 77352
+                },
+                {
+                    "month_on": "2027-10-01",
+                    "month_index": 13,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 56188,
+                    "opening_total_yen": 134507,
+                    "payment_total_yen": 80000,
+                    "interest_total_yen": 1681,
+                    "principal_total_yen": 78319
+                },
+                {
+                    "month_on": "2027-11-01",
+                    "month_index": 14,
+                    "debts_remaining": 0,
+                    "closing_total_yen": 0,
+                    "opening_total_yen": 56188,
+                    "payment_total_yen": 56890,
+                    "interest_total_yen": 702,
+                    "principal_total_yen": 56188
+                }
+            ],
+            "strategy": "avalanche",
+            "monthlyBudgetYen": 80000
+        },
+        {
+            "kind": "refinanced",
+            "name": "total: 借り換え年8% / 月100,000円",
+            "rows": [
+                {
+                    "month_on": "2026-10-01",
+                    "month_index": 1,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 906666,
+                    "opening_total_yen": 1000000,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 6666,
+                    "principal_total_yen": 93334
+                },
+                {
+                    "month_on": "2026-11-01",
+                    "month_index": 2,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 812710,
+                    "opening_total_yen": 906666,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 6044,
+                    "principal_total_yen": 93956
+                },
+                {
+                    "month_on": "2026-12-01",
+                    "month_index": 3,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 718126,
+                    "opening_total_yen": 812710,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 5416,
+                    "principal_total_yen": 94584
+                },
+                {
+                    "month_on": "2027-01-01",
+                    "month_index": 4,
+                    "debts_remaining": 3,
+                    "closing_total_yen": 622913,
+                    "opening_total_yen": 718126,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 4787,
+                    "principal_total_yen": 95213
+                },
+                {
+                    "month_on": "2027-02-01",
+                    "month_index": 5,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 527064,
+                    "opening_total_yen": 622913,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 4151,
+                    "principal_total_yen": 95849
+                },
+                {
+                    "month_on": "2027-03-01",
+                    "month_index": 6,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 430577,
+                    "opening_total_yen": 527064,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 3513,
+                    "principal_total_yen": 96487
+                },
+                {
+                    "month_on": "2027-04-01",
+                    "month_index": 7,
+                    "debts_remaining": 2,
+                    "closing_total_yen": 333447,
+                    "opening_total_yen": 430577,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 2870,
+                    "principal_total_yen": 97130
+                },
+                {
+                    "month_on": "2027-05-01",
+                    "month_index": 8,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 235669,
+                    "opening_total_yen": 333447,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 2222,
+                    "principal_total_yen": 97778
+                },
+                {
+                    "month_on": "2027-06-01",
+                    "month_index": 9,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 137240,
+                    "opening_total_yen": 235669,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 1571,
+                    "principal_total_yen": 98429
+                },
+                {
+                    "month_on": "2027-07-01",
+                    "month_index": 10,
+                    "debts_remaining": 1,
+                    "closing_total_yen": 38154,
+                    "opening_total_yen": 137240,
+                    "payment_total_yen": 100000,
+                    "interest_total_yen": 914,
+                    "principal_total_yen": 99086
+                },
+                {
+                    "month_on": "2027-08-01",
+                    "month_index": 11,
+                    "debts_remaining": 0,
+                    "closing_total_yen": 0,
+                    "opening_total_yen": 38154,
+                    "payment_total_yen": 38408,
+                    "interest_total_yen": 254,
+                    "principal_total_yen": 38154
+                }
+            ],
+            "strategy": "avalanche",
+            "monthlyBudgetYen": 100000
+        }
+    ],
+    "debts": [
+        {
+            "id": "dddddddd-0000-0000-0000-000000000001",
+            "annualRate": "0.1500",
+            "balanceYen": 400000,
+            "paymentDay": 27,
+            "minimumPaymentYen": 10000
+        },
+        {
+            "id": "dddddddd-0000-0000-0000-000000000002",
+            "annualRate": "0.1500",
+            "balanceYen": 300000,
+            "paymentDay": 27,
+            "minimumPaymentYen": 8000
+        },
+        {
+            "id": "dddddddd-0000-0000-0000-000000000003",
+            "annualRate": "0.1800",
+            "balanceYen": 300000,
+            "paymentDay": 5,
+            "minimumPaymentYen": 9000
+        }
+    ],
+    "source": "docs/schema.sql の simulate_debt_payoff() / simulate_total_payoff()",
+    "baseMonth": "2026-09-01",
+    "refinancedAnnualRate": "0.0800"
+}

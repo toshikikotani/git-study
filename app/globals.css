@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+html {
+  /* 数字を等幅にして、桁が変わっても金額が横に揺れないようにする */
+  font-variant-numeric: tabular-nums;
+}

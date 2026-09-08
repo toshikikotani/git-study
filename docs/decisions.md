@@ -13,7 +13,7 @@
 
 | ID | 決定事項 | 選定 | 状態 | 差し替えコスト |
 |---|---|---|---|---|
-| ADR-001 | フロントエンドフレームワーク | Next.js 15 (App Router) | 確定 | 大 |
+| ADR-001 | フロントエンドフレームワーク | Next.js 16 (App Router) | 確定 | 大 |
 | ADR-002 | 通知先 | Discord Webhook | 確定 | 小 |
 | ADR-003 | 投資並走比率 | 返済額の 20% | 暫定 | 極小(設定値) |
 | ADR-004 | 女遊び枠の月額上限 | 40,000 円 | 暫定 | 極小(設定値) |
@@ -31,11 +31,11 @@
 
 ---
 
-## ADR-001:フロントエンドフレームワークは Next.js 15 (App Router)
+## ADR-001:フロントエンドフレームワークは Next.js 16 (App Router)
 
 **未決事項**:フロントフレームワークの確定(Next.js / SvelteKit)
 
-**決定**:Next.js 15 App Router + TypeScript + Tailwind CSS
+**決定**:Next.js 16 App Router + TypeScript + Tailwind CSS v4
 
 **理由**
 
@@ -51,6 +51,14 @@
 - **Remix / React Router v7**:Vercel 以外への移植性は高いが、本システムはロックイン回避を「DB とデータ」で担保しており(ADR-008, ADR-011)、フロントの移植性は優先度が低い
 
 **トレードオフ**:App Router のキャッシュ挙動は初学者を躓かせやすい。金額表示は常に最新でなければならないため、金額を読む画面ではすべて `export const dynamic = 'force-dynamic'` を明示する運用ルールとする。
+
+**付随して決めたこと**(実装時に確定)
+
+- `typedRoutes: true` を有効にする。存在しないルートへのリンクをビルドで落とす。ナビゲーションのリンク切れは、個人開発では気づかないまま放置されやすい
+- ESLint は 9 系に固定する。10 系では `eslint-config-next` が同梱する `eslint-plugin-react` が動作しない(`contextOrFilename.getFilename is not a function`)。上流が対応したら上げる
+- `tsconfig` は `strict` に加えて `noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` / `noUnusedLocals` を有効にする。金額を扱うコードで配列アクセスが `undefined` を返しうることを型で見えるようにするため
+
+**改訂**:2026-09-08 — 実装着手時の最新安定版が Next.js 16 だったため 15 → 16 に変更。App Router 前提であることに変わりはなく、判断の根拠は影響を受けない。
 
 ---
 
