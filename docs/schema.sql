@@ -1906,11 +1906,27 @@ begin
     (p_user_id, '最低返済のみ', 'minimum',   null,   true,  10),
     (p_user_id, '月10万円返済', 'avalanche', 100000, false, 20)
   on conflict (user_id, name) do nothing;
+
+  -- ADR-006:負債の正確な内訳が判明するまでの仮置き3件。
+  -- is_estimated = true とし、画面には「推定」バッジと「正確な値を入力する」
+  -- 導線を出す(M1-2)。最低返済額は ADR-006 に定めが無いため、リボ・
+  -- 消費者金融の一般的な水準から妥当な仮値を置いた(decisions.md に追記)。
+  -- 既に debts が1件でもあれば(本人が入力・削除済み)何もしない。
+  insert into public.debts
+    (user_id, lender_name, kind, current_balance_yen, minimum_payment_yen, annual_rate, payment_day, is_estimated)
+  select p_user_id, v.lender_name, v.kind, v.balance_yen, v.minimum_payment_yen, v.annual_rate, v.payment_day, true
+  from (
+    values
+      ('カードA',     'revolving'::debt_kind,        400000, 10000, 0.15::numeric, 27),
+      ('カードB',     'revolving'::debt_kind,         300000,  8000, 0.15::numeric, 27),
+      ('消費者金融C', 'consumer_finance'::debt_kind, 300000, 10000, 0.18::numeric,  5)
+  ) as v(lender_name, kind, balance_yen, minimum_payment_yen, annual_rate, payment_day)
+  where not exists (select 1 from public.debts where user_id = p_user_id);
 end;
 $$;
 
 comment on function public.seed_defaults(uuid) is
-  'カテゴリ・検知ルール・振替ルール・比較シナリオの初期値を投入する。ユーザー作成直後に一度だけ実行する。';
+  'カテゴリ・検知ルール・振替ルール・比較シナリオ・負債の初期値を投入する。ユーザー作成直後に一度だけ実行する。';
 
 
 -- =============================================================================

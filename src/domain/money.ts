@@ -128,3 +128,28 @@ export function formatAnnualRate(annualRate: number): string {
   const percent = annualRate * 100;
   return `${Number(percent.toFixed(2))}%`;
 }
+
+/**
+ * フォーム入力(パーセント表記)を保存用の小数に変換する。
+ * 「15」も「15%」も 0.15 になる。formatAnnualRate の逆変換。
+ */
+export function parseAnnualRate(input: string): number {
+  const normalized = input
+    .replace(/[０-９．，－＋]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[%％\s]/g, '')
+    .trim();
+
+  if (normalized === '') {
+    throw new MoneyError('年利が空です');
+  }
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new MoneyError(`年利として解釈できません: ${input}`);
+  }
+
+  const percent = Number(normalized);
+  const rate = percent / 100;
+  if (rate < 0 || rate > 1) {
+    throw new MoneyError(`年利は 0〜100% の範囲で入力してください: ${input}`);
+  }
+  return rate;
+}
