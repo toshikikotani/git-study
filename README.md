@@ -51,6 +51,26 @@ Supabase / Vercel / Anthropic のアカウントが未作成でも、`npm run te
 
 `verify:schema` と `gen-payoff-golden.sh` はローカルに PostgreSQL 15 以上(`initdb` / `pg_ctl` / `psql`)が必要。Ubuntu なら `apt-get install -y postgresql-16`。
 
+## デプロイ
+
+ホスティングは Vercel(ADR-012)。**現時点では環境変数なしでデプロイできる。** Supabase もまだ読んでいないため、公開すると仮の数字が入ったホーム画面が表示される。
+
+1. [vercel.com](https://vercel.com) に GitHub アカウントでログイン
+2. **Add New → Project** からこのリポジトリを選ぶ
+3. Framework Preset に **Next.js** が自動で選ばれることを確認し、設定は変えずに **Deploy**
+
+以降、`main` への push で自動デプロイされる。
+
+### 公開前に知っておくこと
+
+- **認証はまだ無い**(M0-3)。URL を知っている人は誰でも開ける。現在は仮の数字しか出ないため実害はないが、**実際の明細や負債を入れる前に M0-3 を終えること**
+- 検索エンジンには拾われないようにしてある(`app/robots.ts` と `metadata.robots`)。ただしこれは検索避けであって、アクセス制限ではない
+- URL を人に見せたくない段階なら、Vercel の **Settings → Deployment Protection → Vercel Authentication** を有効にすると、本人のログインが必要になる
+
+### 環境変数を入れる段階になったら
+
+`.env.example` の項目を Vercel の **Settings → Environment Variables** に入れる。`SUPABASE_SERVICE_ROLE_KEY` / `ANTHROPIC_API_KEY` / `DISCORD_WEBHOOK_URL` / `CRON_SECRET` は Production のみで良い。GitHub Actions 側にも同じ値が要る(定期ジョブ用、ADR-009)。
+
 ## 設計上の約束
 
 コードを書く前に読むべきもの。破ると金額が静かに間違う。
