@@ -14,6 +14,12 @@ export type RepaymentStrategy = Database['public']['Enums']['repayment_strategy'
 export type AppSettings = {
   monthlyRepaymentTargetYen: number;
   repaymentStrategy: RepaymentStrategy;
+  /** 返済目標額に対する投資額の比率(0〜1)。既定 0.2(FR-50)。 */
+  investmentRatioOfRepayment: number;
+  /** 完済を機に高リスク投資枠が解禁されているか(FR-52)。 */
+  isHighRiskUnlocked: boolean;
+  /** 高リスク枠解禁後、投資総額のうち高リスク枠に回す比率(0〜1)。既定 0.3。 */
+  highRiskAllocationRatio: number;
 };
 
 export class SettingsStoreError extends Error {
@@ -27,12 +33,17 @@ export async function getAppSettings(): Promise<AppSettings> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('app_settings')
-    .select('monthly_repayment_target_yen, repayment_strategy')
+    .select(
+      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio',
+    )
     .single();
   if (error) throw new SettingsStoreError(`設定を取得できませんでした: ${error.message}`);
 
   return {
     monthlyRepaymentTargetYen: data.monthly_repayment_target_yen,
     repaymentStrategy: data.repayment_strategy,
+    investmentRatioOfRepayment: data.investment_ratio_of_repayment,
+    isHighRiskUnlocked: data.is_high_risk_unlocked,
+    highRiskAllocationRatio: data.high_risk_allocation_ratio,
   };
 }
