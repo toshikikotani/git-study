@@ -39,6 +39,7 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
+| M2-3b | 分類エンジンを取り込み経路へ接続する(ルール適用 → 保存) | S | M0-3, M2-2 |
 | M4-4 | 給料日チェックリスト | M | M4-3 |
 | M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
 
@@ -182,6 +183,7 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 | M1-4 | 借り換えシミュレーション(FR-04)。`domain/payoff.ts` に `compareRefinance()` を追加 — `comparePlans()`(返済額を変えた効果)と対になる、金利だけを変えた効果を見る純粋関数。`/debts` に「借り換えを試す」区画(`refinance-simulation.tsx`)を追加し、年利入力に応じて即時再計算。`repayment_scenarios` への保存(`src/features/scenarios/store.ts`、`user_id,name` の unique 制約に upsert)・削除・一覧を実装し、`src/domain/scenario.ts` にシナリオ名の検証を追加。実際に Supabase セッションを発行し、年利変更で数字が変わること、保存したシナリオがリロード後も残ること、削除で消えることを実ブラウザ操作で確認済み(検証用シナリオは削除済み、既存の`最低返済のみ`/`月10万円返済`シードは対象外)。テスト4件追加(compareRefinance 2件、assertScenarioName 2件、既存 payoff テストは回帰なし) | 2026-09-09 |
 | M4-3 | 振替ルール編集画面(FR-15)。`/payday` を置きページから実画面へ(T-5)。`src/features/transfer-rules/store.ts`(list/create/update/delete、`listCategoryOptions()`)、`src/domain/transfer-rule.ts`(ルール名・金額指定方式ごとの検証。fixed/percentage/remainder で必要な列だけ埋める)。並び替えは隣接2件の `execution_order` を負の一時値を経由して入れ替え、`ux_transfer_rules_order`(一意制約)に一時的にも触れないようにした。DB 制約違反(`ux_transfer_rules_remainder` など)を本人に伝わる文言に変換する `describeConstraint()` を追加。実際に Supabase セッションを発行し、シードの4ルール(返済→投資→聖域枠→生活費)の表示、並び替え(↑/↓ボタン、DB の `execution_order` で確認)、2件目の「残り全額」ルール作成が拒否されメッセージが出ること、新規作成・改名・削除の一連の流れを実データで確認済み(検証はすべて DB の実値で確認。Server Action 後の DOM 読み取りは revalidate のタイミングにより不安定だったため、断定は DB クエリで行った)。テスト8件追加 | 2026-09-09 |
 | M3-2 | 残りの検知(FR-22 未取込 / FR-23 返済日前日)。`src/domain/alerts.ts`(純粋関数)に `detectInactivity()`/`detectPaymentDueTomorrow()` を追加。返済日は 29〜31 日指定をその月の実際の末日に丸めて比較(`domain/payoff.ts` と同じ考え方)。`src/features/alerts/store.ts` に `recordAlerts()`(`alerts` の `(user_id, dedup_key)` 一意制約へ `upsert` + `ignoreDuplicates` で重複を静かに無視)と、実データで動く `detectAndRecordPaymentDueAlerts()` を追加。FR-22 側は「取り込みの空白日数」の判定ロジックは完成しているが、読み出す先の `transactions` テーブルが T-7 まで空のため接続は見送り(T-21 に記録)。実際の Supabase プロジェクトに対し、実セッションでの `debts` 取得 → 候補生成 → `alerts` への upsert → 同じ候補での再実行が重複を作らないこと(0件挿入)を確認し、検証用データは削除済み。テスト10件追加 | 2026-09-09 |
+| M0-6 | keepalive ジョブ(NFR-05)。`app/api/cron/keepalive/route.ts` — `Authorization: Bearer ${CRON_SECRET}` を `timingSafeEqual` で検証(不一致・欠落は401)、全ユーザー分の `job_runs` 行を `trigger_source='github_actions'` で書き込む。`.github/workflows/keepalive.yml`(日次 `18:00 UTC` = 03:00 JST。pg_cron 側の 03:15 JST とはずらして二重化、ADR-009)。副作用として `src/lib/env.ts` の `getServerEnv()` を発見・修正:1つの必須スキーマに `SUPABASE_SERVICE_ROLE_KEY`/`ANTHROPIC_API_KEY`/`DISCORD_WEBHOOK_URL`/`CRON_SECRET` をまとめていたため、未設定の Discord/Anthropic キーに `CRON_SECRET` だけを使いたい呼び出し元まで巻き添えでエラーになる欠陥があった(このルートで初めて顕在化するところだった)。`getGmailEnv()` と同じ「機能ごとに検証する」方針で `getSupabaseServiceRoleKey()`/`getCronSecret()`/`getAnthropicApiKey()`/`getDiscordWebhookUrl()` の4関数に分割、`tests/domain/env.test.ts` を新API向けに書き換え。ローカルに `CRON_SECRET` を新規発行して実際の Supabase プロジェクトに対して検証:認証なし→401、誤った秘密→401、正しい秘密→200 かつ `job_runs` に1行追加されることを確認。検証中、`started_at` を DB のデフォルト(INSERT実行時刻)任せにすると `finished_at` より後になり得る不整合を発見・修正(アプリ側で計測した開始時刻を明示的に渡す形に変更)。検証用の行は削除済み(pg_cron 側の実行記録は温存)。`docs/env.example` の `CRON_SECRET`/`APP_BASE_URL` はそのまま流用 | 2026-09-09 |
 
 ---
 
@@ -192,3 +194,4 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 1. **Discord Webhook**(B-3):サーバーとチャンネルを1つ作り、Webhook URL を発行
 2. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。`/debts` にシードの3件が表示されているので、「編集」から直接正確な値に直せる
 3. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
+4. **GitHub Secrets への `CRON_SECRET` / `APP_BASE_URL` 設定**(M0-6):`.github/workflows/keepalive.yml` が参照する。リポジトリの Settings → Secrets and variables → Actions で本人が設定する必要がある(このセッションからは触れない領域)。`CRON_SECRET` は Vercel の production 環境変数にも同じ値を設定すること。値は `openssl rand -hex 32` などで新規発行してよい

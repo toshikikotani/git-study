@@ -2,17 +2,29 @@
   "permissions": {
     "allow": [
       "Bash(npx prettier --check *)",
+      "Bash(npx prettier --write *)",
       "mcp__github__pull_request_read",
+      "mcp__github__create_pull_request",
+      "mcp__github__merge_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__github__list_pull_requests",
+      "mcp__github__get_check_run",
       "Bash(npx next dev *)",
       "Bash(npx next build *)",
+      "Bash(npx next typegen *)",
       "Bash(npx vitest *)",
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
       "mcp__Claude_Code_Remote__subscribe_pr_activity",
-      "Bash(git fetch *)",
       "mcp__Claude_Code_Remote__unsubscribe_pr_activity",
-      "Bash(npm view *)",
-      "Bash(npx next typegen *)"
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(npm view *)"
     ]
   }
 }

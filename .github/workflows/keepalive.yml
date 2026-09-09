@@ -1,0 +1,29 @@
+name: Keepalive
+
+# Supabase 無料枠の自動停止を防ぐ死活ジョブ(NFR-05, M0-6)。
+# pg_cron 側(supabase/migrations/20260908000900_cron.sql)と役割が重なる二重化。
+# 片方が止まっても、もう片方が job_runs への書き込みを続ける(ADR-009)。
+
+on:
+  schedule:
+    # 毎日 03:00 JST(= 前日 18:00 UTC)。pg_cron 側の 03:15 JST とはずらしてある。
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/keepalive
+        run: |
+          status=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+            -X POST "${APP_BASE_URL}/api/cron/keepalive" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          cat /tmp/response.json
+          if [ "$status" -ge 300 ]; then
+            echo "::error::keepalive がステータス $status を返しました"
+            exit 1
+          fi
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
