@@ -39,7 +39,6 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M1-4 | 借り換えシミュレーション(金利 Y%) | S | M1-3 |
 | M3-2 | 残りの検知(FR-22 未取込 / FR-23 返済日前日)と alerts への積み上げ | M | M0-3 |
 | M4-3 | 振替ルール編集画面 | M | M0-3 |
 | M2-3b | 分類エンジンを取り込み経路へ接続する(ルール適用 → 保存) | S | M0-3, M2-2 |
@@ -48,14 +47,12 @@
 | M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
 
 優先順位(`docs/mvp-plan.md`)は S1(負債)> S3(リボ検知)> S4(残額)> S2(取り込み)。
-M1-3 が終わったことで M1-4 が Next の先頭に上がった。上から着手する。
 
 ## Backlog
 
 ### S1 負債と完済シミュレーション(最優先)
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M1-4 | 借り換えシミュレーション(金利 Y%) | S | M1-3 |
 | M1-6 | 返済実績の記録と計画差分 | M | M1-2 |
 
 ### S2 明細の取り込みと分類
@@ -175,6 +172,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-20 | ログインをパスワード優先に変更(ADR-011 改定) | 毎回メールを開いてリンクを押す手間が継続利用を阻害していたため。`/login` にパスワード/メールリンクの2タブを用意し、パスワードを既定に。`src/domain/auth.ts` に `assertPassword`/`assertPasswordConfirmed` を追加(8文字以上・確認一致)。`/settings/password` に Server Action(`updateUser({password})`)を新設し、Magic Link ログイン後は毎回ここへ誘導して次回からパスワードで入れるようにした。実際に Node 側で Magic Link セッションを発行してブラウザへ注入し、実サーバー(localhost)相手にパスワード設定フォームを送信 → ホームへリダイレクトを確認。設定したパスワードでの `signInWithPassword` 成功・誤ったパスワードでの拒否も実際の Supabase プロジェクトに対して確認済み(ブラウザから Supabase への直接リクエストはこのサンドボックスのプロキシ制約で検証できないため、そこだけ Node 側の直接呼び出しで代替検証)。テスト4件追加 | 2026-09-08 |
 | M6-1 | 口座(カード)の登録・編集画面(FR-16、実運用フィードバックで追加した S6 の初手)。`/accounts`。`src/features/accounts/store.ts`(`accounts` の list/create/update)、`src/domain/account.ts`(口座名・締め日・支払日の検証)。締め日・支払日の 1〜31 範囲チェックは `domain/debt.ts` の `assertPaymentDay` と全く同じロジックだったため、`src/lib/date.ts` に `isValidDayOfMonth()` として切り出し、両ドメインから参照する形に統一(既存の返済日テストは無改修で通過)。`/transactions` に「口座」への導線を追加。実際に Supabase セッションを発行し、口座の新規登録・一覧表示・リロード後の永続確認・編集・空文字での更新拒否まで実ブラウザ操作で確認済み。テスト8件追加(account 5件、既存 debt テストは回帰なし) | 2026-09-09 |
 | M7-1 | 投資額の自動算出ロジック(FR-50, FR-52。本人の希望で S7 として着手)。`src/domain/investment.ts` の `computeInvestmentPlan()` — 返済目標額 × `investment_ratio_of_repayment` を投資総額とし、`is_high_risk_unlocked` が立つまでは全額インデックス枠、立った後は `high_risk_allocation_ratio` でインデックス/高リスクに分ける(純粋関数)。`features/settings/store.ts` の `AppSettings` にこの3列を追加。`/investments` で「今月の投資目安」を表示し、`/debts` から導線を追加。実データ(返済目標10万円・比率20%)で実際に画面を描画し、20,000円と表示されること、`/debts` からのリンク遷移を Playwright で確認。テスト5件追加 | 2026-09-09 |
+| M1-4 | 借り換えシミュレーション(FR-04)。`domain/payoff.ts` に `compareRefinance()` を追加 — `comparePlans()`(返済額を変えた効果)と対になる、金利だけを変えた効果を見る純粋関数。`/debts` に「借り換えを試す」区画(`refinance-simulation.tsx`)を追加し、年利入力に応じて即時再計算。`repayment_scenarios` への保存(`src/features/scenarios/store.ts`、`user_id,name` の unique 制約に upsert)・削除・一覧を実装し、`src/domain/scenario.ts` にシナリオ名の検証を追加。実際に Supabase セッションを発行し、年利変更で数字が変わること、保存したシナリオがリロード後も残ること、削除で消えることを実ブラウザ操作で確認済み(検証用シナリオは削除済み、既存の`最低返済のみ`/`月10万円返済`シードは対象外)。テスト4件追加(compareRefinance 2件、assertScenarioName 2件、既存 payoff テストは回帰なし) | 2026-09-09 |
 
 ---
 

@@ -1,10 +1,12 @@
 import Link from 'next/link';
 
 import { listDebts, toPayoffDebt } from '@/features/debts/store';
+import { listRefinanceScenarios } from '@/features/scenarios/store';
 import { getAppSettings } from '@/features/settings/store';
 import { DebtRow } from './debt-row';
 import { NewDebt } from './new-debt';
 import { PayoffSimulation } from './payoff-simulation';
+import { RefinanceSimulation } from './refinance-simulation';
 
 /**
  * 負債一覧・登録・編集(FR-01, M1-2)。
@@ -18,7 +20,11 @@ import { PayoffSimulation } from './payoff-simulation';
 export const dynamic = 'force-dynamic';
 
 export default async function DebtsPage() {
-  const [debts, settings] = await Promise.all([listDebts(), getAppSettings()]);
+  const [debts, settings, scenarios] = await Promise.all([
+    listDebts(),
+    getAppSettings(),
+    listRefinanceScenarios(),
+  ]);
 
   return (
     <div className="rise space-y-4">
@@ -46,6 +52,13 @@ export default async function DebtsPage() {
         debts={debts.map(toPayoffDebt)}
         initialMonthlyBudgetYen={settings.monthlyRepaymentTargetYen}
         initialStrategy={settings.repaymentStrategy}
+      />
+
+      <RefinanceSimulation
+        debts={debts.map(toPayoffDebt)}
+        monthlyBudgetYen={settings.monthlyRepaymentTargetYen}
+        strategy={settings.repaymentStrategy}
+        scenarios={scenarios}
       />
 
       <Link

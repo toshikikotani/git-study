@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MAX_MONTHS,
   PayoffError,
+  compareRefinance,
   comparePlans,
   simulateDebtPayoff,
   simulateTotalPayoff,
@@ -315,6 +316,23 @@ describe('withRefinancedRate(FR-04)', () => {
 
   it('パーセント値を渡すとエラー(8% は 0.08)', () => {
     expect(() => withRefinancedRate(debts, 8)).toThrow(/0〜1 の小数/);
+  });
+});
+
+describe('compareRefinance(FR-04)', () => {
+  it('金利を下げると削減利息・短縮月数が正になる', () => {
+    const result = compareRefinance(debts, 100_000, 0.08, { baseMonth });
+    expect(result.savedInterestYen).toBeGreaterThan(0);
+    expect(result.shortenedMonths).toBeGreaterThanOrEqual(0);
+    expect(result.shortenedMonths).toBe(result.original.months - result.refinanced.months);
+  });
+
+  it('月額返済額は変えず、金利だけを変えた効果を見る', () => {
+    const result = compareRefinance(debts, 100_000, 0.08, { baseMonth });
+    const plain = summarizePayoff(
+      simulateTotalPayoff(debts, { monthlyBudgetYen: 100_000 }, { baseMonth }),
+    );
+    expect(result.original).toEqual(plain);
   });
 });
 
