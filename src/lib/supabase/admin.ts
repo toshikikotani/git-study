@@ -13,21 +13,17 @@ import 'server-only';
 
 import { createClient } from '@supabase/supabase-js';
 
-import { getPublicEnv, getServerEnv } from '@/lib/env';
+import { getPublicEnv, getSupabaseServiceRoleKey } from '@/lib/env';
 import type { Database } from './types';
 
 export function createAdminClient() {
   const publicEnv = getPublicEnv();
-  const serverEnv = getServerEnv();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
 
-  return createClient<Database>(
-    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
-    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+  return createClient<Database>(publicEnv.NEXT_PUBLIC_SUPABASE_URL, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+  });
 }
