@@ -6,6 +6,8 @@
  * それ以外の、負債固有の入力(借入先名・返済日)だけ。
  */
 
+import { isValidDayOfMonth } from '@/lib/date';
+
 export class DebtError extends Error {
   constructor(message: string) {
     super(message);
@@ -28,7 +30,7 @@ export function assertLenderName(value: string): string {
  * 28 に丸めて扱う。ここでは範囲だけを見る。
  */
 export function assertPaymentDay(value: number): number {
-  if (!Number.isInteger(value) || value < 1 || value > 31) {
+  if (!isValidDayOfMonth(value)) {
     throw new DebtError(`返済日は1〜31の整数で指定してください: ${value}`);
   }
   return value;

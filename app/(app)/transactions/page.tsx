@@ -52,13 +52,18 @@ export default function TransactionsPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           明細
         </h1>
-        <Link
-          href="/transactions/import"
-          className="text-[13px] font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          取り込む
-        </Link>
+        <div className="flex items-baseline gap-3">
+          <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            口座
+          </Link>
+          <Link
+            href="/transactions/import"
+            className="text-[13px] font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            取り込む
+          </Link>
+        </div>
       </header>
 
       {/* FR-21:リボ・キャッシングは一覧の最上部で数を見せる。
@@ -128,9 +133,14 @@ export default function TransactionsPage() {
 function EmptyState() {
   return (
     <div className="rise space-y-4">
-      <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-        明細
-      </h1>
+      <header className="flex items-baseline justify-between gap-3">
+        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
+          明細
+        </h1>
+        <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          口座
+        </Link>
+      </header>
 
       <div
         className="rounded-3xl p-6"

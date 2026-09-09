@@ -98,6 +98,15 @@ export function formatDateJa(date: DateOnly): string {
   return `${y}年${m}月${d}日`;
 }
 
+/**
+ * 「何日」という日にち番号(1〜31)として妥当か。
+ * DateOnly ではなく、返済日・締め日のような整数入力の検証に使う
+ * (29〜31 を指定した月に日が無ければ、計算側が丸めて扱う。ここでは範囲だけを見る)。
+ */
+export function isValidDayOfMonth(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 31;
+}
+
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0');
 }
