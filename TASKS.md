@@ -39,11 +39,8 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M2-3b | 分類エンジンを取り込み経路へ接続する(ルール適用 → 保存) | S | M0-3, M2-2 |
-| M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3 |
-| M0-6 | keepalive ジョブ(Route Handler + Actions) | S | M0-3, M0-4 |
-| M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
 | M4-4 | 給料日チェックリスト | M | M4-3 |
+| M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
 
 優先順位(`docs/mvp-plan.md`)は S1(負債)> S3(リボ検知)> S4(残額)> S2(取り込み)。
 
@@ -59,6 +56,18 @@
 |---|---|---|---|
 | M2-5 | 確認待ちキューと修正のルール化(学習) | M | M2-4 |
 | M2-6 | カテゴリ・ルール編集画面(改名 / 予算 / ホーム表示枠の選択 / 統廃合) | M | M2-5 |
+| T-7 | `TransactionStore` の Supabase 実装を足す | S | M0-3 |
+| M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3, **T-7** |
+
+**M2-7c 着手時に発見:`TransactionStore` は sessionStorage 実装のまま(T-7 未着手)。
+cron ジョブ(サーバー側、`window` を持たない)から保存しようとしても
+`SessionTransactionStore.add()` は黙って何もしないため、データが静かに
+消える(NFR-06 違反)。さらに `transactions.account_id` は `accounts` への
+NOT NULL な外部キーだが、CSV/貼り付け画面は `buildPreview()` に
+`'pending'`/`'email'`/`'gmail'` という実在しない accountId を渡している
+(M6-2 が別途解消予定)。M2-7c を安全に作るには T-7(Supabase 実装)が先に
+要り、T-7 を実用にするには M6-2(実口座の選択)も要る。3つとも1タスクに
+収まる規模ではないため、着手せず記録のみして次へ進んだ(ループ規約8)。**
 
 ### S3 リボ・キャッシング検知と通知
 | ID | タスク | サイズ | 依存 |
@@ -81,7 +90,7 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 ### S6 口座管理と請求突合(実運用フィードバックで追加、FR-16〜18)
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M6-2 | 取り込み時に口座を選べるようにする(`accountId` の `'pending'` 固定を解消) | S | M6-1, T-7 |
+| M6-2 | 取り込み時に口座を選べるようにする(`accountId` の `'pending'`/`'email'`/`'gmail'` 固定を解消) | S | M6-1, T-7 |
 | M6-3 | 給料日〜給料日の期間ビュー(保存は暦月のまま表示のみ変換、ADR-015) | M | M6-2 |
 | M6-4 | 請求金額メールとの突合(取り込み漏れ検知) | M | M6-2 |
 
