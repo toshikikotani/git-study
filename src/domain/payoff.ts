@@ -305,6 +305,42 @@ export function withRefinancedRate(debts: readonly Debt[], annualRate: number): 
   return debts.map((d) => ({ ...d, annualRate }));
 }
 
+/**
+ * FR-04:現在の金利のままの場合と、借り換えて金利を置き換えた場合を
+ * 同じ月額返済額で比較する。comparePlans() が「返済額を変えた効果」を
+ * 見るのに対し、こちらは「金利だけを変えた効果」を見る。
+ */
+export function compareRefinance(
+  debts: readonly Debt[],
+  monthlyBudgetYen: number,
+  refinancedAnnualRate: number,
+  options: SimulateOptions & { strategy?: RepaymentStrategy | undefined } = {},
+): {
+  original: PayoffSummary;
+  refinanced: PayoffSummary;
+  savedInterestYen: number;
+  shortenedMonths: number;
+} {
+  const strategy = options.strategy ?? 'avalanche';
+  const original = summarizePayoff(
+    simulateTotalPayoff(debts, { monthlyBudgetYen, strategy }, options),
+  );
+  const refinanced = summarizePayoff(
+    simulateTotalPayoff(
+      withRefinancedRate(debts, refinancedAnnualRate),
+      { monthlyBudgetYen, strategy },
+      options,
+    ),
+  );
+
+  return {
+    original,
+    refinanced,
+    savedInterestYen: original.totalInterestYen - refinanced.totalInterestYen,
+    shortenedMonths: original.months - refinanced.months,
+  };
+}
+
 function sum(values: readonly number[]): number {
   return values.reduce((acc, v) => acc + v, 0);
 }
