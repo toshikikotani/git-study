@@ -39,7 +39,6 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
-| M3-2 | 残りの検知(FR-22 未取込 / FR-23 返済日前日)と alerts への積み上げ | M | M0-3 |
 | M2-3b | 分類エンジンを取り込み経路へ接続する(ルール適用 → 保存) | S | M0-3, M2-2 |
 | M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3 |
 | M0-6 | keepalive ジョブ(Route Handler + Actions) | S | M0-3, M0-4 |
@@ -68,6 +67,8 @@
 
 FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのものは
 `domain/budget.ts` と `features/classification/rules.ts` に実装済み。
+FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
+に実装済み(下記 Done)。M3-3 は依然 M3-1(**B-3 待ち**)にも依存。
 
 
 ### S5 朝配信の最小版
@@ -116,6 +117,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
 | T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
 | T-16 | Supabase の Auth 設定(Site URL / Redirect URLs)がリポジトリに残っていない | ダッシュボード側の設定のみで管理している。プロジェクトを作り直す場合に再設定が必要。`supabase/config.toml` の `[auth]` セクションで宣言的に管理する方法もあるが、現状は未導入 |
+| T-21 | `detectInactivity()`(FR-22)を実データに接続する | 判定関数自体は M3-2 で完成しているが、「直近の取り込み日」を読む先の `transactions` テーブルが T-7 まで空のまま。T-7 完了後、`features/alerts/store.ts` に `detectAndRecordInactivityAlert()` を追加して配線する |
 
 **T-12 は refactor(責務分離)の一環として認識しているが未着手。他は2026-09-08 の refactor セッションで着手した3画面の重複解消と mail-sync の分割のみ完了(下記 Done)。** 全体的な「5行ルール」適用は際限がないので、次に触る画面・関数から都度直す方針にする(一括では手を出さない)。
 
@@ -170,6 +172,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M7-1 | 投資額の自動算出ロジック(FR-50, FR-52。本人の希望で S7 として着手)。`src/domain/investment.ts` の `computeInvestmentPlan()` — 返済目標額 × `investment_ratio_of_repayment` を投資総額とし、`is_high_risk_unlocked` が立つまでは全額インデックス枠、立った後は `high_risk_allocation_ratio` でインデックス/高リスクに分ける(純粋関数)。`features/settings/store.ts` の `AppSettings` にこの3列を追加。`/investments` で「今月の投資目安」を表示し、`/debts` から導線を追加。実データ(返済目標10万円・比率20%)で実際に画面を描画し、20,000円と表示されること、`/debts` からのリンク遷移を Playwright で確認。テスト5件追加 | 2026-09-09 |
 | M1-4 | 借り換えシミュレーション(FR-04)。`domain/payoff.ts` に `compareRefinance()` を追加 — `comparePlans()`(返済額を変えた効果)と対になる、金利だけを変えた効果を見る純粋関数。`/debts` に「借り換えを試す」区画(`refinance-simulation.tsx`)を追加し、年利入力に応じて即時再計算。`repayment_scenarios` への保存(`src/features/scenarios/store.ts`、`user_id,name` の unique 制約に upsert)・削除・一覧を実装し、`src/domain/scenario.ts` にシナリオ名の検証を追加。実際に Supabase セッションを発行し、年利変更で数字が変わること、保存したシナリオがリロード後も残ること、削除で消えることを実ブラウザ操作で確認済み(検証用シナリオは削除済み、既存の`最低返済のみ`/`月10万円返済`シードは対象外)。テスト4件追加(compareRefinance 2件、assertScenarioName 2件、既存 payoff テストは回帰なし) | 2026-09-09 |
 | M4-3 | 振替ルール編集画面(FR-15)。`/payday` を置きページから実画面へ(T-5)。`src/features/transfer-rules/store.ts`(list/create/update/delete、`listCategoryOptions()`)、`src/domain/transfer-rule.ts`(ルール名・金額指定方式ごとの検証。fixed/percentage/remainder で必要な列だけ埋める)。並び替えは隣接2件の `execution_order` を負の一時値を経由して入れ替え、`ux_transfer_rules_order`(一意制約)に一時的にも触れないようにした。DB 制約違反(`ux_transfer_rules_remainder` など)を本人に伝わる文言に変換する `describeConstraint()` を追加。実際に Supabase セッションを発行し、シードの4ルール(返済→投資→聖域枠→生活費)の表示、並び替え(↑/↓ボタン、DB の `execution_order` で確認)、2件目の「残り全額」ルール作成が拒否されメッセージが出ること、新規作成・改名・削除の一連の流れを実データで確認済み(検証はすべて DB の実値で確認。Server Action 後の DOM 読み取りは revalidate のタイミングにより不安定だったため、断定は DB クエリで行った)。テスト8件追加 | 2026-09-09 |
+| M3-2 | 残りの検知(FR-22 未取込 / FR-23 返済日前日)。`src/domain/alerts.ts`(純粋関数)に `detectInactivity()`/`detectPaymentDueTomorrow()` を追加。返済日は 29〜31 日指定をその月の実際の末日に丸めて比較(`domain/payoff.ts` と同じ考え方)。`src/features/alerts/store.ts` に `recordAlerts()`(`alerts` の `(user_id, dedup_key)` 一意制約へ `upsert` + `ignoreDuplicates` で重複を静かに無視)と、実データで動く `detectAndRecordPaymentDueAlerts()` を追加。FR-22 側は「取り込みの空白日数」の判定ロジックは完成しているが、読み出す先の `transactions` テーブルが T-7 まで空のため接続は見送り(T-21 に記録)。実際の Supabase プロジェクトに対し、実セッションでの `debts` 取得 → 候補生成 → `alerts` への upsert → 同じ候補での再実行が重複を作らないこと(0件挿入)を確認し、検証用データは削除済み。テスト10件追加 | 2026-09-09 |
 
 ---
 
