@@ -57,3 +57,55 @@ export function assertAmountShape(
 
   return { amountYen: null, percentage: null };
 }
+
+/** チェックリストの1項目。ルールから生成した振替の予定額(M4-4)。 */
+export type TransferPlanItem = {
+  ruleId: string;
+  label: string;
+  plannedAmountYen: number;
+};
+
+/** 予定額を計算する対象。ルールの必要な部分だけ。 */
+export type PlannableRule = {
+  id: string;
+  name: string;
+  amountType: AmountType;
+  amountYen: number | null;
+  percentage: number | null;
+};
+
+/**
+ * 給料日の振替ルールを、実際の入金額に対して按分する(FR-15, M4-4)。
+ *
+ * execution_order 順に処理し、fixed/percentage が確保した後の残りを
+ * remainder ルールが受け取る。fixed/percentage の合計が入金額を超える
+ * (残額が足りない)場合は、以降の予定額を0円に切り詰める。マイナスの
+ * 振替は意味を持たないし、transfer_run_items.planned_amount_yen は
+ * DB 制約で0以上しか許さない。
+ */
+export function computeTransferPlan(
+  rules: readonly PlannableRule[],
+  sourceAmountYen: number,
+): TransferPlanItem[] {
+  if (!Number.isFinite(sourceAmountYen) || sourceAmountYen <= 0) {
+    throw new TransferRuleError(`入金額は正の値で指定してください: ${sourceAmountYen}`);
+  }
+
+  let remaining = sourceAmountYen;
+
+  return rules.map((rule) => {
+    let planned: number;
+    if (rule.amountType === 'fixed') {
+      planned = rule.amountYen ?? 0;
+    } else if (rule.amountType === 'percentage') {
+      planned = Math.round((sourceAmountYen * (rule.percentage ?? 0)) / 100);
+    } else {
+      planned = remaining;
+    }
+
+    planned = Math.max(0, Math.min(planned, remaining));
+    remaining -= planned;
+
+    return { ruleId: rule.id, label: rule.name, plannedAmountYen: planned };
+  });
+}
