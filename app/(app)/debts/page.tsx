@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { listDebts, toPayoffDebt } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { DebtRow } from './debt-row';
@@ -45,6 +47,14 @@ export default async function DebtsPage() {
         initialMonthlyBudgetYen={settings.monthlyRepaymentTargetYen}
         initialStrategy={settings.repaymentStrategy}
       />
+
+      <Link
+        href="/investments"
+        className="block text-center text-[13px] font-medium"
+        style={{ color: 'var(--accent)' }}
+      >
+        返済と並走する投資額を見る →
+      </Link>
     </div>
   );
 }

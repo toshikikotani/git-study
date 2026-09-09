@@ -91,6 +91,12 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M6-3 | 給料日〜給料日の期間ビュー(保存は暦月のまま表示のみ変換、ADR-015) | M | M6-2 |
 | M6-4 | 請求金額メールとの突合(取り込み漏れ検知) | M | M6-2 |
 
+### S7 投資(本人の希望で着手、FR-50〜52)
+| ID | タスク | サイズ | 依存 |
+|---|---|---|---|
+| M7-2 | 投資記録画面(拠出・残高の手入力) | M | M7-1 |
+| M7-3 | 完済検知による高リスク枠解禁 | S | M7-1, M1-2 |
+
 ### フェーズ2以降(MVP 対象外)
 | ID | タスク | 対応 |
 |---|---|---|
@@ -99,8 +105,6 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | P2-3 | ストリーク表示(途切れても責めない文言) | FR-62 |
 | P3-1 | 副業トラッカー(作業時間・入金・時給換算) | FR-40, FR-42 |
 | P3-2 | 転職準備チェックリスト | FR-41 |
-| P3-3 | 投資枠管理(今月の投資額の自動算出) | FR-50, FR-51 |
-| P4-1 | 完済検知による高リスク枠解禁モード | FR-52 |
 | P4-2 | 口座連携 API の再検討 | 9.5 |
 
 ### 改善・技術的負債
@@ -170,6 +174,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M4-2 | ホームの残額表示を実データに接続。`loadHomeSummary()` が Supabase から debts / app_settings / categories / budgets(当月分。無ければ `default_monthly_budget_yen` で代用)/ transactions(当月・対象カテゴリ)/ debt_payments(当月の元本減少)を読むよう差し替え、`PLACEHOLDER_*` を削除。あわせて `debts.original_principal_yen` をフォームに追加(任意入力。進捗ゲージの分母。未入力なら現在残高で代用し、その負債単体の進捗は0%からになる)。`loadHomeSummary()` は Supabase(`next/headers` の `cookies()`)に触れる関数になったためユニットテストの対象から外し(純粋関数の `buildHomeTiles`/`computePayoffSummary` は継続してテスト)、実データでの検証は本セッション内で一時セッションを発行してホーム画面を実際に描画し確認した(残債合計1,000,000円、生活費・聖域タイルとも実データ(0円)で表示) | 2026-09-08 |
 | T-20 | ログインをパスワード優先に変更(ADR-011 改定) | 毎回メールを開いてリンクを押す手間が継続利用を阻害していたため。`/login` にパスワード/メールリンクの2タブを用意し、パスワードを既定に。`src/domain/auth.ts` に `assertPassword`/`assertPasswordConfirmed` を追加(8文字以上・確認一致)。`/settings/password` に Server Action(`updateUser({password})`)を新設し、Magic Link ログイン後は毎回ここへ誘導して次回からパスワードで入れるようにした。実際に Node 側で Magic Link セッションを発行してブラウザへ注入し、実サーバー(localhost)相手にパスワード設定フォームを送信 → ホームへリダイレクトを確認。設定したパスワードでの `signInWithPassword` 成功・誤ったパスワードでの拒否も実際の Supabase プロジェクトに対して確認済み(ブラウザから Supabase への直接リクエストはこのサンドボックスのプロキシ制約で検証できないため、そこだけ Node 側の直接呼び出しで代替検証)。テスト4件追加 | 2026-09-08 |
 | M6-1 | 口座(カード)の登録・編集画面(FR-16、実運用フィードバックで追加した S6 の初手)。`/accounts`。`src/features/accounts/store.ts`(`accounts` の list/create/update)、`src/domain/account.ts`(口座名・締め日・支払日の検証)。締め日・支払日の 1〜31 範囲チェックは `domain/debt.ts` の `assertPaymentDay` と全く同じロジックだったため、`src/lib/date.ts` に `isValidDayOfMonth()` として切り出し、両ドメインから参照する形に統一(既存の返済日テストは無改修で通過)。`/transactions` に「口座」への導線を追加。実際に Supabase セッションを発行し、口座の新規登録・一覧表示・リロード後の永続確認・編集・空文字での更新拒否まで実ブラウザ操作で確認済み。テスト8件追加(account 5件、既存 debt テストは回帰なし) | 2026-09-09 |
+| M7-1 | 投資額の自動算出ロジック(FR-50, FR-52。本人の希望で S7 として着手)。`src/domain/investment.ts` の `computeInvestmentPlan()` — 返済目標額 × `investment_ratio_of_repayment` を投資総額とし、`is_high_risk_unlocked` が立つまでは全額インデックス枠、立った後は `high_risk_allocation_ratio` でインデックス/高リスクに分ける(純粋関数)。`features/settings/store.ts` の `AppSettings` にこの3列を追加。`/investments` で「今月の投資目安」を表示し、`/debts` から導線を追加。実データ(返済目標10万円・比率20%)で実際に画面を描画し、20,000円と表示されること、`/debts` からのリンク遷移を Playwright で確認。テスト5件追加 | 2026-09-09 |
 
 ---
 
