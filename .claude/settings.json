@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prettier --check *)",
+      "mcp__github__pull_request_read",
+      "Bash(npx next dev *)",
+      "Bash(npx next build *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "mcp__Claude_Code_Remote__subscribe_pr_activity",
+      "Bash(git fetch *)",
+      "mcp__Claude_Code_Remote__unsubscribe_pr_activity",
+      "Bash(npm view *)",
+      "Bash(npx next typegen *)"
+    ]
+  }
+}
