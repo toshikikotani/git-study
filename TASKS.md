@@ -40,11 +40,11 @@
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
 | M3-2 | 残りの検知(FR-22 未取込 / FR-23 返済日前日)と alerts への積み上げ | M | M0-3 |
-| M4-3 | 振替ルール編集画面 | M | M0-3 |
 | M2-3b | 分類エンジンを取り込み経路へ接続する(ルール適用 → 保存) | S | M0-3, M2-2 |
 | M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3 |
 | M0-6 | keepalive ジョブ(Route Handler + Actions) | S | M0-3, M0-4 |
 | M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
+| M4-4 | 給料日チェックリスト | M | M4-3 |
 
 優先順位(`docs/mvp-plan.md`)は S1(負債)> S3(リボ検知)> S4(残額)> S2(取り込み)。
 
@@ -69,10 +69,6 @@
 FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのものは
 `domain/budget.ts` と `features/classification/rules.ts` に実装済み。
 
-### S4 給料日振替と使える残額
-| ID | タスク | サイズ | 依存 |
-|---|---|---|---|
-| M4-4 | 給料日チェックリスト | M | M4-3 |
 
 ### S5 朝配信の最小版
 | ID | タスク | サイズ | 依存 |
@@ -111,7 +107,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 |---|---|---|
 | T-2 | CSV アダプタの fixture を実ファイル(匿名化)で用意する | 実フォーマットが判明してから |
 | T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
-| T-5 | `/transactions` `/payday` `/rules` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定(`/debts` は M1-2 で実画面化済み) |
+| T-5 | `/rules` の置きページを実画面に置き換える | ナビのリンク切れを typedRoutes で検出できる状態を保つための暫定(`/debts` は M1-2、`/payday` は M4-3 で実画面化済み。`/transactions` も実装済みだが保存先は T-7 待ち) |
 | T-6 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証する | 現在は手で揃えている。`supabase gen types` が入ったら派生させる(M0-2 後) |
 | T-7 | `TransactionStore` の Supabase 実装を足す | 現在は sessionStorage 実装。画面は差し替えだけで動く(M0-3) |
 | T-8 | 取り込んだ明細を AI 分類へ回す | 分類する関数自体(M2-4)は完成。取り込み経路への接続は M2-3b で行う。それまではルールに当たらないものが全て「確認待ち」のまま |
@@ -173,6 +169,7 @@ FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのもの
 | M6-1 | 口座(カード)の登録・編集画面(FR-16、実運用フィードバックで追加した S6 の初手)。`/accounts`。`src/features/accounts/store.ts`(`accounts` の list/create/update)、`src/domain/account.ts`(口座名・締め日・支払日の検証)。締め日・支払日の 1〜31 範囲チェックは `domain/debt.ts` の `assertPaymentDay` と全く同じロジックだったため、`src/lib/date.ts` に `isValidDayOfMonth()` として切り出し、両ドメインから参照する形に統一(既存の返済日テストは無改修で通過)。`/transactions` に「口座」への導線を追加。実際に Supabase セッションを発行し、口座の新規登録・一覧表示・リロード後の永続確認・編集・空文字での更新拒否まで実ブラウザ操作で確認済み。テスト8件追加(account 5件、既存 debt テストは回帰なし) | 2026-09-09 |
 | M7-1 | 投資額の自動算出ロジック(FR-50, FR-52。本人の希望で S7 として着手)。`src/domain/investment.ts` の `computeInvestmentPlan()` — 返済目標額 × `investment_ratio_of_repayment` を投資総額とし、`is_high_risk_unlocked` が立つまでは全額インデックス枠、立った後は `high_risk_allocation_ratio` でインデックス/高リスクに分ける(純粋関数)。`features/settings/store.ts` の `AppSettings` にこの3列を追加。`/investments` で「今月の投資目安」を表示し、`/debts` から導線を追加。実データ(返済目標10万円・比率20%)で実際に画面を描画し、20,000円と表示されること、`/debts` からのリンク遷移を Playwright で確認。テスト5件追加 | 2026-09-09 |
 | M1-4 | 借り換えシミュレーション(FR-04)。`domain/payoff.ts` に `compareRefinance()` を追加 — `comparePlans()`(返済額を変えた効果)と対になる、金利だけを変えた効果を見る純粋関数。`/debts` に「借り換えを試す」区画(`refinance-simulation.tsx`)を追加し、年利入力に応じて即時再計算。`repayment_scenarios` への保存(`src/features/scenarios/store.ts`、`user_id,name` の unique 制約に upsert)・削除・一覧を実装し、`src/domain/scenario.ts` にシナリオ名の検証を追加。実際に Supabase セッションを発行し、年利変更で数字が変わること、保存したシナリオがリロード後も残ること、削除で消えることを実ブラウザ操作で確認済み(検証用シナリオは削除済み、既存の`最低返済のみ`/`月10万円返済`シードは対象外)。テスト4件追加(compareRefinance 2件、assertScenarioName 2件、既存 payoff テストは回帰なし) | 2026-09-09 |
+| M4-3 | 振替ルール編集画面(FR-15)。`/payday` を置きページから実画面へ(T-5)。`src/features/transfer-rules/store.ts`(list/create/update/delete、`listCategoryOptions()`)、`src/domain/transfer-rule.ts`(ルール名・金額指定方式ごとの検証。fixed/percentage/remainder で必要な列だけ埋める)。並び替えは隣接2件の `execution_order` を負の一時値を経由して入れ替え、`ux_transfer_rules_order`(一意制約)に一時的にも触れないようにした。DB 制約違反(`ux_transfer_rules_remainder` など)を本人に伝わる文言に変換する `describeConstraint()` を追加。実際に Supabase セッションを発行し、シードの4ルール(返済→投資→聖域枠→生活費)の表示、並び替え(↑/↓ボタン、DB の `execution_order` で確認)、2件目の「残り全額」ルール作成が拒否されメッセージが出ること、新規作成・改名・削除の一連の流れを実データで確認済み(検証はすべて DB の実値で確認。Server Action 後の DOM 読み取りは revalidate のタイミングにより不安定だったため、断定は DB クエリで行った)。テスト8件追加 | 2026-09-09 |
 
 ---
 
