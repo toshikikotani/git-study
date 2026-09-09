@@ -15,18 +15,26 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20, 'Supabase の anon キーが短すぎます'),
 });
 
-const serverSchema = z.object({
-  /** RLS を越える。サーバー側でのみ使う。絶対にクライアントへ渡さない。 */
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20, 'service_role キーが短すぎます'),
-  /** 明細分類・朝配信の生成(ADR-010)。 */
-  ANTHROPIC_API_KEY: z.string().startsWith('sk-ant-', 'Anthropic の API キー形式ではありません'),
-  /** 通知・朝配信の送信先(ADR-002)。 */
-  DISCORD_WEBHOOK_URL: z.url().refine((v) => v.startsWith('https://discord.com/api/webhooks/'), {
+/**
+ * サーバー専用の秘密情報は、機能ごとに独立した関数で取り出す
+ * (1つの必須スキーマにまとめない)。
+ *
+ * まとめてしまうと、CRON_SECRET だけを使いたい呼び出し元が、
+ * まだ設定していない DISCORD_WEBHOOK_URL や ANTHROPIC_API_KEY の
+ * 欠落でも巻き添えでエラーになる。機能ごとに使うときだけ検証する
+ * (features/import/email/route.ts の ANTHROPIC_API_KEY・
+ * features/settings/gmail の GMAIL_* と同じ考え方)。
+ */
+const cronSecretSchema = z.string().min(32, 'CRON_SECRET は 32 文字以上にしてください');
+const supabaseServiceRoleKeySchema = z.string().min(20, 'service_role キーが短すぎます');
+const anthropicApiKeySchema = z
+  .string()
+  .startsWith('sk-ant-', 'Anthropic の API キー形式ではありません');
+const discordWebhookUrlSchema = z
+  .url()
+  .refine((v) => v.startsWith('https://discord.com/api/webhooks/'), {
     error: 'Discord の Webhook URL ではありません',
-  }),
-  /** /api/cron/* の認証(ADR-009)。 */
-  CRON_SECRET: z.string().min(32, 'CRON_SECRET は 32 文字以上にしてください'),
-});
+  });
 
 /**
  * Gmail 自動取得(ADR-018)。未設定でもアプリは動く。
@@ -46,14 +54,17 @@ const gmailSchema = z.object({
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;
-export type ServerEnv = z.infer<typeof serverSchema>;
 export type GmailEnv = z.infer<typeof gmailSchema>;
 
 function parseOrThrow<T extends z.ZodType>(schema: T, source: unknown, label: string): z.infer<T> {
   const result = schema.safeParse(source);
   if (!result.success) {
     const details = result.error.issues
-      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+      .map((issue) =>
+        issue.path.length > 0
+          ? `  - ${issue.path.join('.')}: ${issue.message}`
+          : `  - ${issue.message}`,
+      )
       .join('\n');
     throw new Error(
       `${label}の設定に問題があります。\n${details}\n\n.env.example を参照してください。`,
@@ -78,17 +89,31 @@ export function getPublicEnv(): PublicEnv {
   );
 }
 
-/** サーバー専用の設定。Route Handler / Server Action / ジョブからのみ呼ぶ。 */
-export function getServerEnv(): ServerEnv {
+/** RLS を越える。サーバー側でのみ使う。絶対にクライアントへ渡さない。 */
+export function getSupabaseServiceRoleKey(): string {
   return parseOrThrow(
-    serverSchema,
-    {
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-      DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
-      CRON_SECRET: process.env.CRON_SECRET,
-    },
-    'サーバー環境変数',
+    supabaseServiceRoleKeySchema,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    'SUPABASE_SERVICE_ROLE_KEY',
+  );
+}
+
+/** /api/cron/* の認証(ADR-009)。 */
+export function getCronSecret(): string {
+  return parseOrThrow(cronSecretSchema, process.env.CRON_SECRET, 'CRON_SECRET');
+}
+
+/** 明細分類・朝配信の生成(ADR-010)。 */
+export function getAnthropicApiKey(): string {
+  return parseOrThrow(anthropicApiKeySchema, process.env.ANTHROPIC_API_KEY, 'ANTHROPIC_API_KEY');
+}
+
+/** 通知・朝配信の送信先(ADR-002)。 */
+export function getDiscordWebhookUrl(): string {
+  return parseOrThrow(
+    discordWebhookUrlSchema,
+    process.env.DISCORD_WEBHOOK_URL,
+    'DISCORD_WEBHOOK_URL',
   );
 }
 
@@ -109,5 +134,12 @@ export function getGmailEnv(): GmailEnv | null {
   );
 }
 
-/** テスト用に schema を公開する。実行時の検証には getPublicEnv / getServerEnv を使う。 */
-export const schemas = { publicSchema, serverSchema, gmailSchema };
+/** テスト用に schema を公開する。実行時の検証には各 get*Env / get*Secret 関数を使う。 */
+export const schemas = {
+  publicSchema,
+  cronSecretSchema,
+  supabaseServiceRoleKeySchema,
+  anthropicApiKeySchema,
+  discordWebhookUrlSchema,
+  gmailSchema,
+};

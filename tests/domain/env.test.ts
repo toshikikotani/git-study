@@ -12,13 +12,6 @@ const validPublic = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'a'.repeat(40),
 };
 
-const validServer = {
-  SUPABASE_SERVICE_ROLE_KEY: 'b'.repeat(40),
-  ANTHROPIC_API_KEY: 'sk-ant-api03-xxxxxxxx',
-  DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/123/abc',
-  CRON_SECRET: 'c'.repeat(32),
-};
-
 describe('publicSchema', () => {
   it('正しい値を通す', () => {
     expect(schemas.publicSchema.safeParse(validPublic).success).toBe(true);
@@ -39,35 +32,51 @@ describe('publicSchema', () => {
   });
 });
 
-describe('serverSchema', () => {
+/**
+ * サーバー専用の秘密情報は、機能ごとに独立したスキーマで検証する
+ * (CRON_SECRET だけを使いたい呼び出し元が、まだ設定していない
+ * DISCORD_WEBHOOK_URL や ANTHROPIC_API_KEY の欠落で巻き添えにならないように)。
+ */
+describe('supabaseServiceRoleKeySchema', () => {
   it('正しい値を通す', () => {
-    expect(schemas.serverSchema.safeParse(validServer).success).toBe(true);
+    expect(schemas.supabaseServiceRoleKeySchema.safeParse('b'.repeat(40)).success).toBe(true);
   });
 
-  it.each(Object.keys(validServer))('%s が欠けていると失敗する', (key) => {
-    const source: Record<string, unknown> = { ...validServer };
-    delete source[key];
-    expect(schemas.serverSchema.safeParse(source).success).toBe(false);
+  it('短すぎる service_role キーを拒否する', () => {
+    expect(schemas.supabaseServiceRoleKeySchema.safeParse('short').success).toBe(false);
   });
+});
 
-  it('Anthropic の API キー形式でないものを拒否する', () => {
-    const result = schemas.serverSchema.safeParse({
-      ...validServer,
-      ANTHROPIC_API_KEY: 'not-an-anthropic-key',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('Discord 以外の Webhook URL を拒否する(誤送信先を防ぐ)', () => {
-    const result = schemas.serverSchema.safeParse({
-      ...validServer,
-      DISCORD_WEBHOOK_URL: 'https://example.com/api/webhooks/123/abc',
-    });
-    expect(result.success).toBe(false);
+describe('cronSecretSchema', () => {
+  it('正しい値を通す', () => {
+    expect(schemas.cronSecretSchema.safeParse('c'.repeat(32)).success).toBe(true);
   });
 
   it('短すぎる CRON_SECRET を拒否する', () => {
-    const result = schemas.serverSchema.safeParse({ ...validServer, CRON_SECRET: 'short' });
-    expect(result.success).toBe(false);
+    expect(schemas.cronSecretSchema.safeParse('short').success).toBe(false);
+  });
+});
+
+describe('anthropicApiKeySchema', () => {
+  it('正しい値を通す', () => {
+    expect(schemas.anthropicApiKeySchema.safeParse('sk-ant-api03-xxxxxxxx').success).toBe(true);
+  });
+
+  it('Anthropic の API キー形式でないものを拒否する', () => {
+    expect(schemas.anthropicApiKeySchema.safeParse('not-an-anthropic-key').success).toBe(false);
+  });
+});
+
+describe('discordWebhookUrlSchema', () => {
+  it('正しい値を通す', () => {
+    expect(
+      schemas.discordWebhookUrlSchema.safeParse('https://discord.com/api/webhooks/123/abc').success,
+    ).toBe(true);
+  });
+
+  it('Discord 以外の Webhook URL を拒否する(誤送信先を防ぐ)', () => {
+    expect(
+      schemas.discordWebhookUrlSchema.safeParse('https://example.com/api/webhooks/123/abc').success,
+    ).toBe(false);
   });
 });
