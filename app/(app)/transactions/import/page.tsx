@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
+import type { ClassifyResult } from '@/features/classification/store';
 import {
   GENERIC_ADAPTER,
   guessMapping,
@@ -12,6 +13,7 @@ import {
   inspectCsv,
   type ImportAdapter,
 } from '@/features/import/adapters';
+import { requestAiClassification } from '@/features/transactions/classify-client';
 import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
 import type { StoredTransaction } from '@/features/transactions/store';
 
@@ -39,6 +41,9 @@ export default function ImportPage() {
   const [adapter, setAdapter] = useState<ImportAdapter>(GENERIC_ADAPTER);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
+  const [classifying, setClassifying] = useState(false);
+  const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
 
   const onFile = useCallback(async (file: File) => {
     setError(null);
@@ -71,11 +76,48 @@ export default function ImportPage() {
     }
   }, [loaded, adapter]);
 
-  const preview = useMemo<StoredTransaction[]>(() => {
+  const rulePreview = useMemo<StoredTransaction[]>(() => {
     if (!result || 'error' in result) return [];
     const rows = result.transactions;
     return buildPreview(rows, 'pending', (i) => `${rows[i]!.lineNumber}-${i}`);
   }, [result]);
+
+  // AI 分類の結果を id で重ねる。新しいファイルを読むと rulePreview の id が
+  // 総入れ替えになるため、古い aiResults は自然に参照されなくなる(明示的な
+  // リセットは不要)。
+  const preview = useMemo<StoredTransaction[]>(() => {
+    if (aiResults.size === 0) return rulePreview;
+    return rulePreview.map((t) => {
+      const applied = aiResults.get(t.id);
+      if (!applied) return t;
+      return {
+        ...t,
+        categoryId: applied.categoryId,
+        categoryName: applied.categoryName,
+        classifiedBy: applied.classifiedBy,
+        reviewStatus: applied.reviewStatus,
+      };
+    });
+  }, [rulePreview, aiResults]);
+
+  const unclassifiedCount = preview.filter((t) => t.classifiedBy === 'unclassified').length;
+
+  const classify = async () => {
+    const targets = preview.filter((t) => t.classifiedBy === 'unclassified');
+    if (targets.length === 0) return;
+    setClassifying(true);
+    try {
+      const outcome = await requestAiClassification(targets);
+      setAiResults((prev) => {
+        const next = new Map(prev);
+        for (const r of outcome.results) next.set(r.id, r);
+        return next;
+      });
+      setClassifyWarnings(outcome.warnings);
+    } finally {
+      setClassifying(false);
+    }
+  };
 
   const save = async () => {
     if (!loaded || preview.length === 0) return;
@@ -258,6 +300,34 @@ export default function ImportPage() {
                 ))}
               </ul>
             </details>
+          ) : null}
+
+          {/* ルールに当たらなかった分だけ AI に回せる(M2-3b)。押されたときだけ呼ぶ */}
+          {unclassifiedCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => void classify()}
+              disabled={classifying}
+              className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--accent)',
+                border: '1px solid var(--hairline)',
+                opacity: classifying ? 0.6 : 1,
+              }}
+            >
+              {classifying
+                ? '分類しています…'
+                : `分類できなかった ${unclassifiedCount} 件を AI に回す`}
+            </button>
+          ) : null}
+
+          {classifyWarnings.length > 0 ? (
+            <ul className="mt-3 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              {classifyWarnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
           ) : null}
 
           <button

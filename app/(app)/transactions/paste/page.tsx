@@ -5,11 +5,13 @@ import { useMemo, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
+import type { ClassifyResult } from '@/features/classification/store';
 import {
   parseNotificationEmail,
   type EmailParseResult,
   type ParsedEmailTransaction,
 } from '@/features/import/email';
+import { requestAiClassification } from '@/features/transactions/classify-client';
 import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
 import type { StoredTransaction } from '@/features/transactions/store';
 
@@ -34,6 +36,9 @@ export default function PastePage() {
   /** 辞書で読めなかったときに AI が読み取った結果(ADR-019)。 */
   const [rescued, setRescued] = useState<EmailParseResult | null>(null);
   const [asking, setAsking] = useState(false);
+  const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
+  const [classifying, setClassifying] = useState(false);
+  const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
 
   const byLabels = useMemo(() => (body.trim() ? parseNotificationEmail(body) : null), [body]);
   const parsed = rescued ?? byLabels;
@@ -69,10 +74,46 @@ export default function PastePage() {
     }
   };
 
-  const preview = useMemo<StoredTransaction[]>(() => {
+  const rulePreview = useMemo<StoredTransaction[]>(() => {
     if (!parsed) return [];
     return buildPreview(parsed.transactions, 'email', (i) => `paste-${i}`);
   }, [parsed]);
+
+  // AI 分類の結果を id で重ねる。本文を書き換えると rulePreview の内容が
+  // 総入れ替えになるため、古い aiResults は自然に参照されなくなる。
+  const preview = useMemo<StoredTransaction[]>(() => {
+    if (aiResults.size === 0) return rulePreview;
+    return rulePreview.map((t) => {
+      const applied = aiResults.get(t.id);
+      if (!applied) return t;
+      return {
+        ...t,
+        categoryId: applied.categoryId,
+        categoryName: applied.categoryName,
+        classifiedBy: applied.classifiedBy,
+        reviewStatus: applied.reviewStatus,
+      };
+    });
+  }, [rulePreview, aiResults]);
+
+  const unclassifiedCount = preview.filter((t) => t.classifiedBy === 'unclassified').length;
+
+  const classify = async () => {
+    const targets = preview.filter((t) => t.classifiedBy === 'unclassified');
+    if (targets.length === 0) return;
+    setClassifying(true);
+    try {
+      const outcome = await requestAiClassification(targets);
+      setAiResults((prev) => {
+        const next = new Map(prev);
+        for (const r of outcome.results) next.set(r.id, r);
+        return next;
+      });
+      setClassifyWarnings(outcome.warnings);
+    } finally {
+      setClassifying(false);
+    }
+  };
 
   const save = async () => {
     const outcome = await saveBatch(preview, {
@@ -166,6 +207,35 @@ export default function PastePage() {
                 <TransactionRow key={t.id} transaction={t} />
               ))}
             </ul>
+
+            {/* ルールに当たらなかった分だけ AI に回せる(M2-3b)。押されたときだけ呼ぶ */}
+            {unclassifiedCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => void classify()}
+                disabled={classifying}
+                className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
+                style={{
+                  background: 'var(--plane)',
+                  color: 'var(--accent)',
+                  border: '1px solid var(--hairline)',
+                  opacity: classifying ? 0.6 : 1,
+                }}
+              >
+                {classifying
+                  ? '分類しています…'
+                  : `分類できなかった ${unclassifiedCount} 件を AI に回す`}
+              </button>
+            ) : null}
+
+            {classifyWarnings.length > 0 ? (
+              <ul className="mt-3 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                {classifyWarnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            ) : null}
+
             <button
               type="button"
               onClick={() => void save()}
