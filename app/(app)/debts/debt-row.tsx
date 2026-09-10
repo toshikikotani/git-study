@@ -3,14 +3,25 @@
 import { useState } from 'react';
 
 import { Card } from '@/components/ui/card';
+import type { PlanActualDelta } from '@/domain/debt-payment';
 import { formatAnnualRate, formatYen } from '@/domain/money';
+import type { DebtPayment } from '@/features/debts/payments-store';
 import type { Debt } from '@/features/debts/store';
 import { updateDebtAction } from './actions';
 import { DebtForm } from './debt-form';
 import { DEBT_KIND_LABELS } from './kind-labels';
+import { PaymentHistory } from './payment-history';
 
 /** 一覧の1件。読み取り表示と編集フォームをこの中で切り替える。 */
-export function DebtRow({ debt }: { debt: Debt }) {
+export function DebtRow({
+  debt,
+  payments,
+  planActualDelta,
+}: {
+  debt: Debt;
+  payments: readonly DebtPayment[];
+  planActualDelta: PlanActualDelta | null;
+}) {
   const [editing, setEditing] = useState(false);
 
   if (editing) {
@@ -75,6 +86,8 @@ export function DebtRow({ debt }: { debt: Debt }) {
           {debt.note}
         </p>
       ) : null}
+
+      <PaymentHistory debtId={debt.id} payments={payments} planActualDelta={planActualDelta} />
     </Card>
   );
 }
