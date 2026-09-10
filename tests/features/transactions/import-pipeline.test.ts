@@ -61,6 +61,45 @@ describe('buildPreview', () => {
     expect(tx?.reviewStatus).toBe('auto_ok');
   });
 
+  it('categoryNameById を渡すと表示名が入る(M2-5)', () => {
+    const rules: ClassificationRule[] = [
+      {
+        id: 'c1',
+        name: 'コンビニ',
+        priority: 1,
+        matchType: 'keyword',
+        pattern: 'ローソン',
+        categoryId: 'cat-waste',
+        isActive: true,
+      },
+    ];
+    const [tx] = buildPreview(
+      [ROW],
+      'acc-1',
+      (i) => `${i}`,
+      rules,
+      new Map([['cat-waste', '浪費']]),
+    );
+    expect(tx?.categoryName).toBe('浪費');
+  });
+
+  it('categoryNameById に無い categoryId なら categoryName は null のまま', () => {
+    const rules: ClassificationRule[] = [
+      {
+        id: 'c1',
+        name: 'コンビニ',
+        priority: 1,
+        matchType: 'keyword',
+        pattern: 'ローソン',
+        categoryId: 'cat-waste',
+        isActive: true,
+      },
+    ];
+    const [tx] = buildPreview([ROW], 'acc-1', (i) => `${i}`, rules, new Map());
+    expect(tx?.categoryId).toBe('cat-waste');
+    expect(tx?.categoryName).toBeNull();
+  });
+
   it('fingerprint は日付・金額・摘要から決定的に作られる', () => {
     const [a] = buildPreview([ROW], 'acc-1', () => 'a');
     const [b] = buildPreview([{ ...ROW }], 'acc-2', () => 'b');

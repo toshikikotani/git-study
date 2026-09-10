@@ -29,14 +29,21 @@ export type ImportableRow = {
 /**
  * 行を分類し、保存直前のプレビューへ組み立てる。
  * id は呼び出し側の事情(CSV の行番号、貼り付けの連番など)に委ねる。
+ *
+ * categoryNameById は表示用(画面に「未分類」ではなくカテゴリ名を出すため)。
+ * 省略した場合、ルールがカテゴリを設定しても categoryName は null のままになる
+ * (categoryId 自体は正しく入るので、保存や以降の判定には影響しない)。
  */
 export function buildPreview(
   rows: readonly ImportableRow[],
   accountId: string,
   idFor: (index: number) => string,
   rules: readonly ClassificationRule[] = DEFAULT_DETECTION_RULES,
+  categoryNameById: ReadonlyMap<string, string> = new Map(),
 ): StoredTransaction[] {
-  return rows.map((row, index) => buildPreviewRow(row, accountId, idFor(index), rules));
+  return rows.map((row, index) =>
+    buildPreviewRow(row, accountId, idFor(index), rules, categoryNameById),
+  );
 }
 
 function buildPreviewRow(
@@ -44,6 +51,7 @@ function buildPreviewRow(
   accountId: string,
   id: string,
   rules: readonly ClassificationRule[],
+  categoryNameById: ReadonlyMap<string, string>,
 ): StoredTransaction {
   const classification = applyRules(
     {
@@ -62,7 +70,9 @@ function buildPreviewRow(
     amountYen: row.amountYen,
     paymentMethod: classification.paymentMethod,
     categoryId: classification.categoryId,
-    categoryName: null,
+    categoryName: classification.categoryId
+      ? (categoryNameById.get(classification.categoryId) ?? null)
+      : null,
     classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
     // 分類が付いていないものは本人の確認へ回す(FR-12)
     reviewStatus: classification.categoryId ? 'auto_ok' : 'pending',

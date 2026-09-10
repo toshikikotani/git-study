@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
+import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
 import type { ClassifyResult } from '@/features/classification/store';
 import {
   GENERIC_ADAPTER,
@@ -15,6 +16,7 @@ import {
 } from '@/features/import/adapters';
 import { requestAiClassification } from '@/features/transactions/classify-client';
 import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
+import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
 
 /**
@@ -44,6 +46,21 @@ export default function ImportPage() {
   const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
   const [classifying, setClassifying] = useState(false);
   const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
+  const [learnedRules, setLearnedRules] = useState<ClassificationRule[]>([]);
+  const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
+
+  // 学習済みルール(M2-5)。取得に失敗しても固定の検知ルールだけで取り込みは動く
+  useEffect(() => {
+    void fetchLearnedRules().then((fetched) => {
+      setLearnedRules(fetched.rules);
+      setCategoryNameById(fetched.categoryNameById);
+    });
+  }, []);
+
+  const rules = useMemo<ClassificationRule[]>(
+    () => [...DEFAULT_DETECTION_RULES, ...learnedRules],
+    [learnedRules],
+  );
 
   const onFile = useCallback(async (file: File) => {
     setError(null);
@@ -79,8 +96,14 @@ export default function ImportPage() {
   const rulePreview = useMemo<StoredTransaction[]>(() => {
     if (!result || 'error' in result) return [];
     const rows = result.transactions;
-    return buildPreview(rows, 'pending', (i) => `${rows[i]!.lineNumber}-${i}`);
-  }, [result]);
+    return buildPreview(
+      rows,
+      'pending',
+      (i) => `${rows[i]!.lineNumber}-${i}`,
+      rules,
+      categoryNameById,
+    );
+  }, [result, rules, categoryNameById]);
 
   // AI 分類の結果を id で重ねる。新しいファイルを読むと rulePreview の id が
   // 総入れ替えになるため、古い aiResults は自然に参照されなくなる(明示的な

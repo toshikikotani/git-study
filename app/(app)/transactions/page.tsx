@@ -84,17 +84,18 @@ export default function TransactionsPage() {
       ) : null}
 
       {pending.length > 0 ? (
-        <div
+        <Link
+          href="/transactions/review"
           className="flex items-center justify-between gap-3 rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
             確認待ちが {pending.length} 件
           </p>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            M2-5 で確認画面を作ります
+          <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+            確認する →
           </span>
-        </div>
+        </Link>
       ) : null}
 
       {groups.map(([date, rows]) => (
