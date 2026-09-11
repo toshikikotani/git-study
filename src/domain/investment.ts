@@ -62,3 +62,44 @@ export function isFullyPaidOff(debts: readonly { status: DebtLifecycleStatus }[]
   if (debts.length === 0) return false;
   return debts.every((debt) => debt.status !== 'active');
 }
+
+export class InvestmentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvestmentError';
+  }
+}
+
+/** 拠出額(investment_contributions.amount_yen)。`ck_contributions_amount` に合わせ1円以上。 */
+export function assertContributionAmountYen(value: number): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new InvestmentError(`拠出額は1円以上の整数で指定してください: ${value}`);
+  }
+  return value;
+}
+
+/** 残高(investment_snapshots.market_value_yen)。`ck_snapshots_value` に合わせ0円以上。 */
+export function assertSnapshotValueYen(value: number): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new InvestmentError(`残高は0円以上の整数で指定してください: ${value}`);
+  }
+  return value;
+}
+
+/** 取得額(investment_snapshots.cost_basis_yen)。未入力は null、指定するなら0円以上。 */
+export function assertSnapshotCostBasisYen(value: number | null): number | null {
+  if (value === null) return null;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new InvestmentError(`取得額は0円以上の整数で指定してください: ${value}`);
+  }
+  return value;
+}
+
+/** 商品名。空文字・空白のみは拒否する(残高の「同じ商品」判定のキーになるため必須)。 */
+export function assertProductName(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    throw new InvestmentError('商品名を入力してください');
+  }
+  return trimmed;
+}
