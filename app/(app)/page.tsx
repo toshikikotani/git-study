@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CountUp } from '@/components/ui/count-up';
 import { ProgressGauge } from '@/components/ui/meter';
 import { StatTile } from '@/components/ui/stat-tile';
@@ -181,6 +183,15 @@ export default async function HomePage() {
           で表示したい枠を選んでください。
         </p>
       ) : null}
+
+      <Link
+        href="/briefs"
+        className="inline-flex items-center gap-1 px-1 text-xs font-semibold"
+        style={{ color: 'var(--accent)' }}
+      >
+        朝配信のアーカイブ
+        <span aria-hidden>→</span>
+      </Link>
 
       <p className="px-1 pt-0.5 text-[10px] opacity-70" style={{ color: 'var(--ink-muted)' }}>
         数値は仮置き(ADR-006)。Supabase 接続後に実データへ切り替わります。

@@ -13,8 +13,9 @@ import { filterBriefTopics, pickDailyTopic } from '@/domain/briefs';
 import { INCOME_TIP_BANK } from '@/features/briefs/tips';
 import { loadHomeSummary } from '@/features/home/summary';
 import { formatYen } from '@/domain/money';
-import { todayJst } from '@/lib/date';
+import { todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/types';
 
 export class BriefStoreError extends Error {
   constructor(message: string) {
@@ -136,6 +137,111 @@ export async function generateDailyBrief(
   }
 
   return { briefId: brief.id, created: true };
+}
+
+export type BriefStatus = Database['public']['Enums']['brief_status'];
+export type BriefItemKind = Database['public']['Enums']['brief_item_kind'];
+export type BriefExclusionReasonValue = Database['public']['Enums']['brief_exclusion_reason'];
+
+export type BriefListItem = {
+  id: string;
+  briefOn: DateOnly;
+  status: BriefStatus;
+  daysToPayoff: number | null;
+  remainingDebtYen: number | null;
+};
+
+/** 過去の配信を新しい順に並べる(M5-3、FR-32)。 */
+export async function listDailyBriefs(): Promise<BriefListItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('daily_briefs')
+    .select('id, brief_on, status, days_to_payoff, remaining_debt_yen')
+    .order('brief_on', { ascending: false });
+  if (error) throw new BriefStoreError(`配信の一覧を取得できませんでした: ${error.message}`);
+
+  return data.map((row) => ({
+    id: row.id,
+    briefOn: row.brief_on,
+    status: row.status,
+    daysToPayoff: row.days_to_payoff,
+    remainingDebtYen: row.remaining_debt_yen,
+  }));
+}
+
+export type BriefDetailItem = {
+  id: string;
+  kind: BriefItemKind;
+  title: string;
+  summary: string | null;
+};
+
+export type BriefDetailExcludedItem = {
+  id: string;
+  title: string;
+  reason: BriefExclusionReasonValue;
+  reasonDetail: string | null;
+};
+
+export type BriefDetail = {
+  id: string;
+  briefOn: DateOnly;
+  status: BriefStatus;
+  items: BriefDetailItem[];
+  excludedItems: BriefDetailExcludedItem[];
+};
+
+/**
+ * 配信1件の詳細(M5-3)。本文は `brief_items` を並び順どおりに読む
+ * (`body_md` は将来の配信チャネル向けの整形済みテキストで、画面表示は
+ * 構造化されたデータの方がこのアプリの他画面と一貫する)。
+ * 除外ログ(FR-31、なぜ載せなかったかが見える)も合わせて返す。
+ */
+export async function getDailyBrief(id: string): Promise<BriefDetail | null> {
+  const supabase = await createClient();
+  const { data: brief, error: briefError } = await supabase
+    .from('daily_briefs')
+    .select('id, brief_on, status')
+    .eq('id', id)
+    .maybeSingle();
+  if (briefError) throw new BriefStoreError(`配信を取得できませんでした: ${briefError.message}`);
+  if (!brief) return null;
+
+  const [{ data: items, error: itemsError }, { data: excludedItems, error: excludedError }] =
+    await Promise.all([
+      supabase
+        .from('brief_items')
+        .select('id, kind, title, summary')
+        .eq('brief_id', id)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('brief_excluded_items')
+        .select('id, title, reason, reason_detail')
+        .eq('brief_id', id),
+    ]);
+  if (itemsError)
+    throw new BriefStoreError(`配信の項目を取得できませんでした: ${itemsError.message}`);
+  if (excludedError) {
+    throw new BriefStoreError(`除外ログを取得できませんでした: ${excludedError.message}`);
+  }
+
+  return {
+    id: brief.id,
+    briefOn: brief.brief_on,
+    status: brief.status,
+    items: items.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      summary: item.summary,
+    })),
+    excludedItems: excludedItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      reason: item.reason,
+      reasonDetail: item.reason_detail,
+    })),
+  };
 }
 
 function buildHeadlineTitle(daysRemaining: number | null, remainingYen: number): string {
