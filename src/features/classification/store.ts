@@ -150,6 +150,111 @@ export async function listActiveClassificationRules(): Promise<ClassificationRul
   return data.map(ruleFromRow);
 }
 
+export type ClassificationRuleSummary = {
+  id: string;
+  name: string;
+  priority: number;
+  matchType: ClassificationRuleRow['match_type'];
+  pattern: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  isLearned: boolean;
+  isActive: boolean;
+  hitCount: number;
+  lastHitAt: string | null;
+};
+
+/**
+ * 分類ルールの一覧・編集画面(M2-6)向け。無効化済みも含めて全件返す
+ * (`listActiveClassificationRules()` は取り込み経路が使う有効分のみ)。
+ * カテゴリ名は `categories.name` から解決する(ADR-016、code では画面に出さない)。
+ */
+export async function listClassificationRules(): Promise<ClassificationRuleSummary[]> {
+  const supabase = await createClient();
+  const [{ data: rules, error: rulesError }, { data: categories, error: categoriesError }] =
+    await Promise.all([
+      supabase.from('classification_rules').select('*').order('priority', { ascending: true }),
+      supabase.from('categories').select('id, name'),
+    ]);
+  if (rulesError) {
+    throw new ClassificationStoreError(`分類ルールを取得できませんでした: ${rulesError.message}`);
+  }
+  if (categoriesError) {
+    throw new ClassificationStoreError(
+      `カテゴリを取得できませんでした: ${categoriesError.message}`,
+    );
+  }
+
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+  return rules.map((row) => ({
+    id: row.id,
+    name: row.name,
+    priority: row.priority,
+    matchType: row.match_type,
+    pattern: row.pattern,
+    categoryId: row.category_id,
+    categoryName: row.category_id ? (nameById.get(row.category_id) ?? null) : null,
+    isLearned: row.is_learned,
+    isActive: row.is_active,
+    hitCount: row.hit_count,
+    lastHitAt: row.last_hit_at,
+  }));
+}
+
+export async function setClassificationRuleActive(id: string, isActive: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('classification_rules')
+    .update({ is_active: isActive })
+    .eq('id', id);
+  if (error) {
+    throw new ClassificationStoreError(`分類ルールを更新できませんでした: ${error.message}`);
+  }
+}
+
+export async function deleteClassificationRule(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from('classification_rules').delete().eq('id', id);
+  if (error) {
+    throw new ClassificationStoreError(`分類ルールを削除できませんでした: ${error.message}`);
+  }
+}
+
+/**
+ * 隣り合う2件の priority を入れ替える。transfer_rules(M4-3)と違い
+ * 一意制約がないため、負の一時値を経由させる必要はない。
+ */
+async function swapRulePriority(
+  a: { id: string; priority: number },
+  b: { id: string; priority: number },
+): Promise<void> {
+  const supabase = await createClient();
+
+  const step = async (id: string, priority: number) => {
+    const { error } = await supabase.from('classification_rules').update({ priority }).eq('id', id);
+    if (error) throw new ClassificationStoreError(`並び替えに失敗しました: ${error.message}`);
+  };
+
+  await step(a.id, b.priority);
+  await step(b.id, a.priority);
+}
+
+/** 1つ上(priority がより小さい方)のルールと順序を入れ替える。先頭なら何もしない。 */
+export async function moveClassificationRuleUp(id: string): Promise<void> {
+  const rules = await listClassificationRules();
+  const index = rules.findIndex((r) => r.id === id);
+  if (index <= 0) return;
+  await swapRulePriority(rules[index]!, rules[index - 1]!);
+}
+
+/** 1つ下(priority がより大きい方)のルールと順序を入れ替える。末尾なら何もしない。 */
+export async function moveClassificationRuleDown(id: string): Promise<void> {
+  const rules = await listClassificationRules();
+  const index = rules.findIndex((r) => r.id === id);
+  if (index === -1 || index >= rules.length - 1) return;
+  await swapRulePriority(rules[index]!, rules[index + 1]!);
+}
+
 /**
  * 確認待ちキューでの1件修正から学習ルールを作る(FR-12, M2-5)。
  *

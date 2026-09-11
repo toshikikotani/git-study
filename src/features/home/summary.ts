@@ -19,6 +19,11 @@
  */
 
 import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
+import {
+  expandMergedCategoryIds,
+  resolveCategoryRoot,
+  type CategoryMergeNode,
+} from '@/domain/category';
 import { simulateTotalPayoff, summarizePayoff, type Debt } from '@/domain/payoff';
 import { listDebts, toPayoffDebt } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
@@ -166,12 +171,14 @@ export function computePayoffSummary(
 }
 
 export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSummary> {
-  const [payoffInput, categories] = await Promise.all([
+  const [payoffInput, categories, mergeNodes] = await Promise.all([
     loadPayoffInput(now),
     listHomeCategories(now),
+    listCategoryMergeNodes(),
   ]);
   const transactions = await listMonthTransactions(
     categories.map((c) => c.categoryId),
+    mergeNodes,
     now,
   );
 
@@ -179,6 +186,17 @@ export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSumma
     payoff: computePayoffSummary(payoffInput, now),
     tiles: buildHomeTiles(categories, transactions),
   };
+}
+
+/**
+ * 統廃合(merged_into_id、M2-6)を辿るための全カテゴリの最小情報。
+ * 無効化済み(統合済み)のカテゴリも対象に含める必要があるため is_active では絞らない。
+ */
+async function listCategoryMergeNodes(): Promise<CategoryMergeNode[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('categories').select('id, merged_into_id');
+  if (error) throw new Error(`カテゴリを取得できませんでした: ${error.message}`);
+  return data.map((c) => ({ id: c.id, mergedIntoId: c.merged_into_id }));
 }
 
 /** 完済シミュレーションの入力を組み立てる。debts / app_settings / debt_payments を読む。 */
@@ -256,24 +274,36 @@ async function listHomeCategories(now: Date): Promise<HomeCategory[]> {
   });
 }
 
-/** 当月・指定カテゴリの明細。集計から外すもの(振替・対象外)は domain/budget.ts 側で判定する。 */
+/**
+ * 当月・指定カテゴリの明細。集計から外すもの(振替・対象外)は domain/budget.ts 側で判定する。
+ *
+ * ── 統廃合されたカテゴリの明細も含める(FR-13, M2-6)────────────────
+ * カテゴリを統合しても transactions.category_id は書き換えないため、
+ * `categoryIds`(統合先=表示対象)をそのまま条件にすると旧カテゴリの明細が
+ * 抜け落ちる。`expandMergedCategoryIds()` で旧カテゴリの id も条件へ足し、
+ * 取得後は `resolveCategoryRoot()` で明細側の categoryId を統合先へ
+ * 揃え直してから `summarizeBudgets`/`budgetStatusFor` に渡す。
+ */
 async function listMonthTransactions(
   categoryIds: readonly string[],
+  mergeNodes: readonly CategoryMergeNode[],
   now: Date,
 ): Promise<BudgetTransaction[]> {
   if (categoryIds.length === 0) return [];
+
+  const expandedIds = expandMergedCategoryIds(mergeNodes, categoryIds);
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('transactions')
     .select('category_id, amount_yen, is_transfer, review_status')
-    .in('category_id', categoryIds)
+    .in('category_id', expandedIds)
     .gte('occurred_on', monthStartJst(0, now))
     .lt('occurred_on', monthStartJst(1, now));
   if (error) throw new Error(`明細を取得できませんでした: ${error.message}`);
 
   return data.map((t) => ({
-    categoryId: t.category_id,
+    categoryId: t.category_id === null ? null : resolveCategoryRoot(t.category_id, mergeNodes),
     amountYen: t.amount_yen,
     isTransfer: t.is_transfer,
     reviewStatus: t.review_status,
