@@ -18,7 +18,7 @@
 
 import { addDays, addMonthsToParts, daysBetween, splitDateOnly, type DateOnly } from '@/lib/date';
 
-export type AlertKind = 'inactivity' | 'payment_due';
+export type AlertKind = 'inactivity' | 'payment_due' | 'debt_paid_off';
 export type AlertSeverity = 'info' | 'warn' | 'critical';
 
 export type CandidateAlert = {

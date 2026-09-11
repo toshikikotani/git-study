@@ -43,3 +43,22 @@ export function computeInvestmentPlan(input: InvestmentPlanInput): InvestmentPla
   const highRiskYen = Math.round(totalYen * input.highRiskAllocationRatio);
   return { totalYen, indexYen: totalYen - highRiskYen, highRiskYen };
 }
+
+/** debts.status(M7-3)。domain 層は features/debts/store.ts に依存しないため独自に持つ。 */
+export type DebtLifecycleStatus = 'active' | 'paid_off' | 'refinanced' | 'closed';
+
+/**
+ * 全負債が完済したか(FR-52、高リスク枠解禁のトリガー)。
+ *
+ * 一度も負債を登録していない(debts が空)状態は「完済」に含めない。
+ * 完済という節目は、返すべき負債があった上でこそ成立する。
+ *
+ * 'active' 以外(paid_off・refinanced・closed)はどれも「もう返済負担として
+ * 残っていない」状態を意味する:refinanced は新しい負債へ移行済み(その新しい
+ * 負債自体が active として別途カウントされる)、closed は誤登録の無効化。
+ * そのため 'active' が1件も無いことだけを見れば足りる。
+ */
+export function isFullyPaidOff(debts: readonly { status: DebtLifecycleStatus }[]): boolean {
+  if (debts.length === 0) return false;
+  return debts.every((debt) => debt.status !== 'active');
+}

@@ -1,24 +1,36 @@
 import { Card } from '@/components/ui/card';
 import { computeInvestmentPlan } from '@/domain/investment';
 import { formatYen } from '@/domain/money';
+import { checkAndUnlockHighRisk } from '@/features/investments/store';
 import { getAppSettings } from '@/features/settings/store';
 
 /**
- * 投資(M7-1)。
+ * 投資(M7-1, M7-3)。
  *
  * 今はまだ「今月いくら投資に回すか」の自動算出だけ(FR-50)。
  * 拠出・残高の記録(FR-51)は M7-2 でここに足す。
+ *
+ * 全負債の完済を検知して高リスク枠を解禁する処理(FR-52)もここで行う。
+ * アクセスするたびに判定するので、`/debts` で完済した次にこの画面を
+ * 開いたタイミングで自動的に切り替わる(本人が別途操作する必要はない)。
  */
 
 // 完済検知(is_high_risk_unlocked)を反映するため、常に最新の設定を読む。
 export const dynamic = 'force-dynamic';
 
 export default async function InvestmentsPage() {
+  const justUnlocked = await checkAndUnlockHighRisk();
   const settings = await getAppSettings();
+  // Next.js の fetch リクエストメモ化により、checkAndUnlockHighRisk() 内で読んだ
+  // app_settings と同じクエリがこのレンダー内で再利用され、更新直後の1回だけは
+  // settings.isHighRiskUnlocked が更新前の値のまま返ることがある。justUnlocked
+  // (今回のアクセスで解禁したかどうか)を合わせて見ることで、解禁直後の表示も
+  // 次回アクセスと同じ内容にする。
+  const isHighRiskUnlocked = settings.isHighRiskUnlocked || justUnlocked;
   const plan = computeInvestmentPlan({
     monthlyRepaymentTargetYen: settings.monthlyRepaymentTargetYen,
     investmentRatioOfRepayment: settings.investmentRatioOfRepayment,
-    isHighRiskUnlocked: settings.isHighRiskUnlocked,
+    isHighRiskUnlocked,
     highRiskAllocationRatio: settings.highRiskAllocationRatio,
   });
 
@@ -29,6 +41,20 @@ export default async function InvestmentsPage() {
           投資
         </h1>
       </header>
+
+      {justUnlocked ? (
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: 'var(--accent-track)', boxShadow: 'var(--card-shadow)' }}
+        >
+          <p className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+            高リスク枠が解禁されました
+          </p>
+          <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            全ての負債を完済しました。今月から投資の配分にインデックス7:高リスク3が適用されます。
+          </p>
+        </div>
+      ) : null}
 
       <Card>
         <p className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
@@ -45,7 +71,7 @@ export default async function InvestmentsPage() {
           {Math.round(settings.investmentRatioOfRepayment * 100)}%
         </p>
 
-        {settings.isHighRiskUnlocked ? (
+        {isHighRiskUnlocked ? (
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-2xl p-3" style={{ background: 'var(--plane)' }}>
               <p style={{ color: 'var(--ink-muted)' }}>インデックス枠</p>
