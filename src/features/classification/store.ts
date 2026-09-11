@@ -17,8 +17,10 @@ import {
   ClaudeTransactionClassifier,
   type ClassifiableTransaction,
 } from '@/features/classification/ai';
+import { buildLearnedRule, type ClassificationRule } from '@/features/classification/rules';
 import { getAppSettings } from '@/features/settings/store';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/types';
 
 export type CategoryOption = { id: string; code: string; name: string };
 
@@ -109,4 +111,83 @@ export async function classifyUnclassified(
   const missing = rows.filter((row) => !returnedIds.has(row.id)).map((row) => unclassified(row.id));
 
   return { results: [...results, ...missing], warnings: outcome.warnings };
+}
+
+type ClassificationRuleRow = Database['public']['Tables']['classification_rules']['Row'];
+
+function ruleFromRow(row: ClassificationRuleRow): ClassificationRule {
+  return {
+    id: row.id,
+    name: row.name,
+    priority: row.priority,
+    matchType: row.match_type,
+    pattern: row.pattern ?? undefined,
+    accountId: row.account_id ?? undefined,
+    minAmountYen: row.min_amount_yen ?? undefined,
+    maxAmountYen: row.max_amount_yen ?? undefined,
+    categoryId: row.category_id ?? undefined,
+    setPaymentMethod: row.set_payment_method ?? undefined,
+    setMerchantName: row.set_merchant_name ?? undefined,
+    isActive: row.is_active,
+  };
+}
+
+/**
+ * DB 保存の分類ルール(手書き + 学習済み)。取り込み経路は
+ * `DEFAULT_DETECTION_RULES`(FR-21 の検知、固定3件)とこれを両方渡して
+ * `applyRules()` を呼ぶ(M2-5)。
+ */
+export async function listActiveClassificationRules(): Promise<ClassificationRule[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('classification_rules')
+    .select('*')
+    .eq('is_active', true)
+    .order('priority', { ascending: true });
+  if (error) {
+    throw new ClassificationStoreError(`分類ルールを取得できませんでした: ${error.message}`);
+  }
+  return data.map(ruleFromRow);
+}
+
+/**
+ * 確認待ちキューでの1件修正から学習ルールを作る(FR-12, M2-5)。
+ *
+ * 明細はセッション保存のまま(T-7 未着手)で DB の行を持たないため、
+ * learned_from_transaction_id は null のままにする(このルート自体は
+ * 任意の FK なので問題ない)。
+ */
+export async function createLearnedRule(params: {
+  description: string;
+  categoryId: string;
+  accountId: string | null;
+}): Promise<void> {
+  const built = buildLearnedRule({
+    id: '',
+    description: params.description,
+    categoryId: params.categoryId,
+    accountId: params.accountId ?? undefined,
+    fromTransactionId: '',
+  });
+
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new ClassificationStoreError('ログイン状態を確認できませんでした');
+  }
+
+  const { error } = await supabase.from('classification_rules').insert({
+    user_id: auth.user.id,
+    name: built.name,
+    priority: built.priority,
+    match_type: built.matchType,
+    pattern: built.pattern ?? null,
+    account_id: built.accountId ?? null,
+    category_id: built.categoryId ?? null,
+    is_learned: true,
+    is_active: true,
+  });
+  if (error) {
+    throw new ClassificationStoreError(`学習ルールを作成できませんでした: ${error.message}`);
+  }
 }

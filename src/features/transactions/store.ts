@@ -51,6 +51,14 @@ export type AddResult = {
   duplicateCount: number;
 };
 
+/** 確認待ちキューでの1件修正(M2-5)。ここで直せるのは分類だけ。 */
+export type TransactionCorrection = {
+  categoryId: string | null;
+  categoryName: string | null;
+  classifiedBy: StoredTransaction['classifiedBy'];
+  reviewStatus: StoredTransaction['reviewStatus'];
+};
+
 export interface TransactionStore {
   list(): Promise<StoredTransaction[]>;
   batches(): Promise<ImportBatchSummary[]>;
@@ -58,6 +66,8 @@ export interface TransactionStore {
   add(transactions: readonly StoredTransaction[], batch: ImportBatchSummary): Promise<AddResult>;
   /** 取り込み単位で取り消す。列の指定を間違えたときの逃げ道。 */
   removeBatch(batchId: string): Promise<void>;
+  /** 確認待ちキューでの1件修正(M2-5)。存在しない id は黙って無視する。 */
+  update(id: string, correction: TransactionCorrection): Promise<void>;
   clear(): Promise<void>;
 }
 
@@ -136,6 +146,13 @@ export class SessionTransactionStore implements TransactionStore {
     write(
       BATCH_KEY,
       read<ImportBatchSummary>(BATCH_KEY).filter((b) => b.batchId !== batchId),
+    );
+  }
+
+  async update(id: string, correction: TransactionCorrection): Promise<void> {
+    write(
+      STORAGE_KEY,
+      read<StoredTransaction>(STORAGE_KEY).map((t) => (t.id === id ? { ...t, ...correction } : t)),
     );
   }
 
