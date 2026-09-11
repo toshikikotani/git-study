@@ -1,14 +1,20 @@
 import { Card } from '@/components/ui/card';
 import { computeInvestmentPlan } from '@/domain/investment';
 import { formatYen } from '@/domain/money';
-import { checkAndUnlockHighRisk } from '@/features/investments/store';
+import {
+  checkAndUnlockHighRisk,
+  listInvestmentContributions,
+  listInvestmentSnapshots,
+} from '@/features/investments/store';
 import { getAppSettings } from '@/features/settings/store';
+import { ContributionSection } from './contribution-section';
+import { SnapshotSection } from './snapshot-section';
 
 /**
- * 投資(M7-1, M7-3)。
+ * 投資(M7-1, M7-2, M7-3)。
  *
- * 今はまだ「今月いくら投資に回すか」の自動算出だけ(FR-50)。
- * 拠出・残高の記録(FR-51)は M7-2 でここに足す。
+ * 「今月いくら投資に回すか」の自動算出(FR-50)に加え、拠出(フロー)と
+ * 残高(ストック)の手入力・一覧(FR-51、証券口座連携は当面対象外)を持つ。
  *
  * 全負債の完済を検知して高リスク枠を解禁する処理(FR-52)もここで行う。
  * アクセスするたびに判定するので、`/debts` で完済した次にこの画面を
@@ -20,7 +26,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function InvestmentsPage() {
   const justUnlocked = await checkAndUnlockHighRisk();
-  const settings = await getAppSettings();
+  const [settings, contributions, snapshots] = await Promise.all([
+    getAppSettings(),
+    listInvestmentContributions(),
+    listInvestmentSnapshots(),
+  ]);
   // Next.js の fetch リクエストメモ化により、checkAndUnlockHighRisk() 内で読んだ
   // app_settings と同じクエリがこのレンダー内で再利用され、更新直後の1回だけは
   // settings.isHighRiskUnlocked が更新前の値のまま返ることがある。justUnlocked
@@ -93,6 +103,9 @@ export default async function InvestmentsPage() {
           </p>
         )}
       </Card>
+
+      <ContributionSection contributions={contributions} />
+      <SnapshotSection snapshots={snapshots} />
     </div>
   );
 }

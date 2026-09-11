@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeInvestmentPlan, isFullyPaidOff } from '@/domain/investment';
+import {
+  assertContributionAmountYen,
+  assertProductName,
+  assertSnapshotCostBasisYen,
+  assertSnapshotValueYen,
+  computeInvestmentPlan,
+  InvestmentError,
+  isFullyPaidOff,
+} from '@/domain/investment';
 
 describe('computeInvestmentPlan(FR-50)', () => {
   it('返済目標額に比率を掛けた額が投資総額になる', () => {
@@ -74,5 +82,56 @@ describe('isFullyPaidOff(FR-52)', () => {
 
   it('負債を一度も登録していなければ完済に含めない', () => {
     expect(isFullyPaidOff([])).toBe(false);
+  });
+});
+
+describe('assertContributionAmountYen(FR-51)', () => {
+  it('1円以上の整数は許可する', () => {
+    expect(assertContributionAmountYen(1)).toBe(1);
+    expect(assertContributionAmountYen(30000)).toBe(30000);
+  });
+
+  it('0以下・小数は拒否する', () => {
+    expect(() => assertContributionAmountYen(0)).toThrow(InvestmentError);
+    expect(() => assertContributionAmountYen(-1)).toThrow(InvestmentError);
+    expect(() => assertContributionAmountYen(1.5)).toThrow(/拠出額/);
+  });
+});
+
+describe('assertSnapshotValueYen(FR-51)', () => {
+  it('0以上の整数は許可する', () => {
+    expect(assertSnapshotValueYen(0)).toBe(0);
+    expect(assertSnapshotValueYen(500000)).toBe(500000);
+  });
+
+  it('負数・小数は拒否する', () => {
+    expect(() => assertSnapshotValueYen(-1)).toThrow(InvestmentError);
+    expect(() => assertSnapshotValueYen(1.5)).toThrow(/残高/);
+  });
+});
+
+describe('assertSnapshotCostBasisYen(FR-51)', () => {
+  it('null は任意入力としてそのまま通す', () => {
+    expect(assertSnapshotCostBasisYen(null)).toBeNull();
+  });
+
+  it('0以上の整数は許可する', () => {
+    expect(assertSnapshotCostBasisYen(0)).toBe(0);
+    expect(assertSnapshotCostBasisYen(450000)).toBe(450000);
+  });
+
+  it('負数は拒否する', () => {
+    expect(() => assertSnapshotCostBasisYen(-1)).toThrow(/取得額/);
+  });
+});
+
+describe('assertProductName', () => {
+  it('前後の空白を取り除く', () => {
+    expect(assertProductName('  eMAXIS Slim 全世界株式  ')).toBe('eMAXIS Slim 全世界株式');
+  });
+
+  it('空文字・空白のみは拒否する', () => {
+    expect(() => assertProductName('')).toThrow(InvestmentError);
+    expect(() => assertProductName('   ')).toThrow(/商品名/);
   });
 });
