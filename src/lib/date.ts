@@ -74,10 +74,15 @@ export function addMonths(date: DateOnly, offsetMonths: number): DateOnly {
   return addMonthsToParts(y, m, d, offsetMonths);
 }
 
-/** today を含む月の給料日(月末に無い日は月末に丸める、ADR-015と同じ考え方)。 */
-export function paydayInMonthOf(today: DateOnly, payday: number): DateOnly {
-  const [year, month] = splitDateOnly(today);
-  return addMonthsToParts(year, month, payday, 0);
+/**
+ * date を含む月の n 日目(月末に無い日は月末に丸める、ADR-015と同じ考え方)。
+ * 給料日・締め日のような「毎月のn日目」全般に使う汎用の計算(同じ計算を
+ * 給料日サイクル(paydayCycleFor)と締め日サイクル(billingCycleStartFor 等)の
+ * 両方から使うため、片方の名前(旧 paydayInMonthOf)に固定しない)。
+ */
+export function nthDayOfMonth(date: DateOnly, day: number): DateOnly {
+  const [year, month] = splitDateOnly(date);
+  return addMonthsToParts(year, month, day, 0);
 }
 
 /**
@@ -91,15 +96,34 @@ export function paydayCycleFor(
   today: DateOnly,
   payday: number,
 ): { startOn: DateOnly; endOn: DateOnly } {
-  const [year, month] = splitDateOnly(today);
-  const currentPayday = addMonthsToParts(year, month, payday, 0);
+  const currentPayday = nthDayOfMonth(today, payday);
 
   if (today >= currentPayday) {
-    const nextPayday = addMonthsToParts(year, month, payday, 1);
+    const nextPayday = nthDayOfMonth(addMonths(today, 1), payday);
     return { startOn: currentPayday, endOn: addDays(nextPayday, -1) };
   }
-  const previousPayday = addMonthsToParts(year, month, payday, -1);
+  const previousPayday = nthDayOfMonth(addMonths(today, -1), payday);
   return { startOn: previousPayday, endOn: addDays(currentPayday, -1) };
+}
+
+/**
+ * closingDay 起点の請求サイクルで、endOn を含む締め回の開始日
+ * (前回の締め日の翌日、FR-18, M6-4)。
+ */
+export function billingCycleStartFor(endOn: DateOnly, closingDay: number): DateOnly {
+  const previousClosing = nthDayOfMonth(addMonths(endOn, -1), closingDay);
+  return addDays(previousClosing, 1);
+}
+
+/**
+ * closingDay 起点で、today 時点までに直近で締まった請求サイクルの終了日
+ * (FR-18, M6-4)。メールに締め日の記載が無いときのフォールバックに使う。
+ */
+export function mostRecentClosingOnOrBefore(today: DateOnly, closingDay: number): DateOnly {
+  const thisMonthClosing = nthDayOfMonth(today, closingDay);
+  return today >= thisMonthClosing
+    ? thisMonthClosing
+    : nthDayOfMonth(addMonths(today, -1), closingDay);
 }
 
 /** DateOnly に日を足す。 */

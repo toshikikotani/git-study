@@ -6,7 +6,7 @@
  * 落とさず、空配列を返して呼び出し側が「口座が未登録」として案内する。
  */
 
-export type AccountOption = { id: string; name: string };
+export type AccountOption = { id: string; name: string; closingDay: number | null };
 
 export async function fetchAccounts(): Promise<AccountOption[]> {
   try {

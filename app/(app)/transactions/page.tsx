@@ -45,9 +45,16 @@ export default async function TransactionsPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           明細
         </h1>
-        <div className="flex items-baseline gap-3">
+        <div className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
           <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             口座
+          </Link>
+          <Link
+            href="/transactions/reconcile"
+            className="text-[13px]"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            突き合わせ
           </Link>
           <Link
             href="/transactions/import"
