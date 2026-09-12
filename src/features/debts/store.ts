@@ -8,6 +8,8 @@
  * 必要がある(RLS の WITH CHECK は自動補完してくれない)。
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { createClient } from '@/lib/supabase/server';
 import type { DateOnly } from '@/lib/date';
 import type { Database } from '@/lib/supabase/types';
@@ -73,18 +75,36 @@ function fromRow(row: DebtRow): Debt {
   };
 }
 
-/** 有効な負債を、残高の大きい順に返す。入力を促したい大口を上に出す。 */
-export async function listDebts(): Promise<Debt[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+/**
+ * 有効な負債を、残高の大きい順に返す(管理クライアント版)。
+ *
+ * cron ジョブには本人のセッションが無く RLS に頼れないため、user_id を
+ * 明示して絞り込む(M5-2 の朝配信ジョブから利用)。
+ */
+export async function listDebtsAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+): Promise<Debt[]> {
+  const { data, error } = await client
     .from('debts')
     .select('*')
+    .eq('user_id', userId)
     .eq('status', 'active')
     .order('sort_order', { ascending: true })
     .order('current_balance_yen', { ascending: false });
 
   if (error) throw new DebtStoreError(`負債の一覧を取得できませんでした: ${error.message}`);
   return data.map(fromRow);
+}
+
+/** 有効な負債を、残高の大きい順に返す。入力を促したい大口を上に出す。 */
+export async function listDebts(): Promise<Debt[]> {
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new DebtStoreError('ログイン状態を確認できませんでした');
+  }
+  return listDebtsAsAdmin(supabase, auth.user.id);
 }
 
 /**

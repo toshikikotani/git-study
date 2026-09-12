@@ -118,6 +118,17 @@ export function getDiscordWebhookUrl(): string {
 }
 
 /**
+ * Discord Webhook URL。未設定なら null を返す(B-3 待ちのあいだ、
+ * アラートジョブ自体は落とさずスキップできるようにする。GMAIL_ADDRESS 等
+ * の getGmailEnv() と同じ考え方)。
+ */
+export function getOptionalDiscordWebhookUrl(): string | null {
+  const value = process.env.DISCORD_WEBHOOK_URL;
+  if (!value) return null;
+  return parseOrThrow(discordWebhookUrlSchema, value, 'DISCORD_WEBHOOK_URL');
+}
+
+/**
  * Gmail の資格情報。未設定なら null を返す(機能が無効なだけで、エラーではない)。
  * 中途半端に片方だけ設定されている場合は、黙って無効化せずエラーにする。
  */

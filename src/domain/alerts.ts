@@ -18,7 +18,14 @@
 
 import { addDays, addMonthsToParts, daysBetween, splitDateOnly, type DateOnly } from '@/lib/date';
 
-export type AlertKind = 'inactivity' | 'payment_due' | 'debt_paid_off' | 'import_needed';
+export type AlertKind =
+  | 'inactivity'
+  | 'payment_due'
+  | 'debt_paid_off'
+  | 'import_needed'
+  | 'revolving_detected'
+  | 'cashing_detected'
+  | 'installment_detected';
 export type AlertSeverity = 'info' | 'warn' | 'critical';
 
 export type CandidateAlert = {
@@ -28,6 +35,7 @@ export type CandidateAlert = {
   body: string | null;
   dedupKey: string;
   debtId: string | null;
+  transactionId: string | null;
 };
 
 /**
@@ -57,6 +65,7 @@ export function detectInactivity(
         : `${idleDays}日間、新しい明細が取り込まれていません。取り込みが空くと、リボ・キャッシングの検知が遅れます。`,
     dedupKey: `inactivity:${today}`,
     debtId: null,
+    transactionId: null,
   };
 }
 
@@ -82,5 +91,39 @@ export function detectPaymentDueTomorrow(
       body: null,
       dedupKey: `payment_due:${debt.id}:${tomorrow.slice(0, 7)}`,
       debtId: debt.id,
+      transactionId: null,
     }));
+}
+
+/**
+ * FR-21:リボ払い・キャッシング・分割払いを検知する(再発防止の最重要トリガー、
+ * 仕様書13章)。判定そのものは `features/classification/rules.ts` の
+ * `isRiskyPaymentMethod()` が正(ここで再定義しない)。
+ *
+ * dedup_key は取引そのもの(transactionId)に紐付ける。同じ取引を毎時
+ * 再スキャンしても、一度通知した取引は `alerts` の一意制約で二重通知
+ * されない(ADR-007 の冪等性と同じ考え方)。
+ */
+export function detectRiskyTransaction(transaction: {
+  id: string;
+  description: string;
+  amountYen: number;
+  paymentMethod: 'revolving' | 'cashing' | 'installment';
+}): CandidateAlert {
+  const labels = {
+    revolving: { kind: 'revolving_detected', label: 'リボ払い' },
+    cashing: { kind: 'cashing_detected', label: 'キャッシング' },
+    installment: { kind: 'installment_detected', label: '分割払い' },
+  } as const;
+  const { kind, label } = labels[transaction.paymentMethod];
+
+  return {
+    kind,
+    severity: 'critical',
+    title: `${label}を検知しました`,
+    body: `${transaction.description}(${Math.abs(transaction.amountYen).toLocaleString('ja-JP')}円)。該当カードの利用停止を検討してください。`,
+    dedupKey: `risky_payment:${transaction.id}`,
+    debtId: null,
+    transactionId: transaction.id,
+  };
 }

@@ -35,42 +35,25 @@
 
 ## Next
 
-依存が解けており、この順で着手できる。
-
-| ID | タスク | サイズ | 依存 |
-|---|---|---|---|
-| M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
-
-M2-7c・M6-3・M6-4 は完了(下記 Done)。S6(口座管理と請求突合)はこれで全タスク完了。
-残る Next は M3-1(**B-3 待ち**)のみ。優先順位(`docs/mvp-plan.md`)は S1(負債)> S3(リボ検知)> S4(残額)> S2(取り込み)。
+なし。**`docs/mvp-plan.md` の M0〜M7(全28タスク)がすべて完了した。**
+残るのは Blocked の B-1〜B-3(本人の入力待ち)と、下記 Backlog の技術的負債・フェーズ2以降のみ。
+`docs/mvp-plan.md`「全体の完了条件」8項目のうち、Discord への実送信(FR-21/24)と
+朝配信(FR-30)の2項目は **コード・検証は完了しているが B-3(Webhook 未発行)の間は
+実際には届かない**(検知・生成は毎時/毎朝走り、alerts/daily_briefs には積み上がる。
+B-3 解消後の次回実行から自動的に届き始める)。
 
 ## Backlog
-
-### S3 リボ・キャッシング検知と通知
-| ID | タスク | サイズ | 依存 |
-|---|---|---|---|
-| M3-3 | アラートジョブ(毎時) | S | M3-1, M3-2 |
-
-FR-20(浪費70%)と FR-21(リボ/キャッシング/分割)の判定そのものは
-`domain/budget.ts` と `features/classification/rules.ts` に実装済み。
-FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
-に実装済み(下記 Done)。M3-3 は依然 M3-1(**B-3 待ち**)にも依存。
-
-
-### S5 朝配信の最小版
-| ID | タスク | サイズ | 依存 |
-|---|---|---|---|
-| M5-2 | 配信ジョブ(07:00 JST) | S | M5-1, M3-1 |
 
 ### フェーズ2以降(MVP 対象外)
 | ID | タスク | 対応 |
 |---|---|---|
 | P2-1 | Gmail 連携(カード通知メールの解析。リボ検知の主経路) | FR-10, FR-21 |
 | P2-2 | 朝配信の本実装(市場・キャンペーン、FR-31 フィルタ拡充) | FR-30, FR-31 |
-| P2-3 | ストリーク表示(途切れても責めない文言) | FR-62 |
 | P3-1 | 副業トラッカー(作業時間・入金・時給換算) | FR-40, FR-42 |
 | P3-2 | 転職準備チェックリスト | FR-41 |
 | P4-2 | 口座連携 API の再検討 | 9.5 |
+
+ストリーク(FR-62、旧 P2-3)は本人の希望で MVP 完了前に前倒しして実装済み(下記 Done)。
 
 ### 改善・技術的負債
 ここには実装中に気づいたことを積む。空でよい。
@@ -85,8 +68,9 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 | T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
 | T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
 | T-16 | Supabase の Auth 設定(Site URL / Redirect URLs)がリポジトリに残っていない | ダッシュボード側の設定のみで管理している。プロジェクトを作り直す場合に再設定が必要。`supabase/config.toml` の `[auth]` セクションで宣言的に管理する方法もあるが、現状は未導入 |
-| T-21 | `detectInactivity()`(FR-22)を実データに接続する | 判定関数自体は M3-2 で完成している。T-7 完了により `transactions` テーブルが実データを持つようになったため、`features/alerts/store.ts` に `detectAndRecordInactivityAlert()` を追加して配線できる |
 | T-22 | `/settings/gmail` に `gmail_enabled`/`gmail_from_addresses`/`gmail_fetch_limit` を編集する画面を追加する | M2-7c の時点では未設定(SQL/Supabase ダッシュボードでの操作が必要)。列自体は ADR-018 の時点から存在するが、編集する UI が一度も作られていない |
+| T-23 | FR-20(浪費70%閾値)を alerts へ実際に配線する | 判定関数(`hasReachedAlertThreshold()`、`domain/budget.ts`)自体は M4-1 で完成しているが、`features/alerts/store.ts` の `detectAndRecord*AsAdmin()` 群のどれからも呼ばれていない。M3-3 実装時に発見。FR-21(リボ等)・FR-22(未取込)・FR-23(返済日前日)は配線済み |
+| T-24 | `/api/cron/detect-alerts` の catch 節で `kind='job_failure'` の alert を記録する | `docs/mvp-plan.md` の M3-3 DoD が求めているが未実装。現状は例外時に 500 を返すのみで、本人が失敗に気づく経路が無い(GitHub Actions の失敗通知には頼れる) |
 
 **T-12 は refactor(責務分離)の一環として認識しているが未着手。他は2026-09-08 の refactor セッションで着手した3画面の重複解消と mail-sync の分割のみ完了(下記 Done)。** 全体的な「5行ルール」適用は際限がないので、次に触る画面・関数から都度直す方針にする(一括では手を出さない)。
 
@@ -96,7 +80,7 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 |---|---|---|
 | B-1 | 負債の正確な内訳を `debts` に入力し `is_estimated` を落とす | **本人の棚卸し**(全借入先の残高・金利・件数・返済日)。仮値のままでも開発は進むが、完済予定日は確定表示できない |
 | B-2 | 実際の金融機関 CSV でアダプタを検証する | **本人が利用中の銀行・カードの明細ファイル**(1ヶ月分) |
-| B-3 | Discord Webhook URL を GitHub Secrets / Vercel に設定する | **本人による Webhook 発行**。M3-1 の着手前に必要 |
+| B-3 | Discord Webhook URL を GitHub Secrets(`CRON_SECRET` と同じ経路)/ Vercel に `DISCORD_WEBHOOK_URL` として設定する | **本人による Webhook 発行**。M3-1/M3-3/M5-2 は実装・検証済み(ローカル HTTP スタブで送信経路を確認)で、未設定の間は検知・生成だけ行い実送信をスキップする設計のため着手はブロックしていない。設定されれば次回の cron 実行(毎時 / 毎朝07:00 JST)から自動的に届き始める |
 
 ## Done
 
@@ -157,6 +141,9 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 | M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得)。`app/api/cron/import-gmail/route.ts`(新規)— `keepalive` と同じく `createAdminClient()` + Bearer 認証(`CRON_SECRET`)。取り込み先の口座は `app_settings` に新しい列を足さず、環境変数 `GMAIL_IMPORT_ACCOUNT_ID` で指定する方式にした。**理由**:このジョブに本人のセッション(cookie)は無く、口座選択の UI もこのタスクの範囲外な上、`app_settings.gmail_enabled` 等を編集する画面自体がまだ無い(ADR-018 は環境変数名だけを持つ設計で、口座という概念自体 M6-2 より後に生まれた)。`GMAIL_ADDRESS`/`GMAIL_APP_PASSWORD` と同じ Vercel 環境変数 + GitHub Secrets の経路に乗せれば、スキーマ変更なしで完結する(`src/lib/env.ts` に `getGmailImportAccountId()` を追加、uuid 形式を検証)。処理の流れ:`app_settings.gmail_enabled` が false なら即スキップ、口座が本人のものか確認、`transactions`(source='gmail')の既存 `source_ref` を集めて `knownMessageIds` にし(再実行での二重読み込み防止)、`listActiveClassificationRulesForUser()`(新規、`listActiveClassificationRules()` の管理クライアント版。cron は RLS に頼れないため user_id を明示)で学習ルールも取得、`ImapMailSource` + `syncFromMailbox()` を呼んで `transactions`/`import_batches` へ直接 upsert、`app_settings.gmail_last_synced_on` を更新、`job_runs`(job_name='import_gmail')に記録。**あわせて解消した設計の欠け**:`transactions.source_ref`(Gmail の message-id 用に以前から列と一意索引(`ux_transactions_source_ref`)は存在した)が `StoredTransaction`/`importTransactions()` のどこにも配線されていなかった。`StoredTransaction` に `sourceRef` を追加し、CSV/貼り付けでは null、メール取り込みでは `mail-sync.ts` の新規 `buildSourceRef(messageId, indexInMessage)`(1件目は messageId そのまま、1通から複数件抽出された場合の2件目以降は連番を足して一意性を保つ)が埋めるようにした。**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(436件全通過、`buildSourceRef` と source_ref の伝播にテスト3件追加)、`npx next build` 成功。実機検証は2段構え——①cron route の認証・分岐(未認証401、Gmail未設定時のスキップ、`gmail_enabled=false` 時のスキップ、`GMAIL_IMPORT_ACCOUNT_ID` が本人の口座に無い場合のエラー)は実際に立てた dev サーバーへ本物の `CRON_SECRET` で HTTP リクエストして確認。②実 IMAP 接続(`imap.gmail.com:993`)はこの開発サンドボックスのネットワーク制約で到達不能(`CONNECT_TIMEOUT`。本番の Vercel 環境には影響しないサンドボックス固有の制約、ADR-011 改定時の Supabase 直叩きと同種の既知の制約)だったため、`syncFromMailbox()` 以降の実 DB 書き込み(`transactions.source_ref` の保存、fingerprint による重複排除、`job_runs` 記録)は `StaticMailSource` で同じ経路を実際の Supabase プロジェクトに対して検証した(検証用口座・一時テストファイルを作成し確認後にすべて削除、`app_settings` は元の既定値に復元済み)。**本人への確認待ちに追加**:`/accounts` で実口座を作った後、その `accounts.id` を Vercel の環境変数と GitHub Secrets に `GMAIL_IMPORT_ACCOUNT_ID` として設定し、`app_settings.gmail_enabled` を true にする必要がある(後者を編集する画面がまだ無いため、当面は SQL や Supabase ダッシュボードでの操作が必要。UI 化は別タスクとして Backlog に起こす価値があるが、本タスクの範囲外) | 2026-09-12 |
 | M6-3 | 給料日〜給料日の期間ビュー(FR-17)。保存は暦月のまま(ADR-015)、表示だけを給料日基準に変換する。`src/lib/date.ts` に `paydayCycleFor(today, payday)` を追加(純粋関数)— today が今月の給料日以降なら「今月の給料日〜来月の給料日前日」、まだなら「先月の給料日〜今月の給料日前日」を返す。あわせて `features/transfer-runs/store.ts` に private で重複していた `thisMonthsPayday()` を廃止し、共通の `paydayInMonthOf()` を切り出して両方から参照する形に統一(重複解消)。`src/domain/payday-period.ts`(新規、純粋関数)— `domain/budget.ts` の `isCountable` と同じ除外基準(口座間振替・`review_status='ignored'`・収入)で口座別/カテゴリ別/合計の使用金額を集計。`src/features/transactions/period-summary.ts`(新規)の `loadPaydayPeriodSummary()` が `app_settings.payday` から期間を求め、その期間の明細だけを読んで集計・口座名/カテゴリ名を解決する。`/transactions` の一覧上部に期間カード(合計・口座別・カテゴリ別)を追加。使用額が無い口座も「0円」として全件表示(まだ使っていないことも情報)、カテゴリは使用額があるものだけを表示。実際の Supabase プロジェクトに対し、給料日サイクル内・サイクル外・振替(is_transfer)の3明細を作成して `/transactions` を描画 → 期間カードがサイクル内の1件(3,000円)だけを合計・口座別・カテゴリ別に正しく集計し、サイクル外(9,999円)と振替(5,000円)を除外することを確認。あわせて `thisMonthsPayday` → `paydayInMonthOf` への置き換えが `/payday` の給料日チェックリストを壊していないことも確認。検証用データは削除済み。テスト14件追加(`paydayInMonthOf`/`paydayCycleFor` 7件、`sumByAccount`/`sumByCategory`/`totalSpending` 7件) | 2026-09-12 |
 | M6-4 | 請求金額メールとの突合(FR-18)。カード会社から届く「ご利用金額のお知らせ」(締め日単位の合計)を貼り付け、同じ締め期間に取り込んだ明細の合計と突き合わせ、差額があれば `alerts` に記録する。`/transactions/reconcile`(新規)。`src/features/import/statement-email.ts`(新規、純粋関数)の `parseStatementEmail()` — `email.ts`(1件ごとの利用通知)とは別の語彙(「ご請求金額」「お支払金額」等)で合計金額と対象期間を読み取る。期間は年月日が揃った記載のみ対象(「9月10日締め」のような年省略の書式は対象外、口座の締め日で補う)。`src/lib/date.ts` に `billingCycleStartFor(endOn, closingDay)`/`mostRecentClosingOnOrBefore(today, closingDay)` を追加。**ついでの重複解消**:M6-3 で作った `paydayInMonthOf()` が「毎月の n 日目」という給料日専用でない計算だったため、汎用の `nthDayOfMonth()` へ改名し、締め日の計算(billingCycleStartFor 等)もこれを共用する形にした(呼び出し側の `features/transfer-runs/store.ts` も追従)。`src/domain/statement-reconciliation.ts`(新規、純粋関数)— `billingPeriodFor()`(メールの期間 → 無ければ口座の締め日から自動計算 → どちらも無ければ null)と `reconcileTotals()`(差額の算出)。`src/features/transactions/reconciliation-store.ts`(新規)の `reconcileAccountStatement()` が対象期間の明細を読んで `domain/payday-period.ts` の `totalSpending()`(M6-3 と同じ除外基準を再利用)で合計し、差額があれば `features/alerts/store.ts` の `recordAlerts()`(M3-2)をそのまま使って `alerts`(kind は新しいDB列挙値を増やさず既存の `import_needed` を再利用。`AlertKind` の TS 型だけ拡張)に記録する。dedup_key は `import_gap:{accountId}:{periodEndOn}` で同じ期間の再突合が重複記録を作らない。`/api/accounts` のレスポンスに `closingDay` を追加(既存の CSV/貼り付け画面は無視するだけで影響なし)。実際の Supabase プロジェクトに対し、口座(締め日10日)と明細(3,000円、期間内)を作成して検証:①期間付きメール(合計45,678円)を貼り付け→突合→差額42,678円・「取り込み漏れの疑い」表示・`alerts` に正しい title/body/dedup_key で1件記録されることを確認、②同じ突合を再実行→`alerts` が重複記録されない(dedup)ことを確認、③金額を実際の合計(3,000円)に直して再突合→「一致しています」表示を確認、④期間の記載が無いメールを貼り付け→口座の締め日から自動計算した期間(①と同じ8/11〜9/10)で正しく突合できることを確認。検証用データ(口座・明細・alerts)はすべて削除済み。テスト14件追加(`billingCycleStartFor`/`mostRecentClosingOnOrBefore` 5件、`parseStatementEmail` 3件、`billingPeriodFor`/`reconcileTotals` 6件)。**S6(口座管理と請求突合、FR-16〜18)は M6-1・M6-2・M6-3・M6-4 ですべて完了** | 2026-09-12 |
+| M3-1 / M3-3 / T-21 | Discord 通知基盤・毎時アラートジョブ・FR-22の実データ接続(FR-20〜24)。`src/lib/discord.ts`(新規)— Discord Webhook への POST のみを担う汎用クライアント(`docs/architecture.md` の層分離に従い、severity→色のようなアラート固有の業務判断は持たせない。実装中に一度 `AlertSeverity` を import しかけて `lib/ → domain/` の初めての依存になりかけたため、`features/alerts/notify.ts` 側へ寄せ直した)。`src/domain/alerts.ts` に `detectRiskyTransaction()`(FR-21、リボ・キャッシング・分割払いを検知。`CandidateAlert` に `transactionId` を追加)を追加。`src/features/alerts/store.ts` に cron 向けの `*AsAdmin(client, userId, ...)` 群を追加(T-7/M6-4 で確立した管理クライアントパターン)— `detectAndRecordPaymentDueAlertsAsAdmin()`(既存ロジックの移植)、`detectAndRecordInactivityAlertAsAdmin()`(T-21。`import_batches.created_at` の最新行を「最終取り込み日」とする)、`detectAndRecordRiskyTransactionAlertsAsAdmin()`(FR-21。DB の `.in('payment_method', [...])` は `isRiskyPaymentMethod()` の正を崩さないための重複フィルタである旨コメントで明記)。`src/features/alerts/notify.ts`(新規)の `sendPendingAlerts()` が `status='pending'` の alerts を古い順に処理し、`sent`/`failed` を個別に記録(dedup は既存の DB 一意制約のまま)。`app/api/cron/detect-alerts/route.ts` + `.github/workflows/detect-alerts.yml`(毎時)— `keepalive`/`import-gmail` と同じ Bearer 認証、`DISCORD_WEBHOOK_URL` 未設定(B-3 待ち)の間は検知だけ行い送信をスキップする設計。実際の Supabase プロジェクトに対し二段構えで検証:①cron route の認証・多重検知(未認証401、実在の負債・実在のリボ払い明細1件・未取込状態から3種の alert が正しく記録され `transaction_id` FK も正しいこと、再実行で重複しないこと)を実際に dev サーバーへ HTTP リクエストして確認、②実 Discord Webhook は本人が未発行(B-3、後で用意するとのこと)のため、ローカル `node:http` サーバーを Webhook 代わりに立てて `sendPendingAlerts()` の成功パス(`status='sent'`・`sent_at` 設定・Embed の色/形が正しい)と失敗パス(`status='failed'`・`error_message` に「ステータス 500」を含む)を実際の Supabase `alerts` テーブルに対して検証(検証用の一時テストファイルは確認後に削除)。検証用データ(テスト口座・テスト明細・テスト alerts・ストリーク検証で入れた合成 `app_checkins` 3行)はすべて削除済み。テスト8件追加(`detectRiskyTransaction` 4件、`buildEmbedForAlert` 4件)。**S3(リボ・キャッシング検知と通知、FR-21, FR-24)は M3-1・M3-2・M3-3 ですべて完了**(ただし FR-20 の配線漏れを T-23 として、M3-3 DoD の `job_failure` 未実装を T-24 として Backlog へ記録) | 2026-09-12 |
+| FR-62 | 連続確認日数(ストリーク)の表示。本人の希望で MVP 完了前に前倒し実装(旧 P2-3、`docs/mvp-plan.md` は本来フェーズ2扱い)。スキーマ(`app_checkins`/`v_checkin_streak`)は M0-2 の時点から存在していたが、アプリ側から一度も配線されていなかった。`src/domain/streak.ts`(新規、純粋関数)の `streakBadgeFor()` が `none`/`active`/`restart` の3状態を返す(3日未満は非表示、3日以上の実績が途切れた場合だけ「今日から再開」を出す。設計原則3「途切れても責めず再開だけを提示する」)。`src/features/checkins/store.ts`(新規)の `recordCheckin()`(ホームを開くたびに当日分を upsert。失敗しても画面は止めない)と `getCheckinStreak()`(ビューを読むだけ)。`app/(app)/page.tsx` に `StreakBadge` を追加、完済カウントダウンの見出し行の右側に表示。実際の Supabase プロジェクトに対し、`app_checkins` を直接操作して3状態(none: 2日間のみ→非表示、active: 3日連続→「🔥3日連続」、restart: 3日連続の実績はあるが今日を含め途切れている→「今日から再開」)をすべて Playwright のスクリーンショットで確認。検証用の合成データ(2026-09-01〜03)は削除し、本人の実際のチェックイン(2026-09-12、このセッション中にホームを開いたことで記録された本物のデータ)は残した。ドメインテスト4件追加 | 2026-09-12 |
+| M5-2 | 朝配信ジョブ(FR-30、07:00 JST)。`app/api/cron/morning-brief/route.ts` + `.github/workflows/morning-brief.yml`(`0 22 * * *` UTC = 07:00 JST)— 他の cron と同じ Bearer 認証。`src/features/briefs/notify.ts`(新規)の `deliverDailyBriefAsAdmin()` が `daily_briefs.status`(pending/generated/delivered/failed)を送信済みの正として扱い、`delivered` なら何もしない(Actions の遅延で同じ日に複数回走っても二重送信しない、DoD)。**実装中に発見した設計の穴**:`generateDailyBrief()`(M5-1)が内部で使う `loadHomeSummary()`・`listDebts()`・`getAppSettings()` はいずれも「RLS が本人の行に絞る」前提でセッション付きクライアントを自前で生成しており、cron(セッション無し)から呼ぶと該当行が一切見えず `.single()` が「0行」で例外になっていた。T-7/M6-4 で確立した管理クライアントパターンに倣い、3つとも `*AsAdmin(client, userId, ...)` 版を追加し(`src/features/debts/store.ts` の `listDebtsAsAdmin()`、`src/features/settings/store.ts` の `getAppSettingsAsAdmin()`、`src/features/home/summary.ts` の `loadHomeSummaryAsAdmin()` — 内部の4つの private ヘルパー全てに `client`/`userId` を通し、全クエリに `eq('user_id', userId)` を追加)、既存のセッション版はそれぞれ薄いラッパーへ変更(振る舞いは無変更)。`src/features/briefs/store.ts` の `generateDailyBrief()` も同じ形で `generateDailyBriefAsAdmin()` の薄いラッパーに変更。実際の Supabase プロジェクトに対し検証:①cron route(未認証401、生成+送信スキップ、同日2回目は `created:false` で新規生成しないこと)を実際に dev サーバーへ HTTP リクエストして確認、②実 Discord Webhook 未発行(B-3)のため、`M3-1` と同じ手法でローカル `node:http` サーバーを Webhook 代わりに立て、`deliverDailyBriefAsAdmin()` の成功(`status='delivered'`)・失敗(`status='failed'`+`error_message`)・二重送信防止(`already_delivered`)の3パスを実際の Supabase に対して検証。**検証中に発見・修正したバグ**:失敗後に再送信して成功しても `error_message` が消えずに残ってしまう欠陥を発見し、成功時の更新に `error_message: null` を追加して解消。③リファクタの影響確認として `/`・`/debts`・`/briefs` を実セッションで Playwright 描画し、既存表示(残債・カードA・配信一覧)が壊れていないことを確認。検証用データ(テスト用に生成した当日分の `daily_briefs` 行)は削除済み。ストアの配線のみのためドメインテストの追加は無し(M5-3 と同型)。**`docs/mvp-plan.md` の M0〜M7(全28タスク)がこれで完了** | 2026-09-12 |
 
 ---
 

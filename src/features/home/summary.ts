@@ -18,6 +18,8 @@
  * ここでは user_id を意識しない(ADR-011)。
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
 import {
   expandMergedCategoryIds,
@@ -25,10 +27,11 @@ import {
   type CategoryMergeNode,
 } from '@/domain/category';
 import { simulateTotalPayoff, summarizePayoff, type Debt } from '@/domain/payoff';
-import { listDebts, toPayoffDebt } from '@/features/debts/store';
-import { getAppSettings } from '@/features/settings/store';
+import { listDebtsAsAdmin, toPayoffDebt } from '@/features/debts/store';
+import { getAppSettingsAsAdmin } from '@/features/settings/store';
 import { daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/types';
 
 /** ホームに並ぶ残額タイル1枚分。 */
 export type HomeBudgetTile = {
@@ -170,13 +173,26 @@ export function computePayoffSummary(
   };
 }
 
-export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSummary> {
+/**
+ * ホームの3つの数字を組み立てる(管理クライアント版)。
+ *
+ * cron ジョブ(M5-2 の朝配信)には本人のセッションが無く RLS に頼れない
+ * ため、user_id を明示して絞り込む。ホーム画面の表示と朝配信の冒頭2数字を
+ * 必ず一致させる必要があるため、計算式はこちらの1本に集約する。
+ */
+export async function loadHomeSummaryAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date = new Date(),
+): Promise<HomeSummary> {
   const [payoffInput, categories, mergeNodes] = await Promise.all([
-    loadPayoffInput(now),
-    listHomeCategories(now),
-    listCategoryMergeNodes(),
+    loadPayoffInput(client, userId, now),
+    listHomeCategories(client, userId, now),
+    listCategoryMergeNodes(client, userId),
   ]);
   const transactions = await listMonthTransactions(
+    client,
+    userId,
     categories.map((c) => c.categoryId),
     mergeNodes,
     now,
@@ -188,23 +204,41 @@ export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSumma
   };
 }
 
+export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSummary> {
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new Error('ログイン状態を確認できませんでした');
+  }
+  return loadHomeSummaryAsAdmin(supabase, auth.user.id, now);
+}
+
 /**
  * 統廃合(merged_into_id、M2-6)を辿るための全カテゴリの最小情報。
  * 無効化済み(統合済み)のカテゴリも対象に含める必要があるため is_active では絞らない。
  */
-async function listCategoryMergeNodes(): Promise<CategoryMergeNode[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from('categories').select('id, merged_into_id');
+async function listCategoryMergeNodes(
+  client: SupabaseClient<Database>,
+  userId: string,
+): Promise<CategoryMergeNode[]> {
+  const { data, error } = await client
+    .from('categories')
+    .select('id, merged_into_id')
+    .eq('user_id', userId);
   if (error) throw new Error(`カテゴリを取得できませんでした: ${error.message}`);
   return data.map((c) => ({ id: c.id, mergedIntoId: c.merged_into_id }));
 }
 
 /** 完済シミュレーションの入力を組み立てる。debts / app_settings / debt_payments を読む。 */
-async function loadPayoffInput(now: Date): Promise<PayoffInput> {
+async function loadPayoffInput(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date,
+): Promise<PayoffInput> {
   const [rows, settings, reducedThisMonthYen] = await Promise.all([
-    listDebts(),
-    getAppSettings(),
-    loadReducedThisMonthYen(now),
+    listDebtsAsAdmin(client, userId),
+    getAppSettingsAsAdmin(client, userId),
+    loadReducedThisMonthYen(client, userId, now),
   ]);
 
   return {
@@ -222,11 +256,15 @@ async function loadPayoffInput(now: Date): Promise<PayoffInput> {
 }
 
 /** 今月の debt_payments 合計(元本部分)。M1-6 の返済記録が無ければ 0。 */
-async function loadReducedThisMonthYen(now: Date): Promise<number> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+async function loadReducedThisMonthYen(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date,
+): Promise<number> {
+  const { data, error } = await client
     .from('debt_payments')
     .select('principal_yen, amount_yen')
+    .eq('user_id', userId)
     .gte('paid_on', monthStartJst(0, now));
   if (error) throw new Error(`返済実績を取得できませんでした: ${error.message}`);
   // 元本・利息の内訳が無い記録は、合計額をそのまま元本減少として扱う。
@@ -238,11 +276,15 @@ async function loadReducedThisMonthYen(now: Date): Promise<number> {
  * budgets に当月の行が無いカテゴリは、categories.default_monthly_budget_yen を使う
  * (毎月の予算行を作る仕組みはまだ無いため)。
  */
-async function listHomeCategories(now: Date): Promise<HomeCategory[]> {
-  const supabase = await createClient();
-  const { data: categories, error } = await supabase
+async function listHomeCategories(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date,
+): Promise<HomeCategory[]> {
+  const { data: categories, error } = await client
     .from('categories')
     .select('id, code, name, default_monthly_budget_yen, sort_order, show_on_home, is_active')
+    .eq('user_id', userId)
     .eq('show_on_home', true)
     .eq('is_active', true)
     .order('sort_order');
@@ -250,9 +292,10 @@ async function listHomeCategories(now: Date): Promise<HomeCategory[]> {
   if (categories.length === 0) return [];
 
   const categoryIds = categories.map((c) => c.id);
-  const { data: budgets, error: budgetError } = await supabase
+  const { data: budgets, error: budgetError } = await client
     .from('budgets')
     .select('category_id, amount_yen, carry_over_yen')
+    .eq('user_id', userId)
     .eq('month', monthStartJst(0, now))
     .in('category_id', categoryIds);
   if (budgetError) throw new Error(`予算を取得できませんでした: ${budgetError.message}`);
@@ -285,6 +328,8 @@ async function listHomeCategories(now: Date): Promise<HomeCategory[]> {
  * 揃え直してから `summarizeBudgets`/`budgetStatusFor` に渡す。
  */
 async function listMonthTransactions(
+  client: SupabaseClient<Database>,
+  userId: string,
   categoryIds: readonly string[],
   mergeNodes: readonly CategoryMergeNode[],
   now: Date,
@@ -293,10 +338,10 @@ async function listMonthTransactions(
 
   const expandedIds = expandMergedCategoryIds(mergeNodes, categoryIds);
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('transactions')
     .select('category_id, amount_yen, is_transfer, review_status')
+    .eq('user_id', userId)
     .in('category_id', expandedIds)
     .gte('occurred_on', monthStartJst(0, now))
     .lt('occurred_on', monthStartJst(1, now));

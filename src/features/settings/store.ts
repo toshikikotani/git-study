@@ -6,6 +6,8 @@
  * 読むためだけに使う(ホームの完済見込み・負債タブのシミュレーション)。
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -33,13 +35,22 @@ export class SettingsStoreError extends Error {
   }
 }
 
-export async function getAppSettings(): Promise<AppSettings> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+/**
+ * 本人設定を1件取得する(管理クライアント版)。
+ *
+ * cron ジョブには本人のセッションが無く RLS に頼れないため、user_id を
+ * 明示して絞り込む(M5-2 の朝配信ジョブから利用)。
+ */
+export async function getAppSettingsAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+): Promise<AppSettings> {
+  const { data, error } = await client
     .from('app_settings')
     .select(
       'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, classification_confidence_threshold, payday',
     )
+    .eq('user_id', userId)
     .single();
   if (error) throw new SettingsStoreError(`設定を取得できませんでした: ${error.message}`);
 
@@ -52,4 +63,13 @@ export async function getAppSettings(): Promise<AppSettings> {
     classificationConfidenceThreshold: data.classification_confidence_threshold,
     payday: data.payday,
   };
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new SettingsStoreError('ログイン状態を確認できませんでした');
+  }
+  return getAppSettingsAsAdmin(supabase, auth.user.id);
 }
