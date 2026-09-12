@@ -237,6 +237,47 @@ describe('syncFromMailbox — AI は読めなかったときだけ呼ぶ', () =>
     expect(result.transactions[0]).toMatchObject({ amountYen: -800, paymentMethod: 'revolving' });
   });
 
+  it('AI を呼ぶたびに onRescued へ本文を渡す(T-11、辞書を育てるための記録)', async () => {
+    const extractor = fakeExtractor({
+      transactions: [
+        {
+          occurredOn: '2026-09-04',
+          description: 'セブンイレブン',
+          amountYen: -800,
+          paymentMethod: 'revolving',
+        },
+      ],
+      warnings: [],
+    });
+    const samples: { subject: string; body: string; extractedCount: number }[] = [];
+
+    await syncFromMailbox({
+      ...base,
+      source: new StaticMailSource([UNKNOWN]),
+      ai: { extractor, maxCalls: 10, onRescued: (sample) => samples.push(sample) },
+    });
+
+    expect(samples).toHaveLength(1);
+    expect(samples[0]).toEqual({
+      subject: UNKNOWN.subject,
+      body: UNKNOWN.body,
+      extractedCount: 1,
+    });
+  });
+
+  it('onRescued は AI が失敗しても extractedCount:0 で呼ばれる', async () => {
+    const extractor = fakeExtractor({ transactions: [], warnings: ['読めませんでした'] });
+    const samples: { subject: string; body: string; extractedCount: number }[] = [];
+
+    await syncFromMailbox({
+      ...base,
+      source: new StaticMailSource([UNKNOWN]),
+      ai: { extractor, maxCalls: 10, onRescued: (sample) => samples.push(sample) },
+    });
+
+    expect(samples).toEqual([{ subject: UNKNOWN.subject, body: UNKNOWN.body, extractedCount: 0 }]);
+  });
+
   it('AI を設定していなければ呼ばれず、辞書の結果だけが返る', async () => {
     const result = await syncFromMailbox({ ...base, source: new StaticMailSource([UNKNOWN]) });
     expect(result.aiCallCount).toBe(0);

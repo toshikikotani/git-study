@@ -1,15 +1,20 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
+import { getGmailSettings } from '@/features/settings/gmail-store';
+import { GmailSettingsForm } from './gmail-settings-form';
 
 /**
- * Gmail 自動取得の設定案内(ADR-018)。
+ * Gmail 自動取得の設定(T-22、ADR-018)。
  *
  * 資格情報そのものはこの画面から入力させない。アプリパスワードを DB や
  * フォームに通すと、バックアップ・ログ・スクリーンショットの全てが
- * 漏洩経路になる。入力先は環境変数で、ここは手順の案内に徹する(NFR-04)。
+ * 漏洩経路になる。入力先は環境変数で、ここで編集するのは
+ * 有効フラグ・差出人の絞り込み・取得件数上限の3つだけ(NFR-04)。
  */
-export default function GmailSettingsPage() {
+export default async function GmailSettingsPage() {
+  const settings = await getGmailSettings();
+
   return (
     <div className="rise space-y-4">
       <header className="flex items-baseline justify-between gap-3">
@@ -25,6 +30,15 @@ export default function GmailSettingsPage() {
         カード会社の利用通知メールを自動で取り込みます。設定すると、リボ・
         キャッシングを月末を待たずにその日のうちに検知できます。
       </p>
+
+      <Card>
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          設定
+        </h2>
+        <div className="mt-3">
+          <GmailSettingsForm settings={settings} />
+        </div>
+      </Card>
 
       <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -69,19 +83,34 @@ export default function GmailSettingsPage() {
         </h2>
         <ul className="mt-3 space-y-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           <li>・パスワードはこの画面から入力しません。環境変数にのみ置きます</li>
-          <li>・データベースにも保存しません。保存するのは変数名だけです</li>
+          <li>・データベースに保存するのは上の設定(有効フラグ・差出人・件数上限)だけです</li>
           <li>・読み取りは指定したカード会社の差出人に限定できます</li>
           <li>・取り込み済みのメールは二度読みません</li>
         </ul>
       </Card>
 
       <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-        現在は未設定です。設定が済むまでは
-        <Link href="/transactions/paste" className="underline underline-offset-4">
-          メールの貼り付け
-        </Link>
-        で個別に取り込めます。
+        {settings.gmailEnabled
+          ? 'この設定に加えて、環境変数(GMAIL_ADDRESS/GMAIL_APP_PASSWORD/GMAIL_IMPORT_ACCOUNT_ID)の設定が済んでいる必要があります。'
+          : '自動取得を有効にするまでは'}
+        {settings.gmailEnabled ? null : (
+          <>
+            <Link href="/transactions/paste" className="underline underline-offset-4">
+              メールの貼り付け
+            </Link>
+            で個別に取り込めます。
+          </>
+        )}
       </p>
+
+      <Link
+        href="/settings/rescued-emails"
+        className="inline-flex items-center gap-1 px-1 text-xs font-semibold"
+        style={{ color: 'var(--accent)' }}
+      >
+        AI救済メールの見直し
+        <span aria-hidden>→</span>
+      </Link>
     </div>
   );
 }

@@ -156,21 +156,7 @@ export function simulateTotalPayoff(
     assertYen(params.monthlyBudgetYen, '月額予算');
   }
 
-  // 充当順。SQL 側の ORDER BY と一致させること。
-  //   avalanche : 金利降順(総利息が最小になる)
-  //   snowball  : 残高昇順(1件目が早く消える)
-  // どちらも金利・初期残高は期間中に順位が入れ替わらないため、最初に一度だけ並べる。
-  const ordered = [...debts]
-    .filter((d) => d.balanceYen > 0)
-    .sort((a, b) => {
-      if (strategy === 'snowball') {
-        if (a.balanceYen !== b.balanceYen) return a.balanceYen - b.balanceYen;
-      } else if (a.annualRate !== b.annualRate) {
-        return b.annualRate - a.annualRate;
-      }
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-    });
-
+  const ordered = orderDebtsForStrategy(debts, strategy);
   if (ordered.length === 0) return [];
 
   const balances = ordered.map((d) => d.balanceYen);
@@ -181,18 +167,10 @@ export function simulateTotalPayoff(
     if (openingBalanceYen <= 0) break;
 
     const monthIndex = rows.length + 1;
-    let interestTotal = 0;
     let paymentTotal = 0;
 
     // (1) 利息を計上して残高に加える
-    for (let k = 0; k < balances.length; k += 1) {
-      const balance = balances[k]!;
-      if (balance > 0) {
-        const interest = monthlyInterest(balance, ordered[k]!.annualRate);
-        balances[k] = balance + interest;
-        interestTotal += interest;
-      }
-    }
+    const interestTotal = accrueInterest(balances, ordered);
 
     // (2) 全債務へ最低返済額を充てる。予算は毎月ここでリセットする。
     let budget =
@@ -200,27 +178,13 @@ export function simulateTotalPayoff(
         ? ordered.reduce((acc, d, k) => (balances[k]! > 0 ? acc + d.minimumPaymentYen : acc), 0)
         : params.monthlyBudgetYen!;
 
-    for (let k = 0; k < balances.length && budget > 0; k += 1) {
-      const balance = balances[k]!;
-      if (balance > 0) {
-        const pay = Math.min(ordered[k]!.minimumPaymentYen, balance, budget);
-        balances[k] = balance - pay;
-        budget -= pay;
-        paymentTotal += pay;
-      }
-    }
+    const minimumResult = applyBudget(balances, budget, (k) => ordered[k]!.minimumPaymentYen);
+    paymentTotal += minimumResult.paidYen;
+    budget = minimumResult.remainingBudget;
 
     // (3) 余剰を戦略順に充てる。'minimum' は最低返済のみを再現するので行わない。
     if (strategy !== 'minimum') {
-      for (let k = 0; k < balances.length && budget > 0; k += 1) {
-        const balance = balances[k]!;
-        if (balance > 0) {
-          const pay = Math.min(budget, balance);
-          balances[k] = balance - pay;
-          budget -= pay;
-          paymentTotal += pay;
-        }
-      }
+      paymentTotal += applyBudget(balances, budget).paidYen;
     }
 
     const closingBalanceYen = sum(balances);
@@ -343,4 +307,67 @@ export function compareRefinance(
 
 function sum(values: readonly number[]): number {
   return values.reduce((acc, v) => acc + v, 0);
+}
+
+/**
+ * 充当順に並べ替える(T-12、`simulateTotalPayoff()` から分離)。
+ * SQL 側の ORDER BY と一致させること。
+ *   avalanche : 金利降順(総利息が最小になる)
+ *   snowball  : 残高昇順(1件目が早く消える)
+ * どちらも金利・初期残高は期間中に順位が入れ替わらないため、最初に一度だけ並べる。
+ */
+function orderDebtsForStrategy(
+  debts: readonly Debt[],
+  strategy: RepaymentStrategy,
+): readonly Debt[] {
+  return [...debts]
+    .filter((d) => d.balanceYen > 0)
+    .sort((a, b) => {
+      if (strategy === 'snowball') {
+        if (a.balanceYen !== b.balanceYen) return a.balanceYen - b.balanceYen;
+      } else if (a.annualRate !== b.annualRate) {
+        return b.annualRate - a.annualRate;
+      }
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+}
+
+/**
+ * 利息を計上して残高に加える(T-12)。`balances` を直接書き換え、
+ * 計上した利息合計を返す。`ordered` と `balances` は同じ添字で対応する。
+ */
+function accrueInterest(balances: number[], ordered: readonly Debt[]): number {
+  let interestTotal = 0;
+  for (let k = 0; k < balances.length; k += 1) {
+    const balance = balances[k]!;
+    if (balance > 0) {
+      const interest = monthlyInterest(balance, ordered[k]!.annualRate);
+      balances[k] = balance + interest;
+      interestTotal += interest;
+    }
+  }
+  return interestTotal;
+}
+
+/**
+ * 予算を `balances` の先頭(充当順)から順に充てる(T-12)。
+ * `capFor(k)` は k 件目に充てられる上限(最低返済額など)。省略時は
+ * 残高と予算だけが上限になる(余剰の充当で使う)。
+ */
+function applyBudget(
+  balances: number[],
+  budget: number,
+  capFor: (index: number) => number = () => Infinity,
+): { paidYen: number; remainingBudget: number } {
+  let paidYen = 0;
+  for (let k = 0; k < balances.length && budget > 0; k += 1) {
+    const balance = balances[k]!;
+    if (balance > 0) {
+      const pay = Math.min(capFor(k), balance, budget);
+      balances[k] = balance - pay;
+      budget -= pay;
+      paidYen += pay;
+    }
+  }
+  return { paidYen, remainingBudget: budget };
 }

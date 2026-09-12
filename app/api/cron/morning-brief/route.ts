@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
+import { recordJobFailureAlertAsAdmin } from '@/features/alerts/store';
 import { deliverDailyBriefAsAdmin } from '@/features/briefs/notify';
 import { generateDailyBriefAsAdmin } from '@/features/briefs/store';
 import { getCronSecret, getOptionalDiscordWebhookUrl } from '@/lib/env';
@@ -18,6 +19,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * Discord へ送信。`daily_briefs.status='delivered'` を送信済みの正とする
  * ため、Actions の遅延で同じ日に複数回走っても二重送信しない(DoD)。
  * Webhook 未設定(B-3 待ち)の間は生成だけ行い、送信はスキップする。
+ *
+ * 失敗時は kind='job_failure' で alerts に記録する(detect-alerts と同じ、
+ * T-24)。この記録自体が失敗しても本来のエラー応答は変えない。
  */
 
 export const runtime = 'nodejs';
@@ -64,9 +68,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     const result = await deliverDailyBriefAsAdmin(admin, user.id, webhookUrl);
     return NextResponse.json({ briefId, created, result });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    await recordJobFailureAlertAsAdmin(admin, user.id, 'morning-brief', message).catch(() => {});
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

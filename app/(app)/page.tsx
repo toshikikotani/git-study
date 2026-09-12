@@ -200,6 +200,25 @@ export default async function HomePage() {
         <span aria-hidden>→</span>
       </Link>
 
+      <div className="flex flex-wrap gap-x-4 gap-y-1 px-1">
+        <Link
+          href="/side-hustle"
+          className="inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          副業トラッカー
+          <span aria-hidden>→</span>
+        </Link>
+        <Link
+          href="/job-change"
+          className="inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          転職準備
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
+
       <p className="px-1 pt-0.5 text-[10px] opacity-70" style={{ color: 'var(--ink-muted)' }}>
         数値は仮置き(ADR-006)。Supabase 接続後に実データへ切り替わります。
       </p>

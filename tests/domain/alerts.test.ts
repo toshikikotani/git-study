@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildJobFailureAlert,
   detectInactivity,
   detectPaymentDueTomorrow,
   detectRiskyTransaction,
+  detectWastefulBudget,
 } from '@/domain/alerts';
+import type { BudgetStatus } from '@/domain/budget';
 
 describe('detectInactivity(FR-22)', () => {
   it('2日以内なら発火しない', () => {
@@ -126,6 +129,82 @@ describe('detectRiskyTransaction(FR-21)', () => {
       amountYen: -1000,
       paymentMethod: 'revolving',
     });
+    expect(a.dedupKey).not.toBe(b.dedupKey);
+  });
+});
+
+function status(overrides: Partial<BudgetStatus>): BudgetStatus {
+  return {
+    categoryId: 'c1',
+    code: 'waste',
+    budgetYen: 10000,
+    carryOverYen: 0,
+    spentYen: 0,
+    remainingYen: 10000,
+    usageRatio: 0,
+    transactionCount: 0,
+    ...overrides,
+  };
+}
+
+describe('detectWastefulBudget(FR-20)', () => {
+  it('70%未満なら発火しない', () => {
+    expect(
+      detectWastefulBudget({ id: 'c1', name: '浪費' }, status({ usageRatio: 0.5 }), '2026-09'),
+    ).toBeNull();
+  });
+
+  it('ちょうど70%で発火する(境界値)', () => {
+    const alert = detectWastefulBudget(
+      { id: 'c1', name: '浪費' },
+      status({ usageRatio: 0.7, remainingYen: 3000 }),
+      '2026-09',
+    );
+    expect(alert).not.toBeNull();
+    expect(alert!.kind).toBe('waste_budget_70');
+    expect(alert!.title).toBe('浪費が予算の70%に達しました');
+    expect(alert!.body).toMatch(/3,000円/);
+    expect(alert!.dedupKey).toBe('waste_budget_70:c1:2026-09');
+  });
+
+  it('予算未設定(usageRatio が null)なら発火しない', () => {
+    expect(
+      detectWastefulBudget(
+        { id: 'c1', name: '浪費' },
+        status({ budgetYen: null, usageRatio: null }),
+        '2026-09',
+      ),
+    ).toBeNull();
+  });
+
+  it('月が変わると dedup_key も変わる(月ごとに1回)', () => {
+    const a = detectWastefulBudget(
+      { id: 'c1', name: '浪費' },
+      status({ usageRatio: 0.9 }),
+      '2026-09',
+    );
+    const b = detectWastefulBudget(
+      { id: 'c1', name: '浪費' },
+      status({ usageRatio: 0.9 }),
+      '2026-10',
+    );
+    expect(a!.dedupKey).not.toBe(b!.dedupKey);
+  });
+});
+
+describe('buildJobFailureAlert(NFR-06)', () => {
+  it('ジョブ名・エラー内容・日付から候補を組み立てる', () => {
+    const alert = buildJobFailureAlert('detect-alerts', 'DB接続に失敗しました', '2026-09-12');
+    expect(alert.kind).toBe('job_failure');
+    expect(alert.severity).toBe('critical');
+    expect(alert.title).toBe('detect-alertsが失敗しました');
+    expect(alert.body).toBe('DB接続に失敗しました');
+    expect(alert.dedupKey).toBe('job_failure:detect-alerts:2026-09-12');
+  });
+
+  it('同じ日の別ジョブは dedup_key が異なる', () => {
+    const a = buildJobFailureAlert('detect-alerts', 'x', '2026-09-12');
+    const b = buildJobFailureAlert('morning-brief', 'x', '2026-09-12');
     expect(a.dedupKey).not.toBe(b.dedupKey);
   });
 });

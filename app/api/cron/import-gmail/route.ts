@@ -8,6 +8,7 @@ import { ClaudeEmailExtractor } from '@/features/import/email-ai';
 import { GMAIL_IMAP } from '@/features/import/mailbox';
 import { ImapMailSource } from '@/features/import/imap-source';
 import { syncFromMailbox } from '@/features/import/mail-sync';
+import { recordRescuedEmailAsAdmin } from '@/features/import/rescue-store';
 import { getCronSecret, getGmailEnv, getGmailImportAccountId } from '@/lib/env';
 import { addDays, todayJst } from '@/lib/date';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -144,7 +145,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     knownFingerprints: new Set(),
     batchId: randomUUID(),
     ai: anthropicApiKey
-      ? { extractor: new ClaudeEmailExtractor(anthropicApiKey), maxCalls: AI_CALL_LIMIT_PER_RUN }
+      ? {
+          extractor: new ClaudeEmailExtractor(anthropicApiKey),
+          maxCalls: AI_CALL_LIMIT_PER_RUN,
+          // 辞書に足す語を後から見返せるよう本文を残す(T-11)。保存の失敗が
+          // 取り込み本体を止めないよう、ここで完結させて例外を投げない。
+          onRescued: (sample) => {
+            void recordRescuedEmailAsAdmin(admin, user.id, {
+              source: 'gmail',
+              subject: sample.subject,
+              body: sample.body,
+              extractedCount: sample.extractedCount,
+            }).catch(() => {});
+          },
+        }
       : undefined,
   });
 

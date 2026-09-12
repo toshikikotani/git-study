@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { ClaudeEmailExtractor } from '@/features/import/email-ai';
 import { parseNotificationEmail, type EmailParseResult } from '@/features/import/email';
+import { recordRescuedEmailAsAdmin } from '@/features/import/rescue-store';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * 貼り付けられたメール本文を解析する(FR-10)。
@@ -98,6 +100,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const rescued = await new ClaudeEmailExtractor(apiKey).extract({ body, subject });
+  void recordRescue(subject, body, rescued.transactions.length);
+
   if (rescued.transactions.length > 0) {
     return NextResponse.json(toResponse(rescued, true));
   }
@@ -106,6 +110,30 @@ export async function POST(request: Request): Promise<NextResponse> {
   return NextResponse.json(
     toResponse({ transactions: [], warnings: [...byLabels.warnings, ...rescued.warnings] }, true),
   );
+}
+
+/**
+ * 辞書に足す語を後から見返せるよう本文を残す(T-11)。応答を遅らせず、
+ * 失敗しても解析結果には影響させない。
+ */
+async function recordRescue(
+  subject: string | undefined,
+  body: string,
+  extractedCount: number,
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    await recordRescuedEmailAsAdmin(supabase, auth.user.id, {
+      source: 'manual',
+      subject: subject ?? null,
+      body,
+      extractedCount,
+    });
+  } catch {
+    // 記録できなくても解析結果の返却は継続する。
+  }
 }
 
 function toResponse(result: EmailParseResult, usedAi: boolean) {

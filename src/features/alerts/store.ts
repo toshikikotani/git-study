@@ -25,13 +25,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+  buildJobFailureAlert,
   detectInactivity,
   detectPaymentDueTomorrow,
   detectRiskyTransaction,
+  detectWastefulBudget,
   type CandidateAlert,
 } from '@/domain/alerts';
+import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
-import { todayJst, type DateOnly } from '@/lib/date';
+import { monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -173,4 +176,87 @@ export async function detectAndRecordRiskyTransactionAlertsAsAdmin(
     );
 
   return recordAlertsAsAdmin(client, userId, candidates);
+}
+
+/**
+ * FR-20:浪費カテゴリ(categories.kind='waste')が月予算の70%に達したら知らせる。
+ * 判定そのものは domain/alerts.ts の detectWastefulBudget() が正。
+ */
+export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const { data: categories, error } = await client
+    .from('categories')
+    .select('id, name, default_monthly_budget_yen')
+    .eq('user_id', userId)
+    .eq('kind', 'waste')
+    .eq('is_active', true);
+  if (error) throw new AlertStoreError(`カテゴリを取得できませんでした: ${error.message}`);
+  if (categories.length === 0) return 0;
+
+  const monthStart = monthStartJst(0, now);
+  const categoryIds = categories.map((c) => c.id);
+
+  const { data: budgets, error: budgetError } = await client
+    .from('budgets')
+    .select('category_id, amount_yen, carry_over_yen')
+    .eq('user_id', userId)
+    .eq('month', monthStart)
+    .in('category_id', categoryIds);
+  if (budgetError) throw new AlertStoreError(`予算を取得できませんでした: ${budgetError.message}`);
+  const budgetByCategory = new Map(budgets.map((b) => [b.category_id, b]));
+
+  const { data: transactions, error: txError } = await client
+    .from('transactions')
+    .select('category_id, amount_yen, is_transfer, review_status')
+    .eq('user_id', userId)
+    .in('category_id', categoryIds)
+    .gte('occurred_on', monthStart)
+    .lt('occurred_on', monthStartJst(1, now));
+  if (txError) throw new AlertStoreError(`明細を取得できませんでした: ${txError.message}`);
+
+  const budgetTransactions: BudgetTransaction[] = transactions.map((t) => ({
+    categoryId: t.category_id,
+    amountYen: t.amount_yen,
+    isTransfer: t.is_transfer,
+    reviewStatus: t.review_status,
+  }));
+
+  const monthKey = monthStart.slice(0, 7);
+  const candidates = categories
+    .map((c) => {
+      const budget = budgetByCategory.get(c.id);
+      const categoryBudget: CategoryBudget = {
+        categoryId: c.id,
+        code: c.id,
+        budgetYen: budget?.amount_yen ?? c.default_monthly_budget_yen,
+        carryOverYen: budget?.carry_over_yen ?? 0,
+      };
+      return detectWastefulBudget(
+        { id: c.id, name: c.name },
+        budgetStatusFor(categoryBudget, budgetTransactions),
+        monthKey,
+      );
+    })
+    .filter((c): c is CandidateAlert => c !== null);
+
+  return recordAlertsAsAdmin(client, userId, candidates);
+}
+
+/**
+ * NFR-06:ジョブ失敗を alerts へ記録する(M3-3 の DoD)。
+ * 記録自体が失敗しても(DB到達不能など)元の失敗の握り潰しにはしない
+ * ため、呼び出し側で catch して無視する設計にしてある(投げない)。
+ */
+export async function recordJobFailureAlertAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+  jobName: string,
+  errorMessage: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const candidate = buildJobFailureAlert(jobName, errorMessage, todayJst(now));
+  await recordAlertsAsAdmin(client, userId, [candidate]);
 }

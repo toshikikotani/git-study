@@ -36,7 +36,7 @@
 ## Next
 
 なし。**`docs/mvp-plan.md` の M0〜M7(全28タスク)がすべて完了した。**
-残るのは Blocked の B-1〜B-3(本人の入力待ち)と、下記 Backlog の技術的負債・フェーズ2以降のみ。
+残るのは Blocked の B-1〜B-4(本人の入力・作業待ち)と、下記 Backlog の技術的負債・フェーズ2以降のみ。
 `docs/mvp-plan.md`「全体の完了条件」8項目のうち、Discord への実送信(FR-21/24)と
 朝配信(FR-30)の2項目は **コード・検証は完了しているが B-3(Webhook 未発行)の間は
 実際には届かない**(検知・生成は毎時/毎朝走り、alerts/daily_briefs には積み上がる。
@@ -44,16 +44,20 @@ B-3 解消後の次回実行から自動的に届き始める)。
 
 ## Backlog
 
+**2026-09-12 時点で、下記フェーズ2/技術的負債のうち着手可能なものはすべて完了した(下記 Done)。**
+残っているのは、本人の入力・外部認証情報が無いと着手できないものだけ。
+
 ### フェーズ2以降(MVP 対象外)
 | ID | タスク | 対応 |
 |---|---|---|
-| P2-1 | Gmail 連携(カード通知メールの解析。リボ検知の主経路) | FR-10, FR-21 |
 | P2-2 | 朝配信の本実装(市場・キャンペーン、FR-31 フィルタ拡充) | FR-30, FR-31 |
-| P3-1 | 副業トラッカー(作業時間・入金・時給換算) | FR-40, FR-42 |
-| P3-2 | 転職準備チェックリスト | FR-41 |
 | P4-2 | 口座連携 API の再検討 | 9.5 |
 
-ストリーク(FR-62、旧 P2-3)は本人の希望で MVP 完了前に前倒しして実装済み(下記 Done)。
+P2-1(Gmail 連携)は M2-7 系列(2026-09-08)で完了済みだったため削除。P3-1(副業トラッカー)・
+P3-2(転職準備チェックリスト)・ストリーク(FR-62、旧 P2-3)は本人の希望で前倒し実装済み(下記 Done)。
+P2-2 は市場・案件動向の実データが要る(現状 Web 検索・AI 生成の仕組みを持たない、ADR-020)ため、
+着手すると「調べずに書いた市場情報」を配信することになりかねず保留。P4-2 は具体的な連携先
+(Plaid・MoneyForward 等)の選定と契約が本人の判断事項のため保留。
 
 ### 改善・技術的負債
 ここには実装中に気づいたことを積む。空でよい。
@@ -61,18 +65,13 @@ B-3 解消後の次回実行から自動的に届き始める)。
 | ID | タスク | 理由 |
 |---|---|---|
 | T-2 | CSV アダプタの fixture を実ファイル(匿名化)で用意する | 実フォーマットが判明してから |
-| T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
-| T-6 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証する | 現在は手で揃えている。`supabase gen types` が入ったら派生させる(M0-2 後) |
-| T-9 | 列マッピングを `import_adapters` に保存して再利用する | 現在は毎回推測。同じ形式を繰り返すなら保存した方が早い(M0-3 後) |
-| T-11 | AI が救済したメールの書式をラベル辞書へ還元する | AI に回った本文を残しておけば、辞書に語を足して費用ゼロの経路へ戻せる(ADR-019) |
-| T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
+| T-3 | ESLint 10 へ上げる | 2026-09-12 に再確認:`eslint-plugin-react`(最新 7.37.5)の peerDependencies が依然 `eslint: ^3〜^9.7` までで `^10` を含まない。`eslint-config-next` 自体は `eslint>=9.0.0` で上限が無く上げられるが、`eslint-plugin-react` 側が対応するまで見送り。上流の対応待ち |
 | T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
-| T-16 | Supabase の Auth 設定(Site URL / Redirect URLs)がリポジトリに残っていない | ダッシュボード側の設定のみで管理している。プロジェクトを作り直す場合に再設定が必要。`supabase/config.toml` の `[auth]` セクションで宣言的に管理する方法もあるが、現状は未導入 |
-| T-22 | `/settings/gmail` に `gmail_enabled`/`gmail_from_addresses`/`gmail_fetch_limit` を編集する画面を追加する | M2-7c の時点では未設定(SQL/Supabase ダッシュボードでの操作が必要)。列自体は ADR-018 の時点から存在するが、編集する UI が一度も作られていない |
-| T-23 | FR-20(浪費70%閾値)を alerts へ実際に配線する | 判定関数(`hasReachedAlertThreshold()`、`domain/budget.ts`)自体は M4-1 で完成しているが、`features/alerts/store.ts` の `detectAndRecord*AsAdmin()` 群のどれからも呼ばれていない。M3-3 実装時に発見。FR-21(リボ等)・FR-22(未取込)・FR-23(返済日前日)は配線済み |
-| T-24 | `/api/cron/detect-alerts` の catch 節で `kind='job_failure'` の alert を記録する | `docs/mvp-plan.md` の M3-3 DoD が求めているが未実装。現状は例外時に 500 を返すのみで、本人が失敗に気づく経路が無い(GitHub Actions の失敗通知には頼れる) |
+| T-16 | Supabase の Auth 設定(Site URL / Redirect URLs)がリポジトリに残っていない | ダッシュボード側の設定のみで管理している。プロジェクトを作り直す場合に再設定が必要。`supabase/config.toml` の `[auth]` セクションで宣言的に管理する方法もあるが、現状は未導入。本番 Auth 設定を誤って書き換えるリスクがあるため、正確な現在値(本番 URL・許可リダイレクト先)を本人と確認してから着手する |
+| T-25 | `rescued_emails` の2マイグレーションを本番 Supabase プロジェクトへ適用する | T-11 で追加した `20260908001200_rescued_emails.sql` / `20260908001300_rescued_emails_rls.sql` は、このセッションに Supabase Management API の資格情報が無く本番へ適用できなかった(B-3 の Discord Webhook と同種のサンドボックス制約)。ローカル PostgreSQL では `verify-schema.sh`/`verify-migrations.sh` 双方で検証済み(911項目一致)。未適用の間は `recordRescuedEmailAsAdmin()` 呼び出しが静かに失敗するだけで(catch 済み)、他の機能には影響しない。適用後は自動的に記録が始まる |
 
-**T-12 は refactor(責務分離)の一環として認識しているが未着手。他は2026-09-08 の refactor セッションで着手した3画面の重複解消と mail-sync の分割のみ完了(下記 Done)。** 全体的な「5行ルール」適用は際限がないので、次に触る画面・関数から都度直す方針にする(一括では手を出さない)。
+T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下記 Done)。全体的な「5行ルール」適用は
+際限がないので、次に触る画面・関数から都度直す方針は継続(一括では手を出さない)。
 
 ## Blocked
 
@@ -81,6 +80,7 @@ B-3 解消後の次回実行から自動的に届き始める)。
 | B-1 | 負債の正確な内訳を `debts` に入力し `is_estimated` を落とす | **本人の棚卸し**(全借入先の残高・金利・件数・返済日)。仮値のままでも開発は進むが、完済予定日は確定表示できない |
 | B-2 | 実際の金融機関 CSV でアダプタを検証する | **本人が利用中の銀行・カードの明細ファイル**(1ヶ月分) |
 | B-3 | Discord Webhook URL を GitHub Secrets(`CRON_SECRET` と同じ経路)/ Vercel に `DISCORD_WEBHOOK_URL` として設定する | **本人による Webhook 発行**。M3-1/M3-3/M5-2 は実装・検証済み(ローカル HTTP スタブで送信経路を確認)で、未設定の間は検知・生成だけ行い実送信をスキップする設計のため着手はブロックしていない。設定されれば次回の cron 実行(毎時 / 毎朝07:00 JST)から自動的に届き始める |
+| B-4 | T-25(`rescued_emails` の2マイグレーション)を Supabase Management API または `supabase db push` で本番へ適用する | **本人による適用**(このサンドボックスに Management API 資格情報が無いため)。適用されるまで T-11 の記録機能は静かに無効のまま |
 
 ## Done
 
@@ -144,6 +144,13 @@ B-3 解消後の次回実行から自動的に届き始める)。
 | M3-1 / M3-3 / T-21 | Discord 通知基盤・毎時アラートジョブ・FR-22の実データ接続(FR-20〜24)。`src/lib/discord.ts`(新規)— Discord Webhook への POST のみを担う汎用クライアント(`docs/architecture.md` の層分離に従い、severity→色のようなアラート固有の業務判断は持たせない。実装中に一度 `AlertSeverity` を import しかけて `lib/ → domain/` の初めての依存になりかけたため、`features/alerts/notify.ts` 側へ寄せ直した)。`src/domain/alerts.ts` に `detectRiskyTransaction()`(FR-21、リボ・キャッシング・分割払いを検知。`CandidateAlert` に `transactionId` を追加)を追加。`src/features/alerts/store.ts` に cron 向けの `*AsAdmin(client, userId, ...)` 群を追加(T-7/M6-4 で確立した管理クライアントパターン)— `detectAndRecordPaymentDueAlertsAsAdmin()`(既存ロジックの移植)、`detectAndRecordInactivityAlertAsAdmin()`(T-21。`import_batches.created_at` の最新行を「最終取り込み日」とする)、`detectAndRecordRiskyTransactionAlertsAsAdmin()`(FR-21。DB の `.in('payment_method', [...])` は `isRiskyPaymentMethod()` の正を崩さないための重複フィルタである旨コメントで明記)。`src/features/alerts/notify.ts`(新規)の `sendPendingAlerts()` が `status='pending'` の alerts を古い順に処理し、`sent`/`failed` を個別に記録(dedup は既存の DB 一意制約のまま)。`app/api/cron/detect-alerts/route.ts` + `.github/workflows/detect-alerts.yml`(毎時)— `keepalive`/`import-gmail` と同じ Bearer 認証、`DISCORD_WEBHOOK_URL` 未設定(B-3 待ち)の間は検知だけ行い送信をスキップする設計。実際の Supabase プロジェクトに対し二段構えで検証:①cron route の認証・多重検知(未認証401、実在の負債・実在のリボ払い明細1件・未取込状態から3種の alert が正しく記録され `transaction_id` FK も正しいこと、再実行で重複しないこと)を実際に dev サーバーへ HTTP リクエストして確認、②実 Discord Webhook は本人が未発行(B-3、後で用意するとのこと)のため、ローカル `node:http` サーバーを Webhook 代わりに立てて `sendPendingAlerts()` の成功パス(`status='sent'`・`sent_at` 設定・Embed の色/形が正しい)と失敗パス(`status='failed'`・`error_message` に「ステータス 500」を含む)を実際の Supabase `alerts` テーブルに対して検証(検証用の一時テストファイルは確認後に削除)。検証用データ(テスト口座・テスト明細・テスト alerts・ストリーク検証で入れた合成 `app_checkins` 3行)はすべて削除済み。テスト8件追加(`detectRiskyTransaction` 4件、`buildEmbedForAlert` 4件)。**S3(リボ・キャッシング検知と通知、FR-21, FR-24)は M3-1・M3-2・M3-3 ですべて完了**(ただし FR-20 の配線漏れを T-23 として、M3-3 DoD の `job_failure` 未実装を T-24 として Backlog へ記録) | 2026-09-12 |
 | FR-62 | 連続確認日数(ストリーク)の表示。本人の希望で MVP 完了前に前倒し実装(旧 P2-3、`docs/mvp-plan.md` は本来フェーズ2扱い)。スキーマ(`app_checkins`/`v_checkin_streak`)は M0-2 の時点から存在していたが、アプリ側から一度も配線されていなかった。`src/domain/streak.ts`(新規、純粋関数)の `streakBadgeFor()` が `none`/`active`/`restart` の3状態を返す(3日未満は非表示、3日以上の実績が途切れた場合だけ「今日から再開」を出す。設計原則3「途切れても責めず再開だけを提示する」)。`src/features/checkins/store.ts`(新規)の `recordCheckin()`(ホームを開くたびに当日分を upsert。失敗しても画面は止めない)と `getCheckinStreak()`(ビューを読むだけ)。`app/(app)/page.tsx` に `StreakBadge` を追加、完済カウントダウンの見出し行の右側に表示。実際の Supabase プロジェクトに対し、`app_checkins` を直接操作して3状態(none: 2日間のみ→非表示、active: 3日連続→「🔥3日連続」、restart: 3日連続の実績はあるが今日を含め途切れている→「今日から再開」)をすべて Playwright のスクリーンショットで確認。検証用の合成データ(2026-09-01〜03)は削除し、本人の実際のチェックイン(2026-09-12、このセッション中にホームを開いたことで記録された本物のデータ)は残した。ドメインテスト4件追加 | 2026-09-12 |
 | M5-2 | 朝配信ジョブ(FR-30、07:00 JST)。`app/api/cron/morning-brief/route.ts` + `.github/workflows/morning-brief.yml`(`0 22 * * *` UTC = 07:00 JST)— 他の cron と同じ Bearer 認証。`src/features/briefs/notify.ts`(新規)の `deliverDailyBriefAsAdmin()` が `daily_briefs.status`(pending/generated/delivered/failed)を送信済みの正として扱い、`delivered` なら何もしない(Actions の遅延で同じ日に複数回走っても二重送信しない、DoD)。**実装中に発見した設計の穴**:`generateDailyBrief()`(M5-1)が内部で使う `loadHomeSummary()`・`listDebts()`・`getAppSettings()` はいずれも「RLS が本人の行に絞る」前提でセッション付きクライアントを自前で生成しており、cron(セッション無し)から呼ぶと該当行が一切見えず `.single()` が「0行」で例外になっていた。T-7/M6-4 で確立した管理クライアントパターンに倣い、3つとも `*AsAdmin(client, userId, ...)` 版を追加し(`src/features/debts/store.ts` の `listDebtsAsAdmin()`、`src/features/settings/store.ts` の `getAppSettingsAsAdmin()`、`src/features/home/summary.ts` の `loadHomeSummaryAsAdmin()` — 内部の4つの private ヘルパー全てに `client`/`userId` を通し、全クエリに `eq('user_id', userId)` を追加)、既存のセッション版はそれぞれ薄いラッパーへ変更(振る舞いは無変更)。`src/features/briefs/store.ts` の `generateDailyBrief()` も同じ形で `generateDailyBriefAsAdmin()` の薄いラッパーに変更。実際の Supabase プロジェクトに対し検証:①cron route(未認証401、生成+送信スキップ、同日2回目は `created:false` で新規生成しないこと)を実際に dev サーバーへ HTTP リクエストして確認、②実 Discord Webhook 未発行(B-3)のため、`M3-1` と同じ手法でローカル `node:http` サーバーを Webhook 代わりに立て、`deliverDailyBriefAsAdmin()` の成功(`status='delivered'`)・失敗(`status='failed'`+`error_message`)・二重送信防止(`already_delivered`)の3パスを実際の Supabase に対して検証。**検証中に発見・修正したバグ**:失敗後に再送信して成功しても `error_message` が消えずに残ってしまう欠陥を発見し、成功時の更新に `error_message: null` を追加して解消。③リファクタの影響確認として `/`・`/debts`・`/briefs` を実セッションで Playwright 描画し、既存表示(残債・カードA・配信一覧)が壊れていないことを確認。検証用データ(テスト用に生成した当日分の `daily_briefs` 行)は削除済み。ストアの配線のみのためドメインテストの追加は無し(M5-3 と同型)。**`docs/mvp-plan.md` の M0〜M7(全28タスク)がこれで完了** | 2026-09-12 |
+| T-23 / T-24 | FR-20(浪費70%)の alerts 配線と、cron 失敗時の `job_failure` 記録。`src/domain/alerts.ts` に `detectWastefulBudget()`(FR-20。`domain/budget.ts` の `hasReachedAlertThreshold()` が正、ここは月単位の dedup_key と非難しない文言だけを組み立てる)と `buildJobFailureAlert()`(NFR-06。日単位の dedup_key で同日の連続失敗を1件にまとめる)を追加。`AlertKind` に `waste_budget_70`/`job_failure` を追加(DB の `alert_kind` enum には D-3 の時点から両方とも存在しており、マイグレーション不要だった)。`src/features/alerts/store.ts` に `detectAndRecordWastefulBudgetAlertsAsAdmin()`(`categories.kind='waste'` のカテゴリだけを対象に当月の予算消化率を計算。`home/summary.ts` の `listHomeCategories`/`listMonthTransactions` と同型のクエリだが対象条件が違うため独立実装)と `recordJobFailureAlertAsAdmin()` を追加し、`detect-alerts`・`morning-brief` 両 cron ルートの catch 節から呼ぶ(記録自体の失敗は握り潰し、元のエラー応答は変えない)。実際の Supabase プロジェクトに対し、検証用の `waste` カテゴリ(予算10,000円)と明細(8,000円、80%消化)を作成して cron ルートを叩き、`waste_budget_70` アラートが正しい残額(2,000円)付きで記録されることを確認。テスト8件追加(`detectWastefulBudget` 4件、`buildJobFailureAlert` 2件、既存 alerts テストと合わせて20件)。 | 2026-09-12 |
+| T-22 | `/settings/gmail` に Gmail 自動取得の設定編集フォームを追加(有効フラグ・差出人ドメイン絞り込み・1回の取得件数上限)。`src/domain/gmail-settings.ts`(`assertGmailFromAddresses`/`assertGmailFetchLimit`)、`src/features/settings/gmail-store.ts`(`getGmailSettings`/`updateGmailSettings`)、Server Action(`app/(app)/settings/gmail/actions.ts`)。資格情報(`GMAIL_ADDRESS`/`GMAIL_APP_PASSWORD`)と取り込み先口座(`GMAIL_IMPORT_ACCOUNT_ID`)は従来どおり環境変数のみで扱い、この画面からは触れない(NFR-04, ADR-018)。実際の Supabase プロジェクトに対し、実ブラウザ操作で有効化・差出人2件・件数上限150への変更→保存→DBに正しく反映されることを確認し、検証後は既定値(無効・差出人なし・200件)に復元済み。テスト6件追加。 | 2026-09-12 |
+| T-6 / T-9 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証し、列マッピングを保存・再利用できるようにした。`import_adapters` テーブルは M0-2 の時点からスキーマに存在したが、アプリのどこからも読み書きされていなかった(コメントで参照されるだけ)。`src/features/import/adapter-store.ts`(新規)の `fromRow()`/`saveImportAdapterForAccount()` が `Database['public']['Tables']['import_adapters']` の Row/Insert 型を直接使うため、DB 側の列名・型が変わればここがコンパイルエラーになる(T-6)。1口座につき1件の上書き保存(一意制約は無いため、既存行の有無を先に確認してから insert/update を分岐)。`/api/import-adapters`(新規)+ `src/features/transactions/import-adapter-client.ts` 経由で、CSV 取り込み画面(`app/(app)/transactions/import/page.tsx`)がファイル読み込み時に「その口座で前回保存した列対応」を先に試し、ヘッダに存在しなければ `guessMapping()` へフォールバックする。取り込み成功時に使った列対応を保存(失敗しても取り込み自体は完了しているため待たない)。実際の Supabase プロジェクトに対し、検証用口座を作成して POST→GET の往復(保存した値がそのまま返る)、2回目の POST が新規行を増やさず上書きになることを確認。検証用データは削除済み。 | 2026-09-12 |
+| T-11 | AI が救済したメールの書式をラベル辞書へ還元する仕組み(ADR-019)。ラベル辞書(`email.ts`)で読めず AI に回ったメールの本文を `rescued_emails`(新規テーブル)に残し、`/settings/rescued-emails`(新規)で見返せるようにした。新規マイグレーション2本(`20260908001200_rescued_emails.sql`、`20260908001300_rescued_emails_rls.sql`)を `docs/schema.sql` と両方に追加し、`./scripts/verify-schema.sh`/`./scripts/verify-migrations.sh`(911項目一致)でローカル検証済み。`src/features/import/rescue-store.ts`(`recordRescuedEmailAsAdmin`/`listRescuedEmails`/`deleteRescuedEmail`)。`mail-sync.ts`(Gmail cron 経路)は DB に触れない設計(ADR-019 当初からの方針)を保つため、新しく `onRescued` コールバックを追加してもらう形にし、実際の保存は呼び出し側(`app/api/cron/import-gmail/route.ts`)が担う。貼り付け画面側(`app/api/import/email/route.ts`)は元々 Supabase に触れていなかったため、記録用に `createClient()`+`auth.getUser()` を新規に追加。**両経路とも記録の失敗を `.catch()` で握り潰し、取り込み本体には一切影響させない設計**にした——これは単なる防御的プログラミングではなく、このセッションには Supabase Management API の資格情報が無く新規マイグレーションを本番プロジェクトへ適用できなかったため(B-3 の Discord Webhook と同種の制約)、本番ではこの2マイグレーションが適用されるまで `rescued_emails` テーブルが実在せず、素朴に実装すると本番相当の環境でこの機能が触れられるたびに例外を投げてしまうところだった。実際にこの状態(本番 Supabase に対してテーブル未作成のまま insert)を再現し、握り潰しが機能して呼び出し元の処理が継続すること、`/settings/rescued-emails` もクラッシュせず「まだ利用できません」と表示することを確認(修正前は Server Component が例外を投げて画面全体が落ちていたバグを発見・修正)。本番への適用自体は T-25(新規 Backlog、B-4 待ち)として記録。テスト2件追加(`onRescued` コールバックが AI呼び出しのたびに本文を渡すこと、失敗時も extractedCount:0 で渡ること)。 | 2026-09-12 |
+| P3-1 | 副業トラッカー(FR-40, FR-42。本人の希望で MVP 完了前に前倒し)。`side_projects`/`side_work_logs`/`side_incomes` は D-3 の時点でスキーマ用意済み(未配線)。`/side-hustle`(新規)— プロジェクトの登録、作業時間の記録(分単位)、入金の記録。`src/domain/side-hustle.ts` の `computeHourlyRateYen()`(FR-40:合計入金÷合計時間)と `computeIncomeAllocation()`(FR-42:`app_settings.side_income_repayment_ratio`、既定7:3で返済/投資へ自動振り分け。端数は返済側に寄せ、常に合計が入金額と一致するようにして DB 制約 `ck_side_incomes_alloc_sum` を満たす)。実際の資金移動はこのアプリの対象外(他の資金移動と同じく手動。振り分け額を「指示」として画面に表示するところまで)。`getAppSettings()`/`getAppSettingsAsAdmin()` に `sideIncomeRepaymentRatio` を追加。実際の Supabase プロジェクトに対し、検証用プロジェクトを作成し①120分の作業ログ記録→②20,000円の入金記録(返済14,000円/投資6,000円に自動振り分け、画面のプレビューと保存後表示が実際の計算と一致)→③時給換算(10,000円/時、合計2時間から算出)が正しく表示されることを確認。検証用データは削除済み。テスト14件追加。 | 2026-09-12 |
+| P3-2 | 転職準備チェックリスト(FR-41。本人の希望で MVP 完了前に前倒し)。`job_change_milestones` は D-3 の時点でスキーマ用意済み(未配線)。`/job-change`(新規)— 市場調査/職務経歴書/応募/面接/内定の5段階(`milestone_phase`)ごとに項目を一覧し、状態(未着手/進行中/完了/見送り)を1タップで変更、削除できる。`src/features/job-change/store.ts` の `setMilestoneStatus()` が DB 制約(`ck_milestones_done`:status='done' と done_on の有無が一致すること)を満たすため、done へ移るときだけ `done_on` を立てそれ以外は落とす。手動並び替えは FR-41 の要件に無いため対象外(sort_order は既定値のまま作成順)。実際の Supabase プロジェクトに対し、検証用項目を作成→状態を「完了」に変更→`done_on` が正しく設定されることを確認。検証用データは削除済み。テスト2件追加。 | 2026-09-12 |
+| T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff()`(110行)を分割。充当順の並び替え(`orderDebtsForStrategy()`)、利息の計上(`accrueInterest()`)、予算の充当(`applyBudget()`、最低返済と余剰充当の両方で共有。`capFor` で上限だけが違う)の3つの純粋なヘルパー関数に分離し、本体は「毎月これらを順に呼ぶ」ループだけになった。SQL 版との golden fixture 一致検証(M1-1、`tests/domain/payoff.test.ts` 33件)が計算結果の一言一句を保証しており、分割前後で全件通過(数値の変化なし)を確認済み。 | 2026-09-12 |
 
 ---
 

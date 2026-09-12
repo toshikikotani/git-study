@@ -1415,6 +1415,30 @@ create table public.app_checkins (
 );
 
 
+-- -----------------------------------------------------------------------------
+-- 3.21 rescued_emails — AI救済メールの保存(T-11)
+--
+--   ラベル辞書(email.ts の LABELS)で読めず AI に回ったメールの本文を残す。
+--   辞書に語を足せば同じ書式は次から費用ゼロの経路に戻せるが、それには
+--   「どんな書式で落ちたか」を後から見返せる必要がある(ADR-019)。
+-- -----------------------------------------------------------------------------
+create table public.rescued_emails (
+  id              uuid               primary key default gen_random_uuid(),
+  user_id         uuid               not null references auth.users(id) on delete cascade,
+
+  source          transaction_source not null,  -- 'gmail' か 'manual'(メール貼り付け)
+  subject         text,
+  body            text               not null,
+  extracted_count smallint           not null default 0,  -- AI が読み取れた明細数。0ならAIも失敗
+
+  created_at      timestamptz        not null default now(),
+
+  constraint ck_rescued_emails_extracted_count check (extracted_count >= 0)
+);
+
+create index ix_rescued_emails_user_created on public.rescued_emails (user_id, created_at desc);
+
+
 -- =============================================================================
 --  4. updated_at トリガの一括適用
 -- =============================================================================
@@ -1809,7 +1833,7 @@ begin
     'repayment_scenarios','transfer_rules','transfer_runs','transfer_run_items',
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
-    'brief_items','brief_excluded_items','alerts','app_checkins'
+    'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

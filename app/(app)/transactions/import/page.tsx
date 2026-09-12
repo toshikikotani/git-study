@@ -17,6 +17,10 @@ import {
 } from '@/features/import/adapters';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { requestAiClassification } from '@/features/transactions/classify-client';
+import {
+  fetchImportAdapter,
+  saveImportAdapter,
+} from '@/features/transactions/import-adapter-client';
 import { buildPreview } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
@@ -75,27 +79,42 @@ export default function ImportPage() {
     [learnedRules],
   );
 
-  const onFile = useCallback(async (file: File) => {
-    setError(null);
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const info = inspectCsv(bytes);
-      const guess = guessMapping(info.header);
+  const onFile = useCallback(
+    async (file: File) => {
+      setError(null);
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const info = inspectCsv(bytes);
 
-      setLoaded({
-        fileName: file.name,
-        bytes,
-        encoding: info.encoding,
-        header: info.header,
-        totalRows: info.totalRows,
-      });
-      // 推測できた列だけを上書きする。推測できなかった項目は既定値のまま
-      setAdapter({ ...GENERIC_ADAPTER, ...guess, name: file.name });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setLoaded(null);
-    }
-  }, []);
+        setLoaded({
+          fileName: file.name,
+          bytes,
+          encoding: info.encoding,
+          header: info.header,
+          totalRows: info.totalRows,
+        });
+
+        // 同じ口座で前回保存した列対応があればそれを使い、無ければヘッダから
+        // 推測する(T-9)。保存済みの列がこのファイルのヘッダに無ければ、
+        // ファイルの形式が変わった可能性があるため推測に戻す。
+        const saved = accountId ? await fetchImportAdapter(accountId) : null;
+        const savedUsable =
+          saved && info.header && info.header.includes(saved.dateColumn) ? saved : null;
+
+        if (savedUsable) {
+          setAdapter({ ...savedUsable, name: file.name });
+        } else {
+          const guess = guessMapping(info.header);
+          // 推測できた列だけを上書きする。推測できなかった項目は既定値のまま
+          setAdapter({ ...GENERIC_ADAPTER, ...guess, name: file.name });
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        setLoaded(null);
+      }
+    },
+    [accountId],
+  );
 
   const result = useMemo(() => {
     if (!loaded) return null;
@@ -172,6 +191,9 @@ export default function ImportPage() {
       setSaving(false);
       return;
     }
+    // 次回同じ口座で取り込むときのために、実際に使った列対応を保存する
+    // (T-9)。取り込み自体は既に成功しているため、失敗しても待たない。
+    void saveImportAdapter(accountId, adapter);
     // 一覧へ飛ばさず結果を出す。重複で0件だったとき、黙って戻ると
     // 壊れているのか取り込めたのか区別が付かない。
     setSaved(outcome);

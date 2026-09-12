@@ -6,6 +6,8 @@ import {
   detectAndRecordInactivityAlertAsAdmin,
   detectAndRecordPaymentDueAlertsAsAdmin,
   detectAndRecordRiskyTransactionAlertsAsAdmin,
+  detectAndRecordWastefulBudgetAlertsAsAdmin,
+  recordJobFailureAlertAsAdmin,
 } from '@/features/alerts/store';
 import { sendPendingAlerts } from '@/features/alerts/notify';
 import { getCronSecret, getOptionalDiscordWebhookUrl } from '@/lib/env';
@@ -17,10 +19,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * `keepalive`/`import-gmail` と同じく本人のセッションが無い経路のため、
  * `createAdminClient()` + 明示的な user_id で検知・送信を行う。
  *
- * 流れ:検知(FR-21 リボ等・FR-22 未取込・FR-23 返済日前日)→ alerts に記録
- * (重複は DB の一意制約が防ぐ)→ status='pending' の分を Discord へ送信。
- * Webhook 未設定(B-3 待ち)の間は検知だけ行い、送信はスキップする
- * (alerts には積み上がるので、Webhook 設定後にまとめて届く)。
+ * 流れ:検知(FR-20 浪費70%・FR-21 リボ等・FR-22 未取込・FR-23 返済日前日)
+ * → alerts に記録(重複は DB の一意制約が防ぐ)→ status='pending' の分を
+ * Discord へ送信。Webhook 未設定(B-3 待ち)の間は検知だけ行い、送信は
+ * スキップする(alerts には積み上がるので、Webhook 設定後にまとめて届く)。
+ *
+ * 失敗時は kind='job_failure' で alerts に記録する(T-24、M3-3 の DoD)。
+ * この記録自体が失敗しても本来のエラー応答は変えない(catch で握り潰す)。
  */
 
 export const runtime = 'nodejs';
@@ -52,12 +57,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const [paymentDueCount, inactivityCount, riskyCount] = await Promise.all([
+    const [paymentDueCount, inactivityCount, riskyCount, wastefulCount] = await Promise.all([
       detectAndRecordPaymentDueAlertsAsAdmin(admin, user.id),
       detectAndRecordInactivityAlertAsAdmin(admin, user.id),
       detectAndRecordRiskyTransactionAlertsAsAdmin(admin, user.id),
+      detectAndRecordWastefulBudgetAlertsAsAdmin(admin, user.id),
     ]);
-    const recordedCount = paymentDueCount + inactivityCount + riskyCount;
+    const recordedCount = paymentDueCount + inactivityCount + riskyCount + wastefulCount;
 
     const webhookUrl = getOptionalDiscordWebhookUrl();
     if (!webhookUrl) {
@@ -71,9 +77,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     const { sentCount, failedCount } = await sendPendingAlerts(admin, user.id, webhookUrl);
     return NextResponse.json({ recordedCount, sentCount, failedCount });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    await recordJobFailureAlertAsAdmin(admin, user.id, 'detect-alerts', message).catch(() => {});
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

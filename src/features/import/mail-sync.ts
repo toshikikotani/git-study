@@ -50,6 +50,13 @@ export type SyncInput = {
          * 受信箱に想定外のメールが大量にあっても、費用が青天井にならないようにする。
          */
         maxCalls: number;
+        /**
+         * AI を呼ぶたびに本文を渡す(T-11、ADR-019)。ここでは DB に触れない
+         * (mail-sync.ts の設計方針)ため、実際の保存は呼び出し側が担う。
+         * 保存に失敗しても取り込み自体は止めない(呼び出し側の責務)。
+         */
+        onRescued?:
+          ((sample: { subject: string; body: string; extractedCount: number }) => void) | undefined;
       }
     | undefined;
 };
@@ -131,6 +138,11 @@ async function parseMessage(
   if (!ai || aiCallCount >= ai.maxCalls) return { parsed: byLabels, usedAiCall: false };
 
   const rescued = await ai.extractor.extract({ body: message.body, subject: message.subject });
+  ai.onRescued?.({
+    subject: message.subject,
+    body: message.body,
+    extractedCount: rescued.transactions.length,
+  });
   // 救済できたときだけ差し替える。駄目だったなら辞書側の理由も残したい。
   const parsed: EmailParseResult =
     rescued.transactions.length > 0
