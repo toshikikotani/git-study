@@ -5,13 +5,15 @@
  * 呼ばれたときに1回分を組み立てて保存するところまでを担う。
  *
  * 冒頭の数字(完済まで残り日数・使える残額)はホーム画面と必ず一致させる
- * 必要があるため、ホーム画面と同じ `loadHomeSummary()` をそのまま使う
+ * 必要があるため、ホーム画面と同じ `loadHomeSummaryAsAdmin()` をそのまま使う
  * (計算式を複製しない)。
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { filterBriefTopics, pickDailyTopic } from '@/domain/briefs';
 import { INCOME_TIP_BANK } from '@/features/briefs/tips';
-import { loadHomeSummary } from '@/features/home/summary';
+import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { formatYen } from '@/domain/money';
 import { todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
@@ -31,25 +33,23 @@ export type GenerateDailyBriefResult = {
 };
 
 /**
- * 当日分の配信を生成して保存する。
+ * 当日分の配信を生成して保存する(管理クライアント版、M5-2)。
  *
+ * cron ジョブには本人のセッションが無いため、`user_id` を明示して呼ぶ。
  * `ux_briefs_user_date`(user_id, brief_on の一意制約)があるため、同じ日に
  * 二度呼んでも重複して作らない(既存の1件をそのまま返す)。
  */
-export async function generateDailyBrief(
+export async function generateDailyBriefAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
   now: Date = new Date(),
 ): Promise<GenerateDailyBriefResult> {
   const briefOn = todayJst(now);
 
-  const supabase = await createClient();
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth.user) {
-    throw new BriefStoreError('ログイン状態を確認できませんでした');
-  }
-
-  const { data: existing, error: existingError } = await supabase
+  const { data: existing, error: existingError } = await client
     .from('daily_briefs')
     .select('id')
+    .eq('user_id', userId)
     .eq('brief_on', briefOn)
     .maybeSingle();
   if (existingError) {
@@ -59,7 +59,7 @@ export async function generateDailyBrief(
     return { briefId: existing.id, created: false };
   }
 
-  const summary = await loadHomeSummary(now);
+  const summary = await loadHomeSummaryAsAdmin(client, userId, now);
   const livingTile = summary.tiles.find((tile) => tile.code === 'living');
   const sanctuaryTile = summary.tiles.find((tile) => tile.code === 'sanctuary');
 
@@ -77,10 +77,10 @@ export async function generateDailyBrief(
     tip: included[0] ?? null,
   });
 
-  const { data: brief, error: briefError } = await supabase
+  const { data: brief, error: briefError } = await client
     .from('daily_briefs')
     .insert({
-      user_id: auth.user.id,
+      user_id: userId,
       brief_on: briefOn,
       status: 'generated',
       days_to_payoff: summary.payoff.daysRemaining,
@@ -98,7 +98,7 @@ export async function generateDailyBrief(
 
   const items = [
     {
-      user_id: auth.user.id,
+      user_id: userId,
       brief_id: brief.id,
       kind: 'headline' as const,
       sort_order: 10,
@@ -106,7 +106,7 @@ export async function generateDailyBrief(
       summary: null,
     },
     ...included.map((candidate, index) => ({
-      user_id: auth.user.id,
+      user_id: userId,
       brief_id: brief.id,
       kind: 'income_tip' as const,
       sort_order: 20 + index,
@@ -115,15 +115,15 @@ export async function generateDailyBrief(
       source_name: candidate.sourceName,
     })),
   ];
-  const { error: itemsError } = await supabase.from('brief_items').insert(items);
+  const { error: itemsError } = await client.from('brief_items').insert(items);
   if (itemsError) {
     throw new BriefStoreError(`配信の項目を保存できませんでした: ${itemsError.message}`);
   }
 
   if (excluded.length > 0) {
-    const { error: excludedError } = await supabase.from('brief_excluded_items').insert(
+    const { error: excludedError } = await client.from('brief_excluded_items').insert(
       excluded.map((item) => ({
-        user_id: auth.user.id,
+        user_id: userId,
         brief_id: brief.id,
         title: item.candidate.title,
         source_name: item.candidate.sourceName,
@@ -137,6 +137,18 @@ export async function generateDailyBrief(
   }
 
   return { briefId: brief.id, created: true };
+}
+
+/** 当日分の配信を生成して保存する(セッション版)。 */
+export async function generateDailyBrief(
+  now: Date = new Date(),
+): Promise<GenerateDailyBriefResult> {
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new BriefStoreError('ログイン状態を確認できませんでした');
+  }
+  return generateDailyBriefAsAdmin(supabase, auth.user.id, now);
 }
 
 export type BriefStatus = Database['public']['Enums']['brief_status'];

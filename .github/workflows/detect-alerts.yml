@@ -1,0 +1,28 @@
+name: Detect Alerts
+
+# アラートジョブ(毎時、M3-3)。FR-21(リボ等)・FR-22(未取込)・FR-23(返済日前日)
+# を検知して alerts へ記録し、Discord Webhook が設定済みなら送信する。
+# Webhook 未設定(B-3 待ち)でも検知自体は進む(route 側が送信だけスキップする)。
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  detect-alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/detect-alerts
+        run: |
+          status=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+            -X POST "${APP_BASE_URL}/api/cron/detect-alerts" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          cat /tmp/response.json
+          if [ "$status" -ge 300 ]; then
+            echo "::error::detect-alerts がステータス $status を返しました"
+            exit 1
+          fi
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

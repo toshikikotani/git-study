@@ -63,6 +63,7 @@ export async function checkAndUnlockHighRisk(): Promise<boolean> {
       body: '全ての負債を完済しました。投資の配分にインデックス7:高リスク3が適用されます。',
       dedupKey: 'debt_paid_off',
       debtId: null,
+      transactionId: null,
     },
   ]);
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectInactivity, detectPaymentDueTomorrow } from '@/domain/alerts';
+import {
+  detectInactivity,
+  detectPaymentDueTomorrow,
+  detectRiskyTransaction,
+} from '@/domain/alerts';
 
 describe('detectInactivity(FR-22)', () => {
   it('2日以内なら発火しない', () => {
@@ -69,5 +73,59 @@ describe('detectPaymentDueTomorrow(FR-23)', () => {
     ];
     const alerts = detectPaymentDueTomorrow(debts, '2026-09-26');
     expect(alerts.map((a) => a.debtId).sort()).toEqual(['d1', 'd2']);
+  });
+});
+
+describe('detectRiskyTransaction(FR-21)', () => {
+  it('リボ払いを検知する', () => {
+    const alert = detectRiskyTransaction({
+      id: 't1',
+      description: 'カードA利用',
+      amountYen: -12800,
+      paymentMethod: 'revolving',
+    });
+    expect(alert.kind).toBe('revolving_detected');
+    expect(alert.severity).toBe('critical');
+    expect(alert.transactionId).toBe('t1');
+    expect(alert.dedupKey).toBe('risky_payment:t1');
+    expect(alert.body).toMatch(/12,800円/);
+  });
+
+  it('キャッシングを検知する', () => {
+    expect(
+      detectRiskyTransaction({
+        id: 't2',
+        description: 'ATM キャッシング',
+        amountYen: -50000,
+        paymentMethod: 'cashing',
+      }).kind,
+    ).toBe('cashing_detected');
+  });
+
+  it('分割払いを検知する', () => {
+    expect(
+      detectRiskyTransaction({
+        id: 't3',
+        description: '家電量販店',
+        amountYen: -80000,
+        paymentMethod: 'installment',
+      }).kind,
+    ).toBe('installment_detected');
+  });
+
+  it('取引ごとに dedup_key が異なる(同じ取引の再検知だけを防ぐ)', () => {
+    const a = detectRiskyTransaction({
+      id: 't1',
+      description: 'x',
+      amountYen: -1000,
+      paymentMethod: 'revolving',
+    });
+    const b = detectRiskyTransaction({
+      id: 't2',
+      description: 'x',
+      amountYen: -1000,
+      paymentMethod: 'revolving',
+    });
+    expect(a.dedupKey).not.toBe(b.dedupKey);
   });
 });

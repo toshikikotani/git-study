@@ -5,6 +5,8 @@ import { ProgressGauge } from '@/components/ui/meter';
 import { StatTile } from '@/components/ui/stat-tile';
 import { budgetTone } from '@/domain/budget';
 import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
+import { streakBadgeFor } from '@/domain/streak';
+import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
 import { formatDateJa } from '@/lib/date';
 
@@ -12,7 +14,9 @@ import { formatDateJa } from '@/lib/date';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const summary = await loadHomeSummary();
+  // ホームを開いた = 今日確認した(FR-62)。失敗しても画面は止めない。
+  await recordCheckin().catch(() => undefined);
+  const [summary, streak] = await Promise.all([loadHomeSummary(), getCheckinStreak()]);
   const { payoff, tiles } = summary;
 
   return (
@@ -31,22 +35,25 @@ export default async function HomePage() {
         />
 
         <div className="relative">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[11px] font-medium tracking-[0.1em] uppercase"
-              style={{ color: 'var(--ink-muted)' }}
-            >
-              完済まで
-            </span>
-            {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
-            {payoff.isEstimated ? (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
               <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                className="text-[11px] font-medium tracking-[0.1em] uppercase"
+                style={{ color: 'var(--ink-muted)' }}
               >
-                推定
+                完済まで
               </span>
-            ) : null}
+              {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
+              {payoff.isEstimated ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                >
+                  推定
+                </span>
+              ) : null}
+            </div>
+            <StreakBadge streak={streak} />
           </div>
 
           {payoff.daysRemaining === null ? (
@@ -197,5 +204,32 @@ export default async function HomePage() {
         数値は仮置き(ADR-006)。Supabase 接続後に実データへ切り替わります。
       </p>
     </div>
+  );
+}
+
+/**
+ * 連続確認日数のバッジ(FR-62)。
+ *
+ * 3日未満は出さない(祝うほどではない)。途切れていても責めず、
+ * かつて3日以上続いていた実績があるときだけ静かに再開を促す。
+ */
+function StreakBadge({ streak }: { streak: CheckinStreak }) {
+  const badge = streakBadgeFor(streak);
+  if (badge.kind === 'none') return null;
+
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+      style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+    >
+      {badge.kind === 'active' ? (
+        <>
+          <span aria-hidden>🔥</span>
+          {badge.days}日連続
+        </>
+      ) : (
+        '今日から再開'
+      )}
+    </span>
   );
 }
