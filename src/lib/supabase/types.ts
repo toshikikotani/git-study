@@ -1236,6 +1236,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      rescued_emails: {
+        Row: {
+          body: string;
+          created_at: string;
+          extracted_count: number;
+          id: string;
+          source: Database['public']['Enums']['transaction_source'];
+          subject: string | null;
+          user_id: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          extracted_count?: number;
+          id?: string;
+          source: Database['public']['Enums']['transaction_source'];
+          subject?: string | null;
+          user_id: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          extracted_count?: number;
+          id?: string;
+          source?: Database['public']['Enums']['transaction_source'];
+          subject?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       side_incomes: {
         Row: {
           account_id: string | null;

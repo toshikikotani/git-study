@@ -26,6 +26,8 @@ export type AppSettings = {
   classificationConfidenceThreshold: number;
   /** 給料日(1〜31)。月末に無い日は月末に丸める(M4-4)。既定25。 */
   payday: number;
+  /** 副業収入のうち返済に回す比率(0〜1)。既定 0.7(FR-42、P3-1)。 */
+  sideIncomeRepaymentRatio: number;
 };
 
 export class SettingsStoreError extends Error {
@@ -48,7 +50,7 @@ export async function getAppSettingsAsAdmin(
   const { data, error } = await client
     .from('app_settings')
     .select(
-      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, classification_confidence_threshold, payday',
+      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, classification_confidence_threshold, payday, side_income_repayment_ratio',
     )
     .eq('user_id', userId)
     .single();
@@ -62,6 +64,7 @@ export async function getAppSettingsAsAdmin(
     highRiskAllocationRatio: data.high_risk_allocation_ratio,
     classificationConfidenceThreshold: data.classification_confidence_threshold,
     payday: data.payday,
+    sideIncomeRepaymentRatio: data.side_income_repayment_ratio,
   };
 }
 

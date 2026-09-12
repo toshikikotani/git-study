@@ -16,6 +16,8 @@
  * 実体になる。
  */
 
+import { hasReachedAlertThreshold, type BudgetStatus } from '@/domain/budget';
+import { formatYen } from '@/domain/money';
 import { addDays, addMonthsToParts, daysBetween, splitDateOnly, type DateOnly } from '@/lib/date';
 
 export type AlertKind =
@@ -25,7 +27,9 @@ export type AlertKind =
   | 'import_needed'
   | 'revolving_detected'
   | 'cashing_detected'
-  | 'installment_detected';
+  | 'installment_detected'
+  | 'waste_budget_70'
+  | 'job_failure';
 export type AlertSeverity = 'info' | 'warn' | 'critical';
 
 export type CandidateAlert = {
@@ -125,5 +129,59 @@ export function detectRiskyTransaction(transaction: {
     dedupKey: `risky_payment:${transaction.id}`,
     debtId: null,
     transactionId: transaction.id,
+  };
+}
+
+/**
+ * FR-20:浪費カテゴリ(categories.kind='waste')が月予算の閾値(既定70%)に
+ * 達したら知らせる。判定そのものは `domain/budget.ts` の
+ * `hasReachedAlertThreshold()` が正(ここで再定義しない)。
+ *
+ * 100%到達では遅い、まだ使える段階で知らせる(設計原則3)。文言は
+ * 「使いすぎ」のような咎める表現を避け、残額を事実として伝えるだけに
+ * とどめる(FR-64)。
+ *
+ * dedup_key は月単位(`payment_due` と同じ考え方)。月が変われば
+ * 再度70%に達したときにもう一度通知する。
+ */
+export function detectWastefulBudget(
+  category: { id: string; name: string },
+  status: BudgetStatus,
+  monthKey: string,
+  threshold = 0.7,
+): CandidateAlert | null {
+  if (!hasReachedAlertThreshold(status, threshold)) return null;
+
+  return {
+    kind: 'waste_budget_70',
+    severity: 'warn',
+    title: `${category.name}が予算の${Math.round(threshold * 100)}%に達しました`,
+    body: status.remainingYen === null ? null : `残り${formatYen(status.remainingYen)}使えます`,
+    dedupKey: `waste_budget_70:${category.id}:${monthKey}`,
+    debtId: null,
+    transactionId: null,
+  };
+}
+
+/**
+ * NFR-06:ジョブ失敗を知らせる(M3-3 の DoD)。
+ *
+ * dedup_key は日単位。同じジョブが同じ日に何度失敗しても通知は1件に
+ * まとめる(毎時ジョブが同じ原因で連続失敗しても本人の通知が埋もれない
+ * ようにする)一方、失敗が翌日にも続いていれば改めて知らせる。
+ */
+export function buildJobFailureAlert(
+  jobName: string,
+  errorMessage: string,
+  today: DateOnly,
+): CandidateAlert {
+  return {
+    kind: 'job_failure',
+    severity: 'critical',
+    title: `${jobName}が失敗しました`,
+    body: errorMessage,
+    dedupKey: `job_failure:${jobName}:${today}`,
+    debtId: null,
+    transactionId: null,
   };
 }
