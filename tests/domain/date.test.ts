@@ -5,11 +5,13 @@ import {
   addMonths,
   addMonthsToParts,
   assertDateOnly,
+  billingCycleStartFor,
   daysBetween,
   formatDateJa,
   monthStartJst,
+  mostRecentClosingOnOrBefore,
+  nthDayOfMonth,
   paydayCycleFor,
-  paydayInMonthOf,
   splitDateOnly,
   todayJst,
 } from '@/lib/date';
@@ -107,13 +109,13 @@ describe('formatDateJa', () => {
   });
 });
 
-describe('paydayInMonthOf', () => {
-  it('today を含む月の給料日を返す', () => {
-    expect(paydayInMonthOf('2026-09-08', 25)).toBe('2026-09-25');
+describe('nthDayOfMonth', () => {
+  it('date を含む月の n 日目を返す', () => {
+    expect(nthDayOfMonth('2026-09-08', 25)).toBe('2026-09-25');
   });
 
   it('月末に無い日は月末に丸める(ADR-015と同じ考え方)', () => {
-    expect(paydayInMonthOf('2026-02-10', 31)).toBe('2026-02-28');
+    expect(nthDayOfMonth('2026-02-10', 31)).toBe('2026-02-28');
   });
 });
 
@@ -151,5 +153,29 @@ describe('paydayCycleFor(FR-17, M6-3)', () => {
       startOn: '2026-01-31',
       endOn: '2026-02-27',
     });
+  });
+});
+
+describe('billingCycleStartFor(FR-18, M6-4)', () => {
+  it('endOn を含む締め回の開始日(前回の締め日の翌日)を返す', () => {
+    expect(billingCycleStartFor('2026-09-10', 10)).toBe('2026-08-11');
+  });
+
+  it('月末丸めの月をまたぐ', () => {
+    expect(billingCycleStartFor('2026-02-28', 31)).toBe('2026-02-01');
+  });
+});
+
+describe('mostRecentClosingOnOrBefore(FR-18, M6-4)', () => {
+  it('締め日が過ぎていれば今月の締め日', () => {
+    expect(mostRecentClosingOnOrBefore('2026-09-15', 10)).toBe('2026-09-10');
+  });
+
+  it('締め日がまだなら先月の締め日', () => {
+    expect(mostRecentClosingOnOrBefore('2026-09-05', 10)).toBe('2026-08-10');
+  });
+
+  it('締め日当日は当日を返す', () => {
+    expect(mostRecentClosingOnOrBefore('2026-09-10', 10)).toBe('2026-09-10');
   });
 });

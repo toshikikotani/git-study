@@ -22,7 +22,7 @@
 import { computeTransferPlan, type PlannableRule } from '@/domain/transfer-rule';
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
-import { paydayInMonthOf, type DateOnly } from '@/lib/date';
+import { nthDayOfMonth, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -79,7 +79,7 @@ export async function resolvePaydayChecklistState(today: DateOnly): Promise<Payd
   }
 
   const settings = await getAppSettings();
-  const paydayOn = paydayInMonthOf(today, settings.payday);
+  const paydayOn = nthDayOfMonth(today, settings.payday);
 
   const { data: existingRow, error: existingError } = await supabase
     .from('transfer_runs')
