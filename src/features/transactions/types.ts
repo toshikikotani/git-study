@@ -26,6 +26,11 @@ export type StoredTransaction = {
   paymentMethod: PaymentMethod;
   categoryId: string | null;
   categoryName: string | null;
+  /**
+   * 分類を確定させたルール(P5-2)。`classifiedBy==='rule'` のときだけ入る。
+   * 誤爆検知(本人が後から修正した回数を集計する)に使う。
+   */
+  matchedRuleId: string | null;
   /** 誰が分類したか。DB の classified_by に対応。 */
   classifiedBy: 'unclassified' | 'rule' | 'ai' | 'manual';
   /** AI が付けた確信度(0〜1)。classified_by='ai' のときのみ必須(DB制約)。 */
