@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
+import { saveImportBatchAction } from '../actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
@@ -12,8 +13,9 @@ import {
   type EmailParseResult,
   type ParsedEmailTransaction,
 } from '@/features/import/email';
+import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { requestAiClassification } from '@/features/transactions/classify-client';
-import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
+import { buildPreview } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
 
@@ -43,12 +45,23 @@ export default function PastePage() {
   const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
   const [learnedRules, setLearnedRules] = useState<ClassificationRule[]>([]);
   const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
+  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
+  const [accountId, setAccountId] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // 学習済みルール(M2-5)。取得に失敗しても固定の検知ルールだけで取り込みは動く
   useEffect(() => {
     void fetchLearnedRules().then((fetched) => {
       setLearnedRules(fetched.rules);
       setCategoryNameById(fetched.categoryNameById);
+    });
+  }, []);
+
+  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
+  useEffect(() => {
+    void fetchAccounts().then((fetched) => {
+      setAccounts(fetched);
+      setAccountId((current) => current || (fetched[0]?.id ?? ''));
     });
   }, []);
 
@@ -92,9 +105,16 @@ export default function PastePage() {
   };
 
   const rulePreview = useMemo<StoredTransaction[]>(() => {
-    if (!parsed) return [];
-    return buildPreview(parsed.transactions, 'email', (i) => `paste-${i}`, rules, categoryNameById);
-  }, [parsed, rules, categoryNameById]);
+    if (!parsed || !accountId) return [];
+    return buildPreview(
+      parsed.transactions,
+      accountId,
+      (i) => `paste-${i}`,
+      rules,
+      categoryNameById,
+      'manual',
+    );
+  }, [parsed, rules, categoryNameById, accountId]);
 
   // AI 分類の結果を id で重ねる。本文を書き換えると rulePreview の内容が
   // 総入れ替えになるため、古い aiResults は自然に参照されなくなる。
@@ -108,6 +128,7 @@ export default function PastePage() {
         categoryId: applied.categoryId,
         categoryName: applied.categoryName,
         classifiedBy: applied.classifiedBy,
+        confidence: applied.confidence,
         reviewStatus: applied.reviewStatus,
       };
     });
@@ -133,10 +154,18 @@ export default function PastePage() {
   };
 
   const save = async () => {
-    const outcome = await saveBatch(preview, {
+    if (!accountId) return;
+    setSaveError(null);
+    const outcome = await saveImportBatchAction(preview, {
       fileName: 'メール貼り付け',
+      source: 'manual',
+      accountId,
       failedCount: parsed?.warnings.length ?? 0,
     });
+    if (outcome.error) {
+      setSaveError(outcome.error);
+      return;
+    }
     setSaved(outcome);
     setBody('');
   };
@@ -187,6 +216,49 @@ export default function PastePage() {
           </Link>
         </Card>
       ) : null}
+
+      {/* 口座(M6-2) */}
+      <Card>
+        <label
+          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          口座
+        </label>
+        {accounts === null ? (
+          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            読み込んでいます…
+          </p>
+        ) : accounts.length === 0 ? (
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            口座がまだ登録されていません。
+            <Link
+              href="/accounts"
+              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
+              style={{ color: 'var(--accent)' }}
+            >
+              先に登録する →
+            </Link>
+          </p>
+        ) : (
+          <select
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
 
       <Card>
         <label
@@ -256,11 +328,18 @@ export default function PastePage() {
             <button
               type="button"
               onClick={() => void save()}
-              className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
+              disabled={!accountId}
+              className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
               {preview.length} 件を取り込む
             </button>
+
+            {saveError ? (
+              <p className="mt-2 text-center text-xs" style={{ color: 'var(--over)' }}>
+                {saveError}
+              </p>
+            ) : null}
           </>
         ) : null}
 

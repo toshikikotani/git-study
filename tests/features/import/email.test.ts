@@ -187,6 +187,7 @@ describe('syncFromMailbox — 自動取り込み', () => {
 
   const base = {
     source: new StaticMailSource(messages),
+    accountId: 'acc-1',
     rules: RULES,
     knownMessageIds: new Set<string>(),
     knownFingerprints: new Set<string>(),

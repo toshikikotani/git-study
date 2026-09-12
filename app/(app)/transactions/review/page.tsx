@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { listCategoryOptions } from '@/features/classification/store';
+import { listTransactions } from '@/features/transactions/store';
 import { ReviewQueue } from './review-queue';
 
 /**
@@ -15,7 +16,8 @@ import { ReviewQueue } from './review-queue';
 export const dynamic = 'force-dynamic';
 
 export default async function ReviewPage() {
-  const categories = await listCategoryOptions();
+  const [categories, transactions] = await Promise.all([listCategoryOptions(), listTransactions()]);
+  const pending = transactions.filter((t) => t.reviewStatus === 'pending');
 
   return (
     <div className="rise space-y-4">
@@ -32,7 +34,7 @@ export default async function ReviewPage() {
         カテゴリを選んで確定すると、同じ摘要の次の明細から自動で分類されます。
       </p>
 
-      <ReviewQueue categories={categories} />
+      <ReviewQueue categories={categories} initialPending={pending} />
     </div>
   );
 }

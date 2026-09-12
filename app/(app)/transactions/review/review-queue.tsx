@@ -1,69 +1,61 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
-import { transactionStore, type StoredTransaction } from '@/features/transactions/store';
+import type { StoredTransaction } from '@/features/transactions/store';
 import { formatDateJa } from '@/lib/date';
+import { updateTransactionAction } from '../actions';
 import { createLearnedRuleAction } from './actions';
 
 type CategoryOption = { id: string; name: string };
 
 /**
- * 確認待ちの明細を1件ずつ確定していく(M2-5、FR-12)。
+ * 確認待ちの明細を1件ずつ確定していく(M2-5、FR-12、T-7 で実データ化)。
  *
- * 明細はブラウザのセッション保存(T-7 未着手)なので、一覧はここで
- * クライアント側から読む。カテゴリを選んで確定すると:
+ * 一覧はサーバー側(review/page.tsx)で取得して渡す。カテゴリを選んで
+ * 確定すると:
  *   1. その明細のカテゴリが確定する(即座に画面から消える)
  *   2. 同じ摘要の学習ルールを DB に作る(次回以降の取り込みで自動的に当たる)
  * 2 が失敗しても 1 は既に終わっているので、本人の作業は無駄にならない
  * (失敗は画面下部にまとめて出す)。
  */
-export function ReviewQueue({ categories }: { categories: readonly CategoryOption[] }) {
-  const [pending, setPending] = useState<StoredTransaction[] | null>(null);
+export function ReviewQueue({
+  categories,
+  initialPending,
+}: {
+  categories: readonly CategoryOption[];
+  initialPending: readonly StoredTransaction[];
+}) {
+  const [pending, setPending] = useState<StoredTransaction[]>([...initialPending]);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [ruleWarnings, setRuleWarnings] = useState<string[]>([]);
-
-  useEffect(() => {
-    void transactionStore.list().then((all) => {
-      setPending(all.filter((t) => t.reviewStatus === 'pending'));
-    });
-  }, []);
+  const [error, setError] = useState<string | null>(null);
 
   const confirm = async (transaction: StoredTransaction) => {
     const categoryId = selected[transaction.id];
     if (!categoryId) return;
 
     setSavingId(transaction.id);
-    const category = categories.find((c) => c.id === categoryId);
+    setError(null);
 
-    await transactionStore.update(transaction.id, {
-      categoryId,
-      categoryName: category?.name ?? null,
-      classifiedBy: 'manual',
-      reviewStatus: 'corrected',
-    });
-
-    const result = await createLearnedRuleAction(transaction.description, categoryId);
+    const result = await updateTransactionAction(transaction.id, categoryId);
     if (result.error) {
-      setRuleWarnings((prev) => [...prev, `「${transaction.description}」: ${result.error}`]);
+      setError(result.error);
+      setSavingId(null);
+      return;
     }
 
-    setPending((prev) => prev?.filter((t) => t.id !== transaction.id) ?? null);
+    const ruleResult = await createLearnedRuleAction(transaction.description, categoryId);
+    if (ruleResult.error) {
+      setRuleWarnings((prev) => [...prev, `「${transaction.description}」: ${ruleResult.error}`]);
+    }
+
+    setPending((prev) => prev.filter((t) => t.id !== transaction.id));
     setSavingId(null);
   };
-
-  if (pending === null) {
-    return (
-      <Card>
-        <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-          読み込んでいます…
-        </p>
-      </Card>
-    );
-  }
 
   if (pending.length === 0) {
     return (
@@ -118,6 +110,12 @@ export function ReviewQueue({ categories }: { categories: readonly CategoryOptio
           </div>
         </Card>
       ))}
+
+      {error ? (
+        <p className="text-xs" style={{ color: 'var(--over)' }}>
+          {error}
+        </p>
+      ) : null}
 
       {ruleWarnings.length > 0 ? (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>

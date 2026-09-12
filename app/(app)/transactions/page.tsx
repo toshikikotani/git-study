@@ -1,14 +1,11 @@
-'use client';
-
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { formatYen } from '@/domain/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
-  transactionStore,
-  type ImportBatchSummary,
+  listImportBatches,
+  listTransactions,
   type StoredTransaction,
 } from '@/features/transactions/store';
 import { formatDateJa } from '@/lib/date';
@@ -19,24 +16,12 @@ import { formatDateJa } from '@/lib/date';
  * 日付ごとにまとめて出す。金融機関の明細に慣れた目には、
  * 日付が繰り返し出てくる一覧よりこちらの方が追いやすい。
  */
-export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<StoredTransaction[] | null>(null);
-  const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
 
-  useEffect(() => {
-    void (async () => {
-      setTransactions(await transactionStore.list());
-      setBatches(await transactionStore.batches());
-    })();
-  }, []);
+// 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
+export const dynamic = 'force-dynamic';
 
-  if (transactions === null) {
-    return (
-      <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
-        読み込み中…
-      </p>
-    );
-  }
+export default async function TransactionsPage() {
+  const [transactions, batches] = await Promise.all([listTransactions(), listImportBatches()]);
 
   if (transactions.length === 0) {
     return <EmptyState />;
@@ -123,8 +108,7 @@ export default function TransactionsPage() {
 
       {batches.length > 0 ? (
         <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-          {transactions.length} 件 / 取り込み {batches.length} 回。
-          この明細はブラウザに一時保存されています(Supabase 接続後に永続化)。
+          {transactions.length} 件 / 取り込み {batches.length} 回
         </p>
       ) : null}
     </div>

@@ -39,27 +39,15 @@
 
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
+| M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3, T-7 |
+| M6-3 | 給料日〜給料日の期間ビュー(保存は暦月のまま表示のみ変換、ADR-015) | M | M6-2 |
+| M6-4 | 請求金額メールとの突合(取り込み漏れ検知) | M | M6-2 |
 | M3-1 | Discord 通知基盤(Embed / dedup / 失敗記録) | S | **B-3 待ち** |
 
+T-7・M6-2 が完了し(下記 Done)、M2-7c・M6-3・M6-4 の依存が解けたため Next へ繰り上げ。
 優先順位(`docs/mvp-plan.md`)は S1(負債)> S3(リボ検知)> S4(残額)> S2(取り込み)。
 
 ## Backlog
-
-### S2 明細の取り込みと分類
-| ID | タスク | サイズ | 依存 |
-|---|---|---|---|
-| T-7 | `TransactionStore` の Supabase 実装を足す | S | M0-3 |
-| M2-7c | `/api/cron/import-gmail` と GitHub Actions ワークフロー(毎朝取得) | S | M0-3, **T-7** |
-
-**M2-7c 着手時に発見:`TransactionStore` は sessionStorage 実装のまま(T-7 未着手)。
-cron ジョブ(サーバー側、`window` を持たない)から保存しようとしても
-`SessionTransactionStore.add()` は黙って何もしないため、データが静かに
-消える(NFR-06 違反)。さらに `transactions.account_id` は `accounts` への
-NOT NULL な外部キーだが、CSV/貼り付け画面は `buildPreview()` に
-`'pending'`/`'email'`/`'gmail'` という実在しない accountId を渡している
-(M6-2 が別途解消予定)。M2-7c を安全に作るには T-7(Supabase 実装)が先に
-要り、T-7 を実用にするには M6-2(実口座の選択)も要る。3つとも1タスクに
-収まる規模ではないため、着手せず記録のみして次へ進んだ(ループ規約8)。**
 
 ### S3 リボ・キャッシング検知と通知
 | ID | タスク | サイズ | 依存 |
@@ -76,13 +64,6 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 | ID | タスク | サイズ | 依存 |
 |---|---|---|---|
 | M5-2 | 配信ジョブ(07:00 JST) | S | M5-1, M3-1 |
-
-### S6 口座管理と請求突合(実運用フィードバックで追加、FR-16〜18)
-| ID | タスク | サイズ | 依存 |
-|---|---|---|---|
-| M6-2 | 取り込み時に口座を選べるようにする(`accountId` の `'pending'`/`'email'`/`'gmail'` 固定を解消) | S | M6-1, T-7 |
-| M6-3 | 給料日〜給料日の期間ビュー(保存は暦月のまま表示のみ変換、ADR-015) | M | M6-2 |
-| M6-4 | 請求金額メールとの突合(取り込み漏れ検知) | M | M6-2 |
 
 ### フェーズ2以降(MVP 対象外)
 | ID | タスク | 対応 |
@@ -102,13 +83,12 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 | T-2 | CSV アダプタの fixture を実ファイル(匿名化)で用意する | 実フォーマットが判明してから |
 | T-3 | ESLint 10 へ上げる | `eslint-config-next` 同梱の `eslint-plugin-react` が 10 系で動かないため 9 系に固定中(ADR-001)。上流の対応待ち |
 | T-6 | `ImportAdapter`(TS)と `import_adapters`(DB)の対応を型で保証する | 現在は手で揃えている。`supabase gen types` が入ったら派生させる(M0-2 後) |
-| T-7 | `TransactionStore` の Supabase 実装を足す | 現在は sessionStorage 実装。画面は差し替えだけで動く(M0-3) |
 | T-9 | 列マッピングを `import_adapters` に保存して再利用する | 現在は毎回推測。同じ形式を繰り返すなら保存した方が早い(M0-3 後) |
 | T-11 | AI が救済したメールの書式をラベル辞書へ還元する | AI に回った本文を残しておけば、辞書に語を足して費用ゼロの経路へ戻せる(ADR-019) |
 | T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff`(110行)を分割する | SQL 版との golden fixture 一致検証(M1-1)に守られているので、単独セッションで golden テストを都度流しながら進める。ついでに直せる範囲ではない |
 | T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
 | T-16 | Supabase の Auth 設定(Site URL / Redirect URLs)がリポジトリに残っていない | ダッシュボード側の設定のみで管理している。プロジェクトを作り直す場合に再設定が必要。`supabase/config.toml` の `[auth]` セクションで宣言的に管理する方法もあるが、現状は未導入 |
-| T-21 | `detectInactivity()`(FR-22)を実データに接続する | 判定関数自体は M3-2 で完成しているが、「直近の取り込み日」を読む先の `transactions` テーブルが T-7 まで空のまま。T-7 完了後、`features/alerts/store.ts` に `detectAndRecordInactivityAlert()` を追加して配線する |
+| T-21 | `detectInactivity()`(FR-22)を実データに接続する | 判定関数自体は M3-2 で完成している。T-7 完了により `transactions` テーブルが実データを持つようになったため、`features/alerts/store.ts` に `detectAndRecordInactivityAlert()` を追加して配線できる |
 
 **T-12 は refactor(責務分離)の一環として認識しているが未着手。他は2026-09-08 の refactor セッションで着手した3画面の重複解消と mail-sync の分割のみ完了(下記 Done)。** 全体的な「5行ルール」適用は際限がないので、次に触る画面・関数から都度直す方針にする(一括では手を出さない)。
 
@@ -175,6 +155,7 @@ FR-22/FR-23 の検知(M3-2)は `domain/alerts.ts` / `features/alerts/store.ts`
 | M5-1 | 配信内容の生成(FR-30, FR-31)。ADR-020(朝配信「最小版」の1トピックは固定の定型文バンクにする。AI 生成・実データ検索は P2-2 で行う)を決めた上で実装。`src/features/briefs/store.ts`(新規)の `generateDailyBrief()` — 冒頭の数字(完済まで残り日数・使える残額)はホーム画面と必ず一致させる必要があるため、計算式を複製せず `features/home/summary.ts` の `loadHomeSummary()` をそのまま呼ぶ。`ux_briefs_user_date`(user_id, brief_on の一意制約)を利用し、同じ日に何度呼んでも重複生成しない(既存の1件をそのまま返す)。`src/domain/briefs.ts`(純粋関数)に `filterBriefTopics()`(FR-31:情報商材・根拠不明な高収入案件・詐欺性・アフィリエイト目的を示す文言パターンを検出し、`brief_excluded_items` へ理由付きで回す)と `pickDailyTopic()`(`daysBetween('1970-01-01', 当日) % 件数` で決定的に1件選ぶ、乱数不使用)を追加。`src/features/briefs/tips.ts`(新規)に「収入増のヒント」の固定バンク5件(ADR-020の方針により、具体的な案件名・金額・期限は書かず、本人の行動を促す一般論に留めた)。`daily_briefs` + `brief_items`(kind='headline'/'income_tip')への保存に加え、`body_md` も組み立てて保存(FR-32 のアーカイブ表示に備える)。実際の Supabase プロジェクトに対し一時セッションを発行して確認(呼び出し口が無いため検証用に一時的な API ルートを追加し、確認後に削除):①生成した `daily_briefs` 行の `remaining_debt_yen`(1,000,000円)が実際の active な負債残高の合計と一致、`spendable_living_yen`/`spendable_sanctuary_yen`(60,000円/40,000円)がホーム画面の表示と一致することを確認、②`brief_items` に headline・income_tip の2件が正しい `sort_order` で保存されることを確認、③固定バンクは事前に目視で安全と確認済みのため `brief_excluded_items` が0件であることを確認(フィルタ自体は機能している。危険な文言を含む候補が除外されることは `tests/domain/briefs.test.ts` で確認)、④同日に2回目を呼んでも新規行が増えず同じ `briefId` が返ることを確認。検証用データは削除済み、検証用に追加した一時ルートも削除済み。テスト9件追加(filterBriefTopics 6件・pickDailyTopic 3件) | 2026-09-11 |
 | M5-3 | 配信アーカイブ画面(FR-32)。`/briefs`(一覧、新しい順)と `/briefs/[id]`(詳細)を追加。`src/features/briefs/store.ts` に `listDailyBriefs()`(daily_briefs を brief_on 降順で返す)と `getDailyBrief()`(1件の詳細。`brief_items` を sort_order 順、`brief_excluded_items` も合わせて返す)を追加。詳細画面は `body_md`(将来の配信チャネル向けの整形済みテキスト)ではなく `brief_items` を構造化して表示する方針にした(他画面と見た目が揃う)。除外ログがあれば「載せなかった項目」として理由(FR-31 の `brief_exclusion_reason`)付きで表示。ホーム画面の末尾に「朝配信のアーカイブ →」の導線を追加(`/briefs` はボトムナビには入れず、他の非中核画面と同じくリンク経由)。実際の Supabase プロジェクトに対し一時セッションを発行し、検証用に2件の配信データ(項目・除外ログ付き)を作成して確認:①ホーム画面のリンクから `/briefs` へ遷移できること、②一覧が新しい順(2026年9月5日→2026年9月1日)に並ぶこと、③詳細画面で見出し・収入増のヒント・除外ログ(理由ラベル込み)が正しく表示されること、④存在しない id で `notFound()` の404画面が表示されること(HTTPステータスは `next dev` 特有の挙動で200のまま返るが、本番ビルドでは正しく404になる。表示内容自体は正しいことを確認済み)。検証用データは削除済み。ストアの読み出し関数のみのためドメインテストの追加は無し(純粋関数を含まない) | 2026-09-11 |
 | M7-2 | 投資記録画面(FR-51)。`/investments` に拠出(フロー)と残高(ストック)の手入力・一覧を追加(証券口座連携は当面対象外)。`src/features/investments/store.ts` に `listInvestmentContributions()`/`createInvestmentContribution()`(投資額日順の一覧・新規記録)と `listInvestmentSnapshots()`/`upsertInvestmentSnapshot()` を追加。`upsertInvestmentSnapshot()` は「同じ日・同じ商品なら上書き」(DoD)を満たす必要があるが、実テーブルの一意制約(`ux_snapshots_user_account_product_date`)が `coalesce()` を挟んだ式インデックスのため PostgREST の `upsert(onConflict:)` がそのまま使えないと判明。既存行の有無を先に確認してから insert/update を分ける実装に変更した(単一ユーザーのアプリのため TOCTOU の実害は無い)。`src/domain/investment.ts` に `assertContributionAmountYen`/`assertSnapshotValueYen`/`assertSnapshotCostBasisYen`/`assertProductName` を追加。account_id は扱わず常に null(証券口座連携を持たないため)。実際の Supabase プロジェクトに対し一時セッションを発行し、①拠出30,000円(高リスク枠指定)を記録 → 一覧に反映されDB行と一致することを確認、②残高10万円(取得額9万円)を記録 → 一覧に反映、③同じ日・同じ商品名で残高12万円を再記録 → 行が増えず(id 同一)値だけ12万円に上書きされることをDBクエリとリロード後の画面表示の両方で確認。検証用データは削除済み。テスト9件追加(assertContributionAmountYen/assertSnapshotValueYen/assertSnapshotCostBasisYen/assertProductName)。**S7(投資、FR-50〜52)は M7-1・M7-2・M7-3 ですべて完了** | 2026-09-11 |
+| T-7 / M6-2 | 明細(transactions)の Supabase 実装と、取り込み時の実口座選択。`src/features/transactions/store.ts` を全面書き換え — 以前の `TransactionStore` インターフェース・`SessionTransactionStore` クラス(sessionStorage 実装。タブを閉じると消える、サーバー側ジョブから保存できない、NFR-06 違反)を廃止し、`docs/glossary.md` のレイヤー命名(list/create/update)に従う plain 関数(`listTransactions`/`listImportBatches`/`importTransactions`/`updateTransaction`)へ置き換えた。`importTransactions()` は M3-2/M7-2 と同じ「DB の一意制約を取り込み済み判定に使う」パターンで、`transactions` の実索引(`ux_transactions_fingerprint`、`user_id,fingerprint` の素の複合索引)に対する `upsert(..., ignoreDuplicates: true)` が使え、返った行数から重複件数を逆算する。Server Action(`app/(app)/transactions/actions.ts` の `saveImportBatchAction`/`updateTransactionAction`)を新設し、`/transactions`・`/transactions/review` を Server Component 化、`review-queue.tsx`(M2-5)を新しい Server Action 経由に差し替え。M6-2(`accountId` の `'pending'`/`'email'`/`'gmail'` 固定を解消)も同時実装 — `/api/accounts` + `src/features/transactions/accounts-client.ts` で口座選択肢を取得し、CSV取り込み・メール貼り付けの両画面に「口座を選ぶ」区画を追加、`mail-sync.ts` にも実際の `accountId` を渡すよう変更。**実装中に発見・解消したビルド境界のバグ**:`import-pipeline.ts`(プレビュー計算のためクライアント側でも読み込まれる)が `fingerprintOf()`/型を `store.ts` から直接 import していたため、`store.ts` の `createClient`(`@/lib/supabase/server` 経由で `next/headers` に依存)がクライアントバンドルへ引き込まれ、`next build` が `You're importing a module that depends on "next/headers"` で失敗していた。クライアント安全な型と `fingerprintOf()` だけを持つ `src/features/transactions/types.ts` を新設して分離し、`store.ts` はそこから re-export、`import-pipeline.ts` はそちらから import するよう修正して解消。実際の Supabase プロジェクトに対し実セッションで検証:①検証用口座を作成し CSV 取り込み画面から1件取り込み → `transactions`/`import_batches` に正しい `account_id`/`source='csv'`/`review_status='pending'` で保存されることを確認、②同じ CSV を再取り込み → 0件取り込み・1件重複(`ux_transactions_fingerprint` による重複排除が本番相当の経路で機能)を確認、③確認待ちキューでカテゴリを確定 → `category_id`/`classified_by='manual'`/`review_status='corrected'`/`reviewed_at` が正しく更新され、画面からも消えることを確認。検証用データ(口座・明細・取り込みバッチ・学習ルール)はすべて削除済み | 2026-09-12 |
 
 ---
 

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { saveImportBatchAction } from '../actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
@@ -14,8 +15,9 @@ import {
   inspectCsv,
   type ImportAdapter,
 } from '@/features/import/adapters';
+import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { requestAiClassification } from '@/features/transactions/classify-client';
-import { buildPreview, saveBatch } from '@/features/transactions/import-pipeline';
+import { buildPreview } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
 
@@ -43,17 +45,28 @@ export default function ImportPage() {
   const [adapter, setAdapter] = useState<ImportAdapter>(GENERIC_ADAPTER);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
   const [classifying, setClassifying] = useState(false);
   const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
   const [learnedRules, setLearnedRules] = useState<ClassificationRule[]>([]);
   const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
+  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
+  const [accountId, setAccountId] = useState('');
 
   // 学習済みルール(M2-5)。取得に失敗しても固定の検知ルールだけで取り込みは動く
   useEffect(() => {
     void fetchLearnedRules().then((fetched) => {
       setLearnedRules(fetched.rules);
       setCategoryNameById(fetched.categoryNameById);
+    });
+  }, []);
+
+  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
+  useEffect(() => {
+    void fetchAccounts().then((fetched) => {
+      setAccounts(fetched);
+      setAccountId((current) => current || (fetched[0]?.id ?? ''));
     });
   }, []);
 
@@ -94,16 +107,17 @@ export default function ImportPage() {
   }, [loaded, adapter]);
 
   const rulePreview = useMemo<StoredTransaction[]>(() => {
-    if (!result || 'error' in result) return [];
+    if (!result || 'error' in result || !accountId) return [];
     const rows = result.transactions;
     return buildPreview(
       rows,
-      'pending',
+      accountId,
       (i) => `${rows[i]!.lineNumber}-${i}`,
       rules,
       categoryNameById,
+      'csv',
     );
-  }, [result, rules, categoryNameById]);
+  }, [result, rules, categoryNameById, accountId]);
 
   // AI 分類の結果を id で重ねる。新しいファイルを読むと rulePreview の id が
   // 総入れ替えになるため、古い aiResults は自然に参照されなくなる(明示的な
@@ -118,6 +132,7 @@ export default function ImportPage() {
         categoryId: applied.categoryId,
         categoryName: applied.categoryName,
         classifiedBy: applied.classifiedBy,
+        confidence: applied.confidence,
         reviewStatus: applied.reviewStatus,
       };
     });
@@ -143,12 +158,20 @@ export default function ImportPage() {
   };
 
   const save = async () => {
-    if (!loaded || preview.length === 0) return;
+    if (!loaded || preview.length === 0 || !accountId) return;
     setSaving(true);
-    const outcome = await saveBatch(preview, {
+    setSaveError(null);
+    const outcome = await saveImportBatchAction(preview, {
       fileName: loaded.fileName,
+      source: 'csv',
+      accountId,
       failedCount: result && !('error' in result) ? result.errors.length : 0,
     });
+    if (outcome.error) {
+      setSaveError(outcome.error);
+      setSaving(false);
+      return;
+    }
     // 一覧へ飛ばさず結果を出す。重複で0件だったとき、黙って戻ると
     // 壊れているのか取り込めたのか区別が付かない。
     setSaved(outcome);
@@ -170,9 +193,47 @@ export default function ImportPage() {
         </Link>
       </header>
 
-      {/* 1. ファイル */}
+      {/* 0. 口座(M6-2) */}
       <Card>
-        <Step n={1} title="ファイルを選ぶ" />
+        <Step n={1} title="口座を選ぶ" />
+        {accounts === null ? (
+          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            読み込んでいます…
+          </p>
+        ) : accounts.length === 0 ? (
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            口座がまだ登録されていません。
+            <Link
+              href="/accounts"
+              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
+              style={{ color: 'var(--accent)' }}
+            >
+              先に登録する →
+            </Link>
+          </p>
+        ) : (
+          <select
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
+
+      {/* 2. ファイル */}
+      <Card>
+        <Step n={2} title="ファイルを選ぶ" />
         <label
           className="mt-3 block cursor-pointer rounded-2xl border border-dashed px-4 py-8 text-center"
           style={{ borderColor: 'var(--hairline)' }}
@@ -209,10 +270,10 @@ export default function ImportPage() {
         ) : null}
       </Card>
 
-      {/* 2. 列の対応 */}
+      {/* 3. 列の対応 */}
       {loaded ? (
         <Card>
-          <Step n={2} title="列の対応を確かめる" />
+          <Step n={3} title="列の対応を確かめる" />
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             ヘッダから推測しています。違っていれば選び直してください。
           </p>
@@ -285,7 +346,7 @@ export default function ImportPage() {
 
       {result && !('error' in result) ? (
         <Card>
-          <Step n={3} title="取り込む内容を確かめる" />
+          <Step n={4} title="取り込む内容を確かめる" />
 
           <div className="mt-3 flex gap-2">
             <Count label="取り込む" value={result.transactions.length} tone="accent" />
@@ -363,9 +424,11 @@ export default function ImportPage() {
             {saving ? '取り込み中…' : `${preview.length} 件を取り込む`}
           </button>
 
-          <p className="mt-2 text-center text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-            Supabase 未接続のため、いまはブラウザに一時保存されます
-          </p>
+          {saveError ? (
+            <p className="mt-2 text-center text-xs" style={{ color: 'var(--over)' }}>
+              {saveError}
+            </p>
+          ) : null}
         </Card>
       ) : null}
     </div>

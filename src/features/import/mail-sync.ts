@@ -29,6 +29,8 @@ import type { MailQuery, MailSource, RawMessage } from './mailbox';
 
 export type SyncInput = {
   source: MailSource;
+  /** 取り込み先の口座(M6-2。accountId は実在する accounts.id である必要がある)。 */
+  accountId: string;
   query: MailQuery;
   rules: readonly ClassificationRule[];
   /** 既に取り込み済みのメール ID。再実行で二重に読まないため。 */
@@ -85,9 +87,11 @@ export async function syncFromMailbox(input: SyncInput): Promise<SyncResult> {
 
     const built = buildPreview(
       parsed.transactions,
-      'gmail',
+      input.accountId,
       (index) => `${message.messageId}-${index}`,
       input.rules,
+      new Map(),
+      'gmail',
     );
     for (const tx of built) {
       if (seen.has(tx.fingerprint)) {
