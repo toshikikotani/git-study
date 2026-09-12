@@ -74,6 +74,34 @@ export function addMonths(date: DateOnly, offsetMonths: number): DateOnly {
   return addMonthsToParts(y, m, d, offsetMonths);
 }
 
+/** today を含む月の給料日(月末に無い日は月末に丸める、ADR-015と同じ考え方)。 */
+export function paydayInMonthOf(today: DateOnly, payday: number): DateOnly {
+  const [year, month] = splitDateOnly(today);
+  return addMonthsToParts(year, month, payday, 0);
+}
+
+/**
+ * 給料日〜次の給料日前日までの期間(FR-17, M6-3)。
+ *
+ * 保存は暦月のまま(ADR-015)で、ここは表示のためだけに給料日基準の期間へ
+ * 変換する純粋関数。today が今月の給料日以降なら「今月の給料日〜来月の給料日前日」、
+ * まだなら「先月の給料日〜今月の給料日前日」を返す。
+ */
+export function paydayCycleFor(
+  today: DateOnly,
+  payday: number,
+): { startOn: DateOnly; endOn: DateOnly } {
+  const [year, month] = splitDateOnly(today);
+  const currentPayday = addMonthsToParts(year, month, payday, 0);
+
+  if (today >= currentPayday) {
+    const nextPayday = addMonthsToParts(year, month, payday, 1);
+    return { startOn: currentPayday, endOn: addDays(nextPayday, -1) };
+  }
+  const previousPayday = addMonthsToParts(year, month, payday, -1);
+  return { startOn: previousPayday, endOn: addDays(currentPayday, -1) };
+}
+
 /** DateOnly に日を足す。 */
 export function addDays(date: DateOnly, days: number): DateOnly {
   const [y, m, d] = splitDateOnly(date);

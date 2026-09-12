@@ -8,6 +8,8 @@ import {
   daysBetween,
   formatDateJa,
   monthStartJst,
+  paydayCycleFor,
+  paydayInMonthOf,
   splitDateOnly,
   todayJst,
 } from '@/lib/date';
@@ -102,5 +104,52 @@ describe('assertDateOnly / splitDateOnly', () => {
 describe('formatDateJa', () => {
   it('日本語表記にする', () => {
     expect(formatDateJa('2026-09-08')).toBe('2026年9月8日');
+  });
+});
+
+describe('paydayInMonthOf', () => {
+  it('today を含む月の給料日を返す', () => {
+    expect(paydayInMonthOf('2026-09-08', 25)).toBe('2026-09-25');
+  });
+
+  it('月末に無い日は月末に丸める(ADR-015と同じ考え方)', () => {
+    expect(paydayInMonthOf('2026-02-10', 31)).toBe('2026-02-28');
+  });
+});
+
+describe('paydayCycleFor(FR-17, M6-3)', () => {
+  it('給料日より前なら「先月の給料日〜今月の給料日前日」', () => {
+    expect(paydayCycleFor('2026-09-08', 25)).toEqual({
+      startOn: '2026-08-25',
+      endOn: '2026-09-24',
+    });
+  });
+
+  it('給料日当日なら「今月の給料日〜来月の給料日前日」', () => {
+    expect(paydayCycleFor('2026-09-25', 25)).toEqual({
+      startOn: '2026-09-25',
+      endOn: '2026-10-24',
+    });
+  });
+
+  it('給料日より後でも同じサイクル', () => {
+    expect(paydayCycleFor('2026-09-30', 25)).toEqual({
+      startOn: '2026-09-25',
+      endOn: '2026-10-24',
+    });
+  });
+
+  it('年をまたぐ', () => {
+    expect(paydayCycleFor('2026-01-08', 25)).toEqual({
+      startOn: '2025-12-25',
+      endOn: '2026-01-24',
+    });
+  });
+
+  it('月末丸めの月をまたぐ(31日指定・2月)', () => {
+    expect(paydayCycleFor('2026-02-10', 31)).toEqual({
+      startOn: '2026-01-31',
+      endOn: '2026-02-27',
+    });
   });
 });
