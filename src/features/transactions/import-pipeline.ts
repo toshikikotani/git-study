@@ -81,6 +81,7 @@ function buildPreviewRow(
     categoryName: classification.categoryId
       ? (categoryNameById.get(classification.categoryId) ?? null)
       : null,
+    matchedRuleId: classification.matchedRuleId,
     classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
     confidence: null,
     // 分類が付いていないものは本人の確認へ回す(FR-12)

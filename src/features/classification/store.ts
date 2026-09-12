@@ -18,6 +18,8 @@ import {
   type ClassifiableTransaction,
 } from '@/features/classification/ai';
 import { buildLearnedRule, type ClassificationRule } from '@/features/classification/rules';
+import { buildRuleMisfireAlert, isMisfiringRule } from '@/domain/alerts';
+import { recordAlertsAsAdmin } from '@/features/alerts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
@@ -324,4 +326,81 @@ export async function createLearnedRule(params: {
   if (error) {
     throw new ClassificationStoreError(`学習ルールを作成できませんでした: ${error.message}`);
   }
+}
+
+/**
+ * 誤爆気味の学習ルールを検知して無効化する(P5-2)。
+ *
+ * `transactions.matched_rule_id`(このルールで分類が確定した明細)を
+ * 集計し、後から修正(review_status='corrected')された割合が高い
+ * ルールを `is_active=false` にして alerts へ記録する。既定のルール
+ * (`DEFAULT_DETECTION_RULES`、DB には存在しない)は対象外。ルール自体を
+ * 削除しないのは、`/rules` で本人が内容を見て直せるようにするため
+ * (設計原則1:判断はブラックボックス化しない)。
+ */
+export async function detectAndDeactivateMisfiringRulesAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+): Promise<number> {
+  const { data: rules, error: rulesError } = await client
+    .from('classification_rules')
+    .select('id, name, hit_count')
+    .eq('user_id', userId)
+    .eq('is_learned', true)
+    .eq('is_active', true)
+    .gt('hit_count', 0);
+  if (rulesError) {
+    throw new ClassificationStoreError(`分類ルールを取得できませんでした: ${rulesError.message}`);
+  }
+  if (rules.length === 0) return 0;
+
+  const ruleIds = rules.map((r) => r.id);
+  const { data: txs, error: txError } = await client
+    .from('transactions')
+    .select('matched_rule_id, review_status')
+    .eq('user_id', userId)
+    .in('matched_rule_id', ruleIds);
+  if (txError) {
+    throw new ClassificationStoreError(`明細を取得できませんでした: ${txError.message}`);
+  }
+
+  const correctedCountByRule = new Map<string, number>();
+  for (const t of txs) {
+    if (t.review_status !== 'corrected' || t.matched_rule_id === null) continue;
+    correctedCountByRule.set(
+      t.matched_rule_id,
+      (correctedCountByRule.get(t.matched_rule_id) ?? 0) + 1,
+    );
+  }
+
+  const misfiring = rules.filter((rule) =>
+    isMisfiringRule({
+      hitCount: rule.hit_count,
+      correctedCount: correctedCountByRule.get(rule.id) ?? 0,
+    }),
+  );
+  if (misfiring.length === 0) return 0;
+
+  const { error: deactivateError } = await client
+    .from('classification_rules')
+    .update({ is_active: false })
+    .in(
+      'id',
+      misfiring.map((r) => r.id),
+    );
+  if (deactivateError) {
+    throw new ClassificationStoreError(
+      `ルールを無効化できませんでした: ${deactivateError.message}`,
+    );
+  }
+
+  const candidates = misfiring.map((rule) =>
+    buildRuleMisfireAlert(
+      rule.id,
+      rule.name,
+      correctedCountByRule.get(rule.id) ?? 0,
+      rule.hit_count,
+    ),
+  );
+  return recordAlertsAsAdmin(client, userId, candidates);
 }

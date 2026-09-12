@@ -25,16 +25,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+  buildBudgetPaceAlert,
   buildJobFailureAlert,
+  buildMonthlyRecapAlert,
   detectInactivity,
   detectPaymentDueTomorrow,
   detectRiskyTransaction,
   detectWastefulBudget,
+  isAheadOfPace,
+  isLastDayOfMonth,
   type CandidateAlert,
+  type RecapWasteCategory,
 } from '@/domain/alerts';
-import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
+import {
+  budgetStatusFor,
+  type BudgetStatus,
+  type BudgetTransaction,
+  type CategoryBudget,
+} from '@/domain/budget';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
-import { monthStartJst, todayJst, type DateOnly } from '@/lib/date';
+import { addDays, daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -179,14 +189,17 @@ export async function detectAndRecordRiskyTransactionAlertsAsAdmin(
 }
 
 /**
- * FR-20:浪費カテゴリ(categories.kind='waste')が月予算の70%に達したら知らせる。
- * 判定そのものは domain/alerts.ts の detectWastefulBudget() が正。
+ * 浪費カテゴリ(categories.kind='waste')の当月消化状況を読む。
+ *
+ * FR-20 の70%到達判定(下記)と P6-1 の月次振り返りの両方が同じ
+ * 「浪費カテゴリの当月ステータス」を必要とするため共通化する
+ * (categories/budgets/transactions の3クエリを2箇所で重複させない)。
  */
-export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
+async function loadWasteCategoryStatuses(
   client: SupabaseClient<Database>,
   userId: string,
-  now: Date = new Date(),
-): Promise<number> {
+  now: Date,
+): Promise<{ id: string; name: string; status: BudgetStatus }[]> {
   const { data: categories, error } = await client
     .from('categories')
     .select('id, name, default_monthly_budget_yen')
@@ -194,7 +207,7 @@ export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
     .eq('kind', 'waste')
     .eq('is_active', true);
   if (error) throw new AlertStoreError(`カテゴリを取得できませんでした: ${error.message}`);
-  if (categories.length === 0) return 0;
+  if (categories.length === 0) return [];
 
   const monthStart = monthStartJst(0, now);
   const categoryIds = categories.map((c) => c.id);
@@ -224,25 +237,110 @@ export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
     reviewStatus: t.review_status,
   }));
 
+  return categories.map((c) => {
+    const budget = budgetByCategory.get(c.id);
+    const categoryBudget: CategoryBudget = {
+      categoryId: c.id,
+      code: c.id,
+      budgetYen: budget?.amount_yen ?? c.default_monthly_budget_yen,
+      carryOverYen: budget?.carry_over_yen ?? 0,
+    };
+    return { id: c.id, name: c.name, status: budgetStatusFor(categoryBudget, budgetTransactions) };
+  });
+}
+
+/**
+ * FR-20:浪費カテゴリが月予算の70%に達したら知らせる。
+ * 70%未満でも、経過日数に対して消化ペースが速ければ先回りで知らせる
+ * (P5-3)。判定そのものは domain/alerts.ts の
+ * detectWastefulBudget()/isAheadOfPace() が正。
+ */
+export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const wasteCategories = await loadWasteCategoryStatuses(client, userId, now);
+  if (wasteCategories.length === 0) return 0;
+
+  const monthStart = monthStartJst(0, now);
   const monthKey = monthStart.slice(0, 7);
-  const candidates = categories
-    .map((c) => {
-      const budget = budgetByCategory.get(c.id);
-      const categoryBudget: CategoryBudget = {
-        categoryId: c.id,
-        code: c.id,
-        budgetYen: budget?.amount_yen ?? c.default_monthly_budget_yen,
-        carryOverYen: budget?.carry_over_yen ?? 0,
-      };
-      return detectWastefulBudget(
-        { id: c.id, name: c.name },
-        budgetStatusFor(categoryBudget, budgetTransactions),
-        monthKey,
-      );
-    })
-    .filter((c): c is CandidateAlert => c !== null);
+  const elapsedDays = daysBetween(monthStart, todayJst(now)) + 1;
+  const totalDaysInMonth = daysBetween(monthStart, monthStartJst(1, now));
+
+  const candidates = wasteCategories.flatMap(({ id, name, status }) => {
+    const reached = detectWastefulBudget({ id, name }, status, monthKey);
+    if (reached) return [reached];
+
+    // 70%に達していなければペースだけを見る(P5-3)。同じ月内で両方
+    // 発火することはない(70%到達時点でペース側は判定をやめる仕様)。
+    if (isAheadOfPace(status, elapsedDays, totalDaysInMonth)) {
+      return [buildBudgetPaceAlert({ id, name }, status, monthKey)];
+    }
+    return [];
+  });
 
   return recordAlertsAsAdmin(client, userId, candidates);
+}
+
+/**
+ * P6-1:月次の振り返りを月末にだけ Discord へ積む(今月の返済実績・
+ * 副業収入・浪費枠消化)。数値は既存の debt_payments/side_incomes と
+ * loadWasteCategoryStatuses() から集計するだけで、新規スキーマは不要
+ * (TASKS.md P6-1)。
+ *
+ * 月末以外は何もしない(isLastDayOfMonth)。dedup_key が月単位のため、
+ * 月末に cron が複数回走っても二重には積まれない。
+ */
+export async function detectAndRecordMonthlyRecapAlertAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const today = todayJst(now);
+  if (!isLastDayOfMonth(today, addDays(today, 1))) return 0;
+
+  const monthStart = monthStartJst(0, now);
+  const nextMonthStart = monthStartJst(1, now);
+  const monthKey = monthStart.slice(0, 7);
+
+  const [
+    { data: payments, error: paymentsError },
+    { data: incomes, error: incomesError },
+    wasteCategories,
+  ] = await Promise.all([
+    client
+      .from('debt_payments')
+      .select('amount_yen')
+      .eq('user_id', userId)
+      .gte('paid_on', monthStart)
+      .lt('paid_on', nextMonthStart),
+    client
+      .from('side_incomes')
+      .select('amount_yen')
+      .eq('user_id', userId)
+      .gte('received_on', monthStart)
+      .lt('received_on', nextMonthStart),
+    loadWasteCategoryStatuses(client, userId, now),
+  ]);
+  if (paymentsError) {
+    throw new AlertStoreError(`返済実績を取得できませんでした: ${paymentsError.message}`);
+  }
+  if (incomesError) {
+    throw new AlertStoreError(`副業収入を取得できませんでした: ${incomesError.message}`);
+  }
+
+  const summary = {
+    monthKey,
+    totalPaidYen: payments.reduce((sum, p) => sum + p.amount_yen, 0),
+    totalSideIncomeYen: incomes.reduce((sum, i) => sum + i.amount_yen, 0),
+    wasteCategories: wasteCategories.map(({ name, status }): RecapWasteCategory => ({
+      name,
+      status,
+    })),
+  };
+
+  return recordAlertsAsAdmin(client, userId, [buildMonthlyRecapAlert(summary)]);
 }
 
 /**

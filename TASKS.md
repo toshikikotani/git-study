@@ -61,50 +61,22 @@ P2-2 は市場・案件動向の実データが要る(現状 Web 検索・AI 生
 
 ### S8 自動化強化(本人発案、2026-09-12)
 「開く手間を減らす」方向。設計原則(記録の手間を最小化)と相性が良いため優先度は高め。
+P5-2・P5-3 は本セッションで完了(下記 Done)。
 
 | ID | タスク | サイズ | 対応 |
 |---|---|---|---|
 | P5-1 | 給料日チェックリストを Discord から1タップで完結できるようにする | M | FR-15 |
-| P5-2 | 学習ルールの自動昇格。確認待ちを経ずに自動確定する範囲を広げる | S | FR-12, FR-13 |
-| P5-3 | 予算消化ペースの先回り通知(月の途中で使用ペースが速いカテゴリを検知) | M | FR-20 |
 
 - **P5-1**:今は `/payday` を開いて手動でチェックする(M4-4)。Discord の Webhook(送信専用)だけでは
   実現できず、Discord Bot + Interactions API(スラッシュコマンドまたはメッセージのボタン)が要る。
   現状の通知基盤(`lib/discord.ts`)は送信専用の設計のため、双方向にするなら別のクライアント
   (discord.js 等)と、Interaction エンドポイントを受ける新しい Route Handler が必要になる。
   B-3(Webhook 発行)より一段大きい設定(Bot 作成・権限・署名検証)が要るため、着手前に本人と
-  「Bot を作る前提でよいか」を確認した方がよい。
-- **P5-2**:`classification_rules` には既に `hit_count`(画面に「ヒット {n} 件」表示済み、M2-6)がある。
-  「学習ルールが N 回連続で修正されずに使われたら『確認待ち』を経ずに自動確定してよい」という
-  閾値判定を `domain/classification` 側に追加する形になる。ADR-010(確率的判定は使わない)と
-  矛盾しないよう、あくまで「決定的ルールへの信頼度」の話であって AI 判定の話ではないことに注意。
-- **P5-3**:現状の FR-20 は「70%到達」の一点判定。月の経過日数に対する消化率(ペース)を比較し、
-  「このペースだと今月中に使い切る」を早期に知らせる。`domain/budget.ts` に
-  `hasReachedAlertThreshold` と対になる `isAheadOfPace()` のような純粋関数を追加し、
-  `detectAndRecordWastefulBudgetAlertsAsAdmin()`(T-23)に組み込む形になる見込み。
+  「Bot を作る前提でよいか」を確認した方がよい(本セッションでは未着手のまま見送った)。
 
 ### S9 分析・可視化(本人発案、2026-09-12)
-ホーム画面は「3つの数字だけ」(FR-61、設計原則)を維持する。ここでの可視化は
-すべて `/transactions` や新設の詳細画面など、ホーム以外の画面に閉じ込めること。
-実装時は `dataviz` skill(このリポジトリのセッションで利用可能)を先に読むこと。
-
-| ID | タスク | サイズ | 対応 |
-|---|---|---|---|
-| P6-1 | 月次の振り返り配信(今月の返済実績・浪費枠消化・副業収入を月末に Discord へ) | S | - |
-| P6-2 | `/reports`(新規):カテゴリ別支出推移グラフ(直近6ヶ月) | M | FR-14 |
-| P6-3 | 資産推移グラフ(残債総額 + 投資評価額の時系列) | M | FR-02, FR-51 |
-
-- **P6-1**:数値そのものは既存の `debt_payments`/`side_incomes`/`domain/budget.ts` から集計可能で
-  新規スキーマは不要。`features/briefs/` と同じ Discord 送信基盤(`lib/discord.ts` +
-  `features/*/notify.ts` パターン)を再利用できる。月末判定の cron(または既存の `morning-brief`
-  ジョブに当月最終日だけ追加送信する分岐)が要る。
-  グラフではなくテキストの数値サマリで十分(このアプリ全体がテキスト中心の設計)。
-  ダッシュボード化を先にやりたい場合は先に P6-2/P6-3 が要る。
-- **P6-2 / P6-3**:月次の残高・支出をスナップショットとして保存する仕組みが無いため、
-  グラフの元データは都度 `transactions`/`debts`/`investment_snapshots` から月境界で集計する
-  ことになる(新しい集計テーブルを作るかは要検討)。P6-3 は残債総額の履歴を持っていない
-  (`debts.current_balance_yen` は現在値のみ)ため、月次スナップショットを別途記録し始める
-  仕組みが先に要る可能性が高い(着手前に設計を詰めること)。
+P6-1・P6-2・P6-3 は本セッションで完了(下記 Done)。ホーム画面は「3つの数字だけ」
+(FR-61、設計原則)を維持したまま、可視化は `/reports`(新設)に閉じ込めた。
 
 ### 改善・技術的負債
 ここには実装中に気づいたことを積む。空でよい。
@@ -116,6 +88,7 @@ P2-2 は市場・案件動向の実データが要る(現状 Web 検索・AI 生
 | T-13 | `src/features/import/adapters.ts` の `guessMapping` / `mapRow` を分割する | 列推測とパースが1関数に同居している。T-2(実ファイル fixture)と合わせてやると安全 |
 | T-16 | Supabase の Auth 設定(Site URL / Redirect URLs)がリポジトリに残っていない | ダッシュボード側の設定のみで管理している。プロジェクトを作り直す場合に再設定が必要。`supabase/config.toml` の `[auth]` セクションで宣言的に管理する方法もあるが、現状は未導入。本番 Auth 設定を誤って書き換えるリスクがあるため、正確な現在値(本番 URL・許可リダイレクト先)を本人と確認してから着手する |
 | T-25 | `rescued_emails` の2マイグレーションを本番 Supabase プロジェクトへ適用する | T-11 で追加した `20260908001200_rescued_emails.sql` / `20260908001300_rescued_emails_rls.sql` は、このセッションに Supabase Management API の資格情報が無く本番へ適用できなかった(B-3 の Discord Webhook と同種のサンドボックス制約)。ローカル PostgreSQL では `verify-schema.sh`/`verify-migrations.sh` 双方で検証済み(911項目一致)。未適用の間は `recordRescuedEmailAsAdmin()` 呼び出しが静かに失敗するだけで(catch 済み)、他の機能には影響しない。適用後は自動的に記録が始まる |
+| T-26 | `net_worth_snapshots` の2マイグレーションを本番 Supabase プロジェクトへ適用する | P6-3 で追加した `20260912000100_net_worth_snapshots.sql` / `20260912000200_net_worth_snapshots_rls.sql` は、T-25 と同種のサンドボックス制約(Supabase Management API の資格情報が無い)で本番へ適用できなかった。ローカル PostgreSQL では `verify-schema.sh`/`verify-migrations.sh` 双方で検証済み(926項目一致)。未適用の間は `recordNetWorthSnapshotAsAdmin()` 呼び出しが静かに失敗するだけで(`detect-alerts` cron 内で catch 済み)、`/reports` の資産推移グラフも空状態を出すだけで画面は落ちない(`loadNetWorthTrend().catch(() => [])`)。実際に本番 Supabase(テーブル未作成の状態)に対して両方の失敗経路を検証済み。適用後、次の月末の cron 実行から自動的に記録が始まる |
 
 T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下記 Done)。全体的な「5行ルール」適用は
 際限がないので、次に触る画面・関数から都度直す方針は継続(一括では手を出さない)。
@@ -128,6 +101,7 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 | B-2 | 実際の金融機関 CSV でアダプタを検証する | **本人が利用中の銀行・カードの明細ファイル**(1ヶ月分) |
 | B-3 | Discord Webhook URL を GitHub Secrets(`CRON_SECRET` と同じ経路)/ Vercel に `DISCORD_WEBHOOK_URL` として設定する | **本人による Webhook 発行**。M3-1/M3-3/M5-2 は実装・検証済み(ローカル HTTP スタブで送信経路を確認)で、未設定の間は検知・生成だけ行い実送信をスキップする設計のため着手はブロックしていない。設定されれば次回の cron 実行(毎時 / 毎朝07:00 JST)から自動的に届き始める |
 | B-4 | T-25(`rescued_emails` の2マイグレーション)を Supabase Management API または `supabase db push` で本番へ適用する | **本人による適用**(このサンドボックスに Management API 資格情報が無いため)。適用されるまで T-11 の記録機能は静かに無効のまま |
+| B-5 | T-26(`net_worth_snapshots` の2マイグレーション)を Supabase Management API または `supabase db push` で本番へ適用する | **本人による適用**(B-4 と同じ制約)。適用されるまで P6-3 の資産推移グラフは「記録はまだありません」の空状態のまま |
 
 ## Done
 
@@ -198,6 +172,11 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 | P3-1 | 副業トラッカー(FR-40, FR-42。本人の希望で MVP 完了前に前倒し)。`side_projects`/`side_work_logs`/`side_incomes` は D-3 の時点でスキーマ用意済み(未配線)。`/side-hustle`(新規)— プロジェクトの登録、作業時間の記録(分単位)、入金の記録。`src/domain/side-hustle.ts` の `computeHourlyRateYen()`(FR-40:合計入金÷合計時間)と `computeIncomeAllocation()`(FR-42:`app_settings.side_income_repayment_ratio`、既定7:3で返済/投資へ自動振り分け。端数は返済側に寄せ、常に合計が入金額と一致するようにして DB 制約 `ck_side_incomes_alloc_sum` を満たす)。実際の資金移動はこのアプリの対象外(他の資金移動と同じく手動。振り分け額を「指示」として画面に表示するところまで)。`getAppSettings()`/`getAppSettingsAsAdmin()` に `sideIncomeRepaymentRatio` を追加。実際の Supabase プロジェクトに対し、検証用プロジェクトを作成し①120分の作業ログ記録→②20,000円の入金記録(返済14,000円/投資6,000円に自動振り分け、画面のプレビューと保存後表示が実際の計算と一致)→③時給換算(10,000円/時、合計2時間から算出)が正しく表示されることを確認。検証用データは削除済み。テスト14件追加。 | 2026-09-12 |
 | P3-2 | 転職準備チェックリスト(FR-41。本人の希望で MVP 完了前に前倒し)。`job_change_milestones` は D-3 の時点でスキーマ用意済み(未配線)。`/job-change`(新規)— 市場調査/職務経歴書/応募/面接/内定の5段階(`milestone_phase`)ごとに項目を一覧し、状態(未着手/進行中/完了/見送り)を1タップで変更、削除できる。`src/features/job-change/store.ts` の `setMilestoneStatus()` が DB 制約(`ck_milestones_done`:status='done' と done_on の有無が一致すること)を満たすため、done へ移るときだけ `done_on` を立てそれ以外は落とす。手動並び替えは FR-41 の要件に無いため対象外(sort_order は既定値のまま作成順)。実際の Supabase プロジェクトに対し、検証用項目を作成→状態を「完了」に変更→`done_on` が正しく設定されることを確認。検証用データは削除済み。テスト2件追加。 | 2026-09-12 |
 | T-12 | `src/domain/payoff.ts` の `simulateTotalPayoff()`(110行)を分割。充当順の並び替え(`orderDebtsForStrategy()`)、利息の計上(`accrueInterest()`)、予算の充当(`applyBudget()`、最低返済と余剰充当の両方で共有。`capFor` で上限だけが違う)の3つの純粋なヘルパー関数に分離し、本体は「毎月これらを順に呼ぶ」ループだけになった。SQL 版との golden fixture 一致検証(M1-1、`tests/domain/payoff.test.ts` 33件)が計算結果の一言一句を保証しており、分割前後で全件通過(数値の変化なし)を確認済み。 | 2026-09-12 |
+| P5-2 | 学習ルールの誤爆検知と自動無効化(FR-12, FR-13)。**着手前に実装を再確認し、当初の Backlog 案(「N回連続で修正なしなら自動確定」)の前提が誤りだったと判明**:`applyRules()` は既にルール一致時に確認待ちを経ず即時確定しており、追加の「自動昇格」は不要だった。代わりに、これまで一度も使われていなかった `transactions.matched_rule_id`(スキーマにはあったが取り込み経路が書いていなかった)を配線し、「後から本人が修正した割合が高いルールを検知して自動的に無効化する」方向へ作り直した。`StoredTransaction`/`buildPreviewRow()`/`importTransactions()` に `matchedRuleId` を通し、`domain/alerts.ts` に `isMisfiringRule()`(既定:ヒット3件以上かつ修正率50%以上)と `buildRuleMisfireAlert()` を追加(`alert_kind` は既存の `other` を再利用、マイグレーション不要)。`src/features/classification/store.ts` の `detectAndDeactivateMisfiringRulesAsAdmin()` が誤爆ルールを検知し `is_active=false` にした上で `alerts` へ記録、`detect-alerts` cron に配線。実際の Supabase プロジェクトに対し、ヒット4件中3件が修正されたルールを作成→cron 実行→ルールが無効化され正しい alert(title/body/dedup_key)が1件記録されることを確認、再実行で重複記録されない(冪等)ことも確認。検証用データは削除済み。テスト6件追加。 | 2026-09-12 |
+| P5-3 | 予算消化ペースの先回り通知(FR-20)。70%到達の一点判定だけでは、月の前半で既にペースが速いカテゴリに気づくのが遅れる。`domain/alerts.ts` に `isAheadOfPace()`(経過日数に対する消化率が既定1.5倍以上速ければ発火。70%到達済みなら発火しない=同じ状況を二重通知しない。月初数日は分母が小さく比率が跳ねやすいため最低経過日数を設ける)と `buildBudgetPaceAlert()`(`alert_kind` は `other` を再利用)を追加。`features/alerts/store.ts` の `detectAndRecordWastefulBudgetAlertsAsAdmin()`(T-23)にペース判定を組み込み、既存の categories/budgets/transactions クエリを再利用(クエリの重複無し)。**検証中に発見した罠**:最初の検証はJST日付がセッション中に9/12→9/13へ日を跨いだ影響で、狙ったペース比(1.56倍)が実行時には1.44倍まで下がり閾値未満になって不発——バグではなくテストデータの余裕不足だったと判明し、消化額を調整して再検証。実際の Supabase プロジェクトに対し、経過日数13日/30日・消化率67.5%(閾値70%未満)のカテゴリで cron を実行し、正しい `budget_pace` アラート(残額・dedup_key とも正しい)が1件記録されること、再実行で重複しない(冪等)ことを確認。検証用データは削除済み。テスト8件追加。 | 2026-09-12 |
+| P6-1 | 月次振り返り配信(今月の返済実績・副業収入・浪費枠消化を月末に Discord へ)。新規スキーマ不要——既存の `debt_payments`/`side_incomes` と、P5-3 で共通化した浪費カテゴリの当月消化状況(`loadWasteCategoryStatuses()`)から集計するだけ。`domain/alerts.ts` に `isLastDayOfMonth()`(翌日の月が変わるかで判定。31日固定にすると30日までの月を誤判定するため)と `buildMonthlyRecapAlert()`(`alert_kind` は `other` を再利用)を追加。`features/alerts/store.ts` の `detectAndRecordMonthlyRecapAlertAsAdmin()` が月末にだけ候補を積み、既存の `detect-alerts`(毎時)cron に相乗りさせた(新しい GitHub Actions ワークフローを増やさずに済む。dedup_key が月単位のため月末に何度走っても1件のまま)。実際の Supabase プロジェクトに対し、返済実績(20,000円)を作成した上で基準日を月末(9/30)に固定して関数を直接呼び出し検証:①正しい本文(返済額・副業収入0円・浪費カテゴリの消化率)で1件記録、②同じ基準日での再実行は0件(冪等)、③月末以外の基準日では何もしない、の3点を確認。検証用データは削除済み。テスト7件追加。 | 2026-09-12 |
+| P6-2 | `/reports`(新規):カテゴリ別支出推移グラフ(直近6ヶ月、FR-14)。`domain/spending.ts`(新規)の `summarizeMonthlySpendByCategory()` が全月×全カテゴリの組を0円で埋めて返す(`domain/budget.ts` の `summarizeBudgets()` と同じ考え方。集計対象の定義=`isCountable()` はそちらから export して再利用し、「支出」の定義を2箇所で別々に決めない)。`features/reports/store.ts` の `loadCategorySpendingTrend()` が直近6ヶ月分の `transactions`/`categories` を読んで集計し、期間中に一度も支出が無いカテゴリは除外する(`period-summary.ts` の既存の考え方に合わせた)。**画面側でカテゴリに色を割り当てない判断**:`app/globals.css` 冒頭のコメントが「カテゴリごとに色を割り当てる案は捨てた(本人が増減できるため固定の色順が成立せず、暗いサーフェスでは隣接色相が識別できない組み合わせが出る)」と明記しているため、本グラフもそれに従い、カテゴリ数分の small multiples(1カテゴリ=1枠)に分け、色は「支出」の役割一色(`var(--over)`)だけを使い、識別は名前(ラベル)で行う設計にした(dataviz skill の「9個目以降は Other/small multiples へ折り込む」を最初から全カテゴリに適用した形)。各枠はミニバーチャート(6ヶ月分、`title` 属性でホバー時に月・金額を表示、最大月だけ直接ラベル)+ 下部にアクセシビリティ用の表(dataviz: table view は必須)。ホームからのリンクを追加(FR-61 の「ホームは3つの数字だけ」を守り、詳細画面は別ページに閉じ込める)。**検証方法についての制約**:実際の Supabase プロジェクトのデータでクエリ・集計ロジック(振替/ignored 除外、収入除外、複数カテゴリ×複数月の合算)は直接検証したが、`/reports` 画面自体を実ブラウザで描画する検証は、このサンドボックスのエージェントプロキシがブラウザ→Supabase Auth 間の接続を確立できない(`ws_closed_mid_exchange`、プロキシ側のトンネルが handshake 途中で切れる既知の制約)ため断念し、`next build` の型検査・静的生成が通ることで代替した。検証用データは削除済み。テスト7件追加。 | 2026-09-12 |
+| P6-3 | 資産推移グラフ(残債総額 + 投資評価額の時系列、FR-02, FR-51)。`debts.current_balance_yen` は現在値のみで履歴を持たないため、新規テーブル `net_worth_snapshots`(マイグレーション2本:`20260912000100_net_worth_snapshots.sql` / `20260912000200_net_worth_snapshots_rls.sql`、`docs/schema.sql` にも反映)を追加し、月末に1行ずつ記録し始める設計にした。投資評価額側は既に `investment_snapshots`(商品ごとに本人が好きな時に記録)があるため新規スキーマは不要——`domain/investment.ts` に `totalInvestmentValueAsOf()`(商品ごとに指定日以前で最新の記録を1件選び合算。記録の無い商品は0として無視)を追加して合算した。`features/net-worth/store.ts` の `recordNetWorthSnapshotAsAdmin()`(P6-1 と同じ `isLastDayOfMonth()` で月末だけ判定、`(user_id, as_of)` の一意制約に upsert)を既存の `detect-alerts` cron に相乗りさせ、`loadNetWorthTrend()` を `/reports` に追加(2本目のグラフ:残債総額=`var(--over)`「支出・負債」の役割色、投資評価額=`var(--income)`「収入・資産」の役割色をそのまま再利用。globals.css が明記する通り緑×赤は通常視ΔEが境界帯のため、凡例・直接ラベルに必ず数値と文字を添える設計)。**このセッションの制約により新規マイグレーションを本番へ適用できず**(T-25/B-4 と同種、Supabase Management API 資格情報が無い)、`docs/schema.sql` との整合はローカル PostgreSQL で `verify-schema.sh`/`verify-migrations.sh` 双方検証済み(926項目一致)。未適用の間の失敗経路(cron 側の記録・画面側の読み出し双方)を実際の本番 Supabase(テーブル未作成の状態)に対して検証し、両方とも握り潰されて他機能に影響しないことを確認(T-26/B-5 として本番適用待ちを記録)。テスト5件追加。 | 2026-09-12 |
 
 ---
 

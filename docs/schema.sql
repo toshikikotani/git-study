@@ -1439,6 +1439,34 @@ create table public.rescued_emails (
 create index ix_rescued_emails_user_created on public.rescued_emails (user_id, created_at desc);
 
 
+-- -----------------------------------------------------------------------------
+-- 3.22 net_worth_snapshots — 資産推移の月次記録(P6-3)
+--
+--   debts.current_balance_yen は現在値のみで履歴を持たない。資産推移グラフ
+--   (残債総額 + 投資評価額の時系列)を出すには、月末に両者の合計を1行として
+--   記録し始める必要がある。投資評価額は investment_snapshots(商品ごとの
+--   時点スナップショット)から、記録時点で商品ごとに最新の値を合算したもの。
+-- -----------------------------------------------------------------------------
+create table public.net_worth_snapshots (
+  id                   uuid        primary key default gen_random_uuid(),
+  user_id              uuid        not null references auth.users(id) on delete cascade,
+
+  as_of                date        not null,
+  debt_balance_yen     bigint      not null,
+  investment_value_yen bigint      not null,
+
+  created_at           timestamptz not null default now(),
+
+  constraint ck_net_worth_debt_balance check (debt_balance_yen >= 0),
+  constraint ck_net_worth_investment_value check (investment_value_yen >= 0)
+);
+
+create unique index ux_net_worth_snapshots_user_as_of
+  on public.net_worth_snapshots (user_id, as_of);
+create index ix_net_worth_snapshots_user_as_of_desc
+  on public.net_worth_snapshots (user_id, as_of desc);
+
+
 -- =============================================================================
 --  4. updated_at トリガの一括適用
 -- =============================================================================
@@ -1833,7 +1861,8 @@ begin
     'repayment_scenarios','transfer_rules','transfer_runs','transfer_run_items',
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
-    'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails'
+    'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
+    'net_worth_snapshots'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

@@ -103,3 +103,34 @@ export function assertProductName(value: string): string {
   }
   return trimmed;
 }
+
+/**
+ * 資産推移グラフの元になる、投資評価額の時点集計(P6-3)。
+ *
+ * investment_snapshots は商品ごとに本人が好きなタイミングで残高を記録する
+ * (ux_snapshots_user_account_product_date が (account, product, 日付) 単位)。
+ * ある時点の「投資評価額」は、その時点以前で商品ごとに最も新しい記録を
+ * 1件選び、それらを合算したもの(まだ記録が無い・記録前の商品は0として
+ * 無視する。本人が全商品を毎回律儀に更新するとは限らないため)。
+ */
+export type InvestmentSnapshotPoint = {
+  /** 「同じ商品」を識別するキー(accountId + productName の組)。 */
+  productKey: string;
+  asOf: string;
+  marketValueYen: number;
+};
+
+export function totalInvestmentValueAsOf(
+  snapshots: readonly InvestmentSnapshotPoint[],
+  asOf: string,
+): number {
+  const latestByProduct = new Map<string, InvestmentSnapshotPoint>();
+  for (const snapshot of snapshots) {
+    if (snapshot.asOf > asOf) continue;
+    const current = latestByProduct.get(snapshot.productKey);
+    if (!current || snapshot.asOf > current.asOf) {
+      latestByProduct.set(snapshot.productKey, snapshot);
+    }
+  }
+  return [...latestByProduct.values()].reduce((sum, s) => sum + s.marketValueYen, 0);
+}
