@@ -21,6 +21,7 @@ import { buildLearnedRule, type ClassificationRule } from '@/features/classifica
 import { getAppSettings } from '@/features/settings/store';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type CategoryOption = { id: string; code: string; name: string };
 
@@ -147,6 +148,29 @@ export async function listActiveClassificationRules(): Promise<ClassificationRul
   const { data, error } = await supabase
     .from('classification_rules')
     .select('*')
+    .eq('is_active', true)
+    .order('priority', { ascending: true });
+  if (error) {
+    throw new ClassificationStoreError(`分類ルールを取得できませんでした: ${error.message}`);
+  }
+  return data.map(ruleFromRow);
+}
+
+/**
+ * `listActiveClassificationRules()` の管理クライアント版(M2-7c)。
+ *
+ * cron ジョブ(GitHub Actions が叩く Route Handler)には本人のセッション
+ * (cookie)が無いため RLS に頼れず、`createAdminClient()` + 明示的な
+ * `user_id` で読む(`app/api/cron/keepalive/route.ts` と同じ考え方)。
+ */
+export async function listActiveClassificationRulesForUser(
+  admin: SupabaseClient<Database>,
+  userId: string,
+): Promise<ClassificationRule[]> {
+  const { data, error } = await admin
+    .from('classification_rules')
+    .select('*')
+    .eq('user_id', userId)
     .eq('is_active', true)
     .order('priority', { ascending: true });
   if (error) {

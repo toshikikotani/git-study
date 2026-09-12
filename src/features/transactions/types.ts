@@ -35,6 +35,12 @@ export type StoredTransaction = {
   /** 重複排除キー。DB のトリガ(md5)が自動設定するため、ここの値は上書きされる。 */
   fingerprint: string;
   batchId: string | null;
+  /**
+   * Gmail の message-id など、外部の一意キー(M2-7c)。CSV・貼り付けでは
+   * 存在しないため null。`ux_transactions_source_ref`(user_id, source, source_ref、
+   * source_ref が null でない行のみ対象)による重複排除に使う。
+   */
+  sourceRef: string | null;
 };
 
 export type ImportBatchSummary = {

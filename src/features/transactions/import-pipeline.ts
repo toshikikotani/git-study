@@ -88,5 +88,6 @@ function buildPreviewRow(
     source,
     fingerprint: fingerprintOf(row),
     batchId: null,
+    sourceRef: null,
   };
 }

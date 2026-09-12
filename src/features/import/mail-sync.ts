@@ -93,14 +93,18 @@ export async function syncFromMailbox(input: SyncInput): Promise<SyncResult> {
       new Map(),
       'gmail',
     );
-    for (const tx of built) {
+    built.forEach((tx, index) => {
       if (seen.has(tx.fingerprint)) {
         duplicateCount += 1;
-        continue;
+        return;
       }
       seen.add(tx.fingerprint);
-      transactions.push({ ...tx, batchId: input.batchId });
-    }
+      transactions.push({
+        ...tx,
+        batchId: input.batchId,
+        sourceRef: buildSourceRef(message.messageId, index),
+      });
+    });
   }
 
   return {
@@ -133,6 +137,19 @@ async function parseMessage(
       ? rescued
       : { transactions: [], warnings: [...byLabels.warnings, ...rescued.warnings] };
   return { parsed, usedAiCall: true };
+}
+
+/**
+ * transactions.source_ref に入れる値(M2-7c)。
+ *
+ * `ux_transactions_source_ref`(user_id, source, source_ref)は一意制約のため、
+ * 1通のメールから複数件抽出されたときにそのまま messageId を使い回すと
+ * 2件目以降が「重複」として弾かれてしまう(実際には別々の明細)。
+ * 1件目はそのまま messageId(再実行時の重複排除がここで効く)、2件目以降は
+ * 連番を足して一意にする。
+ */
+export function buildSourceRef(messageId: string, indexInMessage: number): string {
+  return indexInMessage === 0 ? messageId : `${messageId}#${indexInMessage}`;
 }
 
 function pushWarnings(

@@ -1,0 +1,30 @@
+name: Import Gmail
+
+# 通知メールの自動取り込み(M2-7c, ADR-018)。
+# Gmail 連携が未設定(GMAIL_ADDRESS / GMAIL_APP_PASSWORD / GMAIL_IMPORT_ACCOUNT_ID の
+# いずれか欠落、または app_settings.gmail_enabled=false)なら route 側が
+# { skipped: true } を返すだけで、このワークフロー自体は失敗にしない。
+
+on:
+  schedule:
+    # 毎日 06:00 JST(= 前日 21:00 UTC)。朝配信(07:00 JST 既定)より前に取り込む。
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+jobs:
+  import-gmail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/import-gmail
+        run: |
+          status=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+            -X POST "${APP_BASE_URL}/api/cron/import-gmail" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          cat /tmp/response.json
+          if [ "$status" -ge 300 ]; then
+            echo "::error::import-gmail がステータス $status を返しました"
+            exit 1
+          fi
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
