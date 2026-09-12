@@ -22,7 +22,7 @@
 import { computeTransferPlan, type PlannableRule } from '@/domain/transfer-rule';
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
-import { addMonthsToParts, splitDateOnly, type DateOnly } from '@/lib/date';
+import { paydayInMonthOf, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -60,12 +60,6 @@ export class TransferRunStoreError extends Error {
 
 const PAYDAY = 'payday' as const;
 
-/** 今日を含む月の給料日(月末に無い日は月末に丸める、ADR-015と同じ考え方)。 */
-function thisMonthsPayday(today: DateOnly, payday: number): DateOnly {
-  const [year, month] = splitDateOnly(today);
-  return addMonthsToParts(year, month, payday, 0);
-}
-
 export async function resolvePaydayChecklistState(today: DateOnly): Promise<PaydayChecklistState> {
   const supabase = await createClient();
 
@@ -85,7 +79,7 @@ export async function resolvePaydayChecklistState(today: DateOnly): Promise<Payd
   }
 
   const settings = await getAppSettings();
-  const paydayOn = thisMonthsPayday(today, settings.payday);
+  const paydayOn = paydayInMonthOf(today, settings.payday);
 
   const { data: existingRow, error: existingError } = await supabase
     .from('transfer_runs')

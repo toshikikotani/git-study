@@ -4,6 +4,10 @@ import { TransactionRow } from '@/components/ui/transaction-row';
 import { formatYen } from '@/domain/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
+  loadPaydayPeriodSummary,
+  type PaydayPeriodSummary,
+} from '@/features/transactions/period-summary';
+import {
   listImportBatches,
   listTransactions,
   type StoredTransaction,
@@ -21,7 +25,11 @@ import { formatDateJa } from '@/lib/date';
 export const dynamic = 'force-dynamic';
 
 export default async function TransactionsPage() {
-  const [transactions, batches] = await Promise.all([listTransactions(), listImportBatches()]);
+  const [transactions, batches, periodSummary] = await Promise.all([
+    listTransactions(),
+    listImportBatches(),
+    loadPaydayPeriodSummary(),
+  ]);
 
   if (transactions.length === 0) {
     return <EmptyState />;
@@ -50,6 +58,8 @@ export default async function TransactionsPage() {
           </Link>
         </div>
       </header>
+
+      <PaydayPeriodCard summary={periodSummary} />
 
       {/* FR-21:リボ・キャッシングは一覧の最上部で数を見せる。
           埋もれさせないことが再発防止の要 */}
@@ -175,6 +185,60 @@ function EmptyState() {
           <span aria-hidden>→</span>
         </Link>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 給料日〜給料日の期間ビュー(FR-17, M6-3)。
+ *
+ * 保存は暦月のままだが(ADR-015)、給料日基準で「今のサイクルでいくら
+ * 使ったか」を口座別・カテゴリ別に見せる。使用額が無いカテゴリ・
+ * まだ使っていない口座も「0円」として意味を持つため、口座は全件出す。
+ */
+function PaydayPeriodCard({ summary }: { summary: PaydayPeriodSummary }) {
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          {formatDateJa(summary.startOn)} 〜 {formatDateJa(summary.endOn)}
+        </p>
+        <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          {formatYen(summary.totalSpentYen)}
+        </p>
+      </div>
+
+      {summary.byAccount.length > 0 ? (
+        <dl className="mt-3 space-y-1">
+          {summary.byAccount.map((a) => (
+            <div key={a.accountId} className="flex items-baseline justify-between gap-3 text-xs">
+              <dt style={{ color: 'var(--ink-secondary)' }}>{a.accountName}</dt>
+              <dd className="tabular" style={{ color: 'var(--ink-secondary)' }}>
+                {formatYen(a.spentYen)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
+      {summary.byCategory.length > 0 ? (
+        <dl className="mt-3 space-y-1 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+          {summary.byCategory.map((c) => (
+            <div
+              key={c.categoryId ?? 'uncategorized'}
+              className="flex items-baseline justify-between gap-3 text-xs"
+            >
+              <dt style={{ color: 'var(--ink-muted)' }}>{c.categoryName ?? '未分類'}</dt>
+              <dd className="tabular" style={{ color: 'var(--ink-muted)' }}>
+                {formatYen(c.spentYen)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </div>
   );
 }
