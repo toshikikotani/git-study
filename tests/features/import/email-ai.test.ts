@@ -192,6 +192,7 @@ describe('syncFromMailbox — AI は読めなかったときだけ呼ぶ', () =>
   }
 
   const base = {
+    accountId: 'acc-1',
     rules: RULES,
     knownMessageIds: new Set<string>(),
     knownFingerprints: new Set<string>(),

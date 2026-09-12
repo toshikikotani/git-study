@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
-import {
-  buildPreview,
-  saveBatch,
-  type ImportableRow,
-} from '@/features/transactions/import-pipeline';
+import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
 
 const ROW: ImportableRow = {
   occurredOn: '2026-09-03',
@@ -117,18 +113,19 @@ describe('buildPreview', () => {
     const preview = buildPreview(rows, 'acc-1', (i) => `${i}`);
     expect(preview).toHaveLength(2);
   });
-});
 
-describe('saveBatch', () => {
-  it('件数と重複件数を返す', async () => {
-    const preview = buildPreview([ROW], 'acc-1', (i) => `${i}`);
-    const result = await saveBatch(preview, { fileName: 'test.csv', failedCount: 0 });
-    expect(result.imported).toBe(1);
-    expect(result.duplicates).toBe(0);
+  it('accountId が渡る', () => {
+    const [tx] = buildPreview([ROW], 'acc-1', (i) => `${i}`);
+    expect(tx?.accountId).toBe('acc-1');
   });
 
-  it('空のプレビューでも落ちない', async () => {
-    const result = await saveBatch([], { fileName: 'empty.csv', failedCount: 0 });
-    expect(result).toEqual({ imported: 0, duplicates: 0 });
+  it('source を省略すると csv になる', () => {
+    const [tx] = buildPreview([ROW], 'acc-1', (i) => `${i}`);
+    expect(tx?.source).toBe('csv');
+  });
+
+  it('source を指定するとそのまま渡る', () => {
+    const [tx] = buildPreview([ROW], 'acc-1', (i) => `${i}`, undefined, undefined, 'manual');
+    expect(tx?.source).toBe('manual');
   });
 });

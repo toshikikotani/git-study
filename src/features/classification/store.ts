@@ -50,6 +50,9 @@ export type ClassifyResult = {
   categoryId: string | null;
   categoryName: string | null;
   classifiedBy: 'ai' | 'unclassified';
+  /** AI が答えた確信度(0〜1)。DB 制約(ck_transactions_ai_needs_confidence)により
+   * classifiedBy='ai' の保存には必須。AI を呼んでいない(unclassified)行は null。 */
+  confidence: number | null;
   reviewStatus: 'auto_ok' | 'pending';
 };
 
@@ -59,6 +62,7 @@ function unclassified(id: string): ClassifyResult {
     categoryId: null,
     categoryName: null,
     classifiedBy: 'unclassified',
+    confidence: null,
     reviewStatus: 'pending',
   };
 }
@@ -102,6 +106,7 @@ export async function classifyUnclassified(
       categoryId: category?.id ?? null,
       categoryName: category?.name ?? null,
       classifiedBy: applied.classifiedBy,
+      confidence: applied.confidence,
       reviewStatus: applied.reviewStatus,
     };
   });

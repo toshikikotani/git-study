@@ -84,9 +84,10 @@ DB 行の型を独自に再定義しない。`Database['public']['Tables']['debt
 
 ## レイヤーの命名(データ取得・更新)
 
-Supabase に直接触れる関数群の命名。`features/transactions/store.ts` の
-`TransactionStore`(list / add / removeBatch)はセッション実装向けの古い形。
-M0-3 以降、Supabase に読み書きする機能は以下の形に揃える。
+Supabase に直接触れる関数群の命名。以下の形に揃える(T-7 以降、
+`features/transactions/store.ts` もこの形。以前あった `TransactionStore`
+インターフェース・`SessionTransactionStore` クラスはセッション実装向けの
+古い形だったため廃止した)。
 
 | 操作 | 関数名の形 | 例 |
 |---|---|---|

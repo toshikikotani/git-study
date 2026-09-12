@@ -1,11 +1,15 @@
 /**
- * 取り込み経路(CSV / メール貼り付け)で共通の「分類 → 保存」。
+ * 取り込み経路(CSV / メール貼り付け)で共通の「分類 → プレビュー組み立て」。
  *
  * ── なぜ切り出すか ──────────────────────────────────────────
  * CSV 取り込みとメール貼り付けは、入り口(パーサ)が違うだけで、そこから先
- * ―検知ルールを当てて StoredTransaction を組み立て、保存する―は同じだった。
+ * ―検知ルールを当てて StoredTransaction を組み立てる―は同じだった。
  * 2箇所に同じロジックがあると、保存の仕方を直すときに片方だけ直して
  * 片方を忘れる事故が起きる(実際に DETECTION_RULES が複製されていた)。
+ *
+ * 保存(DB への insert)は Server Action の責務(app/(app)/transactions/actions.ts)。
+ * ここは純粋関数のみで、DB にもネットワークにも触れない(取り込み画面から
+ * ファイル選択のたびに呼ぶプレビュー計算のため)。
  */
 
 import {
@@ -15,7 +19,7 @@ import {
 } from '@/features/classification/rules';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { DateOnly } from '@/lib/date';
-import { fingerprintOf, transactionStore, type StoredTransaction } from './store';
+import { fingerprintOf, type StoredTransaction, type TransactionSource } from './types';
 
 /** CSV 行・メール1件など、取り込み元が共通して持つ最小限の形。 */
 export type ImportableRow = {
@@ -40,9 +44,10 @@ export function buildPreview(
   idFor: (index: number) => string,
   rules: readonly ClassificationRule[] = DEFAULT_DETECTION_RULES,
   categoryNameById: ReadonlyMap<string, string> = new Map(),
+  source: TransactionSource = 'csv',
 ): StoredTransaction[] {
   return rows.map((row, index) =>
-    buildPreviewRow(row, accountId, idFor(index), rules, categoryNameById),
+    buildPreviewRow(row, accountId, idFor(index), rules, categoryNameById, source),
   );
 }
 
@@ -52,6 +57,7 @@ function buildPreviewRow(
   id: string,
   rules: readonly ClassificationRule[],
   categoryNameById: ReadonlyMap<string, string>,
+  source: TransactionSource,
 ): StoredTransaction {
   const classification = applyRules(
     {
@@ -65,8 +71,10 @@ function buildPreviewRow(
 
   return {
     id,
+    accountId,
     occurredOn: row.occurredOn,
     description: row.description,
+    merchantName: classification.merchantName,
     amountYen: row.amountYen,
     paymentMethod: classification.paymentMethod,
     categoryId: classification.categoryId,
@@ -74,29 +82,11 @@ function buildPreviewRow(
       ? (categoryNameById.get(classification.categoryId) ?? null)
       : null,
     classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
+    confidence: null,
     // 分類が付いていないものは本人の確認へ回す(FR-12)
     reviewStatus: classification.categoryId ? 'auto_ok' : 'pending',
+    source,
     fingerprint: fingerprintOf(row),
-    batchId: '',
+    batchId: null,
   };
-}
-
-/** 取り込みバッチとして保存する。件数は結果を見せるために返す。 */
-export async function saveBatch(
-  preview: readonly StoredTransaction[],
-  meta: { fileName: string; failedCount: number },
-): Promise<{ imported: number; duplicates: number }> {
-  const batchId = `${Date.now()}`;
-  const outcome = await transactionStore.add(
-    preview.map((t) => ({ ...t, batchId, id: `${batchId}-${t.id}` })),
-    {
-      batchId,
-      fileName: meta.fileName,
-      importedAt: new Date().toISOString(),
-      importedCount: preview.length,
-      duplicateCount: 0,
-      failedCount: meta.failedCount,
-    },
-  );
-  return { imported: outcome.imported.length, duplicates: outcome.duplicateCount };
 }
