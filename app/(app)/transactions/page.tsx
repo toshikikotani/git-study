@@ -57,6 +57,13 @@ export default async function TransactionsPage() {
             突き合わせ
           </Link>
           <Link
+            href="/transactions/receipt"
+            className="text-[13px]"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            レシート
+          </Link>
+          <Link
             href="/transactions/import"
             className="text-[13px] font-semibold"
             style={{ color: 'var(--accent)' }}
@@ -155,14 +162,28 @@ function EmptyState() {
           あればその場で分かります。
         </p>
 
-        <Link
-          href="/transactions/import"
-          className="mt-5 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold"
-          style={{ background: 'var(--accent)', color: '#fff' }}
-        >
-          CSV を取り込む
-          <span aria-hidden>→</span>
-        </Link>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Link
+            href="/transactions/import"
+            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold"
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >
+            CSV を取り込む
+            <span aria-hidden>→</span>
+          </Link>
+          <Link
+            href="/transactions/receipt"
+            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--accent)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            レシートを撮る
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
       </div>
 
       <ul className="space-y-1.5 px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
