@@ -134,6 +134,25 @@ export function getGmailEnv(): GmailEnv | null {
   );
 }
 
+/**
+ * Gmail 取り込み先の口座 ID(M2-7c)。
+ *
+ * accounts テーブルへの外部キーだが、DB(app_settings)には持たせない。
+ * 本アプリはシングルユーザーで、この値を画面から編集する UI を持つ意味が
+ * 薄い一方、環境変数に置けば GMAIL_ADDRESS / GMAIL_APP_PASSWORD と同じ経路
+ * (Vercel の環境変数 + GitHub Secrets)だけで設定が完結する(ADR-018 と同じ考え方)。
+ * 未設定なら null(Gmail 連携自体が無効なのと同様、機能が動かないだけ)。
+ */
+export function getGmailImportAccountId(): string | null {
+  const value = process.env.GMAIL_IMPORT_ACCOUNT_ID;
+  if (!value) return null;
+  return parseOrThrow(
+    z.uuid({ error: 'accounts.id の形式(uuid)ではありません' }),
+    value,
+    'GMAIL_IMPORT_ACCOUNT_ID',
+  );
+}
+
 /** テスト用に schema を公開する。実行時の検証には各 get*Env / get*Secret 関数を使う。 */
 export const schemas = {
   publicSchema,

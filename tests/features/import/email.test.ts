@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNotificationEmail } from '@/features/import/email';
-import { StaticMailSource, syncFromMailbox } from '@/features/import/mail-sync';
+import { buildSourceRef, StaticMailSource, syncFromMailbox } from '@/features/import/mail-sync';
 import { buildImapSearch, type RawMessage } from '@/features/import/mailbox';
 import type { ClassificationRule } from '@/features/classification/rules';
 
@@ -250,5 +250,21 @@ describe('syncFromMailbox — 自動取り込み', () => {
   it('分類できない明細は本人の確認へ回す(FR-12)', async () => {
     const result = await syncFromMailbox({ ...base, query: { since: '2026-09-01' } });
     expect(result.transactions.every((t) => t.reviewStatus === 'pending')).toBe(true);
+  });
+
+  it('source_ref に messageId を入れる(M2-7c)', async () => {
+    const result = await syncFromMailbox({ ...base, query: { since: '2026-09-01' } });
+    expect(result.transactions.map((t) => t.sourceRef).sort()).toEqual(['m1', 'm2']);
+  });
+});
+
+describe('buildSourceRef', () => {
+  it('1件目はそのまま messageId', () => {
+    expect(buildSourceRef('m1', 0)).toBe('m1');
+  });
+
+  it('2件目以降は連番を足して一意にする', () => {
+    expect(buildSourceRef('m1', 1)).toBe('m1#1');
+    expect(buildSourceRef('m1', 2)).toBe('m1#2');
   });
 });

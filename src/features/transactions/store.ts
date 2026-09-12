@@ -58,6 +58,7 @@ function fromRow(
     source: row.source,
     fingerprint: row.fingerprint,
     batchId: row.import_batch_id,
+    sourceRef: row.source_ref,
   };
 }
 
@@ -171,6 +172,7 @@ export async function importTransactions(
         source: meta.source,
         import_batch_id: batch.id,
         fingerprint: t.fingerprint,
+        source_ref: t.sourceRef,
       })),
       { onConflict: 'user_id,fingerprint', ignoreDuplicates: true },
     )
