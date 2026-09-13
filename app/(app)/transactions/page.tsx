@@ -57,6 +57,9 @@ export default async function TransactionsPage() {
           <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             口座
           </Link>
+          <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            ちりつも
+          </Link>
           <Link
             href="/transactions/reconcile"
             className="text-[13px]"
