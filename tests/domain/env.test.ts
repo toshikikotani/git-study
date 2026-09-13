@@ -80,3 +80,26 @@ describe('discordWebhookUrlSchema', () => {
     ).toBe(false);
   });
 });
+
+describe('lineSchema(LINE連携)', () => {
+  const valid = {
+    LINE_CHANNEL_ACCESS_TOKEN: 'a'.repeat(80),
+    LINE_USER_ID: `U${'0123456789abcdef'.repeat(2)}`,
+  };
+
+  it('正しい値を通す', () => {
+    expect(schemas.lineSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('短すぎるチャネルアクセストークンを拒否する', () => {
+    expect(
+      schemas.lineSchema.safeParse({ ...valid, LINE_CHANNEL_ACCESS_TOKEN: 'short' }).success,
+    ).toBe(false);
+  });
+
+  it('U+32桁の16進数でない userId を拒否する', () => {
+    expect(
+      schemas.lineSchema.safeParse({ ...valid, LINE_USER_ID: 'not-a-line-user-id' }).success,
+    ).toBe(false);
+  });
+});
