@@ -851,6 +851,48 @@ export type Database = {
           },
         ];
       };
+      goals: {
+        Row: {
+          achieved_at: string | null;
+          created_at: string;
+          current_amount_yen: number;
+          id: string;
+          note: string | null;
+          status: Database['public']['Enums']['goal_status'];
+          target_amount_yen: number | null;
+          target_date: string | null;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          achieved_at?: string | null;
+          created_at?: string;
+          current_amount_yen?: number;
+          id?: string;
+          note?: string | null;
+          status?: Database['public']['Enums']['goal_status'];
+          target_amount_yen?: number | null;
+          target_date?: string | null;
+          title: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          achieved_at?: string | null;
+          created_at?: string;
+          current_amount_yen?: number;
+          id?: string;
+          note?: string | null;
+          status?: Database['public']['Enums']['goal_status'];
+          target_amount_yen?: number | null;
+          target_date?: string | null;
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       import_adapters: {
         Row: {
           account_id: string | null;
@@ -1992,6 +2034,7 @@ export type Database = {
         | 'bank_loan'
         | 'other';
       debt_status: 'active' | 'paid_off' | 'refinanced' | 'closed';
+      goal_status: 'active' | 'achieved' | 'abandoned';
       import_status: 'pending' | 'succeeded' | 'partial' | 'failed';
       job_status: 'running' | 'succeeded' | 'failed' | 'cancelled';
       job_trigger_source: 'github_actions' | 'pg_cron' | 'manual' | 'webhook';
@@ -2189,6 +2232,7 @@ export const Constants = {
         'other',
       ],
       debt_status: ['active', 'paid_off', 'refinanced', 'closed'],
+      goal_status: ['active', 'achieved', 'abandoned'],
       import_status: ['pending', 'succeeded', 'partial', 'failed'],
       job_status: ['running', 'succeeded', 'failed', 'cancelled'],
       job_trigger_source: ['github_actions', 'pg_cron', 'manual', 'webhook'],

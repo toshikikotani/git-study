@@ -227,6 +227,14 @@ export default async function HomePage() {
           <span aria-hidden>→</span>
         </Link>
         <Link
+          href="/advisor"
+          className="inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          AI相談
+          <span aria-hidden>→</span>
+        </Link>
+        <Link
           href="/settings/google"
           className="inline-flex items-center gap-1 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
