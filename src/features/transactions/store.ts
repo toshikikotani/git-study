@@ -226,3 +226,24 @@ export async function updateTransaction(id: string, categoryId: string): Promise
     .eq('id', id);
   if (error) throw new TransactionStoreError(`明細を更新できませんでした: ${error.message}`);
 }
+
+/**
+ * 1件を集計対象から外す(重複の片側を消すときに使う、本人発案)。
+ *
+ * 行は消さない。同じ買い物が複数経路から入っていた事実そのものは
+ * 残しておきたい(消すと、次の取り込みでまた入ってきたときに
+ * 「前にも同じことがあった」が分からなくなる)。ignored は
+ * domain/budget.ts の isCountable() が全機能で除外するため、
+ * 予算・レポート・ちりつも・アラートから一斉に消える。
+ */
+export async function ignoreTransaction(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('transactions')
+    .update({
+      review_status: 'ignored',
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new TransactionStoreError(`明細を除外できませんでした: ${error.message}`);
+}
