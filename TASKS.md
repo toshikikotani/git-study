@@ -78,6 +78,10 @@ P5-2・P5-3 は本セッションで完了(下記 Done)。
 P6-1・P6-2・P6-3 は本セッションで完了(下記 Done)。ホーム画面は「3つの数字だけ」
 (FR-61、設計原則)を維持したまま、可視化は `/reports`(新設)に閉じ込めた。
 
+### S10 通知チャネル拡張(本人発案、2026-09-13)
+P7-2 は本セッションで完了(下記 Done)。LINE のチャネルアクセストークン・userId が
+未発行のため、実際に届くのは B-6(Blocked)解消後。
+
 ### 改善・技術的負債
 ここには実装中に気づいたことを積む。空でよい。
 
@@ -102,6 +106,7 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 | B-3 | Discord Webhook URL を GitHub Secrets(`CRON_SECRET` と同じ経路)/ Vercel に `DISCORD_WEBHOOK_URL` として設定する | **本人による Webhook 発行**。M3-1/M3-3/M5-2 は実装・検証済み(ローカル HTTP スタブで送信経路を確認)で、未設定の間は検知・生成だけ行い実送信をスキップする設計のため着手はブロックしていない。設定されれば次回の cron 実行(毎時 / 毎朝07:00 JST)から自動的に届き始める |
 | B-4 | T-25(`rescued_emails` の2マイグレーション)を Supabase Management API または `supabase db push` で本番へ適用する | **本人による適用**(このサンドボックスに Management API 資格情報が無いため)。適用されるまで T-11 の記録機能は静かに無効のまま |
 | B-5 | T-26(`net_worth_snapshots` の2マイグレーション)を Supabase Management API または `supabase db push` で本番へ適用する | **本人による適用**(B-4 と同じ制約)。適用されるまで P6-3 の資産推移グラフは「記録はまだありません」の空状態のまま |
+| B-6 | LINE Messaging API のチャネルアクセストークン・userId を発行し、`LINE_CHANNEL_ACCESS_TOKEN`/`LINE_USER_ID` として GitHub Secrets / Vercel に設定する | **本人による発行**(`.env.example` に手順を記載)。P7-2 は実装・検証済み(fetch を差し替えたローカルスタブで送信経路・失敗時の扱いを実際の Supabase に対して確認)で、未設定の間は Discord 側だけで動く(B-3 と同じ「あれば使う」設計、着手はブロックしていない)。設定されれば次回の cron 実行から LINE にも届き始める |
 
 ## Done
 
@@ -178,6 +183,7 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 | P6-2 | `/reports`(新規):カテゴリ別支出推移グラフ(直近6ヶ月、FR-14)。`domain/spending.ts`(新規)の `summarizeMonthlySpendByCategory()` が全月×全カテゴリの組を0円で埋めて返す(`domain/budget.ts` の `summarizeBudgets()` と同じ考え方。集計対象の定義=`isCountable()` はそちらから export して再利用し、「支出」の定義を2箇所で別々に決めない)。`features/reports/store.ts` の `loadCategorySpendingTrend()` が直近6ヶ月分の `transactions`/`categories` を読んで集計し、期間中に一度も支出が無いカテゴリは除外する(`period-summary.ts` の既存の考え方に合わせた)。**画面側でカテゴリに色を割り当てない判断**:`app/globals.css` 冒頭のコメントが「カテゴリごとに色を割り当てる案は捨てた(本人が増減できるため固定の色順が成立せず、暗いサーフェスでは隣接色相が識別できない組み合わせが出る)」と明記しているため、本グラフもそれに従い、カテゴリ数分の small multiples(1カテゴリ=1枠)に分け、色は「支出」の役割一色(`var(--over)`)だけを使い、識別は名前(ラベル)で行う設計にした(dataviz skill の「9個目以降は Other/small multiples へ折り込む」を最初から全カテゴリに適用した形)。各枠はミニバーチャート(6ヶ月分、`title` 属性でホバー時に月・金額を表示、最大月だけ直接ラベル)+ 下部にアクセシビリティ用の表(dataviz: table view は必須)。ホームからのリンクを追加(FR-61 の「ホームは3つの数字だけ」を守り、詳細画面は別ページに閉じ込める)。**検証方法についての制約**:実際の Supabase プロジェクトのデータでクエリ・集計ロジック(振替/ignored 除外、収入除外、複数カテゴリ×複数月の合算)は直接検証したが、`/reports` 画面自体を実ブラウザで描画する検証は、このサンドボックスのエージェントプロキシがブラウザ→Supabase Auth 間の接続を確立できない(`ws_closed_mid_exchange`、プロキシ側のトンネルが handshake 途中で切れる既知の制約)ため断念し、`next build` の型検査・静的生成が通ることで代替した。検証用データは削除済み。テスト7件追加。 | 2026-09-12 |
 | P6-3 | 資産推移グラフ(残債総額 + 投資評価額の時系列、FR-02, FR-51)。`debts.current_balance_yen` は現在値のみで履歴を持たないため、新規テーブル `net_worth_snapshots`(マイグレーション2本:`20260912000100_net_worth_snapshots.sql` / `20260912000200_net_worth_snapshots_rls.sql`、`docs/schema.sql` にも反映)を追加し、月末に1行ずつ記録し始める設計にした。投資評価額側は既に `investment_snapshots`(商品ごとに本人が好きな時に記録)があるため新規スキーマは不要——`domain/investment.ts` に `totalInvestmentValueAsOf()`(商品ごとに指定日以前で最新の記録を1件選び合算。記録の無い商品は0として無視)を追加して合算した。`features/net-worth/store.ts` の `recordNetWorthSnapshotAsAdmin()`(P6-1 と同じ `isLastDayOfMonth()` で月末だけ判定、`(user_id, as_of)` の一意制約に upsert)を既存の `detect-alerts` cron に相乗りさせ、`loadNetWorthTrend()` を `/reports` に追加(2本目のグラフ:残債総額=`var(--over)`「支出・負債」の役割色、投資評価額=`var(--income)`「収入・資産」の役割色をそのまま再利用。globals.css が明記する通り緑×赤は通常視ΔEが境界帯のため、凡例・直接ラベルに必ず数値と文字を添える設計)。**このセッションの制約により新規マイグレーションを本番へ適用できず**(T-25/B-4 と同種、Supabase Management API 資格情報が無い)、`docs/schema.sql` との整合はローカル PostgreSQL で `verify-schema.sh`/`verify-migrations.sh` 双方検証済み(926項目一致)。未適用の間の失敗経路(cron 側の記録・画面側の読み出し双方)を実際の本番 Supabase(テーブル未作成の状態)に対して検証し、両方とも握り潰されて他機能に影響しないことを確認(T-26/B-5 として本番適用待ちを記録)。テスト5件追加。 | 2026-09-12 |
 | P7-1 | レシート撮影による取り込み(新機能、本人発案、ADR-021)。現金・電子マネーなど CSV・メール通知(FR-10)のどちらにも記録が残らない支払いを、レシート写真から記録できるようにした。`src/features/import/receipt-ai.ts`(新規)の `ClaudeReceiptExtractor` — `claude-haiku-4-5` の画像入力でレシートから日付・支払合計・店名・支払方法として印字された文字列を書き写させる(email-ai.ts/ADR-019 と同じ役割分担:AI は書き写すだけ、リボ・分割の判定は `readPaymentMethod` の正規表現)。メール通知と異なり画像には辞書に相当する費用ゼロの経路が無いため、この経路は呼ばれた時点で必ず AI を使う設計にした(詳細は ADR-021)。`app/api/import/receipt/route.ts`(新規、認証は proxy.ts が担う。1時間あたりの呼び出し回数上限あり、email/route.ts と同じ歯止め)。`/transactions/receipt`(新規画面)— カメラ起動(`capture="environment"`)またはギャラリーから画像を選び、ブラウザ側で長辺1600px・JPEG品質0.85にリサイズしてから送信(画像トークン数と通信量を抑える)。「AI に読み取らせる」ボタンを押したときだけ課金APIを呼ぶ(貼り付け画面と同じ配慮)。取り込みパイプライン(`buildPreview`/`saveImportBatchAction`)は既存のCSV・貼り付け画面とそのまま共有し、`transaction_source` は新しい値を追加せず既存の `manual` を流用(スキーマ変更には本番 Supabase への適用手段がこのセッションに無いため、T-25 と同じ制約を理由に見送り。ADR-021 に却下理由を記録)。`/transactions` の一覧画面ヘッダとカード0件時の導線にリンクを追加。テスト14件追加(`buildFromAiRows` の検証・失敗時のフォールバック・画像ブロックが実際にモデルへ渡ることを偽クライアントで確認)。**未検証**:このセッションには本番 Supabase 資格情報が無く、実際のスマートフォン撮影・実物のレシートでの読み取り精度・Playwright でのブラウザ操作確認は行っていない(型チェック・lint・本番ビルド・ユニットテスト517件は全通過)。 | 2026-09-12 |
+| P7-2 | LINE Messaging API 連携(本人発案)。Discord に加えて LINE へも通知を送れるようにした。**新規マイグレーション不要**——`notification_channel` enum には D-3 の初期スキーマの時点から既に `'line'` が存在しており(`alerts.channel`/`daily_briefs.channel`/`app_settings.brief_channel` の3箇所)、未配線のまま残っていただけだった(現状これらの列自体はどのチャネルへ送るかの判定にはまだ使っておらず、「設定されている全チャネルへ送る」という単純な方針にした。列を判定に使う本格的な「送信先を選ぶ」UIは今回のスコープ外)。`src/lib/line.ts`(新規、`lib/discord.ts` と同じ役割分担の薄い fetch ラッパー、LINE Push Message API)、`src/lib/env.ts` に `getLineEnv()`(Gmail と同じ「片方だけの設定はエラーにする」方式)と、両notify.tsが共有する `NotificationChannels` 型を追加。`features/alerts/notify.ts` の `sendPendingAlerts()` と `features/briefs/notify.ts` の `deliverDailyBriefAsAdmin()` を、Discord・LINE それぞれへ `Promise.allSettled` で並行送信し、設定されているチャネルのうち1つでも成功すれば sent/delivered とする形に変更(NFR-06:1チャネルの失敗で残りを止めない、を複数チャネルに拡張)。LINE はテキストのみで Discord の Embed のような色を持てないため、`buildLineTextForAlert()` が severity を絵文字(🔵🟠🔴)で表現する。`detect-alerts`/`morning-brief` 両 cron ルートは「Discord・LINE のどちらかが設定されていれば送信を試みる」判定に変更。**本人はまだ LINE のチャネルアクセストークン・userId を持っていない**(発行手順を `.env.example` に記載、B-6として記録)ため、実際の LINE API に対する送信は検証できず、`global.fetch` を差し替えて LINE 宛のリクエストだけ偽装する形で実際の Supabase プロジェクトに対して検証した:①LINEのみ設定・送信成功→alertsが正しくsent、②LINEのみ設定・送信失敗(401)→failed+error_messageに理由、③Discord失敗+LINE成功の混在→1チャネル成功で正しくsentになる、の3パターンを確認(検証中に誤って本物の pending alert 2件を巻き込んで sent にしてしまうミスをしたが、直後に気づいて pending へ復元済み)。テスト9件追加(`lineSchema` 3件、`buildLineTextForAlert` 4件、`postLineMessage` 2件)。 | 2026-09-13 |
 
 ---
 
@@ -186,7 +192,8 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 実装を先に進めるうえで、いずれ必要になるもの。急ぎ順。
 
 1. **Discord Webhook**(B-3):サーバーとチャンネルを1つ作り、Webhook URL を発行
-2. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。`/debts` にシードの3件が表示されているので、「編集」から直接正確な値に直せる
-3. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
-4. **GitHub Secrets への `CRON_SECRET` / `APP_BASE_URL` 設定**(M0-6):`.github/workflows/keepalive.yml` が参照する。リポジトリの Settings → Secrets and variables → Actions で本人が設定する必要がある(このセッションからは触れない領域)。`CRON_SECRET` は Vercel の production 環境変数にも同じ値を設定すること。値は `openssl rand -hex 32` などで新規発行してよい
-5. **Gmail 自動取り込みの有効化**(M2-7c):`/accounts` で実口座を作った後、その `accounts.id` を Vercel の環境変数と GitHub Secrets に `GMAIL_IMPORT_ACCOUNT_ID` として設定し、Supabase の `app_settings.gmail_enabled` を true にする(編集画面がまだ無いため、当面は Supabase ダッシュボードの Table Editor か SQL から)
+2. **LINE のチャネルアクセストークン・userId**(B-6):`.env.example` に発行手順を記載。Discord と両方でも片方だけでもよい
+3. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。`/debts` にシードの3件が表示されているので、「編集」から直接正確な値に直せる
+4. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
+5. **GitHub Secrets への `CRON_SECRET` / `APP_BASE_URL` 設定**(M0-6):`.github/workflows/keepalive.yml` が参照する。リポジトリの Settings → Secrets and variables → Actions で本人が設定する必要がある(このセッションからは触れない領域)。`CRON_SECRET` は Vercel の production 環境変数にも同じ値を設定すること。値は `openssl rand -hex 32` などで新規発行してよい
+6. **Gmail 自動取り込みの有効化**(M2-7c):`/accounts` で実口座を作った後、その `accounts.id` を Vercel の環境変数と GitHub Secrets に `GMAIL_IMPORT_ACCOUNT_ID` として設定し、Supabase の `app_settings.gmail_enabled` を true にする(編集画面がまだ無いため、当面は Supabase ダッシュボードの Table Editor か SQL から)

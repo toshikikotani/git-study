@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildEmbedForAlert } from '@/features/alerts/notify';
+import { buildEmbedForAlert, buildLineTextForAlert } from '@/features/alerts/notify';
 
 describe('buildEmbedForAlert(FR-24, M3-1)', () => {
   it('info は青系の色になる', () => {
@@ -21,5 +21,23 @@ describe('buildEmbedForAlert(FR-24, M3-1)', () => {
   it('body が null なら description は undefined', () => {
     const embed = buildEmbedForAlert({ title: 't', body: null, severity: 'info' });
     expect(embed.description).toBeUndefined();
+  });
+});
+
+describe('buildLineTextForAlert(LINE連携)', () => {
+  it('info には🔵を付ける', () => {
+    expect(buildLineTextForAlert({ title: 't', body: 'b', severity: 'info' })).toBe('🔵 t\nb');
+  });
+
+  it('warn には🟠を付ける', () => {
+    expect(buildLineTextForAlert({ title: 't', body: null, severity: 'warn' })).toBe('🟠 t');
+  });
+
+  it('critical には🔴を付ける', () => {
+    expect(buildLineTextForAlert({ title: 't', body: null, severity: 'critical' })).toBe('🔴 t');
+  });
+
+  it('body が null なら見出しだけになる(改行を付けない)', () => {
+    expect(buildLineTextForAlert({ title: 't', body: null, severity: 'info' })).toBe('🔵 t');
   });
 });

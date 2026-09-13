@@ -53,8 +53,34 @@ const gmailSchema = z.object({
     }),
 });
 
+/**
+ * LINE Messaging API(通知・朝配信の送信先の1つ、Discord と並ぶ選択肢)。
+ * 未設定でもアプリは動く(Gmail と同じ考え方)。
+ *
+ * userId は LINE Developers コンソールの Webhook で本人が Bot に送った
+ * メッセージから拾う値('U' + 32桁の16進数、33文字固定)。
+ */
+const lineSchema = z.object({
+  LINE_CHANNEL_ACCESS_TOKEN: z
+    .string()
+    .min(50, 'LINE のチャネルアクセストークンの形式ではありません'),
+  LINE_USER_ID: z
+    .string()
+    .regex(/^U[0-9a-f]{32}$/, 'LINE の userId の形式(U+32桁の16進数)ではありません'),
+});
+
 export type PublicEnv = z.infer<typeof publicSchema>;
 export type GmailEnv = z.infer<typeof gmailSchema>;
+export type LineEnv = z.infer<typeof lineSchema>;
+
+/**
+ * 通知の送信先チャネル。Discord・LINE のどちらか、または両方が設定されうる
+ * (features/alerts/notify.ts・features/briefs/notify.ts の両方が使う共通の形)。
+ */
+export type NotificationChannels = {
+  discordWebhookUrl: string | null;
+  line: LineEnv | null;
+};
 
 function parseOrThrow<T extends z.ZodType>(schema: T, source: unknown, label: string): z.infer<T> {
   const result = schema.safeParse(source);
@@ -146,6 +172,23 @@ export function getGmailEnv(): GmailEnv | null {
 }
 
 /**
+ * LINE の資格情報。未設定なら null を返す(Discord Webhook と同じ「あれば使う」
+ * 設計。Gmail と同じく片方だけの設定はエラーにする)。
+ */
+export function getLineEnv(): LineEnv | null {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const userId = process.env.LINE_USER_ID;
+
+  if (!token && !userId) return null;
+
+  return parseOrThrow(
+    lineSchema,
+    { LINE_CHANNEL_ACCESS_TOKEN: token, LINE_USER_ID: userId },
+    'LINE 連携の設定',
+  );
+}
+
+/**
  * Gmail 取り込み先の口座 ID(M2-7c)。
  *
  * accounts テーブルへの外部キーだが、DB(app_settings)には持たせない。
@@ -172,4 +215,5 @@ export const schemas = {
   anthropicApiKeySchema,
   discordWebhookUrlSchema,
   gmailSchema,
+  lineSchema,
 };
