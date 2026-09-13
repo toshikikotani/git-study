@@ -338,6 +338,13 @@ create table public.app_settings (
   gmail_address_env_key               text         not null default 'GMAIL_ADDRESS',
   gmail_app_password_env_key          text         not null default 'GMAIL_APP_PASSWORD',
 
+  -- Google連携(本人発案)。月次バックアップ(Googleスプレッドシート)の
+  -- 書き込み先。初回のバックアップ時にアプリが自動でスプレッドシートを
+  -- 作成し、その id をここへ記録する(以降は同じシートへ書き続ける)。
+  -- 値そのものは秘密情報ではない(参照名、ADR-014)。実際の認証情報
+  -- (GOOGLE_REFRESH_TOKEN 等)は環境変数のみに置く。
+  google_backup_spreadsheet_id        text,
+
   created_at                          timestamptz  not null default now(),
   updated_at                          timestamptz  not null default now(),
 

@@ -9,10 +9,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { postDiscordEmbed } from '@/lib/discord';
 import { todayJst } from '@/lib/date';
 import type { NotificationChannels } from '@/lib/env';
-import { postLineMessage } from '@/lib/line';
+import { postLineMessage, postLineTextWithImage } from '@/lib/line';
+import { buildPayoffProgressChartUrl } from '@/lib/quickchart';
 import type { Database } from '@/lib/supabase/types';
 
 export class BriefNotifyError extends Error {
@@ -49,6 +51,14 @@ export async function deliverDailyBriefAsAdmin(
   if (!brief) return 'not_generated';
   if (brief.status === 'delivered') return 'already_delivered';
 
+  // 完済の進捗をグラフ画像にして添える(本人発案)。ホーム画面の数字と
+  // 必ず一致させるため、ここでも同じ loadHomeSummaryAsAdmin() を使う
+  // (generateDailyBriefAsAdmin() と同じ考え方、計算式を複製しない)。
+  // 失敗しても配信本体は止めない(QuickChart は補助表示のため)。
+  const progressChartUrl = await loadHomeSummaryAsAdmin(client, userId, now)
+    .then((summary) => buildPayoffProgressChartUrl(summary.payoff.progressRatio))
+    .catch(() => null);
+
   const attempts: Promise<void>[] = [];
   if (channels.discordWebhookUrl) {
     attempts.push(
@@ -56,13 +66,25 @@ export async function deliverDailyBriefAsAdmin(
         title: '今日の配信',
         description: brief.body_md ?? undefined,
         color: 0x5865f2,
+        imageUrl: progressChartUrl ?? undefined,
       }),
     );
   }
   if (channels.line) {
     const text = brief.body_md ? `📋 今日の配信\n${brief.body_md}` : '📋 今日の配信';
     attempts.push(
-      postLineMessage(channels.line.LINE_CHANNEL_ACCESS_TOKEN, channels.line.LINE_USER_ID, text),
+      progressChartUrl
+        ? postLineTextWithImage(
+            channels.line.LINE_CHANNEL_ACCESS_TOKEN,
+            channels.line.LINE_USER_ID,
+            text,
+            progressChartUrl,
+          )
+        : postLineMessage(
+            channels.line.LINE_CHANNEL_ACCESS_TOKEN,
+            channels.line.LINE_USER_ID,
+            text,
+          ),
     );
   }
 

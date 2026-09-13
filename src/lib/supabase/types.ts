@@ -219,6 +219,7 @@ export type Database = {
           gmail_fetch_limit: number;
           gmail_from_addresses: string[];
           gmail_last_synced_on: string | null;
+          google_backup_spreadsheet_id: string | null;
           high_risk_allocation_ratio: number;
           inactivity_alert_days: number;
           investment_ratio_of_repayment: number;
@@ -248,6 +249,7 @@ export type Database = {
           gmail_fetch_limit?: number;
           gmail_from_addresses?: string[];
           gmail_last_synced_on?: string | null;
+          google_backup_spreadsheet_id?: string | null;
           high_risk_allocation_ratio?: number;
           inactivity_alert_days?: number;
           investment_ratio_of_repayment?: number;
@@ -277,6 +279,7 @@ export type Database = {
           gmail_fetch_limit?: number;
           gmail_from_addresses?: string[];
           gmail_last_synced_on?: string | null;
+          google_backup_spreadsheet_id?: string | null;
           high_risk_allocation_ratio?: number;
           inactivity_alert_days?: number;
           investment_ratio_of_repayment?: number;

@@ -25,13 +25,48 @@ export async function postLineMessage(
   userId: string,
   text: string,
 ): Promise<void> {
+  return postLineMessages(channelAccessToken, userId, [{ type: 'text', text }]);
+}
+
+/**
+ * テキストの直後に画像を1枚添えて送る(本人発案)。LINE は Discord の
+ * Embed のような「1メッセージに文字と画像をまとめる」形を持たないため、
+ * 同じ push リクエストの中で2件のメッセージとして送る(相手には連続した
+ * 2通として届くが、送信自体は1回で済む)。
+ *
+ * imageUrl は QuickChart 等で作った画像そのものの URL、
+ * previewUrl は一覧でのサムネイル用(無ければ imageUrl を使い回す)。
+ * LINE 側の制約で両方 https 必須。
+ */
+export async function postLineTextWithImage(
+  channelAccessToken: string,
+  userId: string,
+  text: string,
+  imageUrl: string,
+  previewUrl: string = imageUrl,
+): Promise<void> {
+  return postLineMessages(channelAccessToken, userId, [
+    { type: 'text', text },
+    { type: 'image', originalContentUrl: imageUrl, previewImageUrl: previewUrl },
+  ]);
+}
+
+type LineMessage =
+  | { type: 'text'; text: string }
+  | { type: 'image'; originalContentUrl: string; previewImageUrl: string };
+
+async function postLineMessages(
+  channelAccessToken: string,
+  userId: string,
+  messages: readonly LineMessage[],
+): Promise<void> {
   const response = await fetch(LINE_PUSH_MESSAGE_URL, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${channelAccessToken}`,
     },
-    body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
+    body: JSON.stringify({ to: userId, messages }),
   });
 
   if (!response.ok) {

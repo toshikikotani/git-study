@@ -103,3 +103,25 @@ describe('lineSchema(LINE連携)', () => {
     ).toBe(false);
   });
 });
+
+describe('googleSchema(Google連携:カレンダー同期・スプレッドシートバックアップ)', () => {
+  const valid = {
+    GOOGLE_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'client-secret',
+    GOOGLE_REFRESH_TOKEN: '1//refresh-token',
+  };
+
+  it('正しい値を通す', () => {
+    expect(schemas.googleSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('どれか1つでも空文字なら拒否する', () => {
+    expect(schemas.googleSchema.safeParse({ ...valid, GOOGLE_REFRESH_TOKEN: '' }).success).toBe(
+      false,
+    );
+    expect(schemas.googleSchema.safeParse({ ...valid, GOOGLE_CLIENT_ID: '' }).success).toBe(false);
+    expect(schemas.googleSchema.safeParse({ ...valid, GOOGLE_CLIENT_SECRET: '' }).success).toBe(
+      false,
+    );
+  });
+});
