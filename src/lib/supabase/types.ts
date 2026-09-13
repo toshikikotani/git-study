@@ -1583,6 +1583,51 @@ export type Database = {
           },
         ];
       };
+      transaction_splits: {
+        Row: {
+          amount_yen: number;
+          category_id: string | null;
+          created_at: string;
+          id: string;
+          note: string | null;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          amount_yen: number;
+          category_id?: string | null;
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          amount_yen?: number;
+          category_id?: string | null;
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_splits_category_id_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'transaction_splits_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];

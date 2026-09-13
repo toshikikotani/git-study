@@ -18,7 +18,15 @@
 
 import { hasReachedAlertThreshold, type BudgetStatus } from '@/domain/budget';
 import { formatYen } from '@/domain/money';
-import { addDays, addMonthsToParts, daysBetween, splitDateOnly, type DateOnly } from '@/lib/date';
+import type { DetectedSubscription } from '@/domain/subscriptions';
+import {
+  addDays,
+  addMonthsToParts,
+  daysBetween,
+  splitDateOnly,
+  formatDateJa,
+  type DateOnly,
+} from '@/lib/date';
 
 /** P6-1 の月次振り返りに載せる、浪費カテゴリ1件分の消化状況。 */
 export type RecapWasteCategory = { name: string; status: BudgetStatus };
@@ -333,6 +341,28 @@ export function buildMonthlyRecapAlert(summary: MonthlyRecapSummary): CandidateA
     title: `${year}年${Number(month)}月の振り返り`,
     body: lines.join('\n'),
     dedupKey: `monthly_recap:${summary.monthKey}`,
+    debtId: null,
+    transactionId: null,
+  };
+}
+
+/**
+ * 新しく検知した定期支払いの通知を組み立てる(本人発案)。
+ *
+ * dedup_key はグループ(店・金額)単位の固定文字列。一度検知して知らせた
+ * サブスクは、以後同じ組み合わせで何度検知しても再通知しない(DB の
+ * 一意制約が「初回だけ通知する」を担保する。P5-2 のルール誤爆通知と
+ * 同じ考え方)。金額が変われば dedup_key も変わるため、値上げは
+ * 「新しいサブスクの検知」として改めて知らせる(これは意図的な仕様:
+ * 値上げに気づけることも「浪費の再発防止」の一部)。
+ */
+export function buildNewSubscriptionAlert(subscription: DetectedSubscription): CandidateAlert {
+  return {
+    kind: 'other',
+    severity: 'info',
+    title: `定期支払いを検知しました: ${subscription.label}`,
+    body: `${formatYen(subscription.amountYen)}が${subscription.occurrenceCount}ヶ月連続で引き落とされています(前回: ${formatDateJa(subscription.lastOccurredOn)})。忘れているサブスクでなければ、そのままで大丈夫です。`,
+    dedupKey: `subscription:${subscription.key}`,
     debtId: null,
     transactionId: null,
   };

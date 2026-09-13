@@ -1467,6 +1467,33 @@ create index ix_net_worth_snapshots_user_as_of_desc
   on public.net_worth_snapshots (user_id, as_of desc);
 
 
+-- -----------------------------------------------------------------------------
+-- 3.23 transaction_splits — 明細の複数カテゴリ分割
+--
+--   1件の明細を複数のカテゴリに配分できるようにする。transactions.category_id
+--   はそのまま残し、分割がある明細だけこの表の行の合計で amount_yen を
+--   置き換える(合計が一致することの保証はアプリ側、domain/transaction-splits.ts
+--   の assertValidSplits() が正。複数行にまたがる合計チェックは CHECK 制約
+--   では表現できない)。
+-- -----------------------------------------------------------------------------
+create table public.transaction_splits (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+  category_id    uuid        references public.categories(id) on delete set null,
+
+  amount_yen     bigint      not null,
+  note           text,
+
+  created_at     timestamptz not null default now(),
+
+  constraint ck_transaction_splits_amount_nonzero check (amount_yen <> 0)
+);
+
+create index ix_transaction_splits_transaction on public.transaction_splits (transaction_id);
+create index ix_transaction_splits_user on public.transaction_splits (user_id);
+
+
 -- =============================================================================
 --  4. updated_at トリガの一括適用
 -- =============================================================================
@@ -1862,7 +1889,7 @@ begin
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
-    'net_worth_snapshots'
+    'net_worth_snapshots','transaction_splits'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

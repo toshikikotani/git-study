@@ -43,7 +43,9 @@ import {
   type BudgetTransaction,
   type CategoryBudget,
 } from '@/domain/budget';
+import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
+import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
 import { addDays, daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
@@ -221,20 +223,36 @@ async function loadWasteCategoryStatuses(
   if (budgetError) throw new AlertStoreError(`予算を取得できませんでした: ${budgetError.message}`);
   const budgetByCategory = new Map(budgets.map((b) => [b.category_id, b]));
 
+  // category_id で絞らず当月分すべてを読む。分割(本人発案)がある明細は
+  // 主カテゴリが浪費カテゴリでなくても、分割先が浪費カテゴリのことがあるため。
   const { data: transactions, error: txError } = await client
     .from('transactions')
-    .select('category_id, amount_yen, is_transfer, review_status')
+    .select('id, category_id, amount_yen, is_transfer, review_status')
     .eq('user_id', userId)
-    .in('category_id', categoryIds)
     .gte('occurred_on', monthStart)
     .lt('occurred_on', monthStartJst(1, now));
   if (txError) throw new AlertStoreError(`明細を取得できませんでした: ${txError.message}`);
 
-  const budgetTransactions: BudgetTransaction[] = transactions.map((t) => ({
-    categoryId: t.category_id,
-    amountYen: t.amount_yen,
-    isTransfer: t.is_transfer,
-    reviewStatus: t.review_status,
+  const splitsByTransactionId = await listSplitsForTransactionIds(
+    client,
+    transactions.map((t) => t.id),
+  );
+  const expanded = expandTransactionsWithSplits(
+    transactions.map((t) => ({
+      id: t.id,
+      categoryId: t.category_id,
+      amountYen: t.amount_yen,
+      isTransfer: t.is_transfer,
+      reviewStatus: t.review_status,
+    })),
+    splitsByTransactionId,
+  );
+
+  const budgetTransactions: BudgetTransaction[] = expanded.map((t) => ({
+    categoryId: t.categoryId,
+    amountYen: t.amountYen,
+    isTransfer: t.isTransfer,
+    reviewStatus: t.reviewStatus,
   }));
 
   return categories.map((c) => {

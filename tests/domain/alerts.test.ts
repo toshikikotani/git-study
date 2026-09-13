@@ -4,6 +4,7 @@ import {
   buildBudgetPaceAlert,
   buildJobFailureAlert,
   buildMonthlyRecapAlert,
+  buildNewSubscriptionAlert,
   buildRuleMisfireAlert,
   detectInactivity,
   detectPaymentDueTomorrow,
@@ -14,6 +15,7 @@ import {
   isMisfiringRule,
 } from '@/domain/alerts';
 import type { BudgetStatus } from '@/domain/budget';
+import type { DetectedSubscription } from '@/domain/subscriptions';
 
 describe('detectInactivity(FR-22)', () => {
   it('2日以内なら発火しない', () => {
@@ -367,6 +369,37 @@ describe('buildMonthlyRecapAlert(P6-1)', () => {
     const summary = { totalPaidYen: 0, totalSideIncomeYen: 0, wasteCategories: [] };
     const a = buildMonthlyRecapAlert({ ...summary, monthKey: '2026-09' });
     const b = buildMonthlyRecapAlert({ ...summary, monthKey: '2026-10' });
+    expect(a.dedupKey).not.toBe(b.dedupKey);
+  });
+});
+
+describe('buildNewSubscriptionAlert(本人発案)', () => {
+  const subscription: DetectedSubscription = {
+    key: 'netflix:-1980',
+    label: 'Netflix',
+    amountYen: 1_980,
+    occurrenceCount: 3,
+    lastOccurredOn: '2026-09-01',
+    nextExpectedOn: '2026-10-01',
+  };
+
+  it('店名・金額・連続回数を1件のアラートにまとめる', () => {
+    const alert = buildNewSubscriptionAlert(subscription);
+    expect(alert.kind).toBe('other');
+    expect(alert.severity).toBe('info');
+    expect(alert.title).toBe('定期支払いを検知しました: Netflix');
+    expect(alert.body).toMatch(/1,980円が3ヶ月連続で引き落とされています/);
+    expect(alert.body).toMatch(/前回: 2026年9月1日/);
+    expect(alert.dedupKey).toBe('subscription:netflix:-1980');
+  });
+
+  it('金額が変わると dedup_key も変わる(価格改定は別のサブスクとして扱う)', () => {
+    const a = buildNewSubscriptionAlert(subscription);
+    const b = buildNewSubscriptionAlert({
+      ...subscription,
+      key: 'netflix:-2490',
+      amountYen: 2_490,
+    });
     expect(a.dedupKey).not.toBe(b.dedupKey);
   });
 });
