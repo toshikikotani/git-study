@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
-import { comparePlans, PayoffError, type Debt } from '@/domain/payoff';
+import { comparePlans, simulateTotalPayoff, PayoffError, type Debt } from '@/domain/payoff';
 import type { RepaymentStrategy as SettingsRepaymentStrategy } from '@/features/settings/store';
 import { formatDateJa, type DateOnly } from '@/lib/date';
+import { PayoffCurveChart } from './payoff-curve-chart';
 
 /** アバランチ/スノーボールの2択。app_settings が持ちうる 'minimum'/'custom' は対象外。 */
 type ToggleableStrategy = 'avalanche' | 'snowball';
@@ -51,7 +52,12 @@ export function PayoffSimulation({
 
   const result = useMemo(() => {
     try {
-      return { ok: true as const, ...comparePlans(debts, monthlyBudgetYen, { strategy }) };
+      const comparison = comparePlans(debts, monthlyBudgetYen, { strategy });
+      // グラフ用の月次残高(FR-02)。comparePlans() は総括の数字だけを返すため、
+      // 同じ入力で改めて明細を取り直す(小規模な純粋計算で往復コストは無い)。
+      const baselineRows = simulateTotalPayoff(debts, { strategy: 'minimum' });
+      const proposedRows = simulateTotalPayoff(debts, { monthlyBudgetYen, strategy });
+      return { ok: true as const, ...comparison, baselineRows, proposedRows };
     } catch (e) {
       const message = e instanceof PayoffError ? e.message : 'シミュレーションできませんでした';
       return { ok: false as const, message };
@@ -117,15 +123,22 @@ export function PayoffSimulation({
 
       <div className="mt-5">
         {result.ok ? (
-          <ComparisonTable
-            baselineMonths={result.baseline.months}
-            baselineInterestYen={result.baseline.totalInterestYen}
-            proposedMonths={result.proposed.months}
-            proposedPayoffOn={result.proposed.payoffOn}
-            proposedInterestYen={result.proposed.totalInterestYen}
-            savedInterestYen={result.savedInterestYen}
-            shortenedMonths={result.shortenedMonths}
-          />
+          <>
+            <ComparisonTable
+              baselineMonths={result.baseline.months}
+              baselineInterestYen={result.baseline.totalInterestYen}
+              proposedMonths={result.proposed.months}
+              proposedPayoffOn={result.proposed.payoffOn}
+              proposedInterestYen={result.proposed.totalInterestYen}
+              savedInterestYen={result.savedInterestYen}
+              shortenedMonths={result.shortenedMonths}
+            />
+            <PayoffCurveChart
+              baseline={result.baselineRows}
+              proposed={result.proposedRows}
+              startingBalanceYen={totalBalanceYen}
+            />
+          </>
         ) : (
           <p className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
             {result.message}
