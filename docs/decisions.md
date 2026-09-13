@@ -23,7 +23,7 @@
 | ADR-008 | 金額の内部表現 | `bigint` の円単位・符号付き | 確定 | 大 |
 | ADR-009 | 定期実行基盤 | GitHub Actions(業務) + pg_cron(死活) | 確定 | 中 |
 | ADR-010 | 分類 AI モデル | Claude Haiku 4.5 | 確定 | 小 |
-| ADR-011 | 認証方式 | Supabase Auth パスワードのみ(合言葉付き新規登録で初回設定・復旧)+ RLS | 確定 | 中 |
+| ADR-011 | 認証方式 | Supabase Auth パスワードのみ(新規登録タブで初回設定・復旧、既存アカウントのみ)+ RLS | 確定 | 中 |
 | ADR-012 | ホスティング | Vercel(Hobby) | 確定 | 中 |
 | ADR-013 | 返済戦略 | アバランチ(高金利優先)を既定 | 確定 | 小 |
 | ADR-014 | 設定値の置き場所 | `app_settings` テーブル(秘密情報は環境変数) | 確定 | 中 |
@@ -276,8 +276,11 @@
 
 - Magic Link(`signInWithOtp`)・`/auth/callback` は完全に削除。ログインは `/login` の「パスワード」タブのみ
 - 初回のパスワード設定・失念時の復旧は「新規登録」タブに置き換えた。ここでの「登録」は新しいアカウントを作るものではない――`app/login/actions.ts` の `registerPasswordAction()` が `admin.auth.admin.updateUserById()` で既存アカウントのパスワードを直接書き換えるだけで、`admin.createUser()` は一切呼ばない(メールアドレスが既存のアカウントと一致しない場合はエラーになり、新規アカウントは作られない)
-- メールアドレスだけでは「他人がこの URL の存在を知って打ち込む」ことを防げない(誰でも知っている前提の情報のため)。そこで本人しか知らない合言葉(環境変数 `REGISTRATION_SECRET`、`/api/cron/* ` の `CRON_SECRET` と同じ位置付け)をもう1つの認証要素として要求し、Magic Link 廃止前と同じ「本人以外は入れない」を保つ
 - 成功しても `registerPasswordAction()` 自体はセッションを作らない(admin 操作はブラウザの cookie を書けない)。クライアント側で続けて `supabase.auth.signInWithPassword()` を呼び、そこで初めてログインする
+
+**改定(2026-09-13、同日2回目):合言葉(`REGISTRATION_SECRET`)を廃止**
+
+上記の改定で追加した合言葉による2要素目を、本人の意向により撤回した。**メールアドレスが既存アカウントと一致しさえすれば、誰でもパスワードを変更してログインできる状態になる**(新規アカウントは作られないという制約は維持されるが、既存の唯一のアカウントの乗っ取りは可能になる)。この URL・メールアドレスの機密性のみに依拠する設計であることを明記しておく。`app/login/actions.ts`/`app/login/login-form.tsx` から `REGISTRATION_SECRET` 関連のコード・環境変数・テストをすべて削除した。
 
 ---
 
