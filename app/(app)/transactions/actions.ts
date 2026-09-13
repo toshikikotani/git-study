@@ -20,19 +20,72 @@ import {
 } from '@/features/transactions/store';
 import { replaceSplits, TransactionSplitStoreError } from '@/features/transactions/splits-store';
 
+/**
+ * レシート商品行から作った分割(本人発案)。呼び出し側(receipt/page.tsx)は
+ * 分割したい行の StoredTransaction に一意な sourceRef を振っておき、ここで
+ * 保存後の実 id と対応付けて transaction_splits を作る。
+ *
+ * B-7(transaction_splits マイグレーション未適用)の間はテーブルが無いため
+ * 個別に失敗するが、明細そのものの取り込みは失敗させない(通常の1件として
+ * 残る)。失敗は warnings にまとめて画面に見せる。
+ */
+export type ReceiptSplitInput = {
+  sourceRef: string;
+  splits: readonly TransactionSplitInput[];
+};
+
 export async function saveImportBatchAction(
   preview: readonly StoredTransaction[],
-  meta: { fileName: string; source: TransactionSource; accountId: string; failedCount: number },
-): Promise<{ imported: number; duplicates: number; error: string | null }> {
+  meta: {
+    fileName: string;
+    source: TransactionSource;
+    accountId: string;
+    failedCount: number;
+    /** レシート撮影(本人発案)。features/import/receipt-storage.ts 参照。 */
+    receiptImagePath?: string | null;
+  },
+  receiptSplits: readonly ReceiptSplitInput[] = [],
+): Promise<{
+  imported: number;
+  duplicates: number;
+  error: string | null;
+  splitWarnings: string[];
+}> {
+  let result;
   try {
-    const result = await importTransactions(preview, meta);
-    revalidatePath('/transactions');
-    return { imported: result.importedCount, duplicates: result.duplicateCount, error: null };
+    result = await importTransactions(preview, meta);
   } catch (error) {
     const message =
       error instanceof TransactionStoreError ? error.message : '取り込みに失敗しました。';
-    return { imported: 0, duplicates: 0, error: message };
+    return { imported: 0, duplicates: 0, error: message, splitWarnings: [] };
   }
+  revalidatePath('/transactions');
+
+  const splitWarnings: string[] = [];
+  if (receiptSplits.length > 0) {
+    const splitsBySourceRef = new Map(receiptSplits.map((s) => [s.sourceRef, s.splits]));
+    for (const inserted of result.insertedTransactions) {
+      if (inserted.sourceRef === null) continue;
+      const splits = splitsBySourceRef.get(inserted.sourceRef);
+      if (!splits) continue;
+      try {
+        await replaceSplits(inserted.id, splits);
+      } catch (error) {
+        splitWarnings.push(
+          error instanceof TransactionSplitStoreError
+            ? error.message
+            : '商品ごとの分割を保存できませんでした。',
+        );
+      }
+    }
+  }
+
+  return {
+    imported: result.importedCount,
+    duplicates: result.duplicateCount,
+    error: null,
+    splitWarnings,
+  };
 }
 
 export async function updateTransactionAction(

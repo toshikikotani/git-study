@@ -940,6 +940,7 @@ export type Database = {
           imported_count: number;
           period_from: string | null;
           period_to: string | null;
+          receipt_image_path: string | null;
           row_count: number;
           source: Database['public']['Enums']['transaction_source'];
           status: Database['public']['Enums']['import_status'];
@@ -959,6 +960,7 @@ export type Database = {
           imported_count?: number;
           period_from?: string | null;
           period_to?: string | null;
+          receipt_image_path?: string | null;
           row_count?: number;
           source: Database['public']['Enums']['transaction_source'];
           status?: Database['public']['Enums']['import_status'];
@@ -978,6 +980,7 @@ export type Database = {
           imported_count?: number;
           period_from?: string | null;
           period_to?: string | null;
+          receipt_image_path?: string | null;
           row_count?: number;
           source?: Database['public']['Enums']['transaction_source'];
           status?: Database['public']['Enums']['import_status'];
