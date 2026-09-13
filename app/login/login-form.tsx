@@ -130,10 +130,23 @@ function RegisterForm() {
     event.preventDefault();
     setStatus('sending');
 
-    const { error } = await registerPasswordAction(email, password, passwordConfirmation, secret);
-    if (error) {
+    let result: { error: string | null };
+    try {
+      result = await registerPasswordAction(email, password, passwordConfirmation, secret);
+    } catch {
+      // REGISTRATION_SECRET 未設定など、サーバー側の設定不備で例外が飛んでくる
+      // ことがある。「設定しています…」のまま固まって見えるのを防ぐため、
+      // ここで必ず error 状態に落とす。
       setStatus('error');
-      setErrorMessage(error);
+      setErrorMessage(
+        '登録処理でエラーが発生しました。サーバー側の設定(REGISTRATION_SECRET)が未完了の可能性があります。',
+      );
+      return;
+    }
+
+    if (result.error) {
+      setStatus('error');
+      setErrorMessage(result.error);
       return;
     }
 
