@@ -52,6 +52,7 @@
   --accent: #2a78d6; /* 返済・残り */
   --accent-track: #dceafc; /* 空のトラック(同一ランプの明るい段) */
   --income: #0f8f60; /* 収入 */
+  --income-track: #d9f2e6;
   --over: #e34948; /* 超過・支出 */
   --over-track: #f9dfdf;
   --attention: #b8860b; /* 閾値到達。点で使い、必ず文字を伴う */
@@ -77,6 +78,7 @@
     --accent: #3987e5;
     --accent-track: #16294a;
     --income: #199e70;
+    --income-track: #163829;
     --over: #e66767;
     --over-track: #3d2027;
     --attention: #fab219;
@@ -101,6 +103,7 @@
   --accent: #3987e5;
   --accent-track: #16294a;
   --income: #199e70;
+  --income-track: #163829;
   --over: #e66767;
   --over-track: #3d2027;
   --attention: #fab219;

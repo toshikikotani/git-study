@@ -150,9 +150,10 @@ export default async function HomePage() {
           );
 
           return (
-            <div
+            <Link
               key={tile.categoryId}
-              className="rise"
+              href={`/budget/${tile.categoryId}`}
+              className="rise block"
               style={{ animationDelay: `${100 + index * 70}ms` }}
             >
               <StatTile
@@ -172,7 +173,7 @@ export default async function HomePage() {
                   tile.usageRatio === null ? undefined : `${Math.round(tile.usageRatio * 100)}%`
                 }
               />
-            </div>
+            </Link>
           );
         })}
       </div>
