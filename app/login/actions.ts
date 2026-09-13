@@ -11,27 +11,17 @@
  * .updateUserById() で直接書き換えるだけで、admin.createUser() は
  * 一切呼ばない)。
  *
- * メールアドレスだけでは誰でも知っている前提の情報のため、
- * REGISTRATION_SECRET(本人しか知らない合言葉)をもう1つの認証要素
- * として要求する(/api/cron/* の CRON_SECRET と同じ考え方)。
+ * 合言葉(REGISTRATION_SECRET)による2要素目は本人の意向で廃止した
+ * (2026-09-13改定)。メールアドレスが既存アカウントと一致しさえすれば
+ * 誰でもパスワードを変更できる状態になる点は明示しておく。
  *
  * 成功してもここではセッションを作らない(admin 操作はブラウザの cookie
  * を書けない)。呼び出し側(login-form.tsx)が続けて
  * `supabase.auth.signInWithPassword()` を呼び、そこで初めてログインする。
  */
 
-import { timingSafeEqual } from 'node:crypto';
-
 import { AuthError, assertPassword, assertPasswordConfirmed } from '@/domain/auth';
-import { getRegistrationSecret } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-function isValidSecret(secret: string): boolean {
-  const expectedBuf = Buffer.from(getRegistrationSecret());
-  const secretBuf = Buffer.from(secret);
-  if (secretBuf.length !== expectedBuf.length) return false;
-  return timingSafeEqual(secretBuf, expectedBuf);
-}
 
 function describeError(error: unknown): string {
   if (error instanceof AuthError) return error.message;
@@ -42,7 +32,6 @@ export async function registerPasswordAction(
   email: string,
   password: string,
   passwordConfirmation: string,
-  secret: string,
 ): Promise<{ error: string | null }> {
   let confirmedPassword: string;
   try {
@@ -53,10 +42,6 @@ export async function registerPasswordAction(
   }
 
   try {
-    if (!isValidSecret(secret)) {
-      return { error: '合言葉が正しくありません' };
-    }
-
     const admin = createAdminClient();
     const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
     if (usersError) {
@@ -77,13 +62,12 @@ export async function registerPasswordAction(
 
     return { error: null };
   } catch {
-    // REGISTRATION_SECRET/SUPABASE_SERVICE_ROLE_KEY 未設定など、サーバー側の
-    // 設定不備で例外が飛んでくることがある。Server Action の例外は
-    // クライアントへ生の内容が伝わらず「固まって見える」原因になるため、
-    // ここで必ず分かるメッセージへ変換する。
+    // SUPABASE_SERVICE_ROLE_KEY 未設定など、サーバー側の設定不備で例外が
+    // 飛んでくることがある。Server Action の例外はクライアントへ生の内容が
+    // 伝わらず「固まって見える」原因になるため、ここで必ず分かるメッセージへ
+    // 変換する。
     return {
-      error:
-        'サーバー側の設定が完了していません(REGISTRATION_SECRET 等)。しばらくしてから再度お試しください。',
+      error: 'サーバー側の設定が完了していません。しばらくしてから再度お試しください。',
     };
   }
 }

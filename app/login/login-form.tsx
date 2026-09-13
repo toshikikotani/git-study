@@ -6,11 +6,11 @@
  * 初回のパスワード設定・失念時の復旧経路は「新規登録」タブに置き換えた
  * ――ここでの「登録」は新しいアカウントを作るものではなく、既存の
  * (本人の)アカウントのメールアドレスと一致した場合にしかパスワードを
- * 設定できない(actions.ts の `registerPasswordAction` 参照)。メール
- * アドレスだけでは誰でも知っている前提の情報のため、本人しか知らない
- * 合言葉(REGISTRATION_SECRET)をもう1つの認証要素として要求することで、
- * 他人がこの URL の存在を知っても勝手にログインできないようにしている
- * (元の shouldCreateUser: false と同じ「本人以外は入れない」を保つ)。
+ * 設定できない(actions.ts の `registerPasswordAction` 参照)。
+ *
+ * 合言葉による2要素目は本人の意向で廃止した(2026-09-13改定)。
+ * メールアドレスが既存アカウントと一致しさえすれば誰でもパスワードを
+ * 変更できる状態になる点は actions.ts に明記している。
  */
 'use client';
 
@@ -122,7 +122,6 @@ function RegisterForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  const [secret, setSecret] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -132,15 +131,13 @@ function RegisterForm() {
 
     let result: { error: string | null };
     try {
-      result = await registerPasswordAction(email, password, passwordConfirmation, secret);
+      result = await registerPasswordAction(email, password, passwordConfirmation);
     } catch {
-      // REGISTRATION_SECRET 未設定など、サーバー側の設定不備で例外が飛んでくる
-      // ことがある。「設定しています…」のまま固まって見えるのを防ぐため、
+      // サーバー側の設定不備などで例外が飛んでくることがある。
+      // 「設定しています…」のまま固まって見えるのを防ぐため、
       // ここで必ず error 状態に落とす。
       setStatus('error');
-      setErrorMessage(
-        '登録処理でエラーが発生しました。サーバー側の設定(REGISTRATION_SECRET)が未完了の可能性があります。',
-      );
+      setErrorMessage('登録処理でエラーが発生しました。しばらくしてから再度お試しください。');
       return;
     }
 
@@ -211,21 +208,6 @@ function RegisterForm() {
           boxShadow: 'var(--card-shadow)',
         }}
       />
-      <input
-        type="password"
-        required
-        autoComplete="off"
-        value={secret}
-        onChange={(event) => setSecret(event.target.value)}
-        placeholder="合言葉"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-        style={{
-          background: 'var(--surface)',
-          color: 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
-        }}
-      />
-
       {status === 'error' ? (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
           {errorMessage}
