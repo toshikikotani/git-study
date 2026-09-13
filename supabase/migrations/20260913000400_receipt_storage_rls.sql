@@ -18,7 +18,11 @@
 
 begin;
 
-alter table storage.objects enable row level security;
+-- storage.objects は Supabase 側で作成時から RLS が有効になっている
+-- (テーブルの所有者は supabase_storage_admin で、SQL Editor が使う postgres
+-- ロールはその所有権を持たない)。ALTER TABLE ... ENABLE ROW LEVEL SECURITY
+-- を実行すると「must be owner of table objects」で失敗するため、ここでは
+-- 有効化し直さず、ポリシーの作成だけ行う(実際に本番プロジェクトで確認)。
 
 drop policy if exists "receipts_own_folder" on storage.objects;
 create policy "receipts_own_folder" on storage.objects
