@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildBudgetPaceAlert,
   buildJobFailureAlert,
+  buildMonthlyRecapAlert,
+  buildRuleMisfireAlert,
   detectInactivity,
   detectPaymentDueTomorrow,
   detectRiskyTransaction,
   detectWastefulBudget,
+  isAheadOfPace,
+  isLastDayOfMonth,
+  isMisfiringRule,
 } from '@/domain/alerts';
 import type { BudgetStatus } from '@/domain/budget';
 
@@ -205,6 +211,162 @@ describe('buildJobFailureAlert(NFR-06)', () => {
   it('同じ日の別ジョブは dedup_key が異なる', () => {
     const a = buildJobFailureAlert('detect-alerts', 'x', '2026-09-12');
     const b = buildJobFailureAlert('morning-brief', 'x', '2026-09-12');
+    expect(a.dedupKey).not.toBe(b.dedupKey);
+  });
+});
+
+describe('isMisfiringRule(P5-2)', () => {
+  it('母数が最低件数(既定3件)に満たなければ判定しない', () => {
+    expect(isMisfiringRule({ hitCount: 2, correctedCount: 2 })).toBe(false);
+  });
+
+  it('修正率が閾値(既定50%)以上なら誤爆と判定する', () => {
+    expect(isMisfiringRule({ hitCount: 4, correctedCount: 2 })).toBe(true);
+  });
+
+  it('修正率が閾値未満なら誤爆と判定しない', () => {
+    expect(isMisfiringRule({ hitCount: 10, correctedCount: 2 })).toBe(false);
+  });
+
+  it('閾値・最低件数はオプションで上書きできる', () => {
+    expect(isMisfiringRule({ hitCount: 5, correctedCount: 1 }, { minHits: 5 })).toBe(false);
+    expect(
+      isMisfiringRule({ hitCount: 5, correctedCount: 1 }, { correctionRateThreshold: 0.2 }),
+    ).toBe(true);
+  });
+});
+
+describe('buildRuleMisfireAlert(P5-2)', () => {
+  it('ルール名・件数から候補を組み立てる', () => {
+    const alert = buildRuleMisfireAlert('r1', 'ローソンを浪費に分類', 3, 5);
+    expect(alert.kind).toBe('other');
+    expect(alert.severity).toBe('warn');
+    expect(alert.title).toBe('ルール「ローソンを浪費に分類」を無効化しました');
+    expect(alert.body).toMatch(/5件中3件/);
+    expect(alert.dedupKey).toBe('rule_misfire:r1');
+  });
+
+  it('ルールごとに dedup_key が異なる', () => {
+    const a = buildRuleMisfireAlert('r1', 'x', 3, 5);
+    const b = buildRuleMisfireAlert('r2', 'x', 3, 5);
+    expect(a.dedupKey).not.toBe(b.dedupKey);
+  });
+});
+
+describe('isAheadOfPace(P5-3)', () => {
+  it('経過日数に対して消化率が閾値(既定1.5倍)以上ならペースが速いと判定する', () => {
+    // 30日中9日経過(30%)で使用率50% → 50/30 ≈ 1.67倍
+    expect(isAheadOfPace(status({ usageRatio: 0.5 }), 9, 30)).toBe(true);
+  });
+
+  it('ペースが遅ければ判定しない', () => {
+    // 30日中20日経過(67%)で使用率30% → 30/67 ≈ 0.45倍
+    expect(isAheadOfPace(status({ usageRatio: 0.3 }), 20, 30)).toBe(false);
+  });
+
+  it('既に70%に達していればここでは発火しない(FR-20側の責務)', () => {
+    expect(isAheadOfPace(status({ usageRatio: 0.9 }), 5, 30)).toBe(false);
+  });
+
+  it('月初の数日(既定3日未満)は誤検知を避けるため判定しない', () => {
+    expect(isAheadOfPace(status({ usageRatio: 0.3 }), 1, 30)).toBe(false);
+  });
+
+  it('usageRatio が null(予算未設定)なら判定しない', () => {
+    expect(isAheadOfPace(status({ budgetYen: null, usageRatio: null }), 9, 30)).toBe(false);
+  });
+
+  it('閾値・最低経過日数はオプションで上書きできる', () => {
+    expect(isAheadOfPace(status({ usageRatio: 0.2 }), 9, 30, { paceMultiplier: 0.5 })).toBe(true);
+    expect(isAheadOfPace(status({ usageRatio: 0.5 }), 2, 30, { minElapsedDays: 1 })).toBe(true);
+  });
+});
+
+describe('buildBudgetPaceAlert(P5-3)', () => {
+  it('カテゴリ名・残額から候補を組み立てる', () => {
+    const alert = buildBudgetPaceAlert(
+      { id: 'c1', name: '浪費' },
+      status({ usageRatio: 0.5, remainingYen: 5000 }),
+      '2026-09',
+    );
+    expect(alert.kind).toBe('other');
+    expect(alert.severity).toBe('info');
+    expect(alert.title).toBe('浪費のペースが速めです');
+    expect(alert.body).toMatch(/5,000円/);
+    expect(alert.dedupKey).toBe('budget_pace:c1:2026-09');
+  });
+
+  it('月が変わると dedup_key も変わる', () => {
+    const a = buildBudgetPaceAlert(
+      { id: 'c1', name: '浪費' },
+      status({ usageRatio: 0.5 }),
+      '2026-09',
+    );
+    const b = buildBudgetPaceAlert(
+      { id: 'c1', name: '浪費' },
+      status({ usageRatio: 0.5 }),
+      '2026-10',
+    );
+    expect(a.dedupKey).not.toBe(b.dedupKey);
+  });
+});
+
+describe('isLastDayOfMonth(P6-1)', () => {
+  it('翌日が翌月なら月末とみなす', () => {
+    expect(isLastDayOfMonth('2026-09-30', '2026-10-01')).toBe(true);
+  });
+
+  it('30日までの月でも正しく判定する(31日固定にしない)', () => {
+    expect(isLastDayOfMonth('2026-04-30', '2026-05-01')).toBe(true);
+  });
+
+  it('翌日も同じ月なら月末ではない', () => {
+    expect(isLastDayOfMonth('2026-09-29', '2026-09-30')).toBe(false);
+  });
+});
+
+describe('buildMonthlyRecapAlert(P6-1)', () => {
+  it('返済・副業収入・浪費カテゴリの状況を1件のアラートにまとめる', () => {
+    const alert = buildMonthlyRecapAlert({
+      monthKey: '2026-09',
+      totalPaidYen: 50_000,
+      totalSideIncomeYen: 30_000,
+      wasteCategories: [{ name: '浪費', status: status({ spentYen: 15_000, usageRatio: 0.75 }) }],
+    });
+    expect(alert.kind).toBe('other');
+    expect(alert.title).toBe('2026年9月の振り返り');
+    expect(alert.body).toMatch(/今月の返済: 50,000円/);
+    expect(alert.body).toMatch(/副業収入: 30,000円/);
+    expect(alert.body).toMatch(/浪費: 15,000円\(予算の75%\)/);
+    expect(alert.dedupKey).toBe('monthly_recap:2026-09');
+  });
+
+  it('浪費カテゴリが無くても組み立てられる', () => {
+    const alert = buildMonthlyRecapAlert({
+      monthKey: '2026-09',
+      totalPaidYen: 0,
+      totalSideIncomeYen: 0,
+      wasteCategories: [],
+    });
+    expect(alert.body).toBe('今月の返済: 0円\n副業収入: 0円');
+  });
+
+  it('予算が無い浪費カテゴリは「予算なし」と表示する', () => {
+    const alert = buildMonthlyRecapAlert({
+      monthKey: '2026-09',
+      totalPaidYen: 0,
+      totalSideIncomeYen: 0,
+      wasteCategories: [
+        { name: '浪費', status: status({ budgetYen: null, usageRatio: null, spentYen: 3_000 }) },
+      ],
+    });
+    expect(alert.body).toMatch(/浪費: 3,000円\(予算なし\)/);
+  });
+
+  it('月が変わると dedup_key も変わる', () => {
+    const summary = { totalPaidYen: 0, totalSideIncomeYen: 0, wasteCategories: [] };
+    const a = buildMonthlyRecapAlert({ ...summary, monthKey: '2026-09' });
+    const b = buildMonthlyRecapAlert({ ...summary, monthKey: '2026-10' });
     expect(a.dedupKey).not.toBe(b.dedupKey);
   });
 });

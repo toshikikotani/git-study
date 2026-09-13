@@ -165,7 +165,10 @@ export function totalSpentYen(transactions: readonly BudgetTransaction[]): numbe
 /**
  * 集計に数えるべき明細か。
  * 口座間振替はお金が減っていないため除く。本人が対象外とした明細も除く。
+ *
+ * domain/spending.ts(P6-2)の月次集計でも同じ判定を使うため export する
+ * (「収支の対象外」の定義を1箇所に保つ)。
  */
-function isCountable(tx: BudgetTransaction): boolean {
+export function isCountable(tx: BudgetTransaction): boolean {
   return !tx.isTransfer && tx.reviewStatus !== 'ignored';
 }

@@ -8,6 +8,8 @@ import {
   computeInvestmentPlan,
   InvestmentError,
   isFullyPaidOff,
+  totalInvestmentValueAsOf,
+  type InvestmentSnapshotPoint,
 } from '@/domain/investment';
 
 describe('computeInvestmentPlan(FR-50)', () => {
@@ -133,5 +135,44 @@ describe('assertProductName', () => {
   it('空文字・空白のみは拒否する', () => {
     expect(() => assertProductName('')).toThrow(InvestmentError);
     expect(() => assertProductName('   ')).toThrow(/商品名/);
+  });
+});
+
+function point(productKey: string, asOf: string, marketValueYen: number): InvestmentSnapshotPoint {
+  return { productKey, asOf, marketValueYen };
+}
+
+describe('totalInvestmentValueAsOf(P6-3)', () => {
+  it('商品ごとに最新のスナップショットだけを合算する', () => {
+    const total = totalInvestmentValueAsOf(
+      [point('p1', '2026-07-01', 100_000), point('p1', '2026-08-01', 120_000)],
+      '2026-09-30',
+    );
+    expect(total).toBe(120_000);
+  });
+
+  it('複数商品はそれぞれの最新値を合算する', () => {
+    const total = totalInvestmentValueAsOf(
+      [point('p1', '2026-08-01', 100_000), point('p2', '2026-08-15', 50_000)],
+      '2026-09-30',
+    );
+    expect(total).toBe(150_000);
+  });
+
+  it('指定日より後のスナップショットは無視する', () => {
+    const total = totalInvestmentValueAsOf(
+      [point('p1', '2026-08-01', 100_000), point('p1', '2026-10-01', 200_000)],
+      '2026-09-30',
+    );
+    expect(total).toBe(100_000);
+  });
+
+  it('指定日以前の記録が無い商品は0として無視する', () => {
+    const total = totalInvestmentValueAsOf([point('p1', '2026-10-01', 200_000)], '2026-09-30');
+    expect(total).toBe(0);
+  });
+
+  it('スナップショットが無ければ0', () => {
+    expect(totalInvestmentValueAsOf([], '2026-09-30')).toBe(0);
   });
 });

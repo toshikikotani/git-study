@@ -1182,6 +1182,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      net_worth_snapshots: {
+        Row: {
+          as_of: string;
+          created_at: string;
+          debt_balance_yen: number;
+          id: string;
+          investment_value_yen: number;
+          user_id: string;
+        };
+        Insert: {
+          as_of: string;
+          created_at?: string;
+          debt_balance_yen: number;
+          id?: string;
+          investment_value_yen: number;
+          user_id: string;
+        };
+        Update: {
+          as_of?: string;
+          created_at?: string;
+          debt_balance_yen?: number;
+          id?: string;
+          investment_value_yen?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       repayment_scenarios: {
         Row: {
           computed_at: string | null;
