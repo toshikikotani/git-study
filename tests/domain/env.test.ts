@@ -57,6 +57,16 @@ describe('cronSecretSchema', () => {
   });
 });
 
+describe('registrationSecretSchema', () => {
+  it('正しい値を通す', () => {
+    expect(schemas.registrationSecretSchema.safeParse('d'.repeat(16)).success).toBe(true);
+  });
+
+  it('短すぎる REGISTRATION_SECRET を拒否する', () => {
+    expect(schemas.registrationSecretSchema.safeParse('short').success).toBe(false);
+  });
+});
+
 describe('anthropicApiKeySchema', () => {
   it('正しい値を通す', () => {
     expect(schemas.anthropicApiKeySchema.safeParse('sk-ant-api03-xxxxxxxx').success).toBe(true);
