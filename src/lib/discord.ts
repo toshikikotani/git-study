@@ -9,6 +9,8 @@ export type DiscordEmbed = {
   title: string;
   description?: string | undefined;
   color: number;
+  /** QuickChart 等で作った画像URL(本人発案)。Embed にそのまま貼れる。 */
+  imageUrl?: string | undefined;
 };
 
 export class DiscordSendError extends Error {
@@ -20,10 +22,13 @@ export class DiscordSendError extends Error {
 
 /** Webhook へ Embed を1件送信する。 */
 export async function postDiscordEmbed(webhookUrl: string, embed: DiscordEmbed): Promise<void> {
+  const { imageUrl, ...rest } = embed;
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ embeds: [embed] }),
+    body: JSON.stringify({
+      embeds: [{ ...rest, image: imageUrl ? { url: imageUrl } : undefined }],
+    }),
   });
 
   if (!response.ok) {

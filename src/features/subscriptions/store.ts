@@ -51,6 +51,33 @@ export async function loadDetectedSubscriptions(
   );
 }
 
+/** `detectAndRecordNewSubscriptionAlertsAsAdmin()`・カレンダー同期(本人発案)が共有する取得部分。 */
+export async function loadDetectedSubscriptionsAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: Date = new Date(),
+): Promise<DetectedSubscription[]> {
+  const rangeStart = addMonths(todayJst(now), -LOOKBACK_MONTHS);
+
+  const { data, error } = await client
+    .from('transactions')
+    .select('merchant_name, description, amount_yen, occurred_on, is_transfer, review_status')
+    .eq('user_id', userId)
+    .gte('occurred_on', rangeStart);
+  if (error) throw new SubscriptionStoreError(`明細を取得できませんでした: ${error.message}`);
+
+  return detectSubscriptions(
+    data.map((row) => ({
+      merchantName: row.merchant_name,
+      description: row.description,
+      amountYen: row.amount_yen,
+      occurredOn: row.occurred_on,
+      isTransfer: row.is_transfer,
+      reviewStatus: row.review_status,
+    })),
+  );
+}
+
 /**
  * 新しく検知した定期支払いだけを alerts へ記録する(cron 向け)。
  * dedup_key(店・金額の組み合わせ)が同じものは DB の一意制約により
@@ -62,25 +89,6 @@ export async function detectAndRecordNewSubscriptionAlertsAsAdmin(
   userId: string,
   now: Date = new Date(),
 ): Promise<number> {
-  const rangeStart = addMonths(todayJst(now), -LOOKBACK_MONTHS);
-
-  const { data, error } = await client
-    .from('transactions')
-    .select('merchant_name, description, amount_yen, occurred_on, is_transfer, review_status')
-    .eq('user_id', userId)
-    .gte('occurred_on', rangeStart);
-  if (error) throw new SubscriptionStoreError(`明細を取得できませんでした: ${error.message}`);
-
-  const subscriptions = detectSubscriptions(
-    data.map((row) => ({
-      merchantName: row.merchant_name,
-      description: row.description,
-      amountYen: row.amount_yen,
-      occurredOn: row.occurred_on,
-      isTransfer: row.is_transfer,
-      reviewStatus: row.review_status,
-    })),
-  );
-
+  const subscriptions = await loadDetectedSubscriptionsAsAdmin(client, userId, now);
   return recordAlertsAsAdmin(client, userId, subscriptions.map(buildNewSubscriptionAlert));
 }

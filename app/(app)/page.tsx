@@ -225,6 +225,14 @@ export default async function HomePage() {
           支出レポート
           <span aria-hidden>→</span>
         </Link>
+        <Link
+          href="/settings/google"
+          className="inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          Google連携
+          <span aria-hidden>→</span>
+        </Link>
       </div>
 
       <p className="px-1 pt-0.5 text-[10px] opacity-70" style={{ color: 'var(--ink-muted)' }}>
