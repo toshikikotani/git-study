@@ -1,18 +1,22 @@
 import Link from 'next/link';
 
-import { TransactionRow } from '@/components/ui/transaction-row';
 import { formatYen } from '@/domain/money';
+import type { DetectedSubscription } from '@/domain/subscriptions';
+import { listCategoryOptions } from '@/features/classification/store';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
+import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import {
   loadPaydayPeriodSummary,
   type PaydayPeriodSummary,
 } from '@/features/transactions/period-summary';
+import { listSplitsForDisplay } from '@/features/transactions/splits-store';
 import {
   listImportBatches,
   listTransactions,
   type StoredTransaction,
 } from '@/features/transactions/store';
 import { formatDateJa } from '@/lib/date';
+import { TransactionRowWithSplit } from './split-editor';
 
 /**
  * 明細一覧(FR-10 の出口)。
@@ -25,15 +29,19 @@ import { formatDateJa } from '@/lib/date';
 export const dynamic = 'force-dynamic';
 
 export default async function TransactionsPage() {
-  const [transactions, batches, periodSummary] = await Promise.all([
+  const [transactions, batches, periodSummary, categories, subscriptions] = await Promise.all([
     listTransactions(),
     listImportBatches(),
     loadPaydayPeriodSummary(),
+    listCategoryOptions(),
+    loadDetectedSubscriptions(),
   ]);
 
   if (transactions.length === 0) {
     return <EmptyState />;
   }
+
+  const splitsByTransactionId = await listSplitsForDisplay(transactions.map((t) => t.id));
 
   const risky = transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod));
   const pending = transactions.filter((t) => t.reviewStatus === 'pending');
@@ -74,6 +82,8 @@ export default async function TransactionsPage() {
       </header>
 
       <PaydayPeriodCard summary={periodSummary} />
+
+      <SubscriptionsCard subscriptions={subscriptions} />
 
       {/* FR-21:リボ・キャッシングは一覧の最上部で数を見せる。
           埋もれさせないことが再発防止の要 */}
@@ -124,7 +134,12 @@ export default async function TransactionsPage() {
           </div>
           <ul className="divide-y" style={{ borderColor: 'var(--hairline)' }}>
             {rows.map((t) => (
-              <TransactionRow key={t.id} transaction={t} />
+              <TransactionRowWithSplit
+                key={t.id}
+                transaction={t}
+                categories={categories}
+                initialSplits={splitsByTransactionId.get(t.id) ?? []}
+              />
             ))}
           </ul>
         </section>
@@ -267,6 +282,50 @@ function PaydayPeriodCard({ summary }: { summary: PaydayPeriodSummary }) {
           ))}
         </dl>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * 検知した定期支払い(サブスク、本人発案)。
+ *
+ * 新しいテーブルは持たず domain/subscriptions.ts が都度計算した結果を
+ * そのまま表示するだけ(features/subscriptions/store.ts 参照)。
+ */
+function SubscriptionsCard({ subscriptions }: { subscriptions: DetectedSubscription[] }) {
+  if (subscriptions.length === 0) return null;
+
+  const totalYen = subscriptions.reduce((a, s) => a + s.amountYen, 0);
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          定期支払い({subscriptions.length} 件)
+        </p>
+        <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          月あたり {formatYen(totalYen)}
+        </p>
+      </div>
+
+      <dl className="mt-3 space-y-1.5">
+        {subscriptions.map((s) => (
+          <div key={s.key} className="flex items-baseline justify-between gap-3 text-xs">
+            <dt style={{ color: 'var(--ink-secondary)' }}>
+              {s.label}
+              <span className="ml-1.5" style={{ color: 'var(--ink-muted)' }}>
+                前回 {formatDateJa(s.lastOccurredOn)}・{s.occurrenceCount}回目
+              </span>
+            </dt>
+            <dd className="tabular" style={{ color: 'var(--ink-secondary)' }}>
+              {formatYen(s.amountYen)}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

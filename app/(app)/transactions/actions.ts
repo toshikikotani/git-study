@@ -10,6 +10,7 @@
 
 import { revalidatePath } from 'next/cache';
 
+import type { TransactionSplitInput } from '@/domain/transaction-splits';
 import {
   importTransactions,
   updateTransaction,
@@ -17,6 +18,7 @@ import {
   type StoredTransaction,
   type TransactionSource,
 } from '@/features/transactions/store';
+import { replaceSplits, TransactionSplitStoreError } from '@/features/transactions/splits-store';
 
 export async function saveImportBatchAction(
   preview: readonly StoredTransaction[],
@@ -46,5 +48,22 @@ export async function updateTransactionAction(
   }
   revalidatePath('/transactions');
   revalidatePath('/transactions/review');
+  return { error: null };
+}
+
+/** 明細の複数カテゴリ分割を保存する(本人発案)。空配列を渡すと分割を解除する。 */
+export async function replaceSplitsAction(
+  transactionId: string,
+  splits: readonly TransactionSplitInput[],
+): Promise<{ error: string | null }> {
+  try {
+    await replaceSplits(transactionId, splits);
+  } catch (error) {
+    return {
+      error:
+        error instanceof TransactionSplitStoreError ? error.message : '分割の保存に失敗しました。',
+    };
+  }
+  revalidatePath('/transactions');
   return { error: null };
 }

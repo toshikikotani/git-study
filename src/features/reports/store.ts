@@ -7,6 +7,8 @@
  */
 
 import { summarizeMonthlySpendByCategory, type SpendingTransaction } from '@/domain/spending';
+import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
+import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
 import { monthStartJst } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 
@@ -46,7 +48,7 @@ export async function loadCategorySpendingTrend(
         .order('sort_order', { ascending: true }),
       supabase
         .from('transactions')
-        .select('category_id, amount_yen, is_transfer, review_status, occurred_on')
+        .select('id, category_id, amount_yen, is_transfer, review_status, occurred_on')
         .gte('occurred_on', rangeStart)
         .lt('occurred_on', rangeEnd),
     ]);
@@ -55,12 +57,29 @@ export async function loadCategorySpendingTrend(
   }
   if (rowsError) throw new ReportStoreError(`明細を取得できませんでした: ${rowsError.message}`);
 
-  const transactions: SpendingTransaction[] = rows.map((row) => ({
-    categoryId: row.category_id,
-    amountYen: row.amount_yen,
-    isTransfer: row.is_transfer,
-    reviewStatus: row.review_status,
-    occurredOn: row.occurred_on,
+  // 分割(本人発案)がある明細は、集計の前に分割先のカテゴリ・金額へ展開する。
+  const splitsByTransactionId = await listSplitsForTransactionIds(
+    supabase,
+    rows.map((r) => r.id),
+  );
+  const expandedRows = expandTransactionsWithSplits(
+    rows.map((row) => ({
+      id: row.id,
+      categoryId: row.category_id,
+      amountYen: row.amount_yen,
+      isTransfer: row.is_transfer,
+      reviewStatus: row.review_status,
+      occurredOn: row.occurred_on,
+    })),
+    splitsByTransactionId,
+  );
+
+  const transactions: SpendingTransaction[] = expandedRows.map((row) => ({
+    categoryId: row.categoryId,
+    amountYen: row.amountYen,
+    isTransfer: row.isTransfer,
+    reviewStatus: row.reviewStatus,
+    occurredOn: row.occurredOn,
   }));
 
   const allRows = summarizeMonthlySpendByCategory(categories, transactions, monthKeys);
