@@ -9,6 +9,7 @@ import {
   loadPaydayPeriodSummary,
   type PaydayPeriodSummary,
 } from '@/features/transactions/period-summary';
+import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { listSplitsForDisplay } from '@/features/transactions/splits-store';
 import {
   listImportBatches,
@@ -29,13 +30,15 @@ import { TransactionRowWithSplit } from './split-editor';
 export const dynamic = 'force-dynamic';
 
 export default async function TransactionsPage() {
-  const [transactions, batches, periodSummary, categories, subscriptions] = await Promise.all([
-    listTransactions(),
-    listImportBatches(),
-    loadPaydayPeriodSummary(),
-    listCategoryOptions(),
-    loadDetectedSubscriptions(),
-  ]);
+  const [transactions, batches, periodSummary, categories, subscriptions, duplicates] =
+    await Promise.all([
+      listTransactions(),
+      listImportBatches(),
+      loadPaydayPeriodSummary(),
+      listCategoryOptions(),
+      loadDetectedSubscriptions(),
+      listDuplicateCandidates(),
+    ]);
 
   if (transactions.length === 0) {
     return <EmptyState />;
@@ -103,6 +106,23 @@ export default async function TransactionsPage() {
             該当カードの停止を検討してください。
           </p>
         </div>
+      ) : null}
+
+      {/* 複数経路(CSV・メール・レシート)から同じ買い物が入ると fingerprint では
+          拾えず二重計上になる。気づける場所は一覧の上しかない */}
+      {duplicates.length > 0 ? (
+        <Link
+          href="/transactions/duplicates"
+          className="flex items-center justify-between gap-3 rounded-2xl p-4"
+          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        >
+          <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            二重に入っていそうな明細が {duplicates.length} 組
+          </p>
+          <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+            確認する →
+          </span>
+        </Link>
       ) : null}
 
       {pending.length > 0 ? (
