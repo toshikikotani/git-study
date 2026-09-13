@@ -16,7 +16,7 @@ const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   installment: '分割払い',
 };
 
-type SplitRowState = { categoryId: string; amountYen: string };
+type SplitRowState = { categoryId: string; amountYen: string; note: string };
 
 /**
  * 明細1行 + 複数カテゴリ分割の編集(本人発案)。
@@ -54,7 +54,7 @@ export function TransactionRowWithSplit({
     rows.length >= 2 && rows.every((r) => Number(r.amountYen) > 0) && sumAbsYen === targetAbsYen;
 
   function addRow(): void {
-    setRows((prev) => [...prev, { categoryId: categories[0]?.id ?? '', amountYen: '' }]);
+    setRows((prev) => [...prev, { categoryId: categories[0]?.id ?? '', amountYen: '', note: '' }]);
   }
   function removeRow(index: number): void {
     setRows((prev) => prev.filter((_, i) => i !== index));
@@ -70,7 +70,7 @@ export function TransactionRowWithSplit({
     const payload = rows.map((r) => ({
       categoryId: r.categoryId || null,
       amountYen: sign * Number(r.amountYen),
-      note: null,
+      note: r.note.trim() === '' ? null : r.note.trim(),
     }));
 
     const result = await replaceSplitsAction(transaction.id, payload);
@@ -85,7 +85,7 @@ export function TransactionRowWithSplit({
         categoryId: p.categoryId,
         categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
         amountYen: p.amountYen,
-        note: null,
+        note: p.note,
       })),
     );
     setSaving(false);
@@ -122,7 +122,13 @@ export function TransactionRowWithSplit({
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               {splits.length > 0
-                ? splits.map((s) => s.categoryName ?? '未分類').join(' / ')
+                ? splits
+                    .map((s) =>
+                      s.note
+                        ? `${s.note}(${s.categoryName ?? '未分類'})`
+                        : (s.categoryName ?? '未分類'),
+                    )
+                    .join(' / ')
                 : (transaction.categoryName ?? '未分類')}
             </span>
 
@@ -176,46 +182,62 @@ export function TransactionRowWithSplit({
           </p>
 
           {rows.map((row, index) => (
-            <div key={index} className="flex gap-2">
-              <select
-                value={row.categoryId}
-                onChange={(e) => updateRow(index, { categoryId: e.target.value })}
-                className="flex-1 rounded-xl px-3 py-2 text-sm"
-                style={{
-                  background: 'var(--plane)',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--hairline)',
-                }}
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+            <div key={index} className="space-y-1">
+              <div className="flex gap-2">
+                <select
+                  value={row.categoryId}
+                  onChange={(e) => updateRow(index, { categoryId: e.target.value })}
+                  className="flex-1 rounded-xl px-3 py-2 text-sm"
+                  style={{
+                    background: 'var(--plane)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--hairline)',
+                  }}
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={row.amountYen}
+                  onChange={(e) =>
+                    updateRow(index, { amountYen: e.target.value.replace(/[^0-9]/g, '') })
+                  }
+                  placeholder="金額"
+                  className="w-24 rounded-xl px-3 py-2 text-sm"
+                  style={{
+                    background: 'var(--plane)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--hairline)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(index)}
+                  className="shrink-0 px-2 text-xs"
+                  style={{ color: 'var(--over)' }}
+                >
+                  削除
+                </button>
+              </div>
+              {/* 何を指しているかのメモ(本人発案)。レシートの商品行を自動分割
+                  したときは、ここに商品名が入って残る。 */}
               <input
                 type="text"
-                inputMode="numeric"
-                value={row.amountYen}
-                onChange={(e) =>
-                  updateRow(index, { amountYen: e.target.value.replace(/[^0-9]/g, '') })
-                }
-                placeholder="金額"
-                className="w-24 rounded-xl px-3 py-2 text-sm"
+                value={row.note}
+                onChange={(e) => updateRow(index, { note: e.target.value })}
+                placeholder="メモ(任意。何の分だったか)"
+                className="w-full rounded-xl px-3 py-1.5 text-xs"
                 style={{
                   background: 'var(--plane)',
                   color: 'var(--ink)',
                   border: '1px solid var(--hairline)',
                 }}
               />
-              <button
-                type="button"
-                onClick={() => removeRow(index)}
-                className="shrink-0 px-2 text-xs"
-                style={{ color: 'var(--over)' }}
-              >
-                削除
-              </button>
             </div>
           ))}
 
@@ -278,12 +300,13 @@ function initialRows(
     return splits.map((s) => ({
       categoryId: s.categoryId ?? '',
       amountYen: String(Math.abs(s.amountYen)),
+      note: s.note ?? '',
     }));
   }
   const first = categories[0]?.id ?? '';
   const second = categories[1]?.id ?? first;
   return [
-    { categoryId: first, amountYen: '' },
-    { categoryId: second, amountYen: '' },
+    { categoryId: first, amountYen: '', note: '' },
+    { categoryId: second, amountYen: '', note: '' },
   ];
 }

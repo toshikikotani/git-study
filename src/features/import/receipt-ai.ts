@@ -15,6 +15,14 @@
  * AI にやらせない」という役割分担はここでも変えない。payment_method_text は
  * レシートにそう書かれていた文字列そのままを返させ、判定は従来どおり
  * readPaymentMethod の正規表現が行う。
+ *
+ * ── 商品行(items)も同じ役割分担 ────────────────────────────
+ * スーパーのレシート1枚に食費と日用品が混ざっていても、店名と合計だけでは
+ * 1カテゴリにしかならない(本人発案のもったいなさの指摘)。ここでは商品行
+ * (品名・金額)を書き写すだけにとどめ、カテゴリの判定はしない。分類は
+ * features/classification の既存パイプライン(ルール→本人操作でのAI)に
+ * 商品行を1件ずつ通す(features/transactions 側の責務)。ここで返す items は
+ * 「合計と一致した」場合のみ呼び出し側が transaction_splits の元にする。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -40,12 +48,25 @@ const MAX_AMOUNT_YEN = 10_000_000;
 export const SUPPORTED_RECEIPT_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export type ReceiptMediaType = (typeof SUPPORTED_RECEIPT_MEDIA_TYPES)[number];
 
+export type ParsedReceiptItem = {
+  /** レシートに印字された品名。 */
+  description: string;
+  /** 支出が負(ADR-008)。親の明細と同じ符号。 */
+  amountYen: number;
+};
+
 export type ParsedReceiptTransaction = {
   occurredOn: DateOnly;
   description: string;
   /** 支出が負(ADR-008)。レシートは常に支出として扱う。 */
   amountYen: number;
   paymentMethod: PaymentMethod;
+  /**
+   * 商品行(本人発案)。2件以上あり、合計が amountYen と一致する場合のみ
+   * 入る。それ以外(内訳が無い、1件しかない、合計が合わない)は空配列。
+   * ここに何も入らなくても取り込み自体は今までどおり1件のまま行える。
+   */
+  items: readonly ParsedReceiptItem[];
 };
 
 export type ReceiptParseResult = {
@@ -68,6 +89,11 @@ export interface AiReceiptExtractor {
  *
  * payment_method_text が enum ではなく string なのが要点(email-ai.ts と同じ理由)。
  */
+const itemSchema = z.object({
+  name: z.string().describe('商品名・品名。レシートに印字された表記のまま。'),
+  amount_yen: z.number().describe('その商品の金額(値引き後の実際の請求額)。円単位の整数。'),
+});
+
 const rowSchema = z.object({
   occurred_on: z.string().describe('レシートに印字された日付。YYYY-MM-DD 形式。時刻は含めない。'),
   amount_yen: z
@@ -84,6 +110,12 @@ const rowSchema = z.object({
     .describe(
       '支払方法としてレシートに書かれていた文字列を、そのまま写す。' +
         '言い換えや翻訳や要約はしない。書かれていなければ空文字。',
+    ),
+  items: z
+    .array(itemSchema)
+    .describe(
+      'レシートに印字された商品行。小計・合計・お預り・お釣り・消費税・ポイントの行は' +
+        '含めない。内訳が印字されていない、または商品が1点しかない場合は空配列。',
     ),
 });
 
@@ -108,6 +140,9 @@ const SYSTEM_PROMPT = [
   '  年が画像のどこにも無ければその明細は返さない。',
   '- payment_method_text はレシートの文字列をそのまま写す。',
   '  「クレジット」を「credit card」に直すようなことはしない。',
+  '- items には商品行を1行ずつ書き写す。小計・合計・お預り・お釣り・消費税・',
+  '  ポイント付与/使用の行は商品ではないので含めない。内訳が印字されていない、',
+  '  または商品が1点しかないレシートは items を空配列にしてよい。',
   '- 1枚に複数のレシートが写っていれば、すべて返す。',
   '- レシート・領収書でない画像(無関係な写真、読み取れないほど不鮮明な画像など)は',
   '  is_receipt を false にして transactions を空にする。',
@@ -203,14 +238,16 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
     }
 
     const description = row.store_name.trim();
+    const label = description === '' ? '(店名不明)' : description;
 
     transactions.push({
       occurredOn,
       // レシートは支出(ADR-008)。符号はモデルに委ねない。
       amountYen: -amount,
-      description: description === '' ? '(店名不明)' : description,
+      description: label,
       // ここが FR-21 の砦。判定するのはモデルではなく正規表現(ADR-010)。
       paymentMethod: readPaymentMethod(row.payment_method_text),
+      items: buildItems(row.items, amount, label, warnings),
     });
   }
 
@@ -219,6 +256,43 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
   }
 
   return { transactions, warnings };
+}
+
+/**
+ * 商品行を検証する。2件以上あり、かつ合計が明細の金額(絶対値)と一致する
+ * 場合だけ items を返す。それ以外は「分割は使えない」を警告として残し、
+ * 空配列を返す(取り込み自体は今までどおり1件のまま続けられる)。
+ *
+ * 1件しかない行(内訳が無い/1点だけの買い物)は AI にとって自然な結果
+ * なので、警告なしで静かに空配列を返す。
+ */
+function buildItems(
+  rawItems: readonly { name: string; amount_yen: number }[],
+  totalAmountAbsYen: number,
+  transactionLabel: string,
+  warnings: string[],
+): ParsedReceiptItem[] {
+  if (rawItems.length < 2) return [];
+
+  const items = rawItems
+    .map((it) => ({
+      description: it.name.trim(),
+      amountYen: -Math.abs(Math.round(it.amount_yen)),
+    }))
+    .filter((it) => Number.isFinite(it.amountYen) && it.amountYen !== 0);
+
+  const sum = items.reduce((acc, it) => acc + it.amountYen, 0);
+  if (items.length < 2 || sum !== -totalAmountAbsYen) {
+    warnings.push(
+      `「${transactionLabel}」の商品ごとの内訳が支払合計と一致しないため、カテゴリの分割は使えません(通常の1件としては取り込めます)。`,
+    );
+    return [];
+  }
+
+  return items.map((it) => ({
+    description: it.description === '' ? '(品名不明)' : it.description,
+    amountYen: it.amountYen,
+  }));
 }
 
 /**

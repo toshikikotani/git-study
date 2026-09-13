@@ -637,6 +637,13 @@ create table public.import_batches (
   file_name       text,
   checksum        text,              -- ファイル内容の SHA-256(16進)
 
+  -- レシート撮影(source='manual')でだけ使う。Storage の receipts バケットの
+  -- オブジェクトキー({user_id}/{uuid}.拡張子)。1回の撮影=1バッチのため
+  -- ここに置く(1枚の写真に複数の買い物が写っていても同じ画像を指す。
+  -- transactions 側に複製しない)。CSV・メールの取り込みでは常に null
+  -- (本人発案、ADR-021 の続き)。
+  receipt_image_path text,
+
   period_from     date,
   period_to       date,
 
@@ -1905,6 +1912,40 @@ begin
   end loop;
 end;
 $$;
+
+
+-- -----------------------------------------------------------------------------
+-- 7.1 Supabase Storage — レシート画像(本人発案、ADR-021 の続き)
+--
+--   receipts バケット自体は SQL の対象外(Storage REST API で作る。バケットの
+--   列構成はプラットフォームのバージョンで変わりうるため、SQL の insert では
+--   触らない)。ここで固定するのはオブジェクトへのアクセス制御だけ。
+--
+--   パスは "{user_id}/{uuid}.拡張子" にすることを前提に、本人のフォルダだけ
+--   読み書きできるようにする(Supabase 公式のフォルダ単位アクセス制御と同じ
+--   パターン)。アップロードは features/import/receipt-storage.ts が本人の
+--   セッション(RLS 適用)で行うため、ここが実際の砦になる。
+--
+--   storage.objects は Supabase 側で作成時から RLS が有効になっている
+--   (テーブルの所有者は supabase_storage_admin で、SQL Editor が使う
+--   postgres ロールはその所有権を持たない)。ALTER TABLE ... ENABLE ROW
+--   LEVEL SECURITY を実行すると「must be owner of table objects」で失敗
+--   するため、ここでは有効化し直さず、ポリシーの作成だけ行う
+--   (実際に本番プロジェクトで確認)。
+-- -----------------------------------------------------------------------------
+
+drop policy if exists "receipts_own_folder" on storage.objects;
+create policy "receipts_own_folder" on storage.objects
+  for all
+  to authenticated
+  using (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  )
+  with check (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 
 -- =============================================================================

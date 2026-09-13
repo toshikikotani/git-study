@@ -78,29 +78,44 @@ export function DuplicateList({ initial }: { initial: readonly DuplicateCandidat
 
           <div className="mt-3 space-y-2">
             {[candidate.earlier, candidate.later].map((side) => (
-              <button
-                key={side.id}
-                type="button"
-                onClick={() => keep(candidate, side.id)}
-                disabled={savingId !== null}
-                className="w-full rounded-xl p-3 text-left disabled:opacity-50"
-                style={{ background: 'var(--plane)' }}
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-sm" style={{ color: 'var(--ink)' }}>
-                    {side.label}
-                  </span>
-                  <span
-                    className="shrink-0 text-[11px] font-semibold"
+              <div key={side.id}>
+                <button
+                  type="button"
+                  onClick={() => keep(candidate, side.id)}
+                  disabled={savingId !== null}
+                  className="w-full rounded-xl p-3 text-left disabled:opacity-50"
+                  style={{ background: 'var(--plane)' }}
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-sm" style={{ color: 'var(--ink)' }}>
+                      {side.label}
+                    </span>
+                    <span
+                      className="shrink-0 text-[11px] font-semibold"
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      これを残す
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                    {formatDateJa(side.occurredOn)} / {SOURCE_LABEL[side.source]} /{' '}
+                    {side.accountName}
+                  </p>
+                </button>
+                {side.receiptImageUrl ? (
+                  // 別タブで開く(このボタンを押すと保存操作が走るため、リンクの
+                  // クリックがボタンの onClick を発火しないようにしている)。
+                  <a
+                    href={side.receiptImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-block px-3 text-[11px] font-medium underline decoration-dotted underline-offset-4"
                     style={{ color: 'var(--accent)' }}
                   >
-                    これを残す
-                  </span>
-                </div>
-                <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                  {formatDateJa(side.occurredOn)} / {SOURCE_LABEL[side.source]} / {side.accountName}
-                </p>
-              </button>
+                    レシートの写真を見る
+                  </a>
+                ) : null}
+              </div>
             ))}
           </div>
 

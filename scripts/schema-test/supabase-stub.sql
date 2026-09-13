@@ -2,6 +2,7 @@
 create schema if not exists extensions;
 create schema if not exists auth;
 create schema if not exists cron;
+create schema if not exists storage;
 
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then
@@ -26,3 +27,27 @@ $$;
 -- pg_cron はローカルに無いので schedule() だけを模す
 create or replace function cron.schedule(text, text, text) returns bigint
 language sql as $$ select 1::bigint $$;
+
+-- Supabase Storage の最小スタブ(receipts バケットの RLS 検証用)。
+-- 列は本物の一部だけ(RLS のポリシーが参照する分)。
+create table if not exists storage.buckets (
+  id     text primary key,
+  name   text not null,
+  public boolean not null default false
+);
+
+create table if not exists storage.objects (
+  id        uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name      text,
+  owner     uuid
+);
+
+-- 本物の storage.foldername() と同じ形("a/b/c.jpg" → {a,b})。
+create or replace function storage.foldername(name text) returns text[]
+language sql immutable as $$
+  select case
+    when array_length(string_to_array(name, '/'), 1) <= 1 then array[]::text[]
+    else (string_to_array(name, '/'))[1 : array_length(string_to_array(name, '/'), 1) - 1]
+  end;
+$$;

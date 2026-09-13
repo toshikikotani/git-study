@@ -61,6 +61,14 @@ export type ImportResult = {
   importedCount: number;
   /** 既に同じ明細があったため取り込まなかった件数(fingerprint の一意制約で判定)。 */
   duplicateCount: number;
+  /**
+   * 今回新しく作られた明細の id と sourceRef(本人発案、レシート商品行の
+   * 自動分割用)。プレビューの id は保存前の一時的な値で DB の id とは無関係
+   * なため、呼び出し側が自分で付けた sourceRef を鍵にして対応付ける。
+   * fingerprint はトリガが上書きするため対応付けには使えない
+   * (fingerprintOf() のコメント参照)。重複でスキップされた行はここに含まれない。
+   */
+  insertedTransactions: readonly { id: string; sourceRef: string | null }[];
 };
 
 /**

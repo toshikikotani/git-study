@@ -56,12 +56,12 @@ export default async function TransactionsPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           明細
         </h1>
+        {/* ちりつも(/spending)とレシート撮影は下タブ・専用ボタン
+            (app/(app)/layout.tsx)へ動線を移したため、ここには置かない
+            (本人発案:見出しの文字リンクが多すぎて動線がわかりにくかった)。 */}
         <div className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
           <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             口座
-          </Link>
-          <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-            ちりつも
           </Link>
           <Link
             href="/transactions/reconcile"
@@ -69,13 +69,6 @@ export default async function TransactionsPage() {
             style={{ color: 'var(--ink-muted)' }}
           >
             突き合わせ
-          </Link>
-          <Link
-            href="/transactions/receipt"
-            className="text-[13px]"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            レシート
           </Link>
           <Link
             href="/transactions/import"

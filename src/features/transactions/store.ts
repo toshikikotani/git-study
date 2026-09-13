@@ -117,6 +117,11 @@ export async function importTransactions(
     source: TransactionSource;
     accountId: string;
     failedCount: number;
+    /**
+     * レシート撮影(本人発案)。1回の撮影=1バッチのため、この行に置く
+     * (features/import/receipt-storage.ts 参照)。他の取り込み経路では省略する。
+     */
+    receiptImagePath?: string | null;
   },
 ): Promise<ImportResult> {
   const supabase = await createClient();
@@ -125,21 +130,41 @@ export async function importTransactions(
     throw new TransactionStoreError('ログイン状態を確認できませんでした');
   }
 
-  const { data: batch, error: batchError } = await supabase
-    .from('import_batches')
-    .insert({
-      user_id: auth.user.id,
-      source: meta.source,
-      account_id: meta.accountId,
-      file_name: meta.fileName,
-      row_count: transactions.length,
-      failed_count: meta.failedCount,
-      status: 'pending',
-    })
-    .select('id')
-    .single();
-  if (batchError) {
-    throw new TransactionStoreError(`取り込みを開始できませんでした: ${batchError.message}`);
+  const batchBase = {
+    user_id: auth.user.id,
+    source: meta.source,
+    account_id: meta.accountId,
+    file_name: meta.fileName,
+    row_count: transactions.length,
+    failed_count: meta.failedCount,
+    status: 'pending' as const,
+  };
+
+  // receipt_image_path は B-8(マイグレーション未適用)の間、本番に列自体が
+  // 無い。列の有無で処理を分けるのではなく「無ければ諦めて普通に insert し
+  // 直す」ことで、レシート機能以外(CSV・メール)は最初から気にせず動き、
+  // レシートも画像パスが保存されないだけで取り込み自体は失敗しない
+  // (splits-store.ts の isMissingTableError と同じ考え方。列版)。
+  let result: {
+    data: { id: string } | null;
+    error: { message: string; code?: string } | null;
+  } | null = null;
+  if (meta.receiptImagePath !== undefined) {
+    const attempt = await supabase
+      .from('import_batches')
+      .insert({ ...batchBase, receipt_image_path: meta.receiptImagePath })
+      .select('id')
+      .single();
+    // 実際の本番 Supabase で確認した値:INSERT では PGRST204(PostgREST の
+    // スキーマキャッシュ層)、SELECT では 42703(Postgres 本来のエラー)を
+    // 返すことがある。どちらも「列が無い」ことを意味するため両方見る。
+    if (attempt.error?.code !== '42703' && attempt.error?.code !== 'PGRST204') result = attempt;
+  }
+  result ??= await supabase.from('import_batches').insert(batchBase).select('id').single();
+
+  const { data: batch, error: batchError } = result;
+  if (batchError || !batch) {
+    throw new TransactionStoreError(`取り込みを開始できませんでした: ${batchError?.message}`);
   }
 
   if (transactions.length === 0) {
@@ -152,7 +177,7 @@ export async function importTransactions(
         completed_at: new Date().toISOString(),
       })
       .eq('id', batch.id);
-    return { importedCount: 0, duplicateCount: 0 };
+    return { importedCount: 0, duplicateCount: 0, insertedTransactions: [] };
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -178,7 +203,11 @@ export async function importTransactions(
       })),
       { onConflict: 'user_id,fingerprint', ignoreDuplicates: true },
     )
-    .select('id');
+    // fingerprint はトリガが上書きする値なので、渡した行との対応付けには使えない
+    // (types.ts の fingerprintOf() のコメント参照)。source_ref はトリガが
+    // 触らずそのまま入るため、こちらで対応付ける(レシート商品行の自動分割、
+    // 本人発案)。
+    .select('id, source_ref');
 
   if (insertError) {
     await supabase
@@ -205,7 +234,11 @@ export async function importTransactions(
     })
     .eq('id', batch.id);
 
-  return { importedCount, duplicateCount };
+  return {
+    importedCount,
+    duplicateCount,
+    insertedTransactions: inserted.map((row) => ({ id: row.id, sourceRef: row.source_ref })),
+  };
 }
 
 /**
