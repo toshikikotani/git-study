@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { recordJobFailureAlertAsAdmin } from '@/features/alerts/store';
 import { deliverDailyBriefAsAdmin } from '@/features/briefs/notify';
 import { generateDailyBriefAsAdmin } from '@/features/briefs/store';
-import { getCronSecret, getOptionalDiscordWebhookUrl } from '@/lib/env';
+import { getCronSecret, getLineEnv, getOptionalDiscordWebhookUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -16,9 +16,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * 行う。
  *
  * 流れ:当日分を生成(`ux_briefs_user_date` があるため二重生成しない)→
- * Discord へ送信。`daily_briefs.status='delivered'` を送信済みの正とする
- * ため、Actions の遅延で同じ日に複数回走っても二重送信しない(DoD)。
- * Webhook 未設定(B-3 待ち)の間は生成だけ行い、送信はスキップする。
+ * Discord・LINE へ送信(どちらか設定されている分だけ)。
+ * `daily_briefs.status='delivered'` を送信済みの正とするため、Actions の
+ * 遅延で同じ日に複数回走っても二重送信しない(DoD)。どちらも未設定
+ * (B-3 待ち)の間は生成だけ行い、送信はスキップする。
  *
  * 失敗時は kind='job_failure' で alerts に記録する(detect-alerts と同じ、
  * T-24)。この記録自体が失敗しても本来のエラー応答は変えない。
@@ -55,17 +56,19 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const { briefId, created } = await generateDailyBriefAsAdmin(admin, user.id);
 
-    const webhookUrl = getOptionalDiscordWebhookUrl();
-    if (!webhookUrl) {
+    const discordWebhookUrl = getOptionalDiscordWebhookUrl();
+    const line = getLineEnv();
+    if (!discordWebhookUrl && !line) {
       return NextResponse.json({
         briefId,
         created,
         skippedSend: true,
-        reason: 'DISCORD_WEBHOOK_URL が未設定です',
+        reason:
+          '通知先が未設定です(DISCORD_WEBHOOK_URL または LINE_CHANNEL_ACCESS_TOKEN/LINE_USER_ID)',
       });
     }
 
-    const result = await deliverDailyBriefAsAdmin(admin, user.id, webhookUrl);
+    const result = await deliverDailyBriefAsAdmin(admin, user.id, { discordWebhookUrl, line });
     return NextResponse.json({ briefId, created, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
