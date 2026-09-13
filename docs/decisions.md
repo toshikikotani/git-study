@@ -23,7 +23,7 @@
 | ADR-008 | 金額の内部表現 | `bigint` の円単位・符号付き | 確定 | 大 |
 | ADR-009 | 定期実行基盤 | GitHub Actions(業務) + pg_cron(死活) | 確定 | 中 |
 | ADR-010 | 分類 AI モデル | Claude Haiku 4.5 | 確定 | 小 |
-| ADR-011 | 認証方式 | Supabase Auth パスワード優先(Magic Link は復旧経路)+ RLS | 確定 | 中 |
+| ADR-011 | 認証方式 | Supabase Auth パスワードのみ(合言葉付き新規登録で初回設定・復旧)+ RLS | 確定 | 中 |
 | ADR-012 | ホスティング | Vercel(Hobby) | 確定 | 中 |
 | ADR-013 | 返済戦略 | アバランチ(高金利優先)を既定 | 確定 | 小 |
 | ADR-014 | 設定値の置き場所 | `app_settings` テーブル(秘密情報は環境変数) | 確定 | 中 |
@@ -269,6 +269,15 @@
 - シングルユーザーで、使い回すパスワードは無い(本人しかアカウントを持たない)。漏洩経路はメールアカウント自体の方が広く、パスワード追加によるリスク増分は小さい
 - Magic Link は廃止せず、初回のパスワード設定と、忘れた場合の復旧経路として残す(`/login` の「メールでログイン」タブ)。`/auth/callback` を経由したログイン後は毎回 `/settings/password` へ促し、パスワードでのログインに戻れるようにする
 - パスワードは `supabase.auth.updateUser({ password })` でのみ設定・変更する。DB のどのテーブルにも平文はもちろんハッシュも持たない(Supabase Auth 側が管理)
+
+**改定(2026-09-13):Magic Link を廃止し、パスワードのみに**
+
+実運用で Magic Link のリンクが「無効です」と表示され機能しないことが分かった(メールクライアント側のリンク事前展開、リンクの使い捨て性、有効期限切れなど原因は複数あり得るが、いずれにせよ実運用に耐えなかった)。加えて、`/login` を開くたびにスマホで入力欄をタップすると画面が自動拡大される不具合(iOS Safari が `font-size` 16px 未満の input をズーム対象にする既知の挙動)も合わせて修正した(`app/globals.css` に `input, select, textarea { font-size: 16px }` を追加)。
+
+- Magic Link(`signInWithOtp`)・`/auth/callback` は完全に削除。ログインは `/login` の「パスワード」タブのみ
+- 初回のパスワード設定・失念時の復旧は「新規登録」タブに置き換えた。ここでの「登録」は新しいアカウントを作るものではない――`app/login/actions.ts` の `registerPasswordAction()` が `admin.auth.admin.updateUserById()` で既存アカウントのパスワードを直接書き換えるだけで、`admin.createUser()` は一切呼ばない(メールアドレスが既存のアカウントと一致しない場合はエラーになり、新規アカウントは作られない)
+- メールアドレスだけでは「他人がこの URL の存在を知って打ち込む」ことを防げない(誰でも知っている前提の情報のため)。そこで本人しか知らない合言葉(環境変数 `REGISTRATION_SECRET`、`/api/cron/* ` の `CRON_SECRET` と同じ位置付け)をもう1つの認証要素として要求し、Magic Link 廃止前と同じ「本人以外は入れない」を保つ
+- 成功しても `registerPasswordAction()` 自体はセッションを作らない(admin 操作はブラウザの cookie を書けない)。クライアント側で続けて `supabase.auth.signInWithPassword()` を呼び、そこで初めてログインする
 
 ---
 

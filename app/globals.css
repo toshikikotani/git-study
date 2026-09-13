@@ -114,6 +114,16 @@ body {
   color: var(--ink);
 }
 
+/* iOS Safari は input のフォントサイズが 16px 未満だとフォーカス時に
+   画面を自動で拡大する。text-sm(14px)のまま入力欄に使うと入力の
+   たびに拡大されてしまうため、実際の見た目は text-sm のまま保ちつつ
+   フォントサイズだけ 16px 相当に引き上げる。 */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
 /* 大きな数字は比例数字で組む。tabular-nums は桁を 0 幅に揃えるため、
    ヒーロー級のサイズだと字間が間延びして見える。等幅が要るのは
    縦に並ぶ表と軸だけ(dataviz: marks-and-anatomy)。 */

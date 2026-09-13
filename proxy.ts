@@ -17,7 +17,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { getPublicEnv } from '@/lib/env';
 
-const PUBLIC_PATHS = ['/login', '/auth/callback'];
+const PUBLIC_PATHS = ['/login'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

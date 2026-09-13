@@ -26,6 +26,9 @@ const publicSchema = z.object({
  * features/settings/gmail の GMAIL_* と同じ考え方)。
  */
 const cronSecretSchema = z.string().min(32, 'CRON_SECRET は 32 文字以上にしてください');
+const registrationSecretSchema = z
+  .string()
+  .min(16, 'REGISTRATION_SECRET は 16 文字以上にしてください');
 const supabaseServiceRoleKeySchema = z.string().min(20, 'service_role キーが短すぎます');
 const anthropicApiKeySchema = z
   .string()
@@ -129,6 +132,22 @@ export function getCronSecret(): string {
   return parseOrThrow(cronSecretSchema, process.env.CRON_SECRET, 'CRON_SECRET');
 }
 
+/**
+ * /login の「新規登録」タブの認証(ADR-011改定)。
+ *
+ * 登録自体はメールアドレスが既存の(本人の)アカウントと一致する場合にしか
+ * 成立しないため新規アカウントは作られないが、メールアドレスだけでは
+ * 誰でも知っている前提の情報のため、本人しか知らない合言葉をもう1つの
+ * 要素として要求する(CRON_SECRET と同じ考え方)。
+ */
+export function getRegistrationSecret(): string {
+  return parseOrThrow(
+    registrationSecretSchema,
+    process.env.REGISTRATION_SECRET,
+    'REGISTRATION_SECRET',
+  );
+}
+
 /** 明細分類・朝配信の生成(ADR-010)。 */
 export function getAnthropicApiKey(): string {
   return parseOrThrow(anthropicApiKeySchema, process.env.ANTHROPIC_API_KEY, 'ANTHROPIC_API_KEY');
@@ -211,6 +230,7 @@ export function getGmailImportAccountId(): string | null {
 export const schemas = {
   publicSchema,
   cronSecretSchema,
+  registrationSecretSchema,
   supabaseServiceRoleKeySchema,
   anthropicApiKeySchema,
   discordWebhookUrlSchema,
