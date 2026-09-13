@@ -259,6 +259,45 @@ export function comparePlans(
 }
 
 /**
+ * 返済額を上乗せしたときの効果(「ちりつも」換算、本人発案)。
+ *
+ * comparePlans() が「最低返済 vs 目標額」を比べるのに対し、こちらは
+ * 「今の目標額 vs 今の目標額 + 上乗せ分」を比べる。日々の小さな支出を
+ * そのまま返済へ回した場合に完済がどれだけ早まるかを出すために使う
+ * ——「480円」が「完済2ヶ月」に見えた瞬間が、ちりつもの実感そのもの。
+ *
+ * 債務が無い(すべて完済済み)場合は両者とも0ヶ月・利息0円になり、
+ * 効果も0として返る(呼び出し側で場合分けしなくてよい)。
+ */
+export function payoffImpactOfExtraPayment(
+  debts: readonly Debt[],
+  baseMonthlyYen: number,
+  extraMonthlyYen: number,
+  options: SimulateOptions & { strategy?: RepaymentStrategy | undefined } = {},
+): { shortenedMonths: number; savedInterestYen: number } {
+  // 完済済み(債務ゼロ)はこのアプリが目指している状態そのもの。
+  // summarizePayoff() は空スケジュールを例外にするため、ここで先に畳む。
+  if (debts.length === 0) return { shortenedMonths: 0, savedInterestYen: 0 };
+
+  const strategy = options.strategy ?? 'avalanche';
+  const base = summarizePayoff(
+    simulateTotalPayoff(debts, { monthlyBudgetYen: baseMonthlyYen, strategy }, options),
+  );
+  const boosted = summarizePayoff(
+    simulateTotalPayoff(
+      debts,
+      { monthlyBudgetYen: baseMonthlyYen + extraMonthlyYen, strategy },
+      options,
+    ),
+  );
+
+  return {
+    shortenedMonths: base.months - boosted.months,
+    savedInterestYen: base.totalInterestYen - boosted.totalInterestYen,
+  };
+}
+
+/**
  * FR-04:借り換えシミュレーション。全債務の金利を指定値に置き換える。
  * DB は変更しない。画面上の試算にのみ使う。
  */

@@ -5,6 +5,7 @@ import {
   PayoffError,
   compareRefinance,
   comparePlans,
+  payoffImpactOfExtraPayment,
   simulateDebtPayoff,
   simulateTotalPayoff,
   summarizePayoff,
@@ -288,6 +289,33 @@ describe('comparePlans(FR-02)', () => {
     expect(result.baseline.months).toBeGreaterThan(result.proposed.months);
     expect(result.savedInterestYen).toBeGreaterThan(0);
     expect(result.shortenedMonths).toBe(result.baseline.months - result.proposed.months);
+  });
+});
+
+describe('payoffImpactOfExtraPayment(ちりつも換算)', () => {
+  it('上乗せした分だけ完済が早まり、利息が減る', () => {
+    const result = payoffImpactOfExtraPayment(debts, 100_000, 20_000, { baseMonth });
+    expect(result.shortenedMonths).toBeGreaterThan(0);
+    expect(result.savedInterestYen).toBeGreaterThan(0);
+  });
+
+  it('上乗せが0なら効果も0', () => {
+    const result = payoffImpactOfExtraPayment(debts, 100_000, 0, { baseMonth });
+    expect(result).toEqual({ shortenedMonths: 0, savedInterestYen: 0 });
+  });
+
+  it('上乗せが大きいほど効果も大きい(単調)', () => {
+    const small = payoffImpactOfExtraPayment(debts, 100_000, 5_000, { baseMonth });
+    const large = payoffImpactOfExtraPayment(debts, 100_000, 50_000, { baseMonth });
+    expect(large.shortenedMonths).toBeGreaterThanOrEqual(small.shortenedMonths);
+    expect(large.savedInterestYen).toBeGreaterThan(small.savedInterestYen);
+  });
+
+  it('債務が無ければ効果も0(呼び出し側で場合分けしなくてよい)', () => {
+    expect(payoffImpactOfExtraPayment([], 100_000, 20_000, { baseMonth })).toEqual({
+      shortenedMonths: 0,
+      savedInterestYen: 0,
+    });
   });
 });
 
