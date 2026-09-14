@@ -144,3 +144,21 @@ export function rankMerchantsBySpend(
 function normalizeLabel(label: string): string {
   return label.replace(/[\s　]/g, '').toLowerCase();
 }
+
+/**
+ * 今のペースが続いた場合の、今月の着地見込み額(家計簿の「予測」、本人発案)。
+ *
+ * domain/accumulation.ts の annualizedPaceYen() と同じ考え方(1日あたりに
+ * 均してから日数を掛ける)だが、あちらは「1年続いたら」、こちらは
+ * 「今月の残り日数まで」を見積もる——月初の数日だけで年換算すると
+ * 大きく振れるのに対し、月内の着地予測は経過日数の割合がそのまま効くため
+ * 実用上はこちらの方が早い時期から参考になる。
+ */
+export function projectedMonthTotalYen(
+  spentSoFarYen: number,
+  elapsedDays: number,
+  totalDaysInMonth: number,
+): number {
+  if (elapsedDays <= 0) return spentSoFarYen;
+  return Math.round((spentSoFarYen / elapsedDays) * totalDaysInMonth);
+}
