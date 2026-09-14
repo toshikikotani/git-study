@@ -4,10 +4,11 @@
  * ボトムナビの「もっと」— 全画面を網羅するドロップアップメニュー(新機能)。
  *
  * ── なぜ要るか ──────────────────────────────────────────────
- * ボトムナビは4件(ホーム/負債/明細/給料日)に絞っている。それ以外の画面
- * (口座・ルール・投資・副業・転職準備・レポート・朝配信・設定群・レシート
- * 撮影・メール貼り付け・突き合わせ)は、各画面に散らばった導線からしか
- * 辿れず、どこに何があるか把握しづらい。この一覧をここへ集約する。
+ * ボトムナビ(ホーム/家計簿/明細/負債/給料日)と、レシート撮影の専用ボタンで
+ * 主要な動線はカバーできても、それ以外の画面(口座・ルール・AI相談・投資・
+ * 副業・転職準備・レポート・朝配信・設定群・メール貼り付け・請求突合・重複
+ * 確認)は各画面に散らばった導線からしか辿れず、どこに何があるか把握しづらい。
+ * この一覧をここへ集約する。
  *
  * ── なぜアンマウントしないのか ──────────────────────────────
  * 開閉のたびに DOM を作り直すと、閉じるときのアニメーションを再生する前に
@@ -26,7 +27,6 @@ const GROUPS = [
   {
     title: '記録を増やす',
     items: [
-      { href: '/transactions/receipt', label: 'レシートを撮る', dek: '現金・電子マネーの支払い' },
       {
         href: '/transactions/paste',
         label: 'メールを貼り付ける',
@@ -34,14 +34,19 @@ const GROUPS = [
       },
       { href: '/accounts', label: '口座' },
       { href: '/transactions/reconcile', label: '請求突合' },
+      { href: '/transactions/duplicates', label: '重複の確認' },
+    ],
+  },
+  {
+    title: '相談する',
+    items: [
+      { href: '/advisor', label: 'AI相談', dek: '目標設定・買う前相談' },
+      { href: '/rules/chat', label: 'ルールをAIに相談する', dek: '会話でルールを変更' },
     ],
   },
   {
     title: '分類を育てる',
-    items: [
-      { href: '/rules', label: 'カテゴリと分類ルール' },
-      { href: '/rules/chat', label: 'ルールをAIに相談する', dek: '会話でルールを変更' },
-    ],
+    items: [{ href: '/rules', label: 'カテゴリと分類ルール' }],
   },
   {
     title: 'この先に向けて',
@@ -62,6 +67,7 @@ const GROUPS = [
     title: '設定',
     items: [
       { href: '/settings/gmail', label: 'Gmail連携' },
+      { href: '/settings/google', label: 'Google連携' },
       { href: '/settings/password', label: 'パスワード' },
       { href: '/settings/rescued-emails', label: '読み取れなかったメール' },
     ],

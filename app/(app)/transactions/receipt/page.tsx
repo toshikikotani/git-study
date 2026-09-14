@@ -3,15 +3,16 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { saveImportBatchAction } from '../actions';
+import { saveImportBatchAction, type ReceiptSplitInput } from '../actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
 import type { ClassifyResult } from '@/features/classification/store';
+import { formatYen } from '@/domain/money';
 import type { ParsedReceiptTransaction, ReceiptParseResult } from '@/features/import/receipt-ai';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { requestAiClassification } from '@/features/transactions/classify-client';
-import { buildPreview } from '@/features/transactions/import-pipeline';
+import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
 
@@ -27,6 +28,16 @@ import type { StoredTransaction } from '@/features/transactions/store';
  * ── なぜ選択後すぐに AI を呼ばないのか ──────────────────────
  * この経路には辞書のような費用ゼロの手段が無く、呼べば必ず課金される。
  * 貼り付け画面と同じく、写真を選んだだけでは呼ばず、押されたときだけ呼ぶ。
+ *
+ * ── 商品行(items)がある明細は分割して取り込む(本人発案) ──────
+ * receipt-ai.ts が商品ごとの内訳を返せた明細は、店名+合計の1件ではなく
+ * 商品行1つずつを既存の分類パイプライン(ルール→本人操作でのAI)に通し、
+ * 保存時に transaction_splits として自動生成する(features/transactions/
+ * splits-store.ts、P8-2 で追加済み)。明細本体(親)の分類は変えない。
+ * ただし親が「確認待ち」のまま残ると、確認待ちキューで本人が1カテゴリだけ
+ * 選んだ瞬間にその店名の学習ルールができ、次の同じ店の買い物が(実際は
+ * 食費+日用品の混在でも)全部そのカテゴリに誤爆する。実際の分類は商品行
+ * (=splits)側にあるため、親は保存時に auto_ok へ倒す(save() 参照)。
  */
 
 const MAX_IMAGE_SIDE = 1600;
@@ -61,6 +72,26 @@ async function resizeToJpegBase64(file: File): Promise<string> {
   return base64;
 }
 
+/** AI分類の結果(押されたときだけ)を、ルール分類済みの行に上書きで反映する。 */
+function applyAiResults(
+  rows: readonly StoredTransaction[],
+  aiResults: ReadonlyMap<string, ClassifyResult>,
+): StoredTransaction[] {
+  if (aiResults.size === 0) return [...rows];
+  return rows.map((t) => {
+    const applied = aiResults.get(t.id);
+    if (!applied) return t;
+    return {
+      ...t,
+      categoryId: applied.categoryId,
+      categoryName: applied.categoryName,
+      classifiedBy: applied.classifiedBy,
+      confidence: applied.confidence,
+      reviewStatus: applied.reviewStatus,
+    };
+  });
+}
+
 export default function ReceiptPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -68,6 +99,7 @@ export default function ReceiptPage() {
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ReceiptParseResult | null>(null);
   const [saved, setSaved] = useState<{ imported: number; duplicates: number } | null>(null);
+  const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
   const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
   const [classifying, setClassifying] = useState(false);
   const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
@@ -109,6 +141,7 @@ export default function ReceiptPage() {
     setImageError(null);
     setExtracted(null);
     setSaved(null);
+    setSaveWarnings([]);
     setPreviewUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return URL.createObjectURL(file);
@@ -147,6 +180,14 @@ export default function ReceiptPage() {
     }
   };
 
+  // 商品行(items)が2件以上ある明細だけ、店名+合計の1件ではなく商品ごとに
+  // 分割して取り込む(本人発案)。receipt-ai.ts が合計と一致しないと判断した
+  // ものは items が空で返るため、ここでは長さだけ見ればよい。
+  const splitEligible = useMemo(
+    () => extracted?.transactions.map((t) => t.items.length >= 2) ?? [],
+    [extracted],
+  );
+
   const rulePreview = useMemo<StoredTransaction[]>(() => {
     if (!extracted || !accountId) return [];
     return buildPreview(
@@ -159,26 +200,59 @@ export default function ReceiptPage() {
     );
   }, [extracted, rules, categoryNameById, accountId]);
 
-  const preview = useMemo<StoredTransaction[]>(() => {
-    if (aiResults.size === 0) return rulePreview;
-    return rulePreview.map((t) => {
-      const applied = aiResults.get(t.id);
-      if (!applied) return t;
-      return {
-        ...t,
-        categoryId: applied.categoryId,
-        categoryName: applied.categoryName,
-        classifiedBy: applied.classifiedBy,
-        confidence: applied.confidence,
-        reviewStatus: applied.reviewStatus,
-      };
+  // 商品行ごとの分類プレビュー(本人発案)。既存の分類パイプラインに商品名を
+  // そのまま通す(店名向けのルールが当たらなくても、押されたときだけの
+  // AI 分類で埋められる。分類の仕組み自体は増やさない)。
+  const itemRulePreviewByIndex = useMemo<Map<number, StoredTransaction[]>>(() => {
+    const map = new Map<number, StoredTransaction[]>();
+    if (!extracted || !accountId) return map;
+    extracted.transactions.forEach((t, i) => {
+      if (!splitEligible[i]) return;
+      const itemRows: ImportableRow[] = t.items.map((item) => ({
+        occurredOn: t.occurredOn,
+        description: item.description,
+        amountYen: item.amountYen,
+        paymentMethod: t.paymentMethod,
+      }));
+      map.set(
+        i,
+        buildPreview(
+          itemRows,
+          accountId,
+          (j) => `receipt-${i}-item-${j}`,
+          rules,
+          categoryNameById,
+          'manual',
+        ),
+      );
     });
-  }, [rulePreview, aiResults]);
+    return map;
+  }, [extracted, splitEligible, rules, categoryNameById, accountId]);
 
-  const unclassifiedCount = preview.filter((t) => t.classifiedBy === 'unclassified').length;
+  const preview = useMemo<StoredTransaction[]>(
+    () => applyAiResults(rulePreview, aiResults),
+    [rulePreview, aiResults],
+  );
+
+  const itemPreviewByIndex = useMemo<Map<number, StoredTransaction[]>>(() => {
+    const map = new Map<number, StoredTransaction[]>();
+    for (const [i, rows] of itemRulePreviewByIndex) map.set(i, applyAiResults(rows, aiResults));
+    return map;
+  }, [itemRulePreviewByIndex, aiResults]);
+
+  // 分割対象の親(明細本体)自身の分類は「AIに回す」の対象にしない。
+  // 実際の分類は商品行(=splits)側にあり、親の分類は保存時に無効化する
+  // (save() 参照)ため、ここで数えても本人が確認する意味が無い。
+  const topLevelUnclassified = preview.filter(
+    (t, i) => t.classifiedBy === 'unclassified' && !splitEligible[i],
+  );
+  const itemUnclassified = [...itemPreviewByIndex.values()].flatMap((rows) =>
+    rows.filter((t) => t.classifiedBy === 'unclassified'),
+  );
+  const unclassifiedCount = topLevelUnclassified.length + itemUnclassified.length;
 
   const classify = async () => {
-    const targets = preview.filter((t) => t.classifiedBy === 'unclassified');
+    const targets = [...topLevelUnclassified, ...itemUnclassified];
     if (targets.length === 0) return;
     setClassifying(true);
     try {
@@ -197,17 +271,69 @@ export default function ReceiptPage() {
   const save = async () => {
     if (!accountId) return;
     setSaveError(null);
-    const outcome = await saveImportBatchAction(preview, {
-      fileName: 'レシート撮影',
-      source: 'manual',
-      accountId,
-      failedCount: extracted?.warnings.length ?? 0,
+
+    // 画像の保存(本人発案)。抽出時ではなく、本人が取り込みを確定した
+    // ここでだけ Storage へ送る(結局取り込まなかった写真まで溜めない)。
+    // 失敗しても取り込み自体は続ける(splits-store.ts と同じ考え方)。
+    let receiptImagePath: string | null = null;
+    const preSaveWarnings: string[] = [];
+    if (imageBase64) {
+      try {
+        const uploadRes = await fetch('/api/import/receipt/upload', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg' }),
+        });
+        const uploaded = (await uploadRes.json()) as { path: string | null; error: string | null };
+        receiptImagePath = uploaded.path;
+        if (uploaded.error) preSaveWarnings.push(uploaded.error);
+      } catch {
+        preSaveWarnings.push('レシート画像を保存できませんでした。取り込みは続けます。');
+      }
+    }
+
+    const receiptSplits: ReceiptSplitInput[] = [];
+    const previewToSave = preview.map((t, i) => {
+      const items = itemPreviewByIndex.get(i);
+      if (!splitEligible[i] || !items || items.length < 2) return t;
+
+      const sourceRef = crypto.randomUUID();
+      receiptSplits.push({
+        sourceRef,
+        splits: items.map((item) => ({
+          categoryId: item.categoryId,
+          amountYen: item.amountYen,
+          note: item.description,
+        })),
+      });
+      return {
+        ...t,
+        sourceRef,
+        // 商品ごとに分割するので、明細本体は確認待ちに出さない。ここで
+        // 「確認待ち」を残すと、確認待ちキューで本人が1カテゴリだけ選んだ
+        // 瞬間にその店名の学習ルールができ、次の同じ店の買い物(実際は
+        // カテゴリが混在していても)を丸ごと誤って分類してしまう。
+        reviewStatus: t.reviewStatus === 'pending' ? ('auto_ok' as const) : t.reviewStatus,
+      };
     });
+
+    const outcome = await saveImportBatchAction(
+      previewToSave,
+      {
+        fileName: 'レシート撮影',
+        source: 'manual',
+        accountId,
+        failedCount: extracted?.warnings.length ?? 0,
+        receiptImagePath,
+      },
+      receiptSplits,
+    );
     if (outcome.error) {
       setSaveError(outcome.error);
       return;
     }
-    setSaved(outcome);
+    setSaved({ imported: outcome.imported, duplicates: outcome.duplicates });
+    setSaveWarnings([...preSaveWarnings, ...outcome.splitWarnings]);
     setPreviewUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return null;
@@ -242,6 +368,13 @@ export default function ReceiptPage() {
             {saved.imported} 件を取り込みました
             {saved.duplicates > 0 ? `(重複 ${saved.duplicates} 件を除外)` : ''}
           </p>
+          {saveWarnings.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              {saveWarnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          ) : null}
           <Link
             href="/transactions"
             className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
@@ -363,9 +496,41 @@ export default function ReceiptPage() {
               className="mt-2 divide-y overflow-hidden rounded-2xl"
               style={{ borderColor: 'var(--hairline)', background: 'var(--plane)' }}
             >
-              {preview.map((t) => (
-                <TransactionRow key={t.id} transaction={t} />
-              ))}
+              {preview.map((t, i) => {
+                const items = itemPreviewByIndex.get(i);
+                if (!splitEligible[i] || !items || items.length < 2) {
+                  return <TransactionRow key={t.id} transaction={t} />;
+                }
+                // 商品ごとに分割して取り込む明細(本人発案)。親自体は分類の
+                // 対象にしない(分類は商品行=splits 側にある)ため、通常の
+                // TransactionRow ではなく専用の見た目にする。
+                return (
+                  <li key={t.id} className="px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
+                        {t.description}
+                      </p>
+                      <span
+                        className="tabular shrink-0 text-[15px] font-semibold"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        −{formatYen(Math.abs(t.amountYen))}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                      商品ごとに{items.length}件のカテゴリへ分けて取り込みます
+                    </p>
+                    <ul
+                      className="mt-2 divide-y overflow-hidden rounded-xl"
+                      style={{ borderColor: 'var(--hairline)', background: 'var(--surface)' }}
+                    >
+                      {items.map((item) => (
+                        <TransactionRow key={item.id} transaction={item} />
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
             </ul>
 
             {/* ルールに当たらなかった分だけ AI に回せる(M2-3b)。押されたときだけ呼ぶ */}

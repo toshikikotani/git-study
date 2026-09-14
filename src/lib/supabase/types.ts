@@ -219,6 +219,7 @@ export type Database = {
           gmail_fetch_limit: number;
           gmail_from_addresses: string[];
           gmail_last_synced_on: string | null;
+          google_backup_spreadsheet_id: string | null;
           high_risk_allocation_ratio: number;
           inactivity_alert_days: number;
           investment_ratio_of_repayment: number;
@@ -248,6 +249,7 @@ export type Database = {
           gmail_fetch_limit?: number;
           gmail_from_addresses?: string[];
           gmail_last_synced_on?: string | null;
+          google_backup_spreadsheet_id?: string | null;
           high_risk_allocation_ratio?: number;
           inactivity_alert_days?: number;
           investment_ratio_of_repayment?: number;
@@ -277,6 +279,7 @@ export type Database = {
           gmail_fetch_limit?: number;
           gmail_from_addresses?: string[];
           gmail_last_synced_on?: string | null;
+          google_backup_spreadsheet_id?: string | null;
           high_risk_allocation_ratio?: number;
           inactivity_alert_days?: number;
           investment_ratio_of_repayment?: number;
@@ -848,6 +851,48 @@ export type Database = {
           },
         ];
       };
+      goals: {
+        Row: {
+          achieved_at: string | null;
+          created_at: string;
+          current_amount_yen: number;
+          id: string;
+          note: string | null;
+          status: Database['public']['Enums']['goal_status'];
+          target_amount_yen: number | null;
+          target_date: string | null;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          achieved_at?: string | null;
+          created_at?: string;
+          current_amount_yen?: number;
+          id?: string;
+          note?: string | null;
+          status?: Database['public']['Enums']['goal_status'];
+          target_amount_yen?: number | null;
+          target_date?: string | null;
+          title: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          achieved_at?: string | null;
+          created_at?: string;
+          current_amount_yen?: number;
+          id?: string;
+          note?: string | null;
+          status?: Database['public']['Enums']['goal_status'];
+          target_amount_yen?: number | null;
+          target_date?: string | null;
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       import_adapters: {
         Row: {
           account_id: string | null;
@@ -940,6 +985,7 @@ export type Database = {
           imported_count: number;
           period_from: string | null;
           period_to: string | null;
+          receipt_image_path: string | null;
           row_count: number;
           source: Database['public']['Enums']['transaction_source'];
           status: Database['public']['Enums']['import_status'];
@@ -959,6 +1005,7 @@ export type Database = {
           imported_count?: number;
           period_from?: string | null;
           period_to?: string | null;
+          receipt_image_path?: string | null;
           row_count?: number;
           source: Database['public']['Enums']['transaction_source'];
           status?: Database['public']['Enums']['import_status'];
@@ -978,6 +1025,7 @@ export type Database = {
           imported_count?: number;
           period_from?: string | null;
           period_to?: string | null;
+          receipt_image_path?: string | null;
           row_count?: number;
           source?: Database['public']['Enums']['transaction_source'];
           status?: Database['public']['Enums']['import_status'];
@@ -1583,6 +1631,51 @@ export type Database = {
           },
         ];
       };
+      transaction_splits: {
+        Row: {
+          amount_yen: number;
+          category_id: string | null;
+          created_at: string;
+          id: string;
+          note: string | null;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          amount_yen: number;
+          category_id?: string | null;
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          amount_yen?: number;
+          category_id?: string | null;
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_splits_category_id_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'transaction_splits_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];
@@ -1941,6 +2034,7 @@ export type Database = {
         | 'bank_loan'
         | 'other';
       debt_status: 'active' | 'paid_off' | 'refinanced' | 'closed';
+      goal_status: 'active' | 'achieved' | 'abandoned';
       import_status: 'pending' | 'succeeded' | 'partial' | 'failed';
       job_status: 'running' | 'succeeded' | 'failed' | 'cancelled';
       job_trigger_source: 'github_actions' | 'pg_cron' | 'manual' | 'webhook';
@@ -2138,6 +2232,7 @@ export const Constants = {
         'other',
       ],
       debt_status: ['active', 'paid_off', 'refinanced', 'closed'],
+      goal_status: ['active', 'achieved', 'abandoned'],
       import_status: ['pending', 'succeeded', 'partial', 'failed'],
       job_status: ['running', 'succeeded', 'failed', 'cancelled'],
       job_trigger_source: ['github_actions', 'pg_cron', 'manual', 'webhook'],

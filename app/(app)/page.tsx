@@ -150,9 +150,10 @@ export default async function HomePage() {
           );
 
           return (
-            <div
+            <Link
               key={tile.categoryId}
-              className="rise"
+              href={`/budget/${tile.categoryId}`}
+              className="rise block"
               style={{ animationDelay: `${100 + index * 70}ms` }}
             >
               <StatTile
@@ -172,7 +173,7 @@ export default async function HomePage() {
                   tile.usageRatio === null ? undefined : `${Math.round(tile.usageRatio * 100)}%`
                 }
               />
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -223,6 +224,22 @@ export default async function HomePage() {
           style={{ color: 'var(--accent)' }}
         >
           支出レポート
+          <span aria-hidden>→</span>
+        </Link>
+        <Link
+          href="/advisor"
+          className="inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          AI相談
+          <span aria-hidden>→</span>
+        </Link>
+        <Link
+          href="/settings/google"
+          className="inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          Google連携
           <span aria-hidden>→</span>
         </Link>
       </div>

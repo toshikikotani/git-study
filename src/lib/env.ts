@@ -53,8 +53,52 @@ const gmailSchema = z.object({
     }),
 });
 
+/**
+ * LINE Messaging API(通知・朝配信の送信先の1つ、Discord と並ぶ選択肢)。
+ * 未設定でもアプリは動く(Gmail と同じ考え方)。
+ *
+ * userId は LINE Developers コンソールの Webhook で本人が Bot に送った
+ * メッセージから拾う値('U' + 32桁の16進数、33文字固定)。
+ */
+const lineSchema = z.object({
+  LINE_CHANNEL_ACCESS_TOKEN: z
+    .string()
+    .min(50, 'LINE のチャネルアクセストークンの形式ではありません'),
+  LINE_USER_ID: z
+    .string()
+    .regex(/^U[0-9a-f]{32}$/, 'LINE の userId の形式(U+32桁の16進数)ではありません'),
+});
+
+/**
+ * Google 連携(カレンダー同期・スプレッドシートへのバックアップ、本人発案)。
+ * 未設定でもアプリは動く(Gmail・LINE と同じ「あれば使う」設計)。
+ *
+ * GOOGLE_REFRESH_TOKEN は DB には置かない(ADR-014:秘密情報は環境変数)。
+ * `/settings/google` で一度だけ OAuth 同意を行い、そこに表示された値を
+ * 本人が Vercel / GitHub Secrets へ手で設定する運用にする
+ * (CRON_SECRET と同じ「発行したら環境変数にコピーする」パターン)。
+ */
+const googleSchema = z.object({
+  GOOGLE_CLIENT_ID: z.string().min(1, 'Google の OAuth クライアントIDを設定してください'),
+  GOOGLE_CLIENT_SECRET: z
+    .string()
+    .min(1, 'Google の OAuth クライアントシークレットを設定してください'),
+  GOOGLE_REFRESH_TOKEN: z.string().min(1, 'Google の refresh token を設定してください'),
+});
+
 export type PublicEnv = z.infer<typeof publicSchema>;
 export type GmailEnv = z.infer<typeof gmailSchema>;
+export type LineEnv = z.infer<typeof lineSchema>;
+export type GoogleEnv = z.infer<typeof googleSchema>;
+
+/**
+ * 通知の送信先チャネル。Discord・LINE のどちらか、または両方が設定されうる
+ * (features/alerts/notify.ts・features/briefs/notify.ts の両方が使う共通の形)。
+ */
+export type NotificationChannels = {
+  discordWebhookUrl: string | null;
+  line: LineEnv | null;
+};
 
 function parseOrThrow<T extends z.ZodType>(schema: T, source: unknown, label: string): z.infer<T> {
   const result = schema.safeParse(source);
@@ -146,6 +190,65 @@ export function getGmailEnv(): GmailEnv | null {
 }
 
 /**
+ * LINE の資格情報。未設定なら null を返す(Discord Webhook と同じ「あれば使う」
+ * 設計。Gmail と同じく片方だけの設定はエラーにする)。
+ */
+export function getLineEnv(): LineEnv | null {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const userId = process.env.LINE_USER_ID;
+
+  if (!token && !userId) return null;
+
+  return parseOrThrow(
+    lineSchema,
+    { LINE_CHANNEL_ACCESS_TOKEN: token, LINE_USER_ID: userId },
+    'LINE 連携の設定',
+  );
+}
+
+/**
+ * Google の OAuth クライアント資格情報だけ(`/settings/google` の同意フロー用)。
+ * refresh token はまだ無い前提(これから発行する側)なので separate に持つ。
+ */
+export function getGoogleClientCredentials(): { clientId: string; clientSecret: string } {
+  const schema = z.object({
+    GOOGLE_CLIENT_ID: googleSchema.shape.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: googleSchema.shape.GOOGLE_CLIENT_SECRET,
+  });
+  const parsed = parseOrThrow(
+    schema,
+    {
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    },
+    'Google OAuth クライアントの設定',
+  );
+  return { clientId: parsed.GOOGLE_CLIENT_ID, clientSecret: parsed.GOOGLE_CLIENT_SECRET };
+}
+
+/**
+ * Google 連携一式(カレンダー同期・スプレッドシート連携)。未設定なら null
+ * (Gmail・LINE と同じ「あれば使う」設計)。1つでも欠けていればエラーにする。
+ */
+export function getGoogleEnv(): GoogleEnv | null {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId && !clientSecret && !refreshToken) return null;
+
+  return parseOrThrow(
+    googleSchema,
+    {
+      GOOGLE_CLIENT_ID: clientId,
+      GOOGLE_CLIENT_SECRET: clientSecret,
+      GOOGLE_REFRESH_TOKEN: refreshToken,
+    },
+    'Google 連携の設定',
+  );
+}
+
+/**
  * Gmail 取り込み先の口座 ID(M2-7c)。
  *
  * accounts テーブルへの外部キーだが、DB(app_settings)には持たせない。
@@ -172,4 +275,6 @@ export const schemas = {
   anthropicApiKeySchema,
   discordWebhookUrlSchema,
   gmailSchema,
+  lineSchema,
+  googleSchema,
 };

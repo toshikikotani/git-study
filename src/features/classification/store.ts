@@ -196,7 +196,7 @@ export type ClassificationRuleSummary = {
   /**
    * このルールが FR-21(リボ・キャッシング・分割払い)の検知に使われているか。
    * `features/rules-chat/*` はこれが立っているルールの変更・削除を拒む
-   * (ADR-022)。検知の無効化を、確認なしに会話から起こさせないための砦。
+   * (ADR-024)。検知の無効化を、確認なしに会話から起こさせないための砦。
    */
   setPaymentMethod: ClassificationRuleRow['set_payment_method'] | null;
 };
@@ -339,7 +339,7 @@ export async function createLearnedRule(params: {
 const CHAT_RULE_DEFAULT_PRIORITY = 500;
 
 /**
- * 本人が内容を指定してルールを作る(新機能、ADR-022「ルールをAIに相談する」)。
+ * 本人が内容を指定してルールを作る(新機能、ADR-024「ルールをAIに相談する」)。
  *
  * `createLearnedRule()` と違い、キーワードを摘要から自動抽出せず、パターン・
  * 一致方式・カテゴリを呼び出し側(チャットの tool 実行層)がそのまま渡す。
@@ -385,7 +385,7 @@ export async function createClassificationRule(params: {
 }
 
 /**
- * 既存のルールを部分更新する(新機能、ADR-022)。パターン・カテゴリ・有効/
+ * 既存のルールを部分更新する(新機能、ADR-024)。パターン・カテゴリ・有効/
  * 無効・名前のみを対象とし、`setPaymentMethod` はここからは変更できない。
  * 呼び出し側(チャットの tool 実行層)は、対象が FR-21 の検知ルール
  * (`setPaymentMethod` 設定済み)でないことを先に確認すること。

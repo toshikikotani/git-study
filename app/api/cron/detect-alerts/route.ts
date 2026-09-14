@@ -13,7 +13,8 @@ import {
 import { sendPendingAlerts } from '@/features/alerts/notify';
 import { detectAndDeactivateMisfiringRulesAsAdmin } from '@/features/classification/store';
 import { recordNetWorthSnapshotAsAdmin } from '@/features/net-worth/store';
-import { getCronSecret, getOptionalDiscordWebhookUrl } from '@/lib/env';
+import { detectAndRecordNewSubscriptionAlertsAsAdmin } from '@/features/subscriptions/store';
+import { getCronSecret, getLineEnv, getOptionalDiscordWebhookUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -23,10 +24,12 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * `createAdminClient()` + 明示的な user_id で検知・送信を行う。
  *
  * 流れ:検知(FR-20 浪費70%・FR-21 リボ等・FR-22 未取込・FR-23 返済日前日・
- * P5-2 誤爆気味の学習ルールの無効化・P6-1 月末の月次振り返り)→ alerts に記録
- * (重複は DB の一意制約が防ぐ)→ status='pending' の分を Discord へ送信。
- * Webhook 未設定(B-3 待ち)の間は検知だけ行い、送信はスキップする(alerts
- * には積み上がるので、Webhook 設定後にまとめて届く)。
+ * P5-2 誤爆気味の学習ルールの無効化・P6-1 月末の月次振り返り・新しく検知した
+ * 定期支払い)→ alerts に記録
+ * (重複は DB の一意制約が防ぐ)→ status='pending' の分を Discord・LINE へ送信
+ * (どちらか設定されている分だけ。両方でも片方でもよい)。どちらも未設定
+ * (B-3 待ち)の間は検知だけ行い、送信はスキップする(alerts には積み上がる
+ * ので、設定後にまとめて届く)。
  *
  * ついでに月末だけ P6-3 の資産スナップショット(net_worth_snapshots)も記録する。
  * 既存の毎時ジョブに相乗りしているだけで、alerts の一部ではない
@@ -65,32 +68,51 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const [paymentDueCount, inactivityCount, riskyCount, wastefulCount, misfireCount, recapCount] =
-      await Promise.all([
-        detectAndRecordPaymentDueAlertsAsAdmin(admin, user.id),
-        detectAndRecordInactivityAlertAsAdmin(admin, user.id),
-        detectAndRecordRiskyTransactionAlertsAsAdmin(admin, user.id),
-        detectAndRecordWastefulBudgetAlertsAsAdmin(admin, user.id),
-        detectAndDeactivateMisfiringRulesAsAdmin(admin, user.id),
-        detectAndRecordMonthlyRecapAlertAsAdmin(admin, user.id),
-      ]);
+    const [
+      paymentDueCount,
+      inactivityCount,
+      riskyCount,
+      wastefulCount,
+      misfireCount,
+      recapCount,
+      subscriptionCount,
+    ] = await Promise.all([
+      detectAndRecordPaymentDueAlertsAsAdmin(admin, user.id),
+      detectAndRecordInactivityAlertAsAdmin(admin, user.id),
+      detectAndRecordRiskyTransactionAlertsAsAdmin(admin, user.id),
+      detectAndRecordWastefulBudgetAlertsAsAdmin(admin, user.id),
+      detectAndDeactivateMisfiringRulesAsAdmin(admin, user.id),
+      detectAndRecordMonthlyRecapAlertAsAdmin(admin, user.id),
+      detectAndRecordNewSubscriptionAlertsAsAdmin(admin, user.id),
+    ]);
     const recordedCount =
-      paymentDueCount + inactivityCount + riskyCount + wastefulCount + misfireCount + recapCount;
+      paymentDueCount +
+      inactivityCount +
+      riskyCount +
+      wastefulCount +
+      misfireCount +
+      recapCount +
+      subscriptionCount;
 
     // P6-3: net_worth_snapshots は本番マイグレーション未適用のため(T-26)、
     // 他の検知を止めないよう個別に catch する(rescued_emails の T-25 と同じ扱い)。
     await recordNetWorthSnapshotAsAdmin(admin, user.id).catch(() => undefined);
 
-    const webhookUrl = getOptionalDiscordWebhookUrl();
-    if (!webhookUrl) {
+    const discordWebhookUrl = getOptionalDiscordWebhookUrl();
+    const line = getLineEnv();
+    if (!discordWebhookUrl && !line) {
       return NextResponse.json({
         recordedCount,
         skippedSend: true,
-        reason: 'DISCORD_WEBHOOK_URL が未設定です',
+        reason:
+          '通知先が未設定です(DISCORD_WEBHOOK_URL または LINE_CHANNEL_ACCESS_TOKEN/LINE_USER_ID)',
       });
     }
 
-    const { sentCount, failedCount } = await sendPendingAlerts(admin, user.id, webhookUrl);
+    const { sentCount, failedCount } = await sendPendingAlerts(admin, user.id, {
+      discordWebhookUrl,
+      line,
+    });
     return NextResponse.json({ recordedCount, sentCount, failedCount });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

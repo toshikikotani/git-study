@@ -16,6 +16,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 780,
         store_name: 'ローソン渋谷店',
         payment_method_text: '現金',
+        items: [],
       },
     ]);
     expect(result.transactions).toHaveLength(1);
@@ -34,6 +35,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 1200,
         store_name: '書店',
         payment_method_text: '',
+        items: [],
       },
     ]);
     expect(result.transactions[0]!.amountYen).toBe(-1200);
@@ -46,6 +48,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 12800,
         store_name: '家電量販店',
         payment_method_text: '5回払い',
+        items: [],
       },
     ]);
     expect(written.transactions[0]!.paymentMethod).toBe('installment');
@@ -58,6 +61,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 500,
         store_name: 'コンビニ',
         payment_method_text: '',
+        items: [],
       },
     ]);
     expect(result.transactions).toEqual([]);
@@ -71,6 +75,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 3_500_000_000,
         store_name: 'コンビニ',
         payment_method_text: '',
+        items: [],
       },
     ]);
     expect(result.transactions).toEqual([]);
@@ -79,7 +84,13 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
 
   it('金額が 0 の行は捨てる', () => {
     const result = buildFromAiRows([
-      { occurred_on: '2026-09-03', amount_yen: 0, store_name: '', payment_method_text: '' },
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 0,
+        store_name: '',
+        payment_method_text: '',
+        items: [],
+      },
     ]);
     expect(result.transactions).toEqual([]);
     expect(result.warnings).not.toEqual([]);
@@ -92,6 +103,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 780.6,
         store_name: '書店',
         payment_method_text: '',
+        items: [],
       },
     ]);
     expect(result.transactions[0]!.amountYen).toBe(-781);
@@ -104,6 +116,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 500,
         store_name: '   ',
         payment_method_text: '',
+        items: [],
       },
     ]);
     expect(result.transactions[0]!.description).toBe('(店名不明)');
@@ -115,6 +128,94 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
     expect(result.warnings).not.toEqual([]);
   });
 
+  it('商品行の合計が支払合計と一致すれば items を返す(本人発案)', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 780,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [
+          { name: 'おにぎり', amount_yen: 150 },
+          { name: '洗剤', amount_yen: 630 },
+        ],
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: 'おにぎり', amountYen: -150 },
+      { description: '洗剤', amountYen: -630 },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('商品行の合計が支払合計と一致しなければ items は空で、理由を警告に残す', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 780,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [
+          { name: 'おにぎり', amount_yen: 150 },
+          { name: '洗剤', amount_yen: 999 },
+        ],
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([]);
+    // 内訳が使えないだけで、明細そのものは通常の1件として残る
+    expect(result.transactions).toHaveLength(1);
+    expect(result.warnings[0]).toMatch(/一致しない/);
+  });
+
+  it('商品が1点だけ(内訳なし)なら items は空、警告も出さない', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 500,
+        store_name: 'コンビニ',
+        payment_method_text: '',
+        items: [{ name: 'コーヒー', amount_yen: 500 }],
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('品名が空の商品行は「(品名不明)」として残す', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 500,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [
+          { name: '  ', amount_yen: 300 },
+          { name: '洗剤', amount_yen: 200 },
+        ],
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: '(品名不明)', amountYen: -300 },
+      { description: '洗剤', amountYen: -200 },
+    ]);
+  });
+
+  it('金額が0の商品行を除いてもなお合計が合わなければ items は空にする', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 500,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [
+          { name: 'サンプル', amount_yen: 0 },
+          { name: '洗剤', amount_yen: 200 },
+        ],
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([]);
+  });
+
   it('1枚に複数の明細が写っていればすべて返す', () => {
     const result = buildFromAiRows([
       {
@@ -122,12 +223,14 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 500,
         store_name: 'コンビニA',
         payment_method_text: '',
+        items: [],
       },
       {
         occurred_on: '2026-09-03',
         amount_yen: 1200,
         store_name: 'コンビニB',
         payment_method_text: '',
+        items: [],
       },
     ]);
     expect(result.transactions).toHaveLength(2);
@@ -190,6 +293,7 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
             amount_yen: 500,
             store_name: 'コンビニ',
             payment_method_text: '',
+            items: [],
           },
         ],
       },

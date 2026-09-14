@@ -80,3 +80,48 @@ describe('discordWebhookUrlSchema', () => {
     ).toBe(false);
   });
 });
+
+describe('lineSchema(LINE連携)', () => {
+  const valid = {
+    LINE_CHANNEL_ACCESS_TOKEN: 'a'.repeat(80),
+    LINE_USER_ID: `U${'0123456789abcdef'.repeat(2)}`,
+  };
+
+  it('正しい値を通す', () => {
+    expect(schemas.lineSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('短すぎるチャネルアクセストークンを拒否する', () => {
+    expect(
+      schemas.lineSchema.safeParse({ ...valid, LINE_CHANNEL_ACCESS_TOKEN: 'short' }).success,
+    ).toBe(false);
+  });
+
+  it('U+32桁の16進数でない userId を拒否する', () => {
+    expect(
+      schemas.lineSchema.safeParse({ ...valid, LINE_USER_ID: 'not-a-line-user-id' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('googleSchema(Google連携:カレンダー同期・スプレッドシートバックアップ)', () => {
+  const valid = {
+    GOOGLE_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'client-secret',
+    GOOGLE_REFRESH_TOKEN: '1//refresh-token',
+  };
+
+  it('正しい値を通す', () => {
+    expect(schemas.googleSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('どれか1つでも空文字なら拒否する', () => {
+    expect(schemas.googleSchema.safeParse({ ...valid, GOOGLE_REFRESH_TOKEN: '' }).success).toBe(
+      false,
+    );
+    expect(schemas.googleSchema.safeParse({ ...valid, GOOGLE_CLIENT_ID: '' }).success).toBe(false);
+    expect(schemas.googleSchema.safeParse({ ...valid, GOOGLE_CLIENT_SECRET: '' }).success).toBe(
+      false,
+    );
+  });
+});

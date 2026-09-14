@@ -2,10 +2,11 @@ import { Card } from '@/components/ui/card';
 import { PasswordForm } from './password-form';
 
 /**
- * パスワード設定(ADR-011)。
+ * パスワード変更(ADR-011改定)。
  *
- * Magic Link ログイン後の着地点。次回からはここで設定したパスワードで
- * ログインできる(/login のパスワードタブ)。
+ * ログイン中に自分でパスワードを変更するための画面。初回設定・
+ * 失念時の復旧は /login の「新規登録」タブ(actions.ts の
+ * `registerPasswordAction`)が担う。
  */
 export default function PasswordSettingsPage() {
   return (

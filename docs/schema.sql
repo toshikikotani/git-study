@@ -234,6 +234,9 @@ create type repayment_strategy as enum (
   'custom'
 );
 
+-- 目標(AI相談で決めた目標、本人発案)
+create type goal_status as enum ('active', 'achieved', 'abandoned');
+
 
 -- =============================================================================
 --  2. 共通関数
@@ -337,6 +340,13 @@ create table public.app_settings (
   line_token_env_key                  text,
   gmail_address_env_key               text         not null default 'GMAIL_ADDRESS',
   gmail_app_password_env_key          text         not null default 'GMAIL_APP_PASSWORD',
+
+  -- Google連携(本人発案)。月次バックアップ(Googleスプレッドシート)の
+  -- 書き込み先。初回のバックアップ時にアプリが自動でスプレッドシートを
+  -- 作成し、その id をここへ記録する(以降は同じシートへ書き続ける)。
+  -- 値そのものは秘密情報ではない(参照名、ADR-014)。実際の認証情報
+  -- (GOOGLE_REFRESH_TOKEN 等)は環境変数のみに置く。
+  google_backup_spreadsheet_id        text,
 
   created_at                          timestamptz  not null default now(),
   updated_at                          timestamptz  not null default now(),
@@ -636,6 +646,13 @@ create table public.import_batches (
 
   file_name       text,
   checksum        text,              -- ファイル内容の SHA-256(16進)
+
+  -- レシート撮影(source='manual')でだけ使う。Storage の receipts バケットの
+  -- オブジェクトキー({user_id}/{uuid}.拡張子)。1回の撮影=1バッチのため
+  -- ここに置く(1枚の写真に複数の買い物が写っていても同じ画像を指す。
+  -- transactions 側に複製しない)。CSV・メールの取り込みでは常に null
+  -- (本人発案、ADR-021 の続き)。
+  receipt_image_path text,
 
   period_from     date,
   period_to       date,
@@ -1467,6 +1484,70 @@ create index ix_net_worth_snapshots_user_as_of_desc
   on public.net_worth_snapshots (user_id, as_of desc);
 
 
+-- -----------------------------------------------------------------------------
+-- 3.23 transaction_splits — 明細の複数カテゴリ分割
+--
+--   1件の明細を複数のカテゴリに配分できるようにする。transactions.category_id
+--   はそのまま残し、分割がある明細だけこの表の行の合計で amount_yen を
+--   置き換える(合計が一致することの保証はアプリ側、domain/transaction-splits.ts
+--   の assertValidSplits() が正。複数行にまたがる合計チェックは CHECK 制約
+--   では表現できない)。
+-- -----------------------------------------------------------------------------
+create table public.transaction_splits (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+  category_id    uuid        references public.categories(id) on delete set null,
+
+  amount_yen     bigint      not null,
+  note           text,
+
+  created_at     timestamptz not null default now(),
+
+  constraint ck_transaction_splits_amount_nonzero check (amount_yen <> 0)
+);
+
+create index ix_transaction_splits_transaction on public.transaction_splits (transaction_id);
+create index ix_transaction_splits_user on public.transaction_splits (user_id);
+
+
+-- 3.24 goals — AI相談(目標設定・買う前相談)で決めた目標(本人発案)
+--
+--   「◯月までに◯万円貯める」のような目標を、対話の結果として保存する。
+--   進捗(current_amount_yen)は自動計算せず本人が更新する(口座連携が無く、
+--   収支全体からの推定では「この目標のために」貯めた額と一致しない可能性が
+--   あるため。TASKS.md 参照)。target_amount_yen/target_date は無くても
+--   目標として成立する(「浪費を減らす」のような金額・期限を持たない目標もある)。
+-- -----------------------------------------------------------------------------
+create table public.goals (
+  id                 uuid        primary key default gen_random_uuid(),
+  user_id            uuid        not null references auth.users(id) on delete cascade,
+
+  title              text        not null,
+  target_amount_yen  bigint,
+  target_date        date,
+  current_amount_yen bigint      not null default 0,
+
+  status             goal_status not null default 'active',
+  note               text,
+
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+  achieved_at        timestamptz,
+
+  constraint ck_goals_title_not_blank check (btrim(title) <> ''),
+  constraint ck_goals_target_amount   check (target_amount_yen is null or target_amount_yen > 0),
+  constraint ck_goals_current_amount  check (current_amount_yen >= 0),
+  constraint ck_goals_achieved        check ((status = 'achieved') = (achieved_at is not null))
+);
+
+create index ix_goals_user_status on public.goals (user_id, status, created_at desc);
+
+create trigger trg_goals_updated_at
+  before update on public.goals
+  for each row execute function public.set_updated_at();
+
+
 -- =============================================================================
 --  4. updated_at トリガの一括適用
 -- =============================================================================
@@ -1862,7 +1943,7 @@ begin
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
-    'net_worth_snapshots'
+    'net_worth_snapshots','transaction_splits','goals'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -1878,6 +1959,40 @@ begin
   end loop;
 end;
 $$;
+
+
+-- -----------------------------------------------------------------------------
+-- 7.1 Supabase Storage — レシート画像(本人発案、ADR-021 の続き)
+--
+--   receipts バケット自体は SQL の対象外(Storage REST API で作る。バケットの
+--   列構成はプラットフォームのバージョンで変わりうるため、SQL の insert では
+--   触らない)。ここで固定するのはオブジェクトへのアクセス制御だけ。
+--
+--   パスは "{user_id}/{uuid}.拡張子" にすることを前提に、本人のフォルダだけ
+--   読み書きできるようにする(Supabase 公式のフォルダ単位アクセス制御と同じ
+--   パターン)。アップロードは features/import/receipt-storage.ts が本人の
+--   セッション(RLS 適用)で行うため、ここが実際の砦になる。
+--
+--   storage.objects は Supabase 側で作成時から RLS が有効になっている
+--   (テーブルの所有者は supabase_storage_admin で、SQL Editor が使う
+--   postgres ロールはその所有権を持たない)。ALTER TABLE ... ENABLE ROW
+--   LEVEL SECURITY を実行すると「must be owner of table objects」で失敗
+--   するため、ここでは有効化し直さず、ポリシーの作成だけ行う
+--   (実際に本番プロジェクトで確認)。
+-- -----------------------------------------------------------------------------
+
+drop policy if exists "receipts_own_folder" on storage.objects;
+create policy "receipts_own_folder" on storage.objects
+  for all
+  to authenticated
+  using (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  )
+  with check (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 
 -- =============================================================================

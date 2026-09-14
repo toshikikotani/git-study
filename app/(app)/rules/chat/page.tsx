@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * ルールをAIに相談する(新機能、ADR-022)。
+ * ルールをAIに相談する(新機能、ADR-024)。
  *
  * 「スターバックスは浪費にして」のように話すと、分類ルールの作成・変更・
  * 削除を代わりに行う。リボ払い・キャッシング・分割払いの検知ルールは
@@ -67,7 +67,7 @@ export default function RulesChatPage() {
   }
 
   return (
-    <div className="rise flex h-[calc(100dvh-6.5rem)] flex-col">
+    <div className="rise flex h-[calc(100dvh-9.5rem)] flex-col">
       <header className="flex items-baseline justify-between gap-3 pb-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
