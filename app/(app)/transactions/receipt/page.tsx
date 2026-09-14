@@ -536,7 +536,7 @@ export default function ReceiptPage() {
                   e.target.value = '';
                 }}
               />
-              📷 撮る
+              撮る
             </label>
             <label
               className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold"
@@ -553,7 +553,7 @@ export default function ReceiptPage() {
                   e.target.value = '';
                 }}
               />
-              🖼 選ぶ
+              選ぶ
             </label>
           </div>
         </div>
