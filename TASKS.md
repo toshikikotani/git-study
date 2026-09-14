@@ -224,16 +224,30 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 
 ---
 
+## 本人向け設定手順の書き方(ルール)
+
+本人発案(「私の認知負荷を下げる説明をして。手順には必ずURLを記載し脳死で設定できるような仕組みで」)。
+今後このファイル・チャットで本人に設定作業を頼むときは、必ず次の形式に従う。
+
+1. **各手順の先頭に、実際にブラウザで開く URL を書く**。「〜の設定画面を開く」のような曖昧な指示だけで終わらせない。固定 URL が無い操作(例:Discord の自分のサーバー内の操作)は、その旨を明記する
+2. **手順は「開く→押す→貼る→保存する」だけの番号付きリストにする**。本人が判断する箇所(「適切な値を入力」のような曖昧な指示)を作らない。入力する値は必ずコードブロックでそのままコピペできる形にする
+3. **各手順の末尾に、完了すると何が起きるかを一文で書く**(やった意味が本人に伝わるように)
+4. 本番の実値(プロジェクトURL・プロジェクトIDなど)が分かっているものはプレースホルダにせず実値を書く。このプロジェクトの固定値は以下のとおり:
+   - アプリ本体:`https://git-study-lemon.vercel.app`
+   - GitHub リポジトリ:`https://github.com/toshikikotani/git-study`
+   - Vercel プロジェクト:`https://vercel.com/toshikikotani/git-study`
+   - Supabase プロジェクト:`https://supabase.com/dashboard/project/ajeezsnwzhjauhukaxrg`
+
 ## 本人への確認待ち
 
-実装を先に進めるうえで、いずれ必要になるもの。急ぎ順。
+実装を先に進めるうえで、いずれ必要になるもの。急ぎ順。手順は上記ルールに従って書く。
 
-1. **Discord Webhook**(B-3):サーバーとチャンネルを1つ作り、Webhook URL を発行
-2. **LINE のチャネルアクセストークン・userId**(B-6):`.env.example` に発行手順を記載。Discord と両方でも片方だけでもよい
-3. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。`/debts` にシードの3件が表示されているので、「編集」から直接正確な値に直せる
-4. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
-5. **GitHub Secrets への `CRON_SECRET` / `APP_BASE_URL` 設定**(M0-6、B-8)。**2026-09-13 に未設定であることを実際のログで確認**:GitHub Actions のスケジュール実行(Keepalive・Detect Alerts・Morning Brief・Import Gmail)が 9/10 以降**全11回失敗**している(`curl: (3) URL rejected: No host part in the URL`)。加えて Vercel 本番も `CRON_SECRET` が未設定(無認証 POST が 401 ではなく 500 を返すことから判明)。`.github/workflows/*.yml` が参照する。リポジトリの Settings → Secrets and variables → Actions で本人が設定する必要がある(このセッションからは触れない領域)。`CRON_SECRET` は Vercel の production 環境変数にも同じ値を設定すること。値は `openssl rand -hex 32` などで新規発行してよい。設定されるまでアラート検知(FR-20〜23)・朝配信(FR-30)・Gmail自動取り込みは本番で一度も実行されていない
-6. **Google連携のセットアップ**(P9-5、B-9):Google Cloud ConsoleでOAuthクライアントを作成し、`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` を発行、Vercel/GitHub Secretsに設定。その後 `/settings/google` の「Google と連携する」から同意し、表示された `GOOGLE_REFRESH_TOKEN` も同様に設定する(手順は `.env.example` に記載)。設定されるまでカレンダー同期・スプレッドシートバックアップは cron が静かにスキップし続ける
-7. **Gmail 自動取り込みの有効化**(M2-7c):`/accounts` で実口座を作った後、その `accounts.id` を Vercel の環境変数と GitHub Secrets に `GMAIL_IMPORT_ACCOUNT_ID` として設定し、Supabase の `app_settings.gmail_enabled` を true にする(編集画面がまだ無いため、当面は Supabase ダッシュボードの Table Editor か SQL から)
-8. **`goals` の2マイグレーションを本番へ適用する**(P9-8、B-10):Supabase Management API または `supabase db push` で適用。適用されるまで AI相談(/advisor)は使えるがチャットは目標を提案するだけで保存できない(「目標機能はまだ利用できません」と表示される)
-9. **LINE経由レシート受信のセットアップ**(P10-5、B-11):LINE Developers コンソールでチャネルシークレットを控え、`LINE_CHANNEL_SECRET`・`LINE_RECEIPT_ACCOUNT_ID` を Vercel/GitHub Secrets に設定し、Webhook URL(`${APP_BASE_URL}/api/webhooks/line`)を有効化する(手順は `.env.example` に記載)。B-6(LINEのチャネルアクセストークン・userId)がまだの場合は先にそちらも必要
+1. **GitHub Secrets への `CRON_SECRET` / `APP_BASE_URL` 設定**(M0-6、B-8、**最優先**)。**2026-09-13 に未設定であることを実際のログで確認**:GitHub Actions のスケジュール実行(Keepalive・Detect Alerts・Morning Brief・Import Gmail)が 9/10 以降**全11回失敗**している。設定されるまでアラート検知(FR-20〜23)・朝配信(FR-30)・Gmail自動取り込みは本番で一度も実行されない
+2. **Discord Webhook**(B-3):サーバーとチャンネルを1つ作り、Webhook URL を発行
+3. **LINE のチャネルアクセストークン・userId**(B-6):Discord と両方でも片方だけでもよい
+4. **LINE経由レシート受信のセットアップ**(P10-5、B-11、3が先に必要):チャネルシークレット・取り込み先口座IDを設定し、Webhook URL を有効化
+5. **Google連携のセットアップ**(P9-5、B-9):Google Cloud ConsoleでOAuthクライアントを作成し発行、`/settings/google` で同意
+6. **Gmail 自動取り込みの有効化**(M2-7c):`/accounts` で実口座を作った後、その口座IDを環境変数に設定し `app_settings.gmail_enabled` を true にする
+7. **Supabase マイグレーション4本を本番へ適用**(B-4・B-5・B-7・B-10):SQL Editor に貼って実行するだけ。未適用でも他機能への影響は無く、該当機能だけ「まだ利用できません」と表示される
+8. **負債の棚卸し**(B-1):借入先ごとの残高・金利・最低返済額・返済日。`/debts` にシードの3件が表示されているので、「編集」から直接正確な値に直せる
+9. **明細 CSV 1ヶ月分**(B-2):利用中の銀行・カードのもの。フォーマットが判明するとアダプタを実データで検証できる
