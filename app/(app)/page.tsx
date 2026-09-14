@@ -1,11 +1,12 @@
 import Link from 'next/link';
 
 import { CountUp } from '@/components/ui/count-up';
+import { ExpandableBudgetTile } from '@/components/ui/expandable-budget-tile';
 import { ProgressGauge } from '@/components/ui/meter';
-import { StatTile } from '@/components/ui/stat-tile';
 import { budgetTone } from '@/domain/budget';
 import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { streakBadgeFor } from '@/domain/streak';
+import { loadCategoryMonthDetail } from '@/features/categories/category-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
 import { formatDateJa } from '@/lib/date';
@@ -31,6 +32,12 @@ export default async function HomePage() {
   ]);
   const streak = await getCheckinStreak();
   const { payoff, tiles } = summary;
+
+  // タイルを押すとその場で内訳を開く(本人発案:遷移せずに見たい)。
+  // タイルは高々数枠(FR-61)なので、ここで内訳もまとめて先読みしておく。
+  const tileDetails = await Promise.all(
+    tiles.map((tile) => loadCategoryMonthDetail(tile.categoryId)),
+  );
 
   return (
     <div className="space-y-3">
@@ -163,30 +170,25 @@ export default async function HomePage() {
           );
 
           return (
-            <Link
+            <ExpandableBudgetTile
               key={tile.categoryId}
-              href={`/budget/${tile.categoryId}`}
-              className="rise block"
               style={{ animationDelay: `${100 + index * 70}ms` }}
-            >
-              <StatTile
-                label={tile.label}
-                value={tile.remainingYen === null ? '予算なし' : formatSpendable(tile.remainingYen)}
-                valueParts={
-                  tile.remainingYen === null ? undefined : spendableParts(tile.remainingYen)
-                }
-                sub={
+              transactions={tileDetails[index]?.transactions ?? []}
+              tile={{
+                label: tile.label,
+                value: tile.remainingYen === null ? '予算なし' : formatSpendable(tile.remainingYen),
+                valueParts:
+                  tile.remainingYen === null ? undefined : spendableParts(tile.remainingYen),
+                sub:
                   tile.budgetYen === null
                     ? undefined
-                    : `${formatYen(tile.spentYen)} / ${formatYen(tile.budgetYen)}`
-                }
-                ratio={tile.usageRatio}
-                tone={tone}
-                note={
-                  tile.usageRatio === null ? undefined : `${Math.round(tile.usageRatio * 100)}%`
-                }
-              />
-            </Link>
+                    : `${formatYen(tile.spentYen)} / ${formatYen(tile.budgetYen)}`,
+                ratio: tile.usageRatio,
+                tone,
+                note:
+                  tile.usageRatio === null ? undefined : `${Math.round(tile.usageRatio * 100)}%`,
+              }}
+            />
           );
         })}
       </div>

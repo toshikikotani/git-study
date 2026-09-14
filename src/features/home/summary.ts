@@ -20,7 +20,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
+import {
+  budgetStatusFor,
+  nextMilestone,
+  type BudgetTransaction,
+  type CategoryBudget,
+} from '@/domain/budget';
 import {
   expandMergedCategoryIds,
   resolveCategoryRoot,
@@ -126,14 +131,6 @@ export type PayoffInput = {
   /** 今月これまでの返済実績(円、正の数)。 */
   reducedThisMonthYen: number;
 };
-
-/** 進捗ゲージに刻むマイルストーン。到達を祝うための節目。 */
-export const MILESTONES = [0.25, 0.5, 0.75, 1] as const;
-
-/** まだ到達していない最初のマイルストーン。全て達成済みなら null。 */
-export function nextMilestone(progressRatio: number): number | null {
-  return MILESTONES.find((m) => progressRatio < m) ?? null;
-}
 
 export function computePayoffSummary(
   input: PayoffInput,
