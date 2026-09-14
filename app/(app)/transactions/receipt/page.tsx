@@ -506,26 +506,57 @@ export default function ReceiptPage() {
       </Card>
 
       <Card>
-        <label
-          className="mt-3 block cursor-pointer rounded-2xl border border-dashed px-4 py-8 text-center"
+        <div
+          className="mt-3 rounded-2xl border border-dashed px-4 py-6 text-center"
           style={{ borderColor: 'var(--hairline)' }}
         >
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
-              if (files.length > 0) void onFiles(files);
-              e.target.value = '';
-            }}
-          />
-          <span className="text-sm font-medium" style={{ color: 'var(--accent)' }}>
+          <p className="mb-3 text-sm font-medium" style={{ color: 'var(--ink-secondary)' }}>
             {entries.length > 0 ? '写真を追加する' : 'レシートを撮る・選ぶ'}
-          </span>
-        </label>
+          </p>
+          <div className="flex justify-center gap-3">
+            {/*
+             * capture="environment" を付けると、モバイルのブラウザは選択肢を
+             * 出さずカメラを直接開いてしまう(本人発案:「撮るか選ぶか選べる
+             * ようにして」)。1つの input に両方を担わせず、カメラ起動専用と
+             * ギャラリー選択専用の input を分けて、本人がボタンで選ぶ形にした。
+             */}
+            <label
+              className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold"
+              style={{ background: 'var(--accent)', color: 'var(--surface)' }}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length > 0) void onFiles(files);
+                  e.target.value = '';
+                }}
+              />
+              📷 撮る
+            </label>
+            <label
+              className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold"
+              style={{ border: '1px solid var(--hairline)', color: 'var(--accent)' }}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length > 0) void onFiles(files);
+                  e.target.value = '';
+                }}
+              />
+              🖼 選ぶ
+            </label>
+          </div>
+        </div>
 
         {entries.length > 0 ? (
           <ul className="mt-3 flex flex-wrap gap-2">
