@@ -15,8 +15,21 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   // ホームを開いた = 今日確認した(FR-62)。失敗しても画面は止めない。
-  await recordCheckin().catch(() => undefined);
-  const [summary, streak] = await Promise.all([loadHomeSummary(), getCheckinStreak()]);
+  //
+  // recordCheckin() は loadHomeSummary() と依存関係が無い(片方の結果を
+  // もう片方が使わない)のに、直列に await していたため、ホームに戻る
+  // たびに「確認記録の書き込み」と「3つの数字の読み込み」の往復時間が
+  // 単純に合算されていた(モバイル回線・復帰直後の再接続時は特に顕著で、
+  // 画面が固まって見える原因になっていた)。並列化して合算を防ぐ。
+  //
+  // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
+  // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
+  // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
+  const [, summary] = await Promise.all([
+    recordCheckin().catch(() => undefined),
+    loadHomeSummary(),
+  ]);
+  const streak = await getCheckinStreak();
   const { payoff, tiles } = summary;
 
   return (
