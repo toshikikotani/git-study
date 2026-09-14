@@ -56,7 +56,7 @@ export default async function TransactionsPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           明細
         </h1>
-        {/* ちりつも(/spending)とレシート撮影は下タブ・専用ボタン
+        {/* 家計簿(/spending)とレシート撮影は下タブ・専用ボタン
             (app/(app)/layout.tsx)へ動線を移したため、ここには置かない
             (本人発案:見出しの文字リンクが多すぎて動線がわかりにくかった)。 */}
         <div className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AccumulationTransaction } from '@/domain/accumulation';
 import {
+  projectedMonthTotalYen,
   rankMerchantsBySpend,
   savingsRateOf,
   summarizeMonthlyIncomeExpense,
@@ -217,5 +218,26 @@ describe('rankMerchantsBySpend', () => {
     const result = rankMerchantsBySpend(transactions);
     expect(result).toHaveLength(10);
     expect(result[0]).toEqual({ label: '店14', count: 1, totalYen: 1_500 });
+  });
+});
+
+describe('projectedMonthTotalYen', () => {
+  it('1日あたりのペースを月の総日数まで伸ばす', () => {
+    // 10日間で30,000円 = 1日3,000円。30日ある月なら90,000円。
+    expect(projectedMonthTotalYen(30_000, 10, 30)).toBe(90_000);
+  });
+
+  it('経過日数が0なら、これまでの額をそのまま返す(0除算を避ける)', () => {
+    expect(projectedMonthTotalYen(0, 0, 30)).toBe(0);
+    expect(projectedMonthTotalYen(5_000, 0, 30)).toBe(5_000);
+  });
+
+  it('端数は四捨五入する', () => {
+    // 3日で1,000円 = 1日333.33円 → 31日で10,333.33... → 10,333
+    expect(projectedMonthTotalYen(1_000, 3, 31)).toBe(10_333);
+  });
+
+  it('月が経過し切った(elapsedDays === totalDaysInMonth)場合はそのままの額', () => {
+    expect(projectedMonthTotalYen(50_000, 30, 30)).toBe(50_000);
   });
 });
