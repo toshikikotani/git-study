@@ -207,61 +207,51 @@ export default async function HomePage() {
         </p>
       ) : null}
 
+      {/*
+       * 本人発案(「説明文は遷移先へ。遷移できるものはボタンにし、関連機能の
+       * 近くに置く。機能がいっぱいあるように見せない」)。以前はここに
+       * 6件の文字リンクが横並びだった。副業・転職準備・Google連携は
+       * 「その他」メニュー(P10-1)から辿れるため重複させず削除し、今見ている
+       * 数字(完済・予算タイル)と直接関係の深い2件だけをボタンとして残した。
+       */}
       <Link
         href="/briefs"
-        className="inline-flex items-center gap-1 px-1 text-xs font-semibold"
-        style={{ color: 'var(--accent)' }}
+        className="rise inline-flex w-full items-center justify-center gap-1.5 rounded-2xl py-3 text-sm font-semibold"
+        style={{
+          animationDelay: `${100 + tiles.length * 70}ms`,
+          background: 'var(--surface)',
+          color: 'var(--accent)',
+          boxShadow: 'var(--card-shadow)',
+        }}
       >
-        朝配信のアーカイブ
+        朝配信のアーカイブを見る
         <span aria-hidden>→</span>
       </Link>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 px-1">
-        <Link
-          href="/side-hustle"
-          className="inline-flex items-center gap-1 text-xs font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          副業トラッカー
-          <span aria-hidden>→</span>
-        </Link>
-        <Link
-          href="/job-change"
-          className="inline-flex items-center gap-1 text-xs font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          転職準備
-          <span aria-hidden>→</span>
-        </Link>
+      <div className="rise flex gap-3" style={{ animationDelay: `${170 + tiles.length * 70}ms` }}>
         <Link
           href="/reports"
-          className="inline-flex items-center gap-1 text-xs font-semibold"
-          style={{ color: 'var(--accent)' }}
+          className="flex-1 rounded-2xl py-3 text-center text-sm font-semibold"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink-secondary)',
+            border: '1px solid var(--hairline)',
+          }}
         >
           支出レポート
-          <span aria-hidden>→</span>
         </Link>
         <Link
           href="/advisor"
-          className="inline-flex items-center gap-1 text-xs font-semibold"
-          style={{ color: 'var(--accent)' }}
+          className="flex-1 rounded-2xl py-3 text-center text-sm font-semibold"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink-secondary)',
+            border: '1px solid var(--hairline)',
+          }}
         >
           AI相談
-          <span aria-hidden>→</span>
-        </Link>
-        <Link
-          href="/settings/google"
-          className="inline-flex items-center gap-1 text-xs font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          Google連携
-          <span aria-hidden>→</span>
         </Link>
       </div>
-
-      <p className="px-1 pt-0.5 text-[10px] opacity-70" style={{ color: 'var(--ink-muted)' }}>
-        数値は仮置き(ADR-006)。Supabase 接続後に実データへ切り替わります。
-      </p>
     </div>
   );
 }

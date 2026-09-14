@@ -25,7 +25,7 @@ export default async function ReportsPage() {
   ]);
 
   return (
-    <div className="space-y-4">
+    <div className="rise space-y-4">
       <header>
         <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
           支出レポート
