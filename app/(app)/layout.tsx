@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { MoreMenu } from '@/components/ui/more-menu';
+
 const NAV = [
   { href: '/', label: 'ホーム' },
   { href: '/debts', label: '負債' },
@@ -45,6 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </li>
             );
           })}
+          <MoreMenu />
         </ul>
       </nav>
     </div>
