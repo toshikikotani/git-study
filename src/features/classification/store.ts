@@ -193,6 +193,12 @@ export type ClassificationRuleSummary = {
   isActive: boolean;
   hitCount: number;
   lastHitAt: string | null;
+  /**
+   * このルールが FR-21(リボ・キャッシング・分割払い)の検知に使われているか。
+   * `features/rules-chat/*` はこれが立っているルールの変更・削除を拒む
+   * (ADR-024)。検知の無効化を、確認なしに会話から起こさせないための砦。
+   */
+  setPaymentMethod: ClassificationRuleRow['set_payment_method'] | null;
 };
 
 /**
@@ -229,6 +235,7 @@ export async function listClassificationRules(): Promise<ClassificationRuleSumma
     isActive: row.is_active,
     hitCount: row.hit_count,
     lastHitAt: row.last_hit_at,
+    setPaymentMethod: row.set_payment_method,
   }));
 }
 
@@ -326,6 +333,139 @@ export async function createLearnedRule(params: {
   if (error) {
     throw new ClassificationStoreError(`学習ルールを作成できませんでした: ${error.message}`);
   }
+}
+
+/** 優先度の既定値。学習ルール(500、buildLearnedRule)と同じ帯に置く。 */
+const CHAT_RULE_DEFAULT_PRIORITY = 500;
+
+/**
+ * 本人が内容を指定してルールを作る(新機能、ADR-024「ルールをAIに相談する」)。
+ *
+ * `createLearnedRule()` と違い、キーワードを摘要から自動抽出せず、パターン・
+ * 一致方式・カテゴリを呼び出し側(チャットの tool 実行層)がそのまま渡す。
+ * `setPaymentMethod`/`setMerchantName`/金額範囲は引数に無く、ここから設定する
+ * 経路が存在しない——FR-21 の検知(ADR-010)に触れるルールは、この経路では
+ * 作れない設計にしてある。
+ */
+export async function createClassificationRule(params: {
+  name: string;
+  matchType: 'keyword' | 'regex' | 'exact';
+  pattern: string;
+  categoryId: string;
+}): Promise<ClassificationRuleSummary> {
+  if (params.pattern.trim() === '') {
+    throw new ClassificationStoreError('ルールのパターンが空です。');
+  }
+  assertValidPattern(params.matchType, params.pattern);
+
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new ClassificationStoreError('ログイン状態を確認できませんでした');
+  }
+
+  const { data, error } = await supabase
+    .from('classification_rules')
+    .insert({
+      user_id: auth.user.id,
+      name: params.name,
+      priority: CHAT_RULE_DEFAULT_PRIORITY,
+      match_type: params.matchType,
+      pattern: params.pattern,
+      category_id: params.categoryId,
+      is_learned: false,
+      is_active: true,
+    })
+    .select('*')
+    .single();
+  if (error || !data) {
+    throw new ClassificationStoreError(`ルールを作成できませんでした: ${error?.message}`);
+  }
+  return toSummary(data, await categoryNameOf(supabase, data.category_id));
+}
+
+/**
+ * 既存のルールを部分更新する(新機能、ADR-024)。パターン・カテゴリ・有効/
+ * 無効・名前のみを対象とし、`setPaymentMethod` はここからは変更できない。
+ * 呼び出し側(チャットの tool 実行層)は、対象が FR-21 の検知ルール
+ * (`setPaymentMethod` 設定済み)でないことを先に確認すること。
+ */
+export async function updateClassificationRule(
+  id: string,
+  updates: {
+    name?: string;
+    matchType?: 'keyword' | 'regex' | 'exact';
+    pattern?: string;
+    categoryId?: string;
+    isActive?: boolean;
+  },
+): Promise<ClassificationRuleSummary> {
+  if (updates.pattern !== undefined) {
+    if (updates.pattern.trim() === '') {
+      throw new ClassificationStoreError('ルールのパターンが空です。');
+    }
+    assertValidPattern(updates.matchType ?? 'keyword', updates.pattern);
+  }
+
+  const supabase = await createClient();
+  const payload: Database['public']['Tables']['classification_rules']['Update'] = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.matchType !== undefined) payload.match_type = updates.matchType;
+  if (updates.pattern !== undefined) payload.pattern = updates.pattern;
+  if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+  if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+
+  const { data, error } = await supabase
+    .from('classification_rules')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error || !data) {
+    throw new ClassificationStoreError(`ルールを更新できませんでした: ${error?.message}`);
+  }
+  return toSummary(data, await categoryNameOf(supabase, data.category_id));
+}
+
+/** regex のときだけコンパイルを試す。keyword/exact は文字列そのものなので不正になりようがない。 */
+function assertValidPattern(matchType: 'keyword' | 'regex' | 'exact', pattern: string): void {
+  if (matchType !== 'regex') return;
+  try {
+    new RegExp(pattern);
+  } catch (cause) {
+    throw new ClassificationStoreError(
+      `正規表現として不正です: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+}
+
+async function categoryNameOf(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  categoryId: string | null,
+): Promise<string | null> {
+  if (categoryId === null) return null;
+  const { data } = await supabase.from('categories').select('name').eq('id', categoryId).single();
+  return data?.name ?? null;
+}
+
+function toSummary(
+  row: ClassificationRuleRow,
+  categoryName: string | null,
+): ClassificationRuleSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    priority: row.priority,
+    matchType: row.match_type,
+    pattern: row.pattern,
+    categoryId: row.category_id,
+    categoryName,
+    isLearned: row.is_learned,
+    isActive: row.is_active,
+    hitCount: row.hit_count,
+    lastHitAt: row.last_hit_at,
+    setPaymentMethod: row.set_payment_method,
+  };
 }
 
 /**

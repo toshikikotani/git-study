@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { listCategories } from '@/features/categories/store';
 import { listClassificationRules } from '@/features/classification/store';
 import { CategoryRow } from './category-row';
@@ -18,10 +20,17 @@ export default async function RulesPage() {
 
   return (
     <div className="rise space-y-6">
-      <header>
+      <header className="flex items-baseline justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           カテゴリと分類ルール
         </h1>
+        <Link
+          href="/rules/chat"
+          className="text-[13px] font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          AIに相談する
+        </Link>
       </header>
 
       <section className="space-y-3">

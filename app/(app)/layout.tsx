@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { MoreMenu } from '@/components/ui/more-menu';
+
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
  * わかりづらい」への対応。/transactions の見出しに小さい文字リンクを並べる
@@ -10,6 +12,10 @@ import { usePathname } from 'next/navigation';
  * 家計簿(/spending)をタブに追加し、レシート撮影は毎回の記録行動そのもの
  * (設計原則2:記録の手間を最小化)なので、どの画面からでも1タップで開ける
  * 専用ボタンとして常設する(タブの隣に置くと埋もれるため別枠にした)。
+ *
+ * それでも辿り着けない画面(口座・ルール・投資・副業・転職準備・レポート・
+ * 朝配信・AI相談・設定群など)は、タブの末尾「もっと」から開くドロップアップ
+ * メニュー(MoreMenu)に集約する。
  */
 const NAV = [
   { href: '/', label: 'ホーム' },
@@ -72,6 +78,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </li>
               );
             })}
+            <MoreMenu />
           </ul>
         </nav>
       </div>
