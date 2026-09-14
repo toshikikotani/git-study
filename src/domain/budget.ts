@@ -172,3 +172,19 @@ export function totalSpentYen(transactions: readonly BudgetTransaction[]): numbe
 export function isCountable(tx: BudgetTransaction): boolean {
   return !tx.isTransfer && tx.reviewStatus !== 'ignored';
 }
+
+/**
+ * 進捗ゲージ(完済・予算)に刻むマイルストーン。到達を祝うための節目。
+ *
+ * `features/home/summary.ts` は `next/headers` に依存する `createClient()` を
+ * 使うため、そこにこの定数を置くと `Meter`(Client Component)がそれを
+ * import した時点でクライアントバンドルに `next/headers` が引き込まれてしまう
+ * (T-7 で発見した同種の問題)。ここ(DB にもネットワークにも触れない
+ * domain 層)に置くことで、サーバー・クライアントどちらからも安全に使える。
+ */
+export const MILESTONES = [0.25, 0.5, 0.75, 1] as const;
+
+/** まだ到達していない最初のマイルストーン。全て達成済みなら null。 */
+export function nextMilestone(progressRatio: number): number | null {
+  return MILESTONES.find((m) => progressRatio < m) ?? null;
+}

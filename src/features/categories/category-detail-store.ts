@@ -10,7 +10,7 @@
  * の listMonthTransactions() と同じ考え方をここでも使う。
  */
 
-import { budgetStatusFor, type BudgetStatus } from '@/domain/budget';
+import { budgetStatusFor } from '@/domain/budget';
 import {
   expandMergedCategoryIds,
   resolveCategoryRoot,
@@ -18,6 +18,9 @@ import {
 } from '@/domain/category';
 import { monthStartJst } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
+import type { CategoryMonthDetail } from './category-detail-types';
+
+export type { CategoryMonthDetail, CategoryTransactionDetail } from './category-detail-types';
 
 export class CategoryDetailError extends Error {
   constructor(message: string) {
@@ -25,23 +28,6 @@ export class CategoryDetailError extends Error {
     this.name = 'CategoryDetailError';
   }
 }
-
-export type CategoryTransactionDetail = {
-  id: string;
-  occurredOn: string;
-  description: string;
-  merchantName: string | null;
-  /** 支出が負、収入が正(ADR-008)。 */
-  amountYen: number;
-};
-
-export type CategoryMonthDetail = {
-  categoryId: string;
-  categoryName: string;
-  status: BudgetStatus;
-  /** 集計対象(isCountable)の当月の明細のみ。日付の新しい順。 */
-  transactions: readonly CategoryTransactionDetail[];
-};
 
 /**
  * 当月・1カテゴリ分の内訳を返す。カテゴリが存在しない・本人のものでない
