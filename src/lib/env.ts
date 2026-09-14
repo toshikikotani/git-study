@@ -207,6 +207,36 @@ export function getLineEnv(): LineEnv | null {
 }
 
 /**
+ * LINE Webhook(レシート画像の受信、本人発案)の署名検証に使う。
+ * `getLineEnv()`(送信専用の既存設定)とは別の任意項目にする——既に
+ * LINE_CHANNEL_ACCESS_TOKEN/LINE_USER_ID だけを設定済みの本人の環境を、
+ * この列を必須化することで壊さないため。
+ */
+export function getLineChannelSecret(): string | null {
+  const value = process.env.LINE_CHANNEL_SECRET;
+  if (!value) return null;
+  return parseOrThrow(
+    z.string().min(1, 'LINE_CHANNEL_SECRET が空です'),
+    value,
+    'LINE_CHANNEL_SECRET',
+  );
+}
+
+/**
+ * LINEで送られたレシート画像の取り込み先口座(GMAIL_IMPORT_ACCOUNT_ID と同じ
+ * 考え方)。
+ */
+export function getLineReceiptAccountId(): string | null {
+  const value = process.env.LINE_RECEIPT_ACCOUNT_ID;
+  if (!value) return null;
+  return parseOrThrow(
+    z.uuid({ error: 'accounts.id の形式(uuid)ではありません' }),
+    value,
+    'LINE_RECEIPT_ACCOUNT_ID',
+  );
+}
+
+/**
  * Google の OAuth クライアント資格情報だけ(`/settings/google` の同意フロー用)。
  * refresh token はまだ無い前提(これから発行する側)なので separate に持つ。
  */

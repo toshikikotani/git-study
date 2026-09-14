@@ -11,6 +11,8 @@
  * 頼らない)。
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -129,9 +131,30 @@ export async function importTransactions(
   if (authError || !auth.user) {
     throw new TransactionStoreError('ログイン状態を確認できませんでした');
   }
+  return importTransactionsAsAdmin(supabase, auth.user.id, transactions, meta);
+}
 
+/**
+ * 本人のセッション(cookie)が無い経路(LINE の受信 Webhook、Gmail 自動取り込み
+ * 相当)向け。管理クライアント + 明示的な user_id で書く
+ * (`app/api/cron/keepalive/route.ts` と同じ考え方)。ロジック本体はここに
+ * 集約し、`importTransactions()` は本人のセッションから user_id を取り出す
+ * だけの薄いラッパーにする(2箇所に同じ取り込みロジックを持たない)。
+ */
+export async function importTransactionsAsAdmin(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  transactions: readonly StoredTransaction[],
+  meta: {
+    fileName: string | null;
+    source: TransactionSource;
+    accountId: string;
+    failedCount: number;
+    receiptImagePath?: string | null;
+  },
+): Promise<ImportResult> {
   const batchBase = {
-    user_id: auth.user.id,
+    user_id: userId,
     source: meta.source,
     account_id: meta.accountId,
     file_name: meta.fileName,
@@ -184,7 +207,7 @@ export async function importTransactions(
     .from('transactions')
     .upsert(
       transactions.map((t) => ({
-        user_id: auth.user.id,
+        user_id: userId,
         account_id: meta.accountId,
         occurred_on: t.occurredOn,
         description: t.description,
