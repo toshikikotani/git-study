@@ -32,26 +32,35 @@ export default async function ReviewPage() {
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         カテゴリを選んで確定すると、同じ摘要の次の明細から自動で分類されます。
-        まとめて整えたいときは
-        <Link
-          href="/rules"
-          className="mx-1 font-semibold underline decoration-dotted underline-offset-4"
-          style={{ color: 'var(--accent)' }}
-        >
-          分類ルール
-        </Link>
-        や
-        <Link
-          href="/rules/chat"
-          className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
-          style={{ color: 'var(--accent)' }}
-        >
-          ルール相談
-        </Link>
-        からどうぞ。
       </p>
 
       <ReviewQueue categories={categories} initialPending={pending} />
+
+      {/* 本人発案:文中リンクではなく、関連機能のすぐ近くにボタンとして置く。 */}
+      <div className="flex gap-2">
+        <Link
+          href="/rules"
+          className="flex-1 rounded-2xl py-2.5 text-center text-[13px] font-semibold"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink-secondary)',
+            border: '1px solid var(--hairline)',
+          }}
+        >
+          分類ルールをまとめて整える
+        </Link>
+        <Link
+          href="/rules/chat"
+          className="flex-1 rounded-2xl py-2.5 text-center text-[13px] font-semibold"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink-secondary)',
+            border: '1px solid var(--hairline)',
+          }}
+        >
+          AIにルール相談
+        </Link>
+      </div>
     </div>
   );
 }
