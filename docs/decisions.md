@@ -633,6 +633,34 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
+## ADR-025:レシート画像の受信は LINE のみ(Discord は見送り)。分類は自動昇格したルールのみ、AI 分類は使わない
+
+**背景**:本人発案で「Discord と LINE でレシート画像を送るだけで自動取り込みしたい」「1回に複数枚まとめて送りたい」という要望が出た。`/transactions/receipt` の既存経路(ADR-021)は本人がブラウザで撮影・アップロードする前提で、外部サービスからの受信経路を持っていなかった。
+
+**Discord を見送った理由**:Discord の Incoming Webhook(ADR-002)は送信専用で、画像の受信はできない。受信するには Gateway に常時接続する Bot が要るが、このアプリは Vercel サーバーレス + GitHub Actions(定時実行)の構成(ADR-012)で、常時接続を保つプロセスを持たない。Slash Command + Interactions Endpoint(HTTPリクエスト駆動)であれば技術的には可能だが、実装量に見合わないとして本人が明示的に見送りを選んだ。**決定**:レシート画像の自動受信は LINE のみとする。LINE Messaging API は Webhook(HTTPS への POST)でメッセージを配信するため、既存のサーバーレス構成にそのまま乗る。
+
+**受信の仕組み**:`app/api/webhooks/line/route.ts` が LINE からの Webhook を受ける。`proxy.ts` の認証関所は本人のセッション cookie を前提にしており、LINE のサーバーはそれを持たないため、`api/webhooks` を `api/cron` と同じく関所の対象外にし(`proxy.ts` の `matcher`)、代わりに `X-Line-Signature`(チャネルシークレットで生 body を HMAC-SHA256 した値)を自前で検証する(LINE 公式の必須要件)。加えて `source.userId` が `LINE_USER_ID`(本人)と一致しない画像は無視する——LINE公式アカウントは友だち追加されれば誰からでもメッセージを受け取れるため、これが無いと他人の画像を取り込んでしまう。
+
+**複数レシート送信**:LINE は1メッセージ=1画像として `events` 配列に積む(まとめて送っても複数の `message` イベントに分かれて届く)。配列を順に処理するだけで自然に対応でき、新しい仕組みは要らない。Web 画面(`/transactions/receipt`)側は逆に「1回の選択で複数ファイルを選べる」形が要望だったため、`<input type="file" multiple>` を受けて `ReceiptEntry[]` の配列を持たせ、抽出・保存を1枚ずつループする形に変更した。**「1回の撮影(受信)=1バッチ」(`import_batches` 1行、`receipt_image_path` 1件)の原則は両経路とも崩していない**——複数化したのは「1回の操作で何枚扱えるか」であって、バッチの単位そのものではない。AI 分類の呼び出しだけは Web 画面側でまとめて1回にした(枚数が増えても API 呼び出し回数を増やさないため)。
+
+**分類は自動昇格したルールのみ(AI分類は呼ばない)**:LINE 受信は本人のセッションが無い経路で、`app/api/cron/import-gmail/route.ts`(ADR-019)と同じ制約を持つ——確認待ちキュー(M2-5)を本人が見るまで、分類ミスに気づく手段が無い。この経路で AI 分類(`classifyUnclassified`)まで自動で回すと、確認前に誤った分類が確定してしまう恐れがある。そのため `DEFAULT_DETECTION_RULES` + 本人の学習済みルール(`listActiveClassificationRulesForUser`、P5-2 の自動昇格ルールを含む)だけを当て、当たらないものは `review_status='pending'` のまま確認待ちに積む。抽出(店名・金額・日付を読み取る)には画像から文字を得る決定的な手段が無いため AI を使うが、判定(どのカテゴリか)は確率的な経路に任せない、という役割分担は ADR-010/019/021 と変えていない。
+
+**商品行(items)の分割は対象外**:`/transactions/receipt` の商品行分割(P-41)は本人がプレビュー画面で内容を確認してから保存する前提。LINE 受信にはその確認画面が無いため、レシート1枚=明細1件として保存し、抽出した商品行があっても `transaction_splits` は作らない。分割したければ本人が後で `/transactions` の編集画面から行う。
+
+**`importTransactions()` の分割**:LINE 受信・Web 画面の複数枚保存とも、本人のセッションを前提にしていた `features/transactions/store.ts` の `importTransactions()` をそのまま使えない。ロジック本体を `importTransactionsAsAdmin(supabase, userId, ...)` に切り出し、`importTransactions()` は本人のセッションから `user_id` を取り出すだけの薄いラッパーにした(`app/api/cron/keepalive/route.ts` の管理クライアント + 明示的な `user_id` という既存パターンをここでも踏襲。2箇所に同じ取り込みロジックを持たない)。
+
+**LINE Webhook のリトライと重複**:LINE は Webhook が失敗(非200やタイムアウト)すると再送する。再送のたびに AI 抽出をやり直すコストは許容し、DB への二重書き込みは `transactions.fingerprint` の一意制約 + `upsert(..., ignoreDuplicates: true)` に任せる。`fingerprint` は BEFORE INSERT/UPDATE トリガが `ON CONFLICT` 判定より前に上書きするため、`sourceRef`(`line-{messageId}-{index}`、対応付け用)に「正しくない」値を渡していても dedup 自体は正しく機能する。
+
+**却下した選択肢**
+
+- **Discord の Slash Command + Interactions Endpoint での受信**:実装コストに見合わないとして本人が見送りを選択(前述)
+- **LINE 受信でも AI 分類まで自動化する**:確認前の誤分類確定を避けるため見送り。ルールに当たらない分類は確認待ちに積むほうが安全(ADR-019 と同じ判断)
+- **LINE 受信でも商品行の分割を自動生成する**:確認画面が無い経路で `assertValidSplits()` の失敗を本人が気づけない。見送り、必要なら手動で分割する経路を使う
+
+**未了**:このセッションには LINE の資格情報(`LINE_CHANNEL_SECRET`・`LINE_CHANNEL_ACCESS_TOKEN`)が無く、実際の LINE からの Webhook 配信・署名検証は未検証。`.env.example` に設定手順を記載し、本人が実機で確認する。
+
+---
+
 ## 未決のまま残す事項
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。

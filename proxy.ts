@@ -11,6 +11,10 @@
  *
  * /api/cron/* は対象外。cron ジョブはブラウザのセッション cookie を
  * 持たず、CRON_SECRET で自分自身を認証する(ADR-009、M2-7c で実装)。
+ *
+ * /api/webhooks/* も対象外。LINE のサーバーがセッション cookie を持たずに
+ * 直接叩いてくる経路のため(本人発案のレシート受信 Webhook)。X-Line-Signature
+ * による検証は各 route.ts 側の責務にする(app/api/webhooks/line/route.ts)。
  */
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
@@ -64,5 +68,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|api/cron).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|api/cron|api/webhooks).*)'],
 };

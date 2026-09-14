@@ -11,12 +11,36 @@
  */
 
 const LINE_PUSH_MESSAGE_URL = 'https://api.line.me/v2/bot/message/push';
+/** メッセージに添付されたファイル本体を取得するAPI(画像・音声等、ホストが別)。 */
+const LINE_CONTENT_API_BASE = 'https://api-data.line.me/v2/bot/message';
 
 export class LineSendError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'LineSendError';
   }
+}
+
+/**
+ * 受信した画像メッセージの中身を取得する(レシート画像の自動取り込み、本人発案)。
+ * LINEは受信画像を常にJPEGへ変換して配信するため、mediaTypeは固定でよい
+ * (`/transactions/receipt` の撮影画面がJPEGへリサイズしているのと同じ前提)。
+ */
+export async function fetchLineImageAsBase64(
+  channelAccessToken: string,
+  messageId: string,
+): Promise<string> {
+  const response = await fetch(`${LINE_CONTENT_API_BASE}/${messageId}/content`, {
+    headers: { authorization: `Bearer ${channelAccessToken}` },
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new LineSendError(
+      `LINE からの画像取得に失敗しました(ステータス ${response.status}): ${detail}`,
+    );
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  return bytes.toString('base64');
 }
 
 /** 指定した userId(本人の LINE アカウント)へテキストを1件送信する。 */
