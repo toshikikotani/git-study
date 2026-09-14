@@ -18,6 +18,7 @@ export function StatTile({
   ratio,
   tone,
   note,
+  hint,
 }: {
   label: string;
   /** 単純な文字列表示。valueParts があればそちらが優先される。 */
@@ -29,6 +30,8 @@ export function StatTile({
   tone?: BudgetTone | undefined;
   /** バッジに出す短い注記。「予算の 75%」など。 */
   note?: string | undefined;
+  /** タイルが押せることを示す小さな注記(本人発案:ホームから内訳を開けるように)。 */
+  hint?: { text: string; expanded: boolean } | undefined;
 }) {
   const resolvedTone: BudgetTone = tone ?? 'normal';
 
@@ -75,6 +78,22 @@ export function StatTile({
       {sub ? (
         <p className="tabular mt-2.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
           {sub}
+        </p>
+      ) : null}
+
+      {hint ? (
+        <p
+          className="mt-2.5 flex items-center gap-1 text-[11px] font-medium"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          {hint.text}
+          <span
+            aria-hidden
+            className="inline-block transition-transform duration-200"
+            style={{ transform: hint.expanded ? 'rotate(180deg)' : 'none' }}
+          >
+            ⌄
+          </span>
         </p>
       ) : null}
     </div>

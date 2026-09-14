@@ -1,5 +1,4 @@
-import type { BudgetTone } from '@/domain/budget';
-import { MILESTONES } from '@/features/home/summary';
+import { MILESTONES, type BudgetTone } from '@/domain/budget';
 
 /**
  * 予算の消化を示すメーター。
