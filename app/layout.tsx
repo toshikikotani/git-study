@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Roboto_Flex, M_PLUS_2 } from 'next/font/google';
+import { Inter, M_PLUS_2 } from 'next/font/google';
 
 import './globals.css';
 
@@ -16,21 +16,23 @@ import './globals.css';
  * 書体に落ちることもある。毎日開かせたい画面で、見え方が保証できない
  * のは受け入れられない。
  *
- * ── 選定(ADR-027で英数字のみ変更) ────────────────────────
- * Roboto Flex  数字と英字。Material Design の標準書体ファミリー
- *              (ADR-027の本格導入方針)。可変フォントだが等幅数字
- *              (tabular figures)の品質は ADR-017 が Inter を選んだ
- *              理由をそのまま満たす。表や軸で使う(.tabular)
+ * ── 選定(ADR-028でADR-027から差し戻し) ────────────────────
+ * Inter        数字と英字。Apple の標準書体(San Francisco)は
+ *              next/font/google で配布されておらずセルフホストできない
+ *              ため、字面・字幅が近く等幅数字(tabular figures)の
+ *              品質も高い Inter を使う(ADR-017が最初に選んだ書体へ
+ *              差し戻し。ADR-027はMaterial標準のRoboto Flexに一時変更
+ *              していた)。表や軸で使う(.tabular)
  * M PLUS 2     日本語。ADR-017の判断を維持(Noto Sans JP より軽量・
  *              UI向き、情報密度の高い画面と相性がよい)
  *
  * 日本語は容量が大きいため preload しない。数字が先に出て日本語が
  * 後から差し替わるが、最上部のヒーローは数字なので実害が小さい。
  */
-const roboto = Roboto_Flex({
+const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-roboto',
+  variable: '--font-inter',
 });
 
 const mplus2 = M_PLUS_2({
@@ -57,7 +59,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja" className={`${roboto.variable} ${mplus2.variable}`}>
+    <html lang="ja" className={`${inter.variable} ${mplus2.variable}`}>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );

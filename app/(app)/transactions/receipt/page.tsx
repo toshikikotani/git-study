@@ -521,11 +521,11 @@ export default function ReceiptPage() {
              * ギャラリー選択専用の input を分けて、本人がボタンで選ぶ形にした。
              */}
             <label
-              className="md-label-large cursor-pointer px-6 py-2.5"
+              className="label-text cursor-pointer px-6 py-2.5"
               style={{
-                borderRadius: 'var(--md-shape-full)',
-                background: 'var(--md-primary)',
-                color: 'var(--md-on-primary)',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--accent)',
+                color: 'var(--on-accent)',
               }}
             >
               <input
@@ -543,11 +543,11 @@ export default function ReceiptPage() {
               撮る
             </label>
             <label
-              className="md-label-large cursor-pointer px-6 py-2.5"
+              className="label-text cursor-pointer px-6 py-2.5"
               style={{
-                borderRadius: 'var(--md-shape-full)',
-                border: '1px solid var(--md-outline)',
-                color: 'var(--md-primary)',
+                borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--hairline)',
+                color: 'var(--accent)',
               }}
             >
               <input

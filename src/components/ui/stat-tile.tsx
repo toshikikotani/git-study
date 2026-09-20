@@ -41,9 +41,9 @@ export function StatTile({
     <div
       className="p-5"
       style={{
-        borderRadius: 'var(--md-shape-lg)',
-        background: 'var(--md-surface-container-low)',
-        boxShadow: 'var(--md-elevation-1)',
+        borderRadius: 'var(--radius-lg)',
+        background: 'var(--surface)',
+        boxShadow: 'var(--shadow-1)',
       }}
     >
       <div className="flex items-center justify-between gap-2">
@@ -95,8 +95,11 @@ export function StatTile({
           {hint.text}
           <MdExpandMore
             aria-hidden
-            className="inline-block transition-transform duration-200"
-            style={{ transform: hint.expanded ? 'rotate(180deg)' : 'none' }}
+            className="inline-block"
+            style={{
+              transform: hint.expanded ? 'rotate(180deg)' : 'none',
+              transition: 'transform var(--duration-medium) var(--ease-spring)',
+            }}
           />
         </p>
       ) : null}

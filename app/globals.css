@@ -26,12 +26,13 @@
    ============================================================================= */
 
 /* 書体は app/layout.tsx が next/font でセルフホストし、CSS 変数として渡す。
-   Roboto Flex(ADR-027、Material の標準書体)を先に置くことで、英数字と
-   数字は Roboto Flex、日本語は M PLUS 2 が受け持つ。フォント取得前でも
-   読めるよう、末尾に端末の既定を残す。 */
+   Apple の標準書体(San Francisco)は next/font/google で配布されておらず
+   セルフホストできないため、字面・字幅がSF Proに近く ADR-017 が既に
+   採用実績を持つ Inter を英数字に使う(ADR-028、ADR-027の Roboto Flex から
+   差し戻し)。日本語は M PLUS 2(ADR-017)を維持。 */
 @theme {
   --font-sans:
-    var(--font-roboto), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
+    var(--font-inter), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
     sans-serif;
 }
 
@@ -114,108 +115,93 @@
 }
 
 /* =============================================================================
-   Material Design 3(ADR-027)
+   Apple Liquid Glass(ADR-028、ADR-027の Material Design 3 を置き換え)
 
    既存の役割色(--accent/--income/--over/--attention 等、上のコメント参照)は
    一切変えない——暗色面での通常視・CVD の ΔE を実測して選んだ値であり、
-   唯一の真実源としてそのまま残す。ここに追加するのは Material 3 の
-   ロール名・elevation・shape・motion のトークン層で、既存の色を
-   Material のカスタムカラーロールとして「言い換える」だけ(ADR-027)。
+   唯一の真実源としてそのまま残す。Material 3 のロール名による「言い換え」
+   層は撤去し、既存の役割色トークンを各コンポーネントから直接参照する形に
+   戻した(間接層を挟む理由が無くなったため)。ここに残すのは、Apple の
+   Human Interface Guidelines(Liquid Glass、iOS 18〜)に沿う shape・
+   motion・素材(半透明+ぼかし)のトークンだけ。
+
+   ── Liquid Glass はナビゲーション用の chrome にだけ使う ──────────
+   本人の要望(「アプリ全体の主要な操作系」)を受けつつ、実際に Apple 自身の
+   アプリを見ても、ガラス素材はタブバー・ツールバー・シート・フローティング
+   ボタンなど「コンテンツの上に浮く操作系」にだけ使われ、本文中のボタンや
+   カードは不透明な塗りのままになっている(全部を透過にすると逆にコンテンツが
+   読みにくくなるため)。この方針に倣い、ガラス素材(--glass-*)はボトムナビ・
+   その他メニューのシート・Button の elevated variant(カードの上に浮く
+   ボタン)に限定して使い、Card・StatTile・Chip 等の本文要素は不透明な
+   サーフェス+Apple 的な角丸とスプリングの動きだけを採用する。
    ============================================================================= */
 :root {
-  /* コアロール。primary=返済(青)、error=超過(赤) が Material の標準ロールに
-     素直に対応する。income(緑)は Material 3 のカスタムカラー拡張として
-     同じ命名規則(ロール/on-ロール/ロール-container/on-ロール-container)を
-     踏襲する。 */
-  --md-primary: var(--accent);
-  --md-on-primary: #ffffff;
-  --md-primary-container: var(--accent-track);
-  --md-on-primary-container: var(--accent);
+  /* 塗り潰しの上に置く文字色。--accent/--over/--income はいずれも
+     暗色面で読めるコントラストを持つ濃さで選んであるため、共通で白。 */
+  --on-accent: #ffffff;
 
-  --md-error: var(--over);
-  --md-on-error: #ffffff;
-  --md-error-container: var(--over-track);
-  --md-on-error-container: var(--over);
+  /* Card の filled variant 用。塗り面のみで少しだけ本文と差をつけたいときに使う
+     (Apple の secondarySystemBackground に相当する中間階調)。 */
+  --surface-fill: color-mix(in srgb, var(--surface-raised) 94%, var(--ink) 6%);
 
-  --md-income: var(--income);
-  --md-on-income: #ffffff;
-  --md-income-container: var(--income-track);
-  --md-on-income-container: var(--income);
+  /* Shape。Apple の continuous corner(スーパー楕円)は CSS の border-radius
+     では厳密には再現できないが、値の刻みは HIG の目安(10/14/20/28px)に寄せた。 */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
 
-  /* Secondary は中立トーン(ナビの非活性表示・控えめな塗りに使う)。 */
-  --md-secondary: var(--ink-secondary);
-  --md-secondary-container: var(--plane);
-  --md-on-secondary-container: var(--ink);
+  /* Motion。standard は色・不透明度などの単純な状態変化に、spring は
+     押下フィードバックやタブの切り替えなど「弾む」動きが要る箇所に使う
+     (cubic-bezier が 1 を一瞬超えてから収まることで、キーフレーム無しで
+     跳ねる感触を作れる)。sheet は UIKit のモーダル遷移に準じたカーブ。 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 150ms;
+  --duration-medium: 320ms;
+  --duration-slow: 380ms;
 
-  /* Surface のはしご。既存は --surface/--surface-raised の2段しか無いため、
-     highest だけ ink 側へ少し寄せて5段相当を作る。 */
-  --md-surface: var(--plane);
-  --md-surface-container-low: var(--surface);
-  --md-surface-container: var(--surface-raised);
-  --md-surface-container-high: color-mix(in srgb, var(--surface-raised) 94%, var(--ink) 6%);
-  --md-surface-container-highest: color-mix(in srgb, var(--surface-raised) 88%, var(--ink) 12%);
-  --md-on-surface: var(--ink);
-  --md-on-surface-variant: var(--ink-secondary);
-  --md-outline: var(--hairline);
-  --md-outline-variant: var(--hairline);
+  /* シャドウ。Material の0〜5段のelevationラダーはガラス素材前提では過剰なため、
+     カード用の1段だけに絞った。 */
+  --shadow-1: 0 1px 2px rgba(10, 16, 32, 0.08), 0 1px 3px 1px rgba(10, 16, 32, 0.06);
 
-  /* Elevation(Material 3)。light はシャドウの重ね合わせ。 */
-  --md-elevation-0: none;
-  --md-elevation-1: 0 1px 2px rgba(10, 16, 32, 0.08), 0 1px 3px 1px rgba(10, 16, 32, 0.06);
-  --md-elevation-2: 0 1px 2px rgba(10, 16, 32, 0.1), 0 2px 6px 2px rgba(10, 16, 32, 0.08);
-  --md-elevation-3: 0 1px 3px rgba(10, 16, 32, 0.12), 0 4px 8px 3px rgba(10, 16, 32, 0.1);
-  --md-elevation-4: 0 2px 3px rgba(10, 16, 32, 0.14), 0 6px 10px 4px rgba(10, 16, 32, 0.1);
-  --md-elevation-5: 0 4px 4px rgba(10, 16, 32, 0.16), 0 8px 12px 6px rgba(10, 16, 32, 0.12);
-
-  /* Shape scale。 */
-  --md-shape-xs: 4px;
-  --md-shape-sm: 8px;
-  --md-shape-md: 12px;
-  --md-shape-lg: 16px;
-  --md-shape-xl: 28px;
-  --md-shape-full: 999px;
-
-  /* Motion。standard は状態変化、emphasized は大きな遷移(シート開閉等)。 */
-  --md-easing-standard: cubic-bezier(0.2, 0, 0, 1);
-  --md-easing-emphasized: cubic-bezier(0.3, 0, 0.8, 0.15);
-  --md-easing-emphasized-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md-duration-short: 150ms;
-  --md-duration-medium: 300ms;
-  --md-duration-long: 500ms;
-
-  /* State layer(hover/pressed の重ね塗り不透明度)。色は on-surface 側を使う。 */
-  --md-state-hover: 0.08;
-  --md-state-pressed: 0.1;
+  /* ガラス素材(半透明+ぼかし)。regular/strong の2段——strong はシートなど
+     背後の内容をより強く隠したい面に使う。 */
+  --glass-tint: rgba(255, 255, 255, 0.55);
+  --glass-tint-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-blur: blur(24px) saturate(180%);
+  --glass-blur-strong: blur(34px) saturate(190%);
+  --glass-shadow: 0 10px 30px rgba(10, 16, 32, 0.14);
+  --glass-shadow-float: 0 14px 38px rgba(10, 16, 32, 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    /* ダークテーマでは影がほぼ見えないため、Material 3 の考え方どおり
-       「面を段階的に明るくする」ことで高さを表す。シャドウは添えるだけ。 */
-    --md-surface-container-low: var(--surface);
-    --md-surface-container: var(--surface-raised);
-    --md-surface-container-high: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
-    --md-surface-container-highest: color-mix(in srgb, var(--surface-raised) 80%, white 20%);
+    --surface-fill: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
 
-    --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --md-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.5);
-    --md-elevation-4: 0 2px 6px rgba(0, 0, 0, 0.5);
-    --md-elevation-5: 0 4px 10px rgba(0, 0, 0, 0.55);
+    /* ダークの Liquid Glass は白ではなく面の色を薄く重ねる(iOS の
+       ダークモード素材と同じ考え方)。縁のハイライトは白を弱く。 */
+    --glass-tint: rgba(20, 24, 34, 0.55);
+    --glass-tint-strong: rgba(20, 24, 34, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.09);
+    --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --glass-shadow-float: 0 14px 38px rgba(0, 0, 0, 0.55);
   }
 }
 
 :root[data-theme='dark'] {
-  --md-surface-container-low: var(--surface);
-  --md-surface-container: var(--surface-raised);
-  --md-surface-container-high: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
-  --md-surface-container-highest: color-mix(in srgb, var(--surface-raised) 80%, white 20%);
+  --surface-fill: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
 
-  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --md-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.5);
-  --md-elevation-4: 0 2px 6px rgba(0, 0, 0, 0.5);
-  --md-elevation-5: 0 4px 10px rgba(0, 0, 0, 0.55);
+  --glass-tint: rgba(20, 24, 34, 0.55);
+  --glass-tint-strong: rgba(20, 24, 34, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --glass-shadow-float: 0 14px 38px rgba(0, 0, 0, 0.55);
 }
 
 body {
@@ -223,69 +209,14 @@ body {
   color: var(--ink);
 }
 
-/* ── Material 3 タイポグラフィスケール ────────────────────────
-   本文の既存サイズ指定(Tailwind の text-*)はそのまま。新規/改修する
-   コンポーネント(Button・Fab・Chip・Card 等)はここから選ぶ。 */
-.md-display-small {
-  font-size: 36px;
-  line-height: 44px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-.md-headline-small {
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.md-title-medium {
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 600;
-}
-.md-body-medium {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 400;
-}
-.md-label-large {
+/* ── ラベル用の文字組み ─────────────────────────────────────
+   本文の既存サイズ指定(Tailwind の text-*)はそのまま。Button・Fab・Chip・
+   ナビのラベルなど、強調した短いラベルに使う。 */
+.label-text {
   font-size: 14px;
   line-height: 20px;
   font-weight: 600;
   letter-spacing: 0.01em;
-}
-
-/* ── Ripple(components/ui/ripple.tsx から使う)────────────────
-   ポインタ座標を --ripple-x/--ripple-y として渡し、そこから広がる円。 */
-@keyframes md-ripple {
-  from {
-    transform: scale(0);
-    opacity: 0.24;
-  }
-  to {
-    transform: scale(1);
-    opacity: 0;
-  }
-}
-
-.md-ripple {
-  position: absolute;
-  left: var(--ripple-x, 50%);
-  top: var(--ripple-y, 50%);
-  width: var(--ripple-size, 100%);
-  height: var(--ripple-size, 100%);
-  border-radius: 999px;
-  background: currentColor;
-  transform-origin: center;
-  pointer-events: none;
-  animation: md-ripple 550ms var(--md-easing-standard, ease-out);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .md-ripple {
-    animation: none;
-    display: none;
-  }
 }
 
 /* iOS Safari は input のフォントサイズが 16px 未満だとフォーカス時に

@@ -19,8 +19,14 @@ import { MoreMenu } from '@/components/ui/more-menu';
  * 朝配信・AI相談・設定群など)は、タブの末尾「その他」から開くドロップアップ
  * メニュー(MoreMenu)に集約する。
  *
- * ボトムナビは Material 3 の Navigation Bar 仕様(ADR-027)——アクティブ
- * 項目の背後に pill 型のインジケータを敷き、ラベルは常時表示する。
+ * ボトムナビは Apple の Liquid Glass 風(ADR-028、ADR-027の Material
+ * Navigation Bar から置き換え)——本人が実際に触っている別アプリの
+ * スクリーンショット(半透明にぼかした帯+選択時に水のように弾むピル)を
+ * 見せて要望されたため、それに直接寄せた。バーの背景は半透明+ぼかし
+ * (backdrop-filter)にし、アクティブ項目の背後のピルは色の変化と
+ * わずかな拡大を「行き過ぎてから収まる」スプリングのイージングで
+ * 動かして弾む感触を作る(ripple のような Material の水紋ではなく、
+ * Apple のタップ時に「軽く縮んでバネで戻る」感触に合わせた)。
  * レシート撮影ボタンは正式な Fab コンポーネントに置き換えた。
  */
 const NAV = [
@@ -43,18 +49,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
             (本人発案)。アイコンだけにして、余計な文字を足さない。
             絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
-            差し替えた(ADR-027 の続き)。 */}
+            差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
+            ナビゲーション chrome にだけ使う方針)。 */}
         <Fab href="/transactions/receipt" label="レシートを撮る">
           <MdCameraAlt aria-hidden size={26} />
         </Fab>
 
         <nav className="w-full max-w-md">
           <ul
-            className="flex items-end gap-1 p-2 backdrop-blur-xl"
+            className="flex items-end gap-1 p-2"
             style={{
-              borderRadius: 'var(--md-shape-xl)',
-              background: 'color-mix(in srgb, var(--md-surface-container-high) 90%, transparent)',
-              boxShadow: 'var(--md-elevation-2)',
+              borderRadius: 'var(--radius-xl)',
+              background: 'var(--glass-tint)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
             }}
           >
             {NAV.map((item) => {
@@ -64,24 +74,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <Link
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
-                    className="flex flex-col items-center gap-1 py-2 transition-colors"
-                    style={{
-                      transitionDuration: 'var(--md-duration-short)',
-                      transitionTimingFunction: 'var(--md-easing-standard)',
-                    }}
+                    className="flex flex-col items-center gap-1 py-2"
                   >
-                    {/* Material 3 の Navigation Bar:アクティブ項目は
-                        pill 型インジケータ(secondary-container)を背後に敷く。
-                        ラベルは常に表示し、色だけで状態を運ばない。 */}
+                    {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
+                        遷移させ、スプリングのイージングで一瞬 1 を超えてから
+                        収まることで「弾む」感触を作る(ADR-028)。 */}
                     <span
-                      className="md-label-large px-2 py-0.5 text-[11px] whitespace-nowrap transition-colors"
+                      className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
                       style={{
-                        borderRadius: 'var(--md-shape-full)',
-                        transitionDuration: 'var(--md-duration-short)',
-                        background: isActive ? 'var(--md-primary-container)' : 'transparent',
-                        color: isActive
-                          ? 'var(--md-on-primary-container)'
-                          : 'var(--md-on-surface-variant)',
+                        borderRadius: 'var(--radius-full)',
+                        transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                        transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+                        background: isActive ? 'var(--accent-track)' : 'transparent',
+                        color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
                       }}
                     >
                       {item.label}
