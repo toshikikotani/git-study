@@ -521,8 +521,12 @@ export default function ReceiptPage() {
              * ギャラリー選択専用の input を分けて、本人がボタンで選ぶ形にした。
              */}
             <label
-              className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold"
-              style={{ background: 'var(--accent)', color: 'var(--surface)' }}
+              className="md-label-large cursor-pointer px-6 py-2.5"
+              style={{
+                borderRadius: 'var(--md-shape-full)',
+                background: 'var(--md-primary)',
+                color: 'var(--md-on-primary)',
+              }}
             >
               <input
                 type="file"
@@ -539,8 +543,12 @@ export default function ReceiptPage() {
               撮る
             </label>
             <label
-              className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold"
-              style={{ border: '1px solid var(--hairline)', color: 'var(--accent)' }}
+              className="md-label-large cursor-pointer px-6 py-2.5"
+              style={{
+                borderRadius: 'var(--md-shape-full)',
+                border: '1px solid var(--md-outline)',
+                color: 'var(--md-primary)',
+              }}
             >
               <input
                 type="file"

@@ -26,11 +26,12 @@
    ============================================================================= */
 
 /* 書体は app/layout.tsx が next/font でセルフホストし、CSS 変数として渡す。
-   Inter を先に置くことで、英数字と数字は Inter、日本語は M PLUS 2 が受け持つ。
-   フォント取得前でも読めるよう、末尾に端末の既定を残す。 */
+   Roboto Flex(ADR-027、Material の標準書体)を先に置くことで、英数字と
+   数字は Roboto Flex、日本語は M PLUS 2 が受け持つ。フォント取得前でも
+   読めるよう、末尾に端末の既定を残す。 */
 @theme {
   --font-sans:
-    var(--font-inter), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
+    var(--font-roboto), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
     sans-serif;
 }
 
@@ -112,9 +113,179 @@
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* =============================================================================
+   Material Design 3(ADR-027)
+
+   既存の役割色(--accent/--income/--over/--attention 等、上のコメント参照)は
+   一切変えない——暗色面での通常視・CVD の ΔE を実測して選んだ値であり、
+   唯一の真実源としてそのまま残す。ここに追加するのは Material 3 の
+   ロール名・elevation・shape・motion のトークン層で、既存の色を
+   Material のカスタムカラーロールとして「言い換える」だけ(ADR-027)。
+   ============================================================================= */
+:root {
+  /* コアロール。primary=返済(青)、error=超過(赤) が Material の標準ロールに
+     素直に対応する。income(緑)は Material 3 のカスタムカラー拡張として
+     同じ命名規則(ロール/on-ロール/ロール-container/on-ロール-container)を
+     踏襲する。 */
+  --md-primary: var(--accent);
+  --md-on-primary: #ffffff;
+  --md-primary-container: var(--accent-track);
+  --md-on-primary-container: var(--accent);
+
+  --md-error: var(--over);
+  --md-on-error: #ffffff;
+  --md-error-container: var(--over-track);
+  --md-on-error-container: var(--over);
+
+  --md-income: var(--income);
+  --md-on-income: #ffffff;
+  --md-income-container: var(--income-track);
+  --md-on-income-container: var(--income);
+
+  /* Secondary は中立トーン(ナビの非活性表示・控えめな塗りに使う)。 */
+  --md-secondary: var(--ink-secondary);
+  --md-secondary-container: var(--plane);
+  --md-on-secondary-container: var(--ink);
+
+  /* Surface のはしご。既存は --surface/--surface-raised の2段しか無いため、
+     highest だけ ink 側へ少し寄せて5段相当を作る。 */
+  --md-surface: var(--plane);
+  --md-surface-container-low: var(--surface);
+  --md-surface-container: var(--surface-raised);
+  --md-surface-container-high: color-mix(in srgb, var(--surface-raised) 94%, var(--ink) 6%);
+  --md-surface-container-highest: color-mix(in srgb, var(--surface-raised) 88%, var(--ink) 12%);
+  --md-on-surface: var(--ink);
+  --md-on-surface-variant: var(--ink-secondary);
+  --md-outline: var(--hairline);
+  --md-outline-variant: var(--hairline);
+
+  /* Elevation(Material 3)。light はシャドウの重ね合わせ。 */
+  --md-elevation-0: none;
+  --md-elevation-1: 0 1px 2px rgba(10, 16, 32, 0.08), 0 1px 3px 1px rgba(10, 16, 32, 0.06);
+  --md-elevation-2: 0 1px 2px rgba(10, 16, 32, 0.1), 0 2px 6px 2px rgba(10, 16, 32, 0.08);
+  --md-elevation-3: 0 1px 3px rgba(10, 16, 32, 0.12), 0 4px 8px 3px rgba(10, 16, 32, 0.1);
+  --md-elevation-4: 0 2px 3px rgba(10, 16, 32, 0.14), 0 6px 10px 4px rgba(10, 16, 32, 0.1);
+  --md-elevation-5: 0 4px 4px rgba(10, 16, 32, 0.16), 0 8px 12px 6px rgba(10, 16, 32, 0.12);
+
+  /* Shape scale。 */
+  --md-shape-xs: 4px;
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-xl: 28px;
+  --md-shape-full: 999px;
+
+  /* Motion。standard は状態変化、emphasized は大きな遷移(シート開閉等)。 */
+  --md-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-easing-emphasized: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-easing-emphasized-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-duration-short: 150ms;
+  --md-duration-medium: 300ms;
+  --md-duration-long: 500ms;
+
+  /* State layer(hover/pressed の重ね塗り不透明度)。色は on-surface 側を使う。 */
+  --md-state-hover: 0.08;
+  --md-state-pressed: 0.1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    /* ダークテーマでは影がほぼ見えないため、Material 3 の考え方どおり
+       「面を段階的に明るくする」ことで高さを表す。シャドウは添えるだけ。 */
+    --md-surface-container-low: var(--surface);
+    --md-surface-container: var(--surface-raised);
+    --md-surface-container-high: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
+    --md-surface-container-highest: color-mix(in srgb, var(--surface-raised) 80%, white 20%);
+
+    --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --md-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.5);
+    --md-elevation-4: 0 2px 6px rgba(0, 0, 0, 0.5);
+    --md-elevation-5: 0 4px 10px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  --md-surface-container-low: var(--surface);
+  --md-surface-container: var(--surface-raised);
+  --md-surface-container-high: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
+  --md-surface-container-highest: color-mix(in srgb, var(--surface-raised) 80%, white 20%);
+
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --md-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --md-elevation-4: 0 2px 6px rgba(0, 0, 0, 0.5);
+  --md-elevation-5: 0 4px 10px rgba(0, 0, 0, 0.55);
+}
+
 body {
   background: var(--plane);
   color: var(--ink);
+}
+
+/* ── Material 3 タイポグラフィスケール ────────────────────────
+   本文の既存サイズ指定(Tailwind の text-*)はそのまま。新規/改修する
+   コンポーネント(Button・Fab・Chip・Card 等)はここから選ぶ。 */
+.md-display-small {
+  font-size: 36px;
+  line-height: 44px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.md-headline-small {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.md-title-medium {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.md-body-medium {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.md-label-large {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ── Ripple(components/ui/ripple.tsx から使う)────────────────
+   ポインタ座標を --ripple-x/--ripple-y として渡し、そこから広がる円。 */
+@keyframes md-ripple {
+  from {
+    transform: scale(0);
+    opacity: 0.24;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.md-ripple {
+  position: absolute;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  width: var(--ripple-size, 100%);
+  height: var(--ripple-size, 100%);
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center;
+  pointer-events: none;
+  animation: md-ripple 550ms var(--md-easing-standard, ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-ripple {
+    animation: none;
+    display: none;
+  }
 }
 
 /* iOS Safari は input のフォントサイズが 16px 未満だとフォーカス時に

@@ -37,8 +37,12 @@ export function StatTile({
 
   return (
     <div
-      className="rounded-[22px] p-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      className="p-5"
+      style={{
+        borderRadius: 'var(--md-shape-lg)',
+        background: 'var(--md-surface-container-low)',
+        boxShadow: 'var(--md-elevation-1)',
+      }}
     >
       <div className="flex items-center justify-between gap-2">
         <span

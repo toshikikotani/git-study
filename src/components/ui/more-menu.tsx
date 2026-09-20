@@ -136,14 +136,23 @@ export function MoreMenu() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="block w-full rounded-full py-2.5 text-center text-[13px] font-medium transition-colors"
-          style={
-            open
-              ? { background: 'var(--accent)', color: '#ffffff' }
-              : { color: 'var(--ink-secondary)' }
-          }
+          className="flex w-full flex-col items-center gap-1 py-2 transition-colors"
+          style={{
+            transitionDuration: 'var(--md-duration-short)',
+            transitionTimingFunction: 'var(--md-easing-standard)',
+          }}
         >
-          その他
+          <span
+            className="md-label-large px-2 py-0.5 text-[11px] whitespace-nowrap transition-colors"
+            style={{
+              borderRadius: 'var(--md-shape-full)',
+              transitionDuration: 'var(--md-duration-short)',
+              background: open ? 'var(--md-primary-container)' : 'transparent',
+              color: open ? 'var(--md-on-primary-container)' : 'var(--md-on-surface-variant)',
+            }}
+          >
+            その他
+          </span>
         </button>
       </li>
 
@@ -172,21 +181,25 @@ function MoreMenuOverlay({ open, onClose }: { open: boolean; onClose: () => void
         }}
       />
 
-      {/* シート本体。iOS の sheet と同じ曲線(0.32,0.72,0,1)で「行き過ぎてから収まる」動きにする */}
+      {/* シート本体。Material 3 の emphasized-decelerate イージング(ADR-027)で
+          「行き過ぎてから収まる」動きにする。 */}
       <div
         role="menu"
         aria-hidden={!open}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-[360ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none"
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform will-change-transform motion-reduce:transition-none"
         style={{
           transform: open ? 'translateY(0)' : 'translateY(110%)',
+          transitionDuration: 'var(--md-duration-medium)',
+          transitionTimingFunction: 'var(--md-easing-emphasized-decel)',
           pointerEvents: open ? 'auto' : 'none',
         }}
       >
         <div
-          className="max-h-[75dvh] overflow-y-auto rounded-[28px] p-2"
+          className="max-h-[75dvh] overflow-y-auto p-2"
           style={{
-            background: 'var(--surface-raised)',
-            boxShadow: '0 -4px 32px -4px rgba(10,16,32,0.35)',
+            borderRadius: 'var(--md-shape-xl)',
+            background: 'var(--md-surface-container-high)',
+            boxShadow: 'var(--md-elevation-3)',
           }}
         >
           <div className="flex justify-center pt-2 pb-1">
@@ -211,7 +224,10 @@ function MoreMenuOverlay({ open, onClose }: { open: boolean; onClose: () => void
                 >
                   {group.title}
                 </h3>
-                <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--plane)' }}>
+                <div
+                  className="overflow-hidden"
+                  style={{ borderRadius: 'var(--md-shape-md)', background: 'var(--md-surface)' }}
+                >
                   {group.items.map((item, i) => (
                     <Link
                       key={item.href}

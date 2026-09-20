@@ -1,5 +1,4 @@
-import Link from 'next/link';
-
+import { Button } from '@/components/ui/button';
 import { CountUp } from '@/components/ui/count-up';
 import { ExpandableBudgetTile } from '@/components/ui/expandable-budget-tile';
 import { ProgressGauge } from '@/components/ui/meter';
@@ -214,43 +213,20 @@ export default async function HomePage() {
        * 「その他」メニュー(P10-1)から辿れるため重複させず削除し、今見ている
        * 数字(完済・予算タイル)と直接関係の深い2件だけをボタンとして残した。
        */}
-      <Link
-        href="/briefs"
-        className="rise inline-flex w-full items-center justify-center gap-1.5 rounded-2xl py-3 text-sm font-semibold"
-        style={{
-          animationDelay: `${100 + tiles.length * 70}ms`,
-          background: 'var(--surface)',
-          color: 'var(--accent)',
-          boxShadow: 'var(--card-shadow)',
-        }}
-      >
-        朝配信のアーカイブを見る
-        <span aria-hidden>→</span>
-      </Link>
+      <div className="rise" style={{ animationDelay: `${100 + tiles.length * 70}ms` }}>
+        <Button href="/briefs" variant="elevated" className="w-full">
+          朝配信のアーカイブを見る
+          <span aria-hidden>→</span>
+        </Button>
+      </div>
 
       <div className="rise flex gap-3" style={{ animationDelay: `${170 + tiles.length * 70}ms` }}>
-        <Link
-          href="/reports"
-          className="flex-1 rounded-2xl py-3 text-center text-sm font-semibold"
-          style={{
-            background: 'var(--plane)',
-            color: 'var(--ink-secondary)',
-            border: '1px solid var(--hairline)',
-          }}
-        >
+        <Button href="/reports" variant="outlined" className="flex-1">
           支出レポート
-        </Link>
-        <Link
-          href="/advisor"
-          className="flex-1 rounded-2xl py-3 text-center text-sm font-semibold"
-          style={{
-            background: 'var(--plane)',
-            color: 'var(--ink-secondary)',
-            border: '1px solid var(--hairline)',
-          }}
-        >
+        </Button>
+        <Button href="/advisor" variant="outlined" className="flex-1">
           AI相談
-        </Link>
+        </Button>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, M_PLUS_2 } from 'next/font/google';
+import { Roboto_Flex, M_PLUS_2 } from 'next/font/google';
 
 import './globals.css';
 
@@ -16,20 +16,21 @@ import './globals.css';
  * 書体に落ちることもある。毎日開かせたい画面で、見え方が保証できない
  * のは受け入れられない。
  *
- * ── 選定 ───────────────────────────────────────────────────
- * Inter        数字と英字。金融 UI で定番。等幅数字の品質が高く、
- *              桁が縦に揃う。表や軸で使う(.tabular)
- * M PLUS 2     日本語。Noto Sans JP より現代的で UI 寄りとされ、
- *              情報密度の高い画面と相性がよい。約 1.8MB と、
- *              Noto Sans JP(約 5.3MB)より大幅に軽い
+ * ── 選定(ADR-027で英数字のみ変更) ────────────────────────
+ * Roboto Flex  数字と英字。Material Design の標準書体ファミリー
+ *              (ADR-027の本格導入方針)。可変フォントだが等幅数字
+ *              (tabular figures)の品質は ADR-017 が Inter を選んだ
+ *              理由をそのまま満たす。表や軸で使う(.tabular)
+ * M PLUS 2     日本語。ADR-017の判断を維持(Noto Sans JP より軽量・
+ *              UI向き、情報密度の高い画面と相性がよい)
  *
  * 日本語は容量が大きいため preload しない。数字が先に出て日本語が
  * 後から差し替わるが、最上部のヒーローは数字なので実害が小さい。
  */
-const inter = Inter({
+const roboto = Roboto_Flex({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-roboto',
 });
 
 const mplus2 = M_PLUS_2({
@@ -56,7 +57,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja" className={`${inter.variable} ${mplus2.variable}`}>
+    <html lang="ja" className={`${roboto.variable} ${mplus2.variable}`}>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );

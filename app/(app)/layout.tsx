@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
 
 /**
@@ -16,6 +17,10 @@ import { MoreMenu } from '@/components/ui/more-menu';
  * それでも辿り着けない画面(口座・ルール・投資・副業・転職準備・レポート・
  * 朝配信・AI相談・設定群など)は、タブの末尾「その他」から開くドロップアップ
  * メニュー(MoreMenu)に集約する。
+ *
+ * ボトムナビは Material 3 の Navigation Bar 仕様(ADR-027)——アクティブ
+ * 項目の背後に pill 型のインジケータを敷き、ラベルは常時表示する。
+ * レシート撮影ボタンは正式な Fab コンポーネントに置き換えた。
  */
 const NAV = [
   { href: '/', label: 'ホーム' },
@@ -36,27 +41,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
             (本人発案)。アイコンだけにして、余計な文字を足さない。 */}
-        <Link
-          href="/transactions/receipt"
-          aria-label="レシートを撮る"
-          className="flex size-14 shrink-0 items-center justify-center rounded-full ring-1 backdrop-blur-xl"
-          style={{
-            background: 'var(--accent)',
-            color: '#ffffff',
-            boxShadow: '0 4px 24px -8px rgba(0,0,0,0.35)',
-          }}
-        >
+        <Fab href="/transactions/receipt" label="レシートを撮る">
           <span aria-hidden className="text-2xl leading-none">
             📷
           </span>
-        </Link>
+        </Fab>
 
         <nav className="w-full max-w-md">
           <ul
-            className="flex rounded-full p-1 ring-1 backdrop-blur-xl"
+            className="flex items-end gap-1 p-2 backdrop-blur-xl"
             style={{
-              background: 'color-mix(in srgb, var(--surface-raised) 82%, transparent)',
-              boxShadow: '0 4px 24px -8px rgba(0,0,0,0.25)',
+              borderRadius: 'var(--md-shape-xl)',
+              background: 'color-mix(in srgb, var(--md-surface-container-high) 90%, transparent)',
+              boxShadow: 'var(--md-elevation-2)',
             }}
           >
             {NAV.map((item) => {
@@ -66,14 +63,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <Link
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
-                    className="block rounded-full py-2.5 text-center text-[13px] font-medium transition-colors"
-                    style={
-                      isActive
-                        ? { background: 'var(--accent)', color: '#ffffff' }
-                        : { color: 'var(--ink-secondary)' }
-                    }
+                    className="flex flex-col items-center gap-1 py-2 transition-colors"
+                    style={{
+                      transitionDuration: 'var(--md-duration-short)',
+                      transitionTimingFunction: 'var(--md-easing-standard)',
+                    }}
                   >
-                    {item.label}
+                    {/* Material 3 の Navigation Bar:アクティブ項目は
+                        pill 型インジケータ(secondary-container)を背後に敷く。
+                        ラベルは常に表示し、色だけで状態を運ばない。 */}
+                    <span
+                      className="md-label-large px-2 py-0.5 text-[11px] whitespace-nowrap transition-colors"
+                      style={{
+                        borderRadius: 'var(--md-shape-full)',
+                        transitionDuration: 'var(--md-duration-short)',
+                        background: isActive ? 'var(--md-primary-container)' : 'transparent',
+                        color: isActive
+                          ? 'var(--md-on-primary-container)'
+                          : 'var(--md-on-surface-variant)',
+                      }}
+                    >
+                      {item.label}
+                    </span>
                   </Link>
                 </li>
               );
