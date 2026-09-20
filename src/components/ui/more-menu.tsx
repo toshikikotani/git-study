@@ -244,10 +244,14 @@ function MoreMenuOverlay({ open, onClose }: { open: boolean; onClose: () => void
                   className="overflow-hidden"
                   style={{ borderRadius: 'var(--radius-md)', background: 'var(--surface)' }}
                 >
+                  {/* prefetch={false}:app/(app)/layout.tsx のナビと同じ理由
+                      (本人からの不具合報告「読み込み中に画面全体にローディング
+                      表示されない」)。 */}
                   {group.items.map((item, i) => (
                     <Link
                       key={item.href}
                       href={item.href}
+                      prefetch={false}
                       role="menuitem"
                       onClick={onClose}
                       className="flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"

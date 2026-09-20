@@ -42,6 +42,20 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
  * `<main>` を PullToRefresh(ADR-029)で包み、全画面に「引っ張って更新」を
  * 効かせる。一回読み込んだ画面はそのまま表示を保持し(next.config.ts の
  * staleTimes)、明示的に下へ引っ張ったときだけ最新化する。
+ *
+ * ── なぜナビの Link に prefetch={false} を付けたか(本人からの不具合報告) ──
+ * 「読み込み中に画面全体にローディング表示されない」——初めて開く画面でも
+ * 発生。原因はこのボトムナビ自体:5画面すべてで常にマウントされ続け、
+ * リンクが常にビューポート内にあるため、Next.js の自動プリフェッチが
+ * ほぼ即座に効いてしまう。ADR-029 で staleTimes.dynamic を伸ばした結果、
+ * この自動プリフェッチが「その場限りのシェルだけ」ではなく実際のページ
+ * 内容まで先読みして温めてしまい、本人が実際にタップする頃には内容が
+ * 揃っていて loading.tsx の表示ごとスキップされてしまっていた。
+ * `prefetch={false}` でこの先読みを止め、タップした瞬間に初めてサーバーへ
+ * 取りに行く(=毎回 loading.tsx が挟まる)ようにした。一度実際に開いた
+ * 画面がキャッシュされたまま保持される挙動(ADR-029 の本題)自体は
+ * staleTimes 側の設定でそのまま効き続ける——prefetch を止めても、
+ * 実際に navigate した後の Router Cache 保持には影響しない。
  */
 const NAV = [
   { href: '/', label: 'ホーム' },
@@ -103,6 +117,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <li key={item.href} className="flex-1">
                     <Link
                       href={item.href}
+                      prefetch={false}
                       aria-current={isActive ? 'page' : undefined}
                       className="flex flex-col items-center gap-1 py-2"
                     >
