@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { DuplicateList } from './duplicate-list';
 
 /**
@@ -16,7 +17,7 @@ import { DuplicateList } from './duplicate-list';
 export const dynamic = 'force-dynamic';
 
 export default async function DuplicatesPage() {
-  const candidates = await listDuplicateCandidates();
+  const candidates = await withMinDuration(listDuplicateCandidates());
 
   return (
     <div className="rise space-y-3">

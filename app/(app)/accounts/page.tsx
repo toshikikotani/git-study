@@ -1,4 +1,5 @@
 import { listAccounts } from '@/features/accounts/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { AccountRow } from './account-row';
 import { NewAccount } from './new-account';
 
@@ -13,7 +14,7 @@ import { NewAccount } from './new-account';
 export const dynamic = 'force-dynamic';
 
 export default async function AccountsPage() {
-  const accounts = await listAccounts();
+  const accounts = await withMinDuration(listAccounts());
 
   return (
     <div className="rise space-y-4">

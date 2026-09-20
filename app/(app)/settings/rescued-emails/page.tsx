@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { listRescuedEmails, type RescuedEmail } from '@/features/import/rescue-store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { RescuedEmailRow } from './rescued-email-row';
 
 /**
@@ -18,7 +19,7 @@ export default async function RescuedEmailsPage() {
   let emails: RescuedEmail[] = [];
   let loadError: string | null = null;
   try {
-    emails = await listRescuedEmails();
+    emails = await withMinDuration(listRescuedEmails());
   } catch (error) {
     loadError = error instanceof Error ? error.message : String(error);
   }

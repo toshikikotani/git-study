@@ -6,6 +6,7 @@ import { listDebtPayments, type DebtPayment } from '@/features/debts/payments-st
 import { listDebts, toPayoffDebt, type Debt } from '@/features/debts/store';
 import { listRefinanceScenarios } from '@/features/scenarios/store';
 import { getAppSettings } from '@/features/settings/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { DebtRow } from './debt-row';
 import { NewDebt } from './new-debt';
 import { PayoffSimulation } from './payoff-simulation';
@@ -23,11 +24,9 @@ import { RefinanceSimulation } from './refinance-simulation';
 export const dynamic = 'force-dynamic';
 
 export default async function DebtsPage() {
-  const [debts, settings, scenarios] = await Promise.all([
-    listDebts(),
-    getAppSettings(),
-    listRefinanceScenarios(),
-  ]);
+  const [debts, settings, scenarios] = await withMinDuration(
+    Promise.all([listDebts(), getAppSettings(), listRefinanceScenarios()]),
+  );
 
   const paymentsByDebt = await Promise.all(debts.map((debt) => listDebtPayments(debt.id)));
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { listActiveGoals } from '@/features/goals/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { ChatPanel } from './chat-panel';
 import { GoalCard } from './goal-card';
 
@@ -15,7 +16,7 @@ import { GoalCard } from './goal-card';
 export const dynamic = 'force-dynamic';
 
 export default async function AdvisorPage() {
-  const goals = await listActiveGoals();
+  const goals = await withMinDuration(listActiveGoals());
 
   return (
     <div className="rise space-y-4">

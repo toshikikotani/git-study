@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { getGmailSettings } from '@/features/settings/gmail-store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { GmailSettingsForm } from './gmail-settings-form';
 
 /**
@@ -13,7 +14,7 @@ import { GmailSettingsForm } from './gmail-settings-form';
  * 有効フラグ・差出人の絞り込み・取得件数上限の3つだけ(NFR-04)。
  */
 export default async function GmailSettingsPage() {
-  const settings = await getGmailSettings();
+  const settings = await withMinDuration(getGmailSettings());
 
   return (
     <div className="rise space-y-4">

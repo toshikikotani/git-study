@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { listCategoryOptions } from '@/features/classification/store';
 import { listTransactions } from '@/features/transactions/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { ReviewQueue } from './review-queue';
 
 /**
@@ -17,7 +18,9 @@ import { ReviewQueue } from './review-queue';
 export const dynamic = 'force-dynamic';
 
 export default async function ReviewPage() {
-  const [categories, transactions] = await Promise.all([listCategoryOptions(), listTransactions()]);
+  const [categories, transactions] = await withMinDuration(
+    Promise.all([listCategoryOptions(), listTransactions()]),
+  );
   const pending = transactions.filter((t) => t.reviewStatus === 'pending');
 
   return (

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { getDailyBrief } from '@/features/briefs/store';
 import { formatDateJa } from '@/lib/date';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { BRIEF_EXCLUSION_REASON_LABELS, BRIEF_ITEM_KIND_LABELS } from '../kind-labels';
 
 /**
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function BriefDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const brief = await getDailyBrief(id);
+  const brief = await withMinDuration(getDailyBrief(id));
   if (!brief) notFound();
 
   return (

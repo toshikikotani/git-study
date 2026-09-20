@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { listCategories } from '@/features/categories/store';
 import { listClassificationRules } from '@/features/classification/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { CategoryRow } from './category-row';
 import { NewCategory } from './new-category';
 import { RuleRow } from './rule-row';
@@ -16,7 +17,9 @@ import { RuleRow } from './rule-row';
 export const dynamic = 'force-dynamic';
 
 export default async function RulesPage() {
-  const [categories, rules] = await Promise.all([listCategories(), listClassificationRules()]);
+  const [categories, rules] = await withMinDuration(
+    Promise.all([listCategories(), listClassificationRules()]),
+  );
 
   return (
     <div className="rise space-y-6">
