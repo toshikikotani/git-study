@@ -1,3 +1,5 @@
+import { MdExpandMore } from 'react-icons/md';
+
 import type { BudgetTone } from '@/domain/budget';
 import { Meter } from './meter';
 
@@ -91,13 +93,11 @@ export function StatTile({
           style={{ color: 'var(--ink-muted)' }}
         >
           {hint.text}
-          <span
+          <MdExpandMore
             aria-hidden
             className="inline-block transition-transform duration-200"
             style={{ transform: hint.expanded ? 'rotate(180deg)' : 'none' }}
-          >
-            ⌄
-          </span>
+          />
         </p>
       ) : null}
     </div>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { MdCameraAlt } from 'react-icons/md';
 
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
@@ -40,11 +41,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07) */}
       <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
-            (本人発案)。アイコンだけにして、余計な文字を足さない。 */}
+            (本人発案)。アイコンだけにして、余計な文字を足さない。
+            絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
+            差し替えた(ADR-027 の続き)。 */}
         <Fab href="/transactions/receipt" label="レシートを撮る">
-          <span aria-hidden className="text-2xl leading-none">
-            📷
-          </span>
+          <MdCameraAlt aria-hidden size={26} />
         </Fab>
 
         <nav className="w-full max-w-md">

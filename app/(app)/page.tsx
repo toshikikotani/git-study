@@ -1,3 +1,5 @@
+import { MdLocalFireDepartment } from 'react-icons/md';
+
 import { Button } from '@/components/ui/button';
 import { CountUp } from '@/components/ui/count-up';
 import { ExpandableBudgetTile } from '@/components/ui/expandable-budget-tile';
@@ -249,7 +251,7 @@ function StreakBadge({ streak }: { streak: CheckinStreak }) {
     >
       {badge.kind === 'active' ? (
         <>
-          <span aria-hidden>🔥</span>
+          <MdLocalFireDepartment aria-hidden size={12} />
           {badge.days}日連続
         </>
       ) : (

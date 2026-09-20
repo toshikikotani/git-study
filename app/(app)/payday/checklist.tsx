@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { MdCheck } from 'react-icons/md';
 
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
@@ -100,7 +101,7 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
                     color: '#fff',
                   }}
                 >
-                  {item.isDone ? '✓' : ''}
+                  {item.isDone ? <MdCheck aria-hidden /> : null}
                 </span>
                 <span
                   className="flex-1 text-sm"
