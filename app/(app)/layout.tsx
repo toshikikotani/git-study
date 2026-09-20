@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { MdCameraAlt } from 'react-icons/md';
 
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
+import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files';
 
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
@@ -39,6 +40,7 @@ const NAV = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
@@ -50,8 +52,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             (本人発案)。アイコンだけにして、余計な文字を足さない。
             絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
             差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
-            ナビゲーション chrome にだけ使う方針)。 */}
-        <Fab href="/transactions/receipt" label="レシートを撮る">
+            ナビゲーション chrome にだけ使う方針)。
+            押した瞬間にカメラアプリが開くよう(本人発案)、href での画面遷移
+            ではなく onFiles(カメラ起動の input)にした。撮影後は
+            pending-receipt-files.ts 経由でファイルを /transactions/receipt
+            へ渡し、そちらの画面が続きの抽出・分類・保存を行う。 */}
+        <Fab
+          label="レシートを撮る"
+          onFiles={(files) => {
+            setPendingReceiptFiles(files);
+            router.push('/transactions/receipt');
+          }}
+        >
           <MdCameraAlt aria-hidden size={26} />
         </Fab>
 

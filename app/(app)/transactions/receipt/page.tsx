@@ -15,6 +15,7 @@ import { requestAiClassification } from '@/features/transactions/classify-client
 import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
+import { takePendingReceiptFiles } from '@/features/import/pending-receipt-files';
 
 /**
  * レシート・領収書の撮影取り込み(新機能、ADR-021)。
@@ -181,6 +182,19 @@ export default function ReceiptPage() {
     );
     setEntries((prev) => [...prev, ...newEntries]);
   };
+
+  // ボトムナビのカメラ FAB(app/(app)/layout.tsx)から撮ってきたファイルが
+  // あれば、マウント時に1度だけ取り込む(本人発案:カメラマークを押した
+  // 瞬間にカメラアプリが開き、撮影後はそのままこの画面の処理に続く)。
+  // takePendingReceiptFiles() は2回目以降 null を返すため、以後の再実行は
+  // 実害が無い。fetchAccounts()/fetchLearnedRules() と同じく、setState は
+  // Promise のコールバック内で行う(react-hooks/set-state-in-effect:effect
+  // の中で直接 setState を呼ぶとカスケードするレンダーになるため)。
+  useEffect(() => {
+    const pending = takePendingReceiptFiles();
+    if (!pending || pending.length === 0) return;
+    void Promise.resolve().then(() => onFiles(pending));
+  }, []);
 
   const removeEntry = (id: string) => {
     setEntries((prev) => {
