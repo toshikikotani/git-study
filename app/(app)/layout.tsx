@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { MdCameraAlt } from 'react-icons/md';
 
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
+import { PullToRefresh } from '@/components/ui/pull-to-refresh';
+import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files';
 
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
@@ -28,6 +30,10 @@ import { MoreMenu } from '@/components/ui/more-menu';
  * 動かして弾む感触を作る(ripple のような Material の水紋ではなく、
  * Apple のタップ時に「軽く縮んでバネで戻る」感触に合わせた)。
  * レシート撮影ボタンは正式な Fab コンポーネントに置き換えた。
+ *
+ * `<main>` を PullToRefresh(ADR-029)で包み、全画面に「引っ張って更新」を
+ * 効かせる。一回読み込んだ画面はそのまま表示を保持し(next.config.ts の
+ * staleTimes)、明示的に下へ引っ張ったときだけ最新化する。
  */
 const NAV = [
   { href: '/', label: 'ホーム' },
@@ -39,10 +45,13 @@ const NAV = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-      <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
+      <PullToRefresh>
+        <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
+      </PullToRefresh>
 
       {/* 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07) */}
       <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -50,8 +59,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             (本人発案)。アイコンだけにして、余計な文字を足さない。
             絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
             差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
-            ナビゲーション chrome にだけ使う方針)。 */}
-        <Fab href="/transactions/receipt" label="レシートを撮る">
+            ナビゲーション chrome にだけ使う方針)。
+            押した瞬間にカメラアプリが開くよう(本人発案)、href での画面遷移
+            ではなく onFiles(カメラ起動の input)にした。撮影後は
+            pending-receipt-files.ts 経由でファイルを /transactions/receipt
+            へ渡し、そちらの画面が続きの抽出・分類・保存を行う。 */}
+        <Fab
+          label="レシートを撮る"
+          onFiles={(files) => {
+            setPendingReceiptFiles(files);
+            router.push('/transactions/receipt');
+          }}
+        >
           <MdCameraAlt aria-hidden size={26} />
         </Fab>
 

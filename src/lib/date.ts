@@ -24,6 +24,13 @@ const jstFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+const jstTimeFormatter = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
 export function assertDateOnly(value: string): DateOnly {
   if (!DATE_ONLY_PATTERN.test(value)) {
     throw new Error(`日付は YYYY-MM-DD 形式である必要があります: ${value}`);
@@ -148,6 +155,15 @@ export function daysBetween(from: DateOnly, to: DateOnly): number {
 export function formatDateJa(date: DateOnly): string {
   const [y, m, d] = splitDateOnly(date);
   return `${y}年${m}月${d}日`;
+}
+
+/**
+ * 表示用の時刻(JST、'13:40')。ADR-029:画面は一度読み込んだ内容を
+ * そのまま保持し、pull-to-refresh でしか最新化しないため、
+ * 「いつ時点の数字か」を示す最終更新時刻の表示に使う。
+ */
+export function formatTimeJa(now: Date = new Date()): string {
+  return jstTimeFormatter.format(now);
 }
 
 /**
