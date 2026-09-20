@@ -10,9 +10,13 @@ import { streakBadgeFor } from '@/domain/streak';
 import { loadCategoryMonthDetail } from '@/features/categories/category-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
-import { formatDateJa } from '@/lib/date';
+import { formatDateJa, formatTimeJa } from '@/lib/date';
 
-// 金額は常に最新でなければならない。App Router のキャッシュに乗せない(ADR-001)。
+// サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
+// (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
+// (next.config.ts の staleTimes)で一度読み込んだ内容を保持し、pull-to-refresh
+// で明示的に引っ張るまで再取得しない——「常に最新」の保証は、代わりに
+// 下の最終更新時刻の表示で担保する(古いままなら本人が見て分かる)。
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
@@ -39,6 +43,11 @@ export default async function HomePage() {
   const tileDetails = await Promise.all(
     tiles.map((tile) => loadCategoryMonthDetail(tile.categoryId)),
   );
+
+  // この関数が実際に実行された時刻(=最後にサーバーへ取りに行った時刻)。
+  // ADR-029:画面は pull-to-refresh するまで保持されるため、いつ時点の
+  // 数字かを本人が判断できるようにする。
+  const updatedAt = formatTimeJa();
 
   return (
     <div className="space-y-3">
@@ -76,6 +85,10 @@ export default async function HomePage() {
             </div>
             <StreakBadge streak={streak} />
           </div>
+
+          <p className="mt-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+            最終更新 {updatedAt}
+          </p>
 
           {payoff.daysRemaining === null ? (
             <p

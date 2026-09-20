@@ -6,6 +6,7 @@ import { MdCameraAlt } from 'react-icons/md';
 
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
+import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files';
 
 /**
@@ -29,6 +30,10 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
  * 動かして弾む感触を作る(ripple のような Material の水紋ではなく、
  * Apple のタップ時に「軽く縮んでバネで戻る」感触に合わせた)。
  * レシート撮影ボタンは正式な Fab コンポーネントに置き換えた。
+ *
+ * `<main>` を PullToRefresh(ADR-029)で包み、全画面に「引っ張って更新」を
+ * 効かせる。一回読み込んだ画面はそのまま表示を保持し(next.config.ts の
+ * staleTimes)、明示的に下へ引っ張ったときだけ最新化する。
  */
 const NAV = [
   { href: '/', label: 'ホーム' },
@@ -44,7 +49,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-      <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
+      <PullToRefresh>
+        <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
+      </PullToRefresh>
 
       {/* 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07) */}
       <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

@@ -303,3 +303,20 @@ textarea {
     opacity: 0.7;
   }
 }
+
+/* pull-to-refresh(ADR-029)のインジケータの回転。 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ptr-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ptr-spin {
+    animation: none;
+  }
+}
