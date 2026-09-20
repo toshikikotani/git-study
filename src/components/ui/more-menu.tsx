@@ -1,16 +1,25 @@
 'use client';
 
 /**
- * ボトムナビの「その他」— 全画面を網羅するドロップアップメニュー(新機能)。
+ * ボトムナビの「その他」— 全画面を網羅するドロップアップメニュー。
  *
  * ── なぜ要るか ──────────────────────────────────────────────
- * ボトムナビ(ホーム/家計簿/明細/負債/給料日)と、レシート撮影の専用ボタンで
- * 主要な動線はカバーできても、それ以外の画面(口座・ルール・AI相談・投資・
- * 副業・転職準備・レポート・朝配信・設定群・メール貼り付け・請求突合・重複
- * 確認)は各画面に散らばった導線からしか辿れず、どこに何があるか把握しづらい。
- * この一覧をここへ集約する。よく使う画面はここに加えて元の画面からも辿れる
- * ようにしてある(例:ルール一覧 → /transactions のヘッダ、この画面自体も
- * /rules のヘッダから)。
+ * ボトムナビ(ホーム/家計簿/明細/給料日)と、レシート撮影の専用ボタンで
+ * 主要な動線はカバーできても、それ以外の画面(負債・口座・ルール・AI相談・
+ * 投資・副業・転職準備・レポート・朝配信・設定群・メール貼り付け・請求突合・
+ * 重複確認)は各画面に散らばった導線からしか辿れず、どこに何があるか
+ * 把握しづらい。この一覧をここへ集約する。よく使う画面はここに加えて
+ * 元の画面からも辿れるようにしてある(例:ルール一覧 → /transactions の
+ * ヘッダ、この画面自体も /rules のヘッダから)。
+ *
+ * ── なぜタブから独立した丸ボタンにしたのか(本人発案) ────────────
+ * 以前はボトムナビの6つ目のタブだった。本人から「メニューが少し大きくて
+ * タップしにくい、pairsみたいにメニュー4つまで」と要望があり、主タブを
+ * ホーム・家計簿・明細・給料日の4つに絞った(負債は下記GROUPSへ移動)。
+ * その他メニュー自体は6タブ目としてピルに詰め込むのをやめ、ナビの
+ * ピル本体の隣に独立した丸いガラス素材ボタンとして置く
+ * (app/(app)/layout.tsx)——タブ数を増やさずに済み、押しやすい大きさも
+ * 確保できる。
  *
  * ── なぜ Portal で描画するのか(本人からの不具合報告への対応) ──
  * 以前はこのコンポーネントをボトムナビの `<ul>`(`backdrop-blur-xl` を持つ)の
@@ -31,6 +40,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { MdMoreHoriz } from 'react-icons/md';
 
 /**
  * サーバー(document が無い)では false、クライアントでは true を返す。
@@ -56,6 +66,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
+      { href: '/debts', label: '負債' },
       {
         href: '/transactions/paste',
         label: 'メールを貼り付ける',
@@ -130,30 +141,30 @@ export function MoreMenu() {
 
   return (
     <>
-      <li className="flex-1">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-haspopup="menu"
-          className="flex w-full flex-col items-center gap-1 py-2"
-        >
-          {/* ボトムナビ本体(app/(app)/layout.tsx)と同じ「弾むピル」の
-              スプリング遷移(ADR-028)。 */}
-          <span
-            className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
-            style={{
-              borderRadius: 'var(--radius-full)',
-              transform: open ? 'scale(1)' : 'scale(0.9)',
-              transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
-              background: open ? 'var(--accent-track)' : 'transparent',
-              color: open ? 'var(--accent)' : 'var(--ink-muted)',
-            }}
-          >
-            その他
-          </span>
-        </button>
-      </li>
+      {/* ナビのピル本体(app/(app)/layout.tsx)とは別の、独立したガラス素材の
+          丸ボタン。タブの数を増やさずに押しやすい大きさを確保する
+          (本人発案「pairsみたいにメニュー4つまで」)。 */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="その他の機能"
+        className="flex size-11 shrink-0 items-center justify-center"
+        style={{
+          borderRadius: 'var(--radius-full)',
+          background: open ? 'var(--accent-track)' : 'var(--glass-tint)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+          color: open ? 'var(--accent)' : 'var(--ink-muted)',
+          transform: open ? 'scale(1.05)' : 'scale(1)',
+          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+        }}
+      >
+        <MdMoreHoriz aria-hidden size={22} />
+      </button>
 
       {isClient
         ? createPortal(

@@ -12,14 +12,22 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
  * わかりづらい」への対応。/transactions の見出しに小さい文字リンクを並べる
- * だけでは、ホーム・負債・明細・給料日と並ぶタブほどの発見性が無かった。
+ * だけでは、ホーム・明細・給料日と並ぶタブほどの発見性が無かった。
  * 家計簿(/spending)をタブに追加し、レシート撮影は毎回の記録行動そのもの
  * (設計原則2:記録の手間を最小化)なので、どの画面からでも1タップで開ける
  * 専用ボタンとして常設する(タブの隣に置くと埋もれるため別枠にした)。
  *
- * それでも辿り着けない画面(口座・ルール・投資・副業・転職準備・レポート・
- * 朝配信・AI相談・設定群など)は、タブの末尾「その他」から開くドロップアップ
- * メニュー(MoreMenu)に集約する。
+ * ── 主タブは4つまで(本人発案) ─────────────────────────────
+ * 別アプリ(pairs)のスクリーンショットを見せて「メニューが少し大きくて
+ * タップしにくい、pairsみたいにメニュー4つまで」と要望。以前はホーム/
+ * 家計簿/明細/負債/給料日の5タブ+その他で計6項目が1本のピルに詰まって
+ * いたため、確認の上、ホーム・家計簿・明細・給料日の4つに絞った(負債は
+ * その他メニューへ)。「その他」自体もタブの6つ目から、ピルの隣に独立した
+ * 丸ボタンへ切り出した(src/components/ui/more-menu.tsx)——タブ数を
+ * 増やさずに済み、それぞれの押しやすい大きさを保てる。負債・口座・ルール・
+ * 投資・副業・転職準備・レポート・朝配信・AI相談・設定群など、タブから
+ * 辿り着けない画面はすべてこの丸ボタンから開くドロップアップメニュー
+ * (MoreMenu)に集約する。
  *
  * ボトムナビは Apple の Liquid Glass 風(ADR-028、ADR-027の Material
  * Navigation Bar から置き換え)——本人が実際に触っている別アプリの
@@ -39,7 +47,6 @@ const NAV = [
   { href: '/', label: 'ホーム' },
   { href: '/spending', label: '家計簿' },
   { href: '/transactions', label: '明細' },
-  { href: '/debts', label: '負債' },
   { href: '/payday', label: '給料日' },
 ] as const;
 
@@ -74,49 +81,54 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <MdCameraAlt aria-hidden size={26} />
         </Fab>
 
-        <nav className="w-full max-w-md">
-          <ul
-            className="flex items-end gap-1 p-2"
-            style={{
-              borderRadius: 'var(--radius-xl)',
-              background: 'var(--glass-tint)',
-              backdropFilter: 'var(--glass-blur)',
-              WebkitBackdropFilter: 'var(--glass-blur)',
-              border: '1px solid var(--glass-border)',
-              boxShadow: 'var(--glass-shadow)',
-            }}
-          >
-            {NAV.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <li key={item.href} className="flex-1">
-                  <Link
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className="flex flex-col items-center gap-1 py-2"
-                  >
-                    {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
-                        遷移させ、スプリングのイージングで一瞬 1 を超えてから
-                        収まることで「弾む」感触を作る(ADR-028)。 */}
-                    <span
-                      className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
-                      style={{
-                        borderRadius: 'var(--radius-full)',
-                        transform: isActive ? 'scale(1)' : 'scale(0.9)',
-                        transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
-                        background: isActive ? 'var(--accent-track)' : 'transparent',
-                        color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
-                      }}
+        {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
+            以前はその他もピルの6項目目だったため1項目が詰まって小さかった
+            (本人発案での見直し、上のコメント参照)。 */}
+        <div className="flex w-full max-w-md items-center gap-2">
+          <nav className="min-w-0 flex-1">
+            <ul
+              className="flex items-end gap-1 p-2"
+              style={{
+                borderRadius: 'var(--radius-xl)',
+                background: 'var(--glass-tint)',
+                backdropFilter: 'var(--glass-blur)',
+                WebkitBackdropFilter: 'var(--glass-blur)',
+                border: '1px solid var(--glass-border)',
+                boxShadow: 'var(--glass-shadow)',
+              }}
+            >
+              {NAV.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <li key={item.href} className="flex-1">
+                    <Link
+                      href={item.href}
+                      aria-current={isActive ? 'page' : undefined}
+                      className="flex flex-col items-center gap-1 py-2"
                     >
-                      {item.label}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-            <MoreMenu />
-          </ul>
-        </nav>
+                      {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
+                          遷移させ、スプリングのイージングで一瞬 1 を超えてから
+                          収まることで「弾む」感触を作る(ADR-028)。 */}
+                      <span
+                        className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
+                        style={{
+                          borderRadius: 'var(--radius-full)',
+                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+                          background: isActive ? 'var(--accent-track)' : 'transparent',
+                          color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <MoreMenu />
+        </div>
       </div>
     </div>
   );
