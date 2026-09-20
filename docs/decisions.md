@@ -779,6 +779,12 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 **検証**:上記の再現環境での実機的な検証に加え、`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(691件全通過)/`npx next build` すべて成功。**未検証**:本番 Vercel + Supabase の実際の往復時間・本人の体感はこのセッションの手段では確認できない(400ms という値は「見えないほど速い」を解消するための妥当な下限として選んだ経験則であり、実測に基づく値ではない)。
 
+**追記(2026-09-20、同日中。真因が判明)**:`withMinDuration` をマージした後も「見えないわ」と再報告があった。この時点で本人は一旦引き下がったが、「マウントするのに時間がかかっているのに、その間なぜ loading が出ないのか」という技術的な疑問を投げかけた。これに対して当初「loading.tsx のコードが page.tsx より後に届くのでは」という説明をしたが、本人から「そもそもマウントしてないものに対して loading を付けても意味がない(loading.tsx と page.tsx は同じルートセグメントの一部としてまとめて配信されるはずで、片方だけ遅れる理由がない)」と筋の通らなさを指摘され、この説明は誤りと認めて撤回した。
+
+決め手になったのは本人の次の具体的な観察:「タイトル(例:『明細』)のみ先に表示され、そのコンテンツは表示されないけど loading もされていない」。これは表示タイミングの問題ではなく、**loading.tsx 自体は描画されているが、見た目上何も無いように見えている**ことを示していた。`src/components/ui/skeleton.tsx`(全 `loading.tsx` が骨格プレースホルダとして共通利用)を確認したところ、背景色が `style={{ background: 'var(--plane)' }}` で固定されており、`app/globals.css` の `body { background: var(--plane); color: var(--ink); }` と完全に同色だった。`loading.tsx` は各画面の `<main>`(= `body` と同じ `--plane` 背景)に直接置かれるため、骨格の矩形は背景と完全に同化して見えなくなっていた——`animate-pulse` の不透明度アニメーション(1⇔0.5)も、同色同士では見た目上まったく変化しない。ADR-029 の pull-to-refresh・staleTimes・`withMinDuration` はいずれも「いつ表示するか」を正しく制御できていたが、その表示対象(Skeleton)自体が常に透明に等しかったため、本人には「何も出ない」ように見え続けていた。
+
+**対応**:`src/components/ui/skeleton.tsx` の背景を `var(--plane)` から `color-mix(in srgb, var(--ink) 10%, transparent)`(`--ink` を10%だけ重ねた透過ティント)に変更。ページ本体(`--plane`)の上でもカード内(`--surface` 系)の上でも、light/dark どちらのテーマでも周囲の背景色と必ず区別できる。**検証**:実際の `globals.css` を読み込む静的HTMLモックアップ(旧`--plane`背景/新`color-mix`ティントを並べたもの)をPlaywrightでlight/dark両方スクリーンショットし、旧版は両テーマで背景に完全に同化して見えないこと、新版は両テーマで明確に視認できる矩形として表示されることを確認した。`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(691件全通過)/`npx next build` すべて成功。**未検証**:本番での実機確認(このセッションには本人の実アカウントでログインする手段が無い)。ただし本件は往復時間やブラウザ差に依存しない決定的なCSSの色衝突であり、`--plane`/`--ink` の値が変わらない限り全環境で再現するため、静的検証で十分に説明できる不具合だった。
+
 ---
 
 ## 未決のまま残す事項
