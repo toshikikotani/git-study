@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md';
 
 import { Card } from '@/components/ui/card';
 import type { ClassificationRuleSummary } from '@/features/classification/store';
@@ -81,7 +82,7 @@ export function RuleRow({
               style={{ color: 'var(--ink-muted)', border: '1px solid var(--hairline)' }}
               aria-label="優先度を上げる"
             >
-              ↑
+              <MdKeyboardArrowUp aria-hidden />
             </button>
             <button
               type="button"
@@ -91,7 +92,7 @@ export function RuleRow({
               style={{ color: 'var(--ink-muted)', border: '1px solid var(--hairline)' }}
               aria-label="優先度を下げる"
             >
-              ↓
+              <MdKeyboardArrowDown aria-hidden />
             </button>
           </div>
           <button

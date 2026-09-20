@@ -136,14 +136,22 @@ export function MoreMenu() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="block w-full rounded-full py-2.5 text-center text-[13px] font-medium transition-colors"
-          style={
-            open
-              ? { background: 'var(--accent)', color: '#ffffff' }
-              : { color: 'var(--ink-secondary)' }
-          }
+          className="flex w-full flex-col items-center gap-1 py-2"
         >
-          その他
+          {/* ボトムナビ本体(app/(app)/layout.tsx)と同じ「弾むピル」の
+              スプリング遷移(ADR-028)。 */}
+          <span
+            className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
+            style={{
+              borderRadius: 'var(--radius-full)',
+              transform: open ? 'scale(1)' : 'scale(0.9)',
+              transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+              background: open ? 'var(--accent-track)' : 'transparent',
+              color: open ? 'var(--accent)' : 'var(--ink-muted)',
+            }}
+          >
+            その他
+          </span>
         </button>
       </li>
 
@@ -172,21 +180,31 @@ function MoreMenuOverlay({ open, onClose }: { open: boolean; onClose: () => void
         }}
       />
 
-      {/* シート本体。iOS の sheet と同じ曲線(0.32,0.72,0,1)で「行き過ぎてから収まる」動きにする */}
+      {/* シート本体。UIKit のモーダル遷移に準じたイージング(ADR-028、
+          ADR-027の emphasized-decelerate から置き換え)で「行き過ぎてから
+          収まる」動きにする。 */}
       <div
         role="menu"
         aria-hidden={!open}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-[360ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none"
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform will-change-transform motion-reduce:transition-none"
         style={{
           transform: open ? 'translateY(0)' : 'translateY(110%)',
+          transitionDuration: 'var(--duration-slow)',
+          transitionTimingFunction: 'var(--ease-sheet)',
           pointerEvents: open ? 'auto' : 'none',
         }}
       >
+        {/* Liquid Glass シート(ADR-028)。ボトムナビと同じ半透明+ぼかしの
+            素材だが、内容を覆い隠す面なので strong(より濃いティント)を使う。 */}
         <div
-          className="max-h-[75dvh] overflow-y-auto rounded-[28px] p-2"
+          className="max-h-[75dvh] overflow-y-auto p-2"
           style={{
-            background: 'var(--surface-raised)',
-            boxShadow: '0 -4px 32px -4px rgba(10,16,32,0.35)',
+            borderRadius: 'var(--radius-xl)',
+            background: 'var(--glass-tint-strong)',
+            backdropFilter: 'var(--glass-blur-strong)',
+            WebkitBackdropFilter: 'var(--glass-blur-strong)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow-float)',
           }}
         >
           <div className="flex justify-center pt-2 pb-1">
@@ -211,7 +229,10 @@ function MoreMenuOverlay({ open, onClose }: { open: boolean; onClose: () => void
                 >
                   {group.title}
                 </h3>
-                <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--plane)' }}>
+                <div
+                  className="overflow-hidden"
+                  style={{ borderRadius: 'var(--radius-md)', background: 'var(--surface)' }}
+                >
                   {group.items.map((item, i) => (
                     <Link
                       key={item.href}

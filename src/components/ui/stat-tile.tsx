@@ -1,3 +1,5 @@
+import { MdExpandMore } from 'react-icons/md';
+
 import type { BudgetTone } from '@/domain/budget';
 import { Meter } from './meter';
 
@@ -37,8 +39,12 @@ export function StatTile({
 
   return (
     <div
-      className="rounded-[22px] p-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      className="p-5"
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        background: 'var(--surface)',
+        boxShadow: 'var(--shadow-1)',
+      }}
     >
       <div className="flex items-center justify-between gap-2">
         <span
@@ -87,13 +93,14 @@ export function StatTile({
           style={{ color: 'var(--ink-muted)' }}
         >
           {hint.text}
-          <span
+          <MdExpandMore
             aria-hidden
-            className="inline-block transition-transform duration-200"
-            style={{ transform: hint.expanded ? 'rotate(180deg)' : 'none' }}
-          >
-            ⌄
-          </span>
+            className="inline-block"
+            style={{
+              transform: hint.expanded ? 'rotate(180deg)' : 'none',
+              transition: 'transform var(--duration-medium) var(--ease-spring)',
+            }}
+          />
         </p>
       ) : null}
     </div>

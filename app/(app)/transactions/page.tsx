@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { Button } from '@/components/ui/button';
 import { formatYen } from '@/domain/money';
 import type { DetectedSubscription } from '@/domain/subscriptions';
 import { listCategoryOptions } from '@/features/classification/store';
@@ -194,26 +195,14 @@ function EmptyState() {
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link
-            href="/transactions/import"
-            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >
+          <Button href="/transactions/import" variant="filled">
             CSV を取り込む
             <span aria-hidden>→</span>
-          </Link>
-          <Link
-            href="/transactions/receipt"
-            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--accent)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
+          </Button>
+          <Button href="/transactions/receipt" variant="outlined">
             レシートを撮る
             <span aria-hidden>→</span>
-          </Link>
+          </Button>
         </div>
       </div>
 

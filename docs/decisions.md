@@ -685,6 +685,67 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
+## ADR-027:Material Design 3 を本格導入する。お金の役割色は Material のカスタムカラーロールとして維持する
+
+**背景**:本人発案(「Google material designを取り入れて先進的なデザインにして欲しい」)。事前に確認し、①適用範囲は本格導入(Material 3 / Material You 相当)、②お金の役割色(青=返済・赤=超過・緑=収入、globals.css 冒頭のコメント参照)は維持する、の2点を決めた。
+
+**なぜ役割色を作り直さないか**:既存の色は暗色面での通常視・CVD 両方の ΔE を実測して選んだ値(ホーム 青×赤、明細 緑×赤、ともに全ペア PASS)。Material のダイナミックカラー(壁紙等から自動生成する配色)をそのまま採用すると、この保証が失われる。Material 3 は「コア5色(primary/secondary/tertiary/error + neutral)」に加えて任意の**カスタムカラーロール**を持てる仕様のため、既存の青(返済)・緑(収入)を Material の primary/tertiary 相当のロールに、赤(超過)を error ロールにそのまま割り当て、`-container`/`on-*` の対をそこから機械的に導出する形にした。色そのものは一切変えていない。
+
+**決定・実装**
+
+1. **トークン層**(`app/globals.css`):既存の `--accent`/`--income`/`--over`/`--attention` 等はそのまま残し(唯一の真実源)、その上に Material 3 のロール名(`--md-primary`・`--md-surface-container-*`・`--md-outline` 等)・elevation(0〜5、light は box-shadow、dark は「面を明るくする」方式——暗い背景に暗い影は見えないため、Material 3 のダークテーマの考え方どおり surface を段階的に明るくする)・shape scale(4/8/12/16/28px + full)・motion(standard/emphasized のイージング関数とデュレーション)・state layer(hover 8%/pressed 10%)を追加した。既存画面は無改修で動く(トークンの追加であって、既存トークンの意味は変えていない)。
+2. **書体**:ADR-017 の日本語書体(M PLUS 2、軽量・UI向きという判断)はそのまま維持しつつ、英字・数字だけ Inter から **Roboto Flex**(Material の標準書体ファミリー)に差し替えた。ADR-017 が Inter を選んだ理由(等幅数字の品質)は Roboto Flex でも満たされるため、金融 UI としての実害はない。
+3. **新規コンポーネント**(`src/components/ui/`):
+   - `ripple.tsx`:タップ位置から広がる Material 名物のリップル効果(`useRipple()` フック、ポインタ座標を CSS カスタムプロパティに渡してアニメーション、`prefers-reduced-motion` で無効化)
+   - `button.tsx`:Filled/Tonal/Outlined/Text/Elevated の5種(Material 3 Button 仕様)。全て `shape-full`(完全な丸みのピル型)、リップル内蔵
+   - `fab.tsx`:Floating Action Button(56dp、primary-container 背景、elevation 3)
+   - `chip.tsx`:Assist/Filter chip 相当
+4. **既存コンポーネントの改修**:`Card`(elevated/filled/outlined の3variant、shape-md)、`StatTile`・`Meter`・`MoreMenu`(shape・elevation・motion トークンに寄せる)。`app/(app)/layout.tsx` のボトムナビを Material 3 の Navigation Bar 仕様(アクティブ項目の背後に pill 型インジケータ、ラベル常時表示)に、レシート撮影ボタンを正式な FAB に置き換えた。
+5. **適用範囲**:トークン基盤・共通コンポーネントは全画面に効くが、個別画面の全フォーム(input/select)を Material の Text Field 仕様(アウトライン+フローティングラベル)へ置き換える作業は今回のスコープに含めていない(範囲が数十画面に及ぶため)。ホーム・レシート撮影・確認待ちなど、本人の目に触れる頻度が高い画面のボタン類は新 `Button`/`Fab` コンポーネントへ置き換えた。残りは次に触れた画面から順次移行する(T-13 と同じ「都度直す」方針、TASKS.md に記録)。
+
+**却下した選択肢**
+
+- **Material のダイナミックカラーをそのまま採用する**:上記のとおり、実測済みの安全な配色を失うため却下
+- **全フォームを含めた完全な一括移行**:差分が膨大になり検証しきれないため、今回は基盤とハイトラフィック画面に絞った
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`/`npx next build` すべて成功(実施タイミングはTASKS.mdのDoneエントリ参照)。実機・実ブラウザでのリップル・エレベーションの見え方の確認はこのセッションの手段では行えない。
+
+---
+
+## ADR-028:Material Design 3 を Apple の Liquid Glass 風デザインに全面移行する(ADR-027を置き換え)
+
+**背景**:本人が別アプリ(マッチングアプリ)のスクリーンショットを提示し、「下の選択部分が水っぽいというか透明でいい感じ」「アニメーションも水みたいで」「iPhoneのOSのアニメーションもこんな感じ」と、Apple の Liquid Glass(iOS 18〜のシステムUI)風の半透明・ぼかし・弾むアニメーションを要望。事前に確認し、①適用範囲はボトムナビだけでなく「アプリ全体の主要な操作系」まで広げる、②直近導入した Material Design 3(ADR-027)のトークンは維持せず Apple 寄りへ全面移行する、の2点を決めた。ADR-027 は本ADRで置き換える(お金の役割色は変えない、という結論だけは両ADRで共通)。
+
+**なぜ Material 3 のロール名層を撤去したか**:ADR-027 は既存の役割色トークン(`--accent`/`--income`/`--over` 等)の上に Material のロール名(`--md-primary` 等)で「言い換える」間接層を作っていた。今回 Material 3 という言い換え先自体をやめるため、この間接層を残す理由が無くなった。各コンポーネントは既存の役割色トークンを直接参照する形に戻し、間接層(`--md-*` 変数群)は削除した。**役割色そのもの(実測済みのCVD安全な配色)は一切変更していない**——ADR-027と同じ約束を維持する。
+
+**なぜ「主要な操作系」の全部をガラス素材にしなかったか**:文字どおり全ボタン・全カードを半透明+ぼかしにすると、Apple自身のアプリでもそうしているように、むしろコンテンツが読みにくくなる。実際に Apple の HIG・自社アプリを見ても、Liquid Glass は**タブバー・シート・ツールバーなど「コンテンツの上に浮くナビゲーション chrome」にだけ**使われ、本文中のボタンやカードは不透明な塗りのままになっている。この方針に倣い、ガラス素材(`--glass-*` トークン)はボトムナビ・その他メニューのシート・Button の `elevated` variant(カードの上に浮くボタン)の3箇所に限定し、Card・StatTile・Chip・filled/tonal/outlined ボタンは不透明な塗り+Apple的な角丸(continuous corner風、10/14/20/28px)+バネのアニメーションだけを採用した。「全面移行」は「見た目の言語を Apple に揃える」ことであって「全部を透過にする」ことではない、という判断を、事前確認の選択肢の説明文でも本人に伝えた上で選んでもらっている。
+
+**決定・実装**
+
+1. **トークン層**(`app/globals.css`):Material 3 のロール名・elevation(0〜5)・shape scale・motion・state layer をすべて削除し、Apple 風の新トークンに置き換えた。
+   - **Shape**:`--radius-sm/md/lg/xl/full`(10/14/20/28/999px)。
+   - **Motion**:`--ease-standard`(色・不透明度用の単純な状態変化)、`--ease-spring`(`cubic-bezier(0.34, 1.56, 0.64, 1)`——1を一瞬超えてから収まるため、キーフレーム無しで「弾む」感触を作れる。タブの切り替え・ボタン押下に使用)、`--ease-sheet`(`cubic-bezier(0.32, 0.72, 0, 1)`、UIKitのモーダル遷移に準じたカーブ、シート開閉に使用)。
+   - **ガラス素材**:`--glass-tint`/`--glass-tint-strong`(半透明の塗り、regular/strongの2段)、`--glass-border`(縁のハイライト)、`--glass-blur`/`--glass-blur-strong`(`backdrop-filter: blur() saturate()`)、`--glass-shadow`/`--glass-shadow-float`。light/darkそれぞれ個別に定義(darkは白ではなく面の色を薄く重ねる、iOSのダークモード素材と同じ考え方)。
+   - Material の0〜5段のelevationラダーは廃止し、カード用の`--shadow-1`のみに絞った(ガラス素材前提のデザインでは過剰なため)。
+2. **タッチフィードバック**:Material の特徴であるリップル(タップ位置から広がる円)を撤去した(`ripple.tsx`削除、`useRipple`の全呼び出し元を除去)。Apple はリップルを使わず、押した要素が軽く縮んでバネで戻る動きでフィードバックする。Button/Fabに `active:scale-*` + `--ease-spring`のtransformトランジションを付けてこれを再現した。
+3. **書体**:ADR-027 が Material の標準書体として採用した Roboto Flex から Inter に差し戻した(`app/layout.tsx`)。Apple の標準書体(San Francisco)は `next/font/google` で配布されておらずセルフホストできないため、字幅・字面が近く ADR-017 で既に採用実績のある Inter を選んだ。日本語(M PLUS 2、ADR-017)は変更なし。
+4. **コンポーネント改修**(`src/components/ui/`):
+   - `button.tsx`:5 variant のうち `filled`/`tonal`/`outlined`/`text` は不透明な塗りのまま、`elevated` だけをガラス素材(`--glass-tint`+`backdrop-filter`)にした。
+   - `fab.tsx`:ガラスにせず `--accent` の塗り潰しの円のまま(Mail の作成ボタン等、Appleでも主要アクションボタンは不透明な塗りが基本のため)。アクセント色を帯びた影を追加。
+   - `chip.tsx`/`card.tsx`/`stat-tile.tsx`:トークン名の付け替えと角丸のみ(20px、Material の16pxから拡大)。
+   - `app/(app)/layout.tsx`(ボトムナビ):`<ul>` をガラス素材(`--glass-tint`+`backdrop-filter: blur(24px) saturate(180%)`+縁のハイライト)にし、本人が提示したスクリーンショットの帯の質感に合わせた。アクティブ項目のピルは `scale(0.9)→scale(1)` を `--ease-spring` で遷移させ、色の変化と合わせて「弾む」ように見せる。
+   - `more-menu.tsx`:「その他」タブのピルはボトムナビと同じ弾む遷移。シート本体はガラス素材(strongティント)+`--ease-sheet`の開閉。
+5. **適用範囲外**:本文中の入力欄(Text Field 相当)は ADR-027 と同じくスコープ外のまま(T-13 方式で都度移行)。ripple.tsx削除以外、既存の役割色・レイアウト構造は変更していない。
+
+**却下した選択肢**
+
+- **アプリ全体のボタン・カードも含めて全部ガラス素材にする**:読みにくさが増すこと、Apple自身のアプリもそうしていないことから却下し、ナビゲーションchromeに限定した(本人にも選択肢の説明時にこの判断基準を伝え、了承を得た)
+- **Material 3のトークン層を残したままガラスの見た目だけ重ねる**:ADR-027の間接層(`--md-*`)を維持する理由が無くなり、コードに2つの言い換え層が並存して混乱するため、完全に置き換えた
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(691件全通過)/`npx next build` すべて成功。実際の `globals.css` トークンを読み込む静的モックアップを作成し、Playwrightでlight/dark両方をスクリーンショットして、ボトムナビの半透明+ぼかし・Buttonのelevated variant・Chip・Cardの見た目を確認した。**未検証**:このセッションには本人の実アカウントでログインする手段が無く、認証後の画面での実際のバネのアニメーション(タブ切り替え時の弾み・ボタン押下時の縮み)の体感はこのセッションの手段では確認できない。
+
+---
+
 ## 未決のまま残す事項
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。

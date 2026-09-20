@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md';
 
 import { formatYen } from '@/domain/money';
 import type { PlanActualDelta } from '@/domain/debt-payment';
@@ -32,10 +33,11 @@ export function PaymentHistory({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="text-xs font-medium"
+          className="inline-flex items-center text-xs font-medium"
           style={{ color: 'var(--ink-secondary)' }}
         >
-          返済実績({payments.length}件){open ? ' ▲' : ' ▼'}
+          返済実績({payments.length}件)
+          {open ? <MdKeyboardArrowUp aria-hidden /> : <MdKeyboardArrowDown aria-hidden />}
         </button>
       </div>
 

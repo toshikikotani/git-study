@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { Button } from '@/components/ui/button';
 import { listCategoryOptions } from '@/features/classification/store';
 import { listTransactions } from '@/features/transactions/store';
 import { ReviewQueue } from './review-queue';
@@ -38,28 +39,12 @@ export default async function ReviewPage() {
 
       {/* 本人発案:文中リンクではなく、関連機能のすぐ近くにボタンとして置く。 */}
       <div className="flex gap-2">
-        <Link
-          href="/rules"
-          className="flex-1 rounded-2xl py-2.5 text-center text-[13px] font-semibold"
-          style={{
-            background: 'var(--plane)',
-            color: 'var(--ink-secondary)',
-            border: '1px solid var(--hairline)',
-          }}
-        >
+        <Button href="/rules" variant="outlined" className="flex-1">
           分類ルールをまとめて整える
-        </Link>
-        <Link
-          href="/rules/chat"
-          className="flex-1 rounded-2xl py-2.5 text-center text-[13px] font-semibold"
-          style={{
-            background: 'var(--plane)',
-            color: 'var(--ink-secondary)',
-            border: '1px solid var(--hairline)',
-          }}
-        >
+        </Button>
+        <Button href="/rules/chat" variant="outlined" className="flex-1">
           AIにルール相談
-        </Link>
+        </Button>
       </div>
     </div>
   );

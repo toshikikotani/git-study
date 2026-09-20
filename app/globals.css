@@ -26,8 +26,10 @@
    ============================================================================= */
 
 /* 書体は app/layout.tsx が next/font でセルフホストし、CSS 変数として渡す。
-   Inter を先に置くことで、英数字と数字は Inter、日本語は M PLUS 2 が受け持つ。
-   フォント取得前でも読めるよう、末尾に端末の既定を残す。 */
+   Apple の標準書体(San Francisco)は next/font/google で配布されておらず
+   セルフホストできないため、字面・字幅がSF Proに近く ADR-017 が既に
+   採用実績を持つ Inter を英数字に使う(ADR-028、ADR-027の Roboto Flex から
+   差し戻し)。日本語は M PLUS 2(ADR-017)を維持。 */
 @theme {
   --font-sans:
     var(--font-inter), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
@@ -112,9 +114,109 @@
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* =============================================================================
+   Apple Liquid Glass(ADR-028、ADR-027の Material Design 3 を置き換え)
+
+   既存の役割色(--accent/--income/--over/--attention 等、上のコメント参照)は
+   一切変えない——暗色面での通常視・CVD の ΔE を実測して選んだ値であり、
+   唯一の真実源としてそのまま残す。Material 3 のロール名による「言い換え」
+   層は撤去し、既存の役割色トークンを各コンポーネントから直接参照する形に
+   戻した(間接層を挟む理由が無くなったため)。ここに残すのは、Apple の
+   Human Interface Guidelines(Liquid Glass、iOS 18〜)に沿う shape・
+   motion・素材(半透明+ぼかし)のトークンだけ。
+
+   ── Liquid Glass はナビゲーション用の chrome にだけ使う ──────────
+   本人の要望(「アプリ全体の主要な操作系」)を受けつつ、実際に Apple 自身の
+   アプリを見ても、ガラス素材はタブバー・ツールバー・シート・フローティング
+   ボタンなど「コンテンツの上に浮く操作系」にだけ使われ、本文中のボタンや
+   カードは不透明な塗りのままになっている(全部を透過にすると逆にコンテンツが
+   読みにくくなるため)。この方針に倣い、ガラス素材(--glass-*)はボトムナビ・
+   その他メニューのシート・Button の elevated variant(カードの上に浮く
+   ボタン)に限定して使い、Card・StatTile・Chip 等の本文要素は不透明な
+   サーフェス+Apple 的な角丸とスプリングの動きだけを採用する。
+   ============================================================================= */
+:root {
+  /* 塗り潰しの上に置く文字色。--accent/--over/--income はいずれも
+     暗色面で読めるコントラストを持つ濃さで選んであるため、共通で白。 */
+  --on-accent: #ffffff;
+
+  /* Card の filled variant 用。塗り面のみで少しだけ本文と差をつけたいときに使う
+     (Apple の secondarySystemBackground に相当する中間階調)。 */
+  --surface-fill: color-mix(in srgb, var(--surface-raised) 94%, var(--ink) 6%);
+
+  /* Shape。Apple の continuous corner(スーパー楕円)は CSS の border-radius
+     では厳密には再現できないが、値の刻みは HIG の目安(10/14/20/28px)に寄せた。 */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+
+  /* Motion。standard は色・不透明度などの単純な状態変化に、spring は
+     押下フィードバックやタブの切り替えなど「弾む」動きが要る箇所に使う
+     (cubic-bezier が 1 を一瞬超えてから収まることで、キーフレーム無しで
+     跳ねる感触を作れる)。sheet は UIKit のモーダル遷移に準じたカーブ。 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 150ms;
+  --duration-medium: 320ms;
+  --duration-slow: 380ms;
+
+  /* シャドウ。Material の0〜5段のelevationラダーはガラス素材前提では過剰なため、
+     カード用の1段だけに絞った。 */
+  --shadow-1: 0 1px 2px rgba(10, 16, 32, 0.08), 0 1px 3px 1px rgba(10, 16, 32, 0.06);
+
+  /* ガラス素材(半透明+ぼかし)。regular/strong の2段——strong はシートなど
+     背後の内容をより強く隠したい面に使う。 */
+  --glass-tint: rgba(255, 255, 255, 0.55);
+  --glass-tint-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-blur: blur(24px) saturate(180%);
+  --glass-blur-strong: blur(34px) saturate(190%);
+  --glass-shadow: 0 10px 30px rgba(10, 16, 32, 0.14);
+  --glass-shadow-float: 0 14px 38px rgba(10, 16, 32, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --surface-fill: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+    /* ダークの Liquid Glass は白ではなく面の色を薄く重ねる(iOS の
+       ダークモード素材と同じ考え方)。縁のハイライトは白を弱く。 */
+    --glass-tint: rgba(20, 24, 34, 0.55);
+    --glass-tint-strong: rgba(20, 24, 34, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.09);
+    --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --glass-shadow-float: 0 14px 38px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  --surface-fill: color-mix(in srgb, var(--surface-raised) 90%, white 10%);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --glass-tint: rgba(20, 24, 34, 0.55);
+  --glass-tint-strong: rgba(20, 24, 34, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --glass-shadow-float: 0 14px 38px rgba(0, 0, 0, 0.55);
+}
+
 body {
   background: var(--plane);
   color: var(--ink);
+}
+
+/* ── ラベル用の文字組み ─────────────────────────────────────
+   本文の既存サイズ指定(Tailwind の text-*)はそのまま。Button・Fab・Chip・
+   ナビのラベルなど、強調した短いラベルに使う。 */
+.label-text {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 /* iOS Safari は input のフォントサイズが 16px 未満だとフォーカス時に
