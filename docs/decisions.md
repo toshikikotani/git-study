@@ -766,6 +766,19 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 **検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(691件全通過)/`npx next build`(`staleTimes` experiment が有効になっていることをビルドログで確認)すべて成功。pull-to-refresh のガラス素材インジケータは、実際の `globals.css` トークンを読み込む静的モックアップをPlaywrightでlight/dark両方スクリーンショットして見た目を確認した。**未検証**:このセッションには本人の実アカウントでログインする手段が無く、①実機でのタッチジェスチャー(引っ張りの抵抗感・離したときの挙動)、②`staleTimes` により実際に revisit 時の loading.tsx が抑制されること、③pull-to-refresh 後に本当に最新のDB値へ差し替わること、はこのセッションの手段では確認できない。
 
+**追記(2026-09-20、本人報告への対応)**:「読み込み中に画面全体にローディング表示されない」(初めて開く画面でも発生)との報告を受けた。まず `prefetch={false}`(ボトムナビ・その他メニューのLinkの自動先読みを止める)で直るはずだと考えて対応したが、直らなかった。
+
+次に「新しい画面には切り替わるが、ローディングの表示だけが無い(固まってはいない)」と確認が取れたため、憶測での修正をやめ、このセッション内に最小構成の Next.js 環境(実プロジェクトの `node_modules`・`next.config.ts` をそのまま使い、`proxy.ts` の認証を一時的にバイパスした使い捨てルート)を作って Playwright で実機検証した。結果:
+- prefetch あり/なしのどちらでも、初回ナビゲーションでは `loading.tsx` が正しく表示され、その後本体に切り替わる(1.5秒の人工遅延を入れたダミーページで確認)
+- `pull-to-refresh.tsx` と同じ `useTransition` を使うクライアント側ラッパーを重ねても、この挙動は変わらない
+- revisit(2回目以降のアクセス)は staleTimes の設計どおり `loading.tsx` を挟まず即座に前回の内容が出る
+
+つまり Next.js の仕組み自体は壊れていなかった。本番(Vercel + Supabase)の実際の往復は数十〜百数十msと速く、`loading.tsx` のスケルトンが描画されてから本体に置き換わるまでが人の目には一瞬すぎて「出ていない」ように見えていたと判断した(本人の「新しい画面には切り替わる」という報告とも整合する)。
+
+**対応**:`src/lib/min-loading-duration.ts`(新規)の `withMinDuration(promise, minMs = 400)` — 実際のデータ取得が何msで終わっても、呼び出し全体が最低 400ms はかかったことにする(先に完了していれば残り時間だけ `setTimeout` で待つ)。`loading.tsx` を持つ全19画面(`app/(app)/page.tsx` ほか)の、そのページを表示するために必ず待つ最初の `await`/`Promise.all` をこの関数で包んだ。revisit(pull-to-refresh でキャッシュから即表示される経路)は page.tsx 自体が再実行されないため、この遅延の影響を受けない——ADR-029 の「一度読み込んだ画面はそのまま保持」という本題は変えていない。
+
+**検証**:上記の再現環境での実機的な検証に加え、`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(691件全通過)/`npx next build` すべて成功。**未検証**:本番 Vercel + Supabase の実際の往復時間・本人の体感はこのセッションの手段では確認できない(400ms という値は「見えないほど速い」を解消するための妥当な下限として選んだ経験則であり、実測に基づく値ではない)。
+
 ---
 
 ## 未決のまま残す事項

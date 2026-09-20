@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { computeHourlyRateYen } from '@/domain/side-hustle';
 import { getAppSettings } from '@/features/settings/store';
 import { listIncomes, listProjects, listWorkLogs } from '@/features/side-hustle/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { IncomeSection } from './income-section';
 import { ProjectSection } from './project-section';
 import { WorkLogSection } from './work-log-section';
@@ -16,12 +17,9 @@ import { WorkLogSection } from './work-log-section';
  * 手動で行い、ここに出す金額は「いくら動かせばよいか」の指示)。
  */
 export default async function SideHustlePage() {
-  const [projects, workLogs, incomes, settings] = await Promise.all([
-    listProjects(),
-    listWorkLogs(),
-    listIncomes(),
-    getAppSettings(),
-  ]);
+  const [projects, workLogs, incomes, settings] = await withMinDuration(
+    Promise.all([listProjects(), listWorkLogs(), listIncomes(), getAppSettings()]),
+  );
 
   const minutesByProject = new Map<string, number>();
   for (const log of workLogs) {

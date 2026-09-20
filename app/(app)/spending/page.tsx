@@ -8,6 +8,7 @@ import {
   type MonthlyLedgerView,
 } from '@/features/spending/store';
 import { formatDateJa } from '@/lib/date';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { CategoryBreakdownChart } from './category-breakdown-chart';
 import { MonthlyTransactionList } from './transaction-list';
 
@@ -32,7 +33,9 @@ import { MonthlyTransactionList } from './transaction-list';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [ledger, pile] = await Promise.all([loadMonthlyLedger(), loadAccumulationView()]);
+  const [ledger, pile] = await withMinDuration(
+    Promise.all([loadMonthlyLedger(), loadAccumulationView()]),
+  );
   const netYen = ledger.totalIncomeYen - ledger.totalSpentYen;
 
   return (

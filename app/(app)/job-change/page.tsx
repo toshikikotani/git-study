@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { listMilestones, type Milestone, type MilestonePhase } from '@/features/job-change/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { MilestoneRow } from './milestone-row';
 import { NewMilestoneForm } from './new-milestone-form';
 
@@ -22,7 +23,7 @@ const PHASE_LABEL: Record<MilestonePhase, string> = {
 };
 
 export default async function JobChangePage() {
-  const milestones = await listMilestones();
+  const milestones = await withMinDuration(listMilestones());
   const byPhase = new Map<MilestonePhase, Milestone[]>();
   for (const phase of PHASES) byPhase.set(phase, []);
   for (const m of milestones) byPhase.get(m.phase)?.push(m);

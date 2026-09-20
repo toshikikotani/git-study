@@ -18,6 +18,7 @@ import {
   type StoredTransaction,
 } from '@/features/transactions/store';
 import { formatDateJa } from '@/lib/date';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { TransactionRowWithSplit } from './split-editor';
 
 /**
@@ -32,14 +33,16 @@ export const dynamic = 'force-dynamic';
 
 export default async function TransactionsPage() {
   const [transactions, batches, periodSummary, categories, subscriptions, duplicates] =
-    await Promise.all([
-      listTransactions(),
-      listImportBatches(),
-      loadPaydayPeriodSummary(),
-      listCategoryOptions(),
-      loadDetectedSubscriptions(),
-      listDuplicateCandidates(),
-    ]);
+    await withMinDuration(
+      Promise.all([
+        listTransactions(),
+        listImportBatches(),
+        loadPaydayPeriodSummary(),
+        listCategoryOptions(),
+        loadDetectedSubscriptions(),
+        listDuplicateCandidates(),
+      ]),
+    );
 
   if (transactions.length === 0) {
     return <EmptyState />;

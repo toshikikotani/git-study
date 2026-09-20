@@ -7,6 +7,7 @@ import {
   listInvestmentSnapshots,
 } from '@/features/investments/store';
 import { getAppSettings } from '@/features/settings/store';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { ContributionSection } from './contribution-section';
 import { SnapshotSection } from './snapshot-section';
 
@@ -25,7 +26,7 @@ import { SnapshotSection } from './snapshot-section';
 export const dynamic = 'force-dynamic';
 
 export default async function InvestmentsPage() {
-  const justUnlocked = await checkAndUnlockHighRisk();
+  const justUnlocked = await withMinDuration(checkAndUnlockHighRisk());
   const [settings, contributions, snapshots] = await Promise.all([
     getAppSettings(),
     listInvestmentContributions(),

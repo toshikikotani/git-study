@@ -2,6 +2,7 @@ import { listAccounts } from '@/features/accounts/store';
 import { listCategoryOptions, listTransferRules } from '@/features/transfer-rules/store';
 import { resolvePaydayChecklistState } from '@/features/transfer-runs/store';
 import { todayJst } from '@/lib/date';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { PaydayAmountForm, PaydayChecklist } from './checklist';
 import { NewRule } from './new-rule';
 import { RuleRow } from './rule-row';
@@ -17,12 +18,14 @@ import { RuleRow } from './rule-row';
 export const dynamic = 'force-dynamic';
 
 export default async function PaydayPage() {
-  const [rules, accounts, categories, checklistState] = await Promise.all([
-    listTransferRules(),
-    listAccounts(),
-    listCategoryOptions(),
-    resolvePaydayChecklistState(todayJst()),
-  ]);
+  const [rules, accounts, categories, checklistState] = await withMinDuration(
+    Promise.all([
+      listTransferRules(),
+      listAccounts(),
+      listCategoryOptions(),
+      resolvePaydayChecklistState(todayJst()),
+    ]),
+  );
 
   return (
     <div className="rise space-y-4">
