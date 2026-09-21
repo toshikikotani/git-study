@@ -240,6 +240,17 @@ create type goal_status as enum ('active', 'achieved', 'abandoned');
 -- 明細ごとの浪費/必要経費診断(本人発案、ADR-030)
 create type spending_verdict as enum ('waste', 'necessary');
 
+-- 固定6分類のみ。AIに自由記述させない(ADR-031)。「一般的にこういうタイプ」
+-- という要望に応えつつ、根拠の無い性格診断・医学的な断定に踏み込ませない歯止め。
+create type spending_persona_type as enum (
+  'impulsive',
+  'steady',
+  'social',
+  'goal_oriented',
+  'frugal',
+  'balanced'
+);
+
 
 -- =============================================================================
 --  2. 共通関数
@@ -1579,6 +1590,42 @@ create table public.transaction_diagnoses (
 create unique index ux_transaction_diagnoses_transaction on public.transaction_diagnoses (transaction_id);
 create index ix_transaction_diagnoses_user on public.transaction_diagnoses (user_id);
 
+-- 3.26 ai_monthly_reports — AI月次レポート(本人発案「AI関連もっと増やしたい。
+-- もっと画期的な機能ない?」、ADR-031)
+--
+--   家計簿・診断(transaction_diagnoses)の蓄積データを1ヶ月分まとめて
+--   AIに渡し、①浪費傾向のタイプ(固定6分類、persona_type)、②実データに
+--   基づく気づき、③行動面の一般的なアドバイスを生成する。1ヶ月につき1行
+--   (再生成は upsert で上書き、過去のレポートを履歴として重ねて残す機能
+--   ではない——transaction_diagnoses と同じ考え方)。医学的な性格診断や
+--   ホルモン等の身体的な断定はさせない(ADR-031、本人の明示的な要望で除外)。
+-- -----------------------------------------------------------------------------
+create table public.ai_monthly_reports (
+  id                uuid                  primary key default gen_random_uuid(),
+  user_id           uuid                  not null references auth.users(id) on delete cascade,
+  month             date                  not null,
+
+  persona_type      spending_persona_type not null,
+  -- なぜそのタイプと判断したか。ラベルだけでなく理由が見えることで、
+  -- 本人が納得したり反論したりできる(transaction_diagnoses.reasoning と同じ考え方)。
+  persona_reasoning text                  not null,
+  -- 実データに基づく気づき(複数件)。数値を独自に作らせず、渡した実際の
+  -- 集計値だけを根拠にさせる(features/ai-report/monthly-report-ai.ts 参照)。
+  insights          text[]                not null default '{}',
+  -- 行動面の一般的なアドバイス(複数件)。食事・体質等、金融データから
+  -- 導けない領域には踏み込ませない。
+  advice            text[]                not null default '{}',
+
+  created_at        timestamptz           not null default now(),
+
+  constraint ck_ai_monthly_reports_month_is_first_day check (extract(day from month) = 1),
+  constraint ck_ai_monthly_reports_persona_reasoning_not_blank check (btrim(persona_reasoning) <> ''),
+  constraint ck_ai_monthly_reports_insights_not_empty check (array_length(insights, 1) > 0),
+  constraint ck_ai_monthly_reports_advice_not_empty check (array_length(advice, 1) > 0)
+);
+
+create unique index ux_ai_monthly_reports_user_month on public.ai_monthly_reports (user_id, month);
+
 
 -- =============================================================================
 --  4. updated_at トリガの一括適用
@@ -1975,7 +2022,8 @@ begin
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
-    'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses'
+    'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
+    'ai_monthly_reports'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

@@ -1711,6 +1711,39 @@ export type Database = {
           },
         ];
       };
+      ai_monthly_reports: {
+        Row: {
+          advice: string[];
+          created_at: string;
+          id: string;
+          insights: string[];
+          month: string;
+          persona_reasoning: string;
+          persona_type: Database['public']['Enums']['spending_persona_type'];
+          user_id: string;
+        };
+        Insert: {
+          advice: string[];
+          created_at?: string;
+          id?: string;
+          insights: string[];
+          month: string;
+          persona_reasoning: string;
+          persona_type: Database['public']['Enums']['spending_persona_type'];
+          user_id: string;
+        };
+        Update: {
+          advice?: string[];
+          created_at?: string;
+          id?: string;
+          insights?: string[];
+          month?: string;
+          persona_reasoning?: string;
+          persona_type?: Database['public']['Enums']['spending_persona_type'];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];
@@ -2081,6 +2114,8 @@ export type Database = {
       repayment_strategy: 'avalanche' | 'snowball' | 'minimum' | 'custom';
       review_status: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
       rule_match_type: 'keyword' | 'regex' | 'exact' | 'amount_range' | 'merchant';
+      spending_persona_type:
+        'impulsive' | 'steady' | 'social' | 'goal_oriented' | 'frugal' | 'balanced';
       spending_verdict: 'waste' | 'necessary';
       transaction_source: 'csv' | 'gmail' | 'manual' | 'api';
       transfer_amount_type: 'fixed' | 'percentage' | 'remainder';
@@ -2287,6 +2322,14 @@ export const Constants = {
       repayment_strategy: ['avalanche', 'snowball', 'minimum', 'custom'],
       review_status: ['auto_ok', 'pending', 'confirmed', 'corrected', 'ignored'],
       rule_match_type: ['keyword', 'regex', 'exact', 'amount_range', 'merchant'],
+      spending_persona_type: [
+        'impulsive',
+        'steady',
+        'social',
+        'goal_oriented',
+        'frugal',
+        'balanced',
+      ],
       spending_verdict: ['waste', 'necessary'],
       transaction_source: ['csv', 'gmail', 'manual', 'api'],
       transfer_amount_type: ['fixed', 'percentage', 'remainder'],
