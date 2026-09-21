@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { saveImportBatchAction, type ReceiptSplitInput } from '../actions';
+import { ensureDefaultAccountAction } from '../../accounts/actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
@@ -15,7 +16,10 @@ import { requestAiClassification } from '@/features/transactions/classify-client
 import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { takePendingReceiptFiles } from '@/features/import/pending-receipt-files';
+import {
+  subscribePendingReceiptFiles,
+  takePendingReceiptFiles,
+} from '@/features/import/pending-receipt-files';
 
 /**
  * レシート・領収書の撮影取り込み(新機能、ADR-021)。
@@ -143,11 +147,27 @@ export default function ReceiptPage() {
     });
   }, []);
 
-  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
+  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)。
+  //
+  // 1件も無い場合は「現金」を自動で作る(本人発案:「口座って何のために
+  // 追加するん？普通に家計簿に登録して欲しいだけなんだけど」)。レシート
+  // 取り込みは現金・電子マネー払いの主経路(設計原則2)なのに、その手前で
+  // /accounts への事前登録を要求するのは記録の手間そのもの。
+  // ensureDefaultAccountAction() 参照。
   useEffect(() => {
-    void fetchAccounts().then((fetched) => {
-      setAccounts(fetched);
-      setAccountId((current) => current || (fetched[0]?.id ?? ''));
+    void fetchAccounts().then(async (fetched) => {
+      if (fetched.length > 0) {
+        setAccounts(fetched);
+        setAccountId((current) => current || fetched[0]!.id);
+        return;
+      }
+      const result = await ensureDefaultAccountAction();
+      if ('account' in result) {
+        setAccounts([result.account]);
+        setAccountId((current) => current || result.account.id);
+      } else {
+        setAccounts([]);
+      }
     });
   }, []);
 
@@ -183,17 +203,27 @@ export default function ReceiptPage() {
     setEntries((prev) => [...prev, ...newEntries]);
   };
 
-  // ボトムナビのカメラ FAB(app/(app)/layout.tsx)から撮ってきたファイルが
-  // あれば、マウント時に1度だけ取り込む(本人発案:カメラマークを押した
-  // 瞬間にカメラアプリが開き、撮影後はそのままこの画面の処理に続く)。
-  // takePendingReceiptFiles() は2回目以降 null を返すため、以後の再実行は
-  // 実害が無い。fetchAccounts()/fetchLearnedRules() と同じく、setState は
-  // Promise のコールバック内で行う(react-hooks/set-state-in-effect:effect
-  // の中で直接 setState を呼ぶとカスケードするレンダーになるため)。
+  // ボトムナビのカメラ FAB(app/(app)/layout.tsx)から撮ってきたファイルを
+  // 取り込む(本人発案:カメラマークを押した瞬間にカメラアプリが開き、
+  // 撮影後はそのままこの画面の処理に続く)。
+  //
+  // マウント時点で既に置かれているファイル(通常の初回遷移)を拾うのに加え、
+  // `setPendingReceiptFiles()` の呼び出しを購読する。理由(本人からの不具合
+  // 報告「画像渡して何の反応も無い」):ADR-029 の staleTimes により
+  // Router Cache がこの画面を使い回すため、一度開いた後にまた FAB を押すと
+  // この画面はマウントし直されず、マウント時1回きりの取得だけでは2回目
+  // 以降のファイルに気づけなかった(pending-receipt-files.ts 参照)。
+  // fetchAccounts()/fetchLearnedRules() と同じく、setState は Promise の
+  // コールバック内で行う(react-hooks/set-state-in-effect:effect の中で
+  // 直接 setState を呼ぶとカスケードするレンダーになるため)。購読側の
+  // コールバックは effect の外(別のユーザー操作)から呼ばれるため対象外。
   useEffect(() => {
-    const pending = takePendingReceiptFiles();
-    if (!pending || pending.length === 0) return;
-    void Promise.resolve().then(() => onFiles(pending));
+    const consume = () => {
+      const pending = takePendingReceiptFiles();
+      if (pending && pending.length > 0) void onFiles(pending);
+    };
+    void Promise.resolve().then(consume);
+    return subscribePendingReceiptFiles(consume);
   }, []);
 
   const removeEntry = (id: string) => {
@@ -253,11 +283,26 @@ export default function ReceiptPage() {
 
   // 写真ごとに、ルール分類済みのプレビュー行を組み立てる(商品行の分割対象判定も含む)。
   const entryPreviews = useMemo<EntryPreview[]>(() => {
-    if (!accountId) return [];
     return entries
       .filter((e): e is ReceiptEntry & { extracted: ReceiptParseResult } => e.extracted !== null)
       .map((entry) => {
         const { extracted } = entry;
+
+        // 口座が未選択のあいだは明細(StoredTransaction は accountId が必須)を
+        // 組み立てられない。ただし読み取り自体の警告(店名不明・合計不一致など、
+        // extracted.warnings)は口座の有無と無関係なので、ここで entry ごと
+        // 丸ごと弾くと「AI に読み取らせたのに何の反応も無い」状態になって
+        // しまう(本人からの不具合報告)。口座が決まるまでは警告だけを見せ、
+        // 明細プレビューは空のまま返す。
+        if (!accountId) {
+          return {
+            entry,
+            splitEligible: extracted.transactions.map(() => false),
+            rulePreview: [],
+            itemRulePreviewByIndex: new Map<number, StoredTransaction[]>(),
+          };
+        }
+
         // 商品行(items)が2件以上ある明細だけ、店名+合計の1件ではなく商品ごとに
         // 分割して取り込む(本人発案)。receipt-ai.ts が合計と一致しないと判断した
         // ものは items が空で返るため、ここでは長さだけ見ればよい。
@@ -476,48 +521,55 @@ export default function ReceiptPage() {
         </Card>
       ) : null}
 
-      {/* 口座(M6-2) */}
-      <Card>
-        <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
-          style={{ color: 'var(--ink-muted)' }}
-        >
-          口座
-        </label>
-        {accounts === null ? (
-          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            読み込んでいます…
-          </p>
-        ) : accounts.length === 0 ? (
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            口座がまだ登録されていません。
-            <Link
-              href="/accounts"
-              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
-              style={{ color: 'var(--accent)' }}
-            >
-              先に登録する →
-            </Link>
-          </p>
-        ) : (
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
+      {/* 口座(M6-2)。
+          口座が1件しか無い(=自動で用意した「現金」、または本人が普段
+          使っている唯一の口座)なら選ぶ意味が無いので、カードごと出さず
+          黙ってその口座を使う(本人発案:「口座って何のために追加するん？
+          普通に家計簿に登録して欲しいだけなんだけど」)。2件以上あるときだけ
+          「どちらの支払いか」を選ばせる意味が生まれる。 */}
+      {accounts !== null && accounts.length === 1 ? null : (
+        <Card>
+          <label
+            className="text-[11px] font-medium tracking-[0.08em] uppercase"
+            style={{ color: 'var(--ink-muted)' }}
           >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </Card>
+            口座
+          </label>
+          {accounts === null ? (
+            <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              読み込んでいます…
+            </p>
+          ) : accounts.length === 0 ? (
+            <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              口座を用意できませんでした。時間をおいてから開き直してください。
+              <Link
+                href="/accounts"
+                className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
+                style={{ color: 'var(--accent)' }}
+              >
+                口座を登録する →
+              </Link>
+            </p>
+          ) : (
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            >
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </Card>
+      )}
 
       <Card>
         <div
@@ -680,6 +732,14 @@ export default function ReceiptPage() {
                   );
                 })}
               </ul>
+            ) : p.entry.extracted && p.entry.extracted.transactions.length > 0 ? (
+              // 読み取り自体は成功しているが、口座が未選択のため明細を組み立てて
+              // いない状態(本人からの不具合報告:「AIに読み取らせても何も出ない」
+              // への対応。理由が分からないまま放置されないよう明示する)。
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                {p.entry.extracted.transactions.length}
+                件読み取れました。上の「口座」を選ぶと明細が表示されます。
+              </p>
             ) : null}
           </div>
         ))}
