@@ -38,26 +38,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdMoreHoriz } from 'react-icons/md';
 
-/**
- * サーバー(document が無い)では false、クライアントでは true を返す。
- * `useEffect` + `setState` で切り替える一般的な書き方は、実質的に
- * 「マウント後に強制で1回再レンダーする」ための setState であり
- * react-hooks/set-state-in-effect(M2-3b で避けている理由と同じ:カスケード
- * するレンダーを増やす)に引っかかる。`useSyncExternalStore` はサーバー用と
- * クライアント用のスナップショットを別々に受け取れるため、同じ結果を
- * effect を経由せず得られる。
- */
-function useIsClient(): boolean {
-  return useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-}
+import { useIsClient } from './use-is-client';
 
 // `as const` にして href をリテラル型のまま保つ。Next の typed routes(next.config.ts)は
 // `<Link href>` に渡る型がリテラルの Route であることを要求するため、途中で

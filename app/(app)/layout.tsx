@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
+import { useIsClient } from '@/components/ui/use-is-client';
 import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files';
 
 /**
@@ -56,6 +58,19 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
  * 画面がキャッシュされたまま保持される挙動(ADR-029 の本題)自体は
  * staleTimes 側の設定でそのまま効き続ける——prefetch を止めても、
  * 実際に navigate した後の Router Cache 保持には影響しない。
+ *
+ * ── なぜボトムナビ全体を Portal で描画するのか(本人からの不具合報告) ──
+ * 「明細とかで height が膨らんできた時に下のメニューが固定じゃなくて
+ * 付いてくる、結果的に下のコンテンツが選択できない」。このバー自体は
+ * `position: fixed` だが、`<main>`(以前は `PullToRefresh` の直下)と
+ * 同じ `<div className="mx-auto ... flex-col">` の中に描画されていた。
+ * `more-menu.tsx` で見つかった不具合(一部のブラウザでは祖先の
+ * `backdrop-filter` が子孫の `position: fixed` の基準(containing block)
+ * になり、固定されるはずの要素がその祖先の矩形に閉じ込められる)と同種の
+ * 問題が起きうる構造で、ページの中身が伸びるほど祖先の高さも伸び、
+ * 「固定のはずのバーがページの高さに比例して下へ流れていく」ように見える。
+ * `more-menu.tsx` のオーバーレイと同じ対処——`createPortal` で
+ * `document.body` 直下に描画し、祖先に何が来ても影響されない土台にした。
  */
 const NAV = [
   { href: '/', label: 'ホーム' },
@@ -65,8 +80,7 @@ const NAV = [
 ] as const;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
+  const isClient = useIsClient();
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
@@ -74,76 +88,87 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
       </PullToRefresh>
 
-      {/* 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07) */}
-      <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
-            (本人発案)。アイコンだけにして、余計な文字を足さない。
-            絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
-            差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
-            ナビゲーション chrome にだけ使う方針)。
-            押した瞬間にカメラアプリが開くよう(本人発案)、href での画面遷移
-            ではなく onFiles(カメラ起動の input)にした。撮影後は
-            pending-receipt-files.ts 経由でファイルを /transactions/receipt
-            へ渡し、そちらの画面が続きの抽出・分類・保存を行う。 */}
-        <Fab
-          label="レシートを撮る"
-          onFiles={(files) => {
-            setPendingReceiptFiles(files);
-            router.push('/transactions/receipt');
-          }}
-        >
-          <MdCameraAlt aria-hidden size={26} />
-        </Fab>
+      {/* document.body 直下に描画する(上のコメント参照)。サーバーレンダー
+          (document が無い)では描画しない。 */}
+      {isClient ? createPortal(<BottomBar />, document.body) : null}
+    </div>
+  );
+}
 
-        {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
-            以前はその他もピルの6項目目だったため1項目が詰まって小さかった
-            (本人発案での見直し、上のコメント参照)。 */}
-        <div className="flex w-full max-w-md items-center gap-2">
-          <nav className="min-w-0 flex-1">
-            <ul
-              className="flex items-end gap-1 p-2"
-              style={{
-                borderRadius: 'var(--radius-xl)',
-                background: 'var(--glass-tint)',
-                backdropFilter: 'var(--glass-blur)',
-                WebkitBackdropFilter: 'var(--glass-blur)',
-                border: '1px solid var(--glass-border)',
-                boxShadow: 'var(--glass-shadow)',
-              }}
-            >
-              {NAV.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <li key={item.href} className="flex-1">
-                    <Link
-                      href={item.href}
-                      prefetch={false}
-                      aria-current={isActive ? 'page' : undefined}
-                      className="flex flex-col items-center gap-1 py-2"
+function BottomBar() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  return (
+    // 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07)
+    <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
+          (本人発案)。アイコンだけにして、余計な文字を足さない。
+          絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
+          差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
+          ナビゲーション chrome にだけ使う方針)。
+          押した瞬間にカメラアプリが開くよう(本人発案)、href での画面遷移
+          ではなく onFiles(カメラ起動の input)にした。撮影後は
+          pending-receipt-files.ts 経由でファイルを /transactions/receipt
+          へ渡し、そちらの画面が続きの抽出・分類・保存を行う。 */}
+      <Fab
+        label="レシートを撮る"
+        onFiles={(files) => {
+          setPendingReceiptFiles(files);
+          router.push('/transactions/receipt');
+        }}
+      >
+        <MdCameraAlt aria-hidden size={26} />
+      </Fab>
+
+      {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
+          以前はその他もピルの6項目目だったため1項目が詰まって小さかった
+          (本人発案での見直し、上のコメント参照)。 */}
+      <div className="flex w-full max-w-md items-center gap-2">
+        <nav className="min-w-0 flex-1">
+          <ul
+            className="flex items-end gap-1 p-2"
+            style={{
+              borderRadius: 'var(--radius-xl)',
+              background: 'var(--glass-tint)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
+            }}
+          >
+            {NAV.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href} className="flex-1">
+                  <Link
+                    href={item.href}
+                    prefetch={false}
+                    aria-current={isActive ? 'page' : undefined}
+                    className="flex flex-col items-center gap-1 py-2"
+                  >
+                    {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
+                        遷移させ、スプリングのイージングで一瞬 1 を超えてから
+                        収まることで「弾む」感触を作る(ADR-028)。 */}
+                    <span
+                      className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
+                      style={{
+                        borderRadius: 'var(--radius-full)',
+                        transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                        transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+                        background: isActive ? 'var(--accent-track)' : 'transparent',
+                        color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
+                      }}
                     >
-                      {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
-                          遷移させ、スプリングのイージングで一瞬 1 を超えてから
-                          収まることで「弾む」感触を作る(ADR-028)。 */}
-                      <span
-                        className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
-                        style={{
-                          borderRadius: 'var(--radius-full)',
-                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
-                          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
-                          background: isActive ? 'var(--accent-track)' : 'transparent',
-                          color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
-                        }}
-                      >
-                        {item.label}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-          <MoreMenu />
-        </div>
+                      {item.label}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        <MoreMenu />
       </div>
     </div>
   );
