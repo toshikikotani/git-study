@@ -165,6 +165,13 @@ export type SpendingDiagnosisView = {
     summary: DiagnosisSummary;
     /** 今月「浪費」と診断された明細、金額の大きい順(高々5件)。 */
     wasteItems: readonly DiagnosedItem[];
+    /**
+     * 今月「必要経費」と診断された明細、金額の大きい順(高々5件、本人発案
+     * 「無駄金ではないと判断されたものについてもなぜそう考えたのか記載して
+     * ほしい」)。浪費側だけでなく必要経費側にも理由を添えることで、AIの
+     * 判断根拠を両方向から検証できるようにする。
+     */
+    necessaryItems: readonly DiagnosedItem[];
     /** 今月、まだ診断していない支出の件数。0 なら「診断する」ボタンは不要。 */
     undiagnosedCount: number;
   };
@@ -213,7 +220,12 @@ export async function loadSpendingDiagnosisView(
   );
 
   const emptyView: SpendingDiagnosisView = {
-    currentMonth: { summary: summarizeDiagnoses([]), wasteItems: [], undiagnosedCount: 0 },
+    currentMonth: {
+      summary: summarizeDiagnoses([]),
+      wasteItems: [],
+      necessaryItems: [],
+      undiagnosedCount: 0,
+    },
     trend: { monthKeys, rows: summarizeDiagnosesByMonth([], monthKeys) },
   };
   if (countable.length === 0) return emptyView;
@@ -242,6 +254,7 @@ export async function loadSpendingDiagnosisView(
 
   const diagnosedAll: DiagnosedTransaction[] = [];
   const wasteItems: DiagnosedItem[] = [];
+  const necessaryItems: DiagnosedItem[] = [];
   let undiagnosedCount = 0;
 
   for (const r of countable) {
@@ -259,17 +272,23 @@ export async function loadSpendingDiagnosisView(
       occurredOn: r.occurred_on,
       verdict: diagnosis.verdict,
     });
-    if (isThisMonth && diagnosis.verdict === 'waste') {
-      wasteItems.push({
+    if (isThisMonth) {
+      const item: DiagnosedItem = {
         id: r.id,
         occurredOn: r.occurred_on,
         label: r.merchant_name ?? r.description,
         amountYen: r.amount_yen,
         reasoning: diagnosis.reasoning,
-      });
+      };
+      if (diagnosis.verdict === 'waste') {
+        wasteItems.push(item);
+      } else {
+        necessaryItems.push(item);
+      }
     }
   }
   wasteItems.sort((a, b) => a.amountYen - b.amountYen);
+  necessaryItems.sort((a, b) => a.amountYen - b.amountYen);
 
   const thisMonthDiagnosed = diagnosedAll.filter((tx) => tx.occurredOn >= monthStart);
 
@@ -277,6 +296,7 @@ export async function loadSpendingDiagnosisView(
     currentMonth: {
       summary: summarizeDiagnoses(thisMonthDiagnosed),
       wasteItems: wasteItems.slice(0, 5),
+      necessaryItems: necessaryItems.slice(0, 5),
       undiagnosedCount,
     },
     trend: {

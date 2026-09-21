@@ -13,7 +13,7 @@ import { useState } from 'react';
 
 import { wasteRatioOf } from '@/domain/diagnosis';
 import { formatYen } from '@/domain/money';
-import type { SpendingDiagnosisView } from '@/features/diagnosis/store';
+import type { DiagnosedItem, SpendingDiagnosisView } from '@/features/diagnosis/store';
 import { formatDateJa } from '@/lib/date';
 import { diagnoseSpendingAction } from './actions';
 
@@ -23,7 +23,7 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
-  const { summary, wasteItems, undiagnosedCount } = current;
+  const { summary, wasteItems, necessaryItems, undiagnosedCount } = current;
 
   const run = async () => {
     setPending(true);
@@ -72,34 +72,16 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
             {formatYen(summary.necessaryYen, { sign: 'never' })}
           </p>
 
-          {wasteItems.length > 0 ? (
-            <ul
-              className="mt-3 space-y-2.5 border-t pt-3"
-              style={{ borderColor: 'var(--hairline)' }}
-            >
-              {wasteItems.map((item) => (
-                <li key={item.id}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="truncate text-xs" style={{ color: 'var(--ink)' }}>
-                      {item.label}
-                    </span>
-                    <span
-                      className="tabular shrink-0 text-xs font-medium"
-                      style={{ color: 'var(--over)' }}
-                    >
-                      {formatYen(item.amountYen)}
-                    </span>
-                  </div>
-                  <p
-                    className="mt-0.5 text-[11px] leading-relaxed"
-                    style={{ color: 'var(--ink-muted)' }}
-                  >
-                    {formatDateJa(item.occurredOn)} ・ {item.reasoning}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <DiagnosisItemList
+            heading="浪費と判断した内訳"
+            items={wasteItems}
+            amountColor="var(--over)"
+          />
+          <DiagnosisItemList
+            heading="必要経費と判断した内訳"
+            items={necessaryItems}
+            amountColor="var(--ink)"
+          />
 
           <DiagnosisTrendBars trend={view.trend} />
         </>
@@ -130,6 +112,49 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
           {error}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * 浪費/必要経費の判断理由付き内訳(本人発案:「無駄金ではないと判断された
+ * ものについてもなぜそう考えたのか記載してほしい」)。浪費側だけでなく
+ * 必要経費側にも同じ形でAIの判断根拠を出すことで、本人が両方向から
+ * 検証・反論できるようにする。
+ */
+function DiagnosisItemList({
+  heading,
+  items,
+  amountColor,
+}: {
+  heading: string;
+  items: readonly DiagnosedItem[];
+  amountColor: string;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+      <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        {heading}
+      </p>
+      <ul className="mt-2 space-y-2.5">
+        {items.map((item) => (
+          <li key={item.id}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="truncate text-xs" style={{ color: 'var(--ink)' }}>
+                {item.label}
+              </span>
+              <span className="tabular shrink-0 text-xs font-medium" style={{ color: amountColor }}>
+                {formatYen(item.amountYen)}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+              {formatDateJa(item.occurredOn)} ・ {item.reasoning}
+            </p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
