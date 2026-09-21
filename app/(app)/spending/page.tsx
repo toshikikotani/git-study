@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { formatYen } from '@/domain/money';
 import { loadAccumulationView, type AccumulationView } from '@/features/accumulation/store';
+import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import {
   loadMonthlyLedger,
   type MonthlyForecast,
@@ -10,6 +11,7 @@ import {
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { CategoryBreakdownChart } from './category-breakdown-chart';
+import { DiagnosisCard } from './diagnosis-card';
 import { MonthlyTransactionList } from './transaction-list';
 
 /**
@@ -27,14 +29,22 @@ import { MonthlyTransactionList } from './transaction-list';
  * 削除はしない——「480円が完済2ヶ月に見える」という小口支出への気づきは
  * 通常の家計簿には無い視点で、価値がある。ただし主役ではないため
  * /spending/pile へ移し、ここではカード1枚の要約から辿れるだけにした。
+ *
+ * ── AI家計診断(本人発案、ADR-030)────────────────────────────
+ * 「AIの分析が弱い。もっと客観視した分析が必要。投資家目線で今のが浪費か
+ * 必要経費なのか判断する機構とそれを分析結果を蓄積表示改善する機能」への
+ * 対応。category_kind(浪費/生活費/聖域...)はカテゴリ単位の静的な分類
+ * だが、こちらは明細1件ごとにAIが下す動的な評定(features/diagnosis/、
+ * DiagnosisCard 参照)。押されたときだけ AI を呼び、結果は蓄積して
+ * 月ごとの浪費比率の推移を見せる。
  */
 
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [ledger, pile] = await withMinDuration(
-    Promise.all([loadMonthlyLedger(), loadAccumulationView()]),
+  const [ledger, pile, diagnosis] = await withMinDuration(
+    Promise.all([loadMonthlyLedger(), loadAccumulationView(), loadSpendingDiagnosisView()]),
   );
   const netYen = ledger.totalIncomeYen - ledger.totalSpentYen;
 
@@ -56,6 +66,7 @@ export default async function SpendingPage() {
 
       <SummaryCard ledger={ledger} netYen={netYen} />
       <ForecastCard forecast={ledger.forecast} />
+      <DiagnosisCard view={diagnosis} />
       <CategoryBreakdownChart rows={ledger.categoryBreakdown} />
       <MonthlyTransactionList transactions={ledger.transactions} />
       <PileTeaserCard view={pile} />

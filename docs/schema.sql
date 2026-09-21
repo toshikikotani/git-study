@@ -237,6 +237,9 @@ create type repayment_strategy as enum (
 -- 目標(AI相談で決めた目標、本人発案)
 create type goal_status as enum ('active', 'achieved', 'abandoned');
 
+-- 明細ごとの浪費/必要経費診断(本人発案、ADR-030)
+create type spending_verdict as enum ('waste', 'necessary');
+
 
 -- =============================================================================
 --  2. 共通関数
@@ -1548,6 +1551,35 @@ create trigger trg_goals_updated_at
   for each row execute function public.set_updated_at();
 
 
+-- 3.25 transaction_diagnoses — 明細ごとの浪費/必要経費診断(本人発案、ADR-030)
+--
+--   category_kind(浪費/生活費/聖域...)はカテゴリ単位の静的な分類で、同じ
+--   カテゴリでも1件ごとの事情までは表さない(例:「外食」でも仕事の会食と
+--   気晴らしの外食では意味が違う)。ここでは明細1件ごとに投資家目線でAIが
+--   下した動的な評定を保存する。1明細につき1行(再診断は upsert で上書き、
+--   過去の評定を履歴として重ねて残す機能ではない)。月ごとの浪費傾向の推移は
+--   この表と transactions.occurred_on を突き合わせて都度集計する
+--   (features/diagnosis/store.ts、新しいスナップショットテーブルは持たない)。
+-- -----------------------------------------------------------------------------
+create table public.transaction_diagnoses (
+  id             uuid             primary key default gen_random_uuid(),
+  user_id        uuid             not null references auth.users(id) on delete cascade,
+  transaction_id uuid             not null references public.transactions(id) on delete cascade,
+
+  verdict        spending_verdict not null,
+  -- 投資家目線での判断理由。本人発案「客観視した分析」の要——ラベルだけでなく
+  -- 理由が見えることで、本人が納得したり反論したりできる。
+  reasoning      text             not null,
+
+  created_at     timestamptz      not null default now(),
+
+  constraint ck_transaction_diagnoses_reasoning_not_blank check (btrim(reasoning) <> '')
+);
+
+create unique index ux_transaction_diagnoses_transaction on public.transaction_diagnoses (transaction_id);
+create index ix_transaction_diagnoses_user on public.transaction_diagnoses (user_id);
+
+
 -- =============================================================================
 --  4. updated_at トリガの一括適用
 -- =============================================================================
@@ -1943,7 +1975,7 @@ begin
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
-    'net_worth_snapshots','transaction_splits','goals'
+    'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

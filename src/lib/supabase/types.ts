@@ -1676,6 +1676,41 @@ export type Database = {
           },
         ];
       };
+      transaction_diagnoses: {
+        Row: {
+          created_at: string;
+          id: string;
+          reasoning: string;
+          transaction_id: string;
+          user_id: string;
+          verdict: Database['public']['Enums']['spending_verdict'];
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          reasoning: string;
+          transaction_id: string;
+          user_id: string;
+          verdict: Database['public']['Enums']['spending_verdict'];
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          reasoning?: string;
+          transaction_id?: string;
+          user_id?: string;
+          verdict?: Database['public']['Enums']['spending_verdict'];
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_diagnoses_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: true;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];
@@ -2046,6 +2081,7 @@ export type Database = {
       repayment_strategy: 'avalanche' | 'snowball' | 'minimum' | 'custom';
       review_status: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
       rule_match_type: 'keyword' | 'regex' | 'exact' | 'amount_range' | 'merchant';
+      spending_verdict: 'waste' | 'necessary';
       transaction_source: 'csv' | 'gmail' | 'manual' | 'api';
       transfer_amount_type: 'fixed' | 'percentage' | 'remainder';
       transfer_run_status: 'pending' | 'completed' | 'skipped';
@@ -2251,6 +2287,7 @@ export const Constants = {
       repayment_strategy: ['avalanche', 'snowball', 'minimum', 'custom'],
       review_status: ['auto_ok', 'pending', 'confirmed', 'corrected', 'ignored'],
       rule_match_type: ['keyword', 'regex', 'exact', 'amount_range', 'merchant'],
+      spending_verdict: ['waste', 'necessary'],
       transaction_source: ['csv', 'gmail', 'manual', 'api'],
       transfer_amount_type: ['fixed', 'percentage', 'remainder'],
       transfer_run_status: ['pending', 'completed', 'skipped'],
