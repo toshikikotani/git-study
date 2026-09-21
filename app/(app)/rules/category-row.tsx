@@ -5,11 +5,16 @@ import { useActionState, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
 import type { Category } from '@/features/categories/store';
-import { mergeCategoryAction, updateCategoryAction, type CategoryFormState } from './actions';
+import {
+  deleteCategoryAction,
+  mergeCategoryAction,
+  updateCategoryAction,
+  type CategoryFormState,
+} from './actions';
 import { CategoryForm } from './category-form';
 import { CATEGORY_KIND_LABELS } from './category-kind-labels';
 
-type Mode = 'view' | 'edit' | 'merge';
+type Mode = 'view' | 'edit' | 'merge' | 'delete';
 
 /** 一覧の1件。読み取り表示・編集フォーム・統合フォームをこの中で切り替える(M2-6)。 */
 export function CategoryRow({
@@ -53,6 +58,18 @@ export function CategoryRow({
     );
   }
 
+  if (mode === 'delete') {
+    return (
+      <Card>
+        <DeleteForm
+          category={category}
+          onDone={() => setMode('view')}
+          onCancel={() => setMode('view')}
+        />
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
@@ -75,8 +92,8 @@ export function CategoryRow({
           ) : null}
         </div>
 
-        {category.isActive ? (
-          <div className="flex shrink-0 gap-3">
+        <div className="flex shrink-0 gap-3">
+          {category.isActive ? (
             <button
               type="button"
               onClick={() => setMode('edit')}
@@ -85,18 +102,31 @@ export function CategoryRow({
             >
               編集
             </button>
-            {!category.isSystem && mergeTargets.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setMode('merge')}
-                className="text-xs font-semibold"
-                style={{ color: 'var(--ink-muted)' }}
-              >
-                統合
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+          ) : null}
+          {category.isActive && !category.isSystem && mergeTargets.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setMode('merge')}
+              className="text-xs font-semibold"
+              style={{ color: 'var(--ink-muted)' }}
+            >
+              統合
+            </button>
+          ) : null}
+          {/* 明細・分類ルールから参照されていれば features/categories/store.ts の
+              deleteCategory() がエラーで拒む(統合を促す)。使われたことのない
+              カテゴリだけがここで本当に消える。 */}
+          {!category.isSystem ? (
+            <button
+              type="button"
+              onClick={() => setMode('delete')}
+              className="text-xs font-semibold"
+              style={{ color: 'var(--over)' }}
+            >
+              削除
+            </button>
+          ) : null}
+        </div>
       </div>
     </Card>
   );
@@ -179,5 +209,72 @@ function MergeForm({
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * 削除はカテゴリ側の入力を必要としない1タップの操作(RuleRow の deleteRuleAction
+ * と同じ考え方)なので、他のフォーム(編集・統合)のような useActionState では
+ * なく、確認ステップだけ挟んだ直接呼び出しにする。
+ */
+function DeleteForm({
+  category,
+  onDone,
+  onCancel,
+}: {
+  category: Category;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    setPending(true);
+    const result = await deleteCategoryAction(category.id);
+    setPending(false);
+    if (result.error === null) {
+      onDone();
+    } else {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+        「{category.name}」を削除する
+      </p>
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        この操作は元に戻せません。明細や分類ルールで使われている場合は削除できません
+        (代わりに統合をお使いください)。
+      </p>
+
+      {error ? (
+        <p className="text-xs" style={{ color: 'var(--over)' }}>
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => void handleDelete()}
+          className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--over)', color: '#fff' }}
+        >
+          {pending ? '削除しています…' : '削除する'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full px-4 py-2.5 text-sm font-medium"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          やめる
+        </button>
+      </div>
+    </div>
   );
 }
