@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CategoryTrendChart } from './category-trend-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
 import { MerchantRankingCard } from './merchant-ranking-card';
@@ -29,13 +31,18 @@ export default async function ReportsPage() {
 
   return (
     <div className="rise space-y-4">
-      <header>
-        <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
-          支出レポート
-        </h1>
-        <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          収支・カテゴリ別支出・店舗別支出・資産推移
-        </p>
+      <header className="flex items-baseline justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
+            支出レポート
+          </h1>
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            収支・カテゴリ別支出・店舗別支出・資産推移
+          </p>
+        </div>
+        <Link href="/reports/ai" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          AI月次レポート →
+        </Link>
       </header>
 
       <IncomeExpenseChart trend={incomeExpenseTrend} />
