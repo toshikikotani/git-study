@@ -266,11 +266,26 @@ export default function ReceiptPage() {
 
   // 写真ごとに、ルール分類済みのプレビュー行を組み立てる(商品行の分割対象判定も含む)。
   const entryPreviews = useMemo<EntryPreview[]>(() => {
-    if (!accountId) return [];
     return entries
       .filter((e): e is ReceiptEntry & { extracted: ReceiptParseResult } => e.extracted !== null)
       .map((entry) => {
         const { extracted } = entry;
+
+        // 口座が未選択のあいだは明細(StoredTransaction は accountId が必須)を
+        // 組み立てられない。ただし読み取り自体の警告(店名不明・合計不一致など、
+        // extracted.warnings)は口座の有無と無関係なので、ここで entry ごと
+        // 丸ごと弾くと「AI に読み取らせたのに何の反応も無い」状態になって
+        // しまう(本人からの不具合報告)。口座が決まるまでは警告だけを見せ、
+        // 明細プレビューは空のまま返す。
+        if (!accountId) {
+          return {
+            entry,
+            splitEligible: extracted.transactions.map(() => false),
+            rulePreview: [],
+            itemRulePreviewByIndex: new Map<number, StoredTransaction[]>(),
+          };
+        }
+
         // 商品行(items)が2件以上ある明細だけ、店名+合計の1件ではなく商品ごとに
         // 分割して取り込む(本人発案)。receipt-ai.ts が合計と一致しないと判断した
         // ものは items が空で返るため、ここでは長さだけ見ればよい。
@@ -693,6 +708,14 @@ export default function ReceiptPage() {
                   );
                 })}
               </ul>
+            ) : p.entry.extracted && p.entry.extracted.transactions.length > 0 ? (
+              // 読み取り自体は成功しているが、口座が未選択のため明細を組み立てて
+              // いない状態(本人からの不具合報告:「AIに読み取らせても何も出ない」
+              // への対応。理由が分からないまま放置されないよう明示する)。
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                {p.entry.extracted.transactions.length}
+                件読み取れました。上の「口座」を選ぶと明細が表示されます。
+              </p>
             ) : null}
           </div>
         ))}
