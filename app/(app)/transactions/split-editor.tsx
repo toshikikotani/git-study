@@ -8,7 +8,7 @@ import type { CategoryOption } from '@/features/classification/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { replaceSplitsAction } from './actions';
+import { replaceSplitsAction, updateTransactionAction } from './actions';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   revolving: 'リボ払い',
@@ -19,12 +19,25 @@ const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
 type SplitRowState = { categoryId: string; amountYen: string; note: string };
 
 /**
- * 明細1行 + 複数カテゴリ分割の編集(本人発案)。
+ * 明細1行 + カテゴリの編集(単一カテゴリの変更・複数カテゴリへの分割)。
  *
  * 表示は `components/ui/transaction-row.tsx` の見た目に合わせつつ、
  * 行そのものをボタンにして開閉する(payment-history.tsx の Card 開閉と
  * 同じパターン)。取り込みプレビュー画面(まだ DB に無い明細)では
  * 分割できないため、あちらは元の `TransactionRow` のまま変えていない。
+ *
+ * ── なぜ単純なカテゴリ変更(mode='simple')が要るか(本人からの不具合報告
+ *    「明細の編集で保存ボタンが押下できない」)────────────────────
+ * P8-2 で複数カテゴリ分割を追加したとき、この行を開いたときの編集UIを
+ * まるごと分割フォームに差し替えてしまっていた。分割フォームの保存条件
+ * (`canSave`)は「2行以上・全行が0より大きい額・合計が明細額と一致」を
+ * 要求するため、「1つのカテゴリに直したいだけ」の本来最も多いはずの
+ * 操作では条件を満たしようが無く、保存ボタンが常に押せなかった
+ * (分割前は `TransactionRow` 自体が編集不可だったため、この単純な
+ * 編集経路は実は一度も存在したことが無かった)。単純な変更は
+ * `updateTransactionAction()`(既存、確認待ちキューが使っているのと
+ * 同じ経路)に戻し、分割は「カテゴリを分ける」から明示的に開く
+ * 別モードにした。
  *
  * 金額の入力は「正の大きさ」で受け取り、保存時に元の明細の符号
  * (支出=負、収入=正、ADR-008)を掛けて揃える。分割を編集する本人に
@@ -40,6 +53,12 @@ export function TransactionRowWithSplit({
   initialSplits: readonly TransactionSplit[];
 }) {
   const [open, setOpen] = useState(false);
+  // 既に分割済みの明細は分割フォームから開く。それ以外(大半の明細)は
+  // 単一カテゴリの変更から開く——分割はあくまで例外的な操作。
+  const [mode, setMode] = useState<'simple' | 'split'>(
+    initialSplits.length > 0 ? 'split' : 'simple',
+  );
+  const [categoryId, setCategoryId] = useState(transaction.categoryId ?? '');
   const [splits, setSplits] = useState<readonly TransactionSplit[]>(initialSplits);
   const [rows, setRows] = useState<SplitRowState[]>(() => initialRows(initialSplits, categories));
   const [saving, setSaving] = useState(false);
@@ -61,6 +80,21 @@ export function TransactionRowWithSplit({
   }
   function updateRow(index: number, patch: Partial<SplitRowState>): void {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  const categoryUnchanged = categoryId === (transaction.categoryId ?? '');
+
+  async function saveCategory(): Promise<void> {
+    if (!categoryId || categoryUnchanged) return;
+    setSaving(true);
+    setError(null);
+    const result = await updateTransactionAction(transaction.id, categoryId);
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setOpen(false);
   }
 
   async function save(): Promise<void> {
@@ -104,7 +138,9 @@ export function TransactionRowWithSplit({
     setSplits([]);
     setRows(initialRows([], categories));
     setSaving(false);
-    setOpen(false);
+    // 分割を解除した直後は「じゃあ1つのカテゴリで」が次にやりたいことの
+    // はずなので、閉じずに単純なカテゴリ変更フォームへ戻す。
+    setMode('simple');
   }
 
   return (
@@ -171,7 +207,60 @@ export function TransactionRowWithSplit({
         </span>
       </button>
 
-      {open ? (
+      {open && mode === 'simple' ? (
+        <div
+          className="mt-3 space-y-2 rounded-2xl border p-3"
+          style={{ borderColor: 'var(--hairline)' }}
+        >
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="w-full rounded-xl px-3 py-2 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            <option value="" disabled>
+              カテゴリを選ぶ
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => void saveCategory()}
+              disabled={saving || !categoryId || categoryUnchanged}
+              className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              {saving ? '保存中…' : '保存'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('split')}
+              className="rounded-full px-4 py-2 text-sm font-semibold"
+              style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+            >
+              カテゴリを分ける
+            </button>
+          </div>
+
+          {error ? (
+            <p className="text-xs" style={{ color: 'var(--over)' }}>
+              {error}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {open && mode === 'split' ? (
         <div
           className="mt-3 space-y-2 rounded-2xl border p-3"
           style={{ borderColor: 'var(--hairline)' }}
@@ -278,7 +367,19 @@ export function TransactionRowWithSplit({
               >
                 分割を解除
               </button>
-            ) : null}
+            ) : (
+              // まだ保存していない分割(splits が空)なら、DB には何も
+              // 触れていないので単純にモードを戻すだけでよい。
+              <button
+                type="button"
+                onClick={() => setMode('simple')}
+                disabled={saving}
+                className="rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+              >
+                やめる
+              </button>
+            )}
           </div>
 
           {error ? (
