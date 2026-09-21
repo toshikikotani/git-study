@@ -15,6 +15,7 @@ import {
   createCategory,
   updateCategory,
   mergeCategory,
+  deleteCategory,
   CategoryStoreError,
   type CategoryInput,
   type CategoryKind,
@@ -110,6 +111,17 @@ export async function mergeCategoryAction(
   }
   try {
     await mergeCategory(id, mergedIntoId);
+  } catch (error) {
+    return { error: describeCategoryError(error) };
+  }
+  revalidatePath('/rules');
+  revalidatePath('/');
+  return { error: null };
+}
+
+export async function deleteCategoryAction(id: string): Promise<{ error: string | null }> {
+  try {
+    await deleteCategory(id);
   } catch (error) {
     return { error: describeCategoryError(error) };
   }

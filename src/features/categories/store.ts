@@ -2,9 +2,11 @@
  * カテゴリ(categories)のデータアクセス(M2-6、FR-13)。
  *
  * 命名は docs/glossary.md の「レイヤーの命名」に従う(list/create/update)。
- * 削除は無い:budgets・classification_rules・transactions から参照されたまま
- * 安全に統廃合するため、`mergeCategory()` で is_active=false + merged_into_id
- * へ付け替える方針(docs/schema.sql §3.3 のコメントに明記)。
+ * 使われたことのあるカテゴリは削除ではなく `mergeCategory()` で
+ * is_active=false + merged_into_id へ付け替える(docs/schema.sql §3.3 の
+ * コメントに明記)。一方、明細・分類ルールから一度も参照されていないカテゴリ
+ * は `deleteCategory()` で本当に削除できる(本人発案:「編集できるけど
+ * 削除できない」。P10-7)。
  */
 
 import { createClient } from '@/lib/supabase/server';
@@ -154,4 +156,69 @@ export async function mergeCategory(id: string, mergedIntoId: string): Promise<v
     .update({ merged_into_id: mergedIntoId, is_active: false, show_on_home: false })
     .eq('id', id);
   if (error) throw new CategoryStoreError(`カテゴリを統合できませんでした: ${error.message}`);
+}
+
+/**
+ * カテゴリの完全な削除(本人発案:「編集できるけど削除できない」)。
+ *
+ * 統廃合(mergeCategory)は「消さずに移行先を指す」ための機能で、使われた
+ * ことのあるカテゴリを安全に片付ける手段としては正しいが、間違って作った・
+ * 結局使わなかったカテゴリまで一覧に残り続けるのは別の不便さだった。
+ * 一方で明細・分類ルールから参照されたまま削除すると、DB の外部キー
+ * (docs/schema.sql §3.3)が transactions.category_id を NULL に、
+ * classification_rules を CASCADE で消してしまい、本人の知らないうちに
+ * 「未分類」化や意図しないルール消失が起きる。そのため、参照が1件でも
+ * あれば削除させず、統合を促すメッセージを返す(壊れた状態を防ぐのではなく、
+ * そもそも壊れる操作を実行させない)。
+ */
+export async function deleteCategory(id: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: category, error: categoryError } = await supabase
+    .from('categories')
+    .select('id, is_system')
+    .eq('id', id)
+    .single();
+  if (categoryError || !category) {
+    throw new CategoryStoreError('削除するカテゴリが見つかりませんでした');
+  }
+  if (category.is_system) {
+    throw new CategoryStoreError('システムが使うカテゴリは削除できません');
+  }
+
+  const [
+    { data: transactions, error: txError },
+    { data: splits, error: splitError },
+    { data: rules, error: ruleError },
+    { data: mergedFrom, error: mergedFromError },
+  ] = await Promise.all([
+    supabase.from('transactions').select('id').eq('category_id', id).limit(1),
+    supabase.from('transaction_splits').select('id').eq('category_id', id).limit(1),
+    supabase.from('classification_rules').select('id').eq('category_id', id).limit(1),
+    supabase.from('categories').select('id').eq('merged_into_id', id).limit(1),
+  ]);
+  if (txError) throw new CategoryStoreError(`明細を確認できませんでした: ${txError.message}`);
+  if (splitError) throw new CategoryStoreError(`明細を確認できませんでした: ${splitError.message}`);
+  if (ruleError)
+    throw new CategoryStoreError(`分類ルールを確認できませんでした: ${ruleError.message}`);
+  if (mergedFromError) {
+    throw new CategoryStoreError(`カテゴリを確認できませんでした: ${mergedFromError.message}`);
+  }
+
+  if (transactions.length > 0 || splits.length > 0) {
+    throw new CategoryStoreError(
+      'このカテゴリを使った明細があるため削除できません。統合をお使いください。',
+    );
+  }
+  if (rules.length > 0) {
+    throw new CategoryStoreError(
+      'このカテゴリへの分類ルールがあるため削除できません。先にルールを削除するか変更してください。',
+    );
+  }
+  if (mergedFrom.length > 0) {
+    throw new CategoryStoreError('このカテゴリへ統合済みのカテゴリがあるため削除できません。');
+  }
+
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw new CategoryStoreError(`カテゴリを削除できませんでした: ${error.message}`);
 }
