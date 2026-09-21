@@ -163,10 +163,10 @@ export type DiagnosedItem = {
 export type SpendingDiagnosisView = {
   currentMonth: {
     summary: DiagnosisSummary;
-    /** 今月「浪費」と診断された明細、金額の大きい順(高々5件)。 */
+    /** 今月「浪費」と診断された明細、金額の大きい順、全件(本人発案「上位5件という必要はなく別に全文表示すればいい」)。 */
     wasteItems: readonly DiagnosedItem[];
     /**
-     * 今月「必要経費」と診断された明細、金額の大きい順(高々5件、本人発案
+     * 今月「必要経費」と診断された明細、金額の大きい順、全件(本人発案
      * 「無駄金ではないと判断されたものについてもなぜそう考えたのか記載して
      * ほしい」)。浪費側だけでなく必要経費側にも理由を添えることで、AIの
      * 判断根拠を両方向から検証できるようにする。
@@ -295,8 +295,8 @@ export async function loadSpendingDiagnosisView(
   return {
     currentMonth: {
       summary: summarizeDiagnoses(thisMonthDiagnosed),
-      wasteItems: wasteItems.slice(0, 5),
-      necessaryItems: necessaryItems.slice(0, 5),
+      wasteItems,
+      necessaryItems,
       undiagnosedCount,
     },
     trend: {
