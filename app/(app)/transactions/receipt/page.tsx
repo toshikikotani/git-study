@@ -15,7 +15,10 @@ import { requestAiClassification } from '@/features/transactions/classify-client
 import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
 import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { takePendingReceiptFiles } from '@/features/import/pending-receipt-files';
+import {
+  subscribePendingReceiptFiles,
+  takePendingReceiptFiles,
+} from '@/features/import/pending-receipt-files';
 
 /**
  * レシート・領収書の撮影取り込み(新機能、ADR-021)。
@@ -183,17 +186,27 @@ export default function ReceiptPage() {
     setEntries((prev) => [...prev, ...newEntries]);
   };
 
-  // ボトムナビのカメラ FAB(app/(app)/layout.tsx)から撮ってきたファイルが
-  // あれば、マウント時に1度だけ取り込む(本人発案:カメラマークを押した
-  // 瞬間にカメラアプリが開き、撮影後はそのままこの画面の処理に続く)。
-  // takePendingReceiptFiles() は2回目以降 null を返すため、以後の再実行は
-  // 実害が無い。fetchAccounts()/fetchLearnedRules() と同じく、setState は
-  // Promise のコールバック内で行う(react-hooks/set-state-in-effect:effect
-  // の中で直接 setState を呼ぶとカスケードするレンダーになるため)。
+  // ボトムナビのカメラ FAB(app/(app)/layout.tsx)から撮ってきたファイルを
+  // 取り込む(本人発案:カメラマークを押した瞬間にカメラアプリが開き、
+  // 撮影後はそのままこの画面の処理に続く)。
+  //
+  // マウント時点で既に置かれているファイル(通常の初回遷移)を拾うのに加え、
+  // `setPendingReceiptFiles()` の呼び出しを購読する。理由(本人からの不具合
+  // 報告「画像渡して何の反応も無い」):ADR-029 の staleTimes により
+  // Router Cache がこの画面を使い回すため、一度開いた後にまた FAB を押すと
+  // この画面はマウントし直されず、マウント時1回きりの取得だけでは2回目
+  // 以降のファイルに気づけなかった(pending-receipt-files.ts 参照)。
+  // fetchAccounts()/fetchLearnedRules() と同じく、setState は Promise の
+  // コールバック内で行う(react-hooks/set-state-in-effect:effect の中で
+  // 直接 setState を呼ぶとカスケードするレンダーになるため)。購読側の
+  // コールバックは effect の外(別のユーザー操作)から呼ばれるため対象外。
   useEffect(() => {
-    const pending = takePendingReceiptFiles();
-    if (!pending || pending.length === 0) return;
-    void Promise.resolve().then(() => onFiles(pending));
+    const consume = () => {
+      const pending = takePendingReceiptFiles();
+      if (pending && pending.length > 0) void onFiles(pending);
+    };
+    void Promise.resolve().then(consume);
+    return subscribePendingReceiptFiles(consume);
   }, []);
 
   const removeEntry = (id: string) => {
