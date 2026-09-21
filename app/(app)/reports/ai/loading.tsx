@@ -6,9 +6,10 @@ export default function AiReportLoading() {
     <div className="space-y-3">
       <header>
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          AI月次レポート
+          AIレポート
         </h1>
       </header>
+      <Skeleton className="h-40 rounded-2xl" />
       <Skeleton className="h-64 rounded-2xl" />
       <Skeleton className="h-40" />
     </div>

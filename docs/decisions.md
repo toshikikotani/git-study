@@ -843,6 +843,29 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
+## ADR-032:AI日次レポートを追加する。ただし浪費傾向のタイプ判定は持たせない(本人発案、ADR-031の続き)
+
+**背景**:ADR-031(AI月次レポート)をマージした直後、本人から「月次と日次両方先に実装して」との指示。ADR-031時点では「最初のリリース範囲は月次レポートから先に作る」を選んでいたが(1ヶ月分のデータが揃ってからの方がタイプ判定・傾向分析の精度が高いという理由)、日次も先に実装してほしいという要望のため続けて対応した。
+
+**なぜ日次レポートに `persona_type`(浪費傾向のタイプ)を持たせないか**:ADR-031の `spending_persona_type` は1ヶ月分の蓄積データから判定する設計だった。1日分のデータだけで同じタイプ判定をすると、たまたまその日に外食が重なっただけで「衝動買い型」に振れる等、判定が日によって大きくぶれてしまい、ADR-031が目指した「一般的にこういうタイプ」という安定したラベル付けの価値が損なわれる。本人からは「日次も」という指示のみで、タイプ判定を日次にも必ず含めよという明示的な指定は無かったため、タイプ判定は月次レポートに一本化し、日次レポートは今日の気づき・アドバイスに絞ることにした(本人が今後「日次にもタイプが欲しい」と言えば、その時点で改めて検討する)。
+
+**決定・実装**
+
+1. **スキーマ**(`supabase/migrations/20260921000500_ai_daily_reports.sql`・`..._rls.sql`、`docs/schema.sql`・`src/lib/supabase/types.ts` に同期):`ai_daily_reports` テーブル(`ai_monthly_reports` と同じ構造だが `persona_type`/`persona_reasoning` を持たない)。1日1行(`user_id, report_date` に unique 制約、再生成は upsert で上書き)。
+2. **AI層**(`src/features/ai-report/daily-report-ai.ts`、テスト5件):モデルは月次と同じ Sonnet(今日の支出を月内の典型的な1日と比べて意味のある気づきを書く推論寄りのタスクのため)。出力は `insights`/`advice` のみ(`personaType` フィールドを持たない点だけが monthly-report-ai.ts との違い)。システムプロンプトに「1日分のデータだけで性格や浪費傾向のタイプを断定しない(それは月次レポートの役割)」を明記し、AI自身にも越権させない歯止めを入れた。
+3. **入力データは新規クエリを増やさない**(`src/features/ai-report/store.ts` の `loadDailyReportInput()`):月次レポートと同じ `loadMonthlyLedger()`・`loadSpendingDiagnosisView()` を呼び出し、今日の日付(`occurredOn === today`)でフィルタするだけ。比較の基準となる「今月のここまでの1日あたり平均支出」は既存の `pace.thisMonthToDateYen / pace.dayOfMonth`(先月同日比の計算に使っている値、`domain/accumulation.ts`)から導く——専用の集計を新設していない。
+4. **未適用テーブルへの耐性**:`ai_monthly_reports`(B-14)と同じ制約でこのセッションには本番適用手段が無いため、同じ「読み取りは握り潰す・書き込みはエラーを返す」設計。
+5. **UI**:既存の `/reports/ai` 画面(ADR-031)に `DailyReportCard`(`app/(app)/reports/ai/daily-report-view.tsx`、新規)を追加し、`MonthlyReportCard` の上に並べた。新しい画面は作らず、月次・日次どちらも1画面で見られるようにした(本人の「両方先に」という指示に対して、画面を分けるより1箇所にまとまっている方が素早く両方確認できるという判断。ADR-031で「新しい画面」を選んだのは既存の `/reports`(集計グラフ)とAIレポートを分けるためであり、日次・月次のAIレポート同士を分ける理由は無い)。画面見出し・リンク文言を「AI月次レポート」から「AIレポート」に改めた(`/reports` ヘッダ、`more-menu.tsx`)。
+
+**却下した選択肢**
+
+- **日次レポートにも `persona_type` を持たせる**:1日分のデータでは判定がぶれやすく、ADR-031が「1ヶ月分のデータが揃ってから作る」を選んだ理由(精度)と矛盾するため不採用
+- **日次レポート専用の画面 `/reports/ai/daily` を新設する**:月次・日次を同じ関心事(AIレポート)として1画面にまとめた方が、本人の「両方先に」という要望に対して素早く両方を見比べられる。ADR-031の「新しい画面」の判断はAIレポート全体と既存の `/reports` を分けるためのものであり、AIレポート内部をさらに画面分割する理由が無い
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(727件全通過、新規5件含む)/`npx next build` すべて成功。`scripts/verify-schema.sh`(33テーブル、RLS全有効)・`scripts/verify-migrations.sh`(1025項目一致、`docs/schema.sql` と `supabase/migrations/` の乖離なし)も成功。**未検証**:このセッションには本番 Supabase の管理APIも実際の Anthropic API キーも無いため、①`ai_daily_reports` マイグレーションの本番適用そのもの(B-15 参照)、②実際の AI 呼び出しが期待どおりの気づき・アドバイスを返すこと、③本番データでの画面表示、は確認できていない。
+
+---
+
 ## 未決のまま残す事項
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。

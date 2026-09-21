@@ -1,17 +1,18 @@
 /**
- * AI月次レポート(ai_monthly_reports)のデータアクセス(本人発案「AI関連
- * もっと増やしたい」、ADR-031)。
+ * AI月次・日次レポート(ai_monthly_reports・ai_daily_reports)のデータアクセス
+ * (本人発案「AI関連もっと増やしたい」「日次レポートと月次レポートどっちも
+ * 出力できるように」、ADR-031/ADR-032)。
  *
- * `ai_monthly_reports` は本番 Supabase へのマイグレーション適用手段がこの
- * セッションに無く(T-25/T-26/B-7/B-10/B-12/B-13 と同じ制約)未適用のため、
- * 読み取りはテーブル未作成のエラー(PGRST205)を「レポートはまだ無い」として
- * 握り潰す(goals・transaction_diagnoses と同じ考え方。適用後は自動的に
- * 効き始める)。一方 saveMonthlyReport() は本人の明示的な操作(「レポートを
- * 作る」ボタン)の結果なので握り潰さず、分かりやすいメッセージにしてそのまま
- * エラーとして返す。
+ * `ai_monthly_reports`/`ai_daily_reports` は本番 Supabase へのマイグレーション
+ * 適用手段がこのセッションに無く(T-25/T-26/B-7/B-10/B-12/B-13 と同じ制約)
+ * 未適用のため、読み取りはテーブル未作成のエラー(PGRST205)を「レポートは
+ * まだ無い」として握り潰す(goals・transaction_diagnoses と同じ考え方。
+ * 適用後は自動的に効き始める)。一方 save*Report() は本人の明示的な操作
+ * (「レポートを作る」ボタン)の結果なので握り潰さず、分かりやすいメッセージに
+ * してそのままエラーとして返す。
  *
- * 入力データ(loadMonthlyReportInput)は既存の store 層(spending・diagnosis・
- * home)をそのまま呼び出して組み立てるだけで、新しい集計クエリは増やさない。
+ * 入力データ(load*ReportInput)は既存の store 層(spending・diagnosis・home)を
+ * そのまま呼び出して組み立てるだけで、新しい集計クエリは増やさない。
  */
 
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -21,8 +22,9 @@ import type { SpendingPersonaType } from '@/domain/persona';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { loadHomeSummary } from '@/features/home/summary';
 import { loadMonthlyLedger } from '@/features/spending/store';
-import { monthStartJst } from '@/lib/date';
+import { monthStartJst, todayJst } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
+import type { DailyReportInput } from './daily-report-ai';
 import { MAX_ITEMS_PER_LIST, type MonthlyReportInput } from './monthly-report-ai';
 
 export class AiReportStoreError extends Error {
@@ -163,5 +165,127 @@ export async function loadMonthlyAiReportView(
 ): Promise<MonthlyAiReportView> {
   const input = await loadMonthlyReportInput(now);
   const report = await loadMonthlyReport(input.monthKey);
+  return { input, report };
+}
+
+/**
+ * 今日分のレポート入力データを組み立てる。今月の家計簿・診断ビューを
+ * そのまま呼び出し、今日の日付でフィルタするだけ(新規クエリは増やさない)。
+ */
+export async function loadDailyReportInput(now: Date = new Date()): Promise<DailyReportInput> {
+  const [ledger, diagnosis] = await Promise.all([
+    loadMonthlyLedger(now),
+    loadSpendingDiagnosisView(now),
+  ]);
+
+  const today = todayJst(now);
+  const todaysSpending = ledger.transactions.filter(
+    (tx) => tx.occurredOn === today && tx.amountYen < 0,
+  );
+  const totalSpentYen = todaysSpending.reduce((acc, tx) => acc - tx.amountYen, 0);
+
+  const categoryTotals = new Map<string, number>();
+  for (const tx of todaysSpending) {
+    const name = tx.categoryName ?? '未分類';
+    categoryTotals.set(name, (categoryTotals.get(name) ?? 0) - tx.amountYen);
+  }
+  const categoryBreakdown = [...categoryTotals.entries()]
+    .map(([name, amountYen]) => ({ name, amountYen }))
+    .sort((a, b) => b.amountYen - a.amountYen);
+
+  // 月初からの累計 ÷ 経過日数(今日を含む)。今日単体の値と比べる基準として使う。
+  const averageDailySpendYen =
+    ledger.pace.dayOfMonth > 0 ? ledger.pace.thisMonthToDateYen / ledger.pace.dayOfMonth : 0;
+
+  const toItem = (item: { label: string; amountYen: number; reasoning: string }) => ({
+    label: item.label,
+    amountYen: item.amountYen,
+    reasoning: item.reasoning,
+  });
+
+  return {
+    dateKey: today,
+    totalSpentYen,
+    transactionCount: todaysSpending.length,
+    categoryBreakdown,
+    averageDailySpendYen,
+    wasteItems: diagnosis.currentMonth.wasteItems
+      .filter((item) => item.occurredOn === today)
+      .map(toItem),
+    necessaryItems: diagnosis.currentMonth.necessaryItems
+      .filter((item) => item.occurredOn === today)
+      .map(toItem),
+  };
+}
+
+export type SaveDailyReportInput = {
+  insights: readonly string[];
+  advice: readonly string[];
+};
+
+/** 日次レポートを保存する。1日1行(再生成は upsert で上書き)。 */
+export async function saveDailyReport(
+  dateKey: string,
+  result: SaveDailyReportInput,
+): Promise<void> {
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new AiReportStoreError('ログイン状態を確認できませんでした');
+  }
+
+  const { error } = await supabase.from('ai_daily_reports').upsert(
+    {
+      user_id: auth.user.id,
+      report_date: dateKey,
+      insights: [...result.insights],
+      advice: [...result.advice],
+    },
+    { onConflict: 'user_id,report_date' },
+  );
+  if (error) {
+    if (isMissingTableError(error)) {
+      throw new AiReportStoreError('レポート機能はまだ利用できません');
+    }
+    throw new AiReportStoreError(`レポートを保存できませんでした: ${error.message}`);
+  }
+}
+
+export type DailyAiReport = {
+  insights: readonly string[];
+  advice: readonly string[];
+  createdAt: string;
+};
+
+/** 指定日のレポートを読む。無ければ null(テーブル未作成もこの扱いに含む)。 */
+export async function loadDailyReport(dateKey: string): Promise<DailyAiReport | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('ai_daily_reports')
+    .select('insights, advice, created_at')
+    .eq('report_date', dateKey)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTableError(error)) return null;
+    throw new AiReportStoreError(`レポートを取得できませんでした: ${error.message}`);
+  }
+  if (!data) return null;
+
+  return {
+    insights: data.insights,
+    advice: data.advice,
+    createdAt: data.created_at,
+  };
+}
+
+export type DailyAiReportView = {
+  input: DailyReportInput;
+  report: DailyAiReport | null;
+};
+
+/** /reports/ai の画面向けビュー(日次分)。数値データとレポート(無ければ null)をまとめて返す。 */
+export async function loadDailyAiReportView(now: Date = new Date()): Promise<DailyAiReportView> {
+  const input = await loadDailyReportInput(now);
+  const report = await loadDailyReport(input.dateKey);
   return { input, report };
 }

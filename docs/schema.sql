@@ -1626,6 +1626,31 @@ create table public.ai_monthly_reports (
 
 create unique index ux_ai_monthly_reports_user_month on public.ai_monthly_reports (user_id, month);
 
+-- 3.27 ai_daily_reports — AI日次レポート(本人発案「日次レポートと月次
+-- レポートどっちも出力できるように」、ADR-032)
+--
+--   今日1日分の実データ(支出・カテゴリ・診断結果)をAIに渡し、気づきと
+--   アドバイスを生成する。ai_monthly_reports と異なり persona_type を持たない
+--   ——1日分のデータでは浪費傾向のタイプ判定にノイズが大きすぎるため、
+--   タイプ判定は月次レポートに一本化する(ADR-032)。1日につき1行(再生成は
+--   upsert で上書き、過去のレポートを履歴として重ねて残す機能ではない)。
+-- -----------------------------------------------------------------------------
+create table public.ai_daily_reports (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users(id) on delete cascade,
+  report_date date        not null,
+
+  insights    text[]      not null default '{}',
+  advice      text[]      not null default '{}',
+
+  created_at  timestamptz not null default now(),
+
+  constraint ck_ai_daily_reports_insights_not_empty check (array_length(insights, 1) > 0),
+  constraint ck_ai_daily_reports_advice_not_empty check (array_length(advice, 1) > 0)
+);
+
+create unique index ux_ai_daily_reports_user_date on public.ai_daily_reports (user_id, report_date);
+
 
 -- =============================================================================
 --  4. updated_at トリガの一括適用
@@ -2023,7 +2048,7 @@ begin
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
-    'ai_monthly_reports'
+    'ai_monthly_reports','ai_daily_reports'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

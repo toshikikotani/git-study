@@ -41,7 +41,7 @@ export default async function ReportsPage() {
           </p>
         </div>
         <Link href="/reports/ai" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-          AI月次レポート →
+          AIレポート →
         </Link>
       </header>
 

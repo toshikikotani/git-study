@@ -85,7 +85,7 @@ const GROUPS = [
     title: '振り返る',
     items: [
       { href: '/reports', label: 'レポート' },
-      { href: '/reports/ai', label: 'AI月次レポート', dek: '傾向・タイプ・アドバイス' },
+      { href: '/reports/ai', label: 'AIレポート', dek: '日次・月次の気づき・アドバイス' },
       { href: '/briefs', label: '朝配信' },
     ],
   },
