@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { saveImportBatchAction, type ReceiptSplitInput } from '../actions';
+import { ensureDefaultAccountAction } from '../../accounts/actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
@@ -146,11 +147,27 @@ export default function ReceiptPage() {
     });
   }, []);
 
-  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
+  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)。
+  //
+  // 1件も無い場合は「現金」を自動で作る(本人発案:「口座って何のために
+  // 追加するん？普通に家計簿に登録して欲しいだけなんだけど」)。レシート
+  // 取り込みは現金・電子マネー払いの主経路(設計原則2)なのに、その手前で
+  // /accounts への事前登録を要求するのは記録の手間そのもの。
+  // ensureDefaultAccountAction() 参照。
   useEffect(() => {
-    void fetchAccounts().then((fetched) => {
-      setAccounts(fetched);
-      setAccountId((current) => current || (fetched[0]?.id ?? ''));
+    void fetchAccounts().then(async (fetched) => {
+      if (fetched.length > 0) {
+        setAccounts(fetched);
+        setAccountId((current) => current || fetched[0]!.id);
+        return;
+      }
+      const result = await ensureDefaultAccountAction();
+      if ('account' in result) {
+        setAccounts([result.account]);
+        setAccountId((current) => current || result.account.id);
+      } else {
+        setAccounts([]);
+      }
     });
   }, []);
 
@@ -504,48 +521,55 @@ export default function ReceiptPage() {
         </Card>
       ) : null}
 
-      {/* 口座(M6-2) */}
-      <Card>
-        <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
-          style={{ color: 'var(--ink-muted)' }}
-        >
-          口座
-        </label>
-        {accounts === null ? (
-          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            読み込んでいます…
-          </p>
-        ) : accounts.length === 0 ? (
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            口座がまだ登録されていません。
-            <Link
-              href="/accounts"
-              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
-              style={{ color: 'var(--accent)' }}
-            >
-              先に登録する →
-            </Link>
-          </p>
-        ) : (
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
+      {/* 口座(M6-2)。
+          口座が1件しか無い(=自動で用意した「現金」、または本人が普段
+          使っている唯一の口座)なら選ぶ意味が無いので、カードごと出さず
+          黙ってその口座を使う(本人発案:「口座って何のために追加するん？
+          普通に家計簿に登録して欲しいだけなんだけど」)。2件以上あるときだけ
+          「どちらの支払いか」を選ばせる意味が生まれる。 */}
+      {accounts !== null && accounts.length === 1 ? null : (
+        <Card>
+          <label
+            className="text-[11px] font-medium tracking-[0.08em] uppercase"
+            style={{ color: 'var(--ink-muted)' }}
           >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </Card>
+            口座
+          </label>
+          {accounts === null ? (
+            <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              読み込んでいます…
+            </p>
+          ) : accounts.length === 0 ? (
+            <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              口座を用意できませんでした。時間をおいてから開き直してください。
+              <Link
+                href="/accounts"
+                className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
+                style={{ color: 'var(--accent)' }}
+              >
+                口座を登録する →
+              </Link>
+            </p>
+          ) : (
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            >
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </Card>
+      )}
 
       <Card>
         <div

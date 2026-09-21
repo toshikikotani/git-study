@@ -18,6 +18,7 @@ import {
 } from '@/domain/account';
 import {
   createAccount,
+  getOrCreateDefaultAccount,
   updateAccount,
   AccountStoreError,
   type AccountInput,
@@ -117,4 +118,23 @@ export async function updateAccountAction(
   }
   revalidatePath('/accounts');
   return { error: null };
+}
+
+export type DefaultAccountResult =
+  { account: { id: string; name: string; closingDay: number | null } } | { error: string };
+
+/**
+ * レシート取り込み(/transactions/receipt)向け。口座が1件も無ければ
+ * 「現金」を自動で作る(getOrCreateDefaultAccount() 参照)。/accounts への
+ * 事前登録を必須にしないための入り口。
+ */
+export async function ensureDefaultAccountAction(): Promise<DefaultAccountResult> {
+  try {
+    const account = await getOrCreateDefaultAccount();
+    return { account: { id: account.id, name: account.name, closingDay: account.closingDay } };
+  } catch (error) {
+    return {
+      error: error instanceof AccountStoreError ? error.message : '口座を用意できませんでした',
+    };
+  }
 }
