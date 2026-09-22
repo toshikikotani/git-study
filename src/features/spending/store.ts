@@ -19,6 +19,7 @@ import {
   type SpendingTransaction,
 } from '@/domain/spending';
 import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { CategoryBreakdownRow, LedgerTransaction, MonthlyLedgerView } from './ledger-types';
 
@@ -30,12 +31,7 @@ export type {
   MonthlyPace,
 } from './ledger-types';
 
-export class SpendingStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SpendingStoreError';
-  }
-}
+export class SpendingStoreError extends AppError {}
 
 const UNCATEGORIZED_LABEL = '未分類';
 

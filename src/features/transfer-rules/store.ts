@@ -10,6 +10,7 @@
  * 一時的に重複する。負の一時値を経由させることで衝突を避ける。
  */
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -41,12 +42,7 @@ export type TransferRuleInput = {
 /** フォームの選択肢用の最小限の形。 */
 export type CategoryOption = { id: string; name: string };
 
-export class TransferRuleStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransferRuleStoreError';
-  }
-}
+export class TransferRuleStoreError extends AppError {}
 
 type TransferRuleRow = Database['public']['Tables']['transfer_rules']['Row'];
 

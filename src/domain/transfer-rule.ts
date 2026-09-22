@@ -7,12 +7,9 @@
 
 import { assertYen, parseYen } from './money';
 
-export class TransferRuleError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransferRuleError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class TransferRuleError extends AppError {}
 
 export type AmountType = 'fixed' | 'percentage' | 'remainder';
 

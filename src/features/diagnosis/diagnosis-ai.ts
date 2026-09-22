@@ -1,31 +1,14 @@
 /**
- * 支出の「浪費 か 必要経費 か」のAI診断(本人発案、ADR-030)。
+ * 明細1件ごとの「浪費 か 必要経費 か」のAI診断(ADR-030)。
  *
- * ── なぜAIによる主観的判断が要るのか ────────────────────────────
- * category_kind(浪費/生活費/聖域...、ADR-010)はカテゴリ単位の静的な分類で、
- * 「リボ・キャッシングの検知」のような確定的な判定(FR-21)ではなく、そもそも
- * 主観に属する。ここは ADR-010 の役割分担(確定的な判定は正規表現、主観的な
- * 判断はAI)のうち、後者に正面から取り組む機能——本人発案「AIの分析が弱い。
- * もっと客観視した分析が必要。投資家目線で今のが浪費か必要経費なのか判断する
- * 機構」に応える。
- *
- * ── なぜ本人操作でだけ呼ぶのか ──────────────────────────────
- * 貼り付け画面・レシート画面と同じ考え方(ADR-019/021)。取り込みのたびに
- * 自動で呼ぶと、明細が増えるほど課金が積み上がる。診断は本人が明示的に
- * ボタンを押した時だけ実行する(features/diagnosis/store.ts の
- * listUndiagnosedTransactionsForDiagnosis() 参照)。
- *
- * ── モデルは Haiku ではなく Sonnet ────────────────────────────
- * 分類(ADR-010)は「どのカテゴリに当てはまるか」という比較的機械的な作業
- * だが、ここは「投資家として妥当な判断か」という踏み込んだ評価を本人が
- * 求めている(「分析が弱い」という指摘そのもの)。/advisor(ADR-023)と
- * 同じ判断で、コストより分析の質を優先し Sonnet を使う。
+ * category_kind はカテゴリ単位の静的な分類で、1件ごとの事情は表せない。
+ * ここは主観的な評定なので、確定的な判定(FR-21)と違いAIに任せる(ADR-010)。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
+import { parseStructured } from '@/lib/anthropic';
 import type { DateOnly } from '@/lib/date';
 
 /** 診断に使うモデル(ADR-030)。日付サフィックスは付けない。 */
@@ -114,32 +97,18 @@ export class ClaudeSpendingDiagnosisAnalyzer implements SpendingDiagnosisAnalyze
   ): Promise<DiagnoseSpendingOutcome> {
     if (transactions.length === 0) return { results: [], warnings: [] };
 
-    let parsed: z.infer<typeof diagnosisSchema> | null;
-    try {
-      const response = await this.client.messages.parse({
-        model: SPENDING_DIAGNOSIS_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserContent(transactions) }],
-        output_config: { format: zodOutputFormat(diagnosisSchema) },
-      });
+    const result = await parseStructured({
+      client: this.client,
+      model: SPENDING_DIAGNOSIS_MODEL,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildUserContent(transactions) }],
+      schema: diagnosisSchema,
+      hints: { truncated: '件数を減らしてもう一度お試しください。' },
+    });
+    if (!result.ok) return { results: [], warnings: [result.message] };
 
-      if (response.stop_reason === 'max_tokens') {
-        return {
-          results: [],
-          warnings: ['AI の出力が長すぎて途中で切れました。件数を減らしてもう一度お試しください。'],
-        };
-      }
-      parsed = response.parsed_output;
-    } catch (error) {
-      return { results: [], warnings: [describeError(error)] };
-    }
-
-    if (parsed === null) {
-      return { results: [], warnings: ['AI の返答を解釈できませんでした。'] };
-    }
-
-    return buildFromAiRows(parsed.diagnoses, transactions);
+    return buildFromAiRows(result.value.diagnoses, transactions);
   }
 }
 
@@ -184,23 +153,4 @@ export function buildFromAiRows(
   }
 
   return { results, warnings };
-}
-
-/**
- * 失敗の理由を本人に見える言葉にする(receipt-ai.ts の describeError() と同じ)。
- */
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。しばらくしてから再試行してください。';
-  }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }

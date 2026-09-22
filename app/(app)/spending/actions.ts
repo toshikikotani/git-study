@@ -13,6 +13,8 @@ import {
   listUndiagnosedTransactions,
   saveDiagnoses,
 } from '@/features/diagnosis/store';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 
 export type DiagnoseSpendingActionResult = {
   diagnosedCount: number;
@@ -21,12 +23,12 @@ export type DiagnoseSpendingActionResult = {
 };
 
 export async function diagnoseSpendingAction(): Promise<DiagnoseSpendingActionResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return {
       diagnosedCount: 0,
       warnings: [],
-      error: 'AI による診断は設定されていません(ANTHROPIC_API_KEY が未設定)。',
+      error: apiKeyMissingMessage('AI による診断'),
     };
   }
 

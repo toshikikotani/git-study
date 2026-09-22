@@ -5,6 +5,8 @@ import {
   SUPPORTED_RECEIPT_MEDIA_TYPES,
   type ReceiptMediaType,
 } from '@/features/import/receipt-ai';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 
 /**
  * レシート画像を解析する(新機能、ADR-021)。
@@ -77,11 +79,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return NextResponse.json({
       transactions: [],
-      warnings: ['AI による読み取りは設定されていません(ANTHROPIC_API_KEY が未設定)。'],
+      warnings: [apiKeyMissingMessage('AI による読み取り')],
     });
   }
 

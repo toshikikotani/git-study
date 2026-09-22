@@ -11,14 +11,9 @@
 import { revalidatePath } from 'next/cache';
 
 import { assertLenderName, assertPaymentDay, DebtError } from '@/domain/debt';
-import { assertYen, MoneyError, parseAnnualRate, parseYen } from '@/domain/money';
-import {
-  createDebt,
-  updateDebt,
-  DebtStoreError,
-  type DebtInput,
-  type DebtKind,
-} from '@/features/debts/store';
+import { assertYen, parseAnnualRate, parseYen } from '@/domain/money';
+import { createDebt, updateDebt, type DebtInput, type DebtKind } from '@/features/debts/store';
+import { describeUserError } from '@/lib/errors';
 
 export type DebtFormState = {
   error: string | null;
@@ -72,17 +67,6 @@ function parseDebtInput(formData: FormData): DebtInput {
   };
 }
 
-function describeError(error: unknown): string {
-  if (
-    error instanceof DebtError ||
-    error instanceof MoneyError ||
-    error instanceof DebtStoreError
-  ) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
-
 export async function createDebtAction(
   _prev: DebtFormState,
   formData: FormData,
@@ -91,7 +75,7 @@ export async function createDebtAction(
     const input = parseDebtInput(formData);
     await createDebt(input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/debts');
   return { error: null };
@@ -106,7 +90,7 @@ export async function updateDebtAction(
     const input = parseDebtInput(formData);
     await updateDebt(id, input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/debts');
   return { error: null };

@@ -1,9 +1,8 @@
 'use server';
 
 /**
- * AI月次・日次レポート(/reports/ai)の Server Action(本人発案、
- * ADR-031/ADR-032)。本人がボタンを押した時だけ AI を呼ぶ唯一の入り口
- * (monthly-report-ai.ts・daily-report-ai.ts 参照)。
+ * AI月次・日次レポート(/reports/ai)の Server Action(ADR-031/ADR-032)。
+ * 本人がボタンを押した時だけ AI を呼ぶ唯一の入り口。
  */
 
 import { revalidatePath } from 'next/cache';
@@ -11,7 +10,6 @@ import { revalidatePath } from 'next/cache';
 import { ClaudeDailyReportAnalyzer } from '@/features/ai-report/daily-report-ai';
 import { ClaudeMonthlyReportAnalyzer } from '@/features/ai-report/monthly-report-ai';
 import {
-  AiReportStoreError,
   loadDailyReportInput,
   loadMonthlyReportInput,
   saveDailyReport,
@@ -19,102 +17,75 @@ import {
   type DailyAiReport,
   type MonthlyAiReport,
 } from '@/features/ai-report/store';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
+import { describeUserError } from '@/lib/errors';
 
-export type GenerateMonthlyReportActionResult = {
+export type GenerateReportActionResult<T> = {
   /**
-   * 生成直後にこの画面上で即座に見せるための本体(Server Action の戻り値に
-   * 含める。revalidatePath だけに頼ると、この呼び出し元コンポーネントの
-   * useState はプロップの更新では自動的に同期されないため)。
+   * 生成直後に画面へ即座に出すための本体。revalidatePath だけに頼ると、
+   * 呼び出し元の useState はプロップ更新では同期されないため戻り値でも返す。
    */
-  report: MonthlyAiReport | null;
+  report: T | null;
   error: string | null;
   warnings: string[];
 };
+
+export type GenerateMonthlyReportActionResult = GenerateReportActionResult<MonthlyAiReport>;
+export type GenerateDailyReportActionResult = GenerateReportActionResult<DailyAiReport>;
 
 export async function generateMonthlyAiReportAction(): Promise<GenerateMonthlyReportActionResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
-    return {
-      report: null,
-      error: 'AI によるレポート生成は設定されていません(ANTHROPIC_API_KEY が未設定)。',
-      warnings: [],
-    };
-  }
-
-  let input;
-  try {
-    input = await loadMonthlyReportInput();
-  } catch (error) {
-    return {
-      report: null,
-      error: error instanceof Error ? error.message : '今月のデータを取得できませんでした。',
-      warnings: [],
-    };
-  }
-
-  const outcome = await new ClaudeMonthlyReportAnalyzer(apiKey).generate(input);
-  if (outcome.report === null) {
-    return { report: null, error: null, warnings: outcome.warnings };
-  }
-
-  try {
-    await saveMonthlyReport(input.monthKey, outcome.report);
-  } catch (error) {
-    return {
-      report: null,
-      error:
-        error instanceof AiReportStoreError ? error.message : 'レポートを保存できませんでした。',
-      warnings: outcome.warnings,
-    };
-  }
-
-  revalidatePath('/reports/ai');
-  return {
-    report: { ...outcome.report, createdAt: new Date().toISOString() },
-    error: null,
-    warnings: outcome.warnings,
-  };
+  return runReportAction({
+    load: loadMonthlyReportInput,
+    loadFailed: '今月のデータを取得できませんでした。',
+    generate: (apiKey, input) => new ClaudeMonthlyReportAnalyzer(apiKey).generate(input),
+    save: (input, report) => saveMonthlyReport(input.monthKey, report),
+  });
 }
 
-export type GenerateDailyReportActionResult = {
-  report: DailyAiReport | null;
-  error: string | null;
-  warnings: string[];
-};
-
 export async function generateDailyAiReportAction(): Promise<GenerateDailyReportActionResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  return runReportAction({
+    load: loadDailyReportInput,
+    loadFailed: '今日のデータを取得できませんでした。',
+    generate: (apiKey, input) => new ClaudeDailyReportAnalyzer(apiKey).generate(input),
+    save: (input, report) => saveDailyReport(input.dateKey, report),
+  });
+}
+
+/** 月次も日次も手順は同じ:キー確認 → 入力取得 → AI → 保存 → 再取得。 */
+async function runReportAction<Input, Body>(step: {
+  load: () => Promise<Input>;
+  loadFailed: string;
+  generate: (apiKey: string, input: Input) => Promise<{ report: Body | null; warnings: string[] }>;
+  save: (input: Input, report: Body) => Promise<void>;
+}): Promise<GenerateReportActionResult<Body & { createdAt: string }>> {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return {
       report: null,
-      error: 'AI によるレポート生成は設定されていません(ANTHROPIC_API_KEY が未設定)。',
+      error: apiKeyMissingMessage('AI によるレポート生成'),
       warnings: [],
     };
   }
 
-  let input;
+  let input: Input;
   try {
-    input = await loadDailyReportInput();
+    input = await step.load();
   } catch (error) {
-    return {
-      report: null,
-      error: error instanceof Error ? error.message : '今日のデータを取得できませんでした。',
-      warnings: [],
-    };
+    return { report: null, error: describeUserError(error, step.loadFailed), warnings: [] };
   }
 
-  const outcome = await new ClaudeDailyReportAnalyzer(apiKey).generate(input);
+  const outcome = await step.generate(apiKey, input);
   if (outcome.report === null) {
     return { report: null, error: null, warnings: outcome.warnings };
   }
 
   try {
-    await saveDailyReport(input.dateKey, outcome.report);
+    await step.save(input, outcome.report);
   } catch (error) {
     return {
       report: null,
-      error:
-        error instanceof AiReportStoreError ? error.message : 'レポートを保存できませんでした。',
+      error: describeUserError(error, 'レポートを保存できませんでした。'),
       warnings: outcome.warnings,
     };
   }

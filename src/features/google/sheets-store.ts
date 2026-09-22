@@ -24,16 +24,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { isLastDayOfMonth } from '@/domain/alerts';
 import { addDays, monthStartJst, todayJst } from '@/lib/date';
 import type { GoogleEnv } from '@/lib/env';
+import { AppError } from '@/lib/errors';
 import { refreshGoogleAccessToken } from '@/lib/google-auth';
 import { createSpreadsheet, ensureSheetTab, writeSheetValues } from '@/lib/google-sheets';
 import type { Database } from '@/lib/supabase/types';
 
-export class GoogleSheetsBackupError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoogleSheetsBackupError';
-  }
-}
+export class GoogleSheetsBackupError extends AppError {}
 
 const BACKUP_SPREADSHEET_TITLE = '家計簿バックアップ';
 const MISSING_COLUMN_CODES = new Set(['42703', 'PGRST204', 'PGRST205']);

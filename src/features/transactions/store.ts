@@ -13,6 +13,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -31,12 +32,7 @@ import type {
   TransactionSource,
 } from './types';
 
-export class TransactionStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransactionStoreError';
-  }
-}
+export class TransactionStoreError extends AppError {}
 
 type TransactionRow = Database['public']['Tables']['transactions']['Row'];
 

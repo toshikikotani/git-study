@@ -1,4 +1,5 @@
 import { formatYen } from '@/domain/money';
+import { formatMonthJa } from '@/lib/date';
 import type { CategorySpendingTrend } from '@/features/reports/store';
 
 /**
@@ -58,7 +59,7 @@ export function CategoryTrendChart({ trend }: { trend: CategorySpendingTrend }) 
                       key={monthKeys[index]}
                       className="relative h-full flex-1 overflow-hidden rounded-t-[4px]"
                       style={{ background: 'var(--over-track)' }}
-                      title={`${monthLabel(monthKeys[index]!)}: ${formatYen(spentYen)}`}
+                      title={`${formatMonthJa(monthKeys[index]!)}: ${formatYen(spentYen)}`}
                     >
                       {index === peakIndex && spentYen > 0 ? (
                         <span
@@ -85,7 +86,7 @@ export function CategoryTrendChart({ trend }: { trend: CategorySpendingTrend }) 
                     className="tabular flex-1 text-center text-[10px]"
                     style={{ color: 'var(--ink-muted)' }}
                   >
-                    {monthLabel(monthKey)}
+                    {formatMonthJa(monthKey)}
                   </span>
                 ))}
               </div>
@@ -121,7 +122,7 @@ function SpendingTable({ trend }: { trend: CategorySpendingTrend }) {
                 className="p-2.5 text-right font-medium"
                 style={{ color: 'var(--ink-muted)' }}
               >
-                {monthLabel(monthKey)}
+                {formatMonthJa(monthKey)}
               </th>
             ))}
           </tr>
@@ -147,8 +148,4 @@ function SpendingTable({ trend }: { trend: CategorySpendingTrend }) {
       </table>
     </div>
   );
-}
-
-function monthLabel(monthKey: string): string {
-  return `${Number(monthKey.slice(5, 7))}月`;
 }

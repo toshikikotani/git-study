@@ -13,8 +13,10 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+
+import { parseStructured } from '@/lib/anthropic';
+import { AppError } from '@/lib/errors';
 
 /**
  * 会話の質が重要なため、分類・抽出系(ADR-010/019/021)の Haiku ではなく
@@ -88,12 +90,7 @@ const SYSTEM_PROMPT_HEADER = [
   '- 「今の状況」に既に載っている目標と似た内容を、重複して提案しない',
 ].join('\n');
 
-export class AdvisorChatError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AdvisorChatError';
-  }
-}
+export class AdvisorChatError extends AppError {}
 
 export class AdvisorChat {
   private readonly client: Anthropic;
@@ -111,31 +108,21 @@ export class AdvisorChat {
       throw new AdvisorChatError('会話が空です');
     }
 
-    let response;
-    try {
-      response = await this.client.messages.parse({
-        model,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: buildSystemPrompt(contextText),
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        output_config: { format: zodOutputFormat(chatResponseSchema) },
-      });
-    } catch (error) {
-      throw new AdvisorChatError(describeError(error));
-    }
+    const result = await parseStructured({
+      client: this.client,
+      model,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      system: buildSystemPrompt(contextText),
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      schema: chatResponseSchema,
+      hints: {
+        truncated: 'もう一度短く聞いてみてください。',
+        rateLimit: '少し時間を置いてから試してください。',
+      },
+    });
+    if (!result.ok) throw new AdvisorChatError(result.message);
 
-    if (response.stop_reason === 'max_tokens') {
-      throw new AdvisorChatError(
-        'AIの返答が長すぎて途中で切れました。もう一度短く聞いてみてください。',
-      );
-    }
-
-    const parsed = response.parsed_output;
-    if (parsed === null) {
-      throw new AdvisorChatError('AIの返答を解釈できませんでした。');
-    }
-
-    return { reply: parsed.reply, goalProposal: parsed.goalProposal };
+    return { reply: result.value.reply, goalProposal: result.value.goalProposal };
   }
 }
 
@@ -146,20 +133,4 @@ function buildSystemPrompt(contextText: string): string {
     '今の状況(正確な計算結果。これ以外の金額は本人に聞かれても断定しない):',
     contextText,
   ].join('\n');
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。少し時間を置いてから試してください。';
-  }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }

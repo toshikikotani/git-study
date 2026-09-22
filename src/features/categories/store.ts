@@ -9,6 +9,7 @@
  * 削除できない」。P10-7)。
  */
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -35,12 +36,7 @@ export type CategoryInput = {
   showOnHome: boolean;
 };
 
-export class CategoryStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CategoryStoreError';
-  }
-}
+export class CategoryStoreError extends AppError {}
 
 type CategoryRow = Database['public']['Tables']['categories']['Row'];
 

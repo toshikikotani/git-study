@@ -1,32 +1,16 @@
 /**
- * AI月次レポートの生成(本人発案「AI関連もっと増やしたい。もっと画期的な機能
- * ない?」、ADR-031)。
+ * AI月次レポートの生成(ADR-031)。1ヶ月分の実データから、浪費傾向のタイプ
+ * (domain/persona.ts の固定6分類)・気づき・アドバイスを作る。
  *
- * ── 何を作るか ──────────────────────────────────────────────────
- * 家計簿・診断(transaction_diagnoses、ADR-030)の1ヶ月分の実データをAIに渡し、
- * ①浪費傾向のタイプ(固定6分類、persona/domain/persona.ts)、②実データに
- * 基づく気づき、③行動面の一般的なアドバイスを生成する。
- *
- * ── なぜ本人操作でだけ呼ぶのか ──────────────────────────────────
- * 診断機能(diagnosis-ai.ts)と同じ考え方。月次レポートは頻繁に再生成する
- * 必要が無く、自動実行にする理由が無い。
- *
- * ── モデルは Sonnet ────────────────────────────────────────────
- * 複数の指標を横断してタイプ判定・気づき・アドバイスを組み立てる推論寄りの
- * タスクのため、diagnosis-ai.ts・advisor と同じ判断で Sonnet を使う。
- *
- * ── 踏み込ませない領域(本人の要望による明示的な線引き) ────────────
- * 「性格タイプは入れてほしいが、ホルモン等の医学的な話は要らない」という
- * 本人の指示どおり、persona は固定6分類(支出の傾向の名づけ)に限定し、
- * 医学的な診断・体質の断定・食事療法などの助言はシステムプロンプトで
- * 明示的に禁じる。
+ * 医学的な断定(体質・食事・ホルモン)はさせない。本人が明示的に外した領域で、
+ * 支出データからは根拠が出せないため。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
 import { SPENDING_PERSONA_TYPES, type SpendingPersonaType } from '@/domain/persona';
+import { parseStructured } from '@/lib/anthropic';
 
 /** レポート生成に使うモデル(ADR-031)。日付サフィックスは付けない。 */
 export const MONTHLY_REPORT_MODEL = 'claude-sonnet-5';
@@ -132,32 +116,18 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
   }
 
   async generate(input: MonthlyReportInput): Promise<GenerateMonthlyReportOutcome> {
-    let parsed: ReportRow | null;
-    try {
-      const response = await this.client.messages.parse({
-        model: MONTHLY_REPORT_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserContent(input) }],
-        output_config: { format: zodOutputFormat(reportSchema) },
-      });
+    const result = await parseStructured({
+      client: this.client,
+      model: MONTHLY_REPORT_MODEL,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildUserContent(input) }],
+      schema: reportSchema,
+      hints: { truncated: 'もう一度お試しください。' },
+    });
+    if (!result.ok) return { report: null, warnings: [result.message] };
 
-      if (response.stop_reason === 'max_tokens') {
-        return {
-          report: null,
-          warnings: ['AI の出力が長すぎて途中で切れました。もう一度お試しください。'],
-        };
-      }
-      parsed = response.parsed_output;
-    } catch (error) {
-      return { report: null, warnings: [describeError(error)] };
-    }
-
-    if (parsed === null) {
-      return { report: null, warnings: ['AI の返答を解釈できませんでした。'] };
-    }
-
-    return buildFromAiOutput(parsed);
+    return buildFromAiOutput(result.value);
   }
 }
 
@@ -243,21 +213,4 @@ export function buildFromAiOutput(row: ReportRow): GenerateMonthlyReportOutcome 
     },
     warnings: [],
   };
-}
-
-/** 失敗の理由を本人に見える言葉にする(receipt-ai.ts・diagnosis-ai.ts の describeError() と同じ)。 */
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。しばらくしてから再試行してください。';
-  }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }

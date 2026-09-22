@@ -377,6 +377,7 @@ describe('ClaudeEmailExtractor — 失敗を握り潰さない', () => {
       messages: {
         parse: vi.fn().mockResolvedValue({
           stop_reason: 'end_turn',
+          usage: { input_tokens: 0, output_tokens: 0 },
           parsed_output: { is_card_notification: false, transactions: [] },
         }),
       },
@@ -392,7 +393,11 @@ describe('ClaudeEmailExtractor — 失敗を握り潰さない', () => {
     const { ClaudeEmailExtractor } = await import('@/features/import/email-ai');
     const client = {
       messages: {
-        parse: vi.fn().mockResolvedValue({ stop_reason: 'max_tokens', parsed_output: null }),
+        parse: vi.fn().mockResolvedValue({
+          stop_reason: 'max_tokens',
+          parsed_output: null,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        }),
       },
     };
     const extractor = new ClaudeEmailExtractor('sk-ant-test', client as never);

@@ -6,14 +6,10 @@
  * ここで読み書きするのは DB に置いてよい3列だけ。
  */
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class GmailSettingsStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GmailSettingsStoreError';
-  }
-}
+export class GmailSettingsStoreError extends AppError {}
 
 export type GmailSettings = {
   gmailEnabled: boolean;

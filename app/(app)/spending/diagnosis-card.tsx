@@ -1,15 +1,8 @@
 'use client';
 
 /**
- * AI家計診断(本人発案:「AIの分析が弱い。もっと客観視した分析が必要。
- * 投資家目線で今のが浪費か必要経費なのか判断する機構とそれを分析結果を
- * 蓄積表示改善する機能が必要」、ADR-030)。
- *
- * 押されたときだけ AI を呼ぶ(diagnosis-ai.ts 参照)。今月の内訳・浪費/必要経費
- * それぞれの全件(理由付き)・直近6ヶ月の浪費比率の推移をこのカード1枚に
- * まとめる。上位N件に絞らない(本人発案:「上位5件という必要はなく別に
- * 全文表示すればいい」)——件数が多い月でも、AIの判断根拠を1件も隠さず
- * 全部見せる。
+ * AI家計診断のカード(ADR-030)。押されたときだけ AI を呼ぶ。
+ * 浪費・必要経費どちらも理由付きで全件出す(上位N件に絞らない)。
  */
 
 import { useState } from 'react';
@@ -17,6 +10,7 @@ import { useState } from 'react';
 import { wasteRatioOf } from '@/domain/diagnosis';
 import { formatYen } from '@/domain/money';
 import type { DiagnosedItem, SpendingDiagnosisView } from '@/features/diagnosis/store';
+import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
 import { formatDateJa } from '@/lib/date';
 import { diagnoseSpendingAction } from './actions';
 
@@ -27,6 +21,10 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
   const [warnings, setWarnings] = useState<string[]>([]);
 
   const { summary, wasteItems, necessaryItems, undiagnosedCount } = current;
+  const wasteRatioPoints = view.trend.rows.map((row) => ({
+    monthKey: row.monthKey,
+    ratio: wasteRatioOf(row),
+  }));
 
   const run = async () => {
     setPending(true);
@@ -38,10 +36,7 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
       setError(result.error);
       return;
     }
-    // revalidatePath がサーバー側の props を更新するが、ボタンを押した
-    // その場でも「あと何件」が動いたことだけは分かるようにしておく
-    // (診断件数が減った分を先に引く。実際の内訳・浪費上位はページの
-    // 再取得で追いつく)。
+    // props の更新(revalidatePath)を待たずに残り件数だけ先に動かす。
     setCurrent((prev) => ({
       ...prev,
       undiagnosedCount: Math.max(prev.undiagnosedCount - result.diagnosedCount, 0),
@@ -86,7 +81,7 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
             amountColor="var(--ink)"
           />
 
-          <DiagnosisTrendBars trend={view.trend} />
+          <WasteRatioBars points={wasteRatioPoints} />
         </>
       )}
 
@@ -119,12 +114,7 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
   );
 }
 
-/**
- * 浪費/必要経費の判断理由付き内訳(本人発案:「無駄金ではないと判断された
- * ものについてもなぜそう考えたのか記載してほしい」)。浪費側だけでなく
- * 必要経費側にも同じ形でAIの判断根拠を出すことで、本人が両方向から
- * 検証・反論できるようにする。
- */
+/** 判断理由を添えた内訳。浪費側・必要経費側で同じ形にする。 */
 function DiagnosisItemList({
   heading,
   items,
@@ -160,62 +150,4 @@ function DiagnosisItemList({
       </ul>
     </div>
   );
-}
-
-/**
- * 浪費比率の推移(本人発案:「蓄積して...月ごとの浪費傾向の推移」)。
- * app/(app)/reports/category-trend-chart.tsx と同じ棒グラフの組み方
- * (相対位置のコンテナ+絶対位置の塗り、bottom 基準)。診断していない月は
- * バーを出さない(0%と誤読させない、domain/diagnosis.ts の wasteRatioOf 参照)。
- */
-function DiagnosisTrendBars({ trend }: { trend: SpendingDiagnosisView['trend'] }) {
-  const ratios = trend.rows.map(wasteRatioOf);
-  if (ratios.every((r) => r === null)) return null;
-
-  return (
-    <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-        浪費比率の推移
-      </p>
-      <div className="mt-2 flex h-16 items-end gap-[3px]">
-        {trend.rows.map((row, i) => {
-          const ratio = ratios[i] ?? null;
-          return (
-            <div
-              key={row.monthKey}
-              className="relative h-full flex-1 overflow-hidden rounded-t-[3px]"
-              style={{ background: 'var(--over-track)' }}
-              title={
-                ratio === null
-                  ? `${monthLabel(row.monthKey)}: 未診断`
-                  : `${monthLabel(row.monthKey)}: 浪費 ${Math.round(ratio * 100)}%`
-              }
-            >
-              {ratio !== null ? (
-                <div
-                  className="absolute inset-x-0 bottom-0 rounded-t-[3px]"
-                  style={{ height: `${Math.round(ratio * 100)}%`, background: 'var(--over)' }}
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-1.5 flex gap-[3px]">
-        {trend.rows.map((row) => (
-          <span
-            key={row.monthKey}
-            className="tabular flex-1 text-center text-[10px]"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            {monthLabel(row.monthKey)}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function monthLabel(monthKey: string): string {
-  return `${Number(monthKey.slice(5, 7))}月`;
 }

@@ -16,15 +16,11 @@ import { INCOME_TIP_BANK } from '@/features/briefs/tips';
 import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { formatYen } from '@/domain/money';
 import { todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class BriefStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'BriefStoreError';
-  }
-}
+export class BriefStoreError extends AppError {}
 
 export type GenerateDailyBriefResult = {
   briefId: string;

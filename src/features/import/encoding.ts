@@ -6,6 +6,8 @@
  * 通ってしまうため、気づくのが遅れる。ここで確実に判定する。
  */
 
+import { AppError } from '@/lib/errors';
+
 export type CsvEncoding = 'auto' | 'utf-8' | 'shift_jis' | 'euc-jp';
 
 export type DecodeResult = {
@@ -18,12 +20,7 @@ export type DecodeResult = {
 
 const UTF8_BOM = [0xef, 0xbb, 0xbf];
 
-export class DecodeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DecodeError';
-  }
-}
+export class DecodeError extends AppError {}
 
 /**
  * バイト列を文字列にする。

@@ -7,13 +7,9 @@
  */
 
 import { isValidDayOfMonth } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 
-export class DebtError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DebtError';
-  }
-}
+export class DebtError extends AppError {}
 
 /** 借入先名。空文字・空白のみは拒否する。 */
 export function assertLenderName(value: string): string {

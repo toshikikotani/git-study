@@ -18,7 +18,8 @@ import {
   type StoredTransaction,
   type TransactionSource,
 } from '@/features/transactions/store';
-import { replaceSplits, TransactionSplitStoreError } from '@/features/transactions/splits-store';
+import { replaceSplits } from '@/features/transactions/splits-store';
+import { describeUserError } from '@/lib/errors';
 
 /**
  * レシート商品行から作った分割(本人発案)。呼び出し側(receipt/page.tsx)は
@@ -71,11 +72,7 @@ export async function saveImportBatchAction(
       try {
         await replaceSplits(inserted.id, splits);
       } catch (error) {
-        splitWarnings.push(
-          error instanceof TransactionSplitStoreError
-            ? error.message
-            : '商品ごとの分割を保存できませんでした。',
-        );
+        splitWarnings.push(describeUserError(error, '商品ごとの分割を保存できませんでした。'));
       }
     }
   }
@@ -112,10 +109,7 @@ export async function replaceSplitsAction(
   try {
     await replaceSplits(transactionId, splits);
   } catch (error) {
-    return {
-      error:
-        error instanceof TransactionSplitStoreError ? error.message : '分割の保存に失敗しました。',
-    };
+    return { error: describeUserError(error, '分割の保存に失敗しました。') };
   }
   revalidatePath('/transactions');
   return { error: null };

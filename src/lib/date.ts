@@ -157,6 +157,11 @@ export function formatDateJa(date: DateOnly): string {
   return `${y}年${m}月${d}日`;
 }
 
+/** グラフの軸ラベル用。'2026-09' → 「9月」 */
+export function formatMonthJa(monthKey: string): string {
+  return `${Number(monthKey.slice(5, 7))}月`;
+}
+
 /**
  * 表示用の時刻(JST、'13:40')。ADR-029:画面は一度読み込んだ内容を
  * そのまま保持し、pull-to-refresh でしか最新化しないため、

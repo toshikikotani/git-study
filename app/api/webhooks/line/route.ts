@@ -7,6 +7,7 @@ import { listActiveClassificationRulesForUser } from '@/features/classification/
 import { importLineReceiptAsAdmin } from '@/features/import/line-receipt';
 import { ClaudeReceiptExtractor } from '@/features/import/receipt-ai';
 import { getLineChannelSecret, getLineEnv, getLineReceiptAccountId } from '@/lib/env';
+import { readAnthropicApiKey } from '@/lib/env';
 import { fetchLineImageAsBase64, postLineMessage } from '@/lib/line';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -93,8 +94,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ processed: 0 });
   }
 
-  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicApiKey) {
+  const anthropicApiKey = readAnthropicApiKey();
+  if (anthropicApiKey === null) {
     return NextResponse.json({ skipped: true, reason: 'ANTHROPIC_API_KEY が未設定です' });
   }
 

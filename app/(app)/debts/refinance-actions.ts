@@ -9,25 +9,14 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { assertScenarioName, ScenarioError } from '@/domain/scenario';
-import {
-  createScenario,
-  deleteScenario,
-  ScenarioStoreError,
-  type RepaymentStrategy,
-} from '@/features/scenarios/store';
+import { assertScenarioName } from '@/domain/scenario';
+import { createScenario, deleteScenario, type RepaymentStrategy } from '@/features/scenarios/store';
 import type { DateOnly } from '@/lib/date';
+import { describeUserError } from '@/lib/errors';
 
 export type ScenarioFormState = {
   error: string | null;
 };
-
-function describeError(error: unknown): string {
-  if (error instanceof ScenarioError || error instanceof ScenarioStoreError) {
-    return error.message;
-  }
-  return 'シナリオを保存できませんでした。';
-}
 
 export async function saveRefinanceScenarioAction(
   _prev: ScenarioFormState,
@@ -54,7 +43,7 @@ export async function saveRefinanceScenarioAction(
       totalPaidYen,
     });
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error, 'シナリオを保存できませんでした。') };
   }
   revalidatePath('/debts');
   return { error: null };

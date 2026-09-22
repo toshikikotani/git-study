@@ -23,6 +23,7 @@ import { computeTransferPlan, type PlannableRule } from '@/domain/transfer-rule'
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
 import { nthDayOfMonth, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -51,12 +52,7 @@ export type PaydayChecklistState =
   | { kind: 'needs_amount'; paydayOn: DateOnly }
   | { kind: 'checklist'; run: TransferRun };
 
-export class TransferRunStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransferRunStoreError';
-  }
-}
+export class TransferRunStoreError extends AppError {}
 
 const PAYDAY = 'payday' as const;
 

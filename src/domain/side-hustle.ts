@@ -2,12 +2,9 @@
  * 副業トラッカーの検証と計算(P3-1、FR-40, FR-42)。
  */
 
-export class SideHustleError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SideHustleError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class SideHustleError extends AppError {}
 
 /** プロジェクト名。空文字・空白のみは拒否する。 */
 export function assertProjectName(value: string): string {

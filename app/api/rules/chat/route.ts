@@ -26,6 +26,9 @@ import {
   type ClassificationRuleSummary,
   type CategoryOption,
 } from '@/features/classification/store';
+import { describeAnthropicError } from '@/lib/anthropic';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 
 /**
  * 「ルールをAIに相談する」(新機能、ADR-024)。
@@ -154,10 +157,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'メッセージがありません' }, { status: 400 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return NextResponse.json({
-      reply: 'AIによるルール変更は設定されていません(ANTHROPIC_API_KEY が未設定)。',
+      reply: apiKeyMissingMessage('AIによるルール変更'),
       changes: [],
     });
   }
@@ -225,7 +228,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       anthropicMessages.push({ role: 'user', content: toolResults });
     }
   } catch (error) {
-    return NextResponse.json({ reply: describeError(error), changes });
+    return NextResponse.json({ reply: describeAnthropicError(error), changes });
   }
 
   return NextResponse.json({
@@ -364,17 +367,4 @@ async function runDeleteRule(input: unknown, changes: RuleChange[]): Promise<Too
   await deleteClassificationRule(ruleId);
   changes.push({ kind: 'deleted', ruleName: before.name, detail: before.pattern ?? '' });
   return { message: `ルール「${before.name}」を削除しました。`, isError: false };
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。しばらくしてから再試行してください。';
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }

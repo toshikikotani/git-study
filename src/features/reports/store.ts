@@ -18,14 +18,10 @@ import {
 import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
 import { monthStartJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class ReportStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ReportStoreError';
-  }
-}
+export class ReportStoreError extends AppError {}
 
 const MONTHS_BACK = 6;
 const INCOME_EXPENSE_MONTHS_BACK = 12;

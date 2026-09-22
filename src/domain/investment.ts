@@ -13,6 +13,8 @@
  * app_settings.is_high_risk_unlocked を渡すだけ)。
  */
 
+import { AppError } from '@/lib/errors';
+
 export type InvestmentPlanInput = {
   /** app_settings.monthly_repayment_target_yen。 */
   monthlyRepaymentTargetYen: number;
@@ -63,12 +65,7 @@ export function isFullyPaidOff(debts: readonly { status: DebtLifecycleStatus }[]
   return debts.every((debt) => debt.status !== 'active');
 }
 
-export class InvestmentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InvestmentError';
-  }
-}
+export class InvestmentError extends AppError {}
 
 /** 拠出額(investment_contributions.amount_yen)。`ck_contributions_amount` に合わせ1円以上。 */
 export function assertContributionAmountYen(value: number): number {

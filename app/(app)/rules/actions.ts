@@ -16,7 +16,6 @@ import {
   updateCategory,
   mergeCategory,
   deleteCategory,
-  CategoryStoreError,
   type CategoryInput,
   type CategoryKind,
 } from '@/features/categories/store';
@@ -27,6 +26,7 @@ import {
   moveClassificationRuleUp,
   setClassificationRuleActive,
 } from '@/features/classification/store';
+import { describeUserError } from '@/lib/errors';
 
 export type CategoryFormState = {
   error: string | null;
@@ -58,13 +58,6 @@ function parseCategoryInput(formData: FormData): CategoryInput {
   };
 }
 
-function describeCategoryError(error: unknown): string {
-  if (error instanceof CategoryError || error instanceof CategoryStoreError) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
-
 export async function createCategoryAction(
   _prev: CategoryFormState,
   formData: FormData,
@@ -77,7 +70,7 @@ export async function createCategoryAction(
     }
     await createCategory({ ...input, kind: kindRaw as CategoryKind });
   } catch (error) {
-    return { error: describeCategoryError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/rules');
   revalidatePath('/');
@@ -93,7 +86,7 @@ export async function updateCategoryAction(
     const input = parseCategoryInput(formData);
     await updateCategory(id, input);
   } catch (error) {
-    return { error: describeCategoryError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/rules');
   revalidatePath('/');
@@ -112,7 +105,7 @@ export async function mergeCategoryAction(
   try {
     await mergeCategory(id, mergedIntoId);
   } catch (error) {
-    return { error: describeCategoryError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/rules');
   revalidatePath('/');
@@ -123,7 +116,7 @@ export async function deleteCategoryAction(id: string): Promise<{ error: string 
   try {
     await deleteCategory(id);
   } catch (error) {
-    return { error: describeCategoryError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/rules');
   revalidatePath('/');

@@ -256,6 +256,7 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
       messages: {
         parse: vi.fn().mockResolvedValue({
           stop_reason: 'end_turn',
+          usage: { input_tokens: 0, output_tokens: 0 },
           parsed_output: { is_receipt: false, transactions: [] },
         }),
       },
@@ -271,7 +272,11 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
     const { ClaudeReceiptExtractor } = await import('@/features/import/receipt-ai');
     const client = {
       messages: {
-        parse: vi.fn().mockResolvedValue({ stop_reason: 'max_tokens', parsed_output: null }),
+        parse: vi.fn().mockResolvedValue({
+          stop_reason: 'max_tokens',
+          parsed_output: null,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        }),
       },
     };
     const extractor = new ClaudeReceiptExtractor('sk-ant-test', client as never);
@@ -285,6 +290,7 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
     const { ClaudeReceiptExtractor } = await import('@/features/import/receipt-ai');
     const parse = vi.fn().mockResolvedValue({
       stop_reason: 'end_turn',
+      usage: { input_tokens: 0, output_tokens: 0 },
       parsed_output: {
         is_receipt: true,
         transactions: [

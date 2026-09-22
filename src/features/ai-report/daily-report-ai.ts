@@ -1,27 +1,15 @@
 /**
- * AI日次レポートの生成(本人発案「日次レポートと月次レポートどっちも出力
- * できるように」、ADR-032)。
+ * AI日次レポートの生成(ADR-032)。今日の支出を今月の平均と比べて気づきと
+ * アドバイスを作る。
  *
- * ── なぜ persona_type(浪費傾向のタイプ)を持たないか ──────────────
- * ai_monthly_reports(ADR-031)は1ヶ月分の蓄積データからタイプを判定する。
- * 1日分のデータだけでタイプ判定をすると、たまたまその日に外食が重なった
- * だけで「衝動買い型」に振れる等、判定がぶれやすくノイズが大きい。タイプ
- * 判定は月次レポートに一本化し、日次レポートは今日の気づきとアドバイスに
- * 絞る。
- *
- * ── なぜ本人操作でだけ呼ぶのか ──────────────────────────────────
- * monthly-report-ai.ts と同じ考え方。
- *
- * ── モデルは Sonnet ────────────────────────────────────────────
- * 今日の支出を月内の典型的な1日と比べて意味のある気づきを書く必要があり、
- * 単純な分類ではなく推論寄りのタスクのため monthly-report-ai.ts と同じ
- * 判断で Sonnet を使う(呼び出し自体は本人操作でしか発生しないため、
- * 頻度によるコスト増はボタン連打を除けば無い)。
+ * 浪費傾向のタイプ判定は持たない——1日分ではその日の偏りで判定がぶれるため、
+ * 月次レポート(ADR-031)に一本化している。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+
+import { parseStructured } from '@/lib/anthropic';
 
 /** レポート生成に使うモデル(ADR-032)。日付サフィックスは付けない。 */
 export const DAILY_REPORT_MODEL = 'claude-sonnet-5';
@@ -102,32 +90,18 @@ export class ClaudeDailyReportAnalyzer implements DailyReportAnalyzer {
   }
 
   async generate(input: DailyReportInput): Promise<GenerateDailyReportOutcome> {
-    let parsed: ReportRow | null;
-    try {
-      const response = await this.client.messages.parse({
-        model: DAILY_REPORT_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserContent(input) }],
-        output_config: { format: zodOutputFormat(reportSchema) },
-      });
+    const result = await parseStructured({
+      client: this.client,
+      model: DAILY_REPORT_MODEL,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildUserContent(input) }],
+      schema: reportSchema,
+      hints: { truncated: 'もう一度お試しください。' },
+    });
+    if (!result.ok) return { report: null, warnings: [result.message] };
 
-      if (response.stop_reason === 'max_tokens') {
-        return {
-          report: null,
-          warnings: ['AI の出力が長すぎて途中で切れました。もう一度お試しください。'],
-        };
-      }
-      parsed = response.parsed_output;
-    } catch (error) {
-      return { report: null, warnings: [describeError(error)] };
-    }
-
-    if (parsed === null) {
-      return { report: null, warnings: ['AI の返答を解釈できませんでした。'] };
-    }
-
-    return buildFromAiOutput(parsed);
+    return buildFromAiOutput(result.value);
   }
 }
 
@@ -185,21 +159,4 @@ export function buildFromAiOutput(row: ReportRow): GenerateDailyReportOutcome {
     },
     warnings: [],
   };
-}
-
-/** 失敗の理由を本人に見える言葉にする(monthly-report-ai.ts の describeError() と同じ)。 */
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。しばらくしてから再試行してください。';
-  }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }

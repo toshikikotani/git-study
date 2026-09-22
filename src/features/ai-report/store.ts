@@ -1,21 +1,10 @@
 /**
- * AI月次・日次レポート(ai_monthly_reports・ai_daily_reports)のデータアクセス
- * (本人発案「AI関連もっと増やしたい」「日次レポートと月次レポートどっちも
- * 出力できるように」、ADR-031/ADR-032)。
+ * AI月次・日次レポートのデータアクセス(ADR-031/ADR-032)。
  *
- * `ai_monthly_reports`/`ai_daily_reports` は本番 Supabase へのマイグレーション
- * 適用手段がこのセッションに無く(T-25/T-26/B-7/B-10/B-12/B-13 と同じ制約)
- * 未適用のため、読み取りはテーブル未作成のエラー(PGRST205)を「レポートは
- * まだ無い」として握り潰す(goals・transaction_diagnoses と同じ考え方。
- * 適用後は自動的に効き始める)。一方 save*Report() は本人の明示的な操作
- * (「レポートを作る」ボタン)の結果なので握り潰さず、分かりやすいメッセージに
- * してそのままエラーとして返す。
- *
- * 入力データ(load*ReportInput)は既存の store 層(spending・diagnosis・home)を
- * そのまま呼び出して組み立てるだけで、新しい集計クエリは増やさない。
+ * 入力は既存の store 層(spending・diagnosis・home)を呼ぶだけで、集計クエリを
+ * 増やさない。両テーブルは本番未適用(B-14/B-15)。未適用時の扱いは
+ * lib/supabase/errors.ts。
  */
-
-import type { PostgrestError } from '@supabase/supabase-js';
 
 import { wasteRatioOf } from '@/domain/diagnosis';
 import type { SpendingPersonaType } from '@/domain/persona';
@@ -23,20 +12,13 @@ import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { loadHomeSummary } from '@/features/home/summary';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { monthStartJst, todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
+import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { DailyReportInput } from './daily-report-ai';
 import { MAX_ITEMS_PER_LIST, type MonthlyReportInput } from './monthly-report-ai';
 
-export class AiReportStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AiReportStoreError';
-  }
-}
-
-function isMissingTableError(error: Pick<PostgrestError, 'code'>): boolean {
-  return error.code === 'PGRST205';
-}
+export class AiReportStoreError extends AppError {}
 
 /**
  * 今月分のレポート入力データを組み立てる。既存の store 層(家計簿・診断・

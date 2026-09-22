@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -30,12 +31,7 @@ export type AppSettings = {
   sideIncomeRepaymentRatio: number;
 };
 
-export class SettingsStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SettingsStoreError';
-  }
-}
+export class SettingsStoreError extends AppError {}
 
 /**
  * 本人設定を1件取得する(管理クライアント版)。

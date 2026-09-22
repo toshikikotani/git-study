@@ -1,35 +1,23 @@
 /**
- * 明細の複数カテゴリ分割のデータアクセス(本人発案)。
+ * 明細の複数カテゴリ分割のデータアクセス。合計の検証は
+ * domain/transaction-splits.ts の純粋関数が担う。
  *
- * 判断(合計が一致するか)は domain/transaction-splits.ts の純粋関数に任せ、
- * ここでは「DB から何を読むか」「DB へどう書くか」だけを担う
- * (features/alerts/store.ts と同じ分離)。
- *
- * `transaction_splits` は本番 Supabase へのマイグレーション適用手段がこの
- * セッションに無く(T-25/T-26/B-7 と同じ制約)未適用のため、毎回の画面表示・
- * 集計で無条件に読む2関数(listSplitsForDisplay/listSplitsForTransactionIds)は
- * テーブル未作成のエラー(PGRST205)を「分割は無い」として握り潰す
- * (rescued_emails/net_worth_snapshots と同じ考え方。適用後は自動的に効き始める)。
- * 一方 replaceSplits() は本人が明示的に押した保存操作なので握り潰さず、
- * 分かりやすいメッセージにしてそのままエラーとして返す。
+ * `transaction_splits` は本番未適用(B-7)。未適用時の扱いは lib/supabase/errors.ts。
  */
 
-import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
   assertValidSplits,
   TransactionSplitError,
   type TransactionSplitInput,
 } from '@/domain/transaction-splits';
+import { AppError } from '@/lib/errors';
+import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class TransactionSplitStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransactionSplitStoreError';
-  }
-}
+export class TransactionSplitStoreError extends AppError {}
 
 export type TransactionSplit = {
   id: string;
@@ -38,10 +26,6 @@ export type TransactionSplit = {
   amountYen: number;
   note: string | null;
 };
-
-function isMissingTableError(error: Pick<PostgrestError, 'code'>): boolean {
-  return error.code === 'PGRST205';
-}
 
 /**
  * 分割をまるごと置き換える(既存の全行を削除し、新しい内容で作り直す)。

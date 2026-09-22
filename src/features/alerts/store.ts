@@ -47,15 +47,11 @@ import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
 import { addDays, daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class AlertStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AlertStoreError';
-  }
-}
+export class AlertStoreError extends AppError {}
 
 /**
  * 候補を alerts へ積む(admin client 版)。重複(同じ dedup_key)は静かに無視する。

@@ -21,18 +21,16 @@ import { buildLearnedRule, type ClassificationRule } from '@/features/classifica
 import { buildRuleMisfireAlert, isMisfiringRule } from '@/domain/alerts';
 import { recordAlertsAsAdmin } from '@/features/alerts/store';
 import { getAppSettings } from '@/features/settings/store';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type CategoryOption = { id: string; code: string; name: string };
 
-export class ClassificationStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ClassificationStoreError';
-  }
-}
+export class ClassificationStoreError extends AppError {}
 
 /** 有効なカテゴリ。AI へは code + name のみ渡す(ADR-016)。 */
 export async function listCategoryOptions(): Promise<CategoryOption[]> {
@@ -81,11 +79,11 @@ export async function classifyUnclassified(
 ): Promise<{ results: ClassifyResult[]; warnings: string[] }> {
   if (rows.length === 0) return { results: [], warnings: [] };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return {
       results: rows.map((row) => unclassified(row.id)),
-      warnings: ['AI による分類は設定されていません(ANTHROPIC_API_KEY が未設定)。'],
+      warnings: [apiKeyMissingMessage('AI による分類')],
     };
   }
 
