@@ -10,16 +10,13 @@
  * 文字(絵文字)で表現する。
  */
 
+import { AppError } from '@/lib/errors';
+
 const LINE_PUSH_MESSAGE_URL = 'https://api.line.me/v2/bot/message/push';
 /** メッセージに添付されたファイル本体を取得するAPI(画像・音声等、ホストが別)。 */
 const LINE_CONTENT_API_BASE = 'https://api-data.line.me/v2/bot/message';
 
-export class LineSendError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'LineSendError';
-  }
-}
+export class LineSendError extends AppError {}
 
 /**
  * 受信した画像メッセージの中身を取得する(レシート画像の自動取り込み、本人発案)。

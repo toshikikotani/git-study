@@ -10,13 +10,9 @@
  */
 
 import { daysBetween, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 
-export class GoalError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoalError';
-  }
-}
+export class GoalError extends AppError {}
 
 /** 目標のタイトル。空文字・空白のみは拒否する。 */
 export function assertGoalTitle(value: string): string {

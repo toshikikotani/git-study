@@ -13,15 +13,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { isLastDayOfMonth } from '@/domain/alerts';
 import { totalInvestmentValueAsOf, type InvestmentSnapshotPoint } from '@/domain/investment';
 import { addDays, todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class NetWorthStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NetWorthStoreError';
-  }
-}
+export class NetWorthStoreError extends AppError {}
 
 /**
  * 月末にだけ、当月分の資産スナップショットを記録する。月末以外は何もしない

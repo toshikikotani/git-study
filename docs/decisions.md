@@ -866,6 +866,45 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
+## ADR-033:重複していた「同じ考慮」を1箇所へ集約し、コードのコメントはADRへの参照に留める(本人発案)
+
+**背景**:本人から「プロジェクト全体をリファクタリングしてください。影響範囲を最小に関数の分離ファイル分割移動。コメントを最小限にする。重複を一切なくす(名前の概念は重複させ、同じ概念は同じ言葉)シーケンスを整理し、同じ考慮を2回しない」という指示。34,000行を調べ、機械的に同型な重複を洗い出した結果、次の5種が見つかった。
+
+| 重複 | 箇所数 | 集約先 |
+|---|---|---|
+| 例外クラスの本体(`super(message)` + `this.name`)| 63 | `src/lib/errors.ts` の `AppError` |
+| 想定内エラー→本人向け文言の変換 | 13 | 同 `describeUserError()` |
+| Anthropic の失敗を日本語にする `describeError` | 7 | `src/lib/anthropic.ts` の `describeAnthropicError()` |
+| 構造化出力の3つの考慮(API失敗 / max_tokens で切れた / 解釈できない)| 6 | 同 `parseStructured()` |
+| テーブル未作成(PGRST205)の判定 | 4 | `src/lib/supabase/errors.ts` |
+| `ANTHROPIC_API_KEY` の未設定判定と文言 | 8 | `readAnthropicApiKey()` / `apiKeyMissingMessage()` |
+| 月ラベル `'2026-09'→「9月」` | 4 | `src/lib/date.ts` の `formatMonthJa()` |
+| 浪費比率の棒グラフ / 箇条書き | 各2 | `src/components/ui/` の `WasteRatioBars` / `BulletList` |
+| AIレポートの Server Action の手順 | 2 | `runReportAction()`(`/reports/ai/actions.ts` 内の非公開関数)|
+
+**決定**
+
+1. **例外は `AppError` を継承する**。`name` は `new.target.name` が入れるため各クラスは1行で済む(`export class GoalStoreError extends AppError {}`)。`instanceof` による判定は今までどおり効く。これにより「この例外の message は本人に見せてよい」という約束が型で表せるようになり、Server Action 側は `describeUserError(error, fallback)` 一本で済む——以前は各画面が自分の例外クラスを列挙していた(列挙漏れが起きても気づけない形だった)。
+2. **同じ言葉を同じ概念に割り当てる**。`describeError` という名前が「Anthropic の失敗」「ドメイン例外」「Google API の応答」の3つに使われていたため、`describeAnthropicError` / `describeUserError` に分け、Google 側はモジュール内の局所関数のままにした。
+3. **AI呼び出しは「渡す内容」と「失敗の見せ方」だけを機能側に残す**。`parseStructured()` が構造化出力の3つの失敗を判定し、文言の末尾に足す一言(次の一手)だけを `hints` で受ける。トークン使用量は応答が返った場合に限り失敗側でも返す(分類機能が課金記録に使うため)。
+4. **コードのコメントは1〜3行に抑え、経緯は ADR に置く**。同じ経緯説明が4つのストアに書き写されていた(未適用テーブルの扱い)。説明は集約先の1箇所に置き、各ファイルは「本番未適用(B-xx)。扱いは lib/supabase/errors.ts」の1行参照にした。要求仕様や本人の発言の引用も、ADR と TASKS.md に既にあるためコードからは外した。
+
+**振る舞いを変えた点**(意図的、いずれも表示文言の統一)
+
+- `/job-change` の保存失敗時、想定外の例外で生の `error.message` を出していたのを、他画面と同じ「保存に失敗しました。入力内容を確認してください。」に揃えた。
+- AI相談(`/advisor`)の切れた・解釈できない時の文言が「AIの返答〜」と独自だったのを、他のAI機能と同じ「AI の出力が長すぎて〜」「AI の返答を解釈できませんでした。」に揃えた。
+- 分類バッチの切れた時の文言の括弧位置が変わった(`…切れました(30件のバッチ)。` → `…切れました。(30件のバッチ)`)。
+- `env.ts` の未使用だった `getAnthropicApiKey()`(未設定なら例外)を削除し、実際に使われている「未設定なら null」の `readAnthropicApiKey()` に置き換えた。生の `process.env.ANTHROPIC_API_KEY` 読みは無くなった。
+
+**却下した選択肢**
+
+- **`messages.parse` の呼び出しごと共通化する**:レシートは画像ブロック、相談は会話履歴、ルール相談は tool use と、渡す内容の形が違う。共通化できるのは失敗の判定だけで、呼び出し自体をまとめると不自然な引数の束になるため、そこまでは寄せなかった。
+- **カードの見た目(`rounded-2xl p-4` + `--surface` + `--card-shadow`、27箇所)を1コンポーネントに寄せる**:既存の `Card`(`p-5`・`--radius-lg`・`--shadow-1`)とは実際に別の見た目で、寄せると表示が変わる。ロジックの集約と同じ変更に混ぜると差分が読めなくなるため、この回は手を付けていない(残っている既知の重複)。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(727件全通過)/`npx next build`/`scripts/verify-migrations.sh`(1025項目一致)すべて成功。99ファイル・純減856行。**未検証**:本番での実機確認(このセッションには本人の実アカウントでログインする手段が無い)。振る舞いを変えた点は上記4件に限られ、いずれも表示文言の統一であることをコード上で確認している。
+
+---
+
 ## 未決のまま残す事項
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。

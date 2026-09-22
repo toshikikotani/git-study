@@ -147,9 +147,13 @@ export function getCronSecret(): string {
   return parseOrThrow(cronSecretSchema, process.env.CRON_SECRET, 'CRON_SECRET');
 }
 
-/** 明細分類・朝配信の生成(ADR-010)。 */
-export function getAnthropicApiKey(): string {
-  return parseOrThrow(anthropicApiKeySchema, process.env.ANTHROPIC_API_KEY, 'ANTHROPIC_API_KEY');
+/**
+ * 明細分類・レシート読取・相談・診断・レポートの生成(ADR-010)。
+ * 未設定でもアプリは動く(AI機能だけ無効)ため、投げずに null を返す。
+ */
+export function readAnthropicApiKey(): string | null {
+  const value = process.env.ANTHROPIC_API_KEY;
+  return value === undefined || value === '' ? null : value;
 }
 
 /** 通知・朝配信の送信先(ADR-002)。 */

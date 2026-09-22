@@ -1,18 +1,12 @@
 'use client';
 
-/**
- * AI月次レポート(本人発案:「AI関連もっと増やしたい。もっと画期的な機能
- * ない?」「日次レポートと月次レポートどっちも出力できるように...性格の
- * 特定もお願いしたい」、ADR-031)。まずは月次レポートから作る(日次は次段階)。
- *
- * 押されたときだけ AI を呼ぶ(monthly-report-ai.ts 参照)。浪費傾向のタイプ・
- * 実データに基づく気づき・行動面のアドバイスをこのカード1枚にまとめる。
- * 医学的な診断やホルモン等の身体的な断定は出さない(本人の明示的な要望)。
- */
+/** AI月次レポートのカード(ADR-031)。押されたときだけ AI を呼ぶ。 */
 
 import { useState } from 'react';
 
+import { BulletList } from '@/components/ui/bullet-list';
 import { ProgressGauge } from '@/components/ui/meter';
+import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
 import { formatYen } from '@/domain/money';
 import { SPENDING_PERSONA_DESCRIPTIONS, SPENDING_PERSONA_LABELS } from '@/domain/persona';
 import type { MonthlyAiReportView } from '@/features/ai-report/store';
@@ -24,6 +18,10 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const { input } = view;
+  const wasteRatioPoints = input.wasteRatioTrend.map((row) => ({
+    monthKey: row.monthKey,
+    ratio: row.wasteRatio,
+  }));
 
   const run = async () => {
     setPending(true);
@@ -73,12 +71,12 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
             </p>
           </div>
 
-          <ItemList heading="気づき" items={report.insights} />
-          <ItemList heading="アドバイス" items={report.advice} />
+          <BulletList heading="気づき" items={report.insights} />
+          <BulletList heading="アドバイス" items={report.advice} />
         </>
       )}
 
-      <WasteRatioTrendChart trend={input.wasteRatioTrend} />
+      <WasteRatioBars points={wasteRatioPoints} />
 
       <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
         <div className="flex items-baseline justify-between gap-3">
@@ -126,81 +124,4 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
       ) : null}
     </div>
   );
-}
-
-function ItemList({ heading, items }: { heading: string; items: readonly string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-        {heading}
-      </p>
-      <ul className="mt-1.5 space-y-1.5">
-        {items.map((item, i) => (
-          <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            ・{item}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/**
- * 浪費比率の推移(app/(app)/spending/diagnosis-card.tsx の DiagnosisTrendBars
- * と同じ組み方)。診断していない月はバーを出さない(0%と誤読させない)。
- */
-function WasteRatioTrendChart({
-  trend,
-}: {
-  trend: readonly { monthKey: string; wasteRatio: number | null }[];
-}) {
-  if (trend.every((row) => row.wasteRatio === null)) return null;
-
-  return (
-    <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-        浪費比率の推移
-      </p>
-      <div className="mt-2 flex h-16 items-end gap-[3px]">
-        {trend.map((row) => (
-          <div
-            key={row.monthKey}
-            className="relative h-full flex-1 overflow-hidden rounded-t-[3px]"
-            style={{ background: 'var(--over-track)' }}
-            title={
-              row.wasteRatio === null
-                ? `${monthLabel(row.monthKey)}: 未診断`
-                : `${monthLabel(row.monthKey)}: 浪費 ${Math.round(row.wasteRatio * 100)}%`
-            }
-          >
-            {row.wasteRatio !== null ? (
-              <div
-                className="absolute inset-x-0 bottom-0 rounded-t-[3px]"
-                style={{
-                  height: `${Math.round(row.wasteRatio * 100)}%`,
-                  background: 'var(--over)',
-                }}
-              />
-            ) : null}
-          </div>
-        ))}
-      </div>
-      <div className="mt-1.5 flex gap-[3px]">
-        {trend.map((row) => (
-          <span
-            key={row.monthKey}
-            className="tabular flex-1 text-center text-[10px]"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            {monthLabel(row.monthKey)}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function monthLabel(monthKey: string): string {
-  return `${Number(monthKey.slice(5, 7))}月`;
 }

@@ -17,17 +17,13 @@ import {
   type CategoryMergeNode,
 } from '@/domain/category';
 import { monthStartJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { CategoryMonthDetail } from './category-detail-types';
 
 export type { CategoryMonthDetail, CategoryTransactionDetail } from './category-detail-types';
 
-export class CategoryDetailError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CategoryDetailError';
-  }
-}
+export class CategoryDetailError extends AppError {}
 
 /**
  * 当月・1カテゴリ分の内訳を返す。カテゴリが存在しない・本人のものでない

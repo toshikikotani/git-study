@@ -6,12 +6,9 @@
  * `app/api/rules/chat/route.ts` が Supabase・Anthropic の両方に触れる薄い層になる。
  */
 
-export class ChatToolError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ChatToolError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class ChatToolError extends AppError {}
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 

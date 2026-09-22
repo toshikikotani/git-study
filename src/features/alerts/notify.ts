@@ -26,6 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AlertSeverity } from '@/domain/alerts';
 import { postDiscordEmbed, type DiscordEmbed } from '@/lib/discord';
 import type { NotificationChannels } from '@/lib/env';
+import { AppError } from '@/lib/errors';
 import { postLineMessage } from '@/lib/line';
 import type { Database } from '@/lib/supabase/types';
 
@@ -68,12 +69,7 @@ export function buildLineTextForAlert(alert: {
   return alert.body ? `${heading}\n${alert.body}` : heading;
 }
 
-export class NotifyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NotifyError';
-  }
-}
+export class NotifyError extends AppError {}
 
 export type SendPendingAlertsResult = {
   sentCount: number;

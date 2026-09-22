@@ -29,8 +29,10 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+
+import { parseStructured } from '@/lib/anthropic';
+import { AppError } from '@/lib/errors';
 
 /** 分類に使う既定モデル。日付サフィックスは付けない(ADR-010)。 */
 export const DEFAULT_CLASSIFICATION_MODEL = 'claude-haiku-4-5';
@@ -100,12 +102,7 @@ const SYSTEM_PROMPT = [
   '- 入力した明細と同じ順序・同じ件数で必ず返す。1件も飛ばさない',
 ].join('\n');
 
-export class AiClassificationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AiClassificationError';
-  }
-}
+export class AiClassificationError extends AppError {}
 
 /**
  * Claude を使う実装。サーバー側でのみ生成すること(NFR-04)。
@@ -163,45 +160,24 @@ export class ClaudeTransactionClassifier {
 
     const maxTokens = Math.max(MIN_OUTPUT_TOKENS, transactions.length * OUTPUT_TOKENS_PER_ITEM);
 
-    let response;
-    try {
-      response = await this.client.messages.parse({
-        model,
-        max_tokens: maxTokens,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserMessage(transactions, categories) }],
-        output_config: { format: zodOutputFormat(batchSchema) },
-      });
-    } catch (error) {
-      return {
-        classifications: [],
-        warnings: [describeError(error)],
-        inputTokens: 0,
-        outputTokens: 0,
-      };
-    }
+    const result = await parseStructured({
+      client: this.client,
+      model,
+      maxTokens,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildUserMessage(transactions, categories) }],
+      schema: batchSchema,
+      hints: {
+        truncated: `(${transactions.length}件のバッチ)`,
+        rateLimit: '次回のジョブで再試行します。',
+      },
+    });
 
-    const usage = {
-      inputTokens: response.usage.input_tokens ?? 0,
-      outputTokens: response.usage.output_tokens,
-    };
-
-    if (response.stop_reason === 'max_tokens') {
-      return {
-        classifications: [],
-        warnings: [`AI の出力が長すぎて途中で切れました(${transactions.length}件のバッチ)。`],
-        ...usage,
-      };
+    const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
+    if (!result.ok) {
+      return { classifications: [], warnings: [result.message], ...usage };
     }
-
-    const parsed = response.parsed_output;
-    if (parsed === null) {
-      return {
-        classifications: [],
-        warnings: ['AI の返答を解釈できませんでした。'],
-        ...usage,
-      };
-    }
+    const parsed = result.value;
 
     if (parsed.classifications.length !== transactions.length) {
       return {
@@ -253,22 +229,6 @@ function buildUserMessage(
     `明細(${transactions.length}件、この順序のまま同じ件数で返すこと):`,
     transactionLines,
   ].join('\n');
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。次回のジョブで再試行します。';
-  }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }
 
 /**

@@ -7,17 +7,16 @@
 import { revalidatePath } from 'next/cache';
 
 import { assertAmountShape, assertRuleName, TransferRuleError } from '@/domain/transfer-rule';
-import { MoneyError } from '@/domain/money';
 import {
   createTransferRule,
   deleteTransferRule,
   moveTransferRuleDown,
   moveTransferRuleUp,
   updateTransferRule,
-  TransferRuleStoreError,
   type AmountType,
   type TransferRuleInput,
 } from '@/features/transfer-rules/store';
+import { describeUserError } from '@/lib/errors';
 
 export type TransferRuleFormState = {
   error: string | null;
@@ -55,17 +54,6 @@ function parseTransferRuleInput(formData: FormData): TransferRuleInput {
   };
 }
 
-function describeError(error: unknown): string {
-  if (
-    error instanceof TransferRuleError ||
-    error instanceof MoneyError ||
-    error instanceof TransferRuleStoreError
-  ) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
-
 export async function createTransferRuleAction(
   _prev: TransferRuleFormState,
   formData: FormData,
@@ -74,7 +62,7 @@ export async function createTransferRuleAction(
     const input = parseTransferRuleInput(formData);
     await createTransferRule(input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/payday');
   return { error: null };
@@ -89,7 +77,7 @@ export async function updateTransferRuleAction(
     const input = parseTransferRuleInput(formData);
     await updateTransferRule(id, input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/payday');
   return { error: null };

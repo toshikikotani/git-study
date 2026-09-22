@@ -3,13 +3,9 @@
  */
 
 import { isValidDayOfMonth } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 
-export class AccountError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AccountError';
-  }
-}
+export class AccountError extends AppError {}
 
 /** 口座名。空文字・空白のみは拒否する。 */
 export function assertAccountName(value: string): string {

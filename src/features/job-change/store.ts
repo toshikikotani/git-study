@@ -8,6 +8,7 @@
  */
 
 import { todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -24,12 +25,7 @@ export type Milestone = {
   note: string | null;
 };
 
-export class JobChangeStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'JobChangeStoreError';
-  }
-}
+export class JobChangeStoreError extends AppError {}
 
 function fromRow(row: {
   id: string;

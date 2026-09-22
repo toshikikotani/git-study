@@ -14,32 +14,20 @@ import {
   assertProductName,
   assertSnapshotCostBasisYen,
   assertSnapshotValueYen,
-  InvestmentError,
 } from '@/domain/investment';
-import { MoneyError, parseYen } from '@/domain/money';
+import { parseYen } from '@/domain/money';
 import {
   createInvestmentContribution,
   upsertInvestmentSnapshot,
-  InvestmentStoreError,
   type InvestmentContributionInput,
   type InvestmentSnapshotInput,
 } from '@/features/investments/store';
 import { assertDateOnly } from '@/lib/date';
+import { describeUserError } from '@/lib/errors';
 
 export type InvestmentFormState = {
   error: string | null;
 };
-
-function describeError(error: unknown): string {
-  if (
-    error instanceof InvestmentError ||
-    error instanceof InvestmentStoreError ||
-    error instanceof MoneyError
-  ) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
 
 function parseContributionInput(formData: FormData): InvestmentContributionInput {
   const contributedOn = assertDateOnly(String(formData.get('contributedOn') ?? ''));
@@ -64,7 +52,7 @@ export async function createContributionAction(
     const input = parseContributionInput(formData);
     await createInvestmentContribution(input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/investments');
   return { error: null };
@@ -92,7 +80,7 @@ export async function upsertSnapshotAction(
     const input = parseSnapshotInput(formData);
     await upsertInvestmentSnapshot(input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/investments');
   return { error: null };

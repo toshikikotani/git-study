@@ -12,6 +12,7 @@ import { formatYen } from '@/domain/money';
 import { totalSpending, type PeriodTransaction } from '@/domain/payday-period';
 import { reconcileTotals, type BillingPeriod } from '@/domain/statement-reconciliation';
 import { recordAlerts } from '@/features/alerts/store';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
 export type ReconciliationInput = {
@@ -29,12 +30,7 @@ export type ReconciliationResult = {
   hasDiscrepancy: boolean;
 };
 
-export class ReconciliationStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ReconciliationStoreError';
-  }
-}
+export class ReconciliationStoreError extends AppError {}
 
 export async function reconcileAccountStatement(
   input: ReconciliationInput,

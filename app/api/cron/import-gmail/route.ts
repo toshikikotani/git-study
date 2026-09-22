@@ -11,6 +11,7 @@ import { syncFromMailbox } from '@/features/import/mail-sync';
 import { recordRescuedEmailAsAdmin } from '@/features/import/rescue-store';
 import { getCronSecret, getGmailEnv, getGmailImportAccountId } from '@/lib/env';
 import { addDays, todayJst } from '@/lib/date';
+import { readAnthropicApiKey } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -119,7 +120,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const learnedRules = await listActiveClassificationRulesForUser(admin, user.id);
   const rules = [...DEFAULT_DETECTION_RULES, ...learnedRules];
 
-  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  const anthropicApiKey = readAnthropicApiKey() ?? undefined;
   const since = settings.gmail_last_synced_on ?? addDays(todayJst(), -INITIAL_LOOKBACK_DAYS);
 
   const source = new ImapMailSource({

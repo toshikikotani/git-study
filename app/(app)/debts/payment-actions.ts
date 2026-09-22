@@ -7,19 +7,13 @@
 import { revalidatePath } from 'next/cache';
 
 import { MoneyError, assertYen, parseYen } from '@/domain/money';
-import { DebtPaymentStoreError, recordDebtPayment } from '@/features/debts/payments-store';
+import { recordDebtPayment } from '@/features/debts/payments-store';
 import { assertDateOnly } from '@/lib/date';
+import { describeUserError } from '@/lib/errors';
 
 export type DebtPaymentFormState = {
   error: string | null;
 };
-
-function describeError(error: unknown): string {
-  if (error instanceof MoneyError || error instanceof DebtPaymentStoreError) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
 
 export async function recordDebtPaymentAction(
   debtId: string,
@@ -36,7 +30,7 @@ export async function recordDebtPaymentAction(
 
     await recordDebtPayment(debtId, { paidOn, amountYen, note: noteRaw === '' ? null : noteRaw });
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/debts');
   return { error: null };

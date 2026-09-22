@@ -1,16 +1,8 @@
 /**
- * 支出診断(transaction_diagnoses)のデータアクセス(本人発案、ADR-030)。
+ * 支出診断(transaction_diagnoses)のデータアクセス(ADR-030)。
  *
- * `transaction_diagnoses` は本番 Supabase へのマイグレーション適用手段が
- * このセッションに無く(T-25/T-26/B-7/B-10/B-12 と同じ制約)未適用のため、
- * 毎回無条件に読む loadSpendingDiagnosisView() はテーブル未作成のエラー
- * (PGRST205)を「診断はまだ無い」として握り潰す(goals・transaction_splits
- * と同じ考え方。適用後は自動的に効き始める)。一方 saveDiagnoses() は
- * 本人の明示的な操作(診断ボタン)の結果なので握り潰さず、分かりやすい
- * メッセージにしてそのままエラーとして返す。
+ * `transaction_diagnoses` は本番未適用(B-13)。未適用時の扱いは lib/supabase/errors.ts。
  */
-
-import type { PostgrestError } from '@supabase/supabase-js';
 
 import { isCountable } from '@/domain/budget';
 import {
@@ -22,18 +14,11 @@ import {
   type SpendingVerdict,
 } from '@/domain/diagnosis';
 import { monthStartJst, todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
+import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class DiagnosisStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DiagnosisStoreError';
-  }
-}
-
-function isMissingTableError(error: Pick<PostgrestError, 'code'>): boolean {
-  return error.code === 'PGRST205';
-}
+export class DiagnosisStoreError extends AppError {}
 
 /** 1回の「診断する」で処理する上限。診断1件ごとに理由文を書かせるため、
  * 増やしすぎると出力が長くなり max_tokens に達しやすい
@@ -163,14 +148,9 @@ export type DiagnosedItem = {
 export type SpendingDiagnosisView = {
   currentMonth: {
     summary: DiagnosisSummary;
-    /** 今月「浪費」と診断された明細、金額の大きい順、全件(本人発案「上位5件という必要はなく別に全文表示すればいい」)。 */
+    /** 今月「浪費」と診断された明細、金額の大きい順、全件。 */
     wasteItems: readonly DiagnosedItem[];
-    /**
-     * 今月「必要経費」と診断された明細、金額の大きい順、全件(本人発案
-     * 「無駄金ではないと判断されたものについてもなぜそう考えたのか記載して
-     * ほしい」)。浪費側だけでなく必要経費側にも理由を添えることで、AIの
-     * 判断根拠を両方向から検証できるようにする。
-     */
+    /** 今月「必要経費」と診断された明細、金額の大きい順、全件。理由も添える。 */
     necessaryItems: readonly DiagnosedItem[];
     /** 今月、まだ診断していない支出の件数。0 なら「診断する」ボタンは不要。 */
     undiagnosedCount: number;

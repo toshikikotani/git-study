@@ -15,6 +15,7 @@
  */
 
 import type { PaymentMethod } from '@/features/import/adapters';
+import { AppError } from '@/lib/errors';
 
 export type RuleMatchType = 'keyword' | 'regex' | 'exact' | 'amount_range' | 'merchant';
 
@@ -61,12 +62,7 @@ export type Classification = {
   appliedRuleIds: string[];
 };
 
-export class RuleError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RuleError';
-  }
-}
+export class RuleError extends AppError {}
 
 /**
  * FR-21 の検知ルール(seed_defaults が投入するものと同じ定義。docs/schema.sql §8)。

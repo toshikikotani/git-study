@@ -20,13 +20,9 @@
  * `supabase.auth.signInWithPassword()` を呼び、そこで初めてログインする。
  */
 
-import { AuthError, assertPassword, assertPasswordConfirmed } from '@/domain/auth';
+import { assertPassword, assertPasswordConfirmed } from '@/domain/auth';
+import { describeUserError } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-function describeError(error: unknown): string {
-  if (error instanceof AuthError) return error.message;
-  return 'パスワードを設定できませんでした。入力内容を確認してください。';
-}
 
 export async function registerPasswordAction(
   email: string,
@@ -38,7 +34,12 @@ export async function registerPasswordAction(
     confirmedPassword = assertPassword(password);
     assertPasswordConfirmed(confirmedPassword, passwordConfirmation);
   } catch (error) {
-    return { error: describeError(error) };
+    return {
+      error: describeUserError(
+        error,
+        'パスワードを設定できませんでした。入力内容を確認してください。',
+      ),
+    };
   }
 
   try {

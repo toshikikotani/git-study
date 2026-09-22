@@ -6,6 +6,7 @@
  * 命名は docs/glossary.md の「レイヤーの命名」に従う(list/create/delete)。
  */
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { DateOnly } from '@/lib/date';
 import type { Database } from '@/lib/supabase/types';
@@ -37,12 +38,7 @@ export type ScenarioInput = {
   totalPaidYen: number;
 };
 
-export class ScenarioStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ScenarioStoreError';
-  }
-}
+export class ScenarioStoreError extends AppError {}
 
 type ScenarioRow = Database['public']['Tables']['repayment_scenarios']['Row'];
 

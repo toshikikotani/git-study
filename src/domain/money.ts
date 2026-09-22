@@ -7,15 +7,12 @@
  * 符号の規約:支出が負、収入が正。集計は SUM だけで済む。
  */
 
+import { AppError } from '@/lib/errors';
+
 /** 金額として扱える整数の上限。これを超える入力は桁の打ち間違いとみなす。 */
 export const MAX_YEN = 1_000_000_000_000; // 1兆円
 
-export class MoneyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MoneyError';
-  }
-}
+export class MoneyError extends AppError {}
 
 /** 整数の円であることを検査する。計算結果を DB へ渡す直前に必ず通す。 */
 export function assertYen(value: number, label = '金額'): number {

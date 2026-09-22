@@ -24,6 +24,8 @@ import {
   updateGoalProgress,
   type GoalInput,
 } from '@/features/goals/store';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 
 export type AdvisorReplyState = {
   error: string | null;
@@ -34,10 +36,10 @@ export type AdvisorReplyState = {
 export async function sendAdvisorMessageAction(
   messages: readonly AdvisorMessage[],
 ): Promise<AdvisorReplyState> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return {
-      error: 'AI相談は設定されていません(ANTHROPIC_API_KEY が未設定)。',
+      error: apiKeyMissingMessage('AI相談'),
       reply: null,
       goalProposal: null,
     };

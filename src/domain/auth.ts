@@ -5,12 +5,9 @@
  * 最低限の形式チェックだけを行う。
  */
 
-export class AuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AuthError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class AuthError extends AppError {}
 
 export const MIN_PASSWORD_LENGTH = 8;
 

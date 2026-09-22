@@ -13,6 +13,7 @@ import {
 } from '@/domain/payday-period';
 import { getAppSettings } from '@/features/settings/store';
 import { paydayCycleFor, todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
 export type AccountSpending = {
@@ -38,12 +39,7 @@ export type PaydayPeriodSummary = {
   byCategory: CategorySpending[];
 };
 
-export class PeriodSummaryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PeriodSummaryError';
-  }
-}
+export class PeriodSummaryError extends AppError {}
 
 export async function loadPaydayPeriodSummary(
   now: Date = new Date(),

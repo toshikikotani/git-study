@@ -1,16 +1,10 @@
 'use client';
 
-/**
- * AI日次レポート(本人発案:「日次レポートと月次レポートどっちも出力できる
- * ように」、ADR-032)。今日の支出・今月の平均との比較・診断結果をもとに、
- * AIが気づきとアドバイスを生成する。浪費傾向のタイプ判定は無い(1日分の
- * データではノイズが大きいため月次レポートに一本化、ADR-032参照)。
- *
- * 押されたときだけ AI を呼ぶ(daily-report-ai.ts 参照)。
- */
+/** AI日次レポートのカード(ADR-032)。押されたときだけ AI を呼ぶ。 */
 
 import { useState } from 'react';
 
+import { BulletList } from '@/components/ui/bullet-list';
 import { formatYen } from '@/domain/money';
 import type { DailyAiReportView } from '@/features/ai-report/store';
 import { generateDailyAiReportAction } from './actions';
@@ -58,8 +52,8 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
         </p>
       ) : (
         <>
-          <ItemList heading="気づき" items={report.insights} />
-          <ItemList heading="アドバイス" items={report.advice} />
+          <BulletList heading="気づき" items={report.insights} />
+          <BulletList heading="アドバイス" items={report.advice} />
         </>
       )}
 
@@ -90,24 +84,6 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
           {error}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function ItemList({ heading, items }: { heading: string; items: readonly string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-        {heading}
-      </p>
-      <ul className="mt-1.5 space-y-1.5">
-        {items.map((item, i) => (
-          <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            ・{item}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

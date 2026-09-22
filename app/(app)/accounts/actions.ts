@@ -25,6 +25,7 @@ import {
   type AccountKind,
   type AccountPurpose,
 } from '@/features/accounts/store';
+import { describeUserError } from '@/lib/errors';
 
 export type AccountFormState = {
   error: string | null;
@@ -84,13 +85,6 @@ function parseAccountInput(formData: FormData): AccountInput {
   };
 }
 
-function describeError(error: unknown): string {
-  if (error instanceof AccountError || error instanceof AccountStoreError) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
-
 export async function createAccountAction(
   _prev: AccountFormState,
   formData: FormData,
@@ -99,7 +93,7 @@ export async function createAccountAction(
     const input = parseAccountInput(formData);
     await createAccount(input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/accounts');
   return { error: null };
@@ -114,7 +108,7 @@ export async function updateAccountAction(
     const input = parseAccountInput(formData);
     await updateAccount(id, input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/accounts');
   return { error: null };

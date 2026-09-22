@@ -5,6 +5,8 @@
  * どう組み立てるかの業務判断は features/alerts/notify.ts が担う)。
  */
 
+import { AppError } from '@/lib/errors';
+
 export type DiscordEmbed = {
   title: string;
   description?: string | undefined;
@@ -13,12 +15,7 @@ export type DiscordEmbed = {
   imageUrl?: string | undefined;
 };
 
-export class DiscordSendError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DiscordSendError';
-  }
-}
+export class DiscordSendError extends AppError {}
 
 /** Webhook へ Embed を1件送信する。 */
 export async function postDiscordEmbed(webhookUrl: string, embed: DiscordEmbed): Promise<void> {

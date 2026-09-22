@@ -6,6 +6,8 @@
  * テストで固める方が、後から本人が読める(NFR-02, 設計原則6)。
  */
 
+import { AppError } from '@/lib/errors';
+
 export type ParseCsvOptions = {
   /** 区切り文字。タブ区切りの明細もあるため差し替えられる。 */
   delimiter?: string;
@@ -21,12 +23,7 @@ export type ParsedCsv = {
   rows: string[][];
 };
 
-export class CsvError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CsvError';
-  }
-}
+export class CsvError extends AppError {}
 
 /**
  * RFC 4180 準拠のパース。

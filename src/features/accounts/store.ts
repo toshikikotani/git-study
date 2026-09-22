@@ -7,6 +7,7 @@
  * 必要がある(RLS の WITH CHECK は自動補完してくれない)。
  */
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -39,12 +40,7 @@ export type AccountInput = {
   note: string | null;
 };
 
-export class AccountStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AccountStoreError';
-  }
-}
+export class AccountStoreError extends AppError {}
 
 type AccountRow = Database['public']['Tables']['accounts']['Row'];
 

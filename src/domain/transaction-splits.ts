@@ -8,18 +8,15 @@
  * 書き込み経路(features/transactions/splits-store.ts)は必ずここを通す。
  */
 
+import { AppError } from '@/lib/errors';
+
 export type TransactionSplitInput = {
   categoryId: string | null;
   amountYen: number;
   note: string | null;
 };
 
-export class TransactionSplitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransactionSplitError';
-  }
-}
+export class TransactionSplitError extends AppError {}
 
 /**
  * 分割の妥当性を検証する。

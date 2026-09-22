@@ -1,4 +1,5 @@
 import { formatYen } from '@/domain/money';
+import { formatMonthJa } from '@/lib/date';
 import { savingsRateOf } from '@/domain/spending';
 import type { IncomeExpenseTrend } from '@/features/reports/store';
 
@@ -70,7 +71,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
           年間収支サマリー
         </h2>
         <span className="tabular text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {monthLabel(monthKeys[monthKeys.length - 1]!)}の貯蓄率{' '}
+          {formatMonthJa(monthKeys[monthKeys.length - 1]!)}の貯蓄率{' '}
           {latestRate === null ? '—' : `${Math.round(latestRate * 100)}%`}
         </span>
       </div>
@@ -79,7 +80,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mt-3 w-full"
         role="img"
-        aria-label={`${monthLabel(monthKeys[monthKeys.length - 1]!)}時点:収入${formatYen(latest.incomeYen)}、支出${formatYen(latest.expenseYen)}`}
+        aria-label={`${formatMonthJa(monthKeys[monthKeys.length - 1]!)}時点:収入${formatYen(latest.incomeYen)}、支出${formatYen(latest.expenseYen)}`}
       >
         <path
           d={linePath(rows.map((r) => r.incomeYen))}
@@ -101,10 +102,10 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
           return (
             <g key={row.monthKey}>
               <circle cx={incomePoint.x} cy={incomePoint.y} r={3} fill="var(--income)">
-                <title>{`${monthLabel(row.monthKey)}: 収入 ${formatYen(row.incomeYen)}`}</title>
+                <title>{`${formatMonthJa(row.monthKey)}: 収入 ${formatYen(row.incomeYen)}`}</title>
               </circle>
               <circle cx={expensePoint.x} cy={expensePoint.y} r={3} fill="var(--over)">
-                <title>{`${monthLabel(row.monthKey)}: 支出 ${formatYen(row.expenseYen)}`}</title>
+                <title>{`${formatMonthJa(row.monthKey)}: 支出 ${formatYen(row.expenseYen)}`}</title>
               </circle>
             </g>
           );
@@ -160,7 +161,7 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
             return (
               <tr key={row.monthKey} style={{ borderBottom: '1px solid var(--hairline)' }}>
                 <td className="p-2" style={{ color: 'var(--ink)' }}>
-                  {monthLabel(row.monthKey)}
+                  {formatMonthJa(row.monthKey)}
                 </td>
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {formatYen(row.incomeYen)}
@@ -178,8 +179,4 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
       </table>
     </div>
   );
-}
-
-function monthLabel(monthKey: string): string {
-  return `${Number(monthKey.slice(5, 7))}月`;
 }
