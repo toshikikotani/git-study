@@ -26,27 +26,11 @@ PG_SANDBOX_PORT="${PG_SANDBOX_PORT:-5438}"
 # 比較用の2つは自分で作る(ヘルパ側は他の検証スクリプトと共有なので触らない)。
 PG_SANDBOX_DB="apply_pending_scratch"
 
-# 本番へ未適用のマイグレーション(TASKS.md の B-4/B-5/B-7/B-10/B-12/B-13/
-# B-14/B-15/B-16)。apply-pending.sql がこの分を受け持つ。
+# 本番へ未適用のマイグレーション(TASKS.md の B-17)。apply-pending.sql が
+# この分を受け持つ。B-4/B-5/B-7/B-10/B-12/B-13/B-14/B-15/B-16 は
+# 2026-09-22に本人が適用済み(P10-30)なのでここには含めない。
 PENDING=(
-  20260908001200_rescued_emails.sql
-  20260908001300_rescued_emails_rls.sql
-  20260912000100_net_worth_snapshots.sql
-  20260912000200_net_worth_snapshots_rls.sql
-  20260913000100_transaction_splits.sql
-  20260913000200_transaction_splits_rls.sql
-  20260913000300_import_batches_receipt_image.sql
-  20260913000500_app_settings_google_backup.sql
-  20260914000100_goals.sql
-  20260914000200_goals_rls.sql
-  20260921000100_transaction_diagnoses.sql
-  20260921000200_transaction_diagnoses_rls.sql
-  20260921000300_ai_monthly_reports.sql
-  20260921000400_ai_monthly_reports_rls.sql
-  20260921000500_ai_daily_reports.sql
-  20260921000600_ai_daily_reports_rls.sql
-  20260922000100_receipt_items.sql
-  20260922000200_receipt_items_rls.sql
+  20260922000300_receipt_items_category.sql
 )
 
 WORK="$(mktemp -d)"

@@ -103,6 +103,13 @@ export function MonthlyTransactionList({
                       {t.itemNames.join('、')}
                     </span>
                   ) : null}
+                  {/* 合計不一致(ADR-035)。修正は /transactions で行うため、
+                      ここでは気づけるようにするだけ(読み取り専用画面)。 */}
+                  {t.itemsStatus === 'mismatched' ? (
+                    <span className="text-[11px]" style={{ color: 'var(--over)' }}>
+                      品目の合計が金額と一致しません
+                    </span>
+                  ) : null}
                 </span>
                 <span
                   className="tabular shrink-0 text-sm font-medium"

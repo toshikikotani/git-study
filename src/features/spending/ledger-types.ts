@@ -8,6 +8,7 @@
  */
 
 import type { BudgetTone } from '@/domain/budget';
+import type { ReceiptItemsStatus } from '@/domain/receipt-items';
 
 export type LedgerTransaction = {
   id: string;
@@ -19,6 +20,8 @@ export type LedgerTransaction = {
   amountYen: number;
   /** レシートの商品名(ADR-034)。無ければ空配列。 */
   itemNames: readonly string[];
+  /** 品目の合計が金額と合っているか(ADR-035)。修正は /transactions で行う。 */
+  itemsStatus: ReceiptItemsStatus;
 };
 
 export type CategoryBreakdownRow = {

@@ -12,6 +12,7 @@
 import { compareToPreviousMonthPace, type AccumulationTransaction } from '@/domain/accumulation';
 import { budgetTone, isCountable, type BudgetTransaction } from '@/domain/budget';
 import { resolveCategoryRoot, type CategoryMergeNode } from '@/domain/category';
+import { receiptItemsStatus } from '@/domain/receipt-items';
 import {
   projectedMonthTotalYen,
   summarizeMonthlyIncomeExpense,
@@ -152,14 +153,18 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
     countableThisMonth.map((tx) => tx.id),
   );
 
-  const transactions: LedgerTransaction[] = countableThisMonth.map((tx) => ({
-    id: tx.id,
-    occurredOn: tx.occurredOn,
-    label: tx.label,
-    categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
-    amountYen: tx.amountYen,
-    itemNames: (itemsByTransactionId.get(tx.id) ?? []).map((item) => item.name),
-  }));
+  const transactions: LedgerTransaction[] = countableThisMonth.map((tx) => {
+    const items = itemsByTransactionId.get(tx.id) ?? [];
+    return {
+      id: tx.id,
+      occurredOn: tx.occurredOn,
+      label: tx.label,
+      categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
+      amountYen: tx.amountYen,
+      itemNames: items.map((item) => item.name),
+      itemsStatus: receiptItemsStatus(items, tx.amountYen),
+    };
+  });
 
   const elapsedDays = daysBetween(thisMonthStart, today) + 1;
   const totalDaysInMonth = daysBetween(thisMonthStart, nextMonthStart);

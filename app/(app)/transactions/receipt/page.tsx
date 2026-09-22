@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveImportBatchAction, type ReceiptItemsInput, type ReceiptSplitInput } from '../actions';
 import { ensureDefaultAccountAction } from '../../accounts/actions';
@@ -10,6 +10,7 @@ import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
 import type { ClassifyResult } from '@/features/classification/store';
 import { formatYen } from '@/domain/money';
+import { receiptItemsStatus } from '@/domain/receipt-items';
 import {
   itemsReconcileWithTotal,
   type ParsedReceiptTransaction,
@@ -37,6 +38,10 @@ import {
  * ── なぜ選択後すぐに AI を呼ばないのか ──────────────────────
  * この経路には辞書のような費用ゼロの手段が無く、呼べば必ず課金される。
  * 貼り付け画面と同じく、写真を選んだだけでは呼ばず、押されたときだけ呼ぶ。
+ * これは「読み取り」(抽出)の話——読み取りが終わった後の「分類」は、
+ * 既に本人が押した読み取りボタンの続きの処理として自動で行う
+ * (本人発案、wasExtractingRef の effect 参照。追加の課金判断が要る
+ * 新しい呼び出しではなく、1回の明示操作の中で完結する処理という位置づけ)。
  *
  * ── 複数枚まとめて取り込み(本人発案) ─────────────────────────
  * 1回の選択で複数枚を渡せる(`<input multiple>`)。「1回の撮影=1バッチ」
@@ -62,6 +67,18 @@ import {
  * 同じ店の買い物が(実際は食費+日用品の混在でも)全部そのカテゴリに誤爆する。
  * 実際の分類は商品行(=splits)側にあるため、親は保存時に auto_ok へ倒す
  * (save() 参照)。
+ *
+ * ── 品目もできれば分類したい(本人発案、ADR-035) ────────────
+ * 分割の対象になるかどうかに関わらず、商品行が1件でもあれば分類パイプライン
+ * (ルール→自動AI)に通し、`receipt_items.category_id` として保存する。
+ * 合計不一致(mismatched)の品目にも同じ分類結果が付く——「合計が合わない
+ * から分類しない」理由は無い(entryPreviews の itemRulePreviewByIndex 参照)。
+ *
+ * ── 金額が一致しない品目は、1回だけ撮り直しを促す(本人発案、ADR-035) ──
+ * 読み取り結果の商品行の合計が明細の金額と一致しない場合、読み取りが
+ * 不正確だった可能性がある。該当の1枚だけ撮り直せるボタンを出すが、
+ * 撮り直しても一致しなければそれ以上は促さない(retryCount 参照)。
+ * どちらも本人必須の操作ではなく、そのまま保存して後から手入力で直せる。
  */
 
 const MAX_IMAGE_SIDE = 1600;
@@ -123,6 +140,8 @@ type ReceiptEntry = {
   imageBase64: string | null;
   imageError: string | null;
   extracted: ReceiptParseResult | null;
+  /** 金額が一致せず撮り直した回数(本人発案)。2回目以降は撮り直しを促さない。 */
+  retryCount: number;
 };
 
 /** 写真1枚分の、派生したプレビュー行(ルール分類済み)。 */
@@ -197,7 +216,7 @@ export default function ReceiptPage() {
         const previewUrl = URL.createObjectURL(file);
         try {
           const imageBase64 = await resizeToJpegBase64(file);
-          return { id, previewUrl, imageBase64, imageError: null, extracted: null };
+          return { id, previewUrl, imageBase64, imageError: null, extracted: null, retryCount: 0 };
         } catch (e) {
           return {
             id,
@@ -205,6 +224,7 @@ export default function ReceiptPage() {
             imageBase64: null,
             imageError: e instanceof Error ? e.message : String(e),
             extracted: null,
+            retryCount: 0,
           };
         }
       }),
@@ -245,46 +265,96 @@ export default function ReceiptPage() {
 
   const pendingExtraction = entries.filter((e) => e.imageBase64 && !e.extracted);
 
-  const extractAll = async () => {
-    if (pendingExtraction.length === 0) return;
-    setExtracting(true);
-    try {
-      const results = await Promise.all(
-        pendingExtraction.map(async (entry) => {
-          try {
-            const response = await fetch('/api/import/receipt', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ image: entry.imageBase64, mediaType: 'image/jpeg' }),
-            });
-            if (!response.ok) {
-              return {
-                id: entry.id,
-                extracted: { transactions: [], warnings: ['読み取りに失敗しました。'] },
-              };
-            }
-            const result = (await response.json()) as {
-              transactions: ParsedReceiptTransaction[];
-              warnings: string[];
-            };
-            return {
-              id: entry.id,
-              extracted: { transactions: result.transactions, warnings: result.warnings },
-            };
-          } catch {
+  // 複数枚まとめて(extractAll)、撮り直した1枚だけ(retakeEntry)の両方から呼ぶ。
+  const extractByTargets = async (
+    targets: readonly { id: string; imageBase64: string }[],
+  ): Promise<void> => {
+    if (targets.length === 0) return;
+    const results = await Promise.all(
+      targets.map(async (entry) => {
+        try {
+          const response = await fetch('/api/import/receipt', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ image: entry.imageBase64, mediaType: 'image/jpeg' }),
+          });
+          if (!response.ok) {
             return {
               id: entry.id,
               extracted: { transactions: [], warnings: ['読み取りに失敗しました。'] },
             };
           }
-        }),
+          const result = (await response.json()) as {
+            transactions: ParsedReceiptTransaction[];
+            warnings: string[];
+          };
+          return {
+            id: entry.id,
+            extracted: { transactions: result.transactions, warnings: result.warnings },
+          };
+        } catch {
+          return {
+            id: entry.id,
+            extracted: { transactions: [], warnings: ['読み取りに失敗しました。'] },
+          };
+        }
+      }),
+    );
+    const extractedById = new Map(results.map((r) => [r.id, r.extracted]));
+    setEntries((prev) =>
+      prev.map((e) =>
+        extractedById.has(e.id) ? { ...e, extracted: extractedById.get(e.id)! } : e,
+      ),
+    );
+  };
+
+  const extractAll = async () => {
+    if (pendingExtraction.length === 0) return;
+    setExtracting(true);
+    try {
+      await extractByTargets(
+        pendingExtraction.map((e) => ({ id: e.id, imageBase64: e.imageBase64! })),
       );
-      const extractedById = new Map(results.map((r) => [r.id, r.extracted]));
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  // 金額が一致しなかった1枚だけ撮り直す(本人発案)。他の写真・明細は
+  // そのまま残す。撮り直しても一致しなければ、そのまま登録してよい
+  // (2回目以降は促さない、retryCount 参照)。
+  const retakeEntry = async (id: string, file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    let imageBase64: string;
+    try {
+      imageBase64 = await resizeToJpegBase64(file);
+    } catch (e) {
       setEntries((prev) =>
-        prev.map((e) =>
-          extractedById.has(e.id) ? { ...e, extracted: extractedById.get(e.id)! } : e,
+        prev.map((entry) =>
+          entry.id === id
+            ? { ...entry, imageError: e instanceof Error ? e.message : String(e) }
+            : entry,
         ),
       );
+      return;
+    }
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              previewUrl,
+              imageBase64,
+              imageError: null,
+              extracted: null,
+              retryCount: entry.retryCount + 1,
+            }
+          : entry,
+      ),
+    );
+    setExtracting(true);
+    try {
+      await extractByTargets([{ id, imageBase64 }]);
     } finally {
       setExtracting(false);
     }
@@ -327,9 +397,11 @@ export default function ReceiptPage() {
           'manual',
         );
 
+        // 品目もできれば分類したい(本人発案、ADR-035)。分割の対象になるか
+        // どうかに関わらず、商品行が1件でもあれば分類パイプラインに通す。
         const itemRulePreviewByIndex = new Map<number, StoredTransaction[]>();
         extracted.transactions.forEach((t, i) => {
-          if (!splitEligible[i]) return;
+          if (t.items.length === 0) return;
           const itemRows: ImportableRow[] = t.items.map((item) => ({
             occurredOn: t.occurredOn,
             description: item.description,
@@ -398,6 +470,26 @@ export default function ReceiptPage() {
     }
   };
 
+  // 読み取り(extractAll・retakeEntry)が終わった直後に、押されるのを待たず
+  // 自動でAI分類まで済ませる(本人発案:「分類させるボタンはもう最初から
+  // 分類させた状態にして」)。読み取り自体は既に本人の明示操作(撮る/選ぶ)
+  // で呼ばれた後の続きの処理なので、ここで追加のAI呼び出しをためらう理由は
+  // 無い。ボタンは失敗時の再試行用に残す。
+  //
+  // classify を effect の依存に含めると(previews が変わるたびに参照が
+  // 変わるため)classify() の結果自体で毎回 effect が再実行されてしまう。
+  // ref 越しに最新の classify を呼ぶことで、発火条件を「読み取りが終わった
+  // 瞬間」だけに保つ。
+  const classifyRef = useRef(classify);
+  classifyRef.current = classify;
+  const wasExtractingRef = useRef(false);
+  useEffect(() => {
+    if (wasExtractingRef.current && !extracting && unclassifiedCount > 0) {
+      void classifyRef.current();
+    }
+    wasExtractingRef.current = extracting;
+  }, [extracting, unclassifiedCount]);
+
   const save = async () => {
     if (!accountId || previews.length === 0) return;
     setSaving(true);
@@ -436,14 +528,21 @@ export default function ReceiptPage() {
         if (rawItems.length === 0) return t;
 
         // 商品行があれば、分割の対象になるかどうかに関わらず必ず記録する
-        // (ADR-034)。sourceRef は保存後の実 id と対応付けるための鍵。
+        // (ADR-034)。品目もできれば分類したい(本人発案、ADR-035)ので、
+        // 生の商品行ではなく分類済みの行(itemPreviewByIndex)を使う——
+        // 分割の対象にならない品目も、ここでは分類パイプラインを通っている
+        // (entryPreviews 参照)。sourceRef は保存後の実 id と対応付ける鍵。
         const sourceRef = crypto.randomUUID();
+        const classifiedItems = p.itemPreviewByIndex.get(i);
         receiptItems.push({
           sourceRef,
-          items: rawItems.map((item) => ({ name: item.description, amountYen: item.amountYen })),
+          items: (classifiedItems ?? []).map((item) => ({
+            name: item.description,
+            amountYen: item.amountYen,
+            categoryId: item.categoryId,
+          })),
         });
 
-        const classifiedItems = p.itemPreviewByIndex.get(i);
         const split = p.splitEligible[i] && classifiedItems && classifiedItems.length >= 2;
         if (split) {
           receiptSplits.push({
@@ -724,7 +823,51 @@ export default function ReceiptPage() {
                 {p.preview.map((t, i) => {
                   const items = p.itemPreviewByIndex.get(i);
                   if (!p.splitEligible[i] || !items || items.length < 2) {
-                    return <TransactionRow key={t.id} transaction={t} />;
+                    const rawItems = p.entry.extracted.transactions[i]?.items ?? [];
+                    const status = receiptItemsStatus(rawItems, t.amountYen);
+                    return (
+                      <Fragment key={t.id}>
+                        <TransactionRow transaction={t} />
+                        {status === 'none' ? (
+                          <li
+                            className="px-4 pb-3 -mt-2 text-[11px]"
+                            style={{ color: 'var(--ink-muted)' }}
+                          >
+                            品目が読み取れませんでした
+                          </li>
+                        ) : status === 'mismatched' ? (
+                          <li className="px-4 pb-3 -mt-2 space-y-1.5">
+                            <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                              {(items ?? rawItems).map((it) => it.description).join('、')}
+                            </p>
+                            <p className="text-[11px]" style={{ color: 'var(--over)' }}>
+                              {p.entry.retryCount > 0
+                                ? '撮り直しても金額が一致しませんでした。保存後に手入力で直せます。'
+                                : '品目の合計が金額と一致しません(読み取りが不正確かもしれません)。'}
+                            </p>
+                            {p.entry.retryCount === 0 ? (
+                              <label
+                                className="inline-block cursor-pointer text-[11px] font-semibold"
+                                style={{ color: 'var(--accent)' }}
+                              >
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void retakeEntry(p.entry.id, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                                この写真を撮り直す →
+                              </label>
+                            ) : null}
+                          </li>
+                        ) : null}
+                      </Fragment>
+                    );
                   }
                   // 商品ごとに分割して取り込む明細(本人発案)。親自体は分類の
                   // 対象にしない(分類は商品行=splits 側にある)ため、通常の
@@ -775,7 +918,12 @@ export default function ReceiptPage() {
               金額と日付が合っているか確認してください。
             </p>
 
-            {/* ルールに当たらなかった分だけ AI に回せる(M2-3b)。押されたときだけ呼ぶ */}
+            {/*
+             * ルールに当たらなかった分は読み取り直後に自動でAIへ回す
+             * (本人発案、wasExtractingRef の effect 参照)。このボタンは
+             * その自動分類が終わってもなお残った分(通信失敗など)の
+             * 再試行用。
+             */}
             {unclassifiedCount > 0 ? (
               <button
                 type="button"

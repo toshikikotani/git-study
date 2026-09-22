@@ -1,31 +1,62 @@
 /**
- * レシートの品目(receipt_items)のデータアクセス(ADR-034)。
+ * レシートの品目(receipt_items)のデータアクセス(ADR-034/035)。
  *
  * `transaction_splits`(カテゴリ分割)とは独立している。品目は分割の対象に
- * なるかどうかに関わらず、常に付く記録(合計の一致は求めない)。
+ * なるかどうかに関わらず、常に付く記録(合計の一致は求めない)。カテゴリ
+ * (category_id)も分割とは別に品目単体へ付けられる(ADR-035)。
  *
  * `receipt_items` は本番未適用。未適用時の扱いは lib/supabase/errors.ts
  * (読み取りは「品目はまだ無い」として握り潰す。保存は本人の明示的な操作
  * =レシート取り込みの一部だが、取り込み自体は失敗させず警告に留める、
  * receipt/page.tsx 参照)。
+ *
+ * `category_id` は receipt_items 自体より後に追加した列で、本番未適用
+ * (B-17)。列が無いあいだも品目そのものの保存を止めたくないため、列付きで
+ * 失敗したら列を外して再試行する(features/transactions/store.ts の
+ * receipt_image_path と同じ考え方、列版)。
  */
 
+import { assertEditableReceiptItems, ReceiptItemsError } from '@/domain/receipt-items';
 import { AppError } from '@/lib/errors';
-import { isMissingTableError } from '@/lib/supabase/errors';
+import { isMissingColumnError, isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 
 export class ReceiptItemStoreError extends AppError {}
 
-export type ReceiptItemInput = { name: string; amountYen: number };
+export type ReceiptItemInput = { name: string; amountYen: number; categoryId?: string | null };
+
+function baseRow(item: ReceiptItemInput, userId: string, transactionId: string, sortOrder: number) {
+  return {
+    user_id: userId,
+    transaction_id: transactionId,
+    name: item.name,
+    amount_yen: item.amountYen,
+    sort_order: sortOrder,
+  };
+}
 
 /**
  * 品目をまるごと置き換える(既存の全行を削除し、新しい内容で作り直す)。
  * 空配列を渡すと品目を無くす(取り込み直後の再保存・訂正を想定)。
+ *
+ * 分割(`assertValidSplits`)と違い、合計が明細の金額と一致することは
+ * 求めない(一致しないまま保存してよい設計、本人発案)。
  */
 export async function replaceReceiptItems(
   transactionId: string,
   items: readonly ReceiptItemInput[],
 ): Promise<void> {
+  if (items.length > 0) {
+    try {
+      assertEditableReceiptItems(items);
+    } catch (error) {
+      if (error instanceof ReceiptItemsError) {
+        throw new ReceiptItemStoreError(error.message);
+      }
+      throw error;
+    }
+  }
+
   const supabase = await createClient();
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError || !auth.user) {
@@ -45,15 +76,17 @@ export async function replaceReceiptItems(
 
   if (items.length === 0) return;
 
-  const { error: insertError } = await supabase.from('receipt_items').insert(
-    items.map((item, i) => ({
-      user_id: auth.user.id,
-      transaction_id: transactionId,
-      name: item.name,
-      amount_yen: item.amountYen,
-      sort_order: i,
-    })),
-  );
+  const rowsWithCategory = items.map((item, i) => ({
+    ...baseRow(item, auth.user.id, transactionId, i),
+    category_id: item.categoryId ?? null,
+  }));
+  let insertError = (await supabase.from('receipt_items').insert(rowsWithCategory)).error;
+  if (insertError && isMissingColumnError(insertError)) {
+    const rowsWithoutCategory = items.map((item, i) =>
+      baseRow(item, auth.user.id, transactionId, i),
+    );
+    insertError = (await supabase.from('receipt_items').insert(rowsWithoutCategory)).error;
+  }
   if (insertError) {
     if (isMissingTableError(insertError)) {
       throw new ReceiptItemStoreError('品目の記録機能はまだ利用できません');
@@ -62,7 +95,13 @@ export async function replaceReceiptItems(
   }
 }
 
-export type ReceiptItem = { name: string; amountYen: number };
+export type ReceiptItem = {
+  id: string;
+  name: string;
+  amountYen: number;
+  categoryId: string | null;
+  categoryName: string | null;
+};
 
 /**
  * 一覧画面向け:表示中の明細群の品目をまとめて読む(splits-store.ts の
@@ -75,19 +114,57 @@ export async function listReceiptItemsForTransactionIds(
   if (transactionIds.length === 0) return map;
 
   const supabase = await createClient();
-  const { data: rows, error } = await supabase
+  let rows: {
+    id: string;
+    transaction_id: string;
+    name: string;
+    amount_yen: number;
+    category_id: string | null;
+  }[];
+  const withCategory = await supabase
     .from('receipt_items')
-    .select('transaction_id, name, amount_yen')
+    .select('id, transaction_id, name, amount_yen, category_id')
     .in('transaction_id', transactionIds)
     .order('sort_order', { ascending: true });
-  if (error) {
-    if (isMissingTableError(error)) return map;
-    throw new ReceiptItemStoreError(`品目を取得できませんでした: ${error.message}`);
+  if (withCategory.error && isMissingColumnError(withCategory.error)) {
+    const withoutCategory = await supabase
+      .from('receipt_items')
+      .select('id, transaction_id, name, amount_yen')
+      .in('transaction_id', transactionIds)
+      .order('sort_order', { ascending: true });
+    if (withoutCategory.error) {
+      if (isMissingTableError(withoutCategory.error)) return map;
+      throw new ReceiptItemStoreError(
+        `品目を取得できませんでした: ${withoutCategory.error.message}`,
+      );
+    }
+    rows = withoutCategory.data.map((r) => ({ ...r, category_id: null }));
+  } else if (withCategory.error) {
+    if (isMissingTableError(withCategory.error)) return map;
+    throw new ReceiptItemStoreError(`品目を取得できませんでした: ${withCategory.error.message}`);
+  } else {
+    rows = withCategory.data;
   }
+  if (rows.length === 0) return map;
+
+  const { data: categories, error: categoriesError } = await supabase
+    .from('categories')
+    .select('id, name');
+  if (categoriesError) {
+    throw new ReceiptItemStoreError(`カテゴリを取得できませんでした: ${categoriesError.message}`);
+  }
+  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
 
   for (const row of rows) {
     const list = map.get(row.transaction_id) ?? [];
-    list.push({ name: row.name, amountYen: row.amount_yen });
+    const categoryId = row.category_id ?? null;
+    list.push({
+      id: row.id,
+      name: row.name,
+      amountYen: row.amount_yen,
+      categoryId,
+      categoryName: categoryId ? (categoryNameById.get(categoryId) ?? null) : null,
+    });
     map.set(row.transaction_id, list);
   }
   return map;
