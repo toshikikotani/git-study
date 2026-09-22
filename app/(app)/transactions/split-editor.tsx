@@ -305,26 +305,34 @@ export function TransactionRowWithSplit({
       {/* 品目のタップ導線(本人からの不具合報告「レシートの品目もどこから
           飛べばいいかわかりません...タップしても何も見れない」)。行を開くと
           単価付きの内訳が見える(以前はプレビューのテキストだけで、開いても
-          カテゴリ編集フォームしか出ず品目自体は確認できなかった)。 */}
-      {open && items.length > 0 ? (
+          カテゴリ編集フォームしか出ず品目自体は確認できなかった)。
+          品目が無いときは、何も出さずに黙るのではなく「記録が無い」と
+          明示する(本人発案「品目が不明な場合はその旨書いてくれ」)。 */}
+      {open ? (
         <div className="mt-3 rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
           <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
             レシートの品目
           </p>
-          <ul className="mt-1.5 space-y-1">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-baseline justify-between gap-3 text-xs"
-                style={{ color: 'var(--ink-secondary)' }}
-              >
-                <span className="min-w-0 truncate">{item.name}</span>
-                <span className="tabular shrink-0">
-                  {formatYen(item.amountYen, { sign: 'never' })}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {items.length > 0 ? (
+            <ul className="mt-1.5 space-y-1">
+              {items.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-baseline justify-between gap-3 text-xs"
+                  style={{ color: 'var(--ink-secondary)' }}
+                >
+                  <span className="min-w-0 truncate">{item.name}</span>
+                  <span className="tabular shrink-0">
+                    {formatYen(item.amountYen, { sign: 'never' })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+              品目の記録はありません
+            </p>
+          )}
         </div>
       ) : null}
 
