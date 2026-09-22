@@ -1771,6 +1771,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      receipt_items: {
+        Row: {
+          amount_yen: number;
+          created_at: string;
+          id: string;
+          name: string;
+          sort_order: number;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          amount_yen: number;
+          created_at?: string;
+          id?: string;
+          name: string;
+          sort_order?: number;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          amount_yen?: number;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          sort_order?: number;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'receipt_items_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];

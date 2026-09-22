@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildFromAiRows } from '@/features/import/receipt-ai';
+import { buildFromAiRows, itemsReconcileWithTotal } from '@/features/import/receipt-ai';
 
 /**
  * AI 抽出の後段(ADR-021)。email-ai.test.ts と同じ考え方:
@@ -148,7 +148,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
     expect(result.warnings).toEqual([]);
   });
 
-  it('商品行の合計が支払合計と一致しなければ items は空で、理由を警告に残す', () => {
+  it('商品行の合計が支払合計と一致しなくても items は返す(本人発案「レシートは店と品目を合わせた概念」、ADR-034)', () => {
     const result = buildFromAiRows([
       {
         occurred_on: '2026-09-03',
@@ -161,13 +161,15 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         ],
       },
     ]);
-    expect(result.transactions[0]!.items).toEqual([]);
-    // 内訳が使えないだけで、明細そのものは通常の1件として残る
+    expect(result.transactions[0]!.items).toEqual([
+      { description: 'おにぎり', amountYen: -150 },
+      { description: '洗剤', amountYen: -999 },
+    ]);
     expect(result.transactions).toHaveLength(1);
-    expect(result.warnings[0]).toMatch(/一致しない/);
+    expect(result.warnings).toEqual([]);
   });
 
-  it('商品が1点だけ(内訳なし)なら items は空、警告も出さない', () => {
+  it('商品が1点だけ(内訳なし)でも items として返す(ADR-034)', () => {
     const result = buildFromAiRows([
       {
         occurred_on: '2026-09-03',
@@ -177,7 +179,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         items: [{ name: 'コーヒー', amount_yen: 500 }],
       },
     ]);
-    expect(result.transactions[0]!.items).toEqual([]);
+    expect(result.transactions[0]!.items).toEqual([{ description: 'コーヒー', amountYen: -500 }]);
     expect(result.warnings).toEqual([]);
   });
 
@@ -200,7 +202,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
     ]);
   });
 
-  it('金額が0の商品行を除いてもなお合計が合わなければ items は空にする', () => {
+  it('金額が0の商品行は除いて、残りは items として返す', () => {
     const result = buildFromAiRows([
       {
         occurred_on: '2026-09-03',
@@ -213,7 +215,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         ],
       },
     ]);
-    expect(result.transactions[0]!.items).toEqual([]);
+    expect(result.transactions[0]!.items).toEqual([{ description: '洗剤', amountYen: -200 }]);
   });
 
   it('1枚に複数の明細が写っていればすべて返す', () => {
@@ -314,5 +316,28 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
     };
     const imageBlock = call.messages[0]!.content.find((c) => c.type === 'image');
     expect(imageBlock?.source?.media_type).toBe('image/png');
+  });
+});
+
+describe('itemsReconcileWithTotal — カテゴリ分割の対象になるか(ADR-034)', () => {
+  it('2件以上あり合計が一致すれば true', () => {
+    const items = [
+      { description: 'おにぎり', amountYen: -150 },
+      { description: '洗剤', amountYen: -630 },
+    ];
+    expect(itemsReconcileWithTotal(items, -780)).toBe(true);
+  });
+
+  it('合計が一致しなければ false(品目としては別に保存する)', () => {
+    const items = [
+      { description: 'おにぎり', amountYen: -150 },
+      { description: '洗剤', amountYen: -999 },
+    ];
+    expect(itemsReconcileWithTotal(items, -780)).toBe(false);
+  });
+
+  it('1件だけなら合計が一致していても false', () => {
+    const items = [{ description: 'コーヒー', amountYen: -500 }];
+    expect(itemsReconcileWithTotal(items, -500)).toBe(false);
   });
 });

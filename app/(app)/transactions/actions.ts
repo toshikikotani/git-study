@@ -11,6 +11,7 @@
 import { revalidatePath } from 'next/cache';
 
 import type { TransactionSplitInput } from '@/domain/transaction-splits';
+import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
 import {
   importTransactions,
   updateTransaction,
@@ -35,6 +36,16 @@ export type ReceiptSplitInput = {
   splits: readonly TransactionSplitInput[];
 };
 
+/**
+ * レシートに写っていた商品行(ADR-034)。カテゴリ分割(ReceiptSplitInput)とは
+ * 独立していて、分割の対象になるかどうかに関わらず常に付く。sourceRef の
+ * 仕組みは ReceiptSplitInput と同じ。
+ */
+export type ReceiptItemsInput = {
+  sourceRef: string;
+  items: readonly ReceiptItemInput[];
+};
+
 export async function saveImportBatchAction(
   preview: readonly StoredTransaction[],
   meta: {
@@ -46,6 +57,7 @@ export async function saveImportBatchAction(
     receiptImagePath?: string | null;
   },
   receiptSplits: readonly ReceiptSplitInput[] = [],
+  receiptItems: readonly ReceiptItemsInput[] = [],
 ): Promise<{
   imported: number;
   duplicates: number;
@@ -73,6 +85,20 @@ export async function saveImportBatchAction(
         await replaceSplits(inserted.id, splits);
       } catch (error) {
         splitWarnings.push(describeUserError(error, '商品ごとの分割を保存できませんでした。'));
+      }
+    }
+  }
+
+  if (receiptItems.length > 0) {
+    const itemsBySourceRef = new Map(receiptItems.map((s) => [s.sourceRef, s.items]));
+    for (const inserted of result.insertedTransactions) {
+      if (inserted.sourceRef === null) continue;
+      const items = itemsBySourceRef.get(inserted.sourceRef);
+      if (!items) continue;
+      try {
+        await replaceReceiptItems(inserted.id, items);
+      } catch (error) {
+        splitWarnings.push(describeUserError(error, '商品の記録を保存できませんでした。'));
       }
     }
   }

@@ -96,6 +96,13 @@ export function MonthlyTransactionList({
                     {formatDateJa(t.occurredOn)}
                     {t.categoryName ? ` ・ ${t.categoryName}` : ''}
                   </span>
+                  {/* レシートの商品名(本人発案「レシートは店と品目を合わせた
+                      概念」、ADR-034)。何に使ったかをここでも見せる。 */}
+                  {t.itemNames.length > 0 ? (
+                    <span className="truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                      {t.itemNames.join('、')}
+                    </span>
+                  ) : null}
                 </span>
                 <span
                   className="tabular shrink-0 text-sm font-medium"

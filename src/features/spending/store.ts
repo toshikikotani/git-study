@@ -18,6 +18,7 @@ import {
   summarizeMonthlySpendByCategory,
   type SpendingTransaction,
 } from '@/domain/spending';
+import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -145,15 +146,20 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   }
   categoryBreakdown.sort((a, b) => b.spentYen - a.spentYen);
 
-  const transactions: LedgerTransaction[] = thisMonth
-    .filter((tx) => isCountable(tx))
-    .map((tx) => ({
-      id: tx.id,
-      occurredOn: tx.occurredOn,
-      label: tx.label,
-      categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
-      amountYen: tx.amountYen,
-    }));
+  const countableThisMonth = thisMonth.filter((tx) => isCountable(tx));
+  // レシートの商品名(ADR-034)。「何に使ったか」を今月の一覧でも見せる。
+  const itemsByTransactionId = await listReceiptItemsForTransactionIds(
+    countableThisMonth.map((tx) => tx.id),
+  );
+
+  const transactions: LedgerTransaction[] = countableThisMonth.map((tx) => ({
+    id: tx.id,
+    occurredOn: tx.occurredOn,
+    label: tx.label,
+    categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
+    amountYen: tx.amountYen,
+    itemNames: (itemsByTransactionId.get(tx.id) ?? []).map((item) => item.name),
+  }));
 
   const elapsedDays = daysBetween(thisMonthStart, today) + 1;
   const totalDaysInMonth = daysBetween(thisMonthStart, nextMonthStart);

@@ -10,6 +10,7 @@ import {
   loadPaydayPeriodSummary,
   type PaydayPeriodSummary,
 } from '@/features/transactions/period-summary';
+import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { listSplitsForDisplay } from '@/features/transactions/splits-store';
 import {
@@ -48,7 +49,11 @@ export default async function TransactionsPage() {
     return <EmptyState />;
   }
 
-  const splitsByTransactionId = await listSplitsForDisplay(transactions.map((t) => t.id));
+  const transactionIds = transactions.map((t) => t.id);
+  const [splitsByTransactionId, itemsByTransactionId] = await Promise.all([
+    listSplitsForDisplay(transactionIds),
+    listReceiptItemsForTransactionIds(transactionIds),
+  ]);
 
   const risky = transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod));
   const pending = transactions.filter((t) => t.reviewStatus === 'pending');
@@ -159,6 +164,7 @@ export default async function TransactionsPage() {
                 transaction={t}
                 categories={categories}
                 initialSplits={splitsByTransactionId.get(t.id) ?? []}
+                receiptItems={itemsByTransactionId.get(t.id) ?? []}
               />
             ))}
           </ul>
