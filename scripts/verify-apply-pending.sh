@@ -26,8 +26,8 @@ PG_SANDBOX_PORT="${PG_SANDBOX_PORT:-5438}"
 # 比較用の2つは自分で作る(ヘルパ側は他の検証スクリプトと共有なので触らない)。
 PG_SANDBOX_DB="apply_pending_scratch"
 
-# 本番へ未適用のマイグレーション(TASKS.md の B-4/B-5/B-7/B-10/B-12/B-13/B-14/B-15)。
-# apply-pending.sql がこの分を受け持つ。
+# 本番へ未適用のマイグレーション(TASKS.md の B-4/B-5/B-7/B-10/B-12/B-13/
+# B-14/B-15/B-16)。apply-pending.sql がこの分を受け持つ。
 PENDING=(
   20260908001200_rescued_emails.sql
   20260908001300_rescued_emails_rls.sql
@@ -45,6 +45,8 @@ PENDING=(
   20260921000400_ai_monthly_reports_rls.sql
   20260921000500_ai_daily_reports.sql
   20260921000600_ai_daily_reports_rls.sql
+  20260922000100_receipt_items.sql
+  20260922000200_receipt_items_rls.sql
 )
 
 WORK="$(mktemp -d)"

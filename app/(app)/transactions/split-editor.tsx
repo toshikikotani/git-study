@@ -6,6 +6,7 @@ import { formatYen } from '@/domain/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import type { CategoryOption } from '@/features/classification/store';
 import type { PaymentMethod } from '@/features/import/adapters';
+import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
 import { replaceSplitsAction, updateTransactionAction } from './actions';
@@ -47,10 +48,13 @@ export function TransactionRowWithSplit({
   transaction,
   categories,
   initialSplits,
+  receiptItems = [],
 }: {
   transaction: StoredTransaction;
   categories: readonly CategoryOption[];
   initialSplits: readonly TransactionSplit[];
+  /** レシートの商品行(ADR-034)。カテゴリ分割の有無に関わらず、常に見せる。 */
+  receiptItems?: readonly ReceiptItem[];
 }) {
   const [open, setOpen] = useState(false);
   // 既に分割済みの明細は分割フォームから開く。それ以外(大半の明細)は
@@ -196,6 +200,14 @@ export function TransactionRowWithSplit({
               </span>
             ) : null}
           </div>
+
+          {/* レシートの商品行(ADR-034)。分割済みの明細はカテゴリの内訳に
+              品名が出ているため(上の splits.map)、二重には出さない。 */}
+          {splits.length === 0 && receiptItems.length > 0 ? (
+            <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              {receiptItems.map((it) => it.name).join('、')}
+            </p>
+          ) : null}
         </div>
 
         <span

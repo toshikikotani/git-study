@@ -16,13 +16,13 @@
  * レシートにそう書かれていた文字列そのままを返させ、判定は従来どおり
  * readPaymentMethod の正規表現が行う。
  *
- * ── 商品行(items)も同じ役割分担 ────────────────────────────
- * スーパーのレシート1枚に食費と日用品が混ざっていても、店名と合計だけでは
- * 1カテゴリにしかならない(本人発案のもったいなさの指摘)。ここでは商品行
- * (品名・金額)を書き写すだけにとどめ、カテゴリの判定はしない。分類は
- * features/classification の既存パイプライン(ルール→本人操作でのAI)に
- * 商品行を1件ずつ通す(features/transactions 側の責務)。ここで返す items は
- * 「合計と一致した」場合のみ呼び出し側が transaction_splits の元にする。
+ * ── 商品行(items)は常に返す(ADR-034) ──────────────────────
+ * 「レシートというのは店と品目を全て合わせた概念」という本人の指摘どおり、
+ * ここでは商品行(品名・金額)を書き写すだけにとどめ、カテゴリの判定は
+ * しない。1点だけの買い物でも、内訳の合計が支払額と一致しなくても items は
+ * 返す——呼び出し側(receipt/page.tsx)がこれを常に `receipt_items` として
+ * 保存する。カテゴリごとに分割できるか(2件以上・合計一致)は別の判断で、
+ * items を返すかどうかとは独立している。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -233,7 +233,7 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
       description: label,
       // ここが FR-21 の砦。判定するのはモデルではなく正規表現(ADR-010)。
       paymentMethod: readPaymentMethod(row.payment_method_text),
-      items: buildItems(row.items, amount, label, warnings),
+      items: buildItems(row.items),
     });
   }
 
@@ -245,38 +245,40 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
 }
 
 /**
- * 商品行を検証する。2件以上あり、かつ合計が明細の金額(絶対値)と一致する
- * 場合だけ items を返す。それ以外は「分割は使えない」を警告として残し、
- * 空配列を返す(取り込み自体は今までどおり1件のまま続けられる)。
+ * 商品行を検証して返す(ADR-034)。「レシートは店と品目を合わせた概念」
+ * という本人の指摘どおり、1点だけの買い物でも、内訳の合計が支払額と
+ * 一致しなくても常に返す——ここでは名前・金額として使えるかだけを見る。
  *
- * 1件しかない行(内訳が無い/1点だけの買い物)は AI にとって自然な結果
- * なので、警告なしで静かに空配列を返す。
+ * カテゴリごとに分割できるか(2件以上・合計が一致)は呼び出し側
+ * (receipt/page.tsx の itemsReconcile())が別に判断する。分割できるか
+ * どうかで、品目そのものを記録するかどうかを左右しない。
  */
 function buildItems(
   rawItems: readonly { name: string; amount_yen: number }[],
-  totalAmountAbsYen: number,
-  transactionLabel: string,
-  warnings: string[],
 ): ParsedReceiptItem[] {
-  if (rawItems.length < 2) return [];
-
-  const items = rawItems
+  return rawItems
     .map((it) => ({
       description: it.name.trim(),
       amountYen: -Math.abs(Math.round(it.amount_yen)),
     }))
-    .filter((it) => Number.isFinite(it.amountYen) && it.amountYen !== 0);
+    .filter((it) => Number.isFinite(it.amountYen) && it.amountYen !== 0)
+    .map((it) => ({
+      description: it.description === '' ? '(品名不明)' : it.description,
+      amountYen: it.amountYen,
+    }));
+}
 
+/**
+ * 商品行をカテゴリごとに分割できるか(receipt/page.tsx が使う)。
+ * 2件以上あり、かつ合計が明細の金額と一致する場合だけ true——
+ * それ以外は品目としては残るが(buildItems 参照)、カテゴリの分割対象には
+ * ならない(transaction_splits は合計一致を必須とするため、ADR-034)。
+ */
+export function itemsReconcileWithTotal(
+  items: readonly ParsedReceiptItem[],
+  totalAmountYen: number,
+): boolean {
+  if (items.length < 2) return false;
   const sum = items.reduce((acc, it) => acc + it.amountYen, 0);
-  if (items.length < 2 || sum !== -totalAmountAbsYen) {
-    warnings.push(
-      `「${transactionLabel}」の商品ごとの内訳が支払合計と一致しないため、カテゴリの分割は使えません(通常の1件としては取り込めます)。`,
-    );
-    return [];
-  }
-
-  return items.map((it) => ({
-    description: it.description === '' ? '(品名不明)' : it.description,
-    amountYen: it.amountYen,
-  }));
+  return sum === totalAmountYen;
 }

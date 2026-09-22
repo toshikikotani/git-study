@@ -1,6 +1,6 @@
 -- =============================================================================
 --  未適用のマイグレーションを、1回のコピペでまとめて適用する(B-4/B-5/B-7/
---  B-10/B-12/B-13/B-14/B-15)
+--  B-10/B-12/B-13/B-14/B-15/B-16)
 --
 --  使い方:
 --    1. https://supabase.com/dashboard で対象プロジェクトを開く
@@ -188,7 +188,29 @@ create table if not exists public.ai_daily_reports (
 create unique index if not exists ux_ai_daily_reports_user_date
   on public.ai_daily_reports (user_id, report_date);
 
--- 9. Row Level Security — 本人の行だけ(ADR-011)
+-- 9. receipt_items — レシートの品目(B-16)
+-- -----------------------------------------------------------------------------
+create table if not exists public.receipt_items (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+
+  name           text        not null,
+  amount_yen     bigint      not null,
+  sort_order     smallint    not null default 0,
+
+  created_at     timestamptz not null default now(),
+
+  constraint ck_receipt_items_name_not_blank check (btrim(name) <> ''),
+  constraint ck_receipt_items_amount_nonzero check (amount_yen <> 0)
+);
+
+create index if not exists ix_receipt_items_transaction
+  on public.receipt_items (transaction_id, sort_order);
+create index if not exists ix_receipt_items_user
+  on public.receipt_items (user_id);
+
+-- 10. Row Level Security — 本人の行だけ(ADR-011)
 -- -----------------------------------------------------------------------------
 -- 上で作った全テーブルに同じ方針を一括で当てる。anon キーが漏れても他人の
 -- データへ到達できない状態を既定にする(NFR-04)。
@@ -198,7 +220,7 @@ declare
 begin
   foreach t in array array[
     'rescued_emails', 'net_worth_snapshots', 'transaction_splits', 'goals',
-    'transaction_diagnoses', 'ai_monthly_reports', 'ai_daily_reports'
+    'transaction_diagnoses', 'ai_monthly_reports', 'ai_daily_reports', 'receipt_items'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -230,7 +252,7 @@ select
        else 'ok' end                                as status
 from (values
   ('rescued_emails'), ('net_worth_snapshots'), ('transaction_splits'), ('goals'),
-  ('transaction_diagnoses'), ('ai_monthly_reports'), ('ai_daily_reports')
+  ('transaction_diagnoses'), ('ai_monthly_reports'), ('ai_daily_reports'), ('receipt_items')
 ) as t(name)
 left join pg_class c
   on c.relname = t.name and c.relnamespace = 'public'::regnamespace and c.relkind = 'r'

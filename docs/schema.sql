@@ -1651,6 +1651,32 @@ create table public.ai_daily_reports (
 
 create unique index ux_ai_daily_reports_user_date on public.ai_daily_reports (user_id, report_date);
 
+-- 3.28 receipt_items — レシートの品目(本人発案、ADR-034)
+--
+--   「レシートというのは店と品目を全て合わせた概念」という指摘への対応。
+--   transaction_splits(カテゴリ分割、2件以上・合計一致が必須)とは別物——
+--   こちらは「何を買ったか」を常に残す記録で、1点だけの買い物でも、内訳の
+--   合計が支払額と一致しなくても保存する。カテゴリ分割の対象になるかどうかに
+--   関わらず、レシートに商品行が写っていた明細には必ず付く。
+-- -----------------------------------------------------------------------------
+create table public.receipt_items (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+
+  name           text        not null,
+  amount_yen     bigint      not null,
+  sort_order     smallint    not null default 0,
+
+  created_at     timestamptz not null default now(),
+
+  constraint ck_receipt_items_name_not_blank check (btrim(name) <> ''),
+  constraint ck_receipt_items_amount_nonzero check (amount_yen <> 0)
+);
+
+create index ix_receipt_items_transaction on public.receipt_items (transaction_id, sort_order);
+create index ix_receipt_items_user on public.receipt_items (user_id);
+
 
 -- =============================================================================
 --  4. updated_at トリガの一括適用
@@ -2048,7 +2074,7 @@ begin
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
-    'ai_monthly_reports','ai_daily_reports'
+    'ai_monthly_reports','ai_daily_reports','receipt_items'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

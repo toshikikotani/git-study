@@ -3,14 +3,18 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { saveImportBatchAction, type ReceiptSplitInput } from '../actions';
+import { saveImportBatchAction, type ReceiptItemsInput, type ReceiptSplitInput } from '../actions';
 import { ensureDefaultAccountAction } from '../../accounts/actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
 import type { ClassifyResult } from '@/features/classification/store';
 import { formatYen } from '@/domain/money';
-import type { ParsedReceiptTransaction, ReceiptParseResult } from '@/features/import/receipt-ai';
+import {
+  itemsReconcileWithTotal,
+  type ParsedReceiptTransaction,
+  type ReceiptParseResult,
+} from '@/features/import/receipt-ai';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { requestAiClassification } from '@/features/transactions/classify-client';
 import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
@@ -44,15 +48,20 @@ import {
  * `saveImportBatchAction` を呼び、1枚の失敗が残りの取り込みを止めない
  * (NFR-06)。
  *
- * ── 商品行(items)がある明細は分割して取り込む(本人発案) ──────
- * receipt-ai.ts が商品ごとの内訳を返せた明細は、店名+合計の1件ではなく
- * 商品行1つずつを既存の分類パイプライン(ルール→本人操作でのAI)に通し、
- * 保存時に transaction_splits として自動生成する(features/transactions/
- * splits-store.ts、P8-2 で追加済み)。明細本体(親)の分類は変えない。
- * ただし親が「確認待ち」のまま残ると、確認待ちキューで本人が1カテゴリだけ
- * 選んだ瞬間にその店名の学習ルールができ、次の同じ店の買い物が(実際は
- * 食費+日用品の混在でも)全部そのカテゴリに誤爆する。実際の分類は商品行
- * (=splits)側にあるため、親は保存時に auto_ok へ倒す(save() 参照)。
+ * ── 商品行(items)は常に記録し、条件を満たせば分割もする(ADR-034) ──
+ * 「レシートは店と品目を合わせた概念」という指摘への対応。receipt-ai.ts が
+ * 読み取れた商品行は、1点だけでも合計が一致しなくても常に `receipt_items`
+ * として保存する(features/receipts/items-store.ts)。
+ *
+ * それとは別に、商品行が2件以上あり合計が一致する明細(itemsReconcileWithTotal)
+ * だけは、店名+合計の1件ではなく商品行1つずつを既存の分類パイプライン
+ * (ルール→本人操作でのAI)に通し、保存時に transaction_splits として自動
+ * 生成する(features/transactions/splits-store.ts、P8-2 で追加済み)。明細
+ * 本体(親)の分類は変えない。ただし親が「確認待ち」のまま残ると、確認待ち
+ * キューで本人が1カテゴリだけ選んだ瞬間にその店名の学習ルールができ、次の
+ * 同じ店の買い物が(実際は食費+日用品の混在でも)全部そのカテゴリに誤爆する。
+ * 実際の分類は商品行(=splits)側にあるため、親は保存時に auto_ok へ倒す
+ * (save() 参照)。
  */
 
 const MAX_IMAGE_SIDE = 1600;
@@ -118,7 +127,7 @@ type ReceiptEntry = {
 
 /** 写真1枚分の、派生したプレビュー行(ルール分類済み)。 */
 type EntryPreview = {
-  entry: ReceiptEntry;
+  entry: ReceiptEntry & { extracted: ReceiptParseResult };
   splitEligible: boolean[];
   rulePreview: StoredTransaction[];
   itemRulePreviewByIndex: Map<number, StoredTransaction[]>;
@@ -303,10 +312,12 @@ export default function ReceiptPage() {
           };
         }
 
-        // 商品行(items)が2件以上ある明細だけ、店名+合計の1件ではなく商品ごとに
-        // 分割して取り込む(本人発案)。receipt-ai.ts が合計と一致しないと判断した
-        // ものは items が空で返るため、ここでは長さだけ見ればよい。
-        const splitEligible = extracted.transactions.map((t) => t.items.length >= 2);
+        // 商品行が2件以上あり合計が一致する明細だけ、店名+合計の1件ではなく
+        // 商品ごとに分割して取り込む(本人発案、ADR-034)。それ以外の明細も
+        // 商品行があれば items としては必ず記録する(save() 参照)。
+        const splitEligible = extracted.transactions.map((t) =>
+          itemsReconcileWithTotal(t.items, t.amountYen),
+        );
         const rulePreview = buildPreview(
           extracted.transactions,
           accountId,
@@ -419,24 +430,37 @@ export default function ReceiptPage() {
       }
 
       const receiptSplits: ReceiptSplitInput[] = [];
+      const receiptItems: ReceiptItemsInput[] = [];
       const previewToSave = p.preview.map((t, i) => {
-        const items = p.itemPreviewByIndex.get(i);
-        if (!p.splitEligible[i] || !items || items.length < 2) return t;
+        const rawItems = p.entry.extracted.transactions[i]?.items ?? [];
+        if (rawItems.length === 0) return t;
 
+        // 商品行があれば、分割の対象になるかどうかに関わらず必ず記録する
+        // (ADR-034)。sourceRef は保存後の実 id と対応付けるための鍵。
         const sourceRef = crypto.randomUUID();
-        receiptSplits.push({
+        receiptItems.push({
           sourceRef,
-          splits: items.map((item) => ({
-            categoryId: item.categoryId,
-            amountYen: item.amountYen,
-            note: item.description,
-          })),
+          items: rawItems.map((item) => ({ name: item.description, amountYen: item.amountYen })),
         });
+
+        const classifiedItems = p.itemPreviewByIndex.get(i);
+        const split = p.splitEligible[i] && classifiedItems && classifiedItems.length >= 2;
+        if (split) {
+          receiptSplits.push({
+            sourceRef,
+            splits: classifiedItems.map((item) => ({
+              categoryId: item.categoryId,
+              amountYen: item.amountYen,
+              note: item.description,
+            })),
+          });
+        }
         return {
           ...t,
           sourceRef,
-          // 商品ごとに分割するので、明細本体は確認待ちに出さない(理由は上部コメント参照)。
-          reviewStatus: t.reviewStatus === 'pending' ? ('auto_ok' as const) : t.reviewStatus,
+          // 商品ごとに分割する場合だけ、明細本体は確認待ちに出さない(理由は上部コメント参照)。
+          reviewStatus:
+            split && t.reviewStatus === 'pending' ? ('auto_ok' as const) : t.reviewStatus,
         };
       });
 
@@ -450,6 +474,7 @@ export default function ReceiptPage() {
           receiptImagePath,
         },
         receiptSplits,
+        receiptItems,
       );
       if (outcome.error) {
         failed.push(outcome.error);
