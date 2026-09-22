@@ -1774,6 +1774,7 @@ export type Database = {
       receipt_items: {
         Row: {
           amount_yen: number;
+          category_id: string | null;
           created_at: string;
           id: string;
           name: string;
@@ -1783,6 +1784,7 @@ export type Database = {
         };
         Insert: {
           amount_yen: number;
+          category_id?: string | null;
           created_at?: string;
           id?: string;
           name: string;
@@ -1792,6 +1794,7 @@ export type Database = {
         };
         Update: {
           amount_yen?: number;
+          category_id?: string | null;
           created_at?: string;
           id?: string;
           name?: string;
@@ -1800,6 +1803,13 @@ export type Database = {
           user_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: 'receipt_items_category_id_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'receipt_items_transaction_id_fkey';
             columns: ['transaction_id'];

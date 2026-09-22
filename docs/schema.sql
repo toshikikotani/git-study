@@ -1667,6 +1667,9 @@ create table public.receipt_items (
   name           text        not null,
   amount_yen     bigint      not null,
   sort_order     smallint    not null default 0,
+  -- カテゴリ分割(transaction_splits)の対象かどうかに関わらず品目単体にも
+  -- 付けられる。null は分類できなかった・分類前(ADR-035)
+  category_id    uuid        references public.categories(id) on delete set null,
 
   created_at     timestamptz not null default now(),
 

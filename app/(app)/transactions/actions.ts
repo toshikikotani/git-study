@@ -140,3 +140,21 @@ export async function replaceSplitsAction(
   revalidatePath('/transactions');
   return { error: null };
 }
+
+/**
+ * レシートの品目を保存し直す(ADR-035)。合計が明細の金額と一致しない
+ * ("mismatched")品目を、本人が手入力で直すために使う。
+ */
+export async function replaceReceiptItemsAction(
+  transactionId: string,
+  items: readonly ReceiptItemInput[],
+): Promise<{ error: string | null }> {
+  try {
+    await replaceReceiptItems(transactionId, items);
+  } catch (error) {
+    return { error: describeUserError(error, '品目の保存に失敗しました。') };
+  }
+  revalidatePath('/transactions');
+  revalidatePath('/spending');
+  return { error: null };
+}

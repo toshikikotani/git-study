@@ -17,8 +17,6 @@ export type LedgerTransaction = {
   categoryName: string | null;
   /** 支出が負、収入が正(ADR-008)。 */
   amountYen: number;
-  /** レシートの商品名(ADR-034)。無ければ空配列。 */
-  itemNames: readonly string[];
 };
 
 export type CategoryBreakdownRow = {
