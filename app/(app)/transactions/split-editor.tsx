@@ -46,16 +46,17 @@ type ItemRowState = { name: string; amountYen: string; categoryId: string };
  * (支出=負、収入=正、ADR-008)を掛けて揃える。分割を編集する本人に
  * マイナス記号を意識させないための配慮。
  *
- * ── レシート品目がある明細は、開いてもカテゴリ編集を自動で出さない
- *    (本人からのUX指摘「明細を開くとカテゴリ分けのやつが出てくる。
- *    これもいらん」)────────────────────────────────────────
+ * ── 開いてもカテゴリ編集フォームを自動で出さない(本人からのUX指摘
+ *    「明細を開くとカテゴリ分けのやつが出てくる。これもいらん」)────
  * P10-31 で品目一覧を「行を開くと見える」形にしたが、この行は元々
- * 「開く=カテゴリ編集フォームを出す」ボタンだったため、品目を見たい
- * だけで開いても常にカテゴリ編集フォームまで一緒に出てしまっていた。
- * 品目が無い(=撮影レシート以外の大半の)明細では「開く=編集したい」
- * のままにして良い(ここで余計な1タップを増やさない)。品目がある
- * 明細だけ、開いた直後は品目一覧のみを見せ、「カテゴリを変更する」を
- * 押すまでカテゴリ編集フォーム(mode='simple'/'split')を出さない。
+ * 「開く=カテゴリ編集フォームを出す」ボタンだったため、開くだけで
+ * 常にカテゴリ編集フォームまで一緒に出てしまっていた。P10-36では
+ * これを品目がある明細だけに絞って直したが、本人から実機の画面(品目の
+ * 無い明細でもフォームが開いたまま並んでいるスクリーンショット)で
+ * 「これも編集でしか不要」と指摘があり、品目の有無に関わらず全ての
+ * 明細に広げた。行を開くと現在の分類(見出しの文字列)と品目(あれば)
+ * だけを見せ、「カテゴリを変更する」を押すまでカテゴリ編集フォーム
+ * (mode='simple'/'split')を出さない。
  *
  * ── 品目の金額修正(ADR-035) ────────────────────────────
  * レシート取り込み時に品目の合計が明細額と一致しなかった(mismatched)
@@ -82,9 +83,8 @@ export function TransactionRowWithSplit({
   const [mode, setMode] = useState<'simple' | 'split'>(
     initialSplits.length > 0 ? 'split' : 'simple',
   );
-  // 品目がある明細だけ、カテゴリ編集フォームを別の明示的な操作にする
-  // (上のコメント参照)。品目が無い明細は常に true 扱いにするので、
-  // この state 自体は「品目がある明細で、変更を押したか」だけを持つ。
+  // カテゴリ編集フォームを開くかどうかは、行を開く(open)とは別の
+  // 明示的な操作にする(上のコメント参照)。
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? '');
   const [splits, setSplits] = useState<readonly TransactionSplit[]>(initialSplits);
@@ -100,9 +100,8 @@ export function TransactionRowWithSplit({
   const [itemsSaving, setItemsSaving] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
-  // 品目が無い明細は今までどおり「開く=カテゴリ編集」のまま。
-  // 品目がある明細だけ、「カテゴリを変更する」を押すまでフォームを隠す。
-  const showCategoryForm = items.length === 0 || categoryFormOpen;
+  // 「カテゴリを変更する」を押すまでフォームを隠す(品目の有無に関わらず)。
+  const showCategoryForm = categoryFormOpen;
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -451,9 +450,9 @@ export function TransactionRowWithSplit({
         </div>
       ) : null}
 
-      {/* 品目がある明細は、開いても品目一覧だけを見せカテゴリ編集は
+      {/* 開いても品目(あれば)と現在の分類だけを見せ、カテゴリ編集は
           明示的に押すまで出さない(このファイル冒頭のコメント参照)。 */}
-      {open && items.length > 0 && !showCategoryForm ? (
+      {open && !showCategoryForm ? (
         <button
           type="button"
           onClick={() => setCategoryFormOpen(true)}
