@@ -46,6 +46,17 @@ type ItemRowState = { name: string; amountYen: string; categoryId: string };
  * (支出=負、収入=正、ADR-008)を掛けて揃える。分割を編集する本人に
  * マイナス記号を意識させないための配慮。
  *
+ * ── レシート品目がある明細は、開いてもカテゴリ編集を自動で出さない
+ *    (本人からのUX指摘「明細を開くとカテゴリ分けのやつが出てくる。
+ *    これもいらん」)────────────────────────────────────────
+ * P10-31 で品目一覧を「行を開くと見える」形にしたが、この行は元々
+ * 「開く=カテゴリ編集フォームを出す」ボタンだったため、品目を見たい
+ * だけで開いても常にカテゴリ編集フォームまで一緒に出てしまっていた。
+ * 品目が無い(=撮影レシート以外の大半の)明細では「開く=編集したい」
+ * のままにして良い(ここで余計な1タップを増やさない)。品目がある
+ * 明細だけ、開いた直後は品目一覧のみを見せ、「カテゴリを変更する」を
+ * 押すまでカテゴリ編集フォーム(mode='simple'/'split')を出さない。
+ *
  * ── 品目の金額修正(ADR-035) ────────────────────────────
  * レシート取り込み時に品目の合計が明細額と一致しなかった(mismatched)
  * 場合だけ、その場で品目の金額・カテゴリを直せる。分割(mode/open)とは
@@ -71,6 +82,10 @@ export function TransactionRowWithSplit({
   const [mode, setMode] = useState<'simple' | 'split'>(
     initialSplits.length > 0 ? 'split' : 'simple',
   );
+  // 品目がある明細だけ、カテゴリ編集フォームを別の明示的な操作にする
+  // (上のコメント参照)。品目が無い明細は常に true 扱いにするので、
+  // この state 自体は「品目がある明細で、変更を押したか」だけを持つ。
+  const [categoryFormOpen, setCategoryFormOpen] = useState(false);
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? '');
   const [splits, setSplits] = useState<readonly TransactionSplit[]>(initialSplits);
   const [rows, setRows] = useState<SplitRowState[]>(() => initialRows(initialSplits, categories));
@@ -85,6 +100,9 @@ export function TransactionRowWithSplit({
   const [itemsSaving, setItemsSaving] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
+  // 品目が無い明細は今までどおり「開く=カテゴリ編集」のまま。
+  // 品目がある明細だけ、「カテゴリを変更する」を押すまでフォームを隠す。
+  const showCategoryForm = items.length === 0 || categoryFormOpen;
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -117,6 +135,7 @@ export function TransactionRowWithSplit({
       return;
     }
     setOpen(false);
+    setCategoryFormOpen(false);
   }
 
   async function save(): Promise<void> {
@@ -146,6 +165,7 @@ export function TransactionRowWithSplit({
     );
     setSaving(false);
     setOpen(false);
+    setCategoryFormOpen(false);
   }
 
   async function clearSplits(): Promise<void> {
@@ -206,7 +226,16 @@ export function TransactionRowWithSplit({
     <li className="px-4 py-3">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
+          // 次に開いたときは、また品目一覧だけの状態から始まってほしい
+          // (開くたびにカテゴリ編集フォームまで出た状態が残らないように)。
+          setOpen((v) => {
+            const next = !v;
+            if (!next) setCategoryFormOpen(false);
+            return next;
+          });
+        }}
         className="flex w-full items-start justify-between gap-3 text-left"
       >
         <div className="min-w-0 flex-1">
@@ -422,7 +451,20 @@ export function TransactionRowWithSplit({
         </div>
       ) : null}
 
-      {open && mode === 'simple' ? (
+      {/* 品目がある明細は、開いても品目一覧だけを見せカテゴリ編集は
+          明示的に押すまで出さない(このファイル冒頭のコメント参照)。 */}
+      {open && items.length > 0 && !showCategoryForm ? (
+        <button
+          type="button"
+          onClick={() => setCategoryFormOpen(true)}
+          className="mt-2 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          カテゴリを変更する
+        </button>
+      ) : null}
+
+      {open && showCategoryForm && mode === 'simple' ? (
         <div
           className="mt-3 space-y-2 rounded-2xl border p-3"
           style={{ borderColor: 'var(--hairline)' }}
@@ -475,7 +517,7 @@ export function TransactionRowWithSplit({
         </div>
       ) : null}
 
-      {open && mode === 'split' ? (
+      {open && showCategoryForm && mode === 'split' ? (
         <div
           className="mt-3 space-y-2 rounded-2xl border p-3"
           style={{ borderColor: 'var(--hairline)' }}
