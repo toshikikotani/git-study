@@ -3,6 +3,12 @@
 /**
  * AI家計診断のカード(ADR-030)。押されたときだけ AI を呼ぶ。
  * 浪費・必要経費どちらも理由付きで全件出す(上位N件に絞らない)。
+ *
+ * ── 内訳は開くまで畳んでおく(本人からのUX指摘「パンパンパンパン、
+ *    詳細見たかったら詳細見るみたいな感じがいい」)──────────────────
+ * 以前は診断済みなら内訳・6ヶ月推移まで常に全展開で、この画面で
+ * 一番縦に場所を取っていた。見出しと浪費比率だけを常に見せ、内訳
+ * (理由付きリスト・推移グラフ)は「詳しく見る」を押すまで畳む。
  */
 
 import { useState } from 'react';
@@ -19,6 +25,7 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const { summary, wasteItems, necessaryItems, undiagnosedCount } = current;
   const wasteRatioPoints = view.trend.rows.map((row) => ({
@@ -65,23 +72,36 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
         </p>
       ) : (
         <>
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            浪費 {formatYen(summary.wasteYen, { sign: 'never' })} ・ 必要経費{' '}
-            {formatYen(summary.necessaryYen, { sign: 'never' })}
-          </p>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((v) => !v)}
+            className="mt-2 flex w-full items-center justify-between gap-3 text-left"
+          >
+            <span className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              浪費 {formatYen(summary.wasteYen, { sign: 'never' })} ・ 必要経費{' '}
+              {formatYen(summary.necessaryYen, { sign: 'never' })}
+            </span>
+            <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+              {detailsOpen ? '閉じる' : '詳しく見る'}
+            </span>
+          </button>
 
-          <DiagnosisItemList
-            heading="浪費と判断した内訳"
-            items={wasteItems}
-            amountColor="var(--over)"
-          />
-          <DiagnosisItemList
-            heading="必要経費と判断した内訳"
-            items={necessaryItems}
-            amountColor="var(--ink)"
-          />
+          {detailsOpen ? (
+            <>
+              <DiagnosisItemList
+                heading="浪費と判断した内訳"
+                items={wasteItems}
+                amountColor="var(--over)"
+              />
+              <DiagnosisItemList
+                heading="必要経費と判断した内訳"
+                items={necessaryItems}
+                amountColor="var(--ink)"
+              />
 
-          <WasteRatioBars points={wasteRatioPoints} />
+              <WasteRatioBars points={wasteRatioPoints} />
+            </>
+          ) : null}
         </>
       )}
 
