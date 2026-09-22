@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { formatYen } from '@/domain/money';
 import type { DetectedSubscription } from '@/domain/subscriptions';
+import { listAccounts } from '@/features/accounts/store';
 import { listCategoryOptions } from '@/features/classification/store';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
@@ -20,6 +21,7 @@ import {
 } from '@/features/transactions/store';
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
+import { TransactionFilters, type TransactionFilterState } from './filters';
 import { TransactionRowWithSplit } from './split-editor';
 
 /**
@@ -32,8 +34,21 @@ import { TransactionRowWithSplit } from './split-editor';
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default async function TransactionsPage() {
-  const [transactions, batches, periodSummary, categories, subscriptions, duplicates] =
+type SearchParams = { account?: string; category?: string; month?: string };
+
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const filter: TransactionFilterState = {
+    accountId: params.account ?? '',
+    categoryId: params.category ?? '',
+    month: params.month ?? '',
+  };
+
+  const [transactions, batches, periodSummary, categories, subscriptions, duplicates, accounts] =
     await withMinDuration(
       Promise.all([
         listTransactions(),
@@ -42,6 +57,7 @@ export default async function TransactionsPage() {
         listCategoryOptions(),
         loadDetectedSubscriptions(),
         listDuplicateCandidates(),
+        listAccounts(),
       ]),
     );
 
@@ -49,15 +65,22 @@ export default async function TransactionsPage() {
     return <EmptyState />;
   }
 
-  const transactionIds = transactions.map((t) => t.id);
+  const months = listMonthOptions(transactions);
+  const filteredTransactions = transactions.filter((t) => matchesFilter(t, filter));
+
+  const transactionIds = filteredTransactions.map((t) => t.id);
   const [splitsByTransactionId, itemsByTransactionId] = await Promise.all([
     listSplitsForDisplay(transactionIds),
     listReceiptItemsForTransactionIds(transactionIds),
   ]);
 
+  // リボ・キャッシング・確認待ちは「今すぐ対応が要るもの」を知らせる目的の
+  // バナーのため、絞り込みの影響を受けない(全件を対象に数える)。絞り込みが
+  // 変えるのは下の一覧だけ。
   const risky = transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod));
   const pending = transactions.filter((t) => t.reviewStatus === 'pending');
-  const groups = groupByDate(transactions);
+  const groups = groupByDate(filteredTransactions);
+  const isFiltered = filter.accountId !== '' || filter.categoryId !== '' || filter.month !== '';
 
   return (
     <div className="rise space-y-3">
@@ -88,6 +111,13 @@ export default async function TransactionsPage() {
           </Link>
         </div>
       </header>
+
+      <TransactionFilters
+        accounts={accounts}
+        categories={categories}
+        months={months}
+        current={filter}
+      />
 
       <PaydayPeriodCard summary={periodSummary} />
 
@@ -142,6 +172,12 @@ export default async function TransactionsPage() {
         </Link>
       ) : null}
 
+      {groups.length === 0 ? (
+        <p className="px-1 text-sm" style={{ color: 'var(--ink-muted)' }}>
+          この絞り込みに一致する明細がありません。
+        </p>
+      ) : null}
+
       {groups.map(([date, rows]) => (
         <section
           key={date}
@@ -173,7 +209,10 @@ export default async function TransactionsPage() {
 
       {batches.length > 0 ? (
         <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-          {transactions.length} 件 / 取り込み {batches.length} 回
+          {isFiltered
+            ? `${filteredTransactions.length} 件 / 全 ${transactions.length} 件`
+            : `${transactions.length} 件`}{' '}
+          / 取り込み {batches.length} 回
         </p>
       ) : null}
     </div>
@@ -353,4 +392,32 @@ function groupByDate(transactions: readonly StoredTransaction[]): [string, Store
     map.set(t.occurredOn, list);
   }
   return [...map.entries()].sort(([a], [b]) => b.localeCompare(a));
+}
+
+/** 明細1件が絞り込み条件に合うか。categoryId === 'none' は未分類を指す。 */
+function matchesFilter(transaction: StoredTransaction, filter: TransactionFilterState): boolean {
+  if (filter.accountId !== '' && transaction.accountId !== filter.accountId) return false;
+  if (filter.categoryId === 'none' && transaction.categoryId !== null) return false;
+  if (
+    filter.categoryId !== '' &&
+    filter.categoryId !== 'none' &&
+    transaction.categoryId !== filter.categoryId
+  ) {
+    return false;
+  }
+  if (filter.month !== '' && !transaction.occurredOn.startsWith(filter.month)) return false;
+  return true;
+}
+
+/** 実際に明細がある月だけを選択肢にする(無い月を選ばせても空の一覧になるだけ)。 */
+function listMonthOptions(
+  transactions: readonly StoredTransaction[],
+): { value: string; label: string }[] {
+  const monthKeys = new Set(transactions.map((t) => t.occurredOn.slice(0, 7)));
+  return [...monthKeys]
+    .sort((a, b) => b.localeCompare(a))
+    .map((monthKey) => {
+      const [year, month] = monthKey.split('-');
+      return { value: monthKey, label: `${year}年${Number(month)}月` };
+    });
 }
