@@ -12,7 +12,6 @@ import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { CategoryBreakdownChart } from './category-breakdown-chart';
 import { DiagnosisCard } from './diagnosis-card';
-import { MonthlyTransactionList } from './transaction-list';
 
 /**
  * 家計簿(本人発案:「ちりつもだけ表示されてて微妙。普通の一般的な家計簿を
@@ -20,10 +19,17 @@ import { MonthlyTransactionList } from './transaction-list';
  *
  * ── 何を「普通の家計簿」とみなしたか ────────────────────────────
  * 今月使った額・収入・先月同日比の収支サマリー、カテゴリ別の内訳(グラフ)、
- * 今月の明細一覧(並び替え可能)、月末までの着地予測の4点セット。どれも
- * 既存の純粋関数(domain/spending.ts・domain/accumulation.ts・domain/budget.ts)
- * を土台にしており、新しい判断ロジックは着地予測(projectedMonthTotalYen)
- * だけ追加した(features/spending/store.ts 参照)。
+ * 月末までの着地予測の3点セット。どれも既存の純粋関数
+ * (domain/spending.ts・domain/accumulation.ts・domain/budget.ts)を土台に
+ * しており、新しい判断ロジックは着地予測(projectedMonthTotalYen)だけ
+ * 追加した(features/spending/store.ts 参照)。
+ *
+ * ── 今月の明細一覧はここに置かない(本人からのUX指摘「情報の重複が
+ *    あってはならない、どこか一箇所見ればその情報がわかるように」)─────
+ * 以前はここに `MonthlyTransactionList`(今月分の再掲)を置いていたが、
+ * `/transactions`(全期間、並び替え・分類編集も可能)と中身がほぼ
+ * そのまま重複していた。同じ明細をこの画面だけ読み取り専用で見せる
+ * 意味は薄く、ヘッダーの「明細(全期間)」リンク1本に統合した。
  *
  * ── ちりつもは補助として残す ────────────────────────────────────
  * 削除はしない——「480円が完済2ヶ月に見える」という小口支出への気づきは
@@ -68,7 +74,6 @@ export default async function SpendingPage() {
       <ForecastCard forecast={ledger.forecast} />
       <DiagnosisCard view={diagnosis} />
       <CategoryBreakdownChart rows={ledger.categoryBreakdown} />
-      <MonthlyTransactionList transactions={ledger.transactions} />
       <PileTeaserCard view={pile} />
     </div>
   );
