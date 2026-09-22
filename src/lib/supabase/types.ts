@@ -1744,6 +1744,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_daily_reports: {
+        Row: {
+          advice: string[];
+          created_at: string;
+          id: string;
+          insights: string[];
+          report_date: string;
+          user_id: string;
+        };
+        Insert: {
+          advice: string[];
+          created_at?: string;
+          id?: string;
+          insights: string[];
+          report_date: string;
+          user_id: string;
+        };
+        Update: {
+          advice?: string[];
+          created_at?: string;
+          id?: string;
+          insights?: string[];
+          report_date?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];
