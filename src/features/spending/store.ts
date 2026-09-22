@@ -12,14 +12,12 @@
 import { compareToPreviousMonthPace, type AccumulationTransaction } from '@/domain/accumulation';
 import { budgetTone, isCountable, type BudgetTransaction } from '@/domain/budget';
 import { resolveCategoryRoot, type CategoryMergeNode } from '@/domain/category';
-import { receiptItemsStatus } from '@/domain/receipt-items';
 import {
   projectedMonthTotalYen,
   summarizeMonthlyIncomeExpense,
   summarizeMonthlySpendByCategory,
   type SpendingTransaction,
 } from '@/domain/spending';
-import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -148,23 +146,13 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   categoryBreakdown.sort((a, b) => b.spentYen - a.spentYen);
 
   const countableThisMonth = thisMonth.filter((tx) => isCountable(tx));
-  // レシートの商品名(ADR-034)。「何に使ったか」を今月の一覧でも見せる。
-  const itemsByTransactionId = await listReceiptItemsForTransactionIds(
-    countableThisMonth.map((tx) => tx.id),
-  );
-
-  const transactions: LedgerTransaction[] = countableThisMonth.map((tx) => {
-    const items = itemsByTransactionId.get(tx.id) ?? [];
-    return {
-      id: tx.id,
-      occurredOn: tx.occurredOn,
-      label: tx.label,
-      categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
-      amountYen: tx.amountYen,
-      itemNames: items.map((item) => item.name),
-      itemsStatus: receiptItemsStatus(items, tx.amountYen),
-    };
-  });
+  const transactions: LedgerTransaction[] = countableThisMonth.map((tx) => ({
+    id: tx.id,
+    occurredOn: tx.occurredOn,
+    label: tx.label,
+    categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
+    amountYen: tx.amountYen,
+  }));
 
   const elapsedDays = daysBetween(thisMonthStart, today) + 1;
   const totalDaysInMonth = daysBetween(thisMonthStart, nextMonthStart);
