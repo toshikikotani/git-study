@@ -274,6 +274,32 @@ export function TransactionRowWithSplit({
         </span>
       </button>
 
+      {/* 品目のタップ導線(本人からの不具合報告「レシートの品目もどこから
+          飛べばいいかわかりません...タップしても何も見れない」)。行を開くと
+          単価付きの内訳が見える(以前はプレビューのテキストだけで、開いても
+          カテゴリ編集フォームしか出ず品目自体は確認できなかった)。 */}
+      {open && items.length > 0 ? (
+        <div className="mt-3 rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
+          <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+            レシートの品目
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-baseline justify-between gap-3 text-xs"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
+                <span className="min-w-0 truncate">{item.name}</span>
+                <span className="tabular shrink-0">
+                  {formatYen(item.amountYen, { sign: 'never' })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {/* 品目の合計が明細額と一致しない(ADR-035)。カテゴリの開閉(open)とは
           独立して、その場で金額・カテゴリを直せるようにする。合わせること
           自体は必須にしない——保存条件は名前が空でない・金額が0でないだけ
