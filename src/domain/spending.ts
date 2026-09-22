@@ -162,3 +162,14 @@ export function projectedMonthTotalYen(
   if (elapsedDays <= 0) return spentSoFarYen;
   return Math.round((spentSoFarYen / elapsedDays) * totalDaysInMonth);
 }
+
+/**
+ * 1日あたりの平均支出(日次レポートで今日の額と比べる基準、ADR-032)。
+ *
+ * 割り算の結果を必ず整数の円に丸める——円は整数で扱う約束(ADR-008)で、
+ * formatYen() は小数を受け取ると例外にする。
+ */
+export function averageDailySpendYen(spentSoFarYen: number, elapsedDays: number): number {
+  if (elapsedDays <= 0) return 0;
+  return Math.round(spentSoFarYen / elapsedDays);
+}
