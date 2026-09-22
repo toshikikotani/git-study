@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AccumulationTransaction } from '@/domain/accumulation';
 import {
+  averageDailySpendYen,
   projectedMonthTotalYen,
   rankMerchantsBySpend,
   savingsRateOf,
@@ -9,6 +10,7 @@ import {
   summarizeMonthlySpendByCategory,
   type SpendingTransaction,
 } from '@/domain/spending';
+import { formatYen } from '@/domain/money';
 
 const CATEGORIES = [
   { id: 'cat-waste', name: '浪費' },
@@ -239,5 +241,23 @@ describe('projectedMonthTotalYen', () => {
 
   it('月が経過し切った(elapsedDays === totalDaysInMonth)場合はそのままの額', () => {
     expect(projectedMonthTotalYen(50_000, 30, 30)).toBe(50_000);
+  });
+});
+
+describe('averageDailySpendYen', () => {
+  it('経過日数で割った1日あたりの額を返す', () => {
+    expect(averageDailySpendYen(30_000, 10)).toBe(3_000);
+  });
+
+  it('割り切れなくても整数の円になる(formatYen が小数を拒むため)', () => {
+    // 10,000 / 3 = 3333.33… を丸める。
+    const value = averageDailySpendYen(10_000, 3);
+    expect(Number.isInteger(value)).toBe(true);
+    expect(value).toBe(3_333);
+    expect(() => formatYen(value)).not.toThrow();
+  });
+
+  it('経過日数が0なら0を返す(0除算を避ける)', () => {
+    expect(averageDailySpendYen(0, 0)).toBe(0);
   });
 });

@@ -10,6 +10,7 @@ import { wasteRatioOf } from '@/domain/diagnosis';
 import type { SpendingPersonaType } from '@/domain/persona';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { loadHomeSummary } from '@/features/home/summary';
+import { averageDailySpendYen } from '@/domain/spending';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
@@ -175,10 +176,6 @@ export async function loadDailyReportInput(now: Date = new Date()): Promise<Dail
     .map(([name, amountYen]) => ({ name, amountYen }))
     .sort((a, b) => b.amountYen - a.amountYen);
 
-  // 月初からの累計 ÷ 経過日数(今日を含む)。今日単体の値と比べる基準として使う。
-  const averageDailySpendYen =
-    ledger.pace.dayOfMonth > 0 ? ledger.pace.thisMonthToDateYen / ledger.pace.dayOfMonth : 0;
-
   const toItem = (item: { label: string; amountYen: number; reasoning: string }) => ({
     label: item.label,
     amountYen: item.amountYen,
@@ -190,7 +187,10 @@ export async function loadDailyReportInput(now: Date = new Date()): Promise<Dail
     totalSpentYen,
     transactionCount: todaysSpending.length,
     categoryBreakdown,
-    averageDailySpendYen,
+    averageDailySpendYen: averageDailySpendYen(
+      ledger.pace.thisMonthToDateYen,
+      ledger.pace.dayOfMonth,
+    ),
     wasteItems: diagnosis.currentMonth.wasteItems
       .filter((item) => item.occurredOn === today)
       .map(toItem),

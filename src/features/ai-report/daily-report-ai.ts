@@ -109,7 +109,7 @@ function buildUserContent(input: DailyReportInput): string {
   const lines: string[] = [
     `${input.dateKey} の家計データ:`,
     '',
-    `今日の支出: ${input.totalSpentYen}円(${input.transactionCount}件) / 今月のここまでの1日あたり平均: ${Math.round(input.averageDailySpendYen)}円`,
+    `今日の支出: ${input.totalSpentYen}円(${input.transactionCount}件) / 今月のここまでの1日あたり平均: ${input.averageDailySpendYen}円`,
     '',
   ];
 
