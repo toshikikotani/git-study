@@ -167,6 +167,9 @@ export async function updateTransactionAction(
     // 学習ルールの作成に失敗しても、明細のカテゴリ更新は既に成功している。
   }
   revalidatePath('/transactions');
+  // /spending のカテゴリ別内訳・カレンダー(calendar.tsx、ADR-043)からも
+  // カテゴリを直せるため、こちらも最新化する。
+  revalidatePath('/spending');
   return { error: null };
 }
 
