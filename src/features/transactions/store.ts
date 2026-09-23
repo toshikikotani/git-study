@@ -265,7 +265,7 @@ export async function importTransactionsAsAdmin(
  * categoryId、classified_by='manual'、review_status='corrected')なので、
  * categoryId は必須のまま受け取る。
  *
- * 金額・日付は本人発案(「今金額と日付が一切編集できない」、ADR-046)で
+ * 金額・日付は本人発案(「今金額と日付が一切編集できない」、ADR-048)で
  * 追加した任意の補正(`patch`)——/transactions の明細行(split-editor.tsx
  * の単純なカテゴリ変更フォーム)だけが渡す。家計簿カレンダー
  * (calendar.tsx)はカテゴリのみを直す入口のため渡さない。amountYen は

@@ -152,7 +152,7 @@ export async function saveImportBatchAction(
  * ルール作成の失敗は明細の更新自体は失敗させない(付随的な最適化のため)。
  *
  * 金額・日付の補正(`patch`)は任意(本人発案「今金額と日付が一切編集
- * できない」、ADR-046)。amountAbsYen は正の大きさ(符号は本人に意識させ
+ * できない」、ADR-048)。amountAbsYen は正の大きさ(符号は本人に意識させ
  * ない、split-editor.tsx の分割入力と同じ設計)——ここで元の明細の収入/
  * 支出の符号(ADR-008)を掛けて揃える。
  */
