@@ -21,6 +21,7 @@ import {
   type ParsedReceiptTransaction,
   type ReceiptParseResult,
 } from '@/features/import/receipt-ai';
+import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { requestAiClassification } from '@/features/transactions/classify-client';
 import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
@@ -85,38 +86,6 @@ import {
  * 撮り直しても一致しなければそれ以上は促さない(retryCount 参照)。
  * どちらも本人必須の操作ではなく、そのまま保存して後から手入力で直せる。
  */
-
-const MAX_IMAGE_SIDE = 1600;
-const JPEG_QUALITY = 0.85;
-
-async function resizeToJpegBase64(file: File): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error ?? new Error('画像を読み込めませんでした'));
-    reader.readAsDataURL(file);
-  });
-
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new window.Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error('画像を読み込めませんでした'));
-    el.src = dataUrl;
-  });
-
-  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(img.width, img.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(img.width * scale));
-  canvas.height = Math.max(1, Math.round(img.height * scale));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('画像を処理できませんでした');
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-  const jpegDataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-  const base64 = jpegDataUrl.split(',')[1];
-  if (!base64) throw new Error('画像を変換できませんでした');
-  return base64;
-}
 
 /** AI分類の結果(押されたときだけ)を、ルール分類済みの行に上書きで反映する。 */
 function applyAiResults(

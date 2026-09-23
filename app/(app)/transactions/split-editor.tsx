@@ -1,16 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
-import { isRiskyPaymentMethod } from '@/features/classification/rules';
+import { DEFAULT_DETECTION_RULES, isRiskyPaymentMethod } from '@/features/classification/rules';
 import type { CategoryOption } from '@/features/classification/store';
 import type { PaymentMethod } from '@/features/import/adapters';
+import { resizeToJpegBase64 } from '@/features/import/resize-image';
+import type { ReceiptParseResult } from '@/features/import/receipt-ai';
 import type { ReceiptItem } from '@/features/receipts/items-store';
+import { fetchLearnedRules } from '@/features/transactions/rules-client';
+import { buildPreview } from '@/features/transactions/import-pipeline';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { replaceReceiptItemsAction, replaceSplitsAction, updateTransactionAction } from './actions';
+import {
+  replaceReceiptItemsAction,
+  replaceSplitsAction,
+  setExpenseSubtypeAction,
+  updateTransactionAction,
+} from './actions';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   revolving: 'リボ払い',
@@ -114,6 +123,91 @@ export function TransactionRowWithSplit({
   // 生活費の小分類(ADR-036)を出してよいかの判定に使う。表示名ではなく
   // code で見る(本人がカテゴリを改名しても判定が崩れないように、ADR-016)。
   const categoryCode = categories.find((c) => c.id === transaction.categoryId)?.code ?? null;
+  const [subtype, setSubtype] = useState(expenseSubtype);
+
+  // 品目の記録が無い明細に、後からレシートを紐付ける(本人発案、P10-40)。
+  // 「品目が無ければ品目の記録はありません、で終わらせず、そこから直接
+  // レシートを登録できるようにしてほしい」という要望に対応。既存の
+  // レシート取り込み画面(/transactions/receipt)は新しい明細を作る前提の
+  // ため、こちらは「この明細に後から品目を足す」専用の経路にした。
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const [attaching, setAttaching] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+
+  async function attachReceipt(file: File): Promise<void> {
+    setAttaching(true);
+    setAttachError(null);
+    try {
+      const imageBase64 = await resizeToJpegBase64(file);
+      const response = await fetch('/api/import/receipt', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg' }),
+      });
+      const parsed = (await response.json()) as ReceiptParseResult;
+      const receipt = parsed.transactions[0];
+      if (!receipt) {
+        setAttachError(parsed.warnings[0] ?? 'レシートとして読み取れませんでした。');
+        return;
+      }
+      if (receipt.items.length === 0 && receipt.expenseSubtype === null) {
+        setAttachError('品目を読み取れませんでした。');
+        return;
+      }
+
+      if (receipt.items.length > 0) {
+        // 品目は既存の分類パイプライン(ルール)に通す。/transactions/receipt
+        // と同じ考え方(ADR-035)だが、こちらは1件だけの追加操作のため
+        // AIへの分類依頼(課金)まではせず、ルールだけで済ませる——それでも
+        // 合わなければ既存の「金額を直す」(mismatched 時の手入力編集、
+        // ADR-035)からカテゴリも直せる。
+        const { rules: learnedRules, categoryNameById } = await fetchLearnedRules();
+        const classified = buildPreview(
+          receipt.items.map((item) => ({
+            occurredOn: transaction.occurredOn,
+            description: item.description,
+            amountYen: item.amountYen,
+            paymentMethod: transaction.paymentMethod,
+          })),
+          transaction.accountId,
+          (i) => `attach-${transaction.id}-${i}`,
+          [...DEFAULT_DETECTION_RULES, ...learnedRules],
+          categoryNameById,
+          'manual',
+        );
+        const payload = classified.map((row, i) => ({
+          name: row.description,
+          amountYen: row.amountYen,
+          categoryId: row.categoryId,
+          productType: receipt.items[i]?.productType ?? null,
+        }));
+        const result = await replaceReceiptItemsAction(transaction.id, payload);
+        if (result.error) {
+          setAttachError(result.error);
+          return;
+        }
+        setItems(
+          payload.map((p, i) => ({
+            id: items[i]?.id ?? `pending-${i}`,
+            name: p.name,
+            amountYen: p.amountYen,
+            categoryId: p.categoryId,
+            categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
+            productType: p.productType,
+          })),
+        );
+      }
+
+      if (receipt.expenseSubtype !== null) {
+        const subtypeResult = await setExpenseSubtypeAction(transaction.id, receipt.expenseSubtype);
+        if (!subtypeResult.error) setSubtype(receipt.expenseSubtype);
+      }
+    } catch {
+      setAttachError('レシートを読み取れませんでした。');
+    } finally {
+      setAttaching(false);
+    }
+  }
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -354,9 +448,39 @@ export function TransactionRowWithSplit({
               ))}
             </ul>
           ) : (
-            <p className="mt-1.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-              品目の記録はありません
-            </p>
+            <div className="mt-1.5 space-y-1.5">
+              <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+                品目の記録はありません
+              </p>
+              {/* 後からレシートを紐付ける(本人発案、P10-40)。「品目が無ければ
+                  ないで終わらせず、その場からレシートを登録できるように」。 */}
+              <input
+                ref={receiptInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void attachReceipt(file);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => receiptInputRef.current?.click()}
+                disabled={attaching}
+                className="text-xs font-semibold disabled:opacity-40"
+                style={{ color: 'var(--accent)' }}
+              >
+                {attaching ? '読み取っています…' : 'レシートを登録する'}
+              </button>
+              {attachError ? (
+                <p className="text-[11px]" style={{ color: 'var(--over)' }}>
+                  {attachError}
+                </p>
+              ) : null}
+            </div>
           )}
         </div>
       ) : null}
@@ -364,9 +488,9 @@ export function TransactionRowWithSplit({
       {/* 生活費の小分類(本人発案、ADR-036)。AIの自由記述で、レシート
           取り込みからしか生まれない値のため無いことも多い。「生活費」
           カテゴリの明細のときだけ、開いた行に控えめに添える。 */}
-      {open && expenseSubtype && categoryCode === 'living' ? (
+      {open && subtype && categoryCode === 'living' ? (
         <p className="mt-1.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-          生活費の内訳:{expenseSubtype}
+          生活費の内訳:{subtype}
         </p>
       ) : null}
 

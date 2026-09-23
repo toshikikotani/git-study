@@ -186,3 +186,20 @@ export async function replaceReceiptItemsAction(
   revalidatePath('/spending');
   return { error: null };
 }
+
+/**
+ * 生活費の小分類を保存する(本人発案、ADR-036)。既存の明細へ後から
+ * レシートを紐付ける機能(P10-40、split-editor.tsx)専用の入口。
+ */
+export async function setExpenseSubtypeAction(
+  transactionId: string,
+  subtype: string,
+): Promise<{ error: string | null }> {
+  try {
+    await setExpenseSubtype(transactionId, subtype);
+  } catch (error) {
+    return { error: describeUserError(error, '生活費の小分類の保存に失敗しました。') };
+  }
+  revalidatePath('/transactions');
+  return { error: null };
+}
