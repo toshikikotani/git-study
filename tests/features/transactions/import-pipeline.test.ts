@@ -31,12 +31,12 @@ describe('buildPreview', () => {
     expect(tx?.paymentMethod).toBe('revolving');
   });
 
-  it('検知ルールはカテゴリを設定しないので、常に確認待ちになる', () => {
+  it('検知ルールはカテゴリを設定しないので未分類のまま、確認待ちキューは撤廃済みなのでauto_ok(ADR-044)', () => {
     const row: ImportableRow = { ...ROW, description: 'リボ払いのご案内' };
     const [tx] = buildPreview([row], 'acc-1', (i) => `${i}`, DEFAULT_DETECTION_RULES);
     expect(tx?.categoryId).toBeNull();
     expect(tx?.classifiedBy).toBe('unclassified');
-    expect(tx?.reviewStatus).toBe('pending');
+    expect(tx?.reviewStatus).toBe('auto_ok');
   });
 
   it('カテゴリを設定するルールに当たれば auto_ok になる', () => {

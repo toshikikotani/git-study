@@ -129,7 +129,6 @@ export default function PastePage() {
         categoryName: applied.categoryName,
         classifiedBy: applied.classifiedBy,
         confidence: applied.confidence,
-        reviewStatus: applied.reviewStatus,
       };
     });
   }, [rulePreview, aiResults]);

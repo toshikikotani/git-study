@@ -152,7 +152,6 @@ export default function ImportPage() {
         categoryName: applied.categoryName,
         classifiedBy: applied.classifiedBy,
         confidence: applied.confidence,
-        reviewStatus: applied.reviewStatus,
       };
     });
   }, [rulePreview, aiResults]);

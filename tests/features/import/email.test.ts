@@ -247,9 +247,10 @@ describe('syncFromMailbox — 自動取り込み', () => {
     expect(result.scannedMessageCount).toBe(2);
   });
 
-  it('分類できない明細は本人の確認へ回す(FR-12)', async () => {
+  it('分類できない明細は未分類のまま取り込む。確認待ちキューは撤廃済み(ADR-044)', async () => {
     const result = await syncFromMailbox({ ...base, query: { since: '2026-09-01' } });
-    expect(result.transactions.every((t) => t.reviewStatus === 'pending')).toBe(true);
+    expect(result.transactions.every((t) => t.classifiedBy === 'unclassified')).toBe(true);
+    expect(result.transactions.every((t) => t.reviewStatus === 'auto_ok')).toBe(true);
   });
 
   it('source_ref に messageId を入れる(M2-7c)', async () => {

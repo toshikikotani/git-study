@@ -4,8 +4,7 @@
  * `/rules` の Server Action(M2-6)。
  *
  * カテゴリ側はフォーム経由(useActionState)、分類ルール側は1タップの操作
- * (優先度の入れ替え・有効無効・削除)なので、確認待ちキュー(M2-5)の
- * `createLearnedRuleAction` と同じく直接呼び出しにする。
+ * (優先度の入れ替え・有効無効・削除)なので、直接呼び出しにする。
  */
 
 import { revalidatePath } from 'next/cache';

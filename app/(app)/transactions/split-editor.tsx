@@ -40,9 +40,8 @@ type SplitRowState = { categoryId: string; amountYen: string; note: string };
  * 操作では条件を満たしようが無く、保存ボタンが常に押せなかった
  * (分割前は `TransactionRow` 自体が編集不可だったため、この単純な
  * 編集経路は実は一度も存在したことが無かった)。単純な変更は
- * `updateTransactionAction()`(既存、確認待ちキューが使っているのと
- * 同じ経路)に戻し、分割は「カテゴリを分ける」から明示的に開く
- * 別モードにした。
+ * `updateTransactionAction()`(既存)に戻し、分割は「カテゴリを分ける」
+ * から明示的に開く別モードにした。
  *
  * 金額の入力は「正の大きさ」で受け取り、保存時に元の明細の符号
  * (支出=負、収入=正、ADR-008)を掛けて揃える。分割を編集する本人に
@@ -145,7 +144,11 @@ export function TransactionRowWithSplit({
     if (!categoryId || categoryUnchanged) return;
     setSaving(true);
     setError(null);
-    const result = await updateTransactionAction(transaction.id, categoryId);
+    const result = await updateTransactionAction(
+      transaction.id,
+      categoryId,
+      transaction.description,
+    );
     setSaving(false);
     if (result.error) {
       setError(result.error);
@@ -250,15 +253,6 @@ export function TransactionRowWithSplit({
                 >
                   <span aria-hidden>!</span>
                   {methodLabel}
-                </span>
-              ) : null}
-
-              {transaction.reviewStatus === 'pending' ? (
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  確認待ち
                 </span>
               ) : null}
 

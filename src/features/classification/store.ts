@@ -3,24 +3,25 @@
  *
  * `features/classification/{rules,ai}.ts` はどちらも純粋関数で、DB にも
  * ネットワークにも触れない(テストしやすさのため意図的にそうしてある)。
- * ここが唯一、Supabase(カテゴリ・確信度の閾値)と Anthropic API の両方に
- * 触れる場所。
+ * ここが唯一、Supabase(カテゴリ)と Anthropic API の両方に触れる場所。
  *
- * ANTHROPIC_API_KEY が未設定でもアプリは動く(エラーにしない)。ルールに
- * 当たらなかった明細は「確認待ち」のまま残るだけ(Gmail 連携・メール貼り付け
- * の AI 救済と同じ考え方)。
+ * ANTHROPIC_API_KEY が未設定でもアプリは動く(エラーにしない)。ルールにも
+ * AI にも当たらなかった明細は「未分類」のまま残るだけ(Gmail 連携・メール
+ * 貼り付けの AI 救済と同じ考え方)。かつては確信度が低い分類・未分類を
+ * どちらも「確認待ち」に回していたが、本人発案(ADR-044)によりこの
+ * 確認待ちの仕組み自体を撤廃した——常に自動で反映し(auto_ok)、
+ * 本人が気になった明細だけその場で編集する運用にした。
  */
 import 'server-only';
 
 import {
-  applyConfidenceThreshold,
+  toAppliedClassification,
   ClaudeTransactionClassifier,
   type ClassifiableTransaction,
 } from '@/features/classification/ai';
 import { buildLearnedRule, type ClassificationRule } from '@/features/classification/rules';
 import { buildRuleMisfireAlert, isMisfiringRule } from '@/domain/alerts';
 import { recordAlertsAsAdmin } from '@/features/alerts/store';
-import { getAppSettings } from '@/features/settings/store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { readAnthropicApiKey } from '@/lib/env';
 import { AppError } from '@/lib/errors';
@@ -54,7 +55,6 @@ export type ClassifyResult = {
   /** AI が答えた確信度(0〜1)。DB 制約(ck_transactions_ai_needs_confidence)により
    * classifiedBy='ai' の保存には必須。AI を呼んでいない(unclassified)行は null。 */
   confidence: number | null;
-  reviewStatus: 'auto_ok' | 'pending';
 };
 
 function unclassified(id: string): ClassifyResult {
@@ -64,14 +64,13 @@ function unclassified(id: string): ClassifyResult {
     categoryName: null,
     classifiedBy: 'unclassified',
     confidence: null,
-    reviewStatus: 'pending',
   };
 }
 
 /**
  * ルールに当たらなかった明細を AI に回す。
  *
- * バッチが失敗した行(AI からの返答が無い行)も「確認待ち」のまま返す。
+ * バッチが失敗した行(AI からの返答が無い行)も未分類のまま返す。
  * 黙って落とさない(NFR-06)。
  */
 export async function classifyUnclassified(
@@ -87,7 +86,7 @@ export async function classifyUnclassified(
     };
   }
 
-  const [categories, settings] = await Promise.all([listCategoryOptions(), getAppSettings()]);
+  const categories = await listCategoryOptions();
   const byCode = new Map(categories.map((category) => [category.code, category]));
 
   const classifier = new ClaudeTransactionClassifier(apiKey);
@@ -97,10 +96,7 @@ export async function classifyUnclassified(
   );
 
   const results = outcome.classifications.map((classification) => {
-    const applied = applyConfidenceThreshold(
-      classification,
-      settings.classificationConfidenceThreshold,
-    );
+    const applied = toAppliedClassification(classification);
     const category = applied.categoryCode ? byCode.get(applied.categoryCode) : undefined;
     return {
       id: classification.transactionId,
@@ -108,11 +104,10 @@ export async function classifyUnclassified(
       categoryName: category?.name ?? null,
       classifiedBy: applied.classifiedBy,
       confidence: applied.confidence,
-      reviewStatus: applied.reviewStatus,
     };
   });
 
-  // バッチ全体が失敗した回など、AI が結果を返さなかった行も確認待ちのまま返す
+  // バッチ全体が失敗した回など、AI が結果を返さなかった行も未分類のまま返す
   const returnedIds = new Set(results.map((result) => result.id));
   const missing = rows.filter((row) => !returnedIds.has(row.id)).map((row) => unclassified(row.id));
 
@@ -292,11 +287,14 @@ export async function moveClassificationRuleDown(id: string): Promise<void> {
 }
 
 /**
- * 確認待ちキューでの1件修正から学習ルールを作る(FR-12, M2-5)。
+ * 本人による1件の分類修正から学習ルールを作る(FR-12, M2-5)。
  *
- * 明細はセッション保存のまま(T-7 未着手)で DB の行を持たないため、
- * learned_from_transaction_id は null のままにする(このルート自体は
- * 任意の FK なので問題ない)。
+ * 以前は確認待ちキューでの確定時だけ呼んでいたが、確認待ちキュー自体を
+ * 撤廃した(本人発案、ADR-044)ため、`updateTransactionAction()`
+ * (app/(app)/transactions/actions.ts)から呼ぶ形に引き継いだ。
+ * `learned_from_transaction_id` は呼び出し元がどの明細か特定して渡す
+ * 経路をまだ持たないため null のままにする(このカラム自体は任意の FK
+ * なので問題ない)。
  */
 export async function createLearnedRule(params: {
   description: string;

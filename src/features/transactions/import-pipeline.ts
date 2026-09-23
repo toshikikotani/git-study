@@ -84,8 +84,9 @@ function buildPreviewRow(
     matchedRuleId: classification.matchedRuleId,
     classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
     confidence: null,
-    // 分類が付いていないものは本人の確認へ回す(FR-12)
-    reviewStatus: classification.categoryId ? 'auto_ok' : 'pending',
+    // 確認待ちキューは撤廃した(本人発案、ADR-044)。分類が付かなければ
+    // 「未分類」のまま明細一覧に残るだけで、本人が気づいたら編集する。
+    reviewStatus: 'auto_ok',
     source,
     fingerprint: fingerprintOf(row),
     batchId: null,

@@ -7,10 +7,10 @@
  * (features/import/mail-sync.ts が cron route から分離されているのと同じ理由)。
  *
  * ── 分類はルールのみ(AI分類は使わない)────────────────────
- * 本人のセッションが無い経路であり、確認待ちキュー(M2-5)を本人が見るまで
- * 分類ミスに気づく手段が無い。app/api/cron/import-gmail/route.ts と同じ方針
- * (ADR-019)で、classifyUnclassified()(AI分類)は呼ばない。ルールに当たら
- * なければ review_status='pending' のまま確認待ちに積む。
+ * 本人のセッションが無い経路であり、次に本人が明細一覧を開くまで分類ミスに
+ * 気づく手段が無い。app/api/cron/import-gmail/route.ts と同じ方針(ADR-019)
+ * で、classifyUnclassified()(AI分類)は呼ばない。ルールに当たらなければ
+ * 「未分類」のまま保存する(確認待ちキューは撤廃済み、本人発案・ADR-044)。
  *
  * ── 商品行の分割(transaction_splits)は対象外 ────────────────
  * /transactions/receipt の商品行分割(P-41)は本人がプレビュー画面で内容を

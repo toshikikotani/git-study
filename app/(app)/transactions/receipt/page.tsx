@@ -68,11 +68,7 @@ import {
  * だけは、店名+合計の1件ではなく商品行1つずつを既存の分類パイプライン
  * (ルール→本人操作でのAI)に通し、保存時に transaction_splits として自動
  * 生成する(features/transactions/splits-store.ts、P8-2 で追加済み)。明細
- * 本体(親)の分類は変えない。ただし親が「確認待ち」のまま残ると、確認待ち
- * キューで本人が1カテゴリだけ選んだ瞬間にその店名の学習ルールができ、次の
- * 同じ店の買い物が(実際は食費+日用品の混在でも)全部そのカテゴリに誤爆する。
- * 実際の分類は商品行(=splits)側にあるため、親は保存時に auto_ok へ倒す
- * (save() 参照)。
+ * 本体(親)の分類は変えない——実際の分類は商品行(=splits)側にある。
  *
  * ── 品目もできれば分類したい(本人発案、ADR-035) ────────────
  * 分割の対象になるかどうかに関わらず、商品行が1件でもあれば分類パイプライン
@@ -102,7 +98,6 @@ function applyAiResults(
       categoryName: applied.categoryName,
       classifiedBy: applied.classifiedBy,
       confidence: applied.confidence,
-      reviewStatus: applied.reviewStatus,
     };
   });
 }
@@ -546,13 +541,7 @@ export default function ReceiptPage() {
           receiptExpenseSubtypes.push({ sourceRef, subtype: expenseSubtype });
         }
 
-        return {
-          ...t,
-          sourceRef,
-          // 商品ごとに分割する場合だけ、明細本体は確認待ちに出さない(理由は上部コメント参照)。
-          reviewStatus:
-            split && t.reviewStatus === 'pending' ? ('auto_ok' as const) : t.reviewStatus,
-        };
+        return { ...t, sourceRef };
       });
 
       const outcome = await saveImportBatchAction(

@@ -42,16 +42,6 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
               {methodLabel}
             </span>
           ) : null}
-
-          {/* FR-12:確信度が低く、本人の確認を待っているもの */}
-          {transaction.reviewStatus === 'pending' ? (
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-            >
-              確認待ち
-            </span>
-          ) : null}
         </div>
       </div>
 

@@ -77,11 +77,10 @@ export default async function TransactionsPage({
       listExpenseSubtypesForTransactionIds(transactionIds),
     ]);
 
-  // リボ・キャッシング・確認待ちは「今すぐ対応が要るもの」を知らせる目的の
-  // バナーのため、絞り込みの影響を受けない(全件を対象に数える)。絞り込みが
-  // 変えるのは下の一覧だけ。
+  // リボ・キャッシングは「今すぐ対応が要るもの」を知らせる目的のバナーのため、
+  // 絞り込みの影響を受けない(全件を対象に数える)。絞り込みが変えるのは
+  // 下の一覧だけ。
   const risky = transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod));
-  const pending = transactions.filter((t) => t.reviewStatus === 'pending');
   const groups = groupByDate(filteredTransactions);
   const isFiltered = filter.accountId !== '' || filter.categoryId !== '' || filter.month !== '';
 
@@ -153,21 +152,6 @@ export default async function TransactionsPage({
         >
           <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
             二重に入っていそうな明細が {duplicates.length} 組
-          </p>
-          <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-            確認する →
-          </span>
-        </Link>
-      ) : null}
-
-      {pending.length > 0 ? (
-        <Link
-          href="/transactions/review"
-          className="flex items-center justify-between gap-3 rounded-2xl p-4"
-          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-        >
-          <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            確認待ちが {pending.length} 件
           </p>
           <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
             確認する →
