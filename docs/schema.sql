@@ -1670,6 +1670,9 @@ create table public.receipt_items (
   -- カテゴリ分割(transaction_splits)の対象かどうかに関わらず品目単体にも
   -- 付けられる。null は分類できなかった・分類前(ADR-035)
   category_id    uuid        references public.categories(id) on delete set null,
+  -- 固定カテゴリとは別の、商品の種類そのもののAI自由記述(ADR-036)。
+  -- 例:飲料・調味料・菓子。固定語彙を与えないため enum ではなく text
+  product_type   text,
 
   created_at     timestamptz not null default now(),
 
@@ -1679,6 +1682,27 @@ create table public.receipt_items (
 
 create index ix_receipt_items_transaction on public.receipt_items (transaction_id, sort_order);
 create index ix_receipt_items_user on public.receipt_items (user_id);
+
+
+-- -----------------------------------------------------------------------------
+-- 3.29 transaction_expense_subtypes — 生活費の小分類(本人発案、ADR-036)
+--
+--   「生活費」カテゴリの明細が具体的に何系の生活費か(食費・日用品・外食
+--   など)をAIの自由記述で持たせる。receipt_items・transaction_splits と
+--   同じく、この値は今のところレシート取り込みという1つの経路からしか
+--   生まれない(通常の CSV・メール取り込みでは値が無い)ため、transactions
+--   本体に列を足すのではなく別テーブルにした。1明細につき最大1行。
+-- -----------------------------------------------------------------------------
+create table public.transaction_expense_subtypes (
+  transaction_id uuid        primary key references public.transactions(id) on delete cascade,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  subtype        text        not null,
+  created_at     timestamptz not null default now(),
+
+  constraint ck_transaction_expense_subtypes_not_blank check (btrim(subtype) <> '')
+);
+
+create index ix_transaction_expense_subtypes_user on public.transaction_expense_subtypes (user_id);
 
 
 -- =============================================================================
@@ -2077,7 +2101,8 @@ begin
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
-    'ai_monthly_reports','ai_daily_reports','receipt_items'
+    'ai_monthly_reports','ai_daily_reports','receipt_items',
+    'transaction_expense_subtypes'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

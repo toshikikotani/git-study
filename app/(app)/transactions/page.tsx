@@ -11,6 +11,7 @@ import {
   loadPaydayPeriodSummary,
   type PaydayPeriodSummary,
 } from '@/features/transactions/period-summary';
+import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { listSplitsForDisplay } from '@/features/transactions/splits-store';
@@ -69,10 +70,12 @@ export default async function TransactionsPage({
   const filteredTransactions = transactions.filter((t) => matchesFilter(t, filter));
 
   const transactionIds = filteredTransactions.map((t) => t.id);
-  const [splitsByTransactionId, itemsByTransactionId] = await Promise.all([
-    listSplitsForDisplay(transactionIds),
-    listReceiptItemsForTransactionIds(transactionIds),
-  ]);
+  const [splitsByTransactionId, itemsByTransactionId, expenseSubtypeByTransactionId] =
+    await Promise.all([
+      listSplitsForDisplay(transactionIds),
+      listReceiptItemsForTransactionIds(transactionIds),
+      listExpenseSubtypesForTransactionIds(transactionIds),
+    ]);
 
   // リボ・キャッシング・確認待ちは「今すぐ対応が要るもの」を知らせる目的の
   // バナーのため、絞り込みの影響を受けない(全件を対象に数える)。絞り込みが
@@ -201,6 +204,7 @@ export default async function TransactionsPage({
                 categories={categories}
                 initialSplits={splitsByTransactionId.get(t.id) ?? []}
                 receiptItems={itemsByTransactionId.get(t.id) ?? []}
+                expenseSubtype={expenseSubtypeByTransactionId.get(t.id) ?? null}
               />
             ))}
           </ul>

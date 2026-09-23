@@ -1778,6 +1778,7 @@ export type Database = {
           created_at: string;
           id: string;
           name: string;
+          product_type: string | null;
           sort_order: number;
           transaction_id: string;
           user_id: string;
@@ -1788,6 +1789,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           name: string;
+          product_type?: string | null;
           sort_order?: number;
           transaction_id: string;
           user_id: string;
@@ -1798,6 +1800,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           name?: string;
+          product_type?: string | null;
           sort_order?: number;
           transaction_id?: string;
           user_id?: string;
@@ -1814,6 +1817,35 @@ export type Database = {
             foreignKeyName: 'receipt_items_transaction_id_fkey';
             columns: ['transaction_id'];
             isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      transaction_expense_subtypes: {
+        Row: {
+          created_at: string;
+          subtype: string;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          subtype: string;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          subtype?: string;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_expense_subtypes_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: true;
             referencedRelation: 'transactions';
             referencedColumns: ['id'];
           },

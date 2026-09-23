@@ -3,7 +3,12 @@
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
-import { saveImportBatchAction, type ReceiptItemsInput, type ReceiptSplitInput } from '../actions';
+import {
+  saveImportBatchAction,
+  type ReceiptExpenseSubtypeInput,
+  type ReceiptItemsInput,
+  type ReceiptSplitInput,
+} from '../actions';
 import { ensureDefaultAccountAction } from '../../accounts/actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
@@ -523,37 +528,55 @@ export default function ReceiptPage() {
 
       const receiptSplits: ReceiptSplitInput[] = [];
       const receiptItems: ReceiptItemsInput[] = [];
+      // 「生活費」の小分類(本人発案、ADR-036)。receiptItems と同じ sourceRef
+      // の仕組みで保存後の実 id と対応付ける。品目が無い(内訳の無い)明細
+      // でも小分類だけは付くことがあるため、sourceRef の発行は品目の有無
+      // だけで決めない(下の判定を参照)。
+      const receiptExpenseSubtypes: ReceiptExpenseSubtypeInput[] = [];
       const previewToSave = p.preview.map((t, i) => {
-        const rawItems = p.entry.extracted.transactions[i]?.items ?? [];
-        if (rawItems.length === 0) return t;
+        const rawTransaction = p.entry.extracted.transactions[i];
+        const rawItems = rawTransaction?.items ?? [];
+        const expenseSubtype = rawTransaction?.expenseSubtype ?? null;
+        if (rawItems.length === 0 && expenseSubtype === null) return t;
 
-        // 商品行があれば、分割の対象になるかどうかに関わらず必ず記録する
-        // (ADR-034)。品目もできれば分類したい(本人発案、ADR-035)ので、
-        // 生の商品行ではなく分類済みの行(itemPreviewByIndex)を使う——
-        // 分割の対象にならない品目も、ここでは分類パイプラインを通っている
-        // (entryPreviews 参照)。sourceRef は保存後の実 id と対応付ける鍵。
         const sourceRef = crypto.randomUUID();
-        const classifiedItems = p.itemPreviewByIndex.get(i);
-        receiptItems.push({
-          sourceRef,
-          items: (classifiedItems ?? []).map((item) => ({
-            name: item.description,
-            amountYen: item.amountYen,
-            categoryId: item.categoryId,
-          })),
-        });
 
-        const split = p.splitEligible[i] && classifiedItems && classifiedItems.length >= 2;
-        if (split) {
-          receiptSplits.push({
+        let split = false;
+        if (rawItems.length > 0) {
+          // 商品行があれば、分割の対象になるかどうかに関わらず必ず記録する
+          // (ADR-034)。品目もできれば分類したい(本人発案、ADR-035)ので、
+          // 生の商品行ではなく分類済みの行(itemPreviewByIndex)を使う——
+          // 分割の対象にならない品目も、ここでは分類パイプラインを通って
+          // いる(entryPreviews 参照)。商品の種類(productType)だけは
+          // 分類パイプラインを通らない生の読み取り結果から補う(ADR-036)。
+          const classifiedItems = p.itemPreviewByIndex.get(i) ?? [];
+          receiptItems.push({
             sourceRef,
-            splits: classifiedItems.map((item) => ({
-              categoryId: item.categoryId,
+            items: classifiedItems.map((item, j) => ({
+              name: item.description,
               amountYen: item.amountYen,
-              note: item.description,
+              categoryId: item.categoryId,
+              productType: rawItems[j]?.productType ?? null,
             })),
           });
+
+          split = Boolean(p.splitEligible[i] && classifiedItems.length >= 2);
+          if (split) {
+            receiptSplits.push({
+              sourceRef,
+              splits: classifiedItems.map((item) => ({
+                categoryId: item.categoryId,
+                amountYen: item.amountYen,
+                note: item.description,
+              })),
+            });
+          }
         }
+
+        if (expenseSubtype !== null) {
+          receiptExpenseSubtypes.push({ sourceRef, subtype: expenseSubtype });
+        }
+
         return {
           ...t,
           sourceRef,
@@ -574,6 +597,7 @@ export default function ReceiptPage() {
         },
         receiptSplits,
         receiptItems,
+        receiptExpenseSubtypes,
       );
       if (outcome.error) {
         failed.push(outcome.error);

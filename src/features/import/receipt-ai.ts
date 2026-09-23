@@ -23,6 +23,18 @@
  * 返す——呼び出し側(receipt/page.tsx)がこれを常に `receipt_items` として
  * 保存する。カテゴリごとに分割できるか(2件以上・合計一致)は別の判断で、
  * items を返すかどうかとは独立している。
+ *
+ * ── 品目の商品分類・生活費の小分類(本人発案、ADR-036) ────────────
+ * 「レシートの商品の分類と、生活費の何系かの小分類も、AIの自由判断で
+ * 付けてほしい」という追加要望。`category_id`(既存の固定カテゴリ一覧
+ * からの分類、ADR-035)とは別に、ここでは商品ごとの品目名(`product_type`、
+ * 例:飲料・調味料・菓子)と、レシート全体としての生活費の内訳
+ * (`expense_subtype`、例:食費・日用品・外食)を、固定語彙を与えず
+ * モデルの自由記述で返させる。固定カテゴリと違い「選択肢の中から選ぶ」
+ * のではなく「一言で言い表す」タスクのため、あえて選択肢を渡さない
+ * (表記ゆれは許容し、新しい言い回しが自然に増えていくことを是とする)。
+ * 判断できない・当てはまらない場合は空文字を返させ、こちら側で null に
+ * 変換する(空文字のまま保存しない)。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -53,6 +65,8 @@ export type ParsedReceiptItem = {
   description: string;
   /** 支出が負(ADR-008)。親の明細と同じ符号。 */
   amountYen: number;
+  /** 商品の種類のAIによる自由記述(例:飲料・調味料、ADR-036)。判断できなければ null。 */
+  productType: string | null;
 };
 
 export type ParsedReceiptTransaction = {
@@ -67,6 +81,13 @@ export type ParsedReceiptTransaction = {
    * ここに何も入らなくても取り込み自体は今までどおり1件のまま行える。
    */
   items: readonly ParsedReceiptItem[];
+  /**
+   * 生活費の何系かのAIによる自由記述(例:食費・日用品・外食、ADR-036)。
+   * 生活費に当てはまらなそうなレシートは null。実際に「生活費」カテゴリ
+   * として分類されたときだけ画面に出す(呼び出し側の判断、receipt-ai.ts
+   * ではカテゴリ分類そのものを行わない)。
+   */
+  expenseSubtype: string | null;
 };
 
 export type ReceiptParseResult = {
@@ -92,6 +113,12 @@ export interface AiReceiptExtractor {
 const itemSchema = z.object({
   name: z.string().describe('商品名・品名。レシートに印字された表記のまま。'),
   amount_yen: z.number().describe('その商品の金額(値引き後の実際の請求額)。円単位の整数。'),
+  product_type: z
+    .string()
+    .describe(
+      'その商品の種類を一言で(例:飲料、調味料、菓子、日用品、書籍)。固定の選択肢は無い。' +
+        '自由に判断してよい。何の商品か判断できなければ空文字。',
+    ),
 });
 
 const rowSchema = z.object({
@@ -116,6 +143,13 @@ const rowSchema = z.object({
     .describe(
       'レシートに印字された商品行。小計・合計・お預り・お釣り・消費税・ポイントの行は' +
         '含めない。内訳が印字されていない、または商品が1点しかない場合は空配列。',
+    ),
+  expense_subtype: z
+    .string()
+    .describe(
+      'この支払いが生活費(食費・日用品・外食・交通費のような暮らしの支出)だとすれば、' +
+        '具体的に何系かを一言で。固定の選択肢は無い。生活費に当てはまらなそうな支払い' +
+        '(投資・趣味・交際費など)や判断が難しい場合は空文字。',
     ),
 });
 
@@ -146,6 +180,13 @@ const SYSTEM_PROMPT = [
   '- 1枚に複数のレシートが写っていれば、すべて返す。',
   '- レシート・領収書でない画像(無関係な写真、読み取れないほど不鮮明な画像など)は',
   '  is_receipt を false にして transactions を空にする。',
+  '',
+  '例外(ここだけは推測してよい):',
+  '- product_type(商品の種類)と expense_subtype(生活費の何系か)は、',
+  '  レシートに印字されている文字ではなく、店名・商品名から判断するあなた自身の',
+  '  判断です。固定の選択肢は渡さないので、自然な日本語の一言で自由に答えて',
+  '  ください。自信が無くても、無理に空文字にせず一番近いと思う言葉を返して',
+  '  よい。本当に判断のしようがない場合だけ空文字にする。',
 ].join('\n');
 
 /**
@@ -234,6 +275,7 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
       // ここが FR-21 の砦。判定するのはモデルではなく正規表現(ADR-010)。
       paymentMethod: readPaymentMethod(row.payment_method_text),
       items: buildItems(row.items),
+      expenseSubtype: toNullableLabel(row.expense_subtype),
     });
   }
 
@@ -254,18 +296,26 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
  * どうかで、品目そのものを記録するかどうかを左右しない。
  */
 function buildItems(
-  rawItems: readonly { name: string; amount_yen: number }[],
+  rawItems: readonly { name: string; amount_yen: number; product_type: string }[],
 ): ParsedReceiptItem[] {
   return rawItems
     .map((it) => ({
       description: it.name.trim(),
       amountYen: -Math.abs(Math.round(it.amount_yen)),
+      productType: toNullableLabel(it.product_type),
     }))
     .filter((it) => Number.isFinite(it.amountYen) && it.amountYen !== 0)
     .map((it) => ({
       description: it.description === '' ? '(品名不明)' : it.description,
       amountYen: it.amountYen,
+      productType: it.productType,
     }));
+}
+
+/** 自由記述のAI判断(product_type/expense_subtype、ADR-036)。空文字は null にする。 */
+function toNullableLabel(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 /**
