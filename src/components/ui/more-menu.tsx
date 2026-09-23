@@ -28,21 +28,22 @@
  * 背景タップで閉じるはずのオーバーレイがそのナビバーの小さな矩形内にしか
  * 存在しないことになっていた——「開くと画面のどこを押しても閉じない」という
  * 報告はこれが原因。`createPortal` で `document.body` 直下に描画し、
- * どんな祖先の CSS にも影響されない土台にした。
+ * どんな祖先の CSS にも影響されない土台にした。シートの枠自体は
+ * `bottom-sheet.tsx`(明細行の長押しプレビューと共有)が担う。
  *
  * ── なぜアンマウントしないのか ──────────────────────────────
  * 開閉のたびに DOM を作り直すと、閉じるときのアニメーションを再生する前に
  * 消えてしまう。常時マウントしたまま transform/opacity と pointer-events を
- * 切り替えることで、開閉どちらの向きも同じ transition で処理する。
+ * 切り替えることで、開閉どちらの向きも同じ transition で処理する
+ * (`bottom-sheet.tsx` も同じ理由でアンマウントしない)。
  */
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { MdMoreHoriz } from 'react-icons/md';
 
-import { useIsClient } from './use-is-client';
+import { BottomSheet } from './bottom-sheet';
 
 // `as const` にして href をリテラル型のまま保つ。Next の typed routes(next.config.ts)は
 // `<Link href>` に渡る型がリテラルの Route であることを要求するため、途中で
@@ -102,9 +103,6 @@ const GROUPS = [
 
 export function MoreMenu() {
   const [open, setOpen] = useState(false);
-  // createPortal は document.body を要求するため、サーバーレンダー(document が無い)
-  // では描画しない。
-  const isClient = useIsClient();
   const pathname = usePathname();
 
   // 画面遷移が起きたら(リンクを踏んだ・戻るボタンなど)必ず閉じる。
@@ -152,126 +150,70 @@ export function MoreMenu() {
         <MdMoreHoriz aria-hidden size={22} />
       </button>
 
-      {isClient
-        ? createPortal(
-            <MoreMenuOverlay open={open} onClose={() => setOpen(false)} />,
-            document.body,
-          )
-        : null}
-    </>
-  );
-}
-
-function MoreMenuOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <>
-      {/* 背景。フェードのみ、動きは付けない(方向感が要らない)。ここをタップすると閉じる */}
-      <div
-        aria-hidden={!open}
-        onClick={onClose}
-        className="fixed inset-0 z-40 transition-opacity duration-200 ease-out motion-reduce:transition-none"
-        style={{
-          background: 'rgba(10, 16, 32, 0.45)',
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? 'auto' : 'none',
-        }}
-      />
-
-      {/* シート本体。UIKit のモーダル遷移に準じたイージング(ADR-028、
-          ADR-027の emphasized-decelerate から置き換え)で「行き過ぎてから
-          収まる」動きにする。 */}
-      <div
-        role="menu"
-        aria-hidden={!open}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform will-change-transform motion-reduce:transition-none"
-        style={{
-          transform: open ? 'translateY(0)' : 'translateY(110%)',
-          transitionDuration: 'var(--duration-slow)',
-          transitionTimingFunction: 'var(--ease-sheet)',
-          pointerEvents: open ? 'auto' : 'none',
-        }}
-      >
-        {/* Liquid Glass シート(ADR-028)。ボトムナビと同じ半透明+ぼかしの
-            素材だが、内容を覆い隠す面なので strong(より濃いティント)を使う。 */}
-        <div
-          className="max-h-[75dvh] overflow-y-auto p-2"
-          style={{
-            borderRadius: 'var(--radius-xl)',
-            background: 'var(--glass-tint-strong)',
-            backdropFilter: 'var(--glass-blur-strong)',
-            WebkitBackdropFilter: 'var(--glass-blur-strong)',
-            border: '1px solid var(--glass-border)',
-            boxShadow: 'var(--glass-shadow-float)',
-          }}
-        >
-          <div className="flex justify-center pt-2 pb-1">
-            <span className="h-1.5 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
-          </div>
-
-          <div className="flex items-center justify-between px-3 pt-1 pb-2">
-            <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
-              その他の機能
-            </h2>
-            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-              外側をタップで閉じる
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
-            {GROUPS.map((group) => (
-              <section key={group.title}>
-                <h3
-                  className="px-2 pb-1.5 text-[11px] font-medium tracking-[0.06em] uppercase"
-                  style={{ color: 'var(--ink-muted)' }}
-                >
-                  {group.title}
-                </h3>
-                <div
-                  className="overflow-hidden"
-                  style={{ borderRadius: 'var(--radius-md)', background: 'var(--surface)' }}
-                >
-                  {/* prefetch={false}:app/(app)/layout.tsx のナビと同じ理由
-                      (本人からの不具合報告「読み込み中に画面全体にローディング
-                      表示されない」)。 */}
-                  {group.items.map((item, i) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      prefetch={false}
-                      role="menuitem"
-                      onClick={onClose}
-                      className="flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
-                      style={{
-                        borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
-                      }}
-                    >
-                      <span>
-                        <span
-                          className="block text-[14px] font-medium"
-                          style={{ color: 'var(--ink)' }}
-                        >
-                          {item.label}
-                        </span>
-                        {'dek' in item ? (
-                          <span
-                            className="mt-0.5 block text-[11.5px]"
-                            style={{ color: 'var(--ink-muted)' }}
-                          >
-                            {item.dek}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
-                        →
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+      <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">
+        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+          <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+            その他の機能
+          </h2>
+          <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+            外側をタップで閉じる
+          </span>
         </div>
-      </div>
+
+        <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
+          {GROUPS.map((group) => (
+            <section key={group.title}>
+              <h3
+                className="px-2 pb-1.5 text-[11px] font-medium tracking-[0.06em] uppercase"
+                style={{ color: 'var(--ink-muted)' }}
+              >
+                {group.title}
+              </h3>
+              <div
+                className="overflow-hidden"
+                style={{ borderRadius: 'var(--radius-md)', background: 'var(--surface)' }}
+              >
+                {/* prefetch={false}:app/(app)/layout.tsx のナビと同じ理由
+                    (本人からの不具合報告「読み込み中に画面全体にローディング
+                    表示されない」)。 */}
+                {group.items.map((item, i) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={false}
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
+                    style={{
+                      borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
+                    }}
+                  >
+                    <span>
+                      <span
+                        className="block text-[14px] font-medium"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        {item.label}
+                      </span>
+                      {'dek' in item ? (
+                        <span
+                          className="mt-0.5 block text-[11.5px]"
+                          style={{ color: 'var(--ink-muted)' }}
+                        >
+                          {item.dek}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+                      →
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </BottomSheet>
     </>
   );
 }
