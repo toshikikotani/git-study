@@ -18,7 +18,7 @@ import { CategoryBreakdownChart, type DrilldownTransaction } from './category-br
 import { DiagnosisCard } from './diagnosis-card';
 import { ReorderableCards, type SpendingCardKey } from './reorderable-cards';
 
-/** カードの既定の並び順(ADR-043/044 時点の並び、ADR-046参照)。 */
+/** カードの既定の並び順(ADR-043/044 時点の並び、ADR-047参照)。 */
 const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
   'summary',
   'calendar',
@@ -89,7 +89,7 @@ const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
  * 各明細に `CategoryBreakdownChart` と同じ `ReceiptItemsPanel` を出して
  * レシートの品目まで見えるようにした(ADR-033、部品を複製しない)。
  *
- * ── カードの並び順は本人が自由に変えられる(本人発案、ADR-046)──────
+ * ── カードの並び順は本人が自由に変えられる(本人発案、ADR-047)──────
  * 「そこの部分自由にレイアウト変えれるようにしたい」への対応。並び替えの
  * たびに本人からの指摘→コード変更という往復(ADR-043/044)が続いていた
  * ため、`ReorderableCards`(reorderable-cards.tsx)で本人が直接、各カードを
