@@ -18,6 +18,7 @@ import {
   summarizeMonthlySpendByCategory,
   type SpendingTransaction,
 } from '@/domain/spending';
+import type { PaymentMethod } from '@/features/import/adapters';
 import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -77,7 +78,7 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   const { data: rows, error: txError } = await supabase
     .from('transactions')
     .select(
-      'id, occurred_on, description, merchant_name, amount_yen, category_id, is_transfer, review_status',
+      'id, occurred_on, description, merchant_name, amount_yen, category_id, is_transfer, review_status, account_id, payment_method',
     )
     .gte('occurred_on', rangeStart)
     .lte('occurred_on', today)
@@ -95,17 +96,23 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
     categories.find((c) => c.id === categoryId)?.default_monthly_budget_yen ??
     null;
 
-  const mapped: (BudgetTransaction & { id: string; occurredOn: string; label: string })[] =
-    rows.map((row) => ({
-      id: row.id,
-      categoryId:
-        row.category_id === null ? null : resolveCategoryRoot(row.category_id, mergeNodes),
-      amountYen: row.amount_yen,
-      isTransfer: row.is_transfer,
-      reviewStatus: row.review_status,
-      occurredOn: row.occurred_on,
-      label: row.merchant_name ?? row.description,
-    }));
+  const mapped: (BudgetTransaction & {
+    id: string;
+    occurredOn: string;
+    label: string;
+    accountId: string;
+    paymentMethod: PaymentMethod;
+  })[] = rows.map((row) => ({
+    id: row.id,
+    categoryId: row.category_id === null ? null : resolveCategoryRoot(row.category_id, mergeNodes),
+    amountYen: row.amount_yen,
+    isTransfer: row.is_transfer,
+    reviewStatus: row.review_status,
+    occurredOn: row.occurred_on,
+    label: row.merchant_name ?? row.description,
+    accountId: row.account_id,
+    paymentMethod: row.payment_method,
+  }));
 
   const thisMonth = mapped.filter((tx) => tx.occurredOn >= thisMonthStart);
   const monthKey = thisMonthStart.slice(0, 7);
@@ -150,8 +157,11 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
     id: tx.id,
     occurredOn: tx.occurredOn,
     label: tx.label,
+    categoryId: tx.categoryId,
     categoryName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
     amountYen: tx.amountYen,
+    accountId: tx.accountId,
+    paymentMethod: tx.paymentMethod,
   }));
 
   const elapsedDays = daysBetween(thisMonthStart, today) + 1;

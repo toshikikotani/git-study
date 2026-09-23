@@ -1,27 +1,19 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
-import { formatYen } from '@/domain/money';
-import { receiptItemsStatus } from '@/domain/receipt-items';
-import { DEFAULT_DETECTION_RULES, isRiskyPaymentMethod } from '@/features/classification/rules';
-import type { CategoryOption } from '@/features/classification/store';
-import type { PaymentMethod } from '@/features/import/adapters';
-import { resizeToJpegBase64 } from '@/features/import/resize-image';
-import type { ReceiptParseResult } from '@/features/import/receipt-ai';
-import type { ReceiptItem } from '@/features/receipts/items-store';
-import { fetchLearnedRules } from '@/features/transactions/rules-client';
-import { buildPreview } from '@/features/transactions/import-pipeline';
-import type { TransactionSplit } from '@/features/transactions/splits-store';
-import type { StoredTransaction } from '@/features/transactions/store';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { SwipeableRow } from '@/components/ui/swipeable-row';
-import {
-  replaceReceiptItemsAction,
-  replaceSplitsAction,
-  setExpenseSubtypeAction,
-  updateTransactionAction,
-} from './actions';
+import { formatYen } from '@/domain/money';
+import { receiptItemsStatus } from '@/domain/receipt-items';
+import { isRiskyPaymentMethod } from '@/features/classification/rules';
+import type { CategoryOption } from '@/features/classification/store';
+import type { PaymentMethod } from '@/features/import/adapters';
+import type { ReceiptItem } from '@/features/receipts/items-store';
+import type { TransactionSplit } from '@/features/transactions/splits-store';
+import type { StoredTransaction } from '@/features/transactions/store';
+import { replaceSplitsAction, updateTransactionAction } from './actions';
+import { ReceiptItemsPanel } from './receipt-items-panel';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   revolving: 'リボ払い',
@@ -30,13 +22,6 @@ const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
 };
 
 type SplitRowState = { categoryId: string; amountYen: string; note: string };
-type ItemRowState = {
-  name: string;
-  amountYen: string;
-  categoryId: string;
-  /** AIが付けた商品分類(ADR-036)。この手入力フォームでは編集させず、そのまま持ち回す。 */
-  productType: string | null;
-};
 
 /**
  * 明細1行 + カテゴリの編集(単一カテゴリの変更・複数カテゴリへの分割)。
@@ -75,26 +60,21 @@ type ItemRowState = {
  * だけを見せ、「カテゴリを変更する」を押すまでカテゴリ編集フォーム
  * (mode='simple'/'split')を出さない。
  *
- * ── 品目の金額修正(ADR-035) ────────────────────────────
- * レシート取り込み時に品目の合計が明細額と一致しなかった(mismatched)
- * 場合だけ、その場で品目の金額・カテゴリを直せる。分割(mode/open)とは
- * 独立した別の開閉状態(itemsOpen)で、合計を一致させることは保存の
- * 条件にしない(receipt_items は分割と違い合計一致を求めない設計、
- * domain/receipt-items.ts 参照)。
+ * ── 品目の金額修正(ADR-035、ADR-041で編集そのものはパネル側へ移動) ──
+ * 品目の編集フォーム自体は`receipt-items-panel.tsx`が持つ(いつでも
+ * 「編集する」から直せる、ADR-041)。ここに残るのは「品目の合計が明細額と
+ * 一致しない(mismatched)」ときに、行を閉じたままでも気づけるようにする
+ * 控えめな警告(下のバナー)だけ——押すと行を開く(setOpen(true))だけで、
+ * 実際の編集はそこで開くパネルに任せる。
  *
- * ── 動線の簡素化+左フリック/長押し(本人発案、ADR-040) ──────────
- * 「機能はいっぱいついてきたけど動線が複雑すぎる」という指摘を受け、
- * 行を開いたときに品目の内訳(金額付き)を自動で出すのをやめ、
- * カテゴリ編集フォームと同じく明示的なボタン(品目を見る/レシートを
- * 登録する)の裏に隠した(itemsDetailOpen)。ヘッダの品名プレビュー
- * (下記 splits.length===0 && items.length>0 の箇所)は開かなくても
- * 見えるため、情報が消えるわけではない。
- * あわせて「左フリックで編集・長押しでプレビュー」という一貫した
- * ジェスチャー(本人発案「操作を重複させることが大事」)を導入。
- * `SwipeableRow` で行ヘッダを包み、左フリックはカテゴリ編集へ直行
- * (open+categoryFormOpen を同時に立てる)、長押しは編集不可の
- * その場プレビュー(previewOpen、BottomSheet)を開く——タップ(行の
- * 開閉)は従来通りヘッダの `<button onClick>` がそのまま処理する。
+ * ── 左フリック/長押し(本人発案、ADR-042) ────────────────────
+ * 「操作を重複させることが大事」という発案のもと、行ヘッダを
+ * `SwipeableRow` で包み、左フリックはカテゴリ変更に直行
+ * (open+categoryFormOpen を同時に立てる)、長押しは編集不可のその場
+ * プレビュー(previewOpen、BottomSheet)を開く——タップ(行の開閉)は
+ * 従来通りヘッダの `<button onClick>` がそのまま処理する。ADR-040/041で
+ * 品目まわりの開閉は`ReceiptItemsPanel`へ既に整理済みのため、このADRの
+ * スコープはジェスチャーの追加のみ。
  */
 export function TransactionRowWithSplit({
   transaction,
@@ -126,109 +106,20 @@ export function TransactionRowWithSplit({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // レシートの品目(ADR-034/035)。合計が明細額と一致しない(mismatched)
-  // ときだけ、その場で金額・カテゴリを直せるようにする。
+  // レシートの品目(ADR-034/035)。編集フォーム自体は receipt-items-panel.tsx
+  // が持つ(ADR-041)。ここでは行を閉じたままでも見える要約・警告のために
+  // 状態だけ持つ。
   const [items, setItems] = useState<readonly ReceiptItem[]>(receiptItems);
-  const [itemsOpen, setItemsOpen] = useState(false);
-  const [itemRows, setItemRows] = useState<ItemRowState[]>(() => initialItemRows(items));
-  const [itemsSaving, setItemsSaving] = useState(false);
-  const [itemsError, setItemsError] = useState<string | null>(null);
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
-  // 品目の金額付き内訳は「品目を見る」を押すまで隠す(ADR-040)。
-  const [itemsDetailOpen, setItemsDetailOpen] = useState(false);
-  // 長押しのその場プレビュー(ADR-040)。open/categoryFormOpen/itemsOpen
-  // とは独立——編集ではなく閲覧専用のため。
-  const [previewOpen, setPreviewOpen] = useState(false);
   // 「カテゴリを変更する」を押すまでフォームを隠す(品目の有無に関わらず)。
   const showCategoryForm = categoryFormOpen;
   // 生活費の小分類(ADR-036)を出してよいかの判定に使う。表示名ではなく
   // code で見る(本人がカテゴリを改名しても判定が崩れないように、ADR-016)。
   const categoryCode = categories.find((c) => c.id === transaction.categoryId)?.code ?? null;
   const [subtype, setSubtype] = useState(expenseSubtype);
-
-  // 品目の記録が無い明細に、後からレシートを紐付ける(本人発案、P10-40)。
-  // 「品目が無ければ品目の記録はありません、で終わらせず、そこから直接
-  // レシートを登録できるようにしてほしい」という要望に対応。既存の
-  // レシート取り込み画面(/transactions/receipt)は新しい明細を作る前提の
-  // ため、こちらは「この明細に後から品目を足す」専用の経路にした。
-  const receiptInputRef = useRef<HTMLInputElement>(null);
-  const [attaching, setAttaching] = useState(false);
-  const [attachError, setAttachError] = useState<string | null>(null);
-
-  async function attachReceipt(file: File): Promise<void> {
-    setAttaching(true);
-    setAttachError(null);
-    try {
-      const imageBase64 = await resizeToJpegBase64(file);
-      const response = await fetch('/api/import/receipt', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg' }),
-      });
-      const parsed = (await response.json()) as ReceiptParseResult;
-      const receipt = parsed.transactions[0];
-      if (!receipt) {
-        setAttachError(parsed.warnings[0] ?? 'レシートとして読み取れませんでした。');
-        return;
-      }
-      if (receipt.items.length === 0 && receipt.expenseSubtype === null) {
-        setAttachError('品目を読み取れませんでした。');
-        return;
-      }
-
-      if (receipt.items.length > 0) {
-        // 品目は既存の分類パイプライン(ルール)に通す。/transactions/receipt
-        // と同じ考え方(ADR-035)だが、こちらは1件だけの追加操作のため
-        // AIへの分類依頼(課金)まではせず、ルールだけで済ませる——それでも
-        // 合わなければ既存の「金額を直す」(mismatched 時の手入力編集、
-        // ADR-035)からカテゴリも直せる。
-        const { rules: learnedRules, categoryNameById } = await fetchLearnedRules();
-        const classified = buildPreview(
-          receipt.items.map((item) => ({
-            occurredOn: transaction.occurredOn,
-            description: item.description,
-            amountYen: item.amountYen,
-            paymentMethod: transaction.paymentMethod,
-          })),
-          transaction.accountId,
-          (i) => `attach-${transaction.id}-${i}`,
-          [...DEFAULT_DETECTION_RULES, ...learnedRules],
-          categoryNameById,
-          'manual',
-        );
-        const payload = classified.map((row, i) => ({
-          name: row.description,
-          amountYen: row.amountYen,
-          categoryId: row.categoryId,
-          productType: receipt.items[i]?.productType ?? null,
-        }));
-        const result = await replaceReceiptItemsAction(transaction.id, payload);
-        if (result.error) {
-          setAttachError(result.error);
-          return;
-        }
-        setItems(
-          payload.map((p, i) => ({
-            id: items[i]?.id ?? `pending-${i}`,
-            name: p.name,
-            amountYen: p.amountYen,
-            categoryId: p.categoryId,
-            categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
-            productType: p.productType,
-          })),
-        );
-      }
-
-      if (receipt.expenseSubtype !== null) {
-        const subtypeResult = await setExpenseSubtypeAction(transaction.id, receipt.expenseSubtype);
-        if (!subtypeResult.error) setSubtype(receipt.expenseSubtype);
-      }
-    } catch {
-      setAttachError('レシートを読み取れませんでした。');
-    } finally {
-      setAttaching(false);
-    }
-  }
+  // 長押しのその場プレビュー(ADR-042)。open/categoryFormOpen とは独立
+  // ——編集ではなく閲覧専用のため。
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -311,47 +202,6 @@ export function TransactionRowWithSplit({
     setMode('simple');
   }
 
-  function updateItemRow(index: number, patch: Partial<ItemRowState>): void {
-    setItemRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
-  }
-
-  const itemsSign = transaction.amountYen < 0 ? -1 : 1;
-  const itemsSumAbsYen = itemRows.reduce((acc, r) => acc + Math.abs(Number(r.amountYen) || 0), 0);
-  const canSaveItems = itemRows.every((r) => r.name.trim() !== '' && Number(r.amountYen) > 0);
-
-  // 分割(`assertValidSplits`)と違い、合計が明細の金額と一致することは
-  // 保存の条件にしない(一致しないまま保存してよい設計、本人発案)。
-  async function saveItems(): Promise<void> {
-    setItemsSaving(true);
-    setItemsError(null);
-    const payload = itemRows.map((r) => ({
-      name: r.name.trim(),
-      amountYen: itemsSign * Number(r.amountYen),
-      categoryId: r.categoryId || null,
-      // このフォームでは商品分類(AIの自由記述、ADR-036)を編集させないが、
-      // 保存は全行の置き換えのため、渡さないと消えてしまう。そのまま持ち回す。
-      productType: r.productType,
-    }));
-    const result = await replaceReceiptItemsAction(transaction.id, payload);
-    if (result.error) {
-      setItemsError(result.error);
-      setItemsSaving(false);
-      return;
-    }
-    setItems(
-      payload.map((p, i) => ({
-        id: items[i]?.id ?? `pending-${i}`,
-        name: p.name,
-        amountYen: p.amountYen,
-        categoryId: p.categoryId,
-        categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
-        productType: p.productType,
-      })),
-    );
-    setItemsSaving(false);
-    setItemsOpen(false);
-  }
-
   return (
     <li className="px-4 py-3">
       <SwipeableRow
@@ -364,15 +214,12 @@ export function TransactionRowWithSplit({
         <button
           type="button"
           onClick={() => {
-            // 閉じるときはカテゴリ編集フォーム・品目内訳の開閉も一緒に
-            // リセットする。次に開いたときは、また何も開いていない状態から
-            // 始まってほしい(開くたびに前回の状態が残らないように)。
+            // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
+            // 次に開いたときは、また品目一覧だけの状態から始まってほしい
+            // (開くたびにカテゴリ編集フォームまで出た状態が残らないように)。
             setOpen((v) => {
               const next = !v;
-              if (!next) {
-                setCategoryFormOpen(false);
-                setItemsDetailOpen(false);
-              }
+              if (!next) setCategoryFormOpen(false);
               return next;
             });
           }}
@@ -444,229 +291,64 @@ export function TransactionRowWithSplit({
         </button>
       </SwipeableRow>
 
-      {/* 行を開いても、品目内訳とカテゴリ編集フォームは自動で出さず、
-          明示的なボタンの裏に隠す(ADR-040、上のファイル冒頭コメント参照)。
-          「品目が不明な場合はその旨書いてくれ」という要望は、品目が無い
-          明細では「品目を見る」の代わりに「レシートを登録する」を直接
-          出すことで引き続き満たす(押さなければ何も出ない黙り方はしない)。 */}
-      {open ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {items.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setItemsDetailOpen((v) => !v)}
-              className="text-xs font-semibold"
-              style={{ color: 'var(--accent)' }}
-            >
-              {itemsDetailOpen ? '品目を隠す' : '品目を見る'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => receiptInputRef.current?.click()}
-              disabled={attaching}
-              className="text-xs font-semibold disabled:opacity-40"
-              style={{ color: 'var(--accent)' }}
-            >
-              {attaching ? '読み取っています…' : 'レシートを登録する'}
-            </button>
-          )}
-          {!showCategoryForm ? (
-            <button
-              type="button"
-              onClick={() => setCategoryFormOpen(true)}
-              className="text-xs font-semibold"
-              style={{ color: 'var(--accent)' }}
-            >
-              カテゴリを変更する
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* 後からレシートを紐付ける(本人発案、P10-40)。「品目が無ければ
-          ないで終わらせず、その場からレシートを登録できるように」。 */}
-      <input
-        ref={receiptInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) void attachReceipt(file);
-        }}
-      />
-      {attachError ? (
-        <p className="mt-1 text-[11px]" style={{ color: 'var(--over)' }}>
-          {attachError}
-        </p>
-      ) : null}
-
       {/* 品目のタップ導線(本人からの不具合報告「レシートの品目もどこから
-          飛べばいいかわかりません...タップしても何も見れない」)。「品目を
-          見る」を押すと単価付きの内訳が見える。 */}
-      {itemsDetailOpen && items.length > 0 ? (
-        <div className="mt-3 rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
-          <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
-            レシートの品目
-          </p>
-          <ul className="mt-1.5 space-y-1">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-baseline justify-between gap-3 text-xs"
-                style={{ color: 'var(--ink-secondary)' }}
-              >
-                <span className="min-w-0 truncate">
-                  {item.name}
-                  {/* 商品の種類(AIの自由記述、ADR-036)。固定カテゴリの
-                      バッジ(splits等)と混ざらないよう括弧書きの添え字にする。 */}
-                  {item.productType ? (
-                    <span className="ml-1" style={{ color: 'var(--ink-muted)' }}>
-                      ({item.productType})
-                    </span>
-                  ) : null}
-                </span>
-                <span className="tabular shrink-0">
-                  {formatYen(item.amountYen, { sign: 'never' })}
-                </span>
-              </li>
-            ))}
-          </ul>
+          飛べばいいかわかりません...タップしても何も見れない」)。行を開くと
+          単価付きの内訳が見える(以前はプレビューのテキストだけで、開いても
+          カテゴリ編集フォームしか出ず品目自体は確認できなかった)。
+          品目が無いときは、何も出さずに黙るのではなく「記録が無い」と
+          明示する(本人発案「品目が不明な場合はその旨書いてくれ」)。表示・
+          未登録時の再登録ボタンは家計簿(/spending)と共通の部品
+          (receipt-items-panel.tsx、ADR-040)。 */}
+      {open ? (
+        <div className="mt-3">
+          <ReceiptItemsPanel
+            transaction={{
+              id: transaction.id,
+              occurredOn: transaction.occurredOn,
+              accountId: transaction.accountId,
+              paymentMethod: transaction.paymentMethod,
+              amountYen: transaction.amountYen,
+            }}
+            categories={categories}
+            categoryCode={categoryCode}
+            items={items}
+            onItemsReplaced={setItems}
+            subtype={subtype}
+            onSubtypeReplaced={setSubtype}
+          />
         </div>
       ) : null}
 
-      {/* 生活費の小分類(本人発案、ADR-036)。AIの自由記述で、レシート
-          取り込みからしか生まれない値のため無いことも多い。「生活費」
-          カテゴリの明細のときだけ、開いた行に控えめに添える。 */}
-      {open && subtype && categoryCode === 'living' ? (
-        <p className="mt-1.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-          生活費の内訳:{subtype}
-        </p>
-      ) : null}
-
-      {/* 品目の合計が明細額と一致しない(ADR-035)。カテゴリの開閉(open)とは
-          独立して、その場で金額・カテゴリを直せるようにする。合わせること
-          自体は必須にしない——保存条件は名前が空でない・金額が0でないだけ
-          (assertEditableReceiptItems 参照)。 */}
-      {splits.length === 0 && itemsStatus === 'mismatched' ? (
+      {/* 品目の合計が明細額と一致しない(ADR-035)。行を閉じたままでも
+          気づけるように、控えめな警告だけ出す——押すと行を開くだけで、
+          実際の編集は開いた先の ReceiptItemsPanel が持つ(ADR-041)。 */}
+      {!open && splits.length === 0 && itemsStatus === 'mismatched' ? (
         <div className="mt-1 flex items-center gap-2">
           <span className="text-[11px]" style={{ color: 'var(--over)' }}>
             品目の合計が金額と一致しません
           </span>
           <button
             type="button"
-            onClick={() => {
-              if (!itemsOpen) setItemRows(initialItemRows(items));
-              setItemsOpen((v) => !v);
-            }}
+            onClick={() => setOpen(true)}
             className="text-[11px] font-semibold"
             style={{ color: 'var(--accent)' }}
           >
-            {itemsOpen ? '閉じる' : '金額を直す'}
+            開いて直す
           </button>
         </div>
       ) : null}
 
-      {itemsOpen ? (
-        <div
-          className="mt-3 space-y-2 rounded-2xl border p-3"
-          style={{ borderColor: 'var(--hairline)' }}
+      {/* 開いても品目(あれば)と現在の分類だけを見せ、カテゴリ編集は
+          明示的に押すまで出さない(このファイル冒頭のコメント参照)。 */}
+      {open && !showCategoryForm ? (
+        <button
+          type="button"
+          onClick={() => setCategoryFormOpen(true)}
+          className="mt-2 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
         >
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-            品目ごとに金額・カテゴリを直せます。合計を一致させる必要はありません。
-          </p>
-
-          {itemRows.map((row, index) => (
-            <div key={index} className="flex gap-2">
-              <input
-                type="text"
-                value={row.name}
-                onChange={(e) => updateItemRow(index, { name: e.target.value })}
-                placeholder="品名"
-                className="flex-1 rounded-xl px-3 py-2 text-sm"
-                style={{
-                  background: 'var(--plane)',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--hairline)',
-                }}
-              />
-              <select
-                value={row.categoryId}
-                onChange={(e) => updateItemRow(index, { categoryId: e.target.value })}
-                className="rounded-xl px-2 py-2 text-sm"
-                style={{
-                  background: 'var(--plane)',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--hairline)',
-                }}
-              >
-                <option value="">未分類</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={row.amountYen}
-                onChange={(e) =>
-                  updateItemRow(index, { amountYen: e.target.value.replace(/[^0-9]/g, '') })
-                }
-                placeholder="金額"
-                className="w-20 rounded-xl px-3 py-2 text-sm"
-                style={{
-                  background: 'var(--plane)',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--hairline)',
-                }}
-              />
-            </div>
-          ))}
-
-          <div className="flex items-center justify-between">
-            <span
-              className="tabular text-xs"
-              style={{
-                color: itemsSumAbsYen === targetAbsYen ? 'var(--ink-muted)' : 'var(--over)',
-              }}
-            >
-              品目合計 {formatYen(itemsSumAbsYen, { sign: 'never' })}(明細額{' '}
-              {formatYen(targetAbsYen, { sign: 'never' })})
-            </span>
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => void saveItems()}
-              disabled={itemsSaving || !canSaveItems}
-              className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              {itemsSaving ? '保存中…' : '保存'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setItemsOpen(false)}
-              disabled={itemsSaving}
-              className="rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
-            >
-              やめる
-            </button>
-          </div>
-
-          {itemsError ? (
-            <p className="text-xs" style={{ color: 'var(--over)' }}>
-              {itemsError}
-            </p>
-          ) : null}
-        </div>
+          カテゴリを変更する
+        </button>
       ) : null}
 
       {open && showCategoryForm && mode === 'simple' ? (
@@ -852,7 +534,7 @@ export function TransactionRowWithSplit({
         </div>
       ) : null}
 
-      {/* 長押しのその場プレビュー(本人発案、ADR-040)。編集の入口は一切
+      {/* 長押しのその場プレビュー(本人発案、ADR-042)。編集の入口は一切
           出さない——閲覧専用。行を開かなくても、その場で内容を確認できる。 */}
       <BottomSheet open={previewOpen} onClose={() => setPreviewOpen(false)} role="dialog">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
@@ -965,13 +647,4 @@ function initialRows(
     { categoryId: first, amountYen: '', note: '' },
     { categoryId: second, amountYen: '', note: '' },
   ];
-}
-
-function initialItemRows(items: readonly ReceiptItem[]): ItemRowState[] {
-  return items.map((it) => ({
-    name: it.name,
-    amountYen: String(Math.abs(it.amountYen)),
-    categoryId: it.categoryId ?? '',
-    productType: it.productType,
-  }));
 }

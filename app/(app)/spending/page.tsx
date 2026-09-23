@@ -2,7 +2,10 @@ import Link from 'next/link';
 
 import { formatYen } from '@/domain/money';
 import { loadAccumulationView, type AccumulationView } from '@/features/accumulation/store';
+import { listCategoryOptions } from '@/features/classification/store';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
+import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
+import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import {
   loadMonthlyLedger,
   type MonthlyForecast,
@@ -10,7 +13,7 @@ import {
 } from '@/features/spending/store';
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
-import { CategoryBreakdownChart } from './category-breakdown-chart';
+import { CategoryBreakdownChart, type DrilldownTransaction } from './category-breakdown-chart';
 import { DiagnosisCard } from './diagnosis-card';
 
 /**
@@ -30,6 +33,15 @@ import { DiagnosisCard } from './diagnosis-card';
  * `/transactions`(全期間、並び替え・分類編集も可能)と中身がほぼ
  * そのまま重複していた。同じ明細をこの画面だけ読み取り専用で見せる
  * 意味は薄く、ヘッダーの「明細(全期間)」リンク1本に統合した。
+ *
+ * ── ただしレシートの詳細だけは例外(本人発案、ADR-040)────────────
+ * 「カテゴリ別の内訳を押したら使った一覧が見れて、さらにそこからレシート
+ * の詳細も見えるようにしてほしい。レシート登録も家計簿の方の責務」との
+ * 指摘を受け、カテゴリ別の内訳(下の CategoryBreakdownChart)を押して
+ * 開く形にした。既定では畳んであり、`/transactions` の全件一覧をそのまま
+ * 再掲するわけではない——カテゴリで絞った上での深掘り経路という位置づけ。
+ * 品目が無い明細はそこから直接レシートを登録できる(receipt-items-panel.tsx、
+ * /transactions の明細行(split-editor.tsx、P10-40)と共通の部品)。
  *
  * ── ちりつもは補助として残す ────────────────────────────────────
  * 削除はしない——「480円が完済2ヶ月に見える」という小口支出への気づきは
@@ -54,6 +66,32 @@ export default async function SpendingPage() {
   );
   const netYen = ledger.totalIncomeYen - ledger.totalSpentYen;
 
+  // カテゴリ別内訳からの深掘り(ADR-040)用。ledger.transactions は当月分
+  // だけのため、件数は少なく1回にまとめて読める(/transactions と同じ
+  // listReceiptItemsForTransactionIds・listExpenseSubtypesForTransactionIds)。
+  const transactionIds = ledger.transactions.map((t) => t.id);
+  const [categories, itemsByTransactionId, expenseSubtypeByTransactionId] = await Promise.all([
+    listCategoryOptions(),
+    listReceiptItemsForTransactionIds(transactionIds),
+    listExpenseSubtypesForTransactionIds(transactionIds),
+  ]);
+  const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
+  for (const t of ledger.transactions) {
+    const key = t.categoryId ?? 'uncategorized';
+    const list = transactionsByCategory[key] ?? [];
+    list.push({
+      id: t.id,
+      occurredOn: t.occurredOn,
+      label: t.label,
+      amountYen: t.amountYen,
+      accountId: t.accountId,
+      paymentMethod: t.paymentMethod,
+      items: itemsByTransactionId.get(t.id) ?? [],
+      expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
+    });
+    transactionsByCategory[key] = list;
+  }
+
   return (
     <div className="rise space-y-3">
       <header className="flex items-baseline justify-between gap-3">
@@ -73,7 +111,11 @@ export default async function SpendingPage() {
       <SummaryCard ledger={ledger} netYen={netYen} />
       <ForecastCard forecast={ledger.forecast} />
       <DiagnosisCard view={diagnosis} />
-      <CategoryBreakdownChart rows={ledger.categoryBreakdown} />
+      <CategoryBreakdownChart
+        rows={ledger.categoryBreakdown}
+        transactionsByCategory={transactionsByCategory}
+        categories={categories}
+      />
       <PileTeaserCard view={pile} />
     </div>
   );
