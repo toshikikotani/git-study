@@ -8,15 +8,21 @@
  */
 
 import type { BudgetTone } from '@/domain/budget';
+import type { PaymentMethod } from '@/features/import/adapters';
 
 export type LedgerTransaction = {
   id: string;
   occurredOn: string;
   /** 店名(無ければ摘要)。 */
   label: string;
+  /** カテゴリ統廃合(merged_into_id)を解決済みのルートID(ADR-016)。 */
+  categoryId: string | null;
   categoryName: string | null;
   /** 支出が負、収入が正(ADR-008)。 */
   amountYen: number;
+  /** カテゴリ別内訳からレシートの再登録ができるように持ち回る(ADR-038)。 */
+  accountId: string;
+  paymentMethod: PaymentMethod;
 };
 
 export type CategoryBreakdownRow = {
