@@ -1134,6 +1134,8 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 **検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(743件全通過)/`npx next build` すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、実機のタッチ操作(左フリックの閾値の感触、長押しの誤発火の有無)は確認できていない。
 
+**追記(2026-09-23、本人報告への対応)**:本人から実機のスクリーンショット付きで「長押しでプレビューできるんだけど選択されてしまう」との報告。`SwipeableRow` は `setTimeout(500ms)` で長押しを検出し `onLongPress`(BottomSheetを開く)を呼ぶ独自実装だが、この待機中に iOS Safari 自身の「長押しでテキスト選択」処理を止めていなかった——選択対象のテキストを持つ `<button>` を長押しすると、ブラウザの選択・コールアウト(「コピー/調べる/翻訳/Webを検索」)がこの自前の長押し検出と同じタイミングで割り込み、BottomSheetのプレビューが開いてもテキストが選択されたままの状態で重なって見えていた。**対応**:`app/globals.css` に `button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }` を追加。ボタンはテキストのコピー元ではなく操作対象であるため、明細行に限らずアプリ全体の `<button>` から選択・コールアウトそのものを止めるのが妥当と判断した(P8-3 の `input, select, textarea { font-size: 16px }` と同じ、グローバルCSSでのデバイス固有の不具合対応というパターンを踏襲)。**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`/`npx next build` すべて成功。**未検証**:実機での長押し確認は引き続きこのセッションの手段では行えない。ただし本件は `-webkit-user-select`/`-webkit-touch-callout` という標準的なiOS Safari対応であり、副作用(ボタン内テキストが選択できなくなること)はボタンの用途上問題にならない。
+
 ---
 
 ## ADR-043:家計簿(/spending)のトップにカレンダーを追加し、日を押すとその日の明細をその場でカテゴリ編集できるようにする(本人発案)
