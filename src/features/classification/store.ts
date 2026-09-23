@@ -8,7 +8,7 @@
  * ANTHROPIC_API_KEY が未設定でもアプリは動く(エラーにしない)。ルールにも
  * AI にも当たらなかった明細は「未分類」のまま残るだけ(Gmail 連携・メール
  * 貼り付けの AI 救済と同じ考え方)。かつては確信度が低い分類・未分類を
- * どちらも「確認待ち」に回していたが、本人発案(ADR-044)によりこの
+ * どちらも「確認待ち」に回していたが、本人発案(ADR-045)によりこの
  * 確認待ちの仕組み自体を撤廃した——常に自動で反映し(auto_ok)、
  * 本人が気になった明細だけその場で編集する運用にした。
  */
@@ -290,7 +290,7 @@ export async function moveClassificationRuleDown(id: string): Promise<void> {
  * 本人による1件の分類修正から学習ルールを作る(FR-12, M2-5)。
  *
  * 以前は確認待ちキューでの確定時だけ呼んでいたが、確認待ちキュー自体を
- * 撤廃した(本人発案、ADR-044)ため、`updateTransactionAction()`
+ * 撤廃した(本人発案、ADR-045)ため、`updateTransactionAction()`
  * (app/(app)/transactions/actions.ts)から呼ぶ形に引き継いだ。
  * `learned_from_transaction_id` は呼び出し元がどの明細か特定して渡す
  * 経路をまだ持たないため null のままにする(このカラム自体は任意の FK

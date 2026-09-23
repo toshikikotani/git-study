@@ -84,7 +84,7 @@ function buildPreviewRow(
     matchedRuleId: classification.matchedRuleId,
     classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
     confidence: null,
-    // 確認待ちキューは撤廃した(本人発案、ADR-044)。分類が付かなければ
+    // 確認待ちキューは撤廃した(本人発案、ADR-045)。分類が付かなければ
     // 「未分類」のまま明細一覧に残るだけで、本人が気づいたら編集する。
     reviewStatus: 'auto_ok',
     source,

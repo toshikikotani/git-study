@@ -185,7 +185,7 @@ describe('ClaudeTransactionClassifier — 失敗を握り潰さない', () => {
   });
 });
 
-describe('toAppliedClassification — 確認待ちキュー撤廃(ADR-044)後の分類反映', () => {
+describe('toAppliedClassification — 確認待ちキュー撤廃(ADR-045)後の分類反映', () => {
   function classification(overrides: Partial<AiClassification> = {}): AiClassification {
     return { transactionId: 't1', categoryCode: 'living', confidence: 0.9, ...overrides };
   }

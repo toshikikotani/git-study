@@ -31,7 +31,7 @@ describe('buildPreview', () => {
     expect(tx?.paymentMethod).toBe('revolving');
   });
 
-  it('検知ルールはカテゴリを設定しないので未分類のまま、確認待ちキューは撤廃済みなのでauto_ok(ADR-044)', () => {
+  it('検知ルールはカテゴリを設定しないので未分類のまま、確認待ちキューは撤廃済みなのでauto_ok(ADR-045)', () => {
     const row: ImportableRow = { ...ROW, description: 'リボ払いのご案内' };
     const [tx] = buildPreview([row], 'acc-1', (i) => `${i}`, DEFAULT_DETECTION_RULES);
     expect(tx?.categoryId).toBeNull();
