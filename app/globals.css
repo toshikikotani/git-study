@@ -229,6 +229,18 @@ textarea {
   font-size: 16px;
 }
 
+/* iOS Safari は button 内のテキストもデフォルトでは選択対象になる。
+   明細行(TransactionRowWithSplit)のように行全体をボタンにして
+   開閉するパターン(本人発案「長押しでテキスト選択メニューが出て
+   しまう」不具合報告)では、長押しがタップと衝突し「コピー/調べる/
+   翻訳」の選択メニューが割り込んで出てしまう。ボタンはテキストの
+   コピー元ではなく操作対象なので、選択・コールアウト自体を止める。 */
+button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* 大きな数字は比例数字で組む。tabular-nums は桁を 0 幅に揃えるため、
    ヒーロー級のサイズだと字間が間延びして見える。等幅が要るのは
    縦に並ぶ表と軸だけ(dataviz: marks-and-anatomy)。 */
