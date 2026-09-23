@@ -19,11 +19,19 @@ import { ReceiptItemsPanel } from '../transactions/receipt-items-panel';
  * 小分類は features/spending/store.ts の loadMonthlyLedger() が明細と
  * まとめて読んでおいたものをそのまま持ち回るだけで、ここでは新しい
  * クエリは発生しない。
+ *
+ * `categoryId`/`categoryName` は本来この配列の親(カテゴリごとのグループ)
+ * から自明だったが、`SpendingCalendar`(calendar.tsx、ADR-044)が同じ配列を
+ * 日付順に並べ替えてから改めてカテゴリでグルーピングするため、明細1件だけ
+ * 見ても分かるように持たせた(page.tsx で1回作るだけで、両方の画面から
+ * 共有する——ADR-033、同じ考慮を複数箇所で作らない)。
  */
 export type DrilldownTransaction = {
   id: string;
   occurredOn: string;
   label: string;
+  categoryId: string | null;
+  categoryName: string | null;
   amountYen: number;
   accountId: string;
   paymentMethod: PaymentMethod;
