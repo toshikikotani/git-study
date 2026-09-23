@@ -317,14 +317,14 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
     expect(result.warnings[0]).toMatch(/失敗/);
   });
 
-  it('レシート・領収書でないと判断されたら明細を作らない', async () => {
+  it('レシート・領収書・振込明細のいずれでもないと判断されたら明細を作らない', async () => {
     const { ClaudeReceiptExtractor } = await import('@/features/import/receipt-ai');
     const client = {
       messages: {
         parse: vi.fn().mockResolvedValue({
           stop_reason: 'end_turn',
           usage: { input_tokens: 0, output_tokens: 0 },
-          parsed_output: { is_receipt: false, transactions: [] },
+          parsed_output: { is_recognized: false, transactions: [] },
         }),
       },
     };
@@ -359,7 +359,7 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
       stop_reason: 'end_turn',
       usage: { input_tokens: 0, output_tokens: 0 },
       parsed_output: {
-        is_receipt: true,
+        is_recognized: true,
         transactions: [
           {
             occurred_on: '2026-09-03',
@@ -382,6 +382,41 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
     };
     const imageBlock = call.messages[0]!.content.find((c) => c.type === 'image');
     expect(imageBlock?.source?.media_type).toBe('image/png');
+  });
+
+  it('振込/送金完了画面も読み取れる(受取人名を店名として、金額を送金額として扱う)', async () => {
+    const { ClaudeReceiptExtractor } = await import('@/features/import/receipt-ai');
+    const parse = vi.fn().mockResolvedValue({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 0, output_tokens: 0 },
+      parsed_output: {
+        is_recognized: true,
+        transactions: [
+          {
+            occurred_on: '2026-09-23',
+            amount_yen: 3000,
+            store_name: 'ハマノ アキヒロ',
+            payment_method_text: '',
+            items: [],
+            expense_subtype: '',
+          },
+        ],
+      },
+    });
+    const extractor = new ClaudeReceiptExtractor('sk-ant-test', { messages: { parse } } as never);
+
+    const result = await extractor.extract({ imageBase64: 'AAA', mediaType: 'image/png' });
+
+    expect(result.transactions).toEqual([
+      expect.objectContaining({
+        occurredOn: '2026-09-23',
+        description: 'ハマノ アキヒロ',
+        amountYen: -3000,
+        paymentMethod: 'unknown',
+        items: [],
+        expenseSubtype: null,
+      }),
+    ]);
   });
 });
 

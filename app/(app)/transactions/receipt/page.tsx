@@ -611,6 +611,7 @@ export default function ReceiptPage() {
       >
         <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           現金・電子マネーなど、通知メールもカード明細も無い支払いはここから記録します。
+          銀行アプリの振込/送金完了画面のスクリーンショットも読み取れます(ADR-038)。
           ギャラリーからは複数枚まとめて選べます。
         </p>
       </div>
