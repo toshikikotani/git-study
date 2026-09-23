@@ -152,6 +152,9 @@ export async function updateTransactionAction(
   }
   revalidatePath('/transactions');
   revalidatePath('/transactions/review');
+  // /spending のカテゴリ別内訳・カレンダー(calendar.tsx、ADR-043)からも
+  // カテゴリを直せるため、こちらも最新化する。
+  revalidatePath('/spending');
   return { error: null };
 }
 

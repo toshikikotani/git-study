@@ -133,6 +133,12 @@ export function mostRecentClosingOnOrBefore(today: DateOnly, closingDay: number)
     : nthDayOfMonth(addMonths(today, -1), closingDay);
 }
 
+/** 曜日(0=日〜6=土)。カレンダーのグリッド組みに使う(本人発案、ADR-043)。 */
+export function weekdayOf(date: DateOnly): number {
+  const [y, m, d] = splitDateOnly(date);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
 /** DateOnly に日を足す。 */
 export function addDays(date: DateOnly, days: number): DateOnly {
   const [y, m, d] = splitDateOnly(date);
