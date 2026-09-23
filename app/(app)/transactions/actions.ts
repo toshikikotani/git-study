@@ -11,6 +11,7 @@
 import { revalidatePath } from 'next/cache';
 
 import type { TransactionSplitInput } from '@/domain/transaction-splits';
+import { createLearnedRule } from '@/features/classification/store';
 import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
 import {
@@ -139,9 +140,19 @@ export async function saveImportBatchAction(
   };
 }
 
+/**
+ * 明細のカテゴリを本人が直接直す(確認待ちキューを介さない、本人発案・
+ * ADR-045)。同じ摘要の学習ルールも合わせて作る——以前は確認待ちキューでの
+ * 確定時だけ作っていた(`classification_rules.is_learned=true`)が、確認待ち
+ * キュー自体を撤廃したため、本人が明細を直すたびにここで作る形へ引き継いだ。
+ * P5-2(誤爆気味の学習ルールを検知して無効化する)は is_learned=true の
+ * ルールを対象にしているため、この経路を絶やすとその安全網の入力が尽きる。
+ * ルール作成の失敗は明細の更新自体は失敗させない(付随的な最適化のため)。
+ */
 export async function updateTransactionAction(
   id: string,
   categoryId: string,
+  description: string,
 ): Promise<{ error: string | null }> {
   try {
     await updateTransaction(id, categoryId);
@@ -150,8 +161,12 @@ export async function updateTransactionAction(
       error: error instanceof TransactionStoreError ? error.message : '更新に失敗しました。',
     };
   }
+  try {
+    await createLearnedRule({ description, categoryId, accountId: null });
+  } catch {
+    // 学習ルールの作成に失敗しても、明細のカテゴリ更新は既に成功している。
+  }
   revalidatePath('/transactions');
-  revalidatePath('/transactions/review');
   // /spending のカテゴリ別内訳・カレンダー(calendar.tsx、ADR-043)からも
   // カテゴリを直せるため、こちらも最新化する。
   revalidatePath('/spending');

@@ -261,7 +261,7 @@ export async function importTransactionsAsAdmin(
 }
 
 /**
- * 確認待ちキューでの1件修正(M2-5)。分類の確定は常にこの形(本人が選んだ
+ * 本人がカテゴリを直接直す(M2-5)。分類の確定は常にこの形(本人が選んだ
  * categoryId、classified_by='manual'、review_status='corrected')なので、
  * 汎用の補正オブジェクトではなく categoryId だけを受け取る。
  */

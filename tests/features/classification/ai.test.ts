@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  applyConfidenceThreshold,
+  toAppliedClassification,
   ClaudeTransactionClassifier,
   type AiClassification,
   type CategoryOption,
@@ -185,43 +185,18 @@ describe('ClaudeTransactionClassifier — 失敗を握り潰さない', () => {
   });
 });
 
-describe('applyConfidenceThreshold — 「AI がどう思ったか」と「信用するか」の境界', () => {
+describe('toAppliedClassification — 確認待ちキュー撤廃(ADR-045)後の分類反映', () => {
   function classification(overrides: Partial<AiClassification> = {}): AiClassification {
     return { transactionId: 't1', categoryCode: 'living', confidence: 0.9, ...overrides };
   }
 
-  it('閾値以上なら自動確定扱い', () => {
-    const result = applyConfidenceThreshold(classification({ confidence: 0.8 }), 0.7);
-    expect(result).toMatchObject({
-      categoryCode: 'living',
-      classifiedBy: 'ai',
-      reviewStatus: 'auto_ok',
-    });
+  it('categoryCode があれば確信度に関わらず ai として適用する', () => {
+    const result = toAppliedClassification(classification({ confidence: 0.4 }));
+    expect(result).toMatchObject({ categoryCode: 'living', classifiedBy: 'ai' });
   });
 
-  it('閾値未満でも分類自体は ai のまま、確認待ちに回す', () => {
-    const result = applyConfidenceThreshold(classification({ confidence: 0.4 }), 0.7);
-    expect(result).toMatchObject({
-      categoryCode: 'living',
-      classifiedBy: 'ai',
-      reviewStatus: 'pending',
-    });
-  });
-
-  it('categoryCode が null なら unclassified として確認待ちに回す', () => {
-    const result = applyConfidenceThreshold(
-      classification({ categoryCode: null, confidence: 0.9 }),
-      0.7,
-    );
-    expect(result).toMatchObject({
-      categoryCode: null,
-      classifiedBy: 'unclassified',
-      reviewStatus: 'pending',
-    });
-  });
-
-  it('閾値ちょうどは自動確定扱い(境界値)', () => {
-    const result = applyConfidenceThreshold(classification({ confidence: 0.7 }), 0.7);
-    expect(result.reviewStatus).toBe('auto_ok');
+  it('categoryCode が null なら unclassified', () => {
+    const result = toAppliedClassification(classification({ categoryCode: null, confidence: 0.9 }));
+    expect(result).toMatchObject({ categoryCode: null, classifiedBy: 'unclassified' });
   });
 });

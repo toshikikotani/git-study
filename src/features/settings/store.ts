@@ -23,8 +23,6 @@ export type AppSettings = {
   isHighRiskUnlocked: boolean;
   /** 高リスク枠解禁後、投資総額のうち高リスク枠に回す比率(0〜1)。既定 0.3。 */
   highRiskAllocationRatio: number;
-  /** AI 分類の確信度がこれ未満なら「確認待ち」に回す(0〜1)。既定 0.8(ADR-010)。 */
-  classificationConfidenceThreshold: number;
   /** 給料日(1〜31)。月末に無い日は月末に丸める(M4-4)。既定25。 */
   payday: number;
   /** 副業収入のうち返済に回す比率(0〜1)。既定 0.7(FR-42、P3-1)。 */
@@ -46,7 +44,7 @@ export async function getAppSettingsAsAdmin(
   const { data, error } = await client
     .from('app_settings')
     .select(
-      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, classification_confidence_threshold, payday, side_income_repayment_ratio',
+      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio',
     )
     .eq('user_id', userId)
     .single();
@@ -58,7 +56,6 @@ export async function getAppSettingsAsAdmin(
     investmentRatioOfRepayment: data.investment_ratio_of_repayment,
     isHighRiskUnlocked: data.is_high_risk_unlocked,
     highRiskAllocationRatio: data.high_risk_allocation_ratio,
-    classificationConfidenceThreshold: data.classification_confidence_threshold,
     payday: data.payday,
     sideIncomeRepaymentRatio: data.side_income_repayment_ratio,
   };

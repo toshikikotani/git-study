@@ -22,8 +22,7 @@ const MATCH_TYPE_LABEL: Record<ClassificationRuleSummary['matchType'], string> =
 
 /**
  * 分類ルール一覧の1件(M2-6)。優先度の入れ替え・有効無効・削除はどれも
- * 1タップの操作なので、確認待ちキュー(M2-5)の学習ルール作成と同じく
- * フォームを介さず直接 Server Action を呼ぶ。
+ * 1タップの操作なので、フォームを介さず直接 Server Action を呼ぶ。
  */
 export function RuleRow({
   rule,

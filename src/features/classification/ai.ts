@@ -183,7 +183,7 @@ export class ClaudeTransactionClassifier {
       return {
         classifications: [],
         warnings: [
-          `AI の返答件数が入力と一致しませんでした(入力${transactions.length}件 / 返答${parsed.classifications.length}件)。当て推量で対応付けないため、このバッチは全て確認待ちに回します。`,
+          `AI の返答件数が入力と一致しませんでした(入力${transactions.length}件 / 返答${parsed.classifications.length}件)。当て推量で対応付けないため、このバッチは全て未分類のままにします。`,
         ],
         ...usage,
       };
@@ -232,39 +232,32 @@ function buildUserMessage(
 }
 
 /**
- * AiClassification を、閾値に基づいて実際の分類結果へ変換する。
+ * AiClassification を、実際の分類結果へ変換する。
  *
- * ここが「AI がどう思ったか」と「それを信用するか」の境界線。
- * 呼び出し側(取り込みパイプライン)は、この結果をそのまま
- * transactions.classified_by / review_status に反映すればよい。
+ * 以前は確信度が閾値未満だと「確認待ち」(review_status='pending')に
+ * 回していたが、本人発案「確認待ちのやつあるけど、あれもうなくして。もう
+ * AI が勝手にやっていい。それが気に食わんかったら編集する」(ADR-045)により
+ * 撤廃した。AI が答えたならそのまま `auto_ok` として適用し、直すかどうかは
+ * 本人が明細を見て編集するかどうかに委ねる(receipt-items-panel.tsx の
+ * 編集ダイアログ・split-editor.tsx の「カテゴリを変更する」がいつでも開ける)。
  */
 export type AppliedClassification = {
   categoryCode: string | null;
   confidence: number;
   classifiedBy: 'ai' | 'unclassified';
-  reviewStatus: 'auto_ok' | 'pending';
 };
 
-export function applyConfidenceThreshold(
-  classification: AiClassification,
-  threshold: number,
-): AppliedClassification {
+export function toAppliedClassification(classification: AiClassification): AppliedClassification {
   if (classification.categoryCode === null) {
     return {
       categoryCode: null,
       confidence: classification.confidence,
       classifiedBy: 'unclassified',
-      reviewStatus: 'pending',
     };
   }
-  const confident = classification.confidence >= threshold;
   return {
     categoryCode: classification.categoryCode,
     confidence: classification.confidence,
-    // 閾値未満でも「AI は分類した」ことに変わりはない。信頼できるかどうかは
-    // review_status(auto_ok / pending)で表し、classified_by は分類主体を表す
-    // ものとして 'ai' のまま残す(本人が確認して確定させる前提)。
     classifiedBy: 'ai',
-    reviewStatus: confident ? 'auto_ok' : 'pending',
   };
 }

@@ -290,7 +290,7 @@ function CalendarTransactionRow({
     if (!categoryId || categoryUnchanged) return;
     setSaving(true);
     setError(null);
-    const result = await updateTransactionAction(transaction.id, categoryId);
+    const result = await updateTransactionAction(transaction.id, categoryId, transaction.label);
     setSaving(false);
     if (result.error) {
       setError(result.error);
