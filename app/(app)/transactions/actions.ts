@@ -190,7 +190,7 @@ export async function replaceReceiptItemsAction(
 /**
  * 生活費の小分類を保存する(本人発案、ADR-036)。既存の明細へ後から
  * レシートを紐付ける機能(P10-40、receipt-items-panel.tsx)専用の入口。
- * 明細一覧(/transactions)・家計簿のカテゴリ内訳(/spending、ADR-038)の
+ * 明細一覧(/transactions)・家計簿のカテゴリ内訳(/spending、ADR-040)の
  * 両方から呼ばれる。
  */
 export async function setExpenseSubtypeAction(

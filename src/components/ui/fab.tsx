@@ -11,10 +11,21 @@ import type { Route } from 'next';
  * (Mail の作成ボタン、Phone の発信ボタン等)であることに倣い、ガラス素材
  * にはしない——ここでは「一番押してほしいボタン」であることを最優先する。
  *
- * href を渡すと通常のリンク、onFiles を渡すとカメラ起動用の
- * `<input type="file" capture="environment">` を持つ `<label>` になる
- * (本人発案:「カメラマーク押した時にすぐカメラアプリになるようにして」——
- * 画面遷移を挟まず、タップした瞬間に OS のカメラが開く)。
+ * href を渡すと通常のリンク、onFiles を渡すと `<input type="file">` を
+ * 持つ `<label>` になる。
+ *
+ * ── 撮る/選ぶを選択できるようにする(本人発案) ──────────────
+ * 以前は `capture="environment"` を付け、タップした瞬間に OS のカメラを
+ * 直接開いていた(画面遷移を挟まない即時性を優先)。その後「カメラアイコン
+ * 押した時に写真を撮るか選ぶか選択できるようにして」と方針が変わったため、
+ * `capture` を外した——`<input type="file" accept="image/*">` は
+ * `capture` が無いと、モバイルの OS がその場で「写真を撮る/ライブラリから
+ * 選ぶ」のネイティブな選択肢を出す(`/transactions/receipt` の「撮る」
+ * 「選ぶ」2ボタンを、この1つのアイコンに集約した形)。
+ *
+ * `<label><input type="file">` はネイティブ要素のため、React が
+ * ハイドレーションを終える前でもタップして機能する(本人からの不具合
+ * 報告「起動が遅い」への対応、app/(app)/layout.tsx 参照)。
  */
 type CommonProps = {
   /** スクリーンリーダー向け。アイコンだけで文字を出さないため必須。 */
@@ -65,7 +76,6 @@ export function Fab(props: FabAsLink | FabAsCapture) {
       <input
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         className="sr-only"
         onChange={(e) => {

@@ -34,7 +34,7 @@ import { DiagnosisCard } from './diagnosis-card';
  * そのまま重複していた。同じ明細をこの画面だけ読み取り専用で見せる
  * 意味は薄く、ヘッダーの「明細(全期間)」リンク1本に統合した。
  *
- * ── ただしレシートの詳細だけは例外(本人発案、ADR-038)────────────
+ * ── ただしレシートの詳細だけは例外(本人発案、ADR-040)────────────
  * 「カテゴリ別の内訳を押したら使った一覧が見れて、さらにそこからレシート
  * の詳細も見えるようにしてほしい。レシート登録も家計簿の方の責務」との
  * 指摘を受け、カテゴリ別の内訳(下の CategoryBreakdownChart)を押して
@@ -66,7 +66,7 @@ export default async function SpendingPage() {
   );
   const netYen = ledger.totalIncomeYen - ledger.totalSpentYen;
 
-  // カテゴリ別内訳からの深掘り(ADR-038)用。ledger.transactions は当月分
+  // カテゴリ別内訳からの深掘り(ADR-040)用。ledger.transactions は当月分
   // だけのため、件数は少なく1回にまとめて読める(/transactions と同じ
   // listReceiptItemsForTransactionIds・listExpenseSubtypesForTransactionIds)。
   const transactionIds = ledger.transactions.map((t) => t.id);

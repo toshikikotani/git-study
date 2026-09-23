@@ -22,7 +22,7 @@ import { MonthlyReportCard } from './report-view';
  *
  * カテゴリ別の内訳は /spending と同じ CategoryBreakdownChart をそのまま
  * 再利用する(見た目・判断ロジックを二重に持たない)。押すとレシートの
- * 詳細まで見える深掘り(ADR-038)も /spending と同じ挙動にする——同じ
+ * 詳細まで見える深掘り(ADR-040)も /spending と同じ挙動にする——同じ
  * 部品を使いながらここだけ深掘りできない、という差を作らないため。
  */
 export const dynamic = 'force-dynamic';

@@ -32,7 +32,7 @@ function toEditRows(items: readonly ReceiptItem[]): EditRowState[] {
 }
 
 /**
- * レシートの品目表示 + 未登録ならその場で登録できるパネル(本人発案、ADR-038)。
+ * レシートの品目表示 + 未登録ならその場で登録できるパネル(本人発案、ADR-040)。
  *
  * 元は明細一覧(/transactions)の行(split-editor.tsx、P10-40)専用だったが、
  * 「家計簿(/spending)からもレシートの詳細が見たいし、レシート登録も
@@ -44,7 +44,7 @@ function toEditRows(items: readonly ReceiptItem[]): EditRowState[] {
  * 家計簿側は「レシートの画像までは要らない、品目の中身が見えればいい」という
  * 要望のため、ここでもレシート画像(receipt_image_path)は扱わない。
  *
- * ── 読み取った直後にその場で編集できる(本人発案、ADR-039)─────────
+ * ── 読み取った直後にその場で編集できる(本人発案、ADR-041)─────────
  * 「レシート読み込んだあと、すぐに編集できるようにして。再度写真撮るのは
  * 手間すぎる」への対応。元は品目の手入力修正(ADR-035)は「品目の合計が
  * 明細額と一致しない(mismatched)」ときだけ`split-editor.tsx`側に別途

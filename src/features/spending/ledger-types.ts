@@ -20,7 +20,7 @@ export type LedgerTransaction = {
   categoryName: string | null;
   /** 支出が負、収入が正(ADR-008)。 */
   amountYen: number;
-  /** カテゴリ別内訳からレシートの再登録ができるように持ち回る(ADR-038)。 */
+  /** カテゴリ別内訳からレシートの再登録ができるように持ち回る(ADR-040)。 */
   accountId: string;
   paymentMethod: PaymentMethod;
 };

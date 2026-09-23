@@ -58,9 +58,9 @@ type SplitRowState = { categoryId: string; amountYen: string; note: string };
  * だけを見せ、「カテゴリを変更する」を押すまでカテゴリ編集フォーム
  * (mode='simple'/'split')を出さない。
  *
- * ── 品目の金額修正(ADR-035、ADR-039で編集そのものはパネル側へ移動) ──
+ * ── 品目の金額修正(ADR-035、ADR-041で編集そのものはパネル側へ移動) ──
  * 品目の編集フォーム自体は`receipt-items-panel.tsx`が持つ(いつでも
- * 「編集する」から直せる、ADR-039)。ここに残るのは「品目の合計が明細額と
+ * 「編集する」から直せる、ADR-041)。ここに残るのは「品目の合計が明細額と
  * 一致しない(mismatched)」ときに、行を閉じたままでも気づけるようにする
  * 控えめな警告(下のバナー)だけ——押すと行を開く(setOpen(true))だけで、
  * 実際の編集はそこで開くパネルに任せる。
@@ -96,7 +96,7 @@ export function TransactionRowWithSplit({
   const [error, setError] = useState<string | null>(null);
 
   // レシートの品目(ADR-034/035)。編集フォーム自体は receipt-items-panel.tsx
-  // が持つ(ADR-039)。ここでは行を閉じたままでも見える要約・警告のために
+  // が持つ(ADR-041)。ここでは行を閉じたままでも見える要約・警告のために
   // 状態だけ持つ。
   const [items, setItems] = useState<readonly ReceiptItem[]>(receiptItems);
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
@@ -276,7 +276,7 @@ export function TransactionRowWithSplit({
           品目が無いときは、何も出さずに黙るのではなく「記録が無い」と
           明示する(本人発案「品目が不明な場合はその旨書いてくれ」)。表示・
           未登録時の再登録ボタンは家計簿(/spending)と共通の部品
-          (receipt-items-panel.tsx、ADR-038)。 */}
+          (receipt-items-panel.tsx、ADR-040)。 */}
       {open ? (
         <div className="mt-3">
           <ReceiptItemsPanel
@@ -299,7 +299,7 @@ export function TransactionRowWithSplit({
 
       {/* 品目の合計が明細額と一致しない(ADR-035)。行を閉じたままでも
           気づけるように、控えめな警告だけ出す——押すと行を開くだけで、
-          実際の編集は開いた先の ReceiptItemsPanel が持つ(ADR-039)。 */}
+          実際の編集は開いた先の ReceiptItemsPanel が持つ(ADR-041)。 */}
       {!open && splits.length === 0 && itemsStatus === 'mismatched' ? (
         <div className="mt-1 flex items-center gap-2">
           <span className="text-[11px]" style={{ color: 'var(--over)' }}>
