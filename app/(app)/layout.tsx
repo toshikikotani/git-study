@@ -88,9 +88,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
       </PullToRefresh>
 
-      {/* document.body 直下に描画する(上のコメント参照)。サーバーレンダー
-          (document が無い)では描画しない。 */}
-      {isClient ? createPortal(<BottomBar />, document.body) : null}
+      {/* document.body 直下に描画する(上のコメント参照)。ハイドレーション
+          前(document が無い、または起動が遅く isClient がまだ true に
+          なっていない間)は、この場に直接描画しておく——本人からの不具合
+          報告「起動が遅い。どんなけ読み込んでてもカメラアイコンはすぐ
+          表示して」への対応。カメラの `<label><input type=file>` は
+          JS 無しでも機能するネイティブ要素のため、ハイドレーション未完了
+          でも即座にレシート撮影を開始できる(祖先の backdrop-filter 問題は
+          root layout に対象となるスタイルが無いため、この一瞬だけ
+          ポータル無しで描画しても実害が無い)。 */}
+      {isClient ? createPortal(<BottomBar />, document.body) : <BottomBar />}
     </div>
   );
 }
@@ -107,10 +114,11 @@ function BottomBar() {
           絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
           差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
           ナビゲーション chrome にだけ使う方針)。
-          押した瞬間にカメラアプリが開くよう(本人発案)、href での画面遷移
-          ではなく onFiles(カメラ起動の input)にした。撮影後は
-          pending-receipt-files.ts 経由でファイルを /transactions/receipt
-          へ渡し、そちらの画面が続きの抽出・分類・保存を行う。 */}
+          href での画面遷移ではなく onFiles(input type=file)にし、
+          撮影後は pending-receipt-files.ts 経由でファイルを
+          /transactions/receipt へ渡し、そちらの画面が続きの抽出・分類・
+          保存を行う。「押した瞬間にカメラアプリを開く」(以前の方針)から
+          「撮る/選ぶを選択できるようにする」へ変更した経緯は fab.tsx 参照。 */}
       <Fab
         label="レシートを撮る"
         onFiles={(files) => {
