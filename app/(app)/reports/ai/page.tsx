@@ -1,6 +1,12 @@
-import { CategoryBreakdownChart } from '../../spending/category-breakdown-chart';
+import {
+  CategoryBreakdownChart,
+  type DrilldownTransaction,
+} from '../../spending/category-breakdown-chart';
 import { DailyReportCard } from './daily-report-view';
 import { loadDailyAiReportView, loadMonthlyAiReportView } from '@/features/ai-report/store';
+import { listCategoryOptions } from '@/features/classification/store';
+import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
+import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { MonthlyReportCard } from './report-view';
@@ -15,7 +21,9 @@ import { MonthlyReportCard } from './report-view';
  * データでは判定のノイズが大きいため)。
  *
  * カテゴリ別の内訳は /spending と同じ CategoryBreakdownChart をそのまま
- * 再利用する(見た目・判断ロジックを二重に持たない)。
+ * 再利用する(見た目・判断ロジックを二重に持たない)。押すとレシートの
+ * 詳細まで見える深掘り(ADR-040)も /spending と同じ挙動にする——同じ
+ * 部品を使いながらここだけ深掘りできない、という差を作らないため。
  */
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +31,29 @@ export default async function AiReportPage() {
   const [dailyView, monthlyView, ledger] = await withMinDuration(
     Promise.all([loadDailyAiReportView(), loadMonthlyAiReportView(), loadMonthlyLedger()]),
   );
+
+  const transactionIds = ledger.transactions.map((t) => t.id);
+  const [categories, itemsByTransactionId, expenseSubtypeByTransactionId] = await Promise.all([
+    listCategoryOptions(),
+    listReceiptItemsForTransactionIds(transactionIds),
+    listExpenseSubtypesForTransactionIds(transactionIds),
+  ]);
+  const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
+  for (const t of ledger.transactions) {
+    const key = t.categoryId ?? 'uncategorized';
+    const list = transactionsByCategory[key] ?? [];
+    list.push({
+      id: t.id,
+      occurredOn: t.occurredOn,
+      label: t.label,
+      amountYen: t.amountYen,
+      accountId: t.accountId,
+      paymentMethod: t.paymentMethod,
+      items: itemsByTransactionId.get(t.id) ?? [],
+      expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
+    });
+    transactionsByCategory[key] = list;
+  }
 
   return (
     <div className="rise space-y-3">
@@ -39,7 +70,11 @@ export default async function AiReportPage() {
 
       <MonthlyReportCard view={monthlyView} />
 
-      <CategoryBreakdownChart rows={ledger.categoryBreakdown} />
+      <CategoryBreakdownChart
+        rows={ledger.categoryBreakdown}
+        transactionsByCategory={transactionsByCategory}
+        categories={categories}
+      />
     </div>
   );
 }
