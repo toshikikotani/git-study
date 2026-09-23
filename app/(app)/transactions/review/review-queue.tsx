@@ -5,8 +5,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { formatDateJa } from '@/lib/date';
-import { updateTransactionAction } from '../actions';
+import { updateTransactionAction, updateTransactionDateAction } from '../actions';
 import { createLearnedRuleAction } from './actions';
 
 type CategoryOption = { id: string; name: string };
@@ -33,6 +32,27 @@ export function ReviewQueue({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [ruleWarnings, setRuleWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // 日付の直し(本人発案)。確認待ちの時点でカテゴリだけでなく日付も
+  // 間違っていることがある(レシート・メール抽出どちらも AI の読み違いが
+  // あり得る)ため、確定と同じ画面で直せるようにする。
+  const [dates, setDates] = useState<Record<string, string>>({});
+  const [dateSavingId, setDateSavingId] = useState<string | null>(null);
+
+  const saveDate = async (transaction: StoredTransaction) => {
+    const occurredOn = dates[transaction.id] ?? transaction.occurredOn;
+    setDateSavingId(transaction.id);
+    setError(null);
+
+    const result = await updateTransactionDateAction(transaction.id, occurredOn);
+    if (result.error) {
+      setError(result.error);
+      setDateSavingId(null);
+      return;
+    }
+
+    setPending((prev) => prev.map((t) => (t.id === transaction.id ? { ...t, occurredOn } : t)));
+    setDateSavingId(null);
+  };
 
   const confirm = async (transaction: StoredTransaction) => {
     const categoryId = selected[transaction.id];
@@ -74,9 +94,34 @@ export function ReviewQueue({
           <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
             {transaction.description}
           </p>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            {formatDateJa(transaction.occurredOn)} ・ {formatYen(transaction.amountYen)}
-          </p>
+          <div
+            className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            <input
+              type="date"
+              value={dates[transaction.id] ?? transaction.occurredOn}
+              onChange={(e) => setDates((prev) => ({ ...prev, [transaction.id]: e.target.value }))}
+              className="rounded-lg px-1.5 py-0.5 text-xs"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+            {(dates[transaction.id] ?? transaction.occurredOn) !== transaction.occurredOn ? (
+              <button
+                type="button"
+                onClick={() => void saveDate(transaction)}
+                disabled={dateSavingId === transaction.id}
+                className="text-[11px] font-semibold disabled:opacity-40"
+                style={{ color: 'var(--accent)' }}
+              >
+                {dateSavingId === transaction.id ? '保存中…' : '日付を保存'}
+              </button>
+            ) : null}
+            <span>・ {formatYen(transaction.amountYen)}</span>
+          </div>
 
           <div className="mt-3 flex gap-2">
             <select

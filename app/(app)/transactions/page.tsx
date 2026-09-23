@@ -64,6 +64,13 @@ export default async function TransactionsPage() {
             口座
           </Link>
           <Link
+            href="/transactions/manual"
+            className="text-[13px]"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            手動で記録
+          </Link>
+          <Link
             href="/transactions/reconcile"
             className="text-[13px]"
             style={{ color: 'var(--ink-muted)' }}
@@ -212,6 +219,18 @@ function EmptyState() {
             }}
           >
             レシートを撮る
+            <span aria-hidden>→</span>
+          </Link>
+          <Link
+            href="/transactions/manual"
+            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--accent)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            手動で記録する
             <span aria-hidden>→</span>
           </Link>
         </div>

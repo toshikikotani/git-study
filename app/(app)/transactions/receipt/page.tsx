@@ -155,6 +155,20 @@ export default function ReceiptPage() {
     }
   };
 
+  // 抽出結果(AI が読み取った日付)は本人の確認が前提(preview の直前に出す
+  // 注記「金額と日付が合っているか確認してください」参照)。合っていなければ
+  // ここで直せるようにする(本人発案)。preview は extracted から都度組み立て
+  // 直されるため、ここを直すだけで保存内容にも反映される。
+  const updateExtractedDate = (index: number, occurredOn: string) => {
+    setExtracted((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        transactions: prev.transactions.map((t, i) => (i === index ? { ...t, occurredOn } : t)),
+      };
+    });
+  };
+
   const extract = async () => {
     if (!imageBase64) return;
     setExtracting(true);
@@ -498,14 +512,30 @@ export default function ReceiptPage() {
             >
               {preview.map((t, i) => {
                 const items = itemPreviewByIndex.get(i);
+                const dateEditor = (
+                  <input
+                    type="date"
+                    value={extracted?.transactions[i]?.occurredOn ?? ''}
+                    onChange={(e) => updateExtractedDate(i, e.target.value)}
+                    className="tabular mb-1.5 rounded-lg px-2 py-1 text-xs"
+                    style={{
+                      background: 'var(--surface)',
+                      color: 'var(--ink-secondary)',
+                      border: '1px solid var(--hairline)',
+                    }}
+                  />
+                );
                 if (!splitEligible[i] || !items || items.length < 2) {
-                  return <TransactionRow key={t.id} transaction={t} />;
+                  return <TransactionRow key={t.id} transaction={t} dateEditor={dateEditor} />;
                 }
                 // 商品ごとに分割して取り込む明細(本人発案)。親自体は分類の
                 // 対象にしない(分類は商品行=splits 側にある)ため、通常の
-                // TransactionRow ではなく専用の見た目にする。
+                // TransactionRow ではなく専用の見た目にする。商品行は親と同じ
+                // 日付を使う(receipt-ai.ts が1明細=1日付で返すため)ので、
+                // 日付編集は親側だけに置けば十分。
                 return (
                   <li key={t.id} className="px-4 py-3">
+                    {dateEditor}
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
                         {t.description}

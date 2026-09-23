@@ -11,9 +11,12 @@
 import { revalidatePath } from 'next/cache';
 
 import type { TransactionSplitInput } from '@/domain/transaction-splits';
+import type { PaymentMethod } from '@/features/import/adapters';
 import {
+  fingerprintOf,
   importTransactions,
   updateTransaction,
+  updateTransactionDate,
   TransactionStoreError,
   type StoredTransaction,
   type TransactionSource,
@@ -97,6 +100,97 @@ export async function updateTransactionAction(
   } catch (error) {
     return {
       error: error instanceof TransactionStoreError ? error.message : '更新に失敗しました。',
+    };
+  }
+  revalidatePath('/transactions');
+  revalidatePath('/transactions/review');
+  return { error: null };
+}
+
+/**
+ * 明細の日付を直す(本人発案)。レシート撮影直後のプレビューは
+ * receipt/page.tsx がローカルの state で直すため保存前はここを通らないが、
+ * 一度保存された明細(取り込み後、あるいは手動登録した明細)を後から直す
+ * 経路がここまで無かった。
+ */
+export async function updateTransactionDateAction(
+  id: string,
+  occurredOn: string,
+): Promise<{ error: string | null }> {
+  try {
+    await updateTransactionDate(id, occurredOn);
+  } catch (error) {
+    return {
+      error:
+        error instanceof TransactionStoreError ? error.message : '日付を更新できませんでした。',
+    };
+  }
+  revalidatePath('/transactions');
+  revalidatePath('/transactions/review');
+  return { error: null };
+}
+
+/**
+ * 手動での明細登録(本人発案)。現金・電子マネー以外にも、レシートを
+ * 撮り忘れた・撮れない支払い(口頭で分かっている金額など)を直接1件だけ
+ * 記録したいという要望。取り込み経路(CSV・レシート等)と同じ
+ * `importTransactions()` にそのまま乗せる——`transaction_source` は
+ * ADR-021 の時点で `manual` を流用する方針が既に決まっており(取り込み元
+ * での見分けは無いが `transactions` の内容自体は正しく記録される)、
+ * ここも新しい値を増やさずそれに従う。カテゴリを選べば本人が確定させた
+ * ことになる(classified_by='manual', review_status='confirmed')。選ばなければ
+ * 確認待ちキュー(/transactions/review)に他の未分類明細と同じように出る。
+ */
+export async function createManualTransactionAction(input: {
+  occurredOn: string;
+  description: string;
+  amountYen: number;
+  paymentMethod: PaymentMethod;
+  accountId: string;
+  categoryId: string | null;
+}): Promise<{ error: string | null }> {
+  const description = input.description.trim();
+  if (description === '') {
+    return { error: '内容を入力してください。' };
+  }
+  if (!Number.isFinite(input.amountYen) || input.amountYen === 0) {
+    return { error: '金額を入力してください。' };
+  }
+
+  const transaction: StoredTransaction = {
+    id: crypto.randomUUID(),
+    accountId: input.accountId,
+    occurredOn: input.occurredOn,
+    description,
+    merchantName: null,
+    amountYen: input.amountYen,
+    paymentMethod: input.paymentMethod,
+    categoryId: input.categoryId,
+    categoryName: null,
+    matchedRuleId: null,
+    classifiedBy: input.categoryId ? 'manual' : 'unclassified',
+    confidence: null,
+    reviewStatus: input.categoryId ? 'confirmed' : 'pending',
+    source: 'manual',
+    fingerprint: fingerprintOf({
+      occurredOn: input.occurredOn,
+      amountYen: input.amountYen,
+      description,
+    }),
+    batchId: null,
+    sourceRef: null,
+  };
+
+  try {
+    await importTransactions([transaction], {
+      fileName: null,
+      source: 'manual',
+      accountId: input.accountId,
+      failedCount: 0,
+    });
+  } catch (error) {
+    return {
+      error: error instanceof TransactionStoreError ? error.message : '登録できませんでした。',
     };
   }
   revalidatePath('/transactions');

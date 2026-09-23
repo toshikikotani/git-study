@@ -11,6 +11,7 @@
  * 頼らない)。
  */
 
+import { assertDateOnly, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -258,6 +259,22 @@ export async function updateTransaction(id: string, categoryId: string): Promise
     })
     .eq('id', id);
   if (error) throw new TransactionStoreError(`明細を更新できませんでした: ${error.message}`);
+}
+
+/**
+ * 明細の日付を直す(本人発案)。レシート由来・CSV由来を問わず、AI や
+ * 明細元が読み違えた日付を後から直せる経路が無かったための追加。
+ * カテゴリの確定(updateTransaction)とは意味が別なので、classified_by・
+ * review_status には触れない。
+ */
+export async function updateTransactionDate(id: string, occurredOn: DateOnly): Promise<void> {
+  assertDateOnly(occurredOn);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('transactions')
+    .update({ occurred_on: occurredOn })
+    .eq('id', id);
+  if (error) throw new TransactionStoreError(`日付を更新できませんでした: ${error.message}`);
 }
 
 /**

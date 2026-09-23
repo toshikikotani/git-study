@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { formatYen } from '@/domain/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
@@ -8,7 +9,7 @@ import type { CategoryOption } from '@/features/classification/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { replaceSplitsAction } from './actions';
+import { replaceSplitsAction, updateTransactionDateAction } from './actions';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   revolving: 'リボ払い',
@@ -39,11 +40,15 @@ export function TransactionRowWithSplit({
   categories: readonly CategoryOption[];
   initialSplits: readonly TransactionSplit[];
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [splits, setSplits] = useState<readonly TransactionSplit[]>(initialSplits);
   const [rows, setRows] = useState<SplitRowState[]>(() => initialRows(initialSplits, categories));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [occurredOn, setOccurredOn] = useState(transaction.occurredOn);
+  const [dateSaving, setDateSaving] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -90,6 +95,22 @@ export function TransactionRowWithSplit({
     );
     setSaving(false);
     setOpen(false);
+  }
+
+  async function saveDate(): Promise<void> {
+    setDateSaving(true);
+    setDateError(null);
+    const result = await updateTransactionDateAction(transaction.id, occurredOn);
+    if (result.error) {
+      setDateError(result.error);
+      setDateSaving(false);
+      return;
+    }
+    setDateSaving(false);
+    // 日付が変わると一覧の日付グループ(page.tsx の groupByDate)自体が
+    // 変わるため、クライアント側の state を書き換えるだけでは反映しきれない。
+    // サーバーコンポーネントを取り直す。
+    router.refresh();
   }
 
   async function clearSplits(): Promise<void> {
@@ -173,9 +194,46 @@ export function TransactionRowWithSplit({
 
       {open ? (
         <div
-          className="mt-3 space-y-2 rounded-2xl border p-3"
+          className="mt-3 space-y-3 rounded-2xl border p-3"
           style={{ borderColor: 'var(--hairline)' }}
         >
+          {/* 日付の修正(本人発案)。レシート・CSV・メールいずれの取り込みでも
+              日付を直す経路がこれまで無かった。分割の編集とは別の保存単位
+              にしてある(片方が未入力・未完了でももう片方だけ保存できる)。 */}
+          <div className="flex items-center gap-2">
+            <label
+              className="text-[11px] font-medium tracking-[0.08em] uppercase"
+              style={{ color: 'var(--ink-muted)' }}
+            >
+              日付
+            </label>
+            <input
+              type="date"
+              value={occurredOn}
+              onChange={(e) => setOccurredOn(e.target.value)}
+              className="flex-1 rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void saveDate()}
+              disabled={dateSaving || occurredOn === transaction.occurredOn}
+              className="shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-40"
+              style={{ background: 'var(--plane)', color: 'var(--accent)' }}
+            >
+              {dateSaving ? '保存中…' : '日付を保存'}
+            </button>
+          </div>
+          {dateError ? (
+            <p className="text-xs" style={{ color: 'var(--over)' }}>
+              {dateError}
+            </p>
+          ) : null}
+
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
             カテゴリごとに金額を分けます。合計は{formatYen(targetAbsYen, { sign: 'never' })}
             に一致させてください。
