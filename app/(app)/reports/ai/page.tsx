@@ -46,6 +46,8 @@ export default async function AiReportPage() {
       id: t.id,
       occurredOn: t.occurredOn,
       label: t.label,
+      categoryId: t.categoryId,
+      categoryName: t.categoryName,
       amountYen: t.amountYen,
       accountId: t.accountId,
       paymentMethod: t.paymentMethod,
