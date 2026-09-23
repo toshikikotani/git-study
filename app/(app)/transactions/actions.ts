@@ -11,6 +11,7 @@
 import { revalidatePath } from 'next/cache';
 
 import type { TransactionSplitInput } from '@/domain/transaction-splits';
+import { assertYen, MoneyError } from '@/domain/money';
 import { createLearnedRule } from '@/features/classification/store';
 import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
@@ -22,6 +23,7 @@ import {
   type TransactionSource,
 } from '@/features/transactions/store';
 import { replaceSplits } from '@/features/transactions/splits-store';
+import { assertDateOnly } from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 
 /**
@@ -148,18 +150,34 @@ export async function saveImportBatchAction(
  * P5-2(誤爆気味の学習ルールを検知して無効化する)は is_learned=true の
  * ルールを対象にしているため、この経路を絶やすとその安全網の入力が尽きる。
  * ルール作成の失敗は明細の更新自体は失敗させない(付随的な最適化のため)。
+ *
+ * 金額・日付の補正(`patch`)は任意(本人発案「今金額と日付が一切編集
+ * できない」、ADR-046)。amountAbsYen は正の大きさ(符号は本人に意識させ
+ * ない、split-editor.tsx の分割入力と同じ設計)——ここで元の明細の収入/
+ * 支出の符号(ADR-008)を掛けて揃える。
  */
 export async function updateTransactionAction(
   id: string,
   categoryId: string,
   description: string,
+  patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean },
 ): Promise<{ error: string | null }> {
   try {
-    await updateTransaction(id, categoryId);
+    let storePatch: { amountYen: number; occurredOn: string } | undefined;
+    if (patch) {
+      const amountAbsYen = assertYen(patch.amountAbsYen, '金額');
+      if (amountAbsYen <= 0) {
+        throw new MoneyError(`金額は正の値で指定してください: ${amountAbsYen}`);
+      }
+      const occurredOn = assertDateOnly(patch.occurredOn);
+      storePatch = {
+        amountYen: patch.isIncome ? amountAbsYen : -amountAbsYen,
+        occurredOn,
+      };
+    }
+    await updateTransaction(id, categoryId, storePatch);
   } catch (error) {
-    return {
-      error: error instanceof TransactionStoreError ? error.message : '更新に失敗しました。',
-    };
+    return { error: describeUserError(error, '更新に失敗しました。') };
   }
   try {
     await createLearnedRule({ description, categoryId, accountId: null });

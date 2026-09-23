@@ -263,9 +263,21 @@ export async function importTransactionsAsAdmin(
 /**
  * 本人がカテゴリを直接直す(M2-5)。分類の確定は常にこの形(本人が選んだ
  * categoryId、classified_by='manual'、review_status='corrected')なので、
- * 汎用の補正オブジェクトではなく categoryId だけを受け取る。
+ * categoryId は必須のまま受け取る。
+ *
+ * 金額・日付は本人発案(「今金額と日付が一切編集できない」、ADR-046)で
+ * 追加した任意の補正(`patch`)——/transactions の明細行(split-editor.tsx
+ * の単純なカテゴリ変更フォーム)だけが渡す。家計簿カレンダー
+ * (calendar.tsx)はカテゴリのみを直す入口のため渡さない。amountYen は
+ * 呼び出し側が符号(ADR-008、支出=負・収入=正)を掛けた最終値を渡す——
+ * 本人には常に正の大きさだけ入力させ、元の収入/支出の種別は変えさせない
+ * 設計(split-editor.tsx のコメント参照)。
  */
-export async function updateTransaction(id: string, categoryId: string): Promise<void> {
+export async function updateTransaction(
+  id: string,
+  categoryId: string,
+  patch?: { amountYen: number; occurredOn: string },
+): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase
     .from('transactions')
@@ -274,6 +286,7 @@ export async function updateTransaction(id: string, categoryId: string): Promise
       classified_by: 'manual',
       review_status: 'corrected',
       reviewed_at: new Date().toISOString(),
+      ...(patch ? { amount_yen: patch.amountYen, occurred_on: patch.occurredOn } : {}),
     })
     .eq('id', id);
   if (error) throw new TransactionStoreError(`明細を更新できませんでした: ${error.message}`);
