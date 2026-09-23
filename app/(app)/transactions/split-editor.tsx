@@ -74,6 +74,15 @@ type SplitRowState = { categoryId: string; amountYen: string; note: string };
  * 従来通りヘッダの `<button onClick>` がそのまま処理する。ADR-040/041で
  * 品目まわりの開閉は`ReceiptItemsPanel`へ既に整理済みのため、このADRの
  * スコープはジェスチャーの追加のみ。
+ *
+ * ── 金額・日付の編集(本人発案「今金額と日付が一切編集できない」、
+ *    ADR-048) ───────────────────────────────────────
+ * 単純なカテゴリ変更フォーム(mode='simple')に日付(`<input type="date">`)・
+ * 金額(正の大きさのみ、カテゴリと同じくマイナス記号は意識させない)を
+ * 追加し、「カテゴリを変更する」ボタンを「金額・日付・カテゴリを編集する」
+ * に改めた。`updateTransactionAction()` 自体は変えず、任意の第4引数
+ * (`patch`)として渡す——家計簿カレンダーは元のカテゴリのみの3引数呼び出し
+ * のまま影響を受けない。
  */
 export function TransactionRowWithSplit({
   transaction,
@@ -100,6 +109,12 @@ export function TransactionRowWithSplit({
   // 明示的な操作にする(上のコメント参照)。
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? '');
+  // 金額・日付の編集(本人発案「今金額と日付が一切編集できない」)。
+  // カテゴリ変更と同じフォームにまとめる(下の canSaveSimpleEdit 参照)。
+  const [amountAbsYenInput, setAmountAbsYenInput] = useState(
+    String(Math.abs(transaction.amountYen)),
+  );
+  const [occurredOnInput, setOccurredOnInput] = useState(transaction.occurredOn);
   const [splits, setSplits] = useState<readonly TransactionSplit[]>(initialSplits);
   const [rows, setRows] = useState<SplitRowState[]>(() => initialRows(initialSplits, categories));
   const [saving, setSaving] = useState(false);
@@ -138,16 +153,27 @@ export function TransactionRowWithSplit({
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
-  const categoryUnchanged = categoryId === (transaction.categoryId ?? '');
+  const amountAbsYen = Number(amountAbsYenInput);
+  const simpleEditUnchanged =
+    categoryId === (transaction.categoryId ?? '') &&
+    amountAbsYen === targetAbsYen &&
+    occurredOnInput === transaction.occurredOn;
+  const canSaveSimpleEdit =
+    !!categoryId && amountAbsYen > 0 && occurredOnInput !== '' && !simpleEditUnchanged;
 
-  async function saveCategory(): Promise<void> {
-    if (!categoryId || categoryUnchanged) return;
+  async function saveSimpleEdit(): Promise<void> {
+    if (!canSaveSimpleEdit) return;
     setSaving(true);
     setError(null);
     const result = await updateTransactionAction(
       transaction.id,
       categoryId,
       transaction.description,
+      {
+        amountAbsYen,
+        occurredOn: occurredOnInput,
+        isIncome,
+      },
     );
     setSaving(false);
     if (result.error) {
@@ -341,7 +367,7 @@ export function TransactionRowWithSplit({
           className="mt-2 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
         >
-          カテゴリを変更する
+          金額・日付・カテゴリを編集する
         </button>
       ) : null}
 
@@ -350,6 +376,33 @@ export function TransactionRowWithSplit({
           className="mt-3 space-y-2 rounded-2xl border p-3"
           style={{ borderColor: 'var(--hairline)' }}
         >
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={occurredOnInput}
+              onChange={(e) => setOccurredOnInput(e.target.value)}
+              className="flex-1 rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={amountAbsYenInput}
+              onChange={(e) => setAmountAbsYenInput(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="金額"
+              className="flex-1 rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+          </div>
+
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
@@ -373,8 +426,8 @@ export function TransactionRowWithSplit({
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => void saveCategory()}
-              disabled={saving || !categoryId || categoryUnchanged}
+              onClick={() => void saveSimpleEdit()}
+              disabled={saving || !canSaveSimpleEdit}
               className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
