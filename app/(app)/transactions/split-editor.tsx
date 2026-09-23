@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
@@ -64,6 +66,15 @@ type SplitRowState = { categoryId: string; amountYen: string; note: string };
  * 一致しない(mismatched)」ときに、行を閉じたままでも気づけるようにする
  * 控えめな警告(下のバナー)だけ——押すと行を開く(setOpen(true))だけで、
  * 実際の編集はそこで開くパネルに任せる。
+ *
+ * ── 左フリック/長押し(本人発案、ADR-042) ────────────────────
+ * 「操作を重複させることが大事」という発案のもと、行ヘッダを
+ * `SwipeableRow` で包み、左フリックはカテゴリ変更に直行
+ * (open+categoryFormOpen を同時に立てる)、長押しは編集不可のその場
+ * プレビュー(previewOpen、BottomSheet)を開く——タップ(行の開閉)は
+ * 従来通りヘッダの `<button onClick>` がそのまま処理する。ADR-040/041で
+ * 品目まわりの開閉は`ReceiptItemsPanel`へ既に整理済みのため、このADRの
+ * スコープはジェスチャーの追加のみ。
  */
 export function TransactionRowWithSplit({
   transaction,
@@ -106,6 +117,9 @@ export function TransactionRowWithSplit({
   // code で見る(本人がカテゴリを改名しても判定が崩れないように、ADR-016)。
   const categoryCode = categories.find((c) => c.id === transaction.categoryId)?.code ?? null;
   const [subtype, setSubtype] = useState(expenseSubtype);
+  // 長押しのその場プレビュー(ADR-042)。open/categoryFormOpen とは独立
+  // ——編集ではなく閲覧専用のため。
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -190,84 +204,92 @@ export function TransactionRowWithSplit({
 
   return (
     <li className="px-4 py-3">
-      <button
-        type="button"
-        onClick={() => {
-          // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
-          // 次に開いたときは、また品目一覧だけの状態から始まってほしい
-          // (開くたびにカテゴリ編集フォームまで出た状態が残らないように)。
-          setOpen((v) => {
-            const next = !v;
-            if (!next) setCategoryFormOpen(false);
-            return next;
-          });
+      <SwipeableRow
+        onSwipeLeft={() => {
+          setOpen(true);
+          setCategoryFormOpen(true);
         }}
-        className="flex w-full items-start justify-between gap-3 text-left"
+        onLongPress={() => setPreviewOpen(true)}
       >
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
-            {transaction.description}
-          </p>
+        <button
+          type="button"
+          onClick={() => {
+            // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
+            // 次に開いたときは、また品目一覧だけの状態から始まってほしい
+            // (開くたびにカテゴリ編集フォームまで出た状態が残らないように)。
+            setOpen((v) => {
+              const next = !v;
+              if (!next) setCategoryFormOpen(false);
+              return next;
+            });
+          }}
+          className="flex w-full items-start justify-between gap-3 text-left"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
+              {transaction.description}
+            </p>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              {splits.length > 0
-                ? splits
-                    .map((s) =>
-                      s.note
-                        ? `${s.note}(${s.categoryName ?? '未分類'})`
-                        : (s.categoryName ?? '未分類'),
-                    )
-                    .join(' / ')
-                : (transaction.categoryName ?? '未分類')}
-            </span>
-
-            {risky && methodLabel ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                style={{ background: 'var(--over-track)', color: 'var(--over)' }}
-              >
-                <span aria-hidden>!</span>
-                {methodLabel}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                {splits.length > 0
+                  ? splits
+                      .map((s) =>
+                        s.note
+                          ? `${s.note}(${s.categoryName ?? '未分類'})`
+                          : (s.categoryName ?? '未分類'),
+                      )
+                      .join(' / ')
+                  : (transaction.categoryName ?? '未分類')}
               </span>
-            ) : null}
 
-            {transaction.reviewStatus === 'pending' ? (
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-              >
-                確認待ち
-              </span>
-            ) : null}
+              {risky && methodLabel ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ background: 'var(--over-track)', color: 'var(--over)' }}
+                >
+                  <span aria-hidden>!</span>
+                  {methodLabel}
+                </span>
+              ) : null}
 
-            {splits.length > 0 ? (
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
-              >
-                分割済み
-              </span>
+              {transaction.reviewStatus === 'pending' ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                >
+                  確認待ち
+                </span>
+              ) : null}
+
+              {splits.length > 0 ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
+                >
+                  分割済み
+                </span>
+              ) : null}
+            </div>
+
+            {/* レシートの商品行(ADR-034)。分割済みの明細はカテゴリの内訳に
+                品名が出ているため(上の splits.map)、二重には出さない。 */}
+            {splits.length === 0 && items.length > 0 ? (
+              <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                {items.map((it) => it.name).join('、')}
+              </p>
             ) : null}
           </div>
 
-          {/* レシートの商品行(ADR-034)。分割済みの明細はカテゴリの内訳に
-              品名が出ているため(上の splits.map)、二重には出さない。 */}
-          {splits.length === 0 && items.length > 0 ? (
-            <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-              {items.map((it) => it.name).join('、')}
-            </p>
-          ) : null}
-        </div>
-
-        <span
-          className="tabular shrink-0 text-[15px] font-semibold"
-          style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
-        >
-          {isIncome ? '+' : '−'}
-          {formatYen(targetAbsYen)}
-        </span>
-      </button>
+          <span
+            className="tabular shrink-0 text-[15px] font-semibold"
+            style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
+          >
+            {isIncome ? '+' : '−'}
+            {formatYen(targetAbsYen)}
+          </span>
+        </button>
+      </SwipeableRow>
 
       {/* 品目のタップ導線(本人からの不具合報告「レシートの品目もどこから
           飛べばいいかわかりません...タップしても何も見れない」)。行を開くと
@@ -511,6 +533,99 @@ export function TransactionRowWithSplit({
           ) : null}
         </div>
       ) : null}
+
+      {/* 長押しのその場プレビュー(本人発案、ADR-042)。編集の入口は一切
+          出さない——閲覧専用。行を開かなくても、その場で内容を確認できる。 */}
+      <BottomSheet open={previewOpen} onClose={() => setPreviewOpen(false)} role="dialog">
+        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+          <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+            明細のプレビュー
+          </h2>
+          <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+            外側をタップで閉じる
+          </span>
+        </div>
+
+        <div className="space-y-3 px-3 pb-3">
+          <div>
+            <p className="text-[15px]" style={{ color: 'var(--ink)' }}>
+              {transaction.description}
+            </p>
+            <p
+              className="tabular text-[15px] font-semibold"
+              style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
+            >
+              {isIncome ? '+' : '−'}
+              {formatYen(targetAbsYen)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+              分類
+            </p>
+            {splits.length > 0 ? (
+              <ul className="mt-1 space-y-0.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+                {splits.map((s, i) => (
+                  <li key={i} className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate">
+                      {s.note
+                        ? `${s.note}(${s.categoryName ?? '未分類'})`
+                        : (s.categoryName ?? '未分類')}
+                    </span>
+                    <span className="tabular shrink-0">
+                      {formatYen(Math.abs(s.amountYen), { sign: 'never' })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+                {transaction.categoryName ?? '未分類'}
+              </p>
+            )}
+            {subtype && categoryCode === 'living' ? (
+              <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                生活費の内訳:{subtype}
+              </p>
+            ) : null}
+          </div>
+
+          {items.length > 0 ? (
+            <div>
+              <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+                レシートの品目
+              </p>
+              <ul className="mt-1 space-y-1">
+                {items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-baseline justify-between gap-3 text-xs"
+                    style={{ color: 'var(--ink-secondary)' }}
+                  >
+                    <span className="min-w-0 truncate">
+                      {item.name}
+                      {item.productType ? (
+                        <span className="ml-1" style={{ color: 'var(--ink-muted)' }}>
+                          ({item.productType})
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="tabular shrink-0">
+                      {formatYen(item.amountYen, { sign: 'never' })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {splits.length === 0 && itemsStatus === 'mismatched' ? (
+                <p className="mt-1 text-[11px]" style={{ color: 'var(--over)' }}>
+                  品目の合計が金額と一致しません
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </BottomSheet>
     </li>
   );
 }
