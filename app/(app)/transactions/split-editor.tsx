@@ -12,7 +12,11 @@ import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
-import { replaceSplitsAction, updateTransactionAction } from './actions';
+import {
+  replaceSplitsAction,
+  updateTransactionAction,
+  updateTransactionMemoAction,
+} from './actions';
 import { ReceiptItemsPanel } from './receipt-items-panel';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
@@ -115,6 +119,13 @@ export function TransactionRowWithSplit({
     String(Math.abs(transaction.amountYen)),
   );
   const [occurredOnInput, setOccurredOnInput] = useState(transaction.occurredOn);
+  // 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付とは
+  // 独立した操作のため、別の開閉状態・別のServer Actionにした。
+  const [memo, setMemo] = useState(transaction.memo);
+  const [memoFormOpen, setMemoFormOpen] = useState(false);
+  const [memoInput, setMemoInput] = useState(transaction.memo ?? '');
+  const [memoSaving, setMemoSaving] = useState(false);
+  const [memoError, setMemoError] = useState<string | null>(null);
   const [splits, setSplits] = useState<readonly TransactionSplit[]>(initialSplits);
   const [rows, setRows] = useState<SplitRowState[]>(() => initialRows(initialSplits, categories));
   const [saving, setSaving] = useState(false);
@@ -182,6 +193,20 @@ export function TransactionRowWithSplit({
     }
     setOpen(false);
     setCategoryFormOpen(false);
+  }
+
+  async function saveMemo(): Promise<void> {
+    setMemoSaving(true);
+    setMemoError(null);
+    const result = await updateTransactionMemoAction(transaction.id, memoInput);
+    setMemoSaving(false);
+    if (result.error) {
+      setMemoError(result.error);
+      return;
+    }
+    const trimmed = memoInput.trim();
+    setMemo(trimmed === '' ? null : trimmed);
+    setMemoFormOpen(false);
   }
 
   async function save(): Promise<void> {
@@ -336,6 +361,85 @@ export function TransactionRowWithSplit({
             subtype={subtype}
             onSubtypeReplaced={setSubtype}
           />
+        </div>
+      ) : null}
+
+      {/* 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付
+          とは独立した操作なので、別の開閉状態を持つ(このファイル冒頭の
+          コメント参照)。 */}
+      {open && !memoFormOpen ? (
+        <div className="mt-3 flex items-start justify-between gap-2">
+          {memo ? (
+            <p
+              className="min-w-0 flex-1 whitespace-pre-wrap text-xs"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              {memo}
+            </p>
+          ) : (
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              メモはありません
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setMemoInput(memo ?? '');
+              setMemoFormOpen(true);
+            }}
+            className="shrink-0 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            {memo ? 'メモを編集する' : 'メモを追加する'}
+          </button>
+        </div>
+      ) : null}
+
+      {open && memoFormOpen ? (
+        <div
+          className="mt-3 space-y-2 rounded-2xl border p-3"
+          style={{ borderColor: 'var(--hairline)' }}
+        >
+          <textarea
+            value={memoInput}
+            onChange={(e) => setMemoInput(e.target.value)}
+            rows={2}
+            placeholder="メモ(任意)"
+            className="w-full rounded-xl px-3 py-2 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void saveMemo()}
+              disabled={memoSaving}
+              className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              {memoSaving ? '保存中…' : '保存'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMemoInput(memo ?? '');
+                setMemoFormOpen(false);
+                setMemoError(null);
+              }}
+              className="rounded-full px-4 py-2 text-sm font-semibold"
+              style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+            >
+              やめる
+            </button>
+          </div>
+          {memoError ? (
+            <p className="text-xs" style={{ color: 'var(--over)' }}>
+              {memoError}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
