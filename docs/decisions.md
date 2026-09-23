@@ -1209,7 +1209,29 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
-## ADR-046:明細行から金額・日付も直接編集できるようにする(本人発案)
+## ADR-046:`(app)` 配下に Error Boundary(`error.tsx`)を追加する(本人からの不具合報告)
+
+**背景**:本人からスクリーンショット付きの不具合報告「これよく出てくる」。ホームを開いた最初のタイミングで、アプリの見た目とは無関係な Vercel のプラットフォーム側の汎用クラッシュ画面("This page couldn't load / A server error occurred"、`ERROR <番号>`)が出る、というもの。
+
+**原因**:このリポジトリには `error.tsx`(Next.js の Error Boundary)が1つも無かった。ホーム(`app/(app)/page.tsx`)は `recordCheckin()`・`loadHomeSummary()`・`getCheckinStreak()`・`loadCategoryMonthDetail()`(タイル数分)という複数の Supabase 呼び出しを直列・並列に `await` しており、`recordCheckin()` だけは既に `.catch(() => undefined)` で失敗を許容しているが、残りは無防備だった。サーバーレス関数の一時的な接続断・タイムアウトなどでこれらのどれか1つが例外を投げると、Error Boundary が無い(Next.js の既定の作法では `error.tsx` を置かない限り例外はそのまま外へ抜ける)ため、アプリの `layout.tsx` はおろか Next.js 自身の最低限のエラーUIも経由せず、Vercel のプラットフォーム層がフォールバックとして出す汎用クラッシュ画面がそのまま表示されていたと考えられる。**このセッションには Vercel の関数ログ・管理API へのアクセス手段が無く**、`loadHomeSummary()` 等のうちどの呼び出しが実際に失敗しているか、失敗の頻度・原因(接続断か、タイムアウトか、別の例外か)そのものは特定できていない。
+
+**決定・実装**
+
+1. **`app/(app)/error.tsx` を新規追加**:`(app)` ルートグループ直下(`layout.tsx` と同階層)に Error Boundary を置いた。Next.js の仕様上、`error.tsx` は同じセグメントの `page.tsx` とその子孫だけを差し替え、親の `layout.tsx`(ボトムナビ・FAB)はそのまま描画され続ける——ホーム・家計簿・明細・給料日の主要4タブすべてがこのグループ配下にあるため、1箇所置くだけで全タブの例外をカバーできる。
+2. **表示はアプリのデザインに合わせる**:`var(--over)`・`var(--ink)`・`var(--ink-muted)` など既存の design token と、共通の `Button` コンポーネント(`onClick={reset}`)を使い、「読み込めませんでした/もう一度お試しください/もう一度試す」という他の失敗表示(`receipt-items-panel.tsx` のレシート読み込み失敗時のメッセージ等)と同じトーンにした。`reset()` はその場でセグメントの再レンダリングを試みる(Next.js の標準 API)。
+3. **エラー自体は `console.error` に残す**:サーバー側の詳細なログを見る手段がこのセッションには無いが、将来ログ収集(Sentry 等)を足すときの最小限のフックとして `useEffect` 内で `console.error(error)` した。
+
+**却下した選択肢**
+
+- **根本原因(なぜ Supabase 呼び出しが失敗するか)を先に特定して直す**:Vercel の関数ログ・管理APIへのアクセス手段がこのセッションには無く、ローカルの `next build`/`vitest` では再現できない(本番環境固有の接続断・タイムアウトの可能性が高い)。原因不明のまま個別の呼び出しへ場当たり的なリトライ・try-catch を足すより、まず「何が起きても本人がその場からやり直せる」土台(Error Boundary)を先に用意する方が費用対効果が高いと判断した。原因特定・個別対応は今後の課題として残す。
+- **ホームページの各データ取得(`loadHomeSummary()` 等)を個別に try-catch し、部分的に degrade したUIを返す**:こちらの方が体験としては上(1つの数字だけ取れなくても残りは見える)だが、`HomeSummary` 型が `payoff`・`tiles` を1つのオブジェクトとして返す構造になっており、部分的な欠損を型・UI両面で安全に扱うには `page.tsx` の構造自体に踏み込む変更が要る。本人の報告は「クラッシュ画面が出ること」自体への指摘であり、Error Boundary だけでその体験は解消するため、今回はスコープを絞った。
+- **`app/global-error.tsx` も同時に追加する**:ルート `layout.tsx`(`app/layout.tsx`)はフォントの設定と `children` の描画のみでデータ取得を行っておらず、例外を投げる経路が無い。現時点で対象が無い箇所への予防的な追加は避けた。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(UIのError Boundaryのみの追加のためユニットテスト追加なし)/`npx next build` すべて成功。**未検証**:このセッションには実機・本人のログイン手段・Vercelの関数ログへのアクセスが無いため、実機での再現(実際に例外を起こしてこの画面が出ること)・表示の確認はできていない。
+
+---
+
+## ADR-047:明細行から金額・日付も直接編集できるようにする(本人発案)
 
 **背景**:本人からのスクリーンショット付き指摘「今金額と日付が一切編集できない。別のダイアログ表示していいしむしろ戻れるなら画面遷移してもいいのでもっと編集しやすくして」。`/transactions` の明細行(`TransactionRowWithSplit`)は ADR-042/044/045 の時点でカテゴリの変更・分割・レシート品目の編集まで揃っていたが、`updateTransaction()`(`src/features/transactions/store.ts`)は元々「本人がカテゴリを直接直す」ためだけの経路で、`category_id` しか更新できなかった——取り込み時の読み取り誤り(レシートAI・CSV列マッピングの誤認識等)で金額や日付が間違っていても、直す手段が無かった。
 
