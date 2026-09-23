@@ -14,6 +14,7 @@ import {
   paydayCycleFor,
   splitDateOnly,
   todayJst,
+  weekdayOf,
 } from '@/lib/date';
 
 describe('todayJst(ADR-015)', () => {
@@ -100,6 +101,14 @@ describe('assertDateOnly / splitDateOnly', () => {
 
   it('分解できる', () => {
     expect(splitDateOnly('2026-09-08')).toEqual([2026, 9, 8]);
+  });
+});
+
+describe('weekdayOf(ADR-043)', () => {
+  it('日曜=0〜土曜=6で返す', () => {
+    expect(weekdayOf('2026-09-01')).toBe(2); // 火曜
+    expect(weekdayOf('2026-09-08')).toBe(2); // 火曜
+    expect(weekdayOf('2026-01-01')).toBe(4); // 木曜
   });
 });
 

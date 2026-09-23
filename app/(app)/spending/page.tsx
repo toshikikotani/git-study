@@ -13,6 +13,7 @@ import {
 } from '@/features/spending/store';
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
+import { SpendingCalendar } from './calendar';
 import { CategoryBreakdownChart, type DrilldownTransaction } from './category-breakdown-chart';
 import { DiagnosisCard } from './diagnosis-card';
 
@@ -55,6 +56,13 @@ import { DiagnosisCard } from './diagnosis-card';
  * だが、こちらは明細1件ごとにAIが下す動的な評定(features/diagnosis/、
  * DiagnosisCard 参照)。押されたときだけ AI を呼び、結果は蓄積して
  * 月ごとの浪費比率の推移を見せる。
+ *
+ * ── トップのカレンダー(本人発案、ADR-043)────────────────────
+ * 「カレンダー追加。家計簿のトップはカレンダー、その下に詳細。カレンダー
+ * 押したら何に使ったかすぐ見れるように編集できるように」への対応。
+ * `SpendingCalendar`(calendar.tsx)を一番上に置き、日を押すとその日の
+ * 明細一覧とカテゴリの簡易編集がカード内に展開される。新しいクエリは
+ * 増やさず、ここで既に読んでいる `ledger.transactions` をそのまま渡す。
  */
 
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
@@ -108,6 +116,11 @@ export default async function SpendingPage() {
         </Link>
       </header>
 
+      <SpendingCalendar
+        transactions={ledger.transactions}
+        period={ledger.period}
+        categories={categories}
+      />
       <SummaryCard ledger={ledger} netYen={netYen} />
       <ForecastCard forecast={ledger.forecast} />
       <DiagnosisCard view={diagnosis} />
