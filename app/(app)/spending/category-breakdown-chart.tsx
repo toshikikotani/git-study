@@ -207,6 +207,7 @@ function DrilldownRow({
               occurredOn: transaction.occurredOn,
               accountId: transaction.accountId,
               paymentMethod: transaction.paymentMethod,
+              amountYen: transaction.amountYen,
             }}
             categories={categories}
             categoryCode={categoryCode}
