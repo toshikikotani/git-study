@@ -57,12 +57,26 @@ import { DiagnosisCard } from './diagnosis-card';
  * DiagnosisCard 参照)。押されたときだけ AI を呼び、結果は蓄積して
  * 月ごとの浪費比率の推移を見せる。
  *
- * ── トップのカレンダー(本人発案、ADR-043)────────────────────
+ * ── トップのカレンダー(本人発案、ADR-043/044)──────────────────
  * 「カレンダー追加。家計簿のトップはカレンダー、その下に詳細。カレンダー
  * 押したら何に使ったかすぐ見れるように編集できるように」への対応。
- * `SpendingCalendar`(calendar.tsx)を一番上に置き、日を押すとその日の
- * 明細一覧とカテゴリの簡易編集がカード内に展開される。新しいクエリは
- * 増やさず、ここで既に読んでいる `ledger.transactions` をそのまま渡す。
+ * `SpendingCalendar`(calendar.tsx)を日を押すとその日の明細一覧が
+ * カード内に展開される。新しいクエリは増やさず、`CategoryBreakdownChart`
+ * と共有する `drilldownTransactions` をそのまま渡す。
+ *
+ * ── ただしトップは今月使った額(本人からのUX指摘、ADR-044)──────────
+ * 「これは一番上に持っていって」(SummaryCard を指す手書き注釈)を受け、
+ * カレンダーより先に SummaryCard(今月使った額)を置くよう並び替えた。
+ * カレンダー自体は引き続き上寄りの重要な要素として残る。
+ *
+ * ── カレンダーの日別明細もカテゴリごとに分け、レシートを見せる(本人発案、
+ *    ADR-044)────────────────────────────────────────────
+ * 「カレンダーに紐づくやつもカテゴリーごとに分けてレシート表示して。今
+ * カテゴリーが弱いな、生活費ってなっちゃう全部」という指摘への対応。
+ * 「生活費」に丸められてしまう明細が多く、カテゴリ名だけでは何を買ったか
+ * 分からないため、`SpendingCalendar` の日別明細をカテゴリでグルーピングし、
+ * 各明細に `CategoryBreakdownChart` と同じ `ReceiptItemsPanel` を出して
+ * レシートの品目まで見えるようにした(ADR-033、部品を複製しない)。
  */
 
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
@@ -83,22 +97,27 @@ export default async function SpendingPage() {
     listReceiptItemsForTransactionIds(transactionIds),
     listExpenseSubtypesForTransactionIds(transactionIds),
   ]);
+  // カテゴリ別内訳(CategoryBreakdownChart)とカレンダー(SpendingCalendar、
+  // ADR-044)の両方から使う、明細1件分の共通の形。ここで1回だけ作り、
+  // 両画面で共有する(ADR-033、同じ考慮を複数箇所で作らない)。
   const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
-  for (const t of ledger.transactions) {
-    const key = t.categoryId ?? 'uncategorized';
-    const list = transactionsByCategory[key] ?? [];
-    list.push({
+  const drilldownTransactions: DrilldownTransaction[] = ledger.transactions.map((t) => {
+    const drilldown: DrilldownTransaction = {
       id: t.id,
       occurredOn: t.occurredOn,
       label: t.label,
+      categoryId: t.categoryId,
+      categoryName: t.categoryName,
       amountYen: t.amountYen,
       accountId: t.accountId,
       paymentMethod: t.paymentMethod,
       items: itemsByTransactionId.get(t.id) ?? [],
       expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
-    });
-    transactionsByCategory[key] = list;
-  }
+    };
+    const key = t.categoryId ?? 'uncategorized';
+    transactionsByCategory[key] = [...(transactionsByCategory[key] ?? []), drilldown];
+    return drilldown;
+  });
 
   return (
     <div className="rise space-y-3">
@@ -116,12 +135,12 @@ export default async function SpendingPage() {
         </Link>
       </header>
 
+      <SummaryCard ledger={ledger} netYen={netYen} />
       <SpendingCalendar
-        transactions={ledger.transactions}
+        transactions={drilldownTransactions}
         period={ledger.period}
         categories={categories}
       />
-      <SummaryCard ledger={ledger} netYen={netYen} />
       <ForecastCard forecast={ledger.forecast} />
       <DiagnosisCard view={diagnosis} />
       <CategoryBreakdownChart
