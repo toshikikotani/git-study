@@ -16,6 +16,17 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 import { SpendingCalendar } from './calendar';
 import { CategoryBreakdownChart, type DrilldownTransaction } from './category-breakdown-chart';
 import { DiagnosisCard } from './diagnosis-card';
+import { ReorderableCards, type SpendingCardKey } from './reorderable-cards';
+
+/** カードの既定の並び順(ADR-043/044 時点の並び、ADR-046参照)。 */
+const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
+  'summary',
+  'calendar',
+  'forecast',
+  'diagnosis',
+  'categoryBreakdown',
+  'pile',
+];
 
 /**
  * 家計簿(本人発案:「ちりつもだけ表示されてて微妙。普通の一般的な家計簿を
@@ -77,6 +88,13 @@ import { DiagnosisCard } from './diagnosis-card';
  * 分からないため、`SpendingCalendar` の日別明細をカテゴリでグルーピングし、
  * 各明細に `CategoryBreakdownChart` と同じ `ReceiptItemsPanel` を出して
  * レシートの品目まで見えるようにした(ADR-033、部品を複製しない)。
+ *
+ * ── カードの並び順は本人が自由に変えられる(本人発案、ADR-046)──────
+ * 「そこの部分自由にレイアウト変えれるようにしたい」への対応。並び替えの
+ * たびに本人からの指摘→コード変更という往復(ADR-043/044)が続いていた
+ * ため、`ReorderableCards`(reorderable-cards.tsx)で本人が直接、各カードを
+ * 長押し+ドラッグして並べ替えられるようにした。並び順はブラウザの
+ * localStorage に保存する(詳細はコンポーネント側のコメント参照)。
  */
 
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
@@ -135,20 +153,29 @@ export default async function SpendingPage() {
         </Link>
       </header>
 
-      <SummaryCard ledger={ledger} netYen={netYen} />
-      <SpendingCalendar
-        transactions={drilldownTransactions}
-        period={ledger.period}
-        categories={categories}
+      <ReorderableCards
+        defaultOrder={DEFAULT_CARD_ORDER}
+        cards={{
+          summary: <SummaryCard ledger={ledger} netYen={netYen} />,
+          calendar: (
+            <SpendingCalendar
+              transactions={drilldownTransactions}
+              period={ledger.period}
+              categories={categories}
+            />
+          ),
+          forecast: <ForecastCard forecast={ledger.forecast} />,
+          diagnosis: <DiagnosisCard view={diagnosis} />,
+          categoryBreakdown: (
+            <CategoryBreakdownChart
+              rows={ledger.categoryBreakdown}
+              transactionsByCategory={transactionsByCategory}
+              categories={categories}
+            />
+          ),
+          pile: <PileTeaserCard view={pile} />,
+        }}
       />
-      <ForecastCard forecast={ledger.forecast} />
-      <DiagnosisCard view={diagnosis} />
-      <CategoryBreakdownChart
-        rows={ledger.categoryBreakdown}
-        transactionsByCategory={transactionsByCategory}
-        categories={categories}
-      />
-      <PileTeaserCard view={pile} />
     </div>
   );
 }
