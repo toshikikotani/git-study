@@ -17,6 +17,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'ローソン渋谷店',
         payment_method_text: '現金',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions).toHaveLength(1);
@@ -36,6 +37,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: '書店',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions[0]!.amountYen).toBe(-1200);
@@ -49,6 +51,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: '家電量販店',
         payment_method_text: '5回払い',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(written.transactions[0]!.paymentMethod).toBe('installment');
@@ -62,6 +65,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'コンビニ',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions).toEqual([]);
@@ -76,6 +80,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'コンビニ',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions).toEqual([]);
@@ -90,6 +95,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: '',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions).toEqual([]);
@@ -104,6 +110,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: '書店',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions[0]!.amountYen).toBe(-781);
@@ -117,6 +124,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: '   ',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions[0]!.description).toBe('(店名不明)');
@@ -136,14 +144,15 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'スーパー',
         payment_method_text: '',
         items: [
-          { name: 'おにぎり', amount_yen: 150 },
-          { name: '洗剤', amount_yen: 630 },
+          { name: 'おにぎり', amount_yen: 150, product_type: '' },
+          { name: '洗剤', amount_yen: 630, product_type: '' },
         ],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions[0]!.items).toEqual([
-      { description: 'おにぎり', amountYen: -150 },
-      { description: '洗剤', amountYen: -630 },
+      { description: 'おにぎり', amountYen: -150, productType: null },
+      { description: '洗剤', amountYen: -630, productType: null },
     ]);
     expect(result.warnings).toEqual([]);
   });
@@ -156,14 +165,15 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'スーパー',
         payment_method_text: '',
         items: [
-          { name: 'おにぎり', amount_yen: 150 },
-          { name: '洗剤', amount_yen: 999 },
+          { name: 'おにぎり', amount_yen: 150, product_type: '' },
+          { name: '洗剤', amount_yen: 999, product_type: '' },
         ],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions[0]!.items).toEqual([
-      { description: 'おにぎり', amountYen: -150 },
-      { description: '洗剤', amountYen: -999 },
+      { description: 'おにぎり', amountYen: -150, productType: null },
+      { description: '洗剤', amountYen: -999, productType: null },
     ]);
     expect(result.transactions).toHaveLength(1);
     expect(result.warnings).toEqual([]);
@@ -176,10 +186,13 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         amount_yen: 500,
         store_name: 'コンビニ',
         payment_method_text: '',
-        items: [{ name: 'コーヒー', amount_yen: 500 }],
+        items: [{ name: 'コーヒー', amount_yen: 500, product_type: '' }],
+        expense_subtype: '',
       },
     ]);
-    expect(result.transactions[0]!.items).toEqual([{ description: 'コーヒー', amountYen: -500 }]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: 'コーヒー', amountYen: -500, productType: null },
+    ]);
     expect(result.warnings).toEqual([]);
   });
 
@@ -191,14 +204,15 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'スーパー',
         payment_method_text: '',
         items: [
-          { name: '  ', amount_yen: 300 },
-          { name: '洗剤', amount_yen: 200 },
+          { name: '  ', amount_yen: 300, product_type: '' },
+          { name: '洗剤', amount_yen: 200, product_type: '' },
         ],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions[0]!.items).toEqual([
-      { description: '(品名不明)', amountYen: -300 },
-      { description: '洗剤', amountYen: -200 },
+      { description: '(品名不明)', amountYen: -300, productType: null },
+      { description: '洗剤', amountYen: -200, productType: null },
     ]);
   });
 
@@ -210,12 +224,15 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'スーパー',
         payment_method_text: '',
         items: [
-          { name: 'サンプル', amount_yen: 0 },
-          { name: '洗剤', amount_yen: 200 },
+          { name: 'サンプル', amount_yen: 0, product_type: '' },
+          { name: '洗剤', amount_yen: 200, product_type: '' },
         ],
+        expense_subtype: '',
       },
     ]);
-    expect(result.transactions[0]!.items).toEqual([{ description: '洗剤', amountYen: -200 }]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: '洗剤', amountYen: -200, productType: null },
+    ]);
   });
 
   it('1枚に複数の明細が写っていればすべて返す', () => {
@@ -226,6 +243,7 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'コンビニA',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
       {
         occurred_on: '2026-09-03',
@@ -233,9 +251,56 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
         store_name: 'コンビニB',
         payment_method_text: '',
         items: [],
+        expense_subtype: '',
       },
     ]);
     expect(result.transactions).toHaveLength(2);
+  });
+
+  it('商品の種類(product_type)を読み取れれば商品ごとに残す(本人発案、ADR-036)', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 780,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [
+          { name: '緑茶', amount_yen: 150, product_type: '飲料' },
+          { name: '柔軟剤', amount_yen: 630, product_type: '  日用品  ' },
+        ],
+        expense_subtype: '',
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: '緑茶', amountYen: -150, productType: '飲料' },
+      { description: '柔軟剤', amountYen: -630, productType: '日用品' },
+    ]);
+  });
+
+  it('生活費の小分類(expense_subtype)を読み取れれば保持し、空文字は null にする(本人発案、ADR-036)', () => {
+    const withSubtype = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 3200,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [],
+        expense_subtype: '  食費  ',
+      },
+    ]);
+    expect(withSubtype.transactions[0]!.expenseSubtype).toBe('食費');
+
+    const withoutSubtype = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 3200,
+        store_name: '証券会社',
+        payment_method_text: '',
+        items: [],
+        expense_subtype: '',
+      },
+    ]);
+    expect(withoutSubtype.transactions[0]!.expenseSubtype).toBeNull();
   });
 });
 
@@ -302,6 +367,7 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
             store_name: 'コンビニ',
             payment_method_text: '',
             items: [],
+            expense_subtype: '',
           },
         ],
       },
@@ -322,22 +388,22 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
 describe('itemsReconcileWithTotal — カテゴリ分割の対象になるか(ADR-034)', () => {
   it('2件以上あり合計が一致すれば true', () => {
     const items = [
-      { description: 'おにぎり', amountYen: -150 },
-      { description: '洗剤', amountYen: -630 },
+      { description: 'おにぎり', amountYen: -150, productType: null },
+      { description: '洗剤', amountYen: -630, productType: null },
     ];
     expect(itemsReconcileWithTotal(items, -780)).toBe(true);
   });
 
   it('合計が一致しなければ false(品目としては別に保存する)', () => {
     const items = [
-      { description: 'おにぎり', amountYen: -150 },
-      { description: '洗剤', amountYen: -999 },
+      { description: 'おにぎり', amountYen: -150, productType: null },
+      { description: '洗剤', amountYen: -999, productType: null },
     ];
     expect(itemsReconcileWithTotal(items, -780)).toBe(false);
   });
 
   it('1件だけなら合計が一致していても false', () => {
-    const items = [{ description: 'コーヒー', amountYen: -500 }];
+    const items = [{ description: 'コーヒー', amountYen: -500, productType: null }];
     expect(itemsReconcileWithTotal(items, -500)).toBe(false);
   });
 });

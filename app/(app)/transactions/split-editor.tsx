@@ -19,7 +19,13 @@ const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
 };
 
 type SplitRowState = { categoryId: string; amountYen: string; note: string };
-type ItemRowState = { name: string; amountYen: string; categoryId: string };
+type ItemRowState = {
+  name: string;
+  amountYen: string;
+  categoryId: string;
+  /** AIが付けた商品分類(ADR-036)。この手入力フォームでは編集させず、そのまま持ち回す。 */
+  productType: string | null;
+};
 
 /**
  * 明細1行 + カテゴリの編集(単一カテゴリの変更・複数カテゴリへの分割)。
@@ -70,12 +76,15 @@ export function TransactionRowWithSplit({
   categories,
   initialSplits,
   receiptItems = [],
+  expenseSubtype = null,
 }: {
   transaction: StoredTransaction;
   categories: readonly CategoryOption[];
   initialSplits: readonly TransactionSplit[];
   /** レシートの商品行(ADR-034)。カテゴリ分割の有無に関わらず、常に見せる。 */
   receiptItems?: readonly ReceiptItem[];
+  /** 生活費の小分類(AIの自由記述、ADR-036)。「生活費」カテゴリのときだけ表示する。 */
+  expenseSubtype?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   // 既に分割済みの明細は分割フォームから開く。それ以外(大半の明細)は
@@ -102,6 +111,9 @@ export function TransactionRowWithSplit({
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
   // 「カテゴリを変更する」を押すまでフォームを隠す(品目の有無に関わらず)。
   const showCategoryForm = categoryFormOpen;
+  // 生活費の小分類(ADR-036)を出してよいかの判定に使う。表示名ではなく
+  // code で見る(本人がカテゴリを改名しても判定が崩れないように、ADR-016)。
+  const categoryCode = categories.find((c) => c.id === transaction.categoryId)?.code ?? null;
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -201,6 +213,9 @@ export function TransactionRowWithSplit({
       name: r.name.trim(),
       amountYen: itemsSign * Number(r.amountYen),
       categoryId: r.categoryId || null,
+      // このフォームでは商品分類(AIの自由記述、ADR-036)を編集させないが、
+      // 保存は全行の置き換えのため、渡さないと消えてしまう。そのまま持ち回す。
+      productType: r.productType,
     }));
     const result = await replaceReceiptItemsAction(transaction.id, payload);
     if (result.error) {
@@ -215,6 +230,7 @@ export function TransactionRowWithSplit({
         amountYen: p.amountYen,
         categoryId: p.categoryId,
         categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
+        productType: p.productType,
       })),
     );
     setItemsSaving(false);
@@ -321,7 +337,16 @@ export function TransactionRowWithSplit({
                   className="flex items-baseline justify-between gap-3 text-xs"
                   style={{ color: 'var(--ink-secondary)' }}
                 >
-                  <span className="min-w-0 truncate">{item.name}</span>
+                  <span className="min-w-0 truncate">
+                    {item.name}
+                    {/* 商品の種類(AIの自由記述、ADR-036)。固定カテゴリの
+                        バッジ(splits等)と混ざらないよう括弧書きの添え字にする。 */}
+                    {item.productType ? (
+                      <span className="ml-1" style={{ color: 'var(--ink-muted)' }}>
+                        ({item.productType})
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="tabular shrink-0">
                     {formatYen(item.amountYen, { sign: 'never' })}
                   </span>
@@ -334,6 +359,15 @@ export function TransactionRowWithSplit({
             </p>
           )}
         </div>
+      ) : null}
+
+      {/* 生活費の小分類(本人発案、ADR-036)。AIの自由記述で、レシート
+          取り込みからしか生まれない値のため無いことも多い。「生活費」
+          カテゴリの明細のときだけ、開いた行に控えめに添える。 */}
+      {open && expenseSubtype && categoryCode === 'living' ? (
+        <p className="mt-1.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          生活費の内訳:{expenseSubtype}
+        </p>
       ) : null}
 
       {/* 品目の合計が明細額と一致しない(ADR-035)。カテゴリの開閉(open)とは
@@ -681,5 +715,6 @@ function initialItemRows(items: readonly ReceiptItem[]): ItemRowState[] {
     name: it.name,
     amountYen: String(Math.abs(it.amountYen)),
     categoryId: it.categoryId ?? '',
+    productType: it.productType,
   }));
 }

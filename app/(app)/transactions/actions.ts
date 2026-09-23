@@ -11,6 +11,7 @@
 import { revalidatePath } from 'next/cache';
 
 import type { TransactionSplitInput } from '@/domain/transaction-splits';
+import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
 import {
   importTransactions,
@@ -46,6 +47,18 @@ export type ReceiptItemsInput = {
   items: readonly ReceiptItemInput[];
 };
 
+/**
+ * 「生活費」明細の小分類(本人発案、ADR-036)。ReceiptItemsInput と同じ
+ * sourceRef の仕組みで、保存後の実 id と対応付ける。カテゴリが実際に
+ * 「生活費」かどうかはここでは判定しない(receipt-ai.ts はカテゴリ分類を
+ * 行わないため)——常に保存しておき、表示側(/transactions)が明細の
+ * カテゴリを見て出すかどうかを決める。
+ */
+export type ReceiptExpenseSubtypeInput = {
+  sourceRef: string;
+  subtype: string;
+};
+
 export async function saveImportBatchAction(
   preview: readonly StoredTransaction[],
   meta: {
@@ -58,6 +71,7 @@ export async function saveImportBatchAction(
   },
   receiptSplits: readonly ReceiptSplitInput[] = [],
   receiptItems: readonly ReceiptItemsInput[] = [],
+  receiptExpenseSubtypes: readonly ReceiptExpenseSubtypeInput[] = [],
 ): Promise<{
   imported: number;
   duplicates: number;
@@ -99,6 +113,20 @@ export async function saveImportBatchAction(
         await replaceReceiptItems(inserted.id, items);
       } catch (error) {
         splitWarnings.push(describeUserError(error, '商品の記録を保存できませんでした。'));
+      }
+    }
+  }
+
+  if (receiptExpenseSubtypes.length > 0) {
+    const subtypeBySourceRef = new Map(receiptExpenseSubtypes.map((s) => [s.sourceRef, s.subtype]));
+    for (const inserted of result.insertedTransactions) {
+      if (inserted.sourceRef === null) continue;
+      const subtype = subtypeBySourceRef.get(inserted.sourceRef);
+      if (!subtype) continue;
+      try {
+        await setExpenseSubtype(inserted.id, subtype);
+      } catch (error) {
+        splitWarnings.push(describeUserError(error, '生活費の小分類を保存できませんでした。'));
       }
     }
   }

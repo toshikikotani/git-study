@@ -1,5 +1,5 @@
 -- =============================================================================
---  未適用のマイグレーションを、1回のコピペでまとめて適用する(B-17)
+--  未適用のマイグレーションを、1回のコピペでまとめて適用する(B-17/B-18)
 --
 --  使い方:
 --    1. https://supabase.com/dashboard で対象プロジェクトを開く
@@ -25,6 +25,35 @@ begin;
 alter table public.receipt_items
   add column if not exists category_id uuid references public.categories(id) on delete set null;
 
+-- 2. receipt_items へ商品分類(自由記述)を追加(B-18、ADR-036)
+-- -----------------------------------------------------------------------------
+alter table public.receipt_items
+  add column if not exists product_type text;
+
+-- 3. transaction_expense_subtypes — 生活費の小分類(B-18、ADR-036)
+-- -----------------------------------------------------------------------------
+create table if not exists public.transaction_expense_subtypes (
+  transaction_id uuid        primary key references public.transactions(id) on delete cascade,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  subtype        text        not null,
+  created_at     timestamptz not null default now(),
+
+  constraint ck_transaction_expense_subtypes_not_blank check (btrim(subtype) <> '')
+);
+
+create index if not exists ix_transaction_expense_subtypes_user
+  on public.transaction_expense_subtypes (user_id);
+
+alter table public.transaction_expense_subtypes enable row level security;
+alter table public.transaction_expense_subtypes force row level security;
+
+drop policy if exists "own_rows" on public.transaction_expense_subtypes;
+create policy "own_rows" on public.transaction_expense_subtypes
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -36,4 +65,19 @@ select
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'receipt_items'
       and column_name = 'category_id'
-  ) then 'ok' else 'NG: 列が無い' end as status;
+  ) then 'ok' else 'NG: 列が無い' end as status
+union all
+select
+  'receipt_items.product_type',
+  case when exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'receipt_items'
+      and column_name = 'product_type'
+  ) then 'ok' else 'NG: 列が無い' end
+union all
+select
+  'transaction_expense_subtypes',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'transaction_expense_subtypes'
+  ) then 'ok' else 'NG: テーブルが無い' end;
