@@ -46,6 +46,13 @@ export type StoredTransaction = {
    * source_ref が null でない行のみ対象)による重複排除に使う。
    */
   sourceRef: string | null;
+  /**
+   * 明細への自由記述メモ(本人発案)。DB の `note` 列に対応——スキーマには
+   * 当初から存在していたが、アプリのどこからも読み書きされていなかった列
+   * (issue #95)。分割(transaction_splits)の各行が持つ`note`(何に使ったか
+   * の按分メモ)とは別物で、こちらは明細1件そのものに対する補足。
+   */
+  memo: string | null;
 };
 
 export type ImportBatchSummary = {

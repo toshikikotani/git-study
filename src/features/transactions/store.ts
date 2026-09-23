@@ -58,6 +58,7 @@ function fromRow(
     fingerprint: row.fingerprint,
     batchId: row.import_batch_id,
     sourceRef: row.source_ref,
+    memo: row.note,
   };
 }
 
@@ -290,6 +291,25 @@ export async function updateTransaction(
     })
     .eq('id', id);
   if (error) throw new TransactionStoreError(`明細を更新できませんでした: ${error.message}`);
+}
+
+/**
+ * 明細に自由記述のメモを付ける(本人発案、issue #95)。カテゴリ変更とは
+ * 独立した操作のため専用の関数にした——`classified_by`/`review_status`等の
+ * 分類関連の列には一切触れない。空文字・空白のみは null として保存する
+ * (「メモを消す」操作を、値の有無だけで表現する)。
+ *
+ * DB の `note` 列はスキーマの初期定義(20260908000300_transactions.sql)に
+ * 元から存在していたが、アプリのどこからも読み書きされていなかった。
+ */
+export async function updateTransactionMemo(id: string, memo: string): Promise<void> {
+  const trimmed = memo.trim();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('transactions')
+    .update({ note: trimmed === '' ? null : trimmed })
+    .eq('id', id);
+  if (error) throw new TransactionStoreError(`メモを保存できませんでした: ${error.message}`);
 }
 
 /**

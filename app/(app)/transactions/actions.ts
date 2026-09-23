@@ -18,6 +18,7 @@ import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/
 import {
   importTransactions,
   updateTransaction,
+  updateTransactionMemo,
   TransactionStoreError,
   type StoredTransaction,
   type TransactionSource,
@@ -188,6 +189,23 @@ export async function updateTransactionAction(
   // /spending のカテゴリ別内訳・カレンダー(calendar.tsx、ADR-043)からも
   // カテゴリを直せるため、こちらも最新化する。
   revalidatePath('/spending');
+  return { error: null };
+}
+
+/**
+ * 明細に自由記述のメモを付ける(本人発案、issue #95)。カテゴリ変更・分割
+ * ・金額日付編集とは独立した操作のため、専用のServer Actionにした。
+ */
+export async function updateTransactionMemoAction(
+  id: string,
+  memo: string,
+): Promise<{ error: string | null }> {
+  try {
+    await updateTransactionMemo(id, memo);
+  } catch (error) {
+    return { error: describeUserError(error, 'メモの保存に失敗しました。') };
+  }
+  revalidatePath('/transactions');
   return { error: null };
 }
 

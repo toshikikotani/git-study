@@ -91,5 +91,6 @@ function buildPreviewRow(
     fingerprint: fingerprintOf(row),
     batchId: null,
     sourceRef: null,
+    memo: null,
   };
 }
