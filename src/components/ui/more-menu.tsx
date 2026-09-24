@@ -54,6 +54,11 @@ const GROUPS = [
     items: [
       { href: '/debts', label: '負債' },
       {
+        href: '/transactions/new',
+        label: '明細を手で登録する',
+        dek: '現金払いなど、取り込みに乗らない明細を1件だけ記録',
+      },
+      {
         href: '/transactions/paste',
         label: 'メールを貼り付ける',
         dek: '通知メールの一時的な取り込み',
