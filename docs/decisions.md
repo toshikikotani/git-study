@@ -1333,6 +1333,28 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
+## ADR-052:口座に用途タグを付け、レポートで用途別の残高を見せる(MoneyForward MEとの機能比較調査、issue #98)
+
+**背景**:ADR-049/051と同じMoneyForward ME機能比較調査(issue #98)への対応。MoneyForward MEには口座を「生活費用」「資産用」のようにグループ分けして見る機能がある。`/accounts`の口座は種別(`kind`)は持つが、用途別に残高をまとめて見る手段が無かった。
+
+**判明した事実(スコープが変わった理由)**:調査すると`accounts.purpose`(`account_purpose` enum、値は`salary`/`repayment`/`investment`/`sanctuary`/`living`/`emergency`/`other`)は既に`/accounts`の一覧・編集フォームまで完全に配線済みで、issueが求める「用途タグを付ける」機能自体は既にあった。一方で`accounts.current_balance_yen`・`balance_updated_on`は最初期のマイグレーション(`docs/schema.sql`)の時点から列は存在するのに、アプリのどこからも読み書きされておらず常に既定値の0円のままだった——issue #95の`transactions.note`と同型の「列はあるが配線されていない」見落とし。残高が常に0円のままでは「用途別の合計残高」を見せても意味が無いため、このADRのスコープは実質「①残高の入力・表示を配線する」「②用途別に合算して見せる」の2段になった。
+
+**決定・実装**
+
+1. **口座の残高を編集可能にする**(`account-form.tsx`/`actions.ts`/`features/accounts/store.ts`):`debts`の`currentBalanceYen`(`debt-form.tsx`)と同じ様式で「現在残高(円)」の入力欄を追加した。クレジットカードは未払い残高をマイナスで入力できるよう`assertYen()`(符号を問わない)をそのまま使う——`debts`同様、負債を負の数で表す規約(ADR-008)と整合する。保存(作成・更新の両方)のたびに`balance_updated_on`を当日日付に更新する——`debts.balance_as_of`と違い、口座には「返済記録」のような別経路の更新イベントが無く、フォーム保存そのものが「本人が残高を入力した」出来事にあたるため。`account-row.tsx`の一覧にも残高を表示し、マイナスは`var(--over)`で強調する。
+2. **`summarizeBalanceByPurpose()`を新設**(`src/domain/account.ts`):口座を`purpose`ごとに残高合算する純粋関数。合計がマイナスになる用途(クレジットカードの未払い残高が多い用途等)もそのまま許容し、合計額の大きい順に並べる。
+3. **`/reports`に`PurposeBalanceCard`を追加**(`app/(app)/reports/purpose-balance-card.tsx`、`features/reports/store.ts`の`loadAccountBalanceByPurpose()`):既存の資産推移グラフ(`NetWorthChart`、月末スナップショットの推移)とは別の切り口として、その下に追加するだけにとどめた(issueの「既存の資産推移グラフに影響を与えず、追加の表示にとどめる」という指示どおり)。見た目は`merchant-ranking-card.tsx`と同じ横棒リストを踏襲しつつ、残高はプラス・マイナスの両方がありうるため、行ごとに符号で色を分ける(income-expense-chart.tsx・ADR-051と同じ考え方、プラス=`var(--income)`、マイナス=`var(--over)`)。
+
+**却下した選択肢**
+
+- **ホーム画面に用途別残高を出す**:ホームは「見るべき数字は3個まで」という設計原則(FR-61、home/summary.ts のコメント参照)を厳格に守っており、新しい集計枠を増やすとその原則を破ることになる。issueも「ホーム画面*または*レポートで」と選択の余地を残していたため、既に複数の集計カードを置いている`/reports`側に統一した。
+- **家族・グループでの共有機能まで実装する**:issueの対象外の指示どおり、単一ユーザー専用のアプリである以上不要(ADR-011の方針と一致)。
+- **`accounts.purpose`に新しい値・フリーテキストを追加する**:既存の`account_purpose` enumが仕様書(7章)の想定する用途をすでに網羅しており、新規マイグレーションを増やす理由が無かった。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(`summarizeBalanceByPurpose()`の新規テスト4件を含め全通過)/`npx next build` すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、実機での残高入力・レポート画面の表示確認は行えていない。
+
+---
+
 ## 未決のまま残す事項
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。

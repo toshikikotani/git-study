@@ -16,6 +16,7 @@ import {
   assertPaymentDay,
   AccountError,
 } from '@/domain/account';
+import { assertYen, parseYen } from '@/domain/money';
 import {
   createAccount,
   getOrCreateDefaultAccount,
@@ -71,6 +72,11 @@ function parseAccountInput(formData: FormData): AccountInput {
   const closingDay = assertClosingDay(parseDayField(formData, 'closingDay'));
   const paymentDay = assertPaymentDay(parseDayField(formData, 'paymentDay'));
 
+  const currentBalanceYen = assertYen(
+    parseYen(String(formData.get('currentBalanceYen') ?? '')),
+    '残高',
+  );
+
   const institutionNameRaw = String(formData.get('institutionName') ?? '').trim();
   const noteRaw = String(formData.get('note') ?? '').trim();
 
@@ -81,6 +87,7 @@ function parseAccountInput(formData: FormData): AccountInput {
     purpose: purposeRaw as AccountPurpose,
     closingDay,
     paymentDay,
+    currentBalanceYen,
     note: noteRaw === '' ? null : noteRaw,
   };
 }
