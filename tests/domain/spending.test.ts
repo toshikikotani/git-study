@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AccumulationTransaction } from '@/domain/accumulation';
 import {
   averageDailySpendYen,
+  compareCurrentMonthToTrailingAverage,
   projectedMonthTotalYen,
   rankMerchantsBySpend,
   savingsRateOf,
@@ -169,6 +170,40 @@ describe('savingsRateOf', () => {
   it('支出が収入を上回れば負の値になる', () => {
     const rate = savingsRateOf({ monthKey: '2026-08', incomeYen: 100_000, expenseYen: 120_000 });
     expect(rate).toBeCloseTo(-0.2);
+  });
+});
+
+describe('compareCurrentMonthToTrailingAverage', () => {
+  const rows = [
+    { monthKey: '2026-06', incomeYen: 0, expenseYen: 100_000 },
+    { monthKey: '2026-07', incomeYen: 0, expenseYen: 200_000 },
+    { monthKey: '2026-08', incomeYen: 0, expenseYen: 0 },
+    { monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000 },
+  ];
+
+  it('当月を除いた他の月の平均と当月の差を返す', () => {
+    const result = compareCurrentMonthToTrailingAverage(rows, '2026-09');
+    expect(result).toEqual({
+      currentMonthExpenseYen: 90_000,
+      trailingAverageExpenseYen: 100_000, // (100,000+200,000+0)/3
+      differenceYen: -10_000,
+    });
+  });
+
+  it('平均より多く使った月は正の差になる(使いすぎ)', () => {
+    const result = compareCurrentMonthToTrailingAverage(rows, '2026-07');
+    // 平均 = (100,000+0+90,000)/3 = 63,333.33... → 63,333
+    expect(result?.trailingAverageExpenseYen).toBe(63_333);
+    expect(result?.differenceYen).toBe(136_667); // 200,000 - 63,333
+  });
+
+  it('当月のデータが無ければ null', () => {
+    expect(compareCurrentMonthToTrailingAverage(rows, '2026-12')).toBeNull();
+  });
+
+  it('他の月が1件も無ければ null(平均を出せない)', () => {
+    const single = [{ monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000 }];
+    expect(compareCurrentMonthToTrailingAverage(single, '2026-09')).toBeNull();
   });
 });
 

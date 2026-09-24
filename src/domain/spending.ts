@@ -99,6 +99,41 @@ export function savingsRateOf(entry: MonthlyIncomeExpense): number | null {
   return (entry.incomeYen - entry.expenseYen) / entry.incomeYen;
 }
 
+export type SpendingPaceVsAverage = {
+  currentMonthExpenseYen: number;
+  /** 当月を除いた他の月の平均支出。 */
+  trailingAverageExpenseYen: number;
+  /** currentMonthExpenseYen - trailingAverageExpenseYen。正なら平均より多い。 */
+  differenceYen: number;
+};
+
+/**
+ * 当月の支出が、直近の他の月の平均と比べて多いか少ないか(MoneyForward ME
+ * との機能比較調査、issue #97「12ヵ月の平均額も出せるため、使い過ぎかどうか
+ * が一目瞭然」)。
+ *
+ * 既存の summarizeMonthlyIncomeExpense() が返す直近12ヶ月分(/reports が
+ * 既に取得済み)をそのまま使う——新しいクエリは増やさない。平均の対象は
+ * 「当月を除く」他の月に限る(当月はまだ集計途中のため、含めると月初ほど
+ * 平均が不当に引き下げられ「使いすぎ」の判定が歪む)。
+ */
+export function compareCurrentMonthToTrailingAverage(
+  rows: readonly MonthlyIncomeExpense[],
+  currentMonthKey: string,
+): SpendingPaceVsAverage | null {
+  const current = rows.find((r) => r.monthKey === currentMonthKey);
+  const priorMonths = rows.filter((r) => r.monthKey !== currentMonthKey);
+  if (!current || priorMonths.length === 0) return null;
+
+  const totalPriorExpenseYen = priorMonths.reduce((acc, r) => acc + r.expenseYen, 0);
+  const trailingAverageExpenseYen = Math.round(totalPriorExpenseYen / priorMonths.length);
+  return {
+    currentMonthExpenseYen: current.expenseYen,
+    trailingAverageExpenseYen,
+    differenceYen: current.expenseYen - trailingAverageExpenseYen,
+  };
+}
+
 export type MerchantSpend = {
   label: string;
   count: number;
