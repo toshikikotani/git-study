@@ -7,6 +7,7 @@
  */
 
 import type { AccumulationTransaction } from '@/domain/accumulation';
+import { summarizeBalanceByPurpose, type PurposeBalance } from '@/domain/account';
 import {
   rankMerchantsBySpend,
   summarizeMonthlyIncomeExpense,
@@ -188,4 +189,25 @@ export async function loadMerchantSpendingRanking(
     monthsBack: MERCHANT_RANKING_MONTHS_BACK,
     merchants: rankMerchantsBySpend(transactions, MERCHANT_RANKING_LIMIT),
   };
+}
+
+/**
+ * 有効な口座の残高を用途(accounts.purpose)ごとに合算する(MoneyForward ME
+ * との機能比較調査、issue #98)。
+ *
+ * 資産推移(net-worth-chart.tsx、debts/investments のスナップショット)とは
+ * 別の切り口——あちらは月末の推移、こちらは「今この瞬間、用途別にいくら
+ * あるか」の内訳。既存のグラフには影響を与えない、追加の表示にとどめる。
+ */
+export async function loadAccountBalanceByPurpose(): Promise<readonly PurposeBalance[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('purpose, current_balance_yen')
+    .eq('is_active', true);
+  if (error) throw new ReportStoreError(`口座を取得できませんでした: ${error.message}`);
+
+  return summarizeBalanceByPurpose(
+    data.map((row) => ({ purpose: row.purpose, currentBalanceYen: row.current_balance_yen })),
+  );
 }

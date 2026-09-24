@@ -82,6 +82,15 @@ export function AccountForm({
         </select>
       </Field>
 
+      <Field label="現在残高(円)" hint="クレジットカードは未払い残高をマイナスで入力してください">
+        <TextInput
+          name="currentBalanceYen"
+          inputMode="numeric"
+          defaultValue={initial ? String(initial.currentBalanceYen) : '0'}
+          required
+        />
+      </Field>
+
       <Field
         label="締め日(1〜31・任意)"
         hint="クレジットカードのみ。銀行口座・現金は空欄で構いません"
