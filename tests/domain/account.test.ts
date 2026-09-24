@@ -5,6 +5,7 @@ import {
   assertAccountName,
   assertClosingDay,
   assertPaymentDay,
+  summarizeBalanceByPurpose,
 } from '@/domain/account';
 
 describe('assertAccountName', () => {
@@ -46,5 +47,41 @@ describe('assertPaymentDay', () => {
 
   it('範囲外は拒否する', () => {
     expect(() => assertPaymentDay(-1)).toThrow(/1〜31/);
+  });
+});
+
+describe('summarizeBalanceByPurpose', () => {
+  it('同じ用途の口座を合算する', () => {
+    const result = summarizeBalanceByPurpose([
+      { purpose: 'living', currentBalanceYen: 100_000 },
+      { purpose: 'living', currentBalanceYen: 50_000 },
+      { purpose: 'investment', currentBalanceYen: 300_000 },
+    ]);
+    expect(result).toEqual([
+      { purpose: 'investment', totalYen: 300_000, accountCount: 1 },
+      { purpose: 'living', totalYen: 150_000, accountCount: 2 },
+    ]);
+  });
+
+  it('クレジットカードの未払い残高(マイナス)も合算する', () => {
+    const result = summarizeBalanceByPurpose([
+      { purpose: 'living', currentBalanceYen: 100_000 },
+      { purpose: 'repayment', currentBalanceYen: -30_000 },
+    ]);
+    const repayment = result.find((r) => r.purpose === 'repayment');
+    expect(repayment).toEqual({ purpose: 'repayment', totalYen: -30_000, accountCount: 1 });
+  });
+
+  it('合計額の大きい順に並べる', () => {
+    const result = summarizeBalanceByPurpose([
+      { purpose: 'other', currentBalanceYen: 10_000 },
+      { purpose: 'repayment', currentBalanceYen: -30_000 },
+      { purpose: 'investment', currentBalanceYen: 300_000 },
+    ]);
+    expect(result.map((r) => r.purpose)).toEqual(['investment', 'other', 'repayment']);
+  });
+
+  it('口座が1件も無ければ空配列', () => {
+    expect(summarizeBalanceByPurpose([])).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { formatYen } from '@/domain/money';
 import type { Account } from '@/features/accounts/store';
 import { updateAccountAction } from './actions';
 import { AccountForm } from './account-form';
@@ -47,16 +48,19 @@ export function AccountRow({ account }: { account: Account }) {
         </button>
       </div>
 
-      {account.closingDay !== null || account.paymentDay !== null ? (
-        <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
-          {account.closingDay !== null ? (
-            <Stat label="締め日" value={`毎月${account.closingDay}日`} />
-          ) : null}
-          {account.paymentDay !== null ? (
-            <Stat label="支払日" value={`毎月${account.paymentDay}日`} />
-          ) : null}
-        </dl>
-      ) : null}
+      <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+        <Stat
+          label="残高"
+          value={formatYen(account.currentBalanceYen)}
+          color={account.currentBalanceYen < 0 ? 'var(--over)' : 'var(--ink-secondary)'}
+        />
+        {account.closingDay !== null ? (
+          <Stat label="締め日" value={`毎月${account.closingDay}日`} />
+        ) : null}
+        {account.paymentDay !== null ? (
+          <Stat label="支払日" value={`毎月${account.paymentDay}日`} />
+        ) : null}
+      </dl>
 
       {account.note ? (
         <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -67,13 +71,13 @@ export function AccountRow({ account }: { account: Account }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
       <dt className="inline" style={{ color: 'var(--ink-muted)' }}>
         {label}{' '}
       </dt>
-      <dd className="tabular inline font-medium" style={{ color: 'var(--ink-secondary)' }}>
+      <dd className="tabular inline font-medium" style={{ color: color ?? 'var(--ink-secondary)' }}>
         {value}
       </dd>
     </div>
