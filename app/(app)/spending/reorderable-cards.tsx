@@ -6,8 +6,6 @@ import { MdDragIndicator } from 'react-icons/md';
 import { useIsClient } from '@/components/ui/use-is-client';
 
 const STORAGE_KEY = 'spending-card-order';
-const LONG_PRESS_MS = 350;
-const MOVE_SLOP = 10;
 
 export type SpendingCardKey =
   'summary' | 'calendar' | 'forecast' | 'diagnosis' | 'categoryBreakdown' | 'pile';
@@ -22,11 +20,12 @@ export type SpendingCardKey =
  * ── なぜ並び替えを明示的な「編集」モードの中だけにしたのか ─────────
  * 各カード(`CategoryBreakdownChart`・`DiagnosisCard`・`SpendingCalendar`)
  * はそれ自体が押せる要素を大量に持つ(開閉・保存ボタン等)。カード本体の
- * どこを長押ししてもドラッグが始まることにすると、普段の操作(カテゴリ行を
+ * どこを触ってもドラッグが始まることにすると、普段の操作(カテゴリ行を
  * 開く等)と衝突する。そのため「並び替え」ボタンを押した時だけ、各カードの
- * 右上に専用のつまみ(`MdDragIndicator`)を出し、そこだけを長押し+ドラッグの
- * 起点にした(本人が選んだ操作、AskUserQuestionで確認)。編集モードでない
- * 間は、これまでどおり何も変わらない。
+ * 右上に専用のつまみ(`MdDragIndicator`)を出し、そこだけをドラッグの起点に
+ * した(AskUserQuestionで確認したのは「掴んでドラッグ」という操作の方向性で、
+ * 掴む判定自体は`DragHandle`のコメント参照)。編集モードでない間は、
+ * これまでどおり何も変わらない。
  *
  * ── 保存先はブラウザの localStorage(サーバーには保存しない) ──────
  * `app_settings`(ADR-014)は本人の入力に基づく「業務パラメータ」の置き場で、
@@ -156,7 +155,7 @@ function DragList({
   const slotsRef = useRef<Slot[]>([]);
   const targetIndexRef = useRef<number | null>(null);
 
-  function handleLongPressStart(key: SpendingCardKey, clientY: number): void {
+  function handleDragStart(key: SpendingCardKey, clientY: number): void {
     // ドラッグ開始時点の各カードの位置・高さを1回だけキャプチャする
     // (このドラッグ中は `order` 自体を変えないため、ページがスクロール
     // さえしなければ最後まで有効——ドラッグ中は touchmove 側で
@@ -239,7 +238,7 @@ function DragList({
             {cards[key]}
             {editing ? (
               <DragHandle
-                onLongPressStart={(y) => handleLongPressStart(key, y)}
+                onDragStart={(y) => handleDragStart(key, y)}
                 onDragMove={handleDragMove}
                 onDragEnd={() => handleDragEnd(key)}
               />
@@ -273,66 +272,52 @@ function displacementFor(
 }
 
 /**
- * つまみ1つ分。長押し(`LONG_PRESS_MS`)でドラッグ開始、動きすぎたら
- * (`MOVE_SLOP`)開始前にキャンセルする(`swipeable-row.tsx` と同じ判定の
- * 考え方)。`pull-to-refresh.tsx` と同じ理由で、`preventDefault()` が効く
- * ネイティブの `addEventListener({ passive: false })` を使う。
+ * つまみ1つ分。触れた瞬間に掴む(本人からの不具合報告「右上そもそも
+ * 掴んでいふぉうができない」への対応)。
+ *
+ * 当初は`swipeable-row.tsx`と同じ「長押し(350ms)で開始、動きすぎたら
+ * キャンセル」という判定にしていたが、この小さなつまみでは正確に押し続ける
+ * こと自体が難しく、実質「掴めない」状態になっていた。このつまみは
+ * 「並び替え」の編集モード中だけ表示され、他に何の役割も持たない
+ * (タップしても何も起きない)ため、普段のタップ操作と区別するための
+ * 長押し待ちはそもそも不要——`SwipeableRow`のような「行を開く操作」との
+ * 衝突を避ける必要が無い。touchstart の時点で即ドラッグを開始し、押した
+ * ことが分かるよう背景色を変える(`pressed` state)。
  */
 function DragHandle({
-  onLongPressStart,
+  onDragStart,
   onDragMove,
   onDragEnd,
 }: {
-  onLongPressStart: (clientY: number) => void;
+  onDragStart: (clientY: number) => void;
   onDragMove: (clientY: number) => void;
   onDragEnd: () => void;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
+  const [pressed, setPressed] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-    let dragging = false;
-    let start: { x: number; y: number } | null = null;
-
-    const clearTimer = () => {
-      if (longPressTimer !== null) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-    };
-
     const onTouchStart = (e: TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
-      start = { x: touch.clientX, y: touch.clientY };
-      dragging = false;
-      longPressTimer = setTimeout(() => {
-        dragging = true;
-        onLongPressStart(touch.clientY);
-      }, LONG_PRESS_MS);
+      setPressed(true);
+      onDragStart(touch.clientY);
     };
 
     const onTouchMove = (e: TouchEvent) => {
       const touch = e.touches[0];
-      if (!touch || !start) return;
-      if (!dragging) {
-        const dx = touch.clientX - start.x;
-        const dy = touch.clientY - start.y;
-        if (Math.abs(dx) > MOVE_SLOP || Math.abs(dy) > MOVE_SLOP) clearTimer();
-        return;
-      }
+      if (!touch) return;
+      // ページのバウンス等を止め、ドラッグの動きだけにする。
       e.preventDefault();
       onDragMove(touch.clientY);
     };
 
     const onTouchEnd = () => {
-      clearTimer();
-      if (dragging) onDragEnd();
-      dragging = false;
-      start = null;
+      setPressed(false);
+      onDragEnd();
     };
 
     el.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -340,29 +325,30 @@ function DragHandle({
     el.addEventListener('touchend', onTouchEnd, { passive: true });
     el.addEventListener('touchcancel', onTouchEnd, { passive: true });
     return () => {
-      clearTimer();
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [onLongPressStart, onDragMove, onDragEnd]);
+  }, [onDragStart, onDragMove, onDragEnd]);
 
   return (
     <button
       ref={ref}
       type="button"
       aria-label="つまんで並び替え"
-      className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full"
+      className="absolute top-2 right-2 flex size-11 items-center justify-center rounded-full"
       style={{
-        background: 'var(--glass-tint-strong)',
+        background: pressed ? 'var(--accent-track)' : 'var(--glass-tint-strong)',
         backdropFilter: 'var(--glass-blur)',
         WebkitBackdropFilter: 'var(--glass-blur)',
-        color: 'var(--ink-muted)',
+        color: pressed ? 'var(--accent)' : 'var(--ink-muted)',
+        transform: pressed ? 'scale(1.1)' : 'scale(1)',
+        transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard)`,
         touchAction: 'none',
       }}
     >
-      <MdDragIndicator aria-hidden size={18} />
+      <MdDragIndicator aria-hidden size={20} />
     </button>
   );
 }
