@@ -1,6 +1,6 @@
 import { formatYen } from '@/domain/money';
 import { formatMonthJa } from '@/lib/date';
-import { savingsRateOf } from '@/domain/spending';
+import { compareCurrentMonthToTrailingAverage, savingsRateOf } from '@/domain/spending';
 import type { IncomeExpenseTrend } from '@/features/reports/store';
 
 /**
@@ -60,6 +60,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
 
   const latest = rows[rows.length - 1]!;
   const latestRate = savingsRateOf(latest);
+  const pace = compareCurrentMonthToTrailingAverage(rows, monthKeys[monthKeys.length - 1]!);
 
   return (
     <div
@@ -75,6 +76,28 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
           {latestRate === null ? '—' : `${Math.round(latestRate * 100)}%`}
         </span>
       </div>
+
+      {/* 直近の他の月の平均と比べて多いか少ないか(MoneyForward MEとの機能
+          比較調査、issue #97)。当月分のデータが無い(初回等)場合は出さない。 */}
+      {pace ? (
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          今月の支出は直近の月平均(
+          {formatYen(pace.trailingAverageExpenseYen, { sign: 'never' })})より
+          {pace.differenceYen === 0 ? (
+            '同じくらいです'
+          ) : (
+            <>
+              <span
+                className="tabular font-semibold"
+                style={{ color: pace.differenceYen > 0 ? 'var(--over)' : 'var(--income)' }}
+              >
+                {formatYen(Math.abs(pace.differenceYen), { sign: 'never' })}
+              </span>
+              {pace.differenceYen > 0 ? '多いです' : '少ないです'}
+            </>
+          )}
+        </p>
+      ) : null}
 
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
