@@ -59,3 +59,30 @@ export function summarizeMustPaySplit(entries: readonly GenredEntry[]): MustPayS
   }
   return { mustPayYen, discretionaryYen };
 }
+
+/**
+ * 明細本体にジャンルが無いとき、レシート品目のジャンルから明細の代表ジャンルを
+ * 決める。品目がすべて分類済みなら、金額が最大のジャンル(同額なら先に現れた方)。
+ * 1件でも未分類の品目が残っていれば null(まだ「未分類」のまま、その品目が
+ * 次回のジャンル分類の対象になる)。明細本体に既にジャンルがあればそれを優先する。
+ */
+export function effectiveGenreId(
+  transactionGenreId: string | null,
+  items: readonly { genreId: string | null; amountYen: number }[],
+): string | null {
+  if (transactionGenreId !== null) return transactionGenreId;
+  if (items.length === 0 || items.some((item) => item.genreId === null)) return null;
+
+  const totalByGenre = new Map<string, number>();
+  for (const item of items) {
+    totalByGenre.set(
+      item.genreId!,
+      (totalByGenre.get(item.genreId!) ?? 0) + Math.abs(item.amountYen),
+    );
+  }
+  let best: { genreId: string; totalYen: number } | null = null;
+  for (const [genreId, totalYen] of totalByGenre) {
+    if (best === null || totalYen > best.totalYen) best = { genreId, totalYen };
+  }
+  return best?.genreId ?? null;
+}
