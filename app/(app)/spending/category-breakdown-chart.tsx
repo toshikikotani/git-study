@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { Meter } from '@/components/ui/meter';
@@ -74,9 +75,20 @@ export function CategoryBreakdownChart({
       className="rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-        ジャンル別の内訳
-      </p>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          ジャンル別の内訳
+        </p>
+        {rows.some((row) => row.genreId === null) ? (
+          <Link
+            href="/reports/genres"
+            className="text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            未分類をAIで分類する →
+          </Link>
+        ) : null}
+      </div>
 
       <ul className="mt-3 space-y-3.5">
         {rows.map((row) => (

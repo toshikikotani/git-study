@@ -59,9 +59,14 @@ const rowSchema = z.object({
   confidence: z.number().describe('そのジャンルを選んだことへの確信度。0〜1'),
 });
 
-const batchSchema = z.object({
-  classifications: z.array(rowSchema).describe('入力と同じ順序・同じ件数で返す'),
-});
+/** ジャンル名を選択肢そのものに絞る(表記ゆれで行が捨てられるのを防ぐ)。 */
+function buildBatchSchema(genreNames: [string, ...string[]]) {
+  return z.object({
+    classifications: z
+      .array(rowSchema.extend({ genre_name: z.enum(genreNames) }))
+      .describe('入力と同じ順序・同じ件数で返す'),
+  });
+}
 
 type BatchRow = z.infer<typeof rowSchema>;
 
@@ -75,6 +80,7 @@ const SYSTEM_PROMPT_HEADER = [
   '- 渡されたジャンルの選択肢の中から最も当てはまるものを1つだけ選ぶ',
   '- 選択肢に無いジャンル名を作らない。名前は選択肢の表記と完全に一致させる',
   '- 入力した順序・件数のまま必ず返す。1件も飛ばさない',
+  '- 判断に迷う場合も飛ばさず、最も近いジャンルを選ぶ。当てはまるものが無ければ「その他」を選ぶ',
 ].join('\n');
 
 /**
@@ -137,7 +143,7 @@ export class ClaudeGenreClassifier {
       maxTokens,
       system,
       messages: [{ role: 'user', content: buildUserContent(targets) }],
-      schema: batchSchema,
+      schema: buildBatchSchema(genreOptions.map((g) => g.name) as [string, ...string[]]),
       hints: {
         truncated: `(${targets.length}件のバッチ)`,
         rateLimit: '次回のジャンル分類で再試行します。',

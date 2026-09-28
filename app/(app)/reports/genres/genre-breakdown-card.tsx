@@ -19,6 +19,7 @@
  * 必須(must_pay)/裁量の2軸でも見られるようにした。
  */
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { formatYen } from '@/domain/money';
@@ -37,6 +38,8 @@ export function GenreBreakdownCard({
   const [pendingCount, setPendingCount] = useState(initialPendingCount);
   const [allPendingCount, setAllPendingCount] = useState(initialAllPendingCount);
   const [progressCount, setProgressCount] = useState<number | null>(null);
+  const [progressScope, setProgressScope] = useState<'month' | 'all'>('month');
+  const router = useRouter();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -48,30 +51,17 @@ export function GenreBreakdownCard({
   const mustPayTotalYen = mustPaySplit.mustPayYen + mustPaySplit.discretionaryYen;
   const mustPayRatio = mustPayTotalYen > 0 ? mustPaySplit.mustPayYen / mustPayTotalYen : 0;
 
-  const run = async () => {
-    setRunning(true);
-    setError(null);
-    const result = await classifyGenresAction('month');
-    setRunning(false);
-    setWarnings(result.warnings);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    setPendingCount((prev) => Math.max(prev - result.classifiedCount, 0));
-    setAllPendingCount((prev) => Math.max(prev - result.classifiedCount, 0));
-  };
-
-  // 過去分も含めた全件。1回の上限(120件)ずつ、未分類が尽きるか、1件も
-  // 進まなくなる(AIが答えを返せない)まで繰り返す。
-  const runAll = async () => {
+  // 1回の呼び出しは40件まで。未分類が尽きるか、1件も進まなくなる(AIが
+  // 答えを返せない)まで繰り返す。
+  const run = async (scope: 'month' | 'all') => {
     setRunning(true);
     setError(null);
     setWarnings([]);
     let total = 0;
+    setProgressScope(scope);
     setProgressCount(0);
     for (;;) {
-      const result = await classifyGenresAction('all');
+      const result = await classifyGenresAction(scope);
       if (result.error) {
         setError(result.error);
         break;
@@ -85,6 +75,7 @@ export function GenreBreakdownCard({
     }
     setProgressCount(null);
     setRunning(false);
+    router.refresh();
   };
 
   return (
@@ -196,25 +187,27 @@ export function GenreBreakdownCard({
       {pendingCount > 0 ? (
         <button
           type="button"
-          onClick={() => void run()}
+          onClick={() => void run('month')}
           disabled={running}
           className="mt-4 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--accent)', color: '#fff' }}
         >
-          {running ? 'ジャンル分類しています…' : `今月の${pendingCount}件をジャンル分類する`}
+          {running && progressScope === 'month'
+            ? `分類しています…(${progressCount ?? 0}件済み)`
+            : `今月の${pendingCount}件をジャンル分類する`}
         </button>
       ) : null}
 
       {allPendingCount > 0 ? (
         <button
           type="button"
-          onClick={() => void runAll()}
+          onClick={() => void run('all')}
           disabled={running}
           className="mt-2 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
         >
-          {progressCount !== null
-            ? `全期間を分類しています…(${progressCount}件済み)`
+          {running && progressScope === 'all'
+            ? `全期間を分類しています…(${progressCount ?? 0}件済み)`
             : `過去分も含め全期間の${allPendingCount}件をまとめて分類する`}
         </button>
       ) : null}
