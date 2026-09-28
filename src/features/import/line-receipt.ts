@@ -22,7 +22,6 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { ClassificationRule } from '@/features/classification/rules';
 import { buildPreview } from '@/features/transactions/import-pipeline';
 import { importTransactionsAsAdmin } from '@/features/transactions/store';
 import type { Database } from '@/lib/supabase/types';
@@ -50,7 +49,6 @@ export async function importLineReceiptAsAdmin(
   admin: SupabaseClient<Database>,
   userId: string,
   accountId: string,
-  rules: readonly ClassificationRule[],
   extractor: AiReceiptExtractor,
   imageBase64: string,
   messageId: string,
@@ -72,21 +70,10 @@ export async function importLineReceiptAsAdmin(
     'image/jpeg',
   );
 
-  const { data: categories, error: categoriesError } = await admin
-    .from('categories')
-    .select('id, name')
-    .eq('user_id', userId);
-  if (categoriesError) {
-    throw new Error(`カテゴリを取得できませんでした: ${categoriesError.message}`);
-  }
-  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
-
   const preview = buildPreview(
     extracted.transactions,
     accountId,
     (index) => `line-${messageId}-${index}`,
-    rules,
-    categoryNameById,
     'manual',
   );
 
@@ -113,8 +100,8 @@ function buildSummaryText(
 ): string {
   const lines = preview.map((t) => {
     const amount = Math.abs(t.amountYen).toLocaleString('ja-JP');
-    const category = t.categoryName ?? '未分類';
-    return `${t.occurredOn} ${t.description} ${amount}円(${category})`;
+    const genre = t.genreName ?? '未分類';
+    return `${t.occurredOn} ${t.description} ${amount}円(${genre})`;
   });
 
   if (duplicateCount > 0) {

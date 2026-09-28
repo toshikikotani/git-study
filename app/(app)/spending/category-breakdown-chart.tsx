@@ -4,15 +4,15 @@ import { useState } from 'react';
 
 import { Meter } from '@/components/ui/meter';
 import { formatYen } from '@/domain/money';
-import type { CategoryOption } from '@/features/classification/store';
+import type { GenreOption } from '@/features/genre/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
-import type { CategoryBreakdownRow } from '@/features/spending/store';
+import type { GenreBreakdownRow } from '@/features/spending/store';
 import { formatDateJa } from '@/lib/date';
 import { ReceiptItemsPanel } from '../transactions/receipt-items-panel';
 
 /**
- * カテゴリ別内訳から辿れる当月の明細1件分(本人発案、ADR-040)。
+ * ジャンル別内訳から辿れる当月の明細1件分(本人発案、ADR-040/ADR-057)。
  *
  * 「カテゴリ別の内訳を押したら使った一覧が見れて、さらにそれを見ると
  * レシートの詳細が見れる(画像は要らない)」という要望への対応。品目・
@@ -20,9 +20,9 @@ import { ReceiptItemsPanel } from '../transactions/receipt-items-panel';
  * まとめて読んでおいたものをそのまま持ち回るだけで、ここでは新しい
  * クエリは発生しない。
  *
- * `categoryId`/`categoryName` は本来この配列の親(カテゴリごとのグループ)
+ * `genreId`/`genreName` は本来この配列の親(ジャンルごとのグループ)
  * から自明だったが、`SpendingCalendar`(calendar.tsx、ADR-044)が同じ配列を
- * 日付順に並べ替えてから改めてカテゴリでグルーピングするため、明細1件だけ
+ * 日付順に並べ替えてから改めてジャンルでグルーピングするため、明細1件だけ
  * 見ても分かるように持たせた(page.tsx で1回作るだけで、両方の画面から
  * 共有する——ADR-033、同じ考慮を複数箇所で作らない)。
  */
@@ -30,8 +30,8 @@ export type DrilldownTransaction = {
   id: string;
   occurredOn: string;
   label: string;
-  categoryId: string | null;
-  categoryName: string | null;
+  genreId: string | null;
+  genreName: string | null;
   amountYen: number;
   accountId: string;
   paymentMethod: PaymentMethod;
@@ -40,29 +40,29 @@ export type DrilldownTransaction = {
 };
 
 /**
- * 今月のカテゴリ別内訳(本人発案:「普通の家計簿」への作り直し)。
+ * 今月のジャンル別内訳(本人発案:「普通の家計簿」への作り直し)。
  *
- * 予算があるカテゴリは既存の Meter(components/ui/meter.tsx)をそのまま使い、
+ * 予算があるジャンルは既存の Meter(components/ui/meter.tsx)をそのまま使い、
  * 「予算に対してどれだけ使ったか」を示す(ホームの予算タイルと同じ色・
  * 判断ロジック=domain/budget.ts の budgetTone()、サーバー側で計算済みの
- * `tone` を受け取るだけ)。予算が無いカテゴリ(投資・返済など)は比較対象が
- * 無いため、単純に「このカテゴリの中での大きさ」を表す中立のバーにする。
+ * `tone` を受け取るだけ)。予算が無いジャンル(投資・返済など)は比較対象が
+ * 無いため、単純に「このジャンルの中での大きさ」を表す中立のバーにする。
  *
- * ── カテゴリ行を押すと当月の明細が見える(ADR-040)────────────────
+ * ── ジャンル行を押すと当月の明細が見える(ADR-040)────────────────
  * /spending は当月明細の再掲を置かない(P10-32)方針だが、あれは
- * 「/transactions と中身がそのまま重複する全件一覧」の話。ここはカテゴリで
+ * 「/transactions と中身がそのまま重複する全件一覧」の話。ここはジャンルで
  * 絞った上に既定で畳んであり、押さないと出てこない——重複というより、
- * カテゴリ別内訳の「内訳」そのものを深掘りする経路として別物として扱う。
+ * ジャンル別内訳の「内訳」そのものを深掘りする経路として別物として扱う。
  */
 export function CategoryBreakdownChart({
   rows,
   transactionsByCategory,
   categories,
 }: {
-  rows: readonly CategoryBreakdownRow[];
-  /** カテゴリID(未分類は 'uncategorized')ごとの当月の明細。 */
+  rows: readonly GenreBreakdownRow[];
+  /** ジャンルID(未分類は 'uncategorized')ごとの当月の明細。 */
   transactionsByCategory: Readonly<Record<string, readonly DrilldownTransaction[]>>;
-  categories: readonly CategoryOption[];
+  categories: readonly GenreOption[];
 }) {
   if (rows.length === 0) return null;
 
@@ -75,15 +75,15 @@ export function CategoryBreakdownChart({
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-        カテゴリ別の内訳
+        ジャンル別の内訳
       </p>
 
       <ul className="mt-3 space-y-3.5">
         {rows.map((row) => (
           <CategoryRow
-            key={row.categoryId ?? 'uncategorized'}
+            key={row.genreId ?? 'uncategorized'}
             row={row}
-            transactions={transactionsByCategory[row.categoryId ?? 'uncategorized'] ?? []}
+            transactions={transactionsByCategory[row.genreId ?? 'uncategorized'] ?? []}
             categories={categories}
             maxSpentYen={maxSpentYen}
             totalYen={totalYen}
@@ -101,23 +101,22 @@ function CategoryRow({
   maxSpentYen,
   totalYen,
 }: {
-  row: CategoryBreakdownRow;
+  row: GenreBreakdownRow;
   transactions: readonly DrilldownTransaction[];
-  categories: readonly CategoryOption[];
+  categories: readonly GenreOption[];
   maxSpentYen: number;
   totalYen: number;
 }) {
   const [open, setOpen] = useState(false);
   const ratio = row.budgetYen !== null && row.budgetYen > 0 ? row.spentYen / row.budgetYen : null;
   const shareOfTotal = totalYen > 0 ? Math.round((row.spentYen / totalYen) * 100) : 0;
-  const categoryCode = categories.find((c) => c.id === row.categoryId)?.code ?? null;
 
   return (
     <li>
       <button type="button" onClick={() => setOpen((v) => !v)} className="block w-full text-left">
         <div className="flex items-baseline justify-between gap-3">
           <span className="truncate text-sm" style={{ color: 'var(--ink)' }}>
-            {row.categoryName}
+            {row.genreName}
           </span>
           <span className="tabular shrink-0 text-sm" style={{ color: 'var(--ink)' }}>
             {formatYen(row.spentYen, { sign: 'never' })}
@@ -129,7 +128,7 @@ function CategoryRow({
             <Meter
               ratio={ratio}
               tone={row.tone}
-              label={`${row.categoryName} 予算の${Math.round(ratio * 100)}%`}
+              label={`${row.genreName} 予算の${Math.round(ratio * 100)}%`}
             />
           ) : (
             <div
@@ -164,12 +163,7 @@ function CategoryRow({
             </p>
           ) : (
             transactions.map((t) => (
-              <DrilldownRow
-                key={t.id}
-                transaction={t}
-                categories={categories}
-                categoryCode={categoryCode}
-              />
+              <DrilldownRow key={t.id} transaction={t} categories={categories} />
             ))
           )}
         </ul>
@@ -178,15 +172,13 @@ function CategoryRow({
   );
 }
 
-/** カテゴリ内訳から辿った明細1件。押すとレシートの品目(あれば)が見える。 */
+/** ジャンル内訳から辿った明細1件。押すとレシートの品目(あれば)が見える。 */
 function DrilldownRow({
   transaction,
   categories,
-  categoryCode,
 }: {
   transaction: DrilldownTransaction;
-  categories: readonly CategoryOption[];
-  categoryCode: string | null;
+  categories: readonly GenreOption[];
 }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<readonly ReceiptItem[]>(transaction.items);
@@ -218,7 +210,6 @@ function DrilldownRow({
               amountYen: transaction.amountYen,
             }}
             categories={categories}
-            categoryCode={categoryCode}
             items={items}
             onItemsReplaced={setItems}
             subtype={subtype}

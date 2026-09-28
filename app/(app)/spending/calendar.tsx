@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { formatYen } from '@/domain/money';
-import type { CategoryOption } from '@/features/classification/store';
+import type { GenreOption } from '@/features/genre/store';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import {
   addDays,
@@ -66,7 +66,7 @@ export function SpendingCalendar({
 }: {
   transactions: readonly DrilldownTransaction[];
   period: { from: string; to: string };
-  categories: readonly CategoryOption[];
+  categories: readonly GenreOption[];
 }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(period.to);
@@ -98,7 +98,7 @@ export function SpendingCalendar({
   ];
 
   const selectedByCategory = useMemo(
-    () => groupByCategory(transactionsByDate.get(selectedDate) ?? []),
+    () => groupByGenre(transactionsByDate.get(selectedDate) ?? []),
     [transactionsByDate, selectedDate],
   );
 
@@ -142,8 +142,8 @@ export function SpendingCalendar({
         ) : (
           <div className="mt-2 space-y-3">
             {selectedByCategory.map((group) => (
-              <CalendarCategoryGroup
-                key={group.categoryId ?? 'uncategorized'}
+              <CalendarGenreGroup
+                key={group.genreId ?? 'uncategorized'}
                 group={group}
                 categories={categories}
                 onSaved={() => router.refresh()}
@@ -156,20 +156,20 @@ export function SpendingCalendar({
   );
 }
 
-type CategoryGroup = {
-  categoryId: string | null;
-  categoryName: string;
+type GenreGroup = {
+  genreId: string | null;
+  genreName: string;
   transactions: DrilldownTransaction[];
 };
 
 /** その日の明細をカテゴリでまとめ、支出額の大きい順に並べる(本人発案、ADR-044)。 */
-function groupByCategory(transactions: readonly DrilldownTransaction[]): CategoryGroup[] {
-  const map = new Map<string, CategoryGroup>();
+function groupByGenre(transactions: readonly DrilldownTransaction[]): GenreGroup[] {
+  const map = new Map<string, GenreGroup>();
   for (const t of transactions) {
-    const key = t.categoryId ?? 'uncategorized';
+    const key = t.genreId ?? 'uncategorized';
     const group = map.get(key) ?? {
-      categoryId: t.categoryId,
-      categoryName: t.categoryName ?? '未分類',
+      genreId: t.genreId,
+      genreName: t.genreName ?? '未分類',
       transactions: [],
     };
     group.transactions.push(t);
@@ -178,7 +178,7 @@ function groupByCategory(transactions: readonly DrilldownTransaction[]): Categor
   return [...map.values()].sort((a, b) => spentYenOf(b) - spentYenOf(a));
 }
 
-function spentYenOf(group: CategoryGroup): number {
+function spentYenOf(group: GenreGroup): number {
   return group.transactions.filter((t) => t.amountYen < 0).reduce((acc, t) => acc - t.amountYen, 0);
 }
 
@@ -227,20 +227,20 @@ function CalendarDayCell({
 }
 
 /** カテゴリ1つ分の見出し(名前・小計)と、その中の明細一覧。 */
-function CalendarCategoryGroup({
+function CalendarGenreGroup({
   group,
   categories,
   onSaved,
 }: {
-  group: CategoryGroup;
-  categories: readonly CategoryOption[];
+  group: GenreGroup;
+  categories: readonly GenreOption[];
   onSaved: () => void;
 }) {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
-          {group.categoryName}
+          {group.genreName}
         </p>
         <p className="tabular text-[11px]" style={{ color: 'var(--ink-muted)' }}>
           {formatYen(spentYenOf(group), { sign: 'never' })}
@@ -270,27 +270,24 @@ function CalendarTransactionRow({
   onSaved,
 }: {
   transaction: DrilldownTransaction;
-  categories: readonly CategoryOption[];
+  categories: readonly GenreOption[];
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [categoryId, setCategoryId] = useState(transaction.categoryId ?? '');
+  const [genreId, setGenreId] = useState(transaction.genreId ?? '');
   const [items, setItems] = useState<readonly ReceiptItem[]>(transaction.items);
   const [subtype, setSubtype] = useState(transaction.expenseSubtype);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isIncome = transaction.amountYen > 0;
-  const categoryUnchanged = categoryId === (transaction.categoryId ?? '');
-  // 生活費の小分類(ADR-036)を出してよいかの判定。セレクトで選び直した
-  // カテゴリに合わせて再計算する(表示名ではなく code で見る、ADR-016)。
-  const categoryCode = categories.find((c) => c.id === categoryId)?.code ?? null;
+  const categoryUnchanged = genreId === (transaction.genreId ?? '');
 
   async function saveCategory(): Promise<void> {
-    if (!categoryId || categoryUnchanged) return;
+    if (!genreId || categoryUnchanged) return;
     setSaving(true);
     setError(null);
-    const result = await updateTransactionAction(transaction.id, categoryId, transaction.label);
+    const result = await updateTransactionAction(transaction.id, genreId);
     setSaving(false);
     if (result.error) {
       setError(result.error);
@@ -322,8 +319,8 @@ function CalendarTransactionRow({
         <div className="mt-1.5 space-y-2">
           <div className="flex gap-2">
             <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              value={genreId}
+              onChange={(e) => setGenreId(e.target.value)}
               className="flex-1 rounded-xl px-3 py-1.5 text-xs"
               style={{
                 background: 'var(--plane)',
@@ -343,7 +340,7 @@ function CalendarTransactionRow({
             <button
               type="button"
               onClick={() => void saveCategory()}
-              disabled={saving || !categoryId || categoryUnchanged}
+              disabled={saving || !genreId || categoryUnchanged}
               className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
@@ -365,7 +362,6 @@ function CalendarTransactionRow({
               amountYen: transaction.amountYen,
             }}
             categories={categories}
-            categoryCode={categoryCode}
             items={items}
             onItemsReplaced={setItems}
             subtype={subtype}

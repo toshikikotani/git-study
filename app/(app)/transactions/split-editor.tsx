@@ -7,7 +7,7 @@ import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
-import type { CategoryOption } from '@/features/classification/store';
+import type { GenreOption } from '@/features/genre/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
@@ -25,7 +25,7 @@ const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   installment: '分割払い',
 };
 
-type SplitRowState = { categoryId: string; amountYen: string; note: string };
+type SplitRowState = { genreId: string; amountYen: string; note: string };
 
 /**
  * 明細1行 + カテゴリの編集(単一カテゴリの変更・複数カテゴリへの分割)。
@@ -96,11 +96,11 @@ export function TransactionRowWithSplit({
   expenseSubtype = null,
 }: {
   transaction: StoredTransaction;
-  categories: readonly CategoryOption[];
+  categories: readonly GenreOption[];
   initialSplits: readonly TransactionSplit[];
-  /** レシートの商品行(ADR-034)。カテゴリ分割の有無に関わらず、常に見せる。 */
+  /** レシートの商品行(ADR-034)。ジャンル分割の有無に関わらず、常に見せる。 */
   receiptItems?: readonly ReceiptItem[];
-  /** 生活費の小分類(AIの自由記述、ADR-036)。「生活費」カテゴリのときだけ表示する。 */
+  /** 生活費の小分類(AIの自由記述、ADR-036)。 */
   expenseSubtype?: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -112,7 +112,7 @@ export function TransactionRowWithSplit({
   // カテゴリ編集フォームを開くかどうかは、行を開く(open)とは別の
   // 明示的な操作にする(上のコメント参照)。
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
-  const [categoryId, setCategoryId] = useState(transaction.categoryId ?? '');
+  const [genreId, setGenreId] = useState(transaction.genreId ?? '');
   // 金額・日付の編集(本人発案「今金額と日付が一切編集できない」)。
   // カテゴリ変更と同じフォームにまとめる(下の canSaveSimpleEdit 参照)。
   const [amountAbsYenInput, setAmountAbsYenInput] = useState(
@@ -138,9 +138,6 @@ export function TransactionRowWithSplit({
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
   // 「カテゴリを変更する」を押すまでフォームを隠す(品目の有無に関わらず)。
   const showCategoryForm = categoryFormOpen;
-  // 生活費の小分類(ADR-036)を出してよいかの判定に使う。表示名ではなく
-  // code で見る(本人がカテゴリを改名しても判定が崩れないように、ADR-016)。
-  const categoryCode = categories.find((c) => c.id === transaction.categoryId)?.code ?? null;
   const [subtype, setSubtype] = useState(expenseSubtype);
   // 長押しのその場プレビュー(ADR-042)。open/categoryFormOpen とは独立
   // ——編集ではなく閲覧専用のため。
@@ -155,7 +152,7 @@ export function TransactionRowWithSplit({
     rows.length >= 2 && rows.every((r) => Number(r.amountYen) > 0) && sumAbsYen === targetAbsYen;
 
   function addRow(): void {
-    setRows((prev) => [...prev, { categoryId: categories[0]?.id ?? '', amountYen: '', note: '' }]);
+    setRows((prev) => [...prev, { genreId: categories[0]?.id ?? '', amountYen: '', note: '' }]);
   }
   function removeRow(index: number): void {
     setRows((prev) => prev.filter((_, i) => i !== index));
@@ -166,26 +163,21 @@ export function TransactionRowWithSplit({
 
   const amountAbsYen = Number(amountAbsYenInput);
   const simpleEditUnchanged =
-    categoryId === (transaction.categoryId ?? '') &&
+    genreId === (transaction.genreId ?? '') &&
     amountAbsYen === targetAbsYen &&
     occurredOnInput === transaction.occurredOn;
   const canSaveSimpleEdit =
-    !!categoryId && amountAbsYen > 0 && occurredOnInput !== '' && !simpleEditUnchanged;
+    !!genreId && amountAbsYen > 0 && occurredOnInput !== '' && !simpleEditUnchanged;
 
   async function saveSimpleEdit(): Promise<void> {
     if (!canSaveSimpleEdit) return;
     setSaving(true);
     setError(null);
-    const result = await updateTransactionAction(
-      transaction.id,
-      categoryId,
-      transaction.description,
-      {
-        amountAbsYen,
-        occurredOn: occurredOnInput,
-        isIncome,
-      },
-    );
+    const result = await updateTransactionAction(transaction.id, genreId, {
+      amountAbsYen,
+      occurredOn: occurredOnInput,
+      isIncome,
+    });
     setSaving(false);
     if (result.error) {
       setError(result.error);
@@ -214,7 +206,7 @@ export function TransactionRowWithSplit({
     setError(null);
     const sign = transaction.amountYen < 0 ? -1 : 1;
     const payload = rows.map((r) => ({
-      categoryId: r.categoryId || null,
+      genreId: r.genreId || null,
       amountYen: sign * Number(r.amountYen),
       note: r.note.trim() === '' ? null : r.note.trim(),
     }));
@@ -228,8 +220,8 @@ export function TransactionRowWithSplit({
     setSplits(
       payload.map((p, i) => ({
         id: `pending-${i}`,
-        categoryId: p.categoryId,
-        categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
+        genreId: p.genreId,
+        genreName: categories.find((c) => c.id === p.genreId)?.name ?? null,
         amountYen: p.amountYen,
         note: p.note,
       })),
@@ -289,12 +281,10 @@ export function TransactionRowWithSplit({
                 {splits.length > 0
                   ? splits
                       .map((s) =>
-                        s.note
-                          ? `${s.note}(${s.categoryName ?? '未分類'})`
-                          : (s.categoryName ?? '未分類'),
+                        s.note ? `${s.note}(${s.genreName ?? '未分類'})` : (s.genreName ?? '未分類'),
                       )
                       .join(' / ')
-                  : (transaction.categoryName ?? '未分類')}
+                  : (transaction.genreName ?? '未分類')}
               </span>
 
               {risky && methodLabel ? (
@@ -355,7 +345,6 @@ export function TransactionRowWithSplit({
               amountYen: transaction.amountYen,
             }}
             categories={categories}
-            categoryCode={categoryCode}
             items={items}
             onItemsReplaced={setItems}
             subtype={subtype}
@@ -508,8 +497,8 @@ export function TransactionRowWithSplit({
           </div>
 
           <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            value={genreId}
+            onChange={(e) => setGenreId(e.target.value)}
             className="w-full rounded-xl px-3 py-2 text-sm"
             style={{
               background: 'var(--plane)',
@@ -569,8 +558,8 @@ export function TransactionRowWithSplit({
             <div key={index} className="space-y-1">
               <div className="flex gap-2">
                 <select
-                  value={row.categoryId}
-                  onChange={(e) => updateRow(index, { categoryId: e.target.value })}
+                  value={row.genreId}
+                  onChange={(e) => updateRow(index, { genreId: e.target.value })}
                   className="flex-1 rounded-xl px-3 py-2 text-sm"
                   style={{
                     background: 'var(--plane)',
@@ -720,9 +709,7 @@ export function TransactionRowWithSplit({
                 {splits.map((s, i) => (
                   <li key={i} className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate">
-                      {s.note
-                        ? `${s.note}(${s.categoryName ?? '未分類'})`
-                        : (s.categoryName ?? '未分類')}
+                      {s.note ? `${s.note}(${s.genreName ?? '未分類'})` : (s.genreName ?? '未分類')}
                     </span>
                     <span className="tabular shrink-0">
                       {formatYen(Math.abs(s.amountYen), { sign: 'never' })}
@@ -732,10 +719,10 @@ export function TransactionRowWithSplit({
               </ul>
             ) : (
               <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-                {transaction.categoryName ?? '未分類'}
+                {transaction.genreName ?? '未分類'}
               </p>
             )}
-            {subtype && categoryCode === 'living' ? (
+            {subtype ? (
               <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
                 生活費の内訳:{subtype}
               </p>
@@ -783,11 +770,11 @@ export function TransactionRowWithSplit({
 
 function initialRows(
   splits: readonly TransactionSplit[],
-  categories: readonly CategoryOption[],
+  categories: readonly GenreOption[],
 ): SplitRowState[] {
   if (splits.length > 0) {
     return splits.map((s) => ({
-      categoryId: s.categoryId ?? '',
+      genreId: s.genreId ?? '',
       amountYen: String(Math.abs(s.amountYen)),
       note: s.note ?? '',
     }));
@@ -795,7 +782,7 @@ function initialRows(
   const first = categories[0]?.id ?? '';
   const second = categories[1]?.id ?? first;
   return [
-    { categoryId: first, amountYen: '', note: '' },
-    { categoryId: second, amountYen: '', note: '' },
+    { genreId: first, amountYen: '', note: '' },
+    { genreId: second, amountYen: '', note: '' },
   ];
 }

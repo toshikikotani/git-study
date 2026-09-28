@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 import { formatYen } from '@/domain/money';
 import { loadAccumulationView, type AccumulationView } from '@/features/accumulation/store';
-import { listCategoryOptions } from '@/features/classification/store';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
+import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import {
@@ -111,11 +111,11 @@ export default async function SpendingPage() {
   // listReceiptItemsForTransactionIds・listExpenseSubtypesForTransactionIds)。
   const transactionIds = ledger.transactions.map((t) => t.id);
   const [categories, itemsByTransactionId, expenseSubtypeByTransactionId] = await Promise.all([
-    listCategoryOptions(),
+    listGenres(),
     listReceiptItemsForTransactionIds(transactionIds),
     listExpenseSubtypesForTransactionIds(transactionIds),
   ]);
-  // カテゴリ別内訳(CategoryBreakdownChart)とカレンダー(SpendingCalendar、
+  // ジャンル別内訳(CategoryBreakdownChart)とカレンダー(SpendingCalendar、
   // ADR-044)の両方から使う、明細1件分の共通の形。ここで1回だけ作り、
   // 両画面で共有する(ADR-033、同じ考慮を複数箇所で作らない)。
   const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
@@ -124,15 +124,15 @@ export default async function SpendingPage() {
       id: t.id,
       occurredOn: t.occurredOn,
       label: t.label,
-      categoryId: t.categoryId,
-      categoryName: t.categoryName,
+      genreId: t.genreId,
+      genreName: t.genreName,
       amountYen: t.amountYen,
       accountId: t.accountId,
       paymentMethod: t.paymentMethod,
       items: itemsByTransactionId.get(t.id) ?? [],
       expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
     };
-    const key = t.categoryId ?? 'uncategorized';
+    const key = t.genreId ?? 'uncategorized';
     transactionsByCategory[key] = [...(transactionsByCategory[key] ?? []), drilldown];
     return drilldown;
   });
@@ -168,7 +168,7 @@ export default async function SpendingPage() {
           diagnosis: <DiagnosisCard view={diagnosis} />,
           categoryBreakdown: (
             <CategoryBreakdownChart
-              rows={ledger.categoryBreakdown}
+              rows={ledger.genreBreakdown}
               transactionsByCategory={transactionsByCategory}
               categories={categories}
             />

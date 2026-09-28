@@ -2,8 +2,6 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
-import { DEFAULT_DETECTION_RULES } from '@/features/classification/rules';
-import { listActiveClassificationRulesForUser } from '@/features/classification/store';
 import { ClaudeEmailExtractor } from '@/features/import/email-ai';
 import { GMAIL_IMAP } from '@/features/import/mailbox';
 import { ImapMailSource } from '@/features/import/imap-source';
@@ -117,9 +115,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     knownRefRows.map((r) => r.source_ref).filter((v): v is string => v !== null),
   );
 
-  const learnedRules = await listActiveClassificationRulesForUser(admin, user.id);
-  const rules = [...DEFAULT_DETECTION_RULES, ...learnedRules];
-
   const anthropicApiKey = readAnthropicApiKey() ?? undefined;
   const since = settings.gmail_last_synced_on ?? addDays(todayJst(), -INITIAL_LOOKBACK_DAYS);
 
@@ -139,7 +134,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         : undefined,
       limit: settings.gmail_fetch_limit,
     },
-    rules,
     knownMessageIds,
     // fingerprint の一意制約は DB 側(transactions.upsert)が最終的に守る。
     // ここでの重複判定は同一実行内(同じメールから複数件抽出された場合)だけで十分。
@@ -195,7 +189,8 @@ export async function POST(request: Request): Promise<NextResponse> {
           merchant_name: t.merchantName,
           amount_yen: t.amountYen,
           payment_method: t.paymentMethod,
-          category_id: t.categoryId,
+          genre_id: t.genreId,
+          must_pay: t.mustPay,
           classified_by: t.classifiedBy,
           confidence: t.confidence,
           review_status: t.reviewStatus,

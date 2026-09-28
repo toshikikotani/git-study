@@ -34,7 +34,7 @@ export type DiagnosisTarget = {
   label: string;
   amountYen: number;
   occurredOn: string;
-  categoryName: string | null;
+  genreName: string | null;
 };
 
 /**
@@ -53,7 +53,7 @@ export async function listUndiagnosedTransactions(
   const { data: rows, error } = await supabase
     .from('transactions')
     .select(
-      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, category_id',
+      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id',
     )
     .gte('occurred_on', monthStart)
     .lte('occurred_on', today)
@@ -63,7 +63,7 @@ export async function listUndiagnosedTransactions(
 
   const countable = rows.filter((r) =>
     isCountable({
-      categoryId: r.category_id,
+      categoryId: r.genre_id,
       amountYen: r.amount_yen,
       isTransfer: r.is_transfer,
       reviewStatus: r.review_status,
@@ -86,18 +86,18 @@ export async function listUndiagnosedTransactions(
   const undiagnosed = countable.filter((r) => !diagnosedIds.has(r.id)).slice(0, MAX_BATCH_SIZE);
   if (undiagnosed.length === 0) return [];
 
-  const categoryIds = [
-    ...new Set(undiagnosed.map((r) => r.category_id).filter((id): id is string => id !== null)),
+  const genreIds = [
+    ...new Set(undiagnosed.map((r) => r.genre_id).filter((id): id is string => id !== null)),
   ];
-  const categoryNameById = new Map<string, string>();
-  if (categoryIds.length > 0) {
+  const genreNameById = new Map<string, string>();
+  if (genreIds.length > 0) {
     const { data: categories, error: catError } = await supabase
-      .from('categories')
+      .from('genres')
       .select('id, name')
-      .in('id', categoryIds);
+      .in('id', genreIds);
     if (catError)
-      throw new DiagnosisStoreError(`カテゴリを取得できませんでした: ${catError.message}`);
-    for (const c of categories) categoryNameById.set(c.id, c.name);
+      throw new DiagnosisStoreError(`ジャンルを取得できませんでした: ${catError.message}`);
+    for (const c of categories) genreNameById.set(c.id, c.name);
   }
 
   return undiagnosed.map((r) => ({
@@ -105,7 +105,7 @@ export async function listUndiagnosedTransactions(
     label: r.merchant_name ?? r.description,
     amountYen: r.amount_yen,
     occurredOn: r.occurred_on,
-    categoryName: r.category_id ? (categoryNameById.get(r.category_id) ?? null) : null,
+    genreName: r.genre_id ? (genreNameById.get(r.genre_id) ?? null) : null,
   }));
 }
 
@@ -182,7 +182,7 @@ export async function loadSpendingDiagnosisView(
   const { data: rows, error } = await supabase
     .from('transactions')
     .select(
-      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, category_id',
+      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id',
     )
     .gte('occurred_on', rangeStart)
     .lte('occurred_on', today)
@@ -192,7 +192,7 @@ export async function loadSpendingDiagnosisView(
 
   const countable = rows.filter((r) =>
     isCountable({
-      categoryId: r.category_id,
+      categoryId: r.genre_id,
       amountYen: r.amount_yen,
       isTransfer: r.is_transfer,
       reviewStatus: r.review_status,
@@ -245,7 +245,7 @@ export async function loadSpendingDiagnosisView(
       continue;
     }
     diagnosedAll.push({
-      categoryId: r.category_id,
+      categoryId: r.genre_id,
       amountYen: r.amount_yen,
       isTransfer: r.is_transfer,
       reviewStatus: r.review_status,

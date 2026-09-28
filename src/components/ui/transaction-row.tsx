@@ -29,7 +29,7 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            {transaction.categoryName ?? '未分類'}
+            {transaction.genreName ?? '未分類'}
           </span>
 
           {/* FR-21:増やしてはいけない借入は、一覧の時点で目に入るようにする */}

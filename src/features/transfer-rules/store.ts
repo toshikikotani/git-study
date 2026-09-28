@@ -55,7 +55,7 @@ function fromRow(row: TransferRuleRow): TransferRule {
     amountYen: row.amount_yen,
     percentage: row.percentage,
     toAccountId: row.to_account_id,
-    categoryId: row.category_id,
+    categoryId: row.genre_id,
     note: row.note,
   };
 }
@@ -75,16 +75,15 @@ export async function listTransferRules(): Promise<TransferRule[]> {
   return data.map(fromRow);
 }
 
-/** 有効なカテゴリの選択肢。表示名は categories.name(ADR-016)。 */
+/** 選択肢に出すジャンル一覧。表示名は genres.name(ADR-016/ADR-057)。 */
 export async function listCategoryOptions(): Promise<CategoryOption[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from('categories')
+    .from('genres')
     .select('id, name')
-    .eq('is_active', true)
     .order('sort_order', { ascending: true });
 
-  if (error) throw new TransferRuleStoreError(`カテゴリを取得できませんでした: ${error.message}`);
+  if (error) throw new TransferRuleStoreError(`ジャンルを取得できませんでした: ${error.message}`);
   return data;
 }
 
@@ -114,7 +113,7 @@ export async function createTransferRule(input: TransferRuleInput): Promise<Tran
       amount_yen: input.amountYen,
       percentage: input.percentage,
       to_account_id: input.toAccountId,
-      category_id: input.categoryId,
+      genre_id: input.categoryId,
       note: input.note,
     })
     .select('*')
@@ -137,7 +136,7 @@ export async function updateTransferRule(
       amount_yen: input.amountYen,
       percentage: input.percentage,
       to_account_id: input.toAccountId,
-      category_id: input.categoryId,
+      genre_id: input.categoryId,
       note: input.note,
     })
     .eq('id', id)

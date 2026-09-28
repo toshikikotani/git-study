@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 
-import type { CategoryTransactionDetail } from '@/features/categories/category-detail-types';
+import type { GenreTransactionDetail } from '@/features/genre/genre-detail-types';
 import { formatYen } from '@/domain/money';
 import { formatDateJa } from '@/lib/date';
 import { StatTile } from './stat-tile';
@@ -23,7 +23,7 @@ export function ExpandableBudgetTile({
   style,
 }: {
   tile: React.ComponentProps<typeof StatTile>;
-  transactions: readonly CategoryTransactionDetail[];
+  transactions: readonly GenreTransactionDetail[];
   style?: React.CSSProperties;
 }) {
   const [expanded, setExpanded] = useState(false);

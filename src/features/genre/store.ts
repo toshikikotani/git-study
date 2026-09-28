@@ -1,22 +1,17 @@
 /**
- * 支出ジャンル(genres・transaction_genres・receipt_item_genres)のデータ
- * アクセス(本人発案、ADR-056)。
+ * 支出ジャンル(genres)のデータアクセス(本人発案、ADR-056/ADR-057)。
  *
- * ジャンルの一覧は `categories` と同じく本人が自由に追加・削除できるDB
- * テーブル(本人発案「カテゴリはdbに保存してenumじゃなくて、自由に変更
- * できる仕組みに。追加削除容易にしたい」)。`transaction_diagnoses`
- * (ADR-030)と同じ「今月、まだ処理していない分だけを本人の操作で処理する」
- * 設計で、レシート品目がある明細は品目ごとに、無い明細は明細全体に、
- * どちらか一方だけジャンルを付ける(本人が選んだ「両方(品目があれば
- * 品目ごと、無ければ明細ごと)」のとおり)。
- *
- * `genres`・`transaction_genres`・`receipt_item_genres` は本番未適用。
- * 未適用時の扱いは他の新規テーブル(transaction_diagnoses 等)と同じ
- * (読み取りは「まだ無い」として握り潰す。書き込みは握り潰さずエラーを返す)。
+ * ADR-057により、ジャンルは「AIが補助的に付ける客観タグ」から「唯一の
+ * カテゴリ」に格上げされた。明細(transactions)・レシート品目(receipt_items)
+ * それぞれが直接 `genre_id` 列を持つ(旧 categories.category_id と同じ形)。
+ * 分類は本人の操作(CSV・メール取り込み等)では確定させず null のまま保存し、
+ * 「今月、まだジャンル分類していない支出」を本人がボタンで一括AI分類する
+ * (`transaction_diagnoses` と同じ「今月の未処理分だけを本人の操作で処理する」
+ * 設計)か、明細を直接編集して手動で選び直す(本人の修正、ADR-057)。
  */
 
-import type { GenredEntry } from '@/domain/genre';
 import { isCountable } from '@/domain/budget';
+import type { GenredEntry } from '@/domain/genre';
 import { monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
@@ -29,7 +24,18 @@ export class GenreStoreError extends AppError {}
  * 超えた分は次回のボタン操作で拾える。 */
 const MAX_BATCH_SIZE = 120;
 
-export type Genre = { id: string; name: string; sortOrder: number };
+export type Genre = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  /** 月次予算(本人発案「カテゴリのそれぞれの値段設定」)。未設定なら無制限。 */
+  budgetYen: number | null;
+  /** ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。 */
+  showOnHome: boolean;
+};
+
+/** 選択肢としてだけ使う画面(取り込みプレビュー・明細編集等)向けの最小限の形。 */
+export type GenreOption = Pick<Genre, 'id' | 'name'>;
 
 /**
  * ジャンルの初期値(本人はいつでも自由に追加・削除できる。あくまで最初の
@@ -63,6 +69,22 @@ const DEFAULT_GENRE_NAMES = [
   'その他',
 ];
 
+function fromRow(row: {
+  id: string;
+  name: string;
+  sort_order: number;
+  budget_yen: number | null;
+  show_on_home: boolean;
+}): Genre {
+  return {
+    id: row.id,
+    name: row.name,
+    sortOrder: row.sort_order,
+    budgetYen: row.budget_yen,
+    showOnHome: row.show_on_home,
+  };
+}
+
 /** ジャンル一覧(並び順)。1件も無ければ初期値を投入してから返す。 */
 export async function listGenres(): Promise<Genre[]> {
   const supabase = await createClient();
@@ -73,16 +95,14 @@ export async function listGenres(): Promise<Genre[]> {
 
   const { data, error } = await supabase
     .from('genres')
-    .select('id, name, sort_order')
+    .select('id, name, sort_order, budget_yen, show_on_home')
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true });
   if (error) {
     if (isMissingTableError(error)) return [];
     throw new GenreStoreError(`ジャンルを取得できませんでした: ${error.message}`);
   }
-  if (data.length > 0) {
-    return data.map((g) => ({ id: g.id, name: g.name, sortOrder: g.sort_order }));
-  }
+  if (data.length > 0) return data.map(fromRow);
 
   const { error: insertError } = await supabase.from('genres').insert(
     DEFAULT_GENRE_NAMES.map((name, index) => ({
@@ -119,20 +139,37 @@ export async function createGenre(name: string): Promise<Genre> {
   const { data, error } = await supabase
     .from('genres')
     .insert({ user_id: auth.user.id, name: trimmed, sort_order: nextSortOrder })
-    .select('id, name, sort_order')
+    .select('id, name, sort_order, budget_yen, show_on_home')
     .single();
   if (error) {
     if (isMissingTableError(error)) throw new GenreStoreError('ジャンル機能はまだ利用できません');
     if (error.code === '23505') throw new GenreStoreError('同じ名前のジャンルが既にあります');
     throw new GenreStoreError(`ジャンルを作成できませんでした: ${error.message}`);
   }
-  return { id: data.id, name: data.name, sortOrder: data.sort_order };
+  return fromRow(data);
+}
+
+/** 月次予算(本人発案「カテゴリのそれぞれの値段設定」)を変更する。null は無制限。 */
+export async function updateGenreBudget(id: string, budgetYen: number | null): Promise<void> {
+  if (budgetYen !== null && (!Number.isInteger(budgetYen) || budgetYen < 0)) {
+    throw new GenreStoreError('予算は0以上の整数円で指定してください');
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from('genres').update({ budget_yen: budgetYen }).eq('id', id);
+  if (error) throw new GenreStoreError(`予算を更新できませんでした: ${error.message}`);
+}
+
+/** ホーム画面に残額を出すか(旧 categories.show_on_home、FR-14, FR-61)。 */
+export async function setGenreShowOnHome(id: string, showOnHome: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from('genres').update({ show_on_home: showOnHome }).eq('id', id);
+  if (error) throw new GenreStoreError(`更新できませんでした: ${error.message}`);
 }
 
 /**
  * ジャンルを削除する(本人発案「追加削除容易にしたい」、categories と違い
- * 統合を経由せず即座に削除できる)。使用中の分類(transaction_genres・
- * receipt_item_genres)は genre_id が on delete cascade のため一緒に消える
+ * 統合を経由せず即座に削除できる)。使用中の明細・品目は genre_id が
+ * on delete set null のため、削除すると自動的に「未分類」へ戻る
  * ——その品目・明細は次回の「ジャンル分類する」で再び対象になる。
  */
 export async function deleteGenre(id: string): Promise<void> {
@@ -158,7 +195,7 @@ export async function listUngenredSpendTargets(now: Date = new Date()): Promise<
   const { data: rows, error } = await supabase
     .from('transactions')
     .select(
-      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, category_id',
+      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id',
     )
     .gte('occurred_on', monthStart)
     .lte('occurred_on', today)
@@ -168,7 +205,7 @@ export async function listUngenredSpendTargets(now: Date = new Date()): Promise<
 
   const countable = rows.filter((r) =>
     isCountable({
-      categoryId: r.category_id,
+      categoryId: r.genre_id,
       amountYen: r.amount_yen,
       isTransfer: r.is_transfer,
       reviewStatus: r.review_status,
@@ -179,55 +216,28 @@ export async function listUngenredSpendTargets(now: Date = new Date()): Promise<
 
   const { data: items, error: itemsError } = await supabase
     .from('receipt_items')
-    .select('id, transaction_id, name, amount_yen')
+    .select('id, transaction_id, name, amount_yen, genre_id')
     .in('transaction_id', countableIds);
   if (itemsError && !isMissingTableError(itemsError)) {
     throw new GenreStoreError(`品目を取得できませんでした: ${itemsError.message}`);
   }
-  const itemsByTransaction = new Map<string, { id: string; name: string; amount_yen: number }[]>();
+  const itemsByTransaction = new Map<
+    string,
+    { id: string; name: string; amount_yen: number; genre_id: string | null }[]
+  >();
   for (const item of items ?? []) {
     const list = itemsByTransaction.get(item.transaction_id) ?? [];
     list.push(item);
     itemsByTransaction.set(item.transaction_id, list);
   }
 
-  const allItems = [...itemsByTransaction.values()].flat();
-  const { data: itemGenres, error: itemGenresError } = await supabase
-    .from('receipt_item_genres')
-    .select('receipt_item_id')
-    .in(
-      'receipt_item_id',
-      allItems.map((i) => i.id),
-    );
-  if (itemGenresError && !isMissingTableError(itemGenresError)) {
-    throw new GenreStoreError(
-      `ジャンル分類の状況を取得できませんでした: ${itemGenresError.message}`,
-    );
-  }
-  const genredItemIds = new Set((itemGenres ?? []).map((g) => g.receipt_item_id));
-
-  const transactionsWithoutItems = countable.filter(
-    (r) => (itemsByTransaction.get(r.id) ?? []).length === 0,
-  );
-  const { data: txGenres, error: txGenresError } = await supabase
-    .from('transaction_genres')
-    .select('transaction_id')
-    .in(
-      'transaction_id',
-      transactionsWithoutItems.map((r) => r.id),
-    );
-  if (txGenresError && !isMissingTableError(txGenresError)) {
-    throw new GenreStoreError(`ジャンル分類の状況を取得できませんでした: ${txGenresError.message}`);
-  }
-  const genredTransactionIds = new Set((txGenres ?? []).map((g) => g.transaction_id));
-
   const targets: GenreTarget[] = [];
-  for (const item of allItems) {
-    if (genredItemIds.has(item.id)) continue;
+  for (const item of (items ?? []).filter((i) => i.genre_id === null)) {
     targets.push({ kind: 'item', id: item.id, label: item.name, amountYen: item.amount_yen });
   }
-  for (const tx of transactionsWithoutItems) {
-    if (genredTransactionIds.has(tx.id)) continue;
+  for (const tx of countable) {
+    if ((itemsByTransaction.get(tx.id) ?? []).length > 0) continue; // 品目側で分類する
+    if (tx.genre_id !== null) continue;
     targets.push({
       kind: 'transaction',
       id: tx.id,
@@ -239,51 +249,28 @@ export async function listUngenredSpendTargets(now: Date = new Date()): Promise<
   return targets.slice(0, MAX_BATCH_SIZE);
 }
 
-/** ジャンル分類の結果を保存する。品目と明細で保存先テーブルが違うため分けて upsert する。 */
+/** ジャンル分類の結果を保存する。品目と明細で更新先テーブルが違うため分けて実行する。 */
 export async function saveGenres(
   results: readonly { kind: 'item' | 'transaction'; id: string; genreId: string }[],
 ): Promise<void> {
   if (results.length === 0) return;
 
   const supabase = await createClient();
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth.user) {
-    throw new GenreStoreError('ログイン状態を確認できませんでした');
+
+  for (const r of results.filter((r) => r.kind === 'item')) {
+    const { error } = await supabase
+      .from('receipt_items')
+      .update({ genre_id: r.genreId })
+      .eq('id', r.id);
+    if (error) throw new GenreStoreError(`品目のジャンルを保存できませんでした: ${error.message}`);
   }
 
-  const itemResults = results.filter((r) => r.kind === 'item');
-  const transactionResults = results.filter((r) => r.kind === 'transaction');
-
-  if (itemResults.length > 0) {
-    const { error } = await supabase.from('receipt_item_genres').upsert(
-      itemResults.map((r) => ({
-        user_id: auth.user.id,
-        receipt_item_id: r.id,
-        genre_id: r.genreId,
-      })),
-      { onConflict: 'receipt_item_id' },
-    );
-    if (error) {
-      if (isMissingTableError(error))
-        throw new GenreStoreError('ジャンル分類機能はまだ利用できません');
-      throw new GenreStoreError(`ジャンル分類を保存できませんでした: ${error.message}`);
-    }
-  }
-
-  if (transactionResults.length > 0) {
-    const { error } = await supabase.from('transaction_genres').upsert(
-      transactionResults.map((r) => ({
-        user_id: auth.user.id,
-        transaction_id: r.id,
-        genre_id: r.genreId,
-      })),
-      { onConflict: 'transaction_id' },
-    );
-    if (error) {
-      if (isMissingTableError(error))
-        throw new GenreStoreError('ジャンル分類機能はまだ利用できません');
-      throw new GenreStoreError(`ジャンル分類を保存できませんでした: ${error.message}`);
-    }
+  for (const r of results.filter((r) => r.kind === 'transaction')) {
+    const { error } = await supabase
+      .from('transactions')
+      .update({ genre_id: r.genreId, classified_by: 'ai' })
+      .eq('id', r.id);
+    if (error) throw new GenreStoreError(`明細のジャンルを保存できませんでした: ${error.message}`);
   }
 }
 
@@ -294,10 +281,14 @@ export type GenreAnalysisView = {
 };
 
 /**
- * 「第三者目線での分析」画面向けのビュー(本人発案)。今月分の、本人が選んだ
- * カテゴリと、AIが割り当てた客観ジャンルの組を1回の呼び出しでまとめて返す。
- * 集計そのものは domain/genre.ts の summarizeByGenre()/summarizeGenreByCategory()
- * が担う(ここではDBから素材を集めるだけ)。
+ * 「ジャンル別分析」画面向けのビュー(本人発案)。今月分の、明細全体・
+ * レシート品目それぞれのジャンルと「絶対払わざるを得ないもの」ラベルを
+ * まとめて返す。集計そのものは domain/genre.ts の summarizeByGenre()/
+ * summarizeMustPaySplit() が担う(ここではDBから素材を集めるだけ)。
+ *
+ * 品目(ADR-035)は明細本体とは別に自分のジャンルを持てるが、must_pay は
+ * 明細1件ごとのラベル(ADR-057)のため、品目は親である明細の must_pay を
+ * そのまま引き継ぐ。
  */
 export async function loadGenreAnalysisView(now: Date = new Date()): Promise<GenreAnalysisView> {
   const supabase = await createClient();
@@ -307,7 +298,7 @@ export async function loadGenreAnalysisView(now: Date = new Date()): Promise<Gen
   const { data: rows, error } = await supabase
     .from('transactions')
     .select(
-      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, category_id',
+      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id, must_pay',
     )
     .gte('occurred_on', monthStart)
     .lte('occurred_on', today)
@@ -317,7 +308,7 @@ export async function loadGenreAnalysisView(now: Date = new Date()): Promise<Gen
 
   const countable = rows.filter((r) =>
     isCountable({
-      categoryId: r.category_id,
+      categoryId: r.genre_id,
       amountYen: r.amount_yen,
       isTransfer: r.is_transfer,
       reviewStatus: r.review_status,
@@ -327,113 +318,72 @@ export async function loadGenreAnalysisView(now: Date = new Date()): Promise<Gen
   if (countable.length === 0) return emptyView;
   const countableIds = countable.map((r) => r.id);
 
-  const categoryIds = [
-    ...new Set(countable.map((r) => r.category_id).filter((id): id is string => id !== null)),
-  ];
-  const categoryNameById = new Map<string, string>();
-  if (categoryIds.length > 0) {
-    const { data: categories, error: catError } = await supabase
-      .from('categories')
-      .select('id, name')
-      .in('id', categoryIds);
-    if (catError) throw new GenreStoreError(`カテゴリを取得できませんでした: ${catError.message}`);
-    for (const c of categories) categoryNameById.set(c.id, c.name);
-  }
-  const categoryNameOf = (r: { category_id: string | null }): string | null =>
-    r.category_id ? (categoryNameById.get(r.category_id) ?? null) : null;
-
   const { data: items, error: itemsError } = await supabase
     .from('receipt_items')
-    .select('id, transaction_id, name, amount_yen')
+    .select('id, transaction_id, amount_yen, genre_id')
     .in('transaction_id', countableIds);
   if (itemsError && !isMissingTableError(itemsError)) {
     throw new GenreStoreError(`品目を取得できませんでした: ${itemsError.message}`);
   }
-  const itemsByTransaction = new Map<string, { id: string; amount_yen: number }[]>();
+  const itemsByTransaction = new Map<
+    string,
+    { id: string; amount_yen: number; genre_id: string | null }[]
+  >();
   for (const item of items ?? []) {
     const list = itemsByTransaction.get(item.transaction_id) ?? [];
     list.push(item);
     itemsByTransaction.set(item.transaction_id, list);
   }
-  const allItems = [...itemsByTransaction.values()].flat();
-  const transactionIdByItemId = new Map((items ?? []).map((i) => [i.id, i.transaction_id]));
 
-  const { data: itemGenres, error: itemGenresError } = await supabase
-    .from('receipt_item_genres')
-    .select('receipt_item_id, genre_id')
-    .in(
-      'receipt_item_id',
-      allItems.map((i) => i.id),
-    );
-  if (itemGenresError && !isMissingTableError(itemGenresError)) {
-    throw new GenreStoreError(`ジャンル分類を取得できませんでした: ${itemGenresError.message}`);
-  }
+  const genreIds = new Set<string>();
+  for (const tx of countable) if (tx.genre_id) genreIds.add(tx.genre_id);
+  for (const item of items ?? []) if (item.genre_id) genreIds.add(item.genre_id);
 
-  const transactionById = new Map(countable.map((r) => [r.id, r]));
-  const transactionsWithoutItems = countable.filter(
-    (r) => (itemsByTransaction.get(r.id) ?? []).length === 0,
-  );
-  const { data: txGenres, error: txGenresError } = await supabase
-    .from('transaction_genres')
-    .select('transaction_id, genre_id')
-    .in(
-      'transaction_id',
-      transactionsWithoutItems.map((r) => r.id),
-    );
-  if (txGenresError && !isMissingTableError(txGenresError)) {
-    throw new GenreStoreError(`ジャンル分類を取得できませんでした: ${txGenresError.message}`);
-  }
-
-  const usedGenreIds = [
-    ...new Set([
-      ...(itemGenres ?? []).map((g) => g.genre_id),
-      ...(txGenres ?? []).map((g) => g.genre_id),
-    ]),
-  ];
   const genreNameById = new Map<string, string>();
-  if (usedGenreIds.length > 0) {
+  if (genreIds.size > 0) {
     const { data: genres, error: genresError } = await supabase
       .from('genres')
       .select('id, name')
-      .in('id', usedGenreIds);
-    if (genresError && !isMissingTableError(genresError)) {
-      throw new GenreStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
-    }
-    for (const g of genres ?? []) genreNameById.set(g.id, g.name);
+      .in('id', [...genreIds]);
+    if (genresError) throw new GenreStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    for (const g of genres) genreNameById.set(g.id, g.name);
   }
 
   const entries: GenredEntry[] = [];
-  for (const g of itemGenres ?? []) {
-    const transactionId = transactionIdByItemId.get(g.receipt_item_id);
-    const item = allItems.find((i) => i.id === g.receipt_item_id);
-    const tx = transactionId ? transactionById.get(transactionId) : undefined;
-    const genreName = genreNameById.get(g.genre_id);
-    if (!item || !tx || genreName === undefined) continue;
+  let pendingCount = 0;
+
+  for (const tx of countable) {
+    const items = itemsByTransaction.get(tx.id) ?? [];
+    if (items.length > 0) {
+      for (const item of items) {
+        if (item.genre_id === null) {
+          pendingCount += 1;
+          continue;
+        }
+        const genreName = genreNameById.get(item.genre_id);
+        if (genreName === undefined) continue;
+        entries.push({
+          genreId: item.genre_id,
+          genreName,
+          amountYen: item.amount_yen,
+          mustPay: tx.must_pay,
+        });
+      }
+      continue;
+    }
+    if (tx.genre_id === null) {
+      pendingCount += 1;
+      continue;
+    }
+    const genreName = genreNameById.get(tx.genre_id);
+    if (genreName === undefined) continue;
     entries.push({
-      genreId: g.genre_id,
-      genreName,
-      amountYen: item.amount_yen,
-      categoryName: categoryNameOf(tx),
-    });
-  }
-  const genredTransactionIds = new Set((txGenres ?? []).map((g) => g.transaction_id));
-  for (const g of txGenres ?? []) {
-    const tx = transactionById.get(g.transaction_id);
-    const genreName = genreNameById.get(g.genre_id);
-    if (!tx || genreName === undefined) continue;
-    entries.push({
-      genreId: g.genre_id,
+      genreId: tx.genre_id,
       genreName,
       amountYen: Math.abs(tx.amount_yen),
-      categoryName: categoryNameOf(tx),
+      mustPay: tx.must_pay,
     });
   }
 
-  const genredItemIds = new Set((itemGenres ?? []).map((g) => g.receipt_item_id));
-  const pendingItemCount = allItems.filter((i) => !genredItemIds.has(i.id)).length;
-  const pendingTransactionCount = transactionsWithoutItems.filter(
-    (r) => !genredTransactionIds.has(r.id),
-  ).length;
-
-  return { entries, pendingCount: pendingItemCount + pendingTransactionCount };
+  return { entries, pendingCount };
 }

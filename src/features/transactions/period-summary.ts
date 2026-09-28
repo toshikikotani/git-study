@@ -52,33 +52,33 @@ export async function loadPaydayPeriodSummary(
   const [
     { data: rows, error: rowsError },
     { data: accounts, error: accountsError },
-    { data: categories, error: categoriesError },
+    { data: genres, error: genresError },
   ] = await Promise.all([
     supabase
       .from('transactions')
-      .select('account_id, category_id, amount_yen, is_transfer, review_status')
+      .select('account_id, genre_id, amount_yen, is_transfer, review_status')
       .gte('occurred_on', startOn)
       .lte('occurred_on', endOn),
     supabase.from('accounts').select('id, name'),
-    supabase.from('categories').select('id, name'),
+    supabase.from('genres').select('id, name'),
   ]);
   if (rowsError) throw new PeriodSummaryError(`明細を取得できませんでした: ${rowsError.message}`);
   if (accountsError) {
     throw new PeriodSummaryError(`口座を取得できませんでした: ${accountsError.message}`);
   }
-  if (categoriesError) {
-    throw new PeriodSummaryError(`カテゴリを取得できませんでした: ${categoriesError.message}`);
+  if (genresError) {
+    throw new PeriodSummaryError(`ジャンルを取得できませんでした: ${genresError.message}`);
   }
 
   const transactions: PeriodTransaction[] = rows.map((row) => ({
     accountId: row.account_id,
-    categoryId: row.category_id,
+    categoryId: row.genre_id,
     amountYen: row.amount_yen,
     isTransfer: row.is_transfer,
     reviewStatus: row.review_status,
   }));
 
-  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(genres.map((g) => [g.id, g.name]));
 
   const spentByAccount = sumByAccount(transactions);
   const byAccount: AccountSpending[] = accounts

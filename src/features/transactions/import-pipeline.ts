@@ -1,5 +1,5 @@
 /**
- * 取り込み経路(CSV / メール貼り付け)で共通の「分類 → プレビュー組み立て」。
+ * 取り込み経路(CSV / メール貼り付け)で共通の「検知 → プレビュー組み立て」。
  *
  * ── なぜ切り出すか ──────────────────────────────────────────
  * CSV 取り込みとメール貼り付けは、入り口(パーサ)が違うだけで、そこから先
@@ -7,16 +7,17 @@
  * 2箇所に同じロジックがあると、保存の仕方を直すときに片方だけ直して
  * 片方を忘れる事故が起きる(実際に DETECTION_RULES が複製されていた)。
  *
+ * ADR-057により、ここで決まるのは支払方法(FR-21)だけになった。ジャンルの
+ * 分類はパターンルールでは決めず、本人がその場で選ぶか(手動)、後から
+ * AIジャンル分類(/reports/genres)にまとめて任せるかのどちらかになる
+ * (取り込み直後は genre_id=null のまま保存してよい)。
+ *
  * 保存(DB への insert)は Server Action の責務(app/(app)/transactions/actions.ts)。
  * ここは純粋関数のみで、DB にもネットワークにも触れない(取り込み画面から
  * ファイル選択のたびに呼ぶプレビュー計算のため)。
  */
 
-import {
-  applyRules,
-  DEFAULT_DETECTION_RULES,
-  type ClassificationRule,
-} from '@/features/classification/rules';
+import { applyRules, DEFAULT_DETECTION_RULES } from '@/features/classification/rules';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { DateOnly } from '@/lib/date';
 import { fingerprintOf, type StoredTransaction, type TransactionSource } from './types';
@@ -31,42 +32,28 @@ export type ImportableRow = {
 };
 
 /**
- * 行を分類し、保存直前のプレビューへ組み立てる。
+ * 行を検知し、保存直前のプレビューへ組み立てる。
  * id は呼び出し側の事情(CSV の行番号、貼り付けの連番など)に委ねる。
- *
- * categoryNameById は表示用(画面に「未分類」ではなくカテゴリ名を出すため)。
- * 省略した場合、ルールがカテゴリを設定しても categoryName は null のままになる
- * (categoryId 自体は正しく入るので、保存や以降の判定には影響しない)。
+ * ジャンルは付けない(ADR-057、本人が選ぶかAIジャンル分類に任せる)。
  */
 export function buildPreview(
   rows: readonly ImportableRow[],
   accountId: string,
   idFor: (index: number) => string,
-  rules: readonly ClassificationRule[] = DEFAULT_DETECTION_RULES,
-  categoryNameById: ReadonlyMap<string, string> = new Map(),
   source: TransactionSource = 'csv',
 ): StoredTransaction[] {
-  return rows.map((row, index) =>
-    buildPreviewRow(row, accountId, idFor(index), rules, categoryNameById, source),
-  );
+  return rows.map((row, index) => buildPreviewRow(row, accountId, idFor(index), source));
 }
 
 function buildPreviewRow(
   row: ImportableRow,
   accountId: string,
   id: string,
-  rules: readonly ClassificationRule[],
-  categoryNameById: ReadonlyMap<string, string>,
   source: TransactionSource,
 ): StoredTransaction {
   const classification = applyRules(
-    {
-      accountId,
-      description: row.description,
-      amountYen: row.amountYen,
-      paymentMethod: row.paymentMethod,
-    },
-    rules,
+    { description: row.description, paymentMethod: row.paymentMethod },
+    DEFAULT_DETECTION_RULES,
   );
 
   return {
@@ -74,19 +61,17 @@ function buildPreviewRow(
     accountId,
     occurredOn: row.occurredOn,
     description: row.description,
-    merchantName: classification.merchantName,
+    merchantName: null,
     amountYen: row.amountYen,
     paymentMethod: classification.paymentMethod,
-    categoryId: classification.categoryId,
-    categoryName: classification.categoryId
-      ? (categoryNameById.get(classification.categoryId) ?? null)
-      : null,
-    matchedRuleId: classification.matchedRuleId,
-    classifiedBy: classification.categoryId ? 'rule' : 'unclassified',
+    genreId: null,
+    genreName: null,
+    classifiedBy: 'unclassified',
     confidence: null,
     // 確認待ちキューは撤廃した(本人発案、ADR-045)。分類が付かなければ
     // 「未分類」のまま明細一覧に残るだけで、本人が気づいたら編集する。
     reviewStatus: 'auto_ok',
+    mustPay: false,
     source,
     fingerprint: fingerprintOf(row),
     batchId: null,

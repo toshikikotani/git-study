@@ -28,7 +28,7 @@ export type SpendingDiagnosisInput = {
   /** 支出が負(ADR-008)。 */
   amountYen: number;
   occurredOn: DateOnly;
-  categoryName: string | null;
+  genreName: string | null;
 };
 
 export type SpendingDiagnosisResult = {
@@ -115,8 +115,8 @@ export class ClaudeSpendingDiagnosisAnalyzer implements SpendingDiagnosisAnalyze
 function buildUserContent(transactions: readonly SpendingDiagnosisInput[]): string {
   const lines = transactions.map(
     (t) =>
-      `id=${t.id} 日付=${t.occurredOn} 店=${t.label} 金額=${Math.abs(t.amountYen)}円 カテゴリ=${
-        t.categoryName ?? '未分類'
+      `id=${t.id} 日付=${t.occurredOn} 店=${t.label} 金額=${Math.abs(t.amountYen)}円 ジャンル=${
+        t.genreName ?? '未分類'
       }`,
   );
   return ['以下の明細それぞれについて、浪費か必要経費かを判断してください。', ...lines].join('\n');

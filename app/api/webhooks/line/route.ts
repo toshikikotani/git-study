@@ -2,8 +2,6 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
-import { DEFAULT_DETECTION_RULES } from '@/features/classification/rules';
-import { listActiveClassificationRulesForUser } from '@/features/classification/store';
 import { importLineReceiptAsAdmin } from '@/features/import/line-receipt';
 import { ClaudeReceiptExtractor } from '@/features/import/receipt-ai';
 import { getLineChannelSecret, getLineEnv, getLineReceiptAccountId } from '@/lib/env';
@@ -109,8 +107,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
   }
 
-  const learnedRules = await listActiveClassificationRulesForUser(admin, user.id);
-  const rules = [...DEFAULT_DETECTION_RULES, ...learnedRules];
   const extractor = new ClaudeReceiptExtractor(anthropicApiKey);
 
   const startedAtMs = Date.now();
@@ -127,7 +123,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         admin,
         user.id,
         accountId,
-        rules,
         extractor,
         imageBase64,
         messageId,
