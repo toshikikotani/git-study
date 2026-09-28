@@ -28,11 +28,15 @@ import { classifyGenresAction } from './actions';
 export function GenreBreakdownCard({
   entries,
   initialPendingCount,
+  initialAllPendingCount,
 }: {
   entries: readonly GenredEntry[];
   initialPendingCount: number;
+  initialAllPendingCount: number;
 }) {
   const [pendingCount, setPendingCount] = useState(initialPendingCount);
+  const [allPendingCount, setAllPendingCount] = useState(initialAllPendingCount);
+  const [progressCount, setProgressCount] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -47,7 +51,7 @@ export function GenreBreakdownCard({
   const run = async () => {
     setRunning(true);
     setError(null);
-    const result = await classifyGenresAction();
+    const result = await classifyGenresAction('month');
     setRunning(false);
     setWarnings(result.warnings);
     if (result.error) {
@@ -55,6 +59,32 @@ export function GenreBreakdownCard({
       return;
     }
     setPendingCount((prev) => Math.max(prev - result.classifiedCount, 0));
+    setAllPendingCount((prev) => Math.max(prev - result.classifiedCount, 0));
+  };
+
+  // 過去分も含めた全件。1回の上限(120件)ずつ、未分類が尽きるか、1件も
+  // 進まなくなる(AIが答えを返せない)まで繰り返す。
+  const runAll = async () => {
+    setRunning(true);
+    setError(null);
+    setWarnings([]);
+    let total = 0;
+    setProgressCount(0);
+    for (;;) {
+      const result = await classifyGenresAction('all');
+      if (result.error) {
+        setError(result.error);
+        break;
+      }
+      setWarnings(result.warnings);
+      total += result.classifiedCount;
+      setProgressCount(total);
+      setAllPendingCount((prev) => Math.max(prev - result.classifiedCount, 0));
+      setPendingCount((prev) => Math.max(prev - result.classifiedCount, 0));
+      if (!result.hasMore || result.classifiedCount === 0) break;
+    }
+    setProgressCount(null);
+    setRunning(false);
   };
 
   return (
@@ -172,6 +202,20 @@ export function GenreBreakdownCard({
           style={{ background: 'var(--accent)', color: '#fff' }}
         >
           {running ? 'ジャンル分類しています…' : `今月の${pendingCount}件をジャンル分類する`}
+        </button>
+      ) : null}
+
+      {allPendingCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => void runAll()}
+          disabled={running}
+          className="mt-2 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+        >
+          {progressCount !== null
+            ? `全期間を分類しています…(${progressCount}件済み)`
+            : `過去分も含め全期間の${allPendingCount}件をまとめて分類する`}
         </button>
       ) : null}
 

@@ -113,6 +113,15 @@ alter table public.transactions
   -- (ジャンルとは独立した軸。ADR-057)。
   add column if not exists must_pay boolean not null default false;
 
+-- 旧カテゴリ(categories)で分類済みだった明細は、新しい genre_id をまだ
+-- 持っていない。旧分類の主観的な判断をジャンルへ自動で読み替えることは
+-- しない(ADR-057の趣旨そのもの)ため、classified_by を「未分類」へ戻す。
+-- ADR-045により、これらは確認キューに積まれず一覧に「未分類」として
+-- 表示され続け、本人・AIによる再分類を待つ。
+update public.transactions
+  set classified_by = 'unclassified'
+  where genre_id is null and classified_by <> 'unclassified';
+
 alter table public.transactions
   drop constraint if exists ck_transactions_classified_has_genre;
 alter table public.transactions
