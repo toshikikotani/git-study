@@ -345,7 +345,8 @@ export async function loadGenreAnalysisView(now: Date = new Date()): Promise<Gen
       .from('genres')
       .select('id, name')
       .in('id', [...genreIds]);
-    if (genresError) throw new GenreStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    if (genresError)
+      throw new GenreStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
     for (const g of genres) genreNameById.set(g.id, g.name);
   }
 

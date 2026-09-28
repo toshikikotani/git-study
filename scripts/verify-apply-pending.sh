@@ -29,8 +29,11 @@ PG_SANDBOX_DB="apply_pending_scratch"
 # 本番へ未適用のマイグレーション(TASKS.md の B-17)。apply-pending.sql
 # がこの分を受け持つ。B-4/B-5/B-7/B-10/B-12/B-13/B-14/B-15/B-16 は
 # 2026-09-22に本人が適用済み(P10-30)なのでここには含めない。
-# genres・transaction_genres・receipt_item_genres(ADR-056)はそれ以降に
-# 追加したため、B-17 のスコープに含める。
+# genres(ADR-056)はそれ以降に追加したため、B-17 のスコープに含める。
+# ADR-057(categories/classification_rules/budgets の廃止、genres への
+# 一本化)により、当初の transaction_genres・receipt_item_genres(中間
+# テーブル)は本番へ一度も適用しないまま不要になったため削除し、代わりに
+# 20260929000100_retire_categories.sql を追加した。
 PENDING=(
   20260922000300_receipt_items_category.sql
   20260922000400_receipt_items_product_type.sql
@@ -38,10 +41,7 @@ PENDING=(
   20260922000600_transaction_expense_subtypes_rls.sql
   20260928000100_genres.sql
   20260928000200_genres_rls.sql
-  20260928000300_transaction_genres.sql
-  20260928000400_transaction_genres_rls.sql
-  20260928000500_receipt_item_genres.sql
-  20260928000600_receipt_item_genres_rls.sql
+  20260929000100_retire_categories.sql
 )
 
 WORK="$(mktemp -d)"

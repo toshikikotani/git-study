@@ -85,20 +85,6 @@ create type debt_status as enum (
   'closed'        -- 誤登録などによる無効化
 );
 
--- カテゴリの性質。予算・残額計算・アラート判定の分岐がこれに依存する(FR-11)
-create type category_kind as enum (
-  'fixed_cost',           -- 固定費
-  'living',               -- 生活費
-  'sanctuary',            -- 聖域(女遊び) — 削減対象外、肯定形で残額表示(FR-64)
-  'waste',                -- 浪費 — 70%到達でアラート(FR-20)
-  'investment_spending',  -- 投資的支出(書籍・学習など)
-  'repayment',            -- 返済
-  'investment',           -- 投資
-  'income',               -- 収入
-  'transfer',             -- 口座間振替(収支に計上しない)
-  'other'
-);
-
 -- 明細の取り込み元(FR-10)
 create type transaction_source as enum (
   'csv',
@@ -121,8 +107,10 @@ create type payment_method as enum (
 -- 誰が分類したか(FR-12)
 create type classified_by as enum (
   'unclassified',
-  'rule',    -- classification_rules によるマッチ
-  'ai',      -- Claude による分類
+  'rule',    -- ADR-057でパターンルール(classification_rules)は廃止した。
+             -- 値そのものは既存データ・DBの enum 定義として残すが、
+             -- 現在このアプリが新規に書き込むことはない。
+  'ai',      -- Claude によるジャンル分類(/reports/genres)
   'manual'   -- 本人による指定・修正
 );
 
@@ -311,8 +299,8 @@ create table public.app_settings (
   payday                              smallint     not null default 25,
   timezone                            text         not null default 'Asia/Tokyo',
 
-  -- カテゴリ別の月次予算はここに置かない。categories.default_monthly_budget_yen と
-  -- budgets テーブルが正(ADR-016)。設定側にも金額を持つと二重定義になり、
+  -- ジャンル別の月次予算はここに置かない。genres.budget_yen が正
+  -- (ADR-016/ADR-057)。設定側にも金額を持つと二重定義になり、
   -- 本人が片方だけ直したときに残額表示が静かにずれる。
 
   -- 返済・投資のルール(ADR-003, ADR-013)
@@ -439,11 +427,48 @@ comment on column public.accounts.is_frozen is
 
 -- categories・budgets は ADR-057 で廃止した(本人発案、生活費・浪費などの
 -- 主観的なカテゴリ分けの廃止)。旧 categories の役割(名前・予算・ホーム表示枠)
--- は genres(下の 3.x、旧セクション番号のまま残す)が引き継ぎ、budgets
--- (コードのどこからも書き込みが無い死んだ仕組みだった)は genres.budget_yen
--- という単一の値に統合した。旧定義は
--- supabase/migrations/20260929000100_retire_categories.sql が本番のテーブルを
--- 退役させる形で反映する。
+-- は genres(このすぐ下)が引き継ぎ、budgets(コードのどこからも書き込みが
+-- 無い死んだ仕組みだった)は genres.budget_yen という単一の値に統合した。
+-- 旧定義は supabase/migrations/20260929000100_retire_categories.sql が
+-- 本番のテーブルを退役させる形で反映する。
+--
+-- 3.3 genres — 支出の唯一の分類(本人発案、ADR-056/ADR-057)
+-- -----------------------------------------------------------------------------
+-- 当初は固定enum(spending_genre)として設計し、本人からの「dbに保存して
+-- enumじゃなくて、自由に変更できる仕組みに」という指摘でDBテーブルへ変更した
+-- (ADR-056)。さらにADR-057で「生活費・浪費などの主観的なカテゴリ分けを
+-- 完全に廃止し、ジャンルを唯一のカテゴリにする」という決定により、旧
+-- categories の役割(予算設定・ホーム表示枠)を丸ごと引き継いだ。kind・
+-- is_system・統合(merged_into_id)は引き継がない——ジャンルは本人が自由に
+-- 追加・削除できる対象で、削除は統合を経由せず即座に行える(参照側の
+-- genre_id を on delete set null/cascade にする)。
+--
+-- transactions・transfer_rules・transaction_splits・receipt_items・alerts が
+-- genre_id で直接参照するため、それらより前に定義する必要がある(当初は
+-- 旧セクション番号 3.30 に置いていたが、参照元より後ろにあると `create table`
+-- の順序でエラーになるため、旧 categories と同じこの位置へ移した)。
+create table public.genres (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references auth.users(id) on delete cascade,
+  name         text        not null,
+  sort_order   integer     not null default 0,
+
+  -- 月次予算(本人発案「カテゴリのそれぞれの値段設定」)。未設定なら無制限。
+  budget_yen   bigint,
+
+  -- ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。
+  show_on_home boolean     not null default false,
+
+  created_at   timestamptz not null default now(),
+
+  constraint ck_genres_name_not_blank check (btrim(name) <> ''),
+  constraint ck_genres_budget check (budget_yen is null or budget_yen >= 0)
+);
+
+create unique index ux_genres_user_name on public.genres (user_id, name);
+create index ix_genres_user on public.genres (user_id, sort_order);
+create index ix_genres_show_on_home on public.genres (user_id, sort_order)
+  where show_on_home;
 
 
 -- -----------------------------------------------------------------------------
@@ -1560,46 +1585,6 @@ create table public.transaction_expense_subtypes (
 
 create index ix_transaction_expense_subtypes_user on public.transaction_expense_subtypes (user_id);
 
--- 3.30 genres — 支出の唯一の分類(本人発案、ADR-056/ADR-057)
--- -----------------------------------------------------------------------------
--- 当初は固定enum(spending_genre)として設計し、本人からの「dbに保存して
--- enumじゃなくて、自由に変更できる仕組みに」という指摘でDBテーブルへ変更した
--- (ADR-056)。さらにADR-057で「生活費・浪費などの主観的なカテゴリ分けを
--- 完全に廃止し、ジャンルを唯一のカテゴリにする」という決定により、旧
--- categories の役割(予算設定・ホーム表示枠)を丸ごと引き継いだ。kind・
--- is_system・統合(merged_into_id)は引き継がない——ジャンルは本人が自由に
--- 追加・削除できる対象で、削除は統合を経由せず即座に行える(参照側の
--- genre_id を on delete set null/cascade にする)。
---
--- 明細・レシート品目のジャンルは、当初は transaction_genres/receipt_item_genres
--- という別テーブルで持っていたが、ジャンルが「AIが補助的に付けるタグ」から
--- 「唯一のカテゴリ」に格上げされたのに伴い、transactions.genre_id /
--- receipt_items.genre_id という直接の列に統合した(旧 categories.category_id
--- と同じ形。1明細(品目)につき1つのジャンルという実体は変わらないため、
--- 別テーブルに分ける理由が無くなった)。
-create table public.genres (
-  id           uuid        primary key default gen_random_uuid(),
-  user_id      uuid        not null references auth.users(id) on delete cascade,
-  name         text        not null,
-  sort_order   integer     not null default 0,
-
-  -- 月次予算(本人発案「カテゴリのそれぞれの値段設定」)。未設定なら無制限。
-  budget_yen   bigint,
-
-  -- ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。
-  show_on_home boolean     not null default false,
-
-  created_at   timestamptz not null default now(),
-
-  constraint ck_genres_name_not_blank check (btrim(name) <> ''),
-  constraint ck_genres_budget check (budget_yen is null or budget_yen >= 0)
-);
-
-create unique index ux_genres_user_name on public.genres (user_id, name);
-create index ix_genres_user on public.genres (user_id, sort_order);
-create index ix_genres_show_on_home on public.genres (user_id, sort_order)
-  where show_on_home;
-
 
 -- =============================================================================
 --  4. updated_at トリガの一括適用
@@ -2109,10 +2094,12 @@ commit;
 --   debts                   → debts
 --   debt_payments           → debt_payments
 --   transactions            → transactions(+ import_batches, import_adapters)
---   categories              → categories
---   classification_rules    → classification_rules
+--   categories              → genres に統合(ADR-057。classification_rules・budgets
+--                             も同時に廃止し、genre_id/budget_yen/must_pay へ集約)
+--   classification_rules    → 廃止(ADR-057)。FR-21の危険検知だけ
+--                             features/classification/rules.ts に固定で残る
 --   transfer_rules          → transfer_rules(+ transfer_runs, transfer_run_items)
---   budgets                 → budgets
+--   budgets                 → 廃止(ADR-057)。genres.budget_yen に統合
 --   side_income_logs        → side_projects, side_work_logs, side_incomes に分割
 --                             (時給換算 FR-40 のため作業時間と入金を分離)
 --   job_change_milestones   → job_change_milestones
@@ -2128,4 +2115,5 @@ commit;
 --   import_adapters         → ADR-007(CSV フォーマット差異の吸収)
 --   import_batches          → FR-10 の冪等な取り込み
 --   app_checkins            → FR-62 のストリーク算出
+--   genres                  → ADR-056/ADR-057。唯一の分類(旧 categories を置換)
 -- =============================================================================

@@ -30,7 +30,7 @@ export default async function DuplicatesPage() {
             同じ金額・近い日付で、別の経路から入った明細
           </p>
         </div>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           明細
         </Link>
       </header>

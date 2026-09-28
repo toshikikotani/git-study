@@ -31,6 +31,11 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
  * 辿り着けない画面はすべてこの丸ボタンから開くドロップアップメニュー
  * (MoreMenu)に集約する。
  *
+ * ── 「明細」タブをさらに廃止(ADR-057) ─────────────────────────
+ * 本人発案「明細と家計簿については統合する。二つのタブの使い分けが
+ * わからん」への対応。明細一覧を家計簿(/spending)へ統合したため、
+ * ホーム・家計簿・給料日の3つになった(4枠使い切る必要は無い)。
+ *
  * ボトムナビは Apple の Liquid Glass 風(ADR-028、ADR-027の Material
  * Navigation Bar から置き換え)——本人が実際に触っている別アプリの
  * スクリーンショット(半透明にぼかした帯+選択時に水のように弾むピル)を
@@ -75,7 +80,6 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
 const NAV = [
   { href: '/', label: 'ホーム' },
   { href: '/spending', label: '家計簿' },
-  { href: '/transactions', label: '明細' },
   { href: '/payday', label: '給料日' },
 ] as const;
 

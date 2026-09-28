@@ -14,7 +14,7 @@ import type { StoredTransaction } from '@/features/transactions/types';
 
 /**
  * 会話に添えた明細一覧(id付き)から、モデルが指定したidを解決する。
- * カテゴリ名の resolveCategoryByName() と同じ考え方——存在しないidを
+ * ジャンル名の resolveGenreByName() と同じ考え方——存在しないidを
  * 勝手に読み替えず、そのidが見つからない旨だけを伝えて拒む。
  */
 export function resolveTransactionById(
@@ -35,15 +35,15 @@ export function resolveTransactionById(
 
 /**
  * システムプロンプトに埋め込む、直近の明細一覧を整形する。
- * カテゴリ・ルール一覧と違い件数が多くなりうるため、呼び出し側が
+ * ジャンル一覧と違い件数が多くなりうるため、呼び出し側が
  * 件数を絞ってから渡す(`features/assistant/chat-tools.ts` 参照)。
  */
 export function formatTransactionContextLines(transactions: readonly StoredTransaction[]): string {
   const lines = transactions
     .map((t) => {
-      const category = t.categoryName ?? '未分類';
+      const genre = t.genreName ?? '未分類';
       const memo = t.memo ? ` メモ=${JSON.stringify(t.memo)}` : '';
-      return `- id=${t.id} ${t.occurredOn} ${JSON.stringify(t.description)} ${t.amountYen}円 → ${category}${memo}`;
+      return `- id=${t.id} ${t.occurredOn} ${JSON.stringify(t.description)} ${t.amountYen}円 → ${genre}${memo}`;
     })
     .join('\n');
   return lines === '' ? '(まだ明細がありません)' : lines;

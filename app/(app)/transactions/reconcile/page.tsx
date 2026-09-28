@@ -86,7 +86,7 @@ export default function ReconcilePage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           請求金額と突き合わせる
         </h1>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           やめる
         </Link>
       </header>

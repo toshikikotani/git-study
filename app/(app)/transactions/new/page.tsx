@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
-import { fetchLearnedRules } from '@/features/transactions/rules-client';
+import { fetchGenreOptions } from '@/features/transactions/genres-client';
 // `./store` ではなく `./types` から読む(T-7/P10-4)。`store.ts` は
 // `next/headers` に依存するため、そこから型だけ import してもクライアント
 // バンドルへ引き込まれてビルドエラーになる。
@@ -43,13 +43,13 @@ import { saveImportBatchAction } from '../actions';
 export default function NewTransactionPage() {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountId, setAccountId] = useState('');
-  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
+  const [genreOptions, setGenreOptions] = useState<{ id: string; name: string }[]>([]);
 
   const [occurredOn, setOccurredOn] = useState(todayJst());
   const [isIncome, setIsIncome] = useState(false);
   const [amountYenInput, setAmountYenInput] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [genreId, setGenreId] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -63,12 +63,10 @@ export default function NewTransactionPage() {
     });
   }, []);
 
-  // カテゴリ一覧。fetchLearnedRules() は取り込み画面向けにルールと一緒に
-  // 返す物だが、ここではカテゴリ名(Map、API応答と同じ並び順)だけを使う。
+  // ジャンル一覧(ADR-057)。取り込み時にAIで確定させることはしない
+  // (本人が選ぶか、後からAIジャンル分類にまとめて任せる)。
   useEffect(() => {
-    void fetchLearnedRules().then((fetched) => {
-      setCategoryOptions([...fetched.categoryNameById].map(([id, name]) => ({ id, name })));
-    });
+    void fetchGenreOptions().then(setGenreOptions);
   }, []);
 
   const canSave =
@@ -92,14 +90,12 @@ export default function NewTransactionPage() {
       merchantName: null,
       amountYen,
       paymentMethod: 'one_time',
-      categoryId: categoryId || null,
-      categoryName: categoryId
-        ? (categoryOptions.find((c) => c.id === categoryId)?.name ?? null)
-        : null,
-      matchedRuleId: null,
-      classifiedBy: categoryId ? 'manual' : 'unclassified',
+      genreId: genreId || null,
+      genreName: genreId ? (genreOptions.find((g) => g.id === genreId)?.name ?? null) : null,
+      classifiedBy: genreId ? 'manual' : 'unclassified',
       confidence: null,
       reviewStatus: 'auto_ok',
+      mustPay: false,
       source: 'manual',
       fingerprint: fingerprintOf({
         occurredOn,
@@ -133,7 +129,7 @@ export default function NewTransactionPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           明細を手で登録する
         </h1>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           やめる
         </Link>
       </header>
@@ -156,7 +152,7 @@ export default function NewTransactionPage() {
             {saved.duplicates > 0 ? '(同じ内容が既にあったため重複は除外しました)' : ''}
           </p>
           <Link
-            href="/transactions"
+            href="/spending"
             className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >
@@ -281,8 +277,8 @@ export default function NewTransactionPage() {
         />
 
         <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          value={genreId}
+          onChange={(e) => setGenreId(e.target.value)}
           className="mt-3 w-full rounded-xl px-3 py-2 text-sm"
           style={{
             background: 'var(--plane)',
@@ -291,9 +287,9 @@ export default function NewTransactionPage() {
           }}
         >
           <option value="">未分類</option>
-          {categoryOptions.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
+          {genreOptions.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
             </option>
           ))}
         </select>

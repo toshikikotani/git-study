@@ -45,17 +45,13 @@ describe('expandTransactionsWithSplits', () => {
   type Row = { id: string; genreId: string | null; amountYen: number; label: string };
 
   it('分割が無い明細はそのまま1行残す', () => {
-    const rows: Row[] = [
-      { id: 't1', genreId: 'genre-food', amountYen: -5_000, label: 'スーパー' },
-    ];
+    const rows: Row[] = [{ id: 't1', genreId: 'genre-food', amountYen: -5_000, label: 'スーパー' }];
     const result = expandTransactionsWithSplits(rows, new Map());
     expect(result).toEqual(rows);
   });
 
   it('分割がある明細は複数行に展開し genreId/amountYen を差し替える', () => {
-    const rows: Row[] = [
-      { id: 't1', genreId: 'genre-food', amountYen: -5_000, label: 'スーパー' },
-    ];
+    const rows: Row[] = [{ id: 't1', genreId: 'genre-food', amountYen: -5_000, label: 'スーパー' }];
     const splitsByTransactionId = new Map([
       [
         't1',

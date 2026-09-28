@@ -6,17 +6,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { saveImportBatchAction } from '../actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
-import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
-import type { ClassifyResult } from '@/features/classification/store';
 import {
   parseNotificationEmail,
   type EmailParseResult,
   type ParsedEmailTransaction,
 } from '@/features/import/email';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
-import { requestAiClassification } from '@/features/transactions/classify-client';
+import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
 import { buildPreview } from '@/features/transactions/import-pipeline';
-import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
 
 /**
@@ -40,21 +37,16 @@ export default function PastePage() {
   /** 辞書で読めなかったときに AI が読み取った結果(ADR-019)。 */
   const [rescued, setRescued] = useState<EmailParseResult | null>(null);
   const [asking, setAsking] = useState(false);
-  const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
-  const [classifying, setClassifying] = useState(false);
-  const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
-  const [learnedRules, setLearnedRules] = useState<ClassificationRule[]>([]);
-  const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
+  const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
+  /** 行ごとに本人が選び直したジャンル(未選択の行は id をキーに持たない)。 */
+  const [genreOverrides, setGenreOverrides] = useState<Map<string, string>>(new Map());
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountId, setAccountId] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // 学習済みルール(M2-5)。取得に失敗しても固定の検知ルールだけで取り込みは動く
+  // ジャンル一覧(ADR-057)。取り込み時にAIで確定させることはしない。
   useEffect(() => {
-    void fetchLearnedRules().then((fetched) => {
-      setLearnedRules(fetched.rules);
-      setCategoryNameById(fetched.categoryNameById);
-    });
+    void fetchGenreOptions().then(setGenreOptions);
   }, []);
 
   // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
@@ -64,11 +56,6 @@ export default function PastePage() {
       setAccountId((current) => current || (fetched[0]?.id ?? ''));
     });
   }, []);
-
-  const rules = useMemo<ClassificationRule[]>(
-    () => [...DEFAULT_DETECTION_RULES, ...learnedRules],
-    [learnedRules],
-  );
 
   const byLabels = useMemo(() => (body.trim() ? parseNotificationEmail(body) : null), [body]);
   const parsed = rescued ?? byLabels;
@@ -106,51 +93,37 @@ export default function PastePage() {
 
   const rulePreview = useMemo<StoredTransaction[]>(() => {
     if (!parsed || !accountId) return [];
-    return buildPreview(
-      parsed.transactions,
-      accountId,
-      (i) => `paste-${i}`,
-      rules,
-      categoryNameById,
-      'manual',
-    );
-  }, [parsed, rules, categoryNameById, accountId]);
+    return buildPreview(parsed.transactions, accountId, (i) => `paste-${i}`, 'manual');
+  }, [parsed, accountId]);
 
-  // AI 分類の結果を id で重ねる。本文を書き換えると rulePreview の内容が
-  // 総入れ替えになるため、古い aiResults は自然に参照されなくなる。
+  // 本人がその場で選び直したジャンルを重ねる。本文を書き換えると
+  // rulePreview の内容が総入れ替えになるため、古い genreOverrides は
+  // 自然に参照されなくなる。
   const preview = useMemo<StoredTransaction[]>(() => {
-    if (aiResults.size === 0) return rulePreview;
+    if (genreOverrides.size === 0) return rulePreview;
     return rulePreview.map((t) => {
-      const applied = aiResults.get(t.id);
-      if (!applied) return t;
+      const genreId = genreOverrides.get(t.id);
+      if (genreId === undefined) return t;
       return {
         ...t,
-        categoryId: applied.categoryId,
-        categoryName: applied.categoryName,
-        classifiedBy: applied.classifiedBy,
-        confidence: applied.confidence,
+        genreId,
+        genreName: genreOptions.find((g) => g.id === genreId)?.name ?? null,
+        classifiedBy: 'manual',
       };
     });
-  }, [rulePreview, aiResults]);
+  }, [rulePreview, genreOverrides, genreOptions]);
 
-  const unclassifiedCount = preview.filter((t) => t.classifiedBy === 'unclassified').length;
-
-  const classify = async () => {
-    const targets = preview.filter((t) => t.classifiedBy === 'unclassified');
-    if (targets.length === 0) return;
-    setClassifying(true);
-    try {
-      const outcome = await requestAiClassification(targets);
-      setAiResults((prev) => {
-        const next = new Map(prev);
-        for (const r of outcome.results) next.set(r.id, r);
-        return next;
-      });
-      setClassifyWarnings(outcome.warnings);
-    } finally {
-      setClassifying(false);
-    }
-  };
+  function setRowGenre(transactionId: string, genreId: string): void {
+    setGenreOverrides((prev) => {
+      const next = new Map(prev);
+      if (genreId === '') {
+        next.delete(transactionId);
+      } else {
+        next.set(transactionId, genreId);
+      }
+      return next;
+    });
+  }
 
   const save = async () => {
     if (!accountId) return;
@@ -175,7 +148,7 @@ export default function PastePage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           メールを貼り付ける
         </h1>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           やめる
         </Link>
       </header>
@@ -207,7 +180,7 @@ export default function PastePage() {
             {saved.duplicates > 0 ? `(重複 ${saved.duplicates} 件を除外)` : ''}
           </p>
           <Link
-            href="/transactions"
+            href="/spending"
             className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >
@@ -292,37 +265,30 @@ export default function PastePage() {
               style={{ borderColor: 'var(--hairline)', background: 'var(--plane)' }}
             >
               {preview.map((t) => (
-                <TransactionRow key={t.id} transaction={t} />
+                <li key={t.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <TransactionRow transaction={t} />
+                  </div>
+                  <select
+                    value={t.genreId ?? ''}
+                    onChange={(e) => setRowGenre(t.id, e.target.value)}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs"
+                    style={{
+                      background: 'var(--surface)',
+                      color: 'var(--ink)',
+                      border: '1px solid var(--hairline)',
+                    }}
+                  >
+                    <option value="">未分類</option>
+                    {genreOptions.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </li>
               ))}
             </ul>
-
-            {/* ルールに当たらなかった分だけ AI に回せる(M2-3b)。押されたときだけ呼ぶ */}
-            {unclassifiedCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => void classify()}
-                disabled={classifying}
-                className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
-                style={{
-                  background: 'var(--plane)',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--hairline)',
-                  opacity: classifying ? 0.6 : 1,
-                }}
-              >
-                {classifying
-                  ? '分類しています…'
-                  : `分類できなかった ${unclassifiedCount} 件を AI に回す`}
-              </button>
-            ) : null}
-
-            {classifyWarnings.length > 0 ? (
-              <ul className="mt-3 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-                {classifyWarnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            ) : null}
 
             <button
               type="button"

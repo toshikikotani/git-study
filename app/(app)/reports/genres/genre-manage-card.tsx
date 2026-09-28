@@ -2,16 +2,23 @@
 
 /**
  * ジャンルの一覧管理(本人発案「カテゴリはdbに保存してenumじゃなくて、
- * 自由に変更できる仕組みに。追加削除容易にしたい」、ADR-056)。
+ * 自由に変更できる仕組みに。追加削除容易にしたい」、ADR-056/ADR-057)。
  *
- * /rules の NewCategory・CategoryRow と同じ構成だが、ジャンルは kind・予算・
- * 統合を持たないため名前だけのシンプルな追加・削除に絞った。
+ * ADR-057で旧 /rules(カテゴリ管理)を廃止し、ここへ統合した。本人が
+ * 設定するのは「ジャンルの増減」と「それぞれの値段設定(予算)」の2つ
+ * (本人発案:「ユーザーが設定するのはカテゴリのそれぞれの値段設定。と
+ * カテゴリの増減」)。ホーム表示(show_on_home)も同じ理由でここに置く。
  */
 
 import { useActionState, useState } from 'react';
 
 import type { Genre } from '@/features/genre/store';
-import { createGenreAction, deleteGenreAction } from './actions';
+import {
+  createGenreAction,
+  deleteGenreAction,
+  setGenreShowOnHomeAction,
+  updateGenreBudgetAction,
+} from './actions';
 
 const INITIAL_STATE: { error: string | null } = { error: null };
 
@@ -53,6 +60,12 @@ export function GenreManageCard({ genres }: { genres: readonly Genre[] }) {
 function GenreListItem({ genre }: { genre: Genre }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [budgetInput, setBudgetInput] = useState(
+    genre.budgetYen === null ? '' : String(genre.budgetYen),
+  );
+  const [budgetSaving, setBudgetSaving] = useState(false);
+  const [showOnHome, setShowOnHome] = useState(genre.showOnHome);
+  const [showOnHomeSaving, setShowOnHomeSaving] = useState(false);
 
   const handleDelete = async () => {
     setPending(true);
@@ -61,24 +74,90 @@ function GenreListItem({ genre }: { genre: Genre }) {
     if (result.error !== null) setError(result.error);
   };
 
+  const handleBudgetBlur = async () => {
+    const current = genre.budgetYen === null ? '' : String(genre.budgetYen);
+    if (budgetInput === current) return;
+    setBudgetSaving(true);
+    const result = await updateGenreBudgetAction(genre.id, budgetInput);
+    setBudgetSaving(false);
+    if (result.error !== null) {
+      setError(result.error);
+      setBudgetInput(current);
+      return;
+    }
+    setError(null);
+  };
+
+  const handleToggleShowOnHome = async () => {
+    const next = !showOnHome;
+    setShowOnHome(next);
+    setShowOnHomeSaving(true);
+    const result = await setGenreShowOnHomeAction(genre.id, next);
+    setShowOnHomeSaving(false);
+    if (result.error !== null) {
+      setError(result.error);
+      setShowOnHome(!next);
+    }
+  };
+
   return (
     <li>
-      <div
-        className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-        style={{ background: 'var(--plane)' }}
-      >
-        <span className="truncate text-sm" style={{ color: 'var(--ink)' }}>
-          {genre.name}
-        </span>
-        <button
-          type="button"
-          onClick={() => void handleDelete()}
-          disabled={pending}
-          className="shrink-0 text-xs font-semibold disabled:opacity-40"
-          style={{ color: 'var(--over)' }}
-        >
-          {pending ? '削除中…' : '削除'}
-        </button>
+      <div className="space-y-1.5 rounded-xl px-3 py-2" style={{ background: 'var(--plane)' }}>
+        <div className="flex items-center justify-between gap-3">
+          <span className="truncate text-sm" style={{ color: 'var(--ink)' }}>
+            {genre.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            disabled={pending}
+            className="shrink-0 text-xs font-semibold disabled:opacity-40"
+            style={{ color: 'var(--over)' }}
+          >
+            {pending ? '削除中…' : '削除'}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* 本人発案「ユーザーが設定するのはカテゴリのそれぞれの値段設定」。
+              空欄は無制限(budget_yen=null)。 */}
+          <label className="flex min-w-0 flex-1 items-center gap-1.5 text-xs">
+            <span className="shrink-0" style={{ color: 'var(--ink-muted)' }}>
+              予算
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={() => void handleBudgetBlur()}
+              disabled={budgetSaving}
+              placeholder="無制限"
+              className="min-w-0 flex-1 rounded-lg px-2 py-1 text-xs"
+              style={{
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+            <span className="shrink-0" style={{ color: 'var(--ink-muted)' }}>
+              円/月
+            </span>
+          </label>
+
+          <label
+            className="flex shrink-0 items-center gap-1 text-[11px]"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            <input
+              type="checkbox"
+              checked={showOnHome}
+              onChange={() => void handleToggleShowOnHome()}
+              disabled={showOnHomeSaving}
+            />
+            ホームに表示
+          </label>
+        </div>
       </div>
       {error ? (
         <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>

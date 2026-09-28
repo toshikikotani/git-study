@@ -82,7 +82,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       detectAndRecordNewSubscriptionAlertsAsAdmin(admin, user.id),
     ]);
     const recordedCount =
-      paymentDueCount + inactivityCount + riskyCount + wastefulCount + recapCount + subscriptionCount;
+      paymentDueCount +
+      inactivityCount +
+      riskyCount +
+      wastefulCount +
+      recapCount +
+      subscriptionCount;
 
     // P6-3: net_worth_snapshots は本番マイグレーション未適用のため(T-26)、
     // 他の検知を止めないよう個別に catch する(rescued_emails の T-25 と同じ扱い)。

@@ -7,14 +7,22 @@
  *
  * ── 内訳は開くまで畳んでおく(本人からのUX指摘「パンパンパンパン、
  *    詳細見たかったら詳細見るみたいな感じがいい」)──────────────────
- * カテゴリ×ジャンルの内訳(本人発案の核心)は件数が伸びやすいため、
+ * 「絶対払わざるを得ないもの」の内訳(下記)は件数が伸びやすいため、
  * diagnosis-card.tsx と同じく「詳しく見る」を押すまで畳む。
+ *
+ * ── カテゴリ×ジャンルの内訳(旧)は廃止し、must_pay の分け方に置き換えた
+ *    (ADR-057)──────────────────────────────────────────
+ * ADR-057により主観的なカテゴリ(生活費・浪費など)自体が廃止されたため、
+ * 「カテゴリ別にジャンルを分けて見る」というこのカード本来の分析軸が
+ * 意味を持たなくなった。代わりに本人発案の「絶対払わざるを得ないものは
+ * ラベルを付けてグラフで表示分けできるように」を実装し、ジャンルの内訳を
+ * 必須(must_pay)/裁量の2軸でも見られるようにした。
  */
 
 import { useState } from 'react';
 
 import { formatYen } from '@/domain/money';
-import { summarizeByGenre, summarizeGenreByCategory, type GenredEntry } from '@/domain/genre';
+import { summarizeByGenre, summarizeMustPaySplit, type GenredEntry } from '@/domain/genre';
 import { classifyGenresAction } from './actions';
 
 export function GenreBreakdownCard({
@@ -31,8 +39,10 @@ export function GenreBreakdownCard({
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const genreTotals = summarizeByGenre(entries);
-  const categoryBreakdowns = summarizeGenreByCategory(entries);
+  const mustPaySplit = summarizeMustPaySplit(entries);
   const maxGenreYen = Math.max(...genreTotals.map((g) => g.totalYen), 1);
+  const mustPayTotalYen = mustPaySplit.mustPayYen + mustPaySplit.discretionaryYen;
+  const mustPayRatio = mustPayTotalYen > 0 ? mustPaySplit.mustPayYen / mustPayTotalYen : 0;
 
   const run = async () => {
     setRunning(true);
@@ -98,39 +108,56 @@ export function GenreBreakdownCard({
             className="mt-4 text-xs font-semibold"
             style={{ color: 'var(--accent)' }}
           >
-            {detailsOpen ? '閉じる' : 'カテゴリ別の内訳を詳しく見る'}
+            {detailsOpen ? '閉じる' : '絶対払わざるを得ないものの内訳を見る'}
           </button>
 
           {detailsOpen ? (
             <div
-              className="mt-3 space-y-4 border-t pt-3"
+              className="mt-3 space-y-3 border-t pt-3"
               style={{ borderColor: 'var(--hairline)' }}
             >
-              {categoryBreakdowns.map((c) => (
-                <div key={c.categoryName}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                      {c.categoryName}
-                    </span>
-                    <span className="tabular text-xs" style={{ color: 'var(--ink-muted)' }}>
-                      {formatYen(c.totalYen, { sign: 'never' })}
-                    </span>
-                  </div>
-                  <ul className="mt-1.5 space-y-1">
-                    {c.genres.map((g) => (
-                      <li
-                        key={g.genreId}
-                        className="flex items-baseline justify-between gap-2 text-[11px]"
-                      >
-                        <span style={{ color: 'var(--ink-secondary)' }}>{g.genreName}</span>
-                        <span className="tabular" style={{ color: 'var(--ink-muted)' }}>
-                          {formatYen(g.totalYen, { sign: 'never' })}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+                明細1件ごとに本人が付けた「絶対払わざるを得ないもの」のラベル
+                (ジャンルとは独立)で、今月の支出を分けています。
+              </p>
+
+              <div
+                className="flex h-3 overflow-hidden rounded-full"
+                style={{ background: 'var(--over-track)' }}
+              >
+                <div
+                  className="h-full"
+                  style={{
+                    width: `${Math.round(mustPayRatio * 100)}%`,
+                    background: 'var(--accent)',
+                  }}
+                />
+              </div>
+
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span style={{ color: 'var(--ink)' }}>
+                  <span
+                    className="mr-1.5 inline-block size-2 rounded-full align-middle"
+                    style={{ background: 'var(--accent)' }}
+                  />
+                  必須({Math.round(mustPayRatio * 100)}%)
+                </span>
+                <span className="tabular font-medium" style={{ color: 'var(--ink)' }}>
+                  {formatYen(mustPaySplit.mustPayYen, { sign: 'never' })}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span style={{ color: 'var(--ink)' }}>
+                  <span
+                    className="mr-1.5 inline-block size-2 rounded-full align-middle"
+                    style={{ background: 'var(--over-track)' }}
+                  />
+                  裁量({Math.round((1 - mustPayRatio) * 100)}%)
+                </span>
+                <span className="tabular font-medium" style={{ color: 'var(--ink)' }}>
+                  {formatYen(mustPaySplit.discretionaryYen, { sign: 'never' })}
+                </span>
+              </div>
             </div>
           ) : null}
         </>

@@ -7,21 +7,8 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages';
 import { NextResponse } from 'next/server';
 
-import {
-  isMatchType,
-  resolveCategoryByName,
-  describeRuleUpdate,
-  type RuleContext,
-} from '@/features/classification/chat-tools';
-import {
-  createClassificationRule,
-  listCategoryOptions,
-  listClassificationRules,
-  updateClassificationRule,
-  deleteClassificationRule,
-  type ClassificationRuleSummary,
-  type CategoryOption,
-} from '@/features/classification/store';
+import { resolveGenreByName } from '@/features/genre/chat-tools';
+import { listGenres, type GenreOption } from '@/features/genre/store';
 import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
 import { parseAppSettingsPatch } from '@/features/settings/chat-tools';
@@ -47,18 +34,20 @@ import { describeUserError } from '@/lib/errors';
  * 「AIに変更を頼む」(本人発案、ADR-054)。
  *
  * 「ルールをAIに相談する」(ADR-024、app/api/rules/chat/route.ts、廃止)を
- * 汎用化したもの。本人が話した内容から、分類ルール・本人設定・明細・
- * レシート品目・生活費の小分類のいずれかを実際に変更する。アーキテクチャ
- * (tool-use のループ、レート制限、会話を保存しないステートレス設計)は
- * 旧実装からそのまま引き継ぐ。各ドメインの純粋な部分は
- * features/{classification,settings,transactions}/chat-tools.ts に、
+ * 汎用化したもの。本人が話した内容から、本人設定・明細・レシート品目・
+ * 生活費の小分類のいずれかを実際に変更する。アーキテクチャ(tool-use の
+ * ループ、レート制限、会話を保存しないステートレス設計)は旧実装から
+ * そのまま引き継ぐ。各ドメインの純粋な部分は
+ * features/{genre,settings,transactions}/chat-tools.ts に、
  * それらを束ねてシステムプロンプトを作る部分は features/assistant/chat-tools.ts に
  * 分離してある。
  *
  * ── 何をさせないか(ADR-010 を会話にも適用する) ───────────────
- * FR-21(リボ・キャッシング・分割払い)の検知ルールは、見逃しが致命的なため
- * 確率的な判断に晒さない。旧実装と同じく、対象ルールが `setPaymentMethod` を
- * 持たないことを実行直前に必ず再確認する(二重で守る)。
+ * FR-21(リボ・キャッシング・分割払い)の検知は固定のロジック
+ * (features/classification/rules.ts の DEFAULT_DETECTION_RULES)であり、
+ * ADR-057によりパターンルール(classification_rules)自体が廃止されたため、
+ * 会話から変更できるツール自体がもう存在しない(create_rule/update_rule/
+ * delete_rule は廃止した)。
  *
  * ── 設定の変更はシークレットに触れない(ADR-014) ─────────────
  * update_settings が触れるのは `AppSettings`(業務パラメータ)の列だけ。
@@ -97,61 +86,6 @@ export type { AssistantChange };
 
 const TOOLS: Tool[] = [
   {
-    name: 'create_rule',
-    description:
-      '新しい分類ルールを作る。摘要が pattern に一致する明細を、指定したカテゴリへ自動的に分類するようになる。' +
-      'リボ払い・キャッシング・分割払いの検知には使えない(このツールでは支払方法を設定できない)。',
-    input_schema: {
-      type: 'object',
-      properties: {
-        pattern: { type: 'string', description: '摘要と照合する文字列(店名やキーワードなど)' },
-        match_type: {
-          type: 'string',
-          enum: ['keyword', 'regex', 'exact'],
-          description:
-            '一致方式。摘要にこの文字列が含まれれば良いなら keyword、完全一致なら exact、それ以外は regex',
-        },
-        category_name: {
-          type: 'string',
-          description:
-            '割り当てるカテゴリの名前。会話に添えたカテゴリ一覧の名前と完全に一致させること',
-        },
-        rule_name: {
-          type: 'string',
-          description: 'ルールの表示名(省略可)。省略時は自動生成する',
-        },
-      },
-      required: ['pattern', 'match_type', 'category_name'],
-    },
-  },
-  {
-    name: 'update_rule',
-    description:
-      '既存の分類ルールを変更する(パターン・一致方式・カテゴリ・有効/無効のいずれか)。' +
-      '会話に添えたルール一覧のうち「変更不可」と書かれていないものだけを対象にできる。',
-    input_schema: {
-      type: 'object',
-      properties: {
-        rule_id: { type: 'string', description: '会話に添えたルール一覧の id' },
-        pattern: { type: 'string' },
-        match_type: { type: 'string', enum: ['keyword', 'regex', 'exact'] },
-        category_name: { type: 'string' },
-        is_active: { type: 'boolean' },
-      },
-      required: ['rule_id'],
-    },
-  },
-  {
-    name: 'delete_rule',
-    description:
-      '既存の分類ルールを削除する。会話に添えたルール一覧のうち「変更不可」と書かれていないものだけを対象にできる。',
-    input_schema: {
-      type: 'object',
-      properties: { rule_id: { type: 'string', description: '会話に添えたルール一覧の id' } },
-      required: ['rule_id'],
-    },
-  },
-  {
     name: 'update_settings',
     description:
       '本人設定を変更する。渡した項目だけを変更する(渡さなかった項目はそのまま)。少なくとも1項目は指定すること。',
@@ -183,13 +117,13 @@ const TOOLS: Tool[] = [
   {
     name: 'update_transaction',
     description:
-      '既存の明細のカテゴリ・金額・日付・メモのいずれかを変更する。少なくとも1項目は指定すること。' +
+      '既存の明細のジャンル・金額・日付・メモのいずれかを変更する。少なくとも1項目は指定すること。' +
       '金額は支出なら負、収入なら正の整数円で指定する。',
     input_schema: {
       type: 'object',
       properties: {
         transaction_id: { type: 'string', description: '会話に添えた明細一覧の id' },
-        category_name: { type: 'string' },
+        genre_name: { type: 'string' },
         amount_yen: { type: 'number' },
         occurred_on: { type: 'string', description: 'YYYY-MM-DD形式' },
         memo: { type: 'string' },
@@ -213,7 +147,7 @@ const TOOLS: Tool[] = [
             properties: {
               name: { type: 'string' },
               amount_yen: { type: 'number', description: '0以外の整数円' },
-              category_name: { type: 'string', description: '省略可' },
+              genre_name: { type: 'string', description: '省略可' },
             },
             required: ['name', 'amount_yen'],
           },
@@ -267,15 +201,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  let categories: CategoryOption[];
-  let rules: ClassificationRuleSummary[];
+  let genres: GenreOption[];
   let currentSettings: AppSettings;
   let recentTransactions: StoredTransaction[];
   try {
     let transactions: StoredTransaction[];
-    [categories, rules, currentSettings, transactions] = await Promise.all([
-      listCategoryOptions(),
-      listClassificationRules(),
+    [genres, currentSettings, transactions] = await Promise.all([
+      listGenres(),
       getAppSettings(),
       listTransactions(),
     ]);
@@ -302,8 +234,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
         system: buildAssistantSystemPrompt({
-          categories,
-          rules: toRuleContexts(rules),
+          genres,
           settings: currentSettings,
           recentTransactions,
         }),
@@ -327,7 +258,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const toolResults: ToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const outcome = await executeTool(toolUse, categories, recentTransactions, changes);
+        const outcome = await executeTool(toolUse, genres, recentTransactions, changes);
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolUse.id,
@@ -347,40 +278,22 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
 }
 
-function toRuleContexts(rules: readonly ClassificationRuleSummary[]): RuleContext[] {
-  return rules.map((r) => ({
-    id: r.id,
-    name: r.name,
-    matchType: r.matchType,
-    pattern: r.pattern,
-    categoryName: r.categoryName,
-    isActive: r.isActive,
-    isProtected: r.setPaymentMethod !== null,
-  }));
-}
-
 type ToolOutcome = { message: string; isError: boolean };
 
 async function executeTool(
   toolUse: ToolUseBlock,
-  categories: readonly CategoryOption[],
+  genres: readonly GenreOption[],
   transactions: readonly StoredTransaction[],
   changes: AssistantChange[],
 ): Promise<ToolOutcome> {
   try {
     switch (toolUse.name) {
-      case 'create_rule':
-        return await runCreateRule(toolUse.input, categories, changes);
-      case 'update_rule':
-        return await runUpdateRule(toolUse.input, categories, changes);
-      case 'delete_rule':
-        return await runDeleteRule(toolUse.input, changes);
       case 'update_settings':
         return await runUpdateSettings(toolUse.input, changes);
       case 'update_transaction':
-        return await runUpdateTransaction(toolUse.input, categories, transactions, changes);
+        return await runUpdateTransaction(toolUse.input, genres, transactions, changes);
       case 'update_receipt_items':
-        return await runUpdateReceiptItems(toolUse.input, categories, transactions, changes);
+        return await runUpdateReceiptItems(toolUse.input, genres, transactions, changes);
       case 'set_expense_subtype':
         return await runSetExpenseSubtype(toolUse.input, transactions, changes);
       default:
@@ -389,99 +302,6 @@ async function executeTool(
   } catch (error) {
     return { message: describeUserError(error, '実行に失敗しました。'), isError: true };
   }
-}
-
-async function runCreateRule(
-  input: unknown,
-  categories: readonly CategoryOption[],
-  changes: AssistantChange[],
-): Promise<ToolOutcome> {
-  const args = input as Record<string, unknown>;
-  const pattern = typeof args.pattern === 'string' ? args.pattern : '';
-  const matchType = isMatchType(args.match_type) ? args.match_type : null;
-  if (pattern.trim() === '' || matchType === null) {
-    return { message: 'pattern と match_type は必須です。', isError: true };
-  }
-  const category = resolveCategoryByName(args.category_name, categories);
-  const name =
-    typeof args.rule_name === 'string' && args.rule_name.trim() !== ''
-      ? args.rule_name.trim()
-      : `チャットで作成: ${pattern}`;
-
-  const created = await createClassificationRule({
-    name,
-    matchType,
-    pattern,
-    categoryId: category.id,
-  });
-  changes.push({
-    kind: 'created',
-    target: created.name,
-    detail: `「${pattern}」→ ${category.name}`,
-  });
-  return { message: `ルール「${created.name}」(id=${created.id})を作成しました。`, isError: false };
-}
-
-/** 保護対象(FR-21の検知)かどうかを、実行直前に必ず取り直して確認する。 */
-async function assertNotProtected(ruleId: string): Promise<ClassificationRuleSummary> {
-  const rules = await listClassificationRules();
-  const rule = rules.find((r) => r.id === ruleId);
-  if (!rule) {
-    throw new ChatToolError(`id=${ruleId} のルールが見つかりません。`);
-  }
-  if (rule.setPaymentMethod !== null) {
-    throw new ChatToolError(
-      `「${rule.name}」はリボ払い・キャッシング・分割払いの検知に使われているため、会話からは変更・削除できません。`,
-    );
-  }
-  return rule;
-}
-
-async function runUpdateRule(
-  input: unknown,
-  categories: readonly CategoryOption[],
-  changes: AssistantChange[],
-): Promise<ToolOutcome> {
-  const args = input as Record<string, unknown>;
-  const ruleId = typeof args.rule_id === 'string' ? args.rule_id : '';
-  if (ruleId === '') {
-    return { message: 'rule_id は必須です。', isError: true };
-  }
-  const before = await assertNotProtected(ruleId);
-
-  const updates: Parameters<typeof updateClassificationRule>[1] = {};
-  if (typeof args.pattern === 'string') updates.pattern = args.pattern;
-  if (isMatchType(args.match_type)) updates.matchType = args.match_type;
-  if (typeof args.is_active === 'boolean') updates.isActive = args.is_active;
-  let categoryName: string | undefined;
-  if (args.category_name !== undefined) {
-    const category = resolveCategoryByName(args.category_name, categories);
-    updates.categoryId = category.id;
-    categoryName = category.name;
-  }
-  if (Object.keys(updates).length === 0) {
-    return { message: '変更する項目がありません。', isError: true };
-  }
-
-  const updated = await updateClassificationRule(ruleId, updates);
-  changes.push({
-    kind: 'updated',
-    target: updated.name,
-    detail: describeRuleUpdate(before, updated, categoryName),
-  });
-  return { message: `ルール「${updated.name}」を変更しました。`, isError: false };
-}
-
-async function runDeleteRule(input: unknown, changes: AssistantChange[]): Promise<ToolOutcome> {
-  const args = input as Record<string, unknown>;
-  const ruleId = typeof args.rule_id === 'string' ? args.rule_id : '';
-  if (ruleId === '') {
-    return { message: 'rule_id は必須です。', isError: true };
-  }
-  const before = await assertNotProtected(ruleId);
-  await deleteClassificationRule(ruleId);
-  changes.push({ kind: 'deleted', target: before.name, detail: before.pattern ?? '' });
-  return { message: `ルール「${before.name}」を削除しました。`, isError: false };
 }
 
 async function runUpdateSettings(input: unknown, changes: AssistantChange[]): Promise<ToolOutcome> {
@@ -494,33 +314,33 @@ async function runUpdateSettings(input: unknown, changes: AssistantChange[]): Pr
 
 async function runUpdateTransaction(
   input: unknown,
-  categories: readonly CategoryOption[],
+  genres: readonly GenreOption[],
   transactions: readonly StoredTransaction[],
   changes: AssistantChange[],
 ): Promise<ToolOutcome> {
   const args = input as Record<string, unknown>;
   const current = resolveTransactionById(args.transaction_id, transactions);
 
-  let categoryId = current.categoryId;
-  let categoryName = current.categoryName;
-  if (args.category_name !== undefined) {
-    const category = resolveCategoryByName(args.category_name, categories);
-    categoryId = category.id;
-    categoryName = category.name;
+  let genreId = current.genreId;
+  let genreName = current.genreName;
+  if (args.genre_name !== undefined) {
+    const genre = resolveGenreByName(args.genre_name, genres);
+    genreId = genre.id;
+    genreName = genre.name;
   }
 
   const hasAmountOrDate = args.amount_yen !== undefined || args.occurred_on !== undefined;
-  const changingCategoryOrAmountOrDate = args.category_name !== undefined || hasAmountOrDate;
+  const changingGenreOrAmountOrDate = args.genre_name !== undefined || hasAmountOrDate;
   const hasMemo = typeof args.memo === 'string';
 
-  if (!changingCategoryOrAmountOrDate && !hasMemo) {
+  if (!changingGenreOrAmountOrDate && !hasMemo) {
     return { message: '変更する項目がありません。', isError: true };
   }
 
-  if (changingCategoryOrAmountOrDate) {
-    if (categoryId === null) {
+  if (changingGenreOrAmountOrDate) {
+    if (genreId === null) {
       throw new ChatToolError(
-        'この明細にはまだカテゴリが無いため、category_name も併せて指定してください。',
+        'この明細にはまだジャンルが無いため、genre_name も併せて指定してください。',
       );
     }
     const amountYen =
@@ -528,7 +348,7 @@ async function runUpdateTransaction(
     const occurredOn = typeof args.occurred_on === 'string' ? args.occurred_on : current.occurredOn;
     await updateTransaction(
       current.id,
-      categoryId,
+      genreId,
       hasAmountOrDate ? { amountYen, occurredOn } : undefined,
     );
   }
@@ -537,7 +357,7 @@ async function runUpdateTransaction(
   }
 
   const detailParts: string[] = [];
-  if (args.category_name !== undefined) detailParts.push(`カテゴリ: ${categoryName}`);
+  if (args.genre_name !== undefined) detailParts.push(`ジャンル: ${genreName}`);
   if (typeof args.amount_yen === 'number')
     detailParts.push(`金額: ${Math.trunc(args.amount_yen)}円`);
   if (typeof args.occurred_on === 'string') detailParts.push(`日付: ${args.occurred_on}`);
@@ -549,7 +369,7 @@ async function runUpdateTransaction(
 
 async function runUpdateReceiptItems(
   input: unknown,
-  categories: readonly CategoryOption[],
+  genres: readonly GenreOption[],
   transactions: readonly StoredTransaction[],
   changes: AssistantChange[],
 ): Promise<ToolOutcome> {
@@ -567,11 +387,9 @@ async function runUpdateReceiptItems(
     if (name === '' || !Number.isFinite(amountYen) || amountYen === 0) {
       throw new ChatToolError('品目には name と 0 以外の amount_yen が必要です。');
     }
-    const categoryId =
-      item.category_name !== undefined
-        ? resolveCategoryByName(item.category_name, categories).id
-        : null;
-    return { name, amountYen, categoryId };
+    const genreId =
+      item.genre_name !== undefined ? resolveGenreByName(item.genre_name, genres).id : null;
+    return { name, amountYen, genreId };
   });
 
   await replaceReceiptItems(current.id, items);

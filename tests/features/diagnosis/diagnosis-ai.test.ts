@@ -17,7 +17,7 @@ function input(
     label: 'カフェ',
     amountYen: -500,
     occurredOn: '2026-09-03',
-    categoryName: '浪費',
+    genreName: 'カフェ・飲料',
     ...overrides,
   };
 }

@@ -83,7 +83,13 @@ describe('applyRules(FR-21の検知)', () => {
 describe('matches', () => {
   it('keyword は部分一致', () => {
     expect(
-      matches(tx(), { id: 'r1', name: 'テスト', matchType: 'keyword', pattern: 'ソン', setPaymentMethod: 'revolving' }),
+      matches(tx(), {
+        id: 'r1',
+        name: 'テスト',
+        matchType: 'keyword',
+        pattern: 'ソン',
+        setPaymentMethod: 'revolving',
+      }),
     ).toBe(true);
   });
 

@@ -89,7 +89,7 @@ export async function saveImportBatchAction(
       error instanceof TransactionStoreError ? error.message : '取り込みに失敗しました。';
     return { imported: 0, duplicates: 0, error: message, splitWarnings: [] };
   }
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
 
   const splitWarnings: string[] = [];
   if (receiptSplits.length > 0) {
@@ -175,9 +175,6 @@ export async function updateTransactionAction(
   } catch (error) {
     return { error: describeUserError(error, '更新に失敗しました。') };
   }
-  revalidatePath('/transactions');
-  // /spending のジャンル別内訳・カレンダー(calendar.tsx、ADR-043)からも
-  // ジャンルを直せるため、こちらも最新化する。
   revalidatePath('/spending');
   return { error: null };
 }
@@ -195,7 +192,7 @@ export async function updateTransactionMemoAction(
   } catch (error) {
     return { error: describeUserError(error, 'メモの保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
   return { error: null };
 }
 
@@ -209,7 +206,7 @@ export async function replaceSplitsAction(
   } catch (error) {
     return { error: describeUserError(error, '分割の保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
   return { error: null };
 }
 
@@ -226,7 +223,6 @@ export async function replaceReceiptItemsAction(
   } catch (error) {
     return { error: describeUserError(error, '品目の保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
   revalidatePath('/spending');
   return { error: null };
 }
@@ -234,8 +230,7 @@ export async function replaceReceiptItemsAction(
 /**
  * 生活費の小分類を保存する(本人発案、ADR-036)。既存の明細へ後から
  * レシートを紐付ける機能(P10-40、receipt-items-panel.tsx)専用の入口。
- * 明細一覧(/transactions)・家計簿のカテゴリ内訳(/spending、ADR-040)の
- * 両方から呼ばれる。
+ * 家計簿(/spending、ADR-040)の明細一覧・ジャンル内訳の両方から呼ばれる。
  */
 export async function setExpenseSubtypeAction(
   transactionId: string,
@@ -246,7 +241,6 @@ export async function setExpenseSubtypeAction(
   } catch (error) {
     return { error: describeUserError(error, '生活費の小分類の保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
   revalidatePath('/spending');
   return { error: null };
 }

@@ -281,7 +281,9 @@ export function TransactionRowWithSplit({
                 {splits.length > 0
                   ? splits
                       .map((s) =>
-                        s.note ? `${s.note}(${s.genreName ?? '未分類'})` : (s.genreName ?? '未分類'),
+                        s.note
+                          ? `${s.note}(${s.genreName ?? '未分類'})`
+                          : (s.genreName ?? '未分類'),
                       )
                       .join(' / ')
                   : (transaction.genreName ?? '未分類')}

@@ -4,16 +4,17 @@ import { listGenres, loadGenreAnalysisView } from '@/features/genre/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GenreBreakdownCard } from './genre-breakdown-card';
 import { GenreManageCard } from './genre-manage-card';
+import { RiskyRulesCard } from './risky-rules-card';
 
 /**
- * ジャンル別分析の入口(本人発案「投資家目線で客観的にジャンル細分化する
+ * ジャンル管理・分析の入口(本人発案「投資家目線で客観的にジャンル細分化する
  * AIを作ってほしい。第三者の分類があると第三者目線での分析ができる」、
- * ADR-056)。
+ * ADR-056/ADR-057)。
  *
- * /reports/categories(P10-60)が本人のカテゴリを掘り下げる画面なのに対し、
- * こちらは本人のカテゴリとは独立した、AIによる客観的なジャンルで支出を
- * 横断的に見る画面——役割が違うので既存の画面には手を加えず、別ページに
- * した。
+ * ADR-057により、ジャンルは本人が決めていた主観的なカテゴリ(生活費・浪費
+ * など)を置き換える唯一の分類になった。旧 /rules(カテゴリ管理)・
+ * /reports/categories(カテゴリの掘り下げ)はどちらも廃止し、ジャンルの
+ * 管理(追加削除・予算・ホーム表示)と分析をこの1画面に統合した。
  */
 
 export const dynamic = 'force-dynamic';
@@ -28,10 +29,10 @@ export default async function GenresPage() {
       <header className="flex items-baseline justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
-            ジャンル別分析
+            ジャンル管理・分析
           </h1>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            本人のカテゴリとは独立した、AIによる客観的な分類
+            唯一の分類。追加削除・予算はここで、分類はAIが行う
           </p>
         </div>
         <Link href="/reports" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
@@ -42,6 +43,8 @@ export default async function GenresPage() {
       <GenreBreakdownCard entries={view.entries} initialPendingCount={view.pendingCount} />
 
       <GenreManageCard genres={genres} />
+
+      <RiskyRulesCard />
     </div>
   );
 }

@@ -21,12 +21,12 @@ function transaction(overrides: Partial<StoredTransaction> = {}): StoredTransact
     merchantName: null,
     amountYen: -500,
     paymentMethod: 'one_time',
-    categoryId: 'c1',
-    categoryName: '生活費',
-    matchedRuleId: null,
+    genreId: 'g1',
+    genreName: '生活費',
     classifiedBy: 'manual',
     confidence: null,
     reviewStatus: 'auto_ok',
+    mustPay: false,
     source: 'manual',
     fingerprint: 'f1',
     batchId: null,
@@ -63,9 +63,7 @@ describe('formatTransactionContextLines', () => {
   });
 
   it('未分類・メモ無しの明細を表示する', () => {
-    const lines = formatTransactionContextLines([
-      transaction({ categoryId: null, categoryName: null }),
-    ]);
+    const lines = formatTransactionContextLines([transaction({ genreId: null, genreName: null })]);
     expect(lines).toContain('未分類');
   });
 

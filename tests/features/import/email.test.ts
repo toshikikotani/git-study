@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { parseNotificationEmail } from '@/features/import/email';
 import { buildSourceRef, StaticMailSource, syncFromMailbox } from '@/features/import/mail-sync';
 import { buildImapSearch, type RawMessage } from '@/features/import/mailbox';
-import type { ClassificationRule } from '@/features/classification/rules';
 
 /**
  * カード利用通知メールの解析(FR-10, 仕様書 9.2)。
@@ -149,18 +148,6 @@ describe('buildImapSearch', () => {
 });
 
 describe('syncFromMailbox — 自動取り込み', () => {
-  const RULES: ClassificationRule[] = [
-    {
-      id: 'd1',
-      name: 'リボ払いの検知',
-      priority: 1,
-      matchType: 'regex',
-      pattern: '(リボ|ﾘﾎﾞ)',
-      setPaymentMethod: 'revolving',
-      isActive: true,
-    },
-  ];
-
   const messages: RawMessage[] = [
     {
       messageId: 'm1',
@@ -188,7 +175,6 @@ describe('syncFromMailbox — 自動取り込み', () => {
   const base = {
     source: new StaticMailSource(messages),
     accountId: 'acc-1',
-    rules: RULES,
     knownMessageIds: new Set<string>(),
     knownFingerprints: new Set<string>(),
     batchId: 'b1',

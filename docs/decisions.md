@@ -1491,6 +1491,30 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 ---
 
+## ADR-057:生活費・浪費・聖域という本人主観のカテゴリ分けを完全に廃止し、AIによる客観的なジャンル(ADR-056)を唯一の分類にする(本人発案)
+
+**背景**:本人発案「今までの生活費・無駄金・浪費などユーザー定義のカテゴリ分けの概念を完全に廃止したい。そして今のカテゴリ(ジャンル)を正とする」。ADR-056で追加した`genres`(AIによる客観的なジャンル分類)は当初`categories`(`category_kind`:生活費/浪費/聖域、本人が主観で決める)と併存する「第三者目線の追加情報」だったが、本人はその主観的な分類そのものをやめたいと判断した。返済・投資・収入・口座間振替も含め、全ての明細をジャンルで扱う(「収入と支出という概念では同じ」という本人の判断)。分類ルール(パターンでカテゴリを決める仕組み、`classification_rules`)も、本人が「このパターンはこのカテゴリ」と決める主観であるため合わせて廃止する。一方でFR-21(リボ払い等の危険検知)は`DEFAULT_DETECTION_RULES`としてTS側に固定済みで、主観の入る余地が無いためADR-010のまま変更しない。本人からはこの移行を「今回一気に完全移行する(推奨)」で進める確認を得た。
+
+**決定・実装**
+
+1. **スキーマ**(`supabase/migrations/20260929000100_retire_categories.sql`):`categories`・`category_kind`・`classification_rules`・`budgets`を廃止。`budgets`はコードのどこからも書き込みが無い死んだ仕組み(月次上書き・繰越は未使用)だったため、`genres`に`budget_yen`(月次予算、未設定なら無制限)・`show_on_home`(旧`categories.show_on_home`、FR-14/FR-61)を追加して一本化した。`transactions`・`transfer_rules`・`transaction_splits`・`receipt_items`・`alerts`の`category_id`はすべて`genre_id`に置き換え。`transactions`には本人発案「絶対払わざるを得ないもの」を明細1件ごとに付ける`must_pay`列(ジャンルとは独立した軸)を追加した。`genres`は上記5テーブルから直接参照されるため、`docs/schema.sql`内の定義位置をそれらより前(旧`categories`と同じ位置)へ移す必要があった——後ろに置くとPostgresの`create table`が参照先未存在エラーになる。同様に`category_id`を落とす前に、それへ依存する`v_monthly_category_spend`・`v_current_month_budget_status`ビュー(実装はどこからも問い合わせていないドキュメント用)を先に削除する必要があった。両ビューは書き直さず削除し、予算消化状況の計算は`domain/budget.ts`(TS側)に一本化した。
+2. **ジャンル管理・分析画面**(`app/(app)/reports/genres/`):`/rules`(旧`categories`・`classification_rules`のCRUD画面)を廃止し、ジャンルの追加・削除に加えて予算入力(空欄で無制限)・「ホームに表示」チェックボックスをここへ統合した。FR-21の検知ルールは本人が変更できない固定ロジックであることを示すため、`DEFAULT_DETECTION_RULES`を読み取り専用で表示する`RiskyRulesCard`を新設した。
+3. **明細一覧の統合**(`/transactions`→`/spending`):旧`/transactions`の全文(フィルタ・給料日期間カード・サブスクカード・重複/危険バナー・日付ごとの明細一覧)を`TransactionListSection`として切り出し、`/spending`の`ReorderableCards`(ADR-047)へ新しいカードとして埋め込んだ。本人が既に持つカード並び替えのカスタマイズを崩さず「1画面・1タブに」という要望を満たすため、ページ統合ではなくカード化を選んだ。`/transactions`はクエリを引き継いで`/spending`へリダイレクトするだけの薄いページとして残す(既存のブックマーク・リンク互換のため)。ボトムナビは「明細」タブを削除し3タブになった。
+4. **取り込み時のAI自動分類を廃止**(CSV・ペースト・レシート・手入力の4画面):`features/genre/store.ts`のコメントにあった「取り込み時にAIで確定させることはしない」という既定方針に統一し、各画面の「AIに回す」機構を削除、代わりに行ごとのジャンル`<select>`(手入力は単一の`<select>`)を置いた。ジャンル分類はAIが後から客観的に付けるもの(ADR-056の趣旨)であり、取り込み直後に本人が主観で確定させる操作とは性質が違うため、取り込みフローには残さない。
+5. **AIに変更を頼む(ADR-054)**:`create_rule`/`update_rule`/`delete_rule`ツールと分類ルール関連のコンテキストを削除し、`update_transaction`/`update_receipt_items`は`genre_name`でジャンルを指定する形に変えた。システムプロンプトにも「FR-21は固定ロジックでチャットからは変更できない」ことを明記した。
+6. **必須支出の可視化**:`app/(app)/reports/genres/genre-breakdown-card.tsx`に、`must_pay`に基づく「必須/裁量」の二色バーと割合・金額を表示するUIを追加した(旧「カテゴリ×ジャンル」のクロス集計は`categories`廃止に伴い削除)。
+
+**却下した選択肢**
+
+- **`categories`と`genres`を併存させたまま、`category_kind`だけ廃止する**:本人の発言は「カテゴリ分けの概念を完全に廃止」であり、`categories`テーブル自体(名前・並び順・ホーム表示・予算)を残す理由が無くなる。全て`genres`が代替できるため、テーブルごと廃止した。
+- **`budgets`テーブルを`category_id`→`genre_id`だけ置き換えて存続させる**:元々書き込みコードが無い死んだ仕組みであり、月次上書き・繰越の複雑さを持ち込む価値が無いと判断し、`genres.budget_yen`という単一値に単純化した。
+- **`/transactions`と`/spending`を1つのページファイルへ物理的に統合する**:本人が使っている`ReorderableCards`のカード順カスタマイズ(ADR-047)を壊さずに「1画面に」を実現できる方が優れているため、明細一覧をカードとして埋め込む設計を選んだ。
+- **`classified_by`enumから`'rule'`を削除する**:分類ルール廃止によりこの値を書き込むコードは無くなったが、enum値の削除は既存データ・本番運用への影響範囲がこのADRの主題(主観的カテゴリの廃止)を超えるため、コメントで「未使用」と明記するに留め、DBのenum定義自体は変更しなかった(今回のスコープ外)。
+
+**検証**:`npx tsc --noEmit -p .`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(731件全通過)/`npx next build`すべて成功。`scripts/verify-migrations.sh`(`docs/schema.sql`とマイグレーション群が同じスキーマを作ることを950項目で比較・一致)・`scripts/verify-schema.sh`(RLS全テーブルで有効、制約テストも含め全成功)・`scripts/verify-apply-pending.sh`(`apply-pending.sql`が未適用分と同じスキーマを作ることを941項目で比較・一致、2回実行しても冪等)も成功。**未検証**:このセッションには本番Supabaseの管理APIが無いため、実際の本番マイグレーション適用そのものは確認できていない(B-17参照)。
+
+---
+
 ## 未決のまま残す事項
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。

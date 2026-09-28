@@ -36,7 +36,10 @@ export class TransactionStoreError extends AppError {}
 
 type TransactionRow = Database['public']['Tables']['transactions']['Row'];
 
-function fromRow(row: TransactionRow, genreNameById: ReadonlyMap<string, string>): StoredTransaction {
+function fromRow(
+  row: TransactionRow,
+  genreNameById: ReadonlyMap<string, string>,
+): StoredTransaction {
   return {
     id: row.id,
     accountId: row.account_id,

@@ -180,7 +180,12 @@ describe('netAmountYen / totalSpentYen', () => {
     spend('genre-income', 250_000),
     spend('genre-sanctuary', -30_000),
     spend('genre-living', -50_000),
-    { categoryId: 'genre-transfer', amountYen: -100_000, isTransfer: true, reviewStatus: 'auto_ok' },
+    {
+      categoryId: 'genre-transfer',
+      amountYen: -100_000,
+      isTransfer: true,
+      reviewStatus: 'auto_ok',
+    },
   ];
 
   it('振替を除いた収支を返す(支出は負のまま)', () => {

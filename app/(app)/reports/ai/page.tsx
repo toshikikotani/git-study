@@ -4,7 +4,7 @@ import {
 } from '../../spending/category-breakdown-chart';
 import { DailyReportCard } from './daily-report-view';
 import { loadDailyAiReportView, loadMonthlyAiReportView } from '@/features/ai-report/store';
-import { listCategoryOptions } from '@/features/classification/store';
+import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { loadMonthlyLedger } from '@/features/spending/store';
@@ -34,20 +34,20 @@ export default async function AiReportPage() {
 
   const transactionIds = ledger.transactions.map((t) => t.id);
   const [categories, itemsByTransactionId, expenseSubtypeByTransactionId] = await Promise.all([
-    listCategoryOptions(),
+    listGenres(),
     listReceiptItemsForTransactionIds(transactionIds),
     listExpenseSubtypesForTransactionIds(transactionIds),
   ]);
   const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
   for (const t of ledger.transactions) {
-    const key = t.categoryId ?? 'uncategorized';
+    const key = t.genreId ?? 'uncategorized';
     const list = transactionsByCategory[key] ?? [];
     list.push({
       id: t.id,
       occurredOn: t.occurredOn,
       label: t.label,
-      categoryId: t.categoryId,
-      categoryName: t.categoryName,
+      genreId: t.genreId,
+      genreName: t.genreName,
       amountYen: t.amountYen,
       accountId: t.accountId,
       paymentMethod: t.paymentMethod,
@@ -73,7 +73,7 @@ export default async function AiReportPage() {
       <MonthlyReportCard view={monthlyView} />
 
       <CategoryBreakdownChart
-        rows={ledger.categoryBreakdown}
+        rows={ledger.genreBreakdown}
         transactionsByCategory={transactionsByCategory}
         categories={categories}
       />

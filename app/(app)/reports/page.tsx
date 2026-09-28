@@ -60,14 +60,6 @@ export default async function ReportsPage() {
       )}
 
       <Link
-        href="/reports/categories"
-        className="block text-[13px] font-medium"
-        style={{ color: 'var(--accent)' }}
-      >
-        カテゴリを選んで年→月→日で掘り下げる →
-      </Link>
-
-      <Link
         href="/reports/genres"
         className="block text-[13px] font-medium"
         style={{ color: 'var(--accent)' }}

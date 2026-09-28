@@ -8,7 +8,13 @@ import { useIsClient } from '@/components/ui/use-is-client';
 const STORAGE_KEY = 'spending-card-order';
 
 export type SpendingCardKey =
-  'summary' | 'calendar' | 'forecast' | 'diagnosis' | 'categoryBreakdown' | 'pile';
+  | 'summary'
+  | 'calendar'
+  | 'forecast'
+  | 'diagnosis'
+  | 'categoryBreakdown'
+  | 'pile'
+  | 'transactionList';
 
 /**
  * 家計簿(/spending)の各カードの並び順を、本人が自由に変えられるように
@@ -49,7 +55,7 @@ export type SpendingCardKey =
  * ── 既知の制約 ─────────────────────────────────────────────
  * タッチ操作専用(マウスでのドラッグは対象外——このアプリ自体がスマホ
  * 専用の個人用アプリのため)。画面の上下端付近でのオートスクロールは
- * 実装していない(カードは6枚のみで、多くの端末で1〜2画面に収まるため、
+ * 実装していない(カードは7枚のみで、多くの端末で1〜2画面に収まるため、
  * 現時点では見送った)。
  */
 export function ReorderableCards({
@@ -143,6 +149,7 @@ function DragList({
     diagnosis: null,
     categoryBreakdown: null,
     pile: null,
+    transactionList: null,
   });
   const [draggingKey, setDraggingKey] = useState<SpendingCardKey | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
