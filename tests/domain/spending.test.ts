@@ -4,11 +4,13 @@ import type { AccumulationTransaction } from '@/domain/accumulation';
 import {
   averageDailySpendYen,
   compareCurrentMonthToTrailingAverage,
+  distinctYearsWithSpend,
   projectedMonthTotalYen,
   rankMerchantsBySpend,
   savingsRateOf,
   summarizeMonthlyIncomeExpense,
   summarizeMonthlySpendByCategory,
+  summarizeSpendByPeriod,
   type SpendingTransaction,
 } from '@/domain/spending';
 import { formatYen } from '@/domain/money';
@@ -204,6 +206,111 @@ describe('compareCurrentMonthToTrailingAverage', () => {
   it('他の月が1件も無ければ null(平均を出せない)', () => {
     const single = [{ monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000 }];
     expect(compareCurrentMonthToTrailingAverage(single, '2026-09')).toBeNull();
+  });
+});
+
+describe('summarizeSpendByPeriod', () => {
+  it('月キー(7桁)で合算する', () => {
+    const rows = summarizeSpendByPeriod(
+      [spend('cat-food', -3_000, '2026-08-05'), spend('cat-food', -2_000, '2026-08-20')],
+      ['2026-07', '2026-08'],
+      7,
+    );
+    expect(rows).toEqual([
+      { period: '2026-07', spentYen: 0 },
+      { period: '2026-08', spentYen: 5_000 },
+    ]);
+  });
+
+  it('年キー(4桁)で合算する', () => {
+    const rows = summarizeSpendByPeriod(
+      [spend('cat-food', -3_000, '2025-12-31'), spend('cat-food', -2_000, '2026-01-05')],
+      ['2025', '2026'],
+      4,
+    );
+    expect(rows).toEqual([
+      { period: '2025', spentYen: 3_000 },
+      { period: '2026', spentYen: 2_000 },
+    ]);
+  });
+
+  it('日キー(10桁)で合算する', () => {
+    const rows = summarizeSpendByPeriod(
+      [spend('cat-food', -1_000, '2026-08-05'), spend('cat-food', -500, '2026-08-05')],
+      ['2026-08-05', '2026-08-06'],
+      10,
+    );
+    expect(rows).toEqual([
+      { period: '2026-08-05', spentYen: 1_500 },
+      { period: '2026-08-06', spentYen: 0 },
+    ]);
+  });
+
+  it('収入・振替・ignoredは合算しない', () => {
+    const rows = summarizeSpendByPeriod(
+      [
+        spend('cat-food', 100_000, '2026-08-05'),
+        {
+          categoryId: 'cat-food',
+          amountYen: -5_000,
+          isTransfer: true,
+          reviewStatus: 'auto_ok',
+          occurredOn: '2026-08-05',
+        },
+        {
+          categoryId: 'cat-food',
+          amountYen: -5_000,
+          isTransfer: false,
+          reviewStatus: 'ignored',
+          occurredOn: '2026-08-05',
+        },
+      ],
+      ['2026-08'],
+      7,
+    );
+    expect(rows).toEqual([{ period: '2026-08', spentYen: 0 }]);
+  });
+
+  it('periodKeysに無い期間の実績は無視する', () => {
+    const rows = summarizeSpendByPeriod([spend('cat-food', -1_000, '2026-06-01')], ['2026-08'], 7);
+    expect(rows).toEqual([{ period: '2026-08', spentYen: 0 }]);
+  });
+});
+
+describe('distinctYearsWithSpend', () => {
+  it('支出のある年を新しい順に返す', () => {
+    const years = distinctYearsWithSpend([
+      spend('cat-food', -1_000, '2025-03-01'),
+      spend('cat-food', -1_000, '2026-08-01'),
+      spend('cat-food', -1_000, '2024-12-01'),
+    ]);
+    expect(years).toEqual(['2026', '2025', '2024']);
+  });
+
+  it('同じ年は1件にまとめる', () => {
+    const years = distinctYearsWithSpend([
+      spend('cat-food', -1_000, '2026-01-01'),
+      spend('cat-food', -2_000, '2026-06-01'),
+    ]);
+    expect(years).toEqual(['2026']);
+  });
+
+  it('収入・振替・ignoredの年は含めない', () => {
+    const years = distinctYearsWithSpend([
+      spend('cat-food', 100_000, '2026-01-01'),
+      {
+        categoryId: 'cat-food',
+        amountYen: -1_000,
+        isTransfer: true,
+        reviewStatus: 'auto_ok',
+        occurredOn: '2025-01-01',
+      },
+    ]);
+    expect(years).toEqual([]);
+  });
+
+  it('取引が1件も無ければ空配列', () => {
+    expect(distinctYearsWithSpend([])).toEqual([]);
   });
 });
 
