@@ -183,8 +183,9 @@ export type GenreTarget =
   | { kind: 'transaction'; id: string; label: string; amountYen: number };
 
 const SCAN_PAGE_SIZE = 500;
-/** `.in()` は URL に載るため、品目の取得は明細IDを分けて行う。 */
-const ITEM_QUERY_ID_CHUNK = 100;
+/** `.in()` は URL に載る上、Supabase は1回の応答を1000行までに切り詰めるため、
+ * 品目の多いレシートでも収まるよう明細IDを少数ずつ取得する。 */
+const ITEM_QUERY_ID_CHUNK = 20;
 
 type ScanRange = { from?: string; to?: string };
 

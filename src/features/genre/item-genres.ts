@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 
 export class ItemGenreError extends AppError {}
 
-/** `.in()` は URL に載るため、明細IDを分けて取得する。 */
-const ID_CHUNK = 100;
+/** `.in()` は URL に載る上、Supabase は1回の応答を1000行までに切り詰めるため、
+ * 品目の多いレシートでも収まるよう明細IDを少数ずつ取得する。 */
+const ID_CHUNK = 20;
 
 /**
  * 明細本体にジャンルが無い支出について、レシート品目のジャンルから決めた
