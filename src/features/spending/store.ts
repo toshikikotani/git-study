@@ -18,6 +18,7 @@ import {
   summarizeMonthlySpendByCategory,
   type SpendingTransaction,
 } from '@/domain/spending';
+import { resolveItemGenres } from '@/features/genre/item-genres';
 import type { PaymentMethod } from '@/features/import/adapters';
 import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
@@ -64,6 +65,8 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
     .order('occurred_on', { ascending: false });
   if (txError) throw new SpendingStoreError(`明細を取得できませんでした: ${txError.message}`);
 
+  const itemGenreByTransactionId = await resolveItemGenres(rows);
+
   const nameById = new Map(genres.map((g) => [g.id, g.name]));
   const budgetById = new Map(genres.map((g) => [g.id, g.budget_yen]));
 
@@ -75,7 +78,7 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
     paymentMethod: PaymentMethod;
   })[] = rows.map((row) => ({
     id: row.id,
-    categoryId: row.genre_id,
+    categoryId: row.genre_id ?? itemGenreByTransactionId.get(row.id) ?? null,
     amountYen: row.amount_yen,
     isTransfer: row.is_transfer,
     reviewStatus: row.review_status,

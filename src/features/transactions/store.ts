@@ -13,6 +13,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { resolveItemGenres } from '@/features/genre/item-genres';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
@@ -81,7 +82,11 @@ export async function listTransactions(): Promise<StoredTransaction[]> {
   }
 
   const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
-  return rows.map((row) => fromRow(row, genreNameById));
+  const itemGenreByTransactionId = await resolveItemGenres(rows);
+  return rows.map((row) => {
+    const inherited = itemGenreByTransactionId.get(row.id);
+    return fromRow(inherited ? { ...row, genre_id: inherited } : row, genreNameById);
+  });
 }
 
 export async function listImportBatches(): Promise<ImportBatchSummary[]> {

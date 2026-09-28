@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { summarizeByGenre, summarizeMustPaySplit, type GenredEntry } from '@/domain/genre';
+import {
+  effectiveGenreId,
+  summarizeByGenre,
+  summarizeMustPaySplit,
+  type GenredEntry,
+} from '@/domain/genre';
 
 describe('summarizeByGenre', () => {
   it('ジャンルごとに合計し、金額の大きい順に並べる', () => {
@@ -35,5 +40,34 @@ describe('summarizeMustPaySplit', () => {
 
   it('空配列なら両方0円', () => {
     expect(summarizeMustPaySplit([])).toEqual({ mustPayYen: 0, discretionaryYen: 0 });
+  });
+});
+
+describe('effectiveGenreId', () => {
+  it('明細本体にジャンルがあればそれを優先する', () => {
+    expect(effectiveGenreId('g1', [{ genreId: 'g2', amountYen: 500 }])).toBe('g1');
+  });
+
+  it('品目がすべて分類済みなら金額が最大のジャンルを代表にする', () => {
+    expect(
+      effectiveGenreId(null, [
+        { genreId: 'g1', amountYen: 150 },
+        { genreId: 'g2', amountYen: 800 },
+        { genreId: 'g1', amountYen: 300 },
+      ]),
+    ).toBe('g2');
+  });
+
+  it('未分類の品目が1件でも残っていれば null', () => {
+    expect(
+      effectiveGenreId(null, [
+        { genreId: 'g1', amountYen: 150 },
+        { genreId: null, amountYen: 800 },
+      ]),
+    ).toBeNull();
+  });
+
+  it('品目が無ければ null', () => {
+    expect(effectiveGenreId(null, [])).toBeNull();
   });
 });
