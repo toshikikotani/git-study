@@ -25,7 +25,7 @@ export const GENRE_CLASSIFICATION_MODEL = 'claude-haiku-4-5';
 /** 1回のリクエストに含める件数。reasoning が無く出力が軽いため、
  * classification/ai.ts(40件)より多めにできる。 */
 export const DEFAULT_BATCH_SIZE = 60;
-const OUTPUT_TOKENS_PER_ITEM = 30;
+const OUTPUT_TOKENS_PER_ITEM = 40;
 const MIN_OUTPUT_TOKENS = 512;
 
 /** ジャンルの選択肢。呼び出し側が本人の genres 一覧を渡す(ここでは DB を読まない)。 */
@@ -39,7 +39,12 @@ export type GenreClassifiable = {
   amountYen: number;
 };
 
-export type GenreClassification = { id: string; genreId: string };
+export type GenreClassification = {
+  id: string;
+  genreId: string;
+  /** 0〜1。明細の classified_by='ai' には確信度が必須(DB制約 ck_transactions_ai_needs_confidence)。 */
+  confidence: number;
+};
 
 export type BatchGenreClassifyResult = {
   classifications: GenreClassification[];
@@ -50,6 +55,7 @@ export type BatchGenreClassifyResult = {
 const rowSchema = z.object({
   id: z.string().describe('渡された id をそのまま返す。存在しない id を作らない。'),
   genre_name: z.string().describe('渡されたジャンルの選択肢の名前のいずれかと完全に一致させること'),
+  confidence: z.number().describe('そのジャンルを選んだことへの確信度。0〜1'),
 });
 
 const batchSchema = z.object({
@@ -168,7 +174,11 @@ export function buildFromAiRows(
     const genreId = idByName.get(row.genre_name.trim());
     if (genreId === undefined) continue;
     seen.add(row.id);
-    classifications.push({ id: row.id, genreId });
+    classifications.push({
+      id: row.id,
+      genreId,
+      confidence: Math.min(Math.max(row.confidence, 0), 1),
+    });
   }
 
   const warnings: string[] = [];

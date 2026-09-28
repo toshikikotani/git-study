@@ -1,6 +1,10 @@
 import Link from 'next/link';
 
-import { listGenres, loadGenreAnalysisView } from '@/features/genre/store';
+import {
+  countUngenredSpendTargetsAllPeriods,
+  listGenres,
+  loadGenreAnalysisView,
+} from '@/features/genre/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GenreBreakdownCard } from './genre-breakdown-card';
 import { GenreManageCard } from './genre-manage-card';
@@ -20,8 +24,8 @@ import { RiskyRulesCard } from './risky-rules-card';
 export const dynamic = 'force-dynamic';
 
 export default async function GenresPage() {
-  const [view, genres] = await withMinDuration(
-    Promise.all([loadGenreAnalysisView(), listGenres()]),
+  const [view, genres, allPendingCount] = await withMinDuration(
+    Promise.all([loadGenreAnalysisView(), listGenres(), countUngenredSpendTargetsAllPeriods()]),
   );
 
   return (
@@ -40,7 +44,11 @@ export default async function GenresPage() {
         </Link>
       </header>
 
-      <GenreBreakdownCard entries={view.entries} initialPendingCount={view.pendingCount} />
+      <GenreBreakdownCard
+        entries={view.entries}
+        initialPendingCount={view.pendingCount}
+        initialAllPendingCount={allPendingCount}
+      />
 
       <GenreManageCard genres={genres} />
 

@@ -182,76 +182,110 @@ export type GenreTarget =
   | { kind: 'item'; id: string; label: string; amountYen: number }
   | { kind: 'transaction'; id: string; label: string; amountYen: number };
 
+const SCAN_PAGE_SIZE = 500;
+/** `.in()` は URL に載るため、品目の取得は明細IDを分けて行う。 */
+const ITEM_QUERY_ID_CHUNK = 100;
+
+type ScanRange = { from?: string; to?: string };
+
 /**
- * 今月、まだジャンル分類していない支出(収入・振替・対象外は除く、
- * domain/budget.ts の isCountable() と同じ定義)。レシート品目がある明細は
- * 品目ごとに、無い明細は明細全体を対象にする。
+ * まだジャンル分類していない支出(収入・振替・対象外は除く、
+ * domain/budget.ts の isCountable() と同じ定義)を新しい順に走査し、
+ * limit 件までの分類対象を返す。レシート品目がある明細は品目ごとに、
+ * 無い明細は明細全体を対象にする。
  */
-export async function listUngenredSpendTargets(now: Date = new Date()): Promise<GenreTarget[]> {
+async function scanUngenredTargets(range: ScanRange, limit: number): Promise<GenreTarget[]> {
   const supabase = await createClient();
-  const monthStart = monthStartJst(0, now);
-  const today = todayJst(now);
-
-  const { data: rows, error } = await supabase
-    .from('transactions')
-    .select(
-      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id',
-    )
-    .gte('occurred_on', monthStart)
-    .lte('occurred_on', today)
-    .lt('amount_yen', 0)
-    .order('occurred_on', { ascending: false });
-  if (error) throw new GenreStoreError(`明細を取得できませんでした: ${error.message}`);
-
-  const countable = rows.filter((r) =>
-    isCountable({
-      categoryId: r.genre_id,
-      amountYen: r.amount_yen,
-      isTransfer: r.is_transfer,
-      reviewStatus: r.review_status,
-    }),
-  );
-  if (countable.length === 0) return [];
-  const countableIds = countable.map((r) => r.id);
-
-  const { data: items, error: itemsError } = await supabase
-    .from('receipt_items')
-    .select('id, transaction_id, name, amount_yen, genre_id')
-    .in('transaction_id', countableIds);
-  if (itemsError && !isMissingTableError(itemsError)) {
-    throw new GenreStoreError(`品目を取得できませんでした: ${itemsError.message}`);
-  }
-  const itemsByTransaction = new Map<
-    string,
-    { id: string; name: string; amount_yen: number; genre_id: string | null }[]
-  >();
-  for (const item of items ?? []) {
-    const list = itemsByTransaction.get(item.transaction_id) ?? [];
-    list.push(item);
-    itemsByTransaction.set(item.transaction_id, list);
-  }
-
   const targets: GenreTarget[] = [];
-  for (const item of (items ?? []).filter((i) => i.genre_id === null)) {
-    targets.push({ kind: 'item', id: item.id, label: item.name, amountYen: item.amount_yen });
-  }
-  for (const tx of countable) {
-    if ((itemsByTransaction.get(tx.id) ?? []).length > 0) continue; // 品目側で分類する
-    if (tx.genre_id !== null) continue;
-    targets.push({
-      kind: 'transaction',
-      id: tx.id,
-      label: tx.merchant_name ?? tx.description,
-      amountYen: Math.abs(tx.amount_yen),
-    });
+
+  for (let offset = 0; targets.length < limit; offset += SCAN_PAGE_SIZE) {
+    let query = supabase
+      .from('transactions')
+      .select(
+        'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id',
+      )
+      .lt('amount_yen', 0);
+    if (range.from) query = query.gte('occurred_on', range.from);
+    if (range.to) query = query.lte('occurred_on', range.to);
+    const { data: rows, error } = await query
+      .order('occurred_on', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + SCAN_PAGE_SIZE - 1);
+    if (error) throw new GenreStoreError(`明細を取得できませんでした: ${error.message}`);
+    if (rows.length === 0) break;
+
+    const countable = rows.filter((r) =>
+      isCountable({
+        categoryId: r.genre_id,
+        amountYen: r.amount_yen,
+        isTransfer: r.is_transfer,
+        reviewStatus: r.review_status,
+      }),
+    );
+
+    const items: {
+      id: string;
+      transaction_id: string;
+      name: string;
+      amount_yen: number;
+      genre_id: string | null;
+    }[] = [];
+    for (let i = 0; i < countable.length; i += ITEM_QUERY_ID_CHUNK) {
+      const ids = countable.slice(i, i + ITEM_QUERY_ID_CHUNK).map((r) => r.id);
+      const { data, error: itemsError } = await supabase
+        .from('receipt_items')
+        .select('id, transaction_id, name, amount_yen, genre_id')
+        .in('transaction_id', ids);
+      if (itemsError && !isMissingTableError(itemsError)) {
+        throw new GenreStoreError(`品目を取得できませんでした: ${itemsError.message}`);
+      }
+      items.push(...(data ?? []));
+    }
+    const itemTransactionIds = new Set(items.map((i) => i.transaction_id));
+
+    for (const item of items.filter((i) => i.genre_id === null)) {
+      targets.push({ kind: 'item', id: item.id, label: item.name, amountYen: item.amount_yen });
+    }
+    for (const tx of countable) {
+      if (itemTransactionIds.has(tx.id)) continue; // 品目側で分類する
+      if (tx.genre_id !== null) continue;
+      targets.push({
+        kind: 'transaction',
+        id: tx.id,
+        label: tx.merchant_name ?? tx.description,
+        amountYen: Math.abs(tx.amount_yen),
+      });
+    }
+
+    if (rows.length < SCAN_PAGE_SIZE) break;
   }
 
-  return targets.slice(0, MAX_BATCH_SIZE);
+  return targets.slice(0, limit);
+}
+
+/** 今月、まだジャンル分類していない支出(1回の処理上限つき)。 */
+export async function listUngenredSpendTargets(now: Date = new Date()): Promise<GenreTarget[]> {
+  return scanUngenredTargets({ from: monthStartJst(0, now), to: todayJst(now) }, MAX_BATCH_SIZE);
+}
+
+/** 期間を問わず、まだジャンル分類していない支出(1回の処理上限つき)。 */
+export async function listUngenredSpendTargetsAllPeriods(): Promise<GenreTarget[]> {
+  return scanUngenredTargets({}, MAX_BATCH_SIZE);
+}
+
+/** 期間を問わず、まだジャンル分類していない品目・明細の件数。 */
+export async function countUngenredSpendTargetsAllPeriods(): Promise<number> {
+  return (await scanUngenredTargets({}, Number.POSITIVE_INFINITY)).length;
 }
 
 /** ジャンル分類の結果を保存する。品目と明細で更新先テーブルが違うため分けて実行する。 */
 export async function saveGenres(
-  results: readonly { kind: 'item' | 'transaction'; id: string; genreId: string }[],
+  results: readonly {
+    kind: 'item' | 'transaction';
+    id: string;
+    genreId: string;
+    confidence: number;
+  }[],
 ): Promise<void> {
   if (results.length === 0) return;
 
@@ -268,7 +302,7 @@ export async function saveGenres(
   for (const r of results.filter((r) => r.kind === 'transaction')) {
     const { error } = await supabase
       .from('transactions')
-      .update({ genre_id: r.genreId, classified_by: 'ai' })
+      .update({ genre_id: r.genreId, classified_by: 'ai', confidence: r.confidence })
       .eq('id', r.id);
     if (error) throw new GenreStoreError(`明細のジャンルを保存できませんでした: ${error.message}`);
   }

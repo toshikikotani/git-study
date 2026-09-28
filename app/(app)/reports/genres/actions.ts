@@ -17,6 +17,7 @@ import {
   GenreStoreError,
   listGenres,
   listUngenredSpendTargets,
+  listUngenredSpendTargetsAllPeriods,
   saveGenres,
   setGenreShowOnHome,
   updateGenreBudget,
@@ -25,17 +26,26 @@ import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
 
+const MAX_TARGETS_PER_CALL = 120;
+
 export type ClassifyGenresActionResult = {
   classifiedCount: number;
+  /** 1回の処理上限に達した。まだ未分類が残っている可能性が高い。 */
+  hasMore: boolean;
   warnings: string[];
   error: string | null;
 };
 
-export async function classifyGenresAction(): Promise<ClassifyGenresActionResult> {
+/** scope='all' は過去分も含めた全期間。1回の上限(120件)ずつ処理するため、
+ * 呼び出し側が hasMore の間くり返し呼ぶ。 */
+export async function classifyGenresAction(
+  scope: 'month' | 'all' = 'month',
+): Promise<ClassifyGenresActionResult> {
   const apiKey = readAnthropicApiKey();
   if (apiKey === null) {
     return {
       classifiedCount: 0,
+      hasMore: false,
       warnings: [],
       error: apiKeyMissingMessage('AIによるジャンル分類'),
     };
@@ -44,16 +54,20 @@ export async function classifyGenresAction(): Promise<ClassifyGenresActionResult
   let targets;
   let genreOptions;
   try {
-    [targets, genreOptions] = await Promise.all([listUngenredSpendTargets(), listGenres()]);
+    [targets, genreOptions] = await Promise.all([
+      scope === 'all' ? listUngenredSpendTargetsAllPeriods() : listUngenredSpendTargets(),
+      listGenres(),
+    ]);
   } catch (error) {
     return {
       classifiedCount: 0,
+      hasMore: false,
       warnings: [],
       error: error instanceof GenreStoreError ? error.message : '明細を取得できませんでした。',
     };
   }
   if (targets.length === 0) {
-    return { classifiedCount: 0, warnings: [], error: null };
+    return { classifiedCount: 0, hasMore: false, warnings: [], error: null };
   }
 
   const outcome = await new ClaudeGenreClassifier(apiKey).classifyMany(
@@ -61,7 +75,7 @@ export async function classifyGenresAction(): Promise<ClassifyGenresActionResult
     genreOptions,
   );
   if (outcome.classifications.length === 0) {
-    return { classifiedCount: 0, warnings: outcome.warnings, error: null };
+    return { classifiedCount: 0, hasMore: false, warnings: outcome.warnings, error: null };
   }
 
   const targetById = new Map(targets.map((t) => [t.id, t]));
@@ -71,19 +85,23 @@ export async function classifyGenresAction(): Promise<ClassifyGenresActionResult
         kind: targetById.get(c.id)!.kind,
         id: c.id,
         genreId: c.genreId,
+        confidence: c.confidence,
       })),
     );
   } catch (error) {
     return {
       classifiedCount: 0,
+      hasMore: false,
       warnings: outcome.warnings,
       error: error instanceof GenreStoreError ? error.message : '分類結果を保存できませんでした。',
     };
   }
 
   revalidatePath('/reports/genres');
+  revalidatePath('/spending');
   return {
     classifiedCount: outcome.classifications.length,
+    hasMore: targets.length >= MAX_TARGETS_PER_CALL,
     warnings: outcome.warnings,
     error: null,
   };
