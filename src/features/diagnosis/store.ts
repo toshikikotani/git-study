@@ -16,6 +16,7 @@ import {
 import { monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
+import { resolveItemGenres } from '@/features/genre/item-genres';
 import { createClient } from '@/lib/supabase/server';
 
 export class DiagnosisStoreError extends AppError {}
@@ -26,6 +27,9 @@ export class DiagnosisStoreError extends AppError {}
  * 次回の「診断する」で拾える。 */
 const MAX_BATCH_SIZE = 30;
 
+/** 1明細あたり診断に渡す品名の上限(プロンプトの肥大化を防ぐ)。 */
+const MAX_ITEM_NAMES = 8;
+
 /** 推移表示の対象月数(本人発案:「蓄積して...月ごとの浪費傾向の推移」)。 */
 const TREND_MONTHS_BACK = 6;
 
@@ -35,6 +39,10 @@ export type DiagnosisTarget = {
   amountYen: number;
   occurredOn: string;
   genreName: string | null;
+  mustPay: boolean;
+  genreMonthSpentYen: number | null;
+  genreBudgetYen: number | null;
+  itemNames: string[];
 };
 
 /**
@@ -53,7 +61,7 @@ export async function listUndiagnosedTransactions(
   const { data: rows, error } = await supabase
     .from('transactions')
     .select(
-      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id',
+      'id, description, merchant_name, amount_yen, occurred_on, is_transfer, review_status, genre_id, must_pay',
     )
     .gte('occurred_on', monthStart)
     .lte('occurred_on', today)
@@ -86,27 +94,60 @@ export async function listUndiagnosedTransactions(
   const undiagnosed = countable.filter((r) => !diagnosedIds.has(r.id)).slice(0, MAX_BATCH_SIZE);
   if (undiagnosed.length === 0) return [];
 
-  const genreIds = [
-    ...new Set(undiagnosed.map((r) => r.genre_id).filter((id): id is string => id !== null)),
-  ];
-  const genreNameById = new Map<string, string>();
-  if (genreIds.length > 0) {
-    const { data: categories, error: catError } = await supabase
-      .from('genres')
-      .select('id, name')
-      .in('id', genreIds);
-    if (catError)
-      throw new DiagnosisStoreError(`ジャンルを取得できませんでした: ${catError.message}`);
-    for (const c of categories) genreNameById.set(c.id, c.name);
+  // 品目ごとに分類した明細は、品目から決めた代表ジャンルで扱う(明細本体の
+  // ジャンルが空でも、家計簿・分類と同じ見え方にそろえる)。
+  const itemGenreByTransactionId = await resolveItemGenres(rows);
+  const effectiveGenreId = (r: (typeof rows)[number]): string | null =>
+    r.genre_id ?? itemGenreByTransactionId.get(r.id) ?? null;
+
+  const { data: genres, error: genresError } = await supabase
+    .from('genres')
+    .select('id, name, budget_yen');
+  if (genresError) {
+    throw new DiagnosisStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+  }
+  const genreById = new Map(genres.map((g) => [g.id, g]));
+
+  // 診断の根拠に「そのジャンルを今月どれだけ使っているか」を添える。
+  const monthSpentByGenre = new Map<string, number>();
+  for (const r of countable) {
+    const genreId = effectiveGenreId(r);
+    if (genreId === null) continue;
+    monthSpentByGenre.set(genreId, (monthSpentByGenre.get(genreId) ?? 0) - r.amount_yen);
   }
 
-  return undiagnosed.map((r) => ({
-    id: r.id,
-    label: r.merchant_name ?? r.description,
-    amountYen: r.amount_yen,
-    occurredOn: r.occurred_on,
-    genreName: r.genre_id ? (genreNameById.get(r.genre_id) ?? null) : null,
-  }));
+  const { data: items, error: itemsError } = await supabase
+    .from('receipt_items')
+    .select('transaction_id, name')
+    .in(
+      'transaction_id',
+      undiagnosed.map((r) => r.id),
+    );
+  if (itemsError && !isMissingTableError(itemsError)) {
+    throw new DiagnosisStoreError(`品目を取得できませんでした: ${itemsError.message}`);
+  }
+  const itemNamesByTransaction = new Map<string, string[]>();
+  for (const item of items ?? []) {
+    const list = itemNamesByTransaction.get(item.transaction_id) ?? [];
+    list.push(item.name);
+    itemNamesByTransaction.set(item.transaction_id, list);
+  }
+
+  return undiagnosed.map((r) => {
+    const genreId = effectiveGenreId(r);
+    const genre = genreId === null ? undefined : genreById.get(genreId);
+    return {
+      id: r.id,
+      label: r.merchant_name ?? r.description,
+      amountYen: r.amount_yen,
+      occurredOn: r.occurred_on,
+      genreName: genre?.name ?? null,
+      mustPay: r.must_pay,
+      genreMonthSpentYen: genreId === null ? null : (monthSpentByGenre.get(genreId) ?? null),
+      genreBudgetYen: genre?.budget_yen ?? null,
+      itemNames: (itemNamesByTransaction.get(r.id) ?? []).slice(0, MAX_ITEM_NAMES),
+    };
+  });
 }
 
 /** 診断結果を保存する。1明細1行(再診断は upsert で上書き)。 */

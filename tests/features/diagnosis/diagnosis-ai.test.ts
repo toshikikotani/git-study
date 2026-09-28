@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildFromAiRows, type SpendingDiagnosisInput } from '@/features/diagnosis/diagnosis-ai';
+import {
+  buildFromAiRows,
+  buildUserContent,
+  type SpendingDiagnosisInput,
+} from '@/features/diagnosis/diagnosis-ai';
 
 /**
  * AI診断の後段(ADR-030)。receipt-ai.test.ts と同じ考え方:モデルの出力
@@ -18,6 +22,10 @@ function input(
     amountYen: -500,
     occurredOn: '2026-09-03',
     genreName: 'カフェ・飲料',
+    mustPay: false,
+    genreMonthSpentYen: null,
+    genreBudgetYen: null,
+    itemNames: [],
     ...overrides,
   };
 }
@@ -93,5 +101,35 @@ describe('buildFromAiRows(diagnosis) — モデルの出力を信用しきらな
   it('渡された明細が空なら何もしない', () => {
     const result = buildFromAiRows([], []);
     expect(result).toEqual({ results: [], warnings: [] });
+  });
+});
+
+describe('buildUserContent — ジャンルを踏まえた診断の材料', () => {
+  it('ジャンルの今月合計・予算・必須ラベル・品目を渡す', () => {
+    const content = buildUserContent([
+      input('tx-1', {
+        genreName: '外食',
+        genreMonthSpentYen: 12000,
+        genreBudgetYen: 10000,
+        mustPay: true,
+        itemNames: ['ラーメン', '餃子'],
+      }),
+    ]);
+    expect(content).toContain('ジャンル=外食');
+    expect(content).toContain('ジャンル今月合計=12000円(予算10000円)');
+    expect(content).toContain('必須ラベル=あり');
+    expect(content).toContain('品目=ラーメン、餃子');
+  });
+
+  it('予算が無ければ予算なしと書き、未分類には合計を付けない', () => {
+    const withBudgetless = buildUserContent([
+      input('tx-1', { genreMonthSpentYen: 3000, genreBudgetYen: null }),
+    ]);
+    expect(withBudgetless).toContain('(予算なし)');
+
+    const uncategorized = buildUserContent([input('tx-2', { genreName: null })]);
+    expect(uncategorized).toContain('ジャンル=未分類');
+    expect(uncategorized).not.toContain('ジャンル今月合計');
+    expect(uncategorized).not.toContain('必須ラベル');
   });
 });
