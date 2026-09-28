@@ -80,6 +80,7 @@ import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files'
 const NAV = [
   { href: '/', label: 'ホーム' },
   { href: '/spending', label: '家計簿' },
+  { href: '/plan', label: '目標' },
   { href: '/payday', label: '給料日' },
 ] as const;
 

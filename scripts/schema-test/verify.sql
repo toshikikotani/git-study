@@ -156,6 +156,27 @@ begin
     raise notice 'OK: マイナスの予算を拒否した(ck_genres_budget)';
   end;
 
+  -- 支出目標の期間が逆転している
+  begin
+    insert into public.spending_plans (user_id, period_start, period_end)
+    values (u, '2026-10-31', '2026-10-01');
+    raise exception 'FAIL: 終了日が開始日より前の目標が通ってしまった';
+  exception when check_violation then
+    raise notice 'OK: 期間が逆転した目標を拒否した(ck_spending_plans_period)';
+  end;
+
+  -- 支出目標にマイナスの目標額
+  begin
+    insert into public.spending_plans (id, user_id, period_start, period_end)
+    values ('eeeeeeee-0000-0000-0000-000000000001', u, '2026-10-01', '2026-10-31');
+    insert into public.spending_plan_items (plan_id, user_id, genre_id, target_yen)
+    values ('eeeeeeee-0000-0000-0000-000000000001', u,
+            (select id from public.genres where user_id = u and name = '食料品'), -1);
+    raise exception 'FAIL: マイナスの目標額が通ってしまった';
+  exception when check_violation then
+    raise notice 'OK: マイナスの目標額を拒否した(ck_spending_plan_items_target)';
+  end;
+
   -- 返済額が利息を下回るケース
   begin
     perform * from public.simulate_debt_payoff('dddddddd-0000-0000-0000-000000000001', 1000);
