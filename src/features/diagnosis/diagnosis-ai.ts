@@ -1,8 +1,11 @@
 /**
  * 明細1件ごとの「浪費 か 必要経費 か」のAI診断(ADR-030)。
  *
- * category_kind はカテゴリ単位の静的な分類で、1件ごとの事情は表せない。
- * ここは主観的な評定なので、確定的な判定(FR-21)と違いAIに任せる(ADR-010)。
+ * ジャンル(genres、ADR-057で唯一の分類になった)は支出の種類を表すだけで、
+ * 1件ごとの事情までは表せない。ここは主観的な評定なので、確定的な判定
+ * (FR-21)と違いAIに任せる(ADR-010)。ジャンルは判断の軸として、その月の
+ * ジャンル合計・予算、本人が付けた「絶対払わざるを得ない」ラベル、
+ * レシート品目とあわせて渡す。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -29,6 +32,14 @@ export type SpendingDiagnosisInput = {
   amountYen: number;
   occurredOn: DateOnly;
   genreName: string | null;
+  /** 本人が「絶対払わざるを得ないもの」と付けたラベル(ADR-057)。 */
+  mustPay: boolean;
+  /** このジャンルの今月の支出合計(円、正)。ジャンルが未分類なら null。 */
+  genreMonthSpentYen: number | null;
+  /** このジャンルの月次予算(円)。未設定なら null。 */
+  genreBudgetYen: number | null;
+  /** レシート品目の品名(何を買ったかの手掛かり)。無ければ空。 */
+  itemNames: readonly string[];
 };
 
 export type SpendingDiagnosisResult = {
@@ -70,7 +81,14 @@ const SYSTEM_PROMPT = [
   '- 「浪費」とは、それが無くても生活・仕事に支障が出ない、気晴らしや欲求を',
   '  満たすためだけの支出。金額の大小だけでは判断しない(少額でも繰り返せば',
   '  浪費たり得るし、高額でも仕事の投資なら必要経費たり得る)。',
-  '- カテゴリ名は参考程度に留め、店名・金額・日付など実際の内容から判断する。',
+  '- ジャンル(食料品・外食・娯楽など)は判断の軸にする。同じジャンルの',
+  '  今月の合計や予算が渡されたら、その中での位置づけ(予算を超えているジャンル',
+  '  への追加支出か、繰り返しか)も根拠に含める。ジャンルが未分類なら店名から判断する。',
+  '- 「必須ラベル」は本人が絶対払わざるを得ないと自ら付けた支出。原則として',
+  '  必要経費と判断してよいが、内容と明らかに矛盾する場合はその旨を理由に書く。',
+  '- レシート品目が渡された場合は、店名よりも品目を優先して内容を判断する。',
+  '- ジャンルの名前だけで機械的に決めない。店名・品目・金額・日付など実際の',
+  '  内容も見る。',
   '- 迷う場合は「必要経費」側に倒さない。本人は甘い判断ではなく客観的な評価を',
   '  求めている。',
   '- reasoning は1文・40字程度。ラベルの言い換えではなく、判断の根拠を書く。',
@@ -112,13 +130,23 @@ export class ClaudeSpendingDiagnosisAnalyzer implements SpendingDiagnosisAnalyze
   }
 }
 
-function buildUserContent(transactions: readonly SpendingDiagnosisInput[]): string {
-  const lines = transactions.map(
-    (t) =>
-      `id=${t.id} 日付=${t.occurredOn} 店=${t.label} 金額=${Math.abs(t.amountYen)}円 ジャンル=${
-        t.genreName ?? '未分類'
-      }`,
-  );
+export function buildUserContent(transactions: readonly SpendingDiagnosisInput[]): string {
+  const lines = transactions.map((t) => {
+    const parts = [
+      `id=${t.id}`,
+      `日付=${t.occurredOn}`,
+      `店=${t.label}`,
+      `金額=${Math.abs(t.amountYen)}円`,
+      `ジャンル=${t.genreName ?? '未分類'}`,
+    ];
+    if (t.genreMonthSpentYen !== null) {
+      const budget = t.genreBudgetYen === null ? '予算なし' : `予算${t.genreBudgetYen}円`;
+      parts.push(`ジャンル今月合計=${t.genreMonthSpentYen}円(${budget})`);
+    }
+    if (t.mustPay) parts.push('必須ラベル=あり');
+    if (t.itemNames.length > 0) parts.push(`品目=${t.itemNames.join('、')}`);
+    return parts.join(' ');
+  });
   return ['以下の明細それぞれについて、浪費か必要経費かを判断してください。', ...lines].join('\n');
 }
 
