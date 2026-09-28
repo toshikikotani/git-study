@@ -22,10 +22,11 @@ import { parseStructured } from '@/lib/anthropic';
 /** ジャンル分類に使うモデル(ADR-056)。日付サフィックスは付けない。 */
 export const GENRE_CLASSIFICATION_MODEL = 'claude-haiku-4-5';
 
-/** 1回のリクエストに含める件数。reasoning が無く出力が軽いため、
- * classification/ai.ts(40件)より多めにできる。 */
-export const DEFAULT_BATCH_SIZE = 60;
-const OUTPUT_TOKENS_PER_ITEM = 40;
+/** 1回のリクエストに含める件数。出力が途中で切れるとバッチ全体が失敗する
+ * ため、classification/ai.ts と同じ40件に抑える。 */
+export const DEFAULT_BATCH_SIZE = 40;
+// id(uuid)・ジャンル名・確信度で1件あたり50〜60トークン使うため、余裕を持たせる。
+const OUTPUT_TOKENS_PER_ITEM = 100;
 const MIN_OUTPUT_TOKENS = 512;
 
 /** ジャンルの選択肢。呼び出し側が本人の genres 一覧を渡す(ここでは DB を読まない)。 */
