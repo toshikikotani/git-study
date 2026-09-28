@@ -1584,6 +1584,47 @@ create table public.transaction_expense_subtypes (
 );
 
 create index ix_transaction_expense_subtypes_user on public.transaction_expense_subtypes (user_id);
+-- 3.31 spending_plans / spending_plan_items — 期間つきの支出目標(本人発案、ADR-058)
+--
+--   カレンダーで選んだ期間(period_start〜period_end)について、ジャンルごとの
+--   支出目標を持つ。AIが過去の支出と課題(予算超過・増加傾向・浪費判定・
+--   必須ラベル)から目安を提案し(ai_suggested_yen、reason)、本人が
+--   target_yen へ直す。step_percent は提案時の「改善の強さ」で、1回の
+--   目標で削る幅の上限(徐々に改善するための歯止め)。ジャンルの恒常的な
+--   月次予算(genres.budget_yen)とは別物で、期間ごとに立て直していく。
+-- -----------------------------------------------------------------------------
+create table public.spending_plans (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references auth.users(id) on delete cascade,
+  period_start date        not null,
+  period_end   date        not null,
+  step_percent integer     not null default 10,
+  created_at   timestamptz not null default now(),
+
+  constraint ck_spending_plans_period check (period_end >= period_start),
+  constraint ck_spending_plans_step   check (step_percent between 0 and 50)
+);
+
+create index ix_spending_plans_user on public.spending_plans (user_id, created_at desc);
+
+create table public.spending_plan_items (
+  id               uuid   primary key default gen_random_uuid(),
+  plan_id          uuid   not null references public.spending_plans(id) on delete cascade,
+  user_id          uuid   not null references auth.users(id) on delete cascade,
+  genre_id         uuid   not null references public.genres(id) on delete cascade,
+  target_yen       bigint not null,
+  ai_suggested_yen bigint,
+  reason           text,
+
+  constraint ck_spending_plan_items_target check (target_yen >= 0),
+  constraint ck_spending_plan_items_ai     check (ai_suggested_yen is null or ai_suggested_yen >= 0)
+);
+
+create unique index ux_spending_plan_items_plan_genre
+  on public.spending_plan_items (plan_id, genre_id);
+create index ix_spending_plan_items_user on public.spending_plan_items (user_id);
+
+
 
 
 -- =============================================================================
@@ -1925,7 +1966,7 @@ begin
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
-    'transaction_expense_subtypes','genres'
+    'transaction_expense_subtypes','genres','spending_plans','spending_plan_items'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -2116,4 +2157,6 @@ commit;
 --   import_batches          → FR-10 の冪等な取り込み
 --   app_checkins            → FR-62 のストリーク算出
 --   genres                  → ADR-056/ADR-057。唯一の分類(旧 categories を置換)
+--   spending_plans          → ADR-058。カレンダーで選んだ期間のジャンル別支出目標
+--   spending_plan_items     → ADR-058。目標の明細(AI提案額と本人の目標額)
 -- =============================================================================

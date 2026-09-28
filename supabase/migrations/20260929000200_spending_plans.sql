@@ -1,29 +1,15 @@
 -- =============================================================================
---  未適用のマイグレーションを、1回のコピペでまとめて適用する(ADR-058)
+--  spending_plans / spending_plan_items — 期間つきの支出目標(本人発案、ADR-058)
 --
---  使い方:
---    1. https://supabase.com/dashboard で対象プロジェクトを開く
---    2. 左メニュー「SQL Editor」→「New query」
---    3. このファイルを全部コピーして貼り付け、Run(Ctrl+Enter)
---    4. 最後に出る表で、全部の行が ok になっていることを確認する
---
---  何度実行しても壊れない(既に適用済みの部分は黙って飛ばす)。
---  全体が1つのトランザクションなので、途中で失敗したら何も適用されない。
---
---  これは supabase/migrations/ の未適用分を機械的に連結したもので、内容の正は
---  あくまで supabase/migrations/。ずれていないことは
---  scripts/verify-apply-pending.sh が検証する(CI でも実行する)。
---
---  B-4/B-5/B-7/B-10/B-12/B-13/B-14/B-15/B-16 は2026-09-22に、ADR-056/057
---  (genres・categories 等の廃止と genre_id への一本化)までのマイグレーションは
---  2026-09-29に本人が適用済み。このファイルは以後、その時点で未適用だった
---  ものだけを持つ。
+--  出典: docs/schema.sql(人間が全体像を読むための正)
+--  この 20260929000200_spending_plans.sql は実際に適用される正。
+--  以降の変更は、このファイルを書き換えるのではなく新しいマイグレーションを
+--  追加し、docs/schema.sql にも同じ変更を反映すること。
+--  両者の乖離は scripts/verify-migrations.sh と CI が検出する。
 -- =============================================================================
 
 begin;
 
--- 1. spending_plans / spending_plan_items — 期間つきの支出目標(ADR-058)
--- -----------------------------------------------------------------------------
 -- 3.31 spending_plans / spending_plan_items — 期間つきの支出目標(本人発案、ADR-058)
 --
 --   カレンダーで選んだ期間(period_start〜period_end)について、ジャンルごとの
@@ -33,7 +19,7 @@ begin;
 --   目標で削る幅の上限(徐々に改善するための歯止め)。ジャンルの恒常的な
 --   月次予算(genres.budget_yen)とは別物で、期間ごとに立て直していく。
 -- -----------------------------------------------------------------------------
-create table if not exists public.spending_plans (
+create table public.spending_plans (
   id           uuid        primary key default gen_random_uuid(),
   user_id      uuid        not null references auth.users(id) on delete cascade,
   period_start date        not null,
@@ -45,9 +31,9 @@ create table if not exists public.spending_plans (
   constraint ck_spending_plans_step   check (step_percent between 0 and 50)
 );
 
-create index if not exists ix_spending_plans_user on public.spending_plans (user_id, created_at desc);
+create index ix_spending_plans_user on public.spending_plans (user_id, created_at desc);
 
-create table if not exists public.spending_plan_items (
+create table public.spending_plan_items (
   id               uuid   primary key default gen_random_uuid(),
   plan_id          uuid   not null references public.spending_plans(id) on delete cascade,
   user_id          uuid   not null references auth.users(id) on delete cascade,
@@ -60,9 +46,9 @@ create table if not exists public.spending_plan_items (
   constraint ck_spending_plan_items_ai     check (ai_suggested_yen is null or ai_suggested_yen >= 0)
 );
 
-create unique index if not exists ux_spending_plan_items_plan_genre
+create unique index ux_spending_plan_items_plan_genre
   on public.spending_plan_items (plan_id, genre_id);
-create index if not exists ix_spending_plan_items_user on public.spending_plan_items (user_id);
+create index ix_spending_plan_items_user on public.spending_plan_items (user_id);
 
 alter table public.spending_plans enable row level security;
 alter table public.spending_plans force row level security;
@@ -85,20 +71,3 @@ create policy "own_rows" on public.spending_plan_items
   with check (user_id = (select auth.uid()));
 
 commit;
-
--- =============================================================================
---  確認 — 下の表で status が全部 ok なら完了
--- =============================================================================
-select
-  'spending_plans' as "テーブル",
-  case when exists (
-    select 1 from information_schema.tables
-    where table_schema = 'public' and table_name = 'spending_plans'
-  ) then 'ok' else 'NG: テーブルが無い' end as status
-union all
-select
-  'spending_plan_items',
-  case when exists (
-    select 1 from information_schema.tables
-    where table_schema = 'public' and table_name = 'spending_plan_items'
-  ) then 'ok' else 'NG: テーブルが無い' end;

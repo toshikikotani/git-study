@@ -1426,6 +1426,78 @@ export type Database = {
           },
         ];
       };
+      spending_plan_items: {
+        Row: {
+          ai_suggested_yen: number | null;
+          genre_id: string;
+          id: string;
+          plan_id: string;
+          reason: string | null;
+          target_yen: number;
+          user_id: string;
+        };
+        Insert: {
+          ai_suggested_yen?: number | null;
+          genre_id: string;
+          id?: string;
+          plan_id: string;
+          reason?: string | null;
+          target_yen: number;
+          user_id: string;
+        };
+        Update: {
+          ai_suggested_yen?: number | null;
+          genre_id?: string;
+          id?: string;
+          plan_id?: string;
+          reason?: string | null;
+          target_yen?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'spending_plan_items_genre_id_fkey';
+            columns: ['genre_id'];
+            isOneToOne: false;
+            referencedRelation: 'genres';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'spending_plan_items_plan_id_fkey';
+            columns: ['plan_id'];
+            isOneToOne: false;
+            referencedRelation: 'spending_plans';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      spending_plans: {
+        Row: {
+          created_at: string;
+          id: string;
+          period_end: string;
+          period_start: string;
+          step_percent: number;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          period_end: string;
+          period_start: string;
+          step_percent?: number;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          period_end?: string;
+          period_start?: string;
+          step_percent?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       transaction_diagnoses: {
         Row: {
           created_at: string;
