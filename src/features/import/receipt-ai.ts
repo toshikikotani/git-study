@@ -121,7 +121,14 @@ export interface AiReceiptExtractor {
  */
 const itemSchema = z.object({
   name: z.string().describe('商品名・品名。レシートに印字された表記のまま。'),
-  amount_yen: z.number().describe('その商品の金額(値引き後の実際の請求額)。円単位の整数。'),
+  amount_yen: z
+    .number()
+    .describe(
+      'その商品の金額(値引き後の実際の請求額)。消費税を含めた税込の金額を返す。' +
+        'レシート上の商品行が税抜表示になっている場合は、その商品にかかる消費税を' +
+        '含めた税込額に直して返す(商品ごとの税込額の合計が、支払合計の金額と' +
+        '一致するように)。円単位の整数。',
+    ),
   product_type: z
     .string()
     .describe(
@@ -200,6 +207,9 @@ const SYSTEM_PROMPT = [
   '- items には商品行を1行ずつ書き写す。小計・合計・お預り・お釣り・消費税・',
   '  ポイント付与/使用の行は商品ではないので含めない。内訳が印字されていない、',
   '  商品が1点しかない、または振込明細の場合は items を空配列にしてよい。',
+  '  商品ごとの金額は消費税を含めた税込額で返す。レシートの商品行が税抜表示で、',
+  '  消費税が別の行にまとめて書かれている場合は、その消費税を商品に按分して',
+  '  税込額に直す(商品ごとの税込額を合計すると、支払合計の金額と一致するように)。',
   '- 1枚に複数のレシート・振込明細が写っていれば、すべて返す。',
   '- レシート・領収書でも振込/送金の完了画面でもない画像(無関係な写真、',
   '  読み取れないほど不鮮明な画像など)は is_recognized を false にして',
@@ -301,7 +311,7 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
       description: label,
       // ここが FR-21 の砦。判定するのはモデルではなく正規表現(ADR-010)。
       paymentMethod: readPaymentMethod(row.payment_method_text),
-      items: buildItems(row.items),
+      items: reconcileItemsWithAmount(buildItems(row.items), -amount, row.items.length),
       expenseSubtype: toNullableLabel(row.expense_subtype),
     });
   }
@@ -311,6 +321,48 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
   }
 
   return { transactions, warnings };
+}
+
+/**
+ * 商品行を明細の支払合計に合わせて補正する(本人発案:「登録後レシートの
+ * 中身と合わないことが多い。おそらく原因としては税抜とかが影響してる。
+ * その辺の情報も判断に含める必要がある。購入製品が一個だけだったら合計
+ * 金額と一致するのが正だと思う」)。
+ *
+ * 日本のレシートは商品ごとの内訳を税抜表示にし、消費税だけ別行にまとめる
+ * 組み方が多い。プロンプト側で商品行を税込に直すよう指示しているが、
+ * 読み取り自体が完璧とは限らないため、ここでもう一段補正する:
+ *
+ *   - レシートに商品行が本当に1点だけ印字されていたなら、按分する相手が
+ *     いないので支払合計そのものがその商品の金額として正しい(曖昧さが
+ *     無い、本人の指摘どおり)。金額が0円などで無効として弾かれた行が
+ *     混ざっていた場合(buildItems 参照)は対象外にする——「1点だけ」は
+ *     読み取り時点(originalItemCount)の話であり、フィルタ後の件数では
+ *     判断しない。
+ *   - 商品が2点以上で、内訳の合計と支払合計の差が商品の点数以下(消費税の
+ *     四捨五入が商品ごとに最大1円ずれる想定)なら、読み取りは実質正しいと
+ *     見なし、その差額を最後の商品行に足して合計を一致させる。
+ *   - それより大きくずれている場合は読み取りそのものが不正確な可能性が
+ *     高いため補正しない(receipt-items.ts の receiptItemsStatus が
+ *     「合計が一致しません」の警告として本人に見せる)。
+ */
+function reconcileItemsWithAmount(
+  items: readonly ParsedReceiptItem[],
+  amountYen: number,
+  originalItemCount: number,
+): ParsedReceiptItem[] {
+  if (items.length === 0) return [];
+  if (items.length === 1 && originalItemCount === 1) {
+    return [{ ...items[0]!, amountYen }];
+  }
+
+  const sum = items.reduce((acc, it) => acc + it.amountYen, 0);
+  const diff = amountYen - sum;
+  if (diff === 0) return [...items];
+  if (Math.abs(diff) > items.length) return [...items];
+
+  const lastIndex = items.length - 1;
+  return items.map((it, i) => (i === lastIndex ? { ...it, amountYen: it.amountYen + diff } : it));
 }
 
 /**

@@ -18,6 +18,7 @@ import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import {
   itemsReconcileWithTotal,
+  type ParsedReceiptItem,
   type ParsedReceiptTransaction,
   type ReceiptParseResult,
 } from '@/features/import/receipt-ai';
@@ -41,13 +42,15 @@ import {
  * 設計原則2(記録の手間を最小化)に沿うと、レシートを撮るだけで済む経路が
  * 現金払いの「主経路」になる(貼り付け画面のような一時的な逃げ道ではない)。
  *
- * ── なぜ選択後すぐに AI を呼ばないのか ──────────────────────
- * この経路には辞書のような費用ゼロの手段が無く、呼べば必ず課金される。
- * 貼り付け画面と同じく、写真を選んだだけでは呼ばず、押されたときだけ呼ぶ。
- * これは「読み取り」(抽出)の話——読み取りが終わった後の「分類」は、
- * 既に本人が押した読み取りボタンの続きの処理として自動で行う
- * (本人発案、wasExtractingRef の effect 参照。追加の課金判断が要る
- * 新しい呼び出しではなく、1回の明示操作の中で完結する処理という位置づけ)。
+ * ── 撮る・選ぶの直後に自動で読み取る(本人発案、ADR-055) ─────────
+ * 以前は写真を選んだだけでは AI を呼ばず、専用の「AI に読み取らせる」
+ * ボタンを押したときだけ呼んでいた(課金判断を明示操作に絞る設計)。
+ * 「撮影後はすぐ読みとって。もう押すしかないんだからAI分析はちゃっちゃ
+ * かけて」という指摘を受け、撮る・選ぶという操作自体をその課金判断とみなす
+ * ことにした——レシートを撮る・選ぶ以外にこの画面で本人がすることは無く、
+ * 読み取りボタンは「必ず次に押す」だけの1手間になっていた。読み取りが
+ * 終わった後の「分類」は、既に自動になった読み取りの続きとして変わらず
+ * 自動で行う(本人発案、wasExtractingRef の effect 参照)。
  *
  * ── 複数枚まとめて取り込み(本人発案) ─────────────────────────
  * 1回の選択で複数枚を渡せる(`<input multiple>`)。「1回の撮影=1バッチ」
@@ -102,6 +105,32 @@ function applyAiResults(
   });
 }
 
+/**
+ * 本人が手でカテゴリを直した結果(押されたときだけ)を、AI分類済みの行に
+ * さらに上書きで反映する(本人発案:「編集はレシートの品目や日付カテゴリ
+ * 全て柔軟に手で編集できるようにして」)。applyAiResults と同じ「合成id
+ * をキーにした上書きMap」の形だが、優先順位はこちらが最も高い
+ * (手動 > AI > ルール、本人が直接選んだ値を機械分類が覆すことは無い)。
+ */
+function applyManualCategoryOverrides(
+  rows: readonly StoredTransaction[],
+  overrides: ReadonlyMap<string, string | null>,
+  categoryNameById: ReadonlyMap<string, string>,
+): StoredTransaction[] {
+  if (overrides.size === 0) return [...rows];
+  return rows.map((t) => {
+    if (!overrides.has(t.id)) return t;
+    const categoryId = overrides.get(t.id) ?? null;
+    return {
+      ...t,
+      categoryId,
+      categoryName: categoryId === null ? null : (categoryNameById.get(categoryId) ?? null),
+      classifiedBy: 'manual',
+      confidence: null,
+    };
+  });
+}
+
 /** 写真1枚分の状態。「1枚=1バッチ」を保つため、抽出・保存の単位もここで揃える。 */
 type ReceiptEntry = {
   id: string;
@@ -135,6 +164,19 @@ export default function ReceiptPage() {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountId, setAccountId] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
+  // 分析後すぐに手で直せるようにする(本人発案:「分析後すぐに編集または
+  // 削除できるようにして。編集はレシートの品目や日付カテゴリ全て柔軟に
+  // 手で編集できるようにして」)。カテゴリはルール→AIの結果を上書きする
+  // 追加の1段として、aiResults と同じ「合成id(receipt-${entryId}-${i})
+  // をキーにしたMap」の形にする(applyAiResults と同じ考え方、優先順位は
+  // 手動 > AI > ルール)。日付・品目(名前・金額)はルール分類に影響しない
+  // ため、上書きMapを介さず entries state を直接書き換える(値がそのまま
+  // rulePreview/itemRulePreviewByIndex に流れる)。
+  const [manualCategoryOverrides, setManualCategoryOverrides] = useState<
+    Map<string, string | null>
+  >(new Map());
+  // 一度に1件だけ編集フォームを開く(`${entryId}:${index}` 形式のキー)。
+  const [editingKey, setEditingKey] = useState<string | null>(null);
 
   // 学習済みルール(M2-5)。取得に失敗しても固定の検知ルールだけで取り込みは動く
   useEffect(() => {
@@ -173,6 +215,14 @@ export default function ReceiptPage() {
     [learnedRules],
   );
 
+  // 撮影・選択の直後に自動でAIに読み取らせる(本人発案:「撮影後はすぐ
+  // 読みとって。もう押すしかないんだからAI分析はちゃっちゃとかけて」)。
+  // 以前は読み取り専用のボタンを挟んでいたが、レシートを撮る・選ぶという
+  // 操作自体が既に本人の明示操作であり、その続きとして読み取りを呼ぶことに
+  // 追加の課金判断を挟む理由が無い(この画面の元々の判断は「選んだだけでは
+  // 呼ばない」だったが、本人の指示でボタン1つ分の手間を無くす方に倒した)。
+  // 「追加でレシートを追加する」操作(下の「撮る」「選ぶ」ボタン)自体は
+  // そのまま残し、その直後に自動で読み取りが続く形にした。
   const onFiles = async (files: readonly File[]) => {
     if (files.length === 0) return;
     setSaved(null);
@@ -199,6 +249,17 @@ export default function ReceiptPage() {
       }),
     );
     setEntries((prev) => [...prev, ...newEntries]);
+
+    const targets = newEntries
+      .filter((e): e is ReceiptEntry & { imageBase64: string } => e.imageBase64 !== null)
+      .map((e) => ({ id: e.id, imageBase64: e.imageBase64 }));
+    if (targets.length === 0) return;
+    setExtracting(true);
+    try {
+      await extractByTargets(targets);
+    } finally {
+      setExtracting(false);
+    }
   };
 
   // ボトムナビのカメラ FAB(app/(app)/layout.tsx)から撮ってきたファイルを
@@ -215,10 +276,16 @@ export default function ReceiptPage() {
   // コールバック内で行う(react-hooks/set-state-in-effect:effect の中で
   // 直接 setState を呼ぶとカスケードするレンダーになるため)。購読側の
   // コールバックは effect の外(別のユーザー操作)から呼ばれるため対象外。
+  //
+  // onFiles は毎レンダー新しい関数になる(撮影直後の自動読み取りを内側で
+  // 呼ぶため)。classify/classifyRef(下記)と同じ理由・同じ流儀で ref
+  // 越しに最新の onFiles を呼び、依存配列を空(マウント時のみ)に保つ。
+  const onFilesRef = useRef(onFiles);
+  onFilesRef.current = onFiles;
   useEffect(() => {
     const consume = () => {
       const pending = takePendingReceiptFiles();
-      if (pending && pending.length > 0) void onFiles(pending);
+      if (pending && pending.length > 0) void onFilesRef.current(pending);
     };
     void Promise.resolve().then(consume);
     return subscribePendingReceiptFiles(consume);
@@ -232,9 +299,47 @@ export default function ReceiptPage() {
     });
   };
 
-  const pendingExtraction = entries.filter((e) => e.imageBase64 && !e.extracted);
+  // 分析後すぐに手で直せるようにする(本人発案)。日付・品目(名前・金額)は
+  // ルール分類に影響しない値のため、entries state を直接書き換える——
+  // rulePreview/itemRulePreviewByIndex は毎回entriesから作り直す(entryPreviews
+  // のuseMemo参照)ので、ここを直すだけで下流のプレビュー全体に反映される。
+  function updateOccurredOn(entryId: string, index: number, occurredOn: string): void {
+    setEntries((prev) =>
+      prev.map((e) => {
+        if (e.id !== entryId || !e.extracted) return e;
+        const transactions = e.extracted.transactions.map((t, i) =>
+          i === index ? { ...t, occurredOn } : t,
+        );
+        return { ...e, extracted: { ...e.extracted, transactions } };
+      }),
+    );
+  }
 
-  // 複数枚まとめて(extractAll)、撮り直した1枚だけ(retakeEntry)の両方から呼ぶ。
+  function updateItem(
+    entryId: string,
+    index: number,
+    itemIndex: number,
+    patch: { description?: string; amountYen?: number },
+  ): void {
+    setEntries((prev) =>
+      prev.map((e) => {
+        if (e.id !== entryId || !e.extracted) return e;
+        const transactions = e.extracted.transactions.map((t, i) => {
+          if (i !== index) return t;
+          const items = t.items.map((item, j) => (j === itemIndex ? { ...item, ...patch } : item));
+          return { ...t, items };
+        });
+        return { ...e, extracted: { ...e.extracted, transactions } };
+      }),
+    );
+  }
+
+  function setManualCategory(syntheticId: string, categoryId: string | null): void {
+    setManualCategoryOverrides((prev) => new Map(prev).set(syntheticId, categoryId));
+  }
+
+  // 撮影・選択直後の自動読み取り(onFiles)、撮り直した1枚だけ(retakeEntry)
+  // の両方から呼ぶ。
   const extractByTargets = async (
     targets: readonly { id: string; imageBase64: string }[],
   ): Promise<void> => {
@@ -275,18 +380,6 @@ export default function ReceiptPage() {
         extractedById.has(e.id) ? { ...e, extracted: extractedById.get(e.id)! } : e,
       ),
     );
-  };
-
-  const extractAll = async () => {
-    if (pendingExtraction.length === 0) return;
-    setExtracting(true);
-    try {
-      await extractByTargets(
-        pendingExtraction.map((e) => ({ id: e.id, imageBase64: e.imageBase64! })),
-      );
-    } finally {
-      setExtracting(false);
-    }
   };
 
   // 金額が一致しなかった1枚だけ撮り直す(本人発案)。他の写真・明細は
@@ -399,12 +492,23 @@ export default function ReceiptPage() {
     () =>
       entryPreviews.map((p) => ({
         ...p,
-        preview: applyAiResults(p.rulePreview, aiResults),
+        preview: applyManualCategoryOverrides(
+          applyAiResults(p.rulePreview, aiResults),
+          manualCategoryOverrides,
+          categoryNameById,
+        ),
         itemPreviewByIndex: new Map(
-          [...p.itemRulePreviewByIndex].map(([i, rows]) => [i, applyAiResults(rows, aiResults)]),
+          [...p.itemRulePreviewByIndex].map(([i, rows]) => [
+            i,
+            applyManualCategoryOverrides(
+              applyAiResults(rows, aiResults),
+              manualCategoryOverrides,
+              categoryNameById,
+            ),
+          ]),
         ),
       })),
-    [entryPreviews, aiResults],
+    [entryPreviews, aiResults, manualCategoryOverrides, categoryNameById],
   );
 
   // 分割対象の親(明細本体)自身の分類は「AIに回す」の対象にしない(save() 参照)。
@@ -439,7 +543,7 @@ export default function ReceiptPage() {
     }
   };
 
-  // 読み取り(extractAll・retakeEntry)が終わった直後に、押されるのを待たず
+  // 読み取り(onFiles・retakeEntry)が終わった直後に、押されるのを待たず
   // 自動でAI分類まで済ませる(本人発案:「分類させるボタンはもう最初から
   // 分類させた状態にして」)。読み取り自体は既に本人の明示操作(撮る/選ぶ)
   // で呼ばれた後の続きの処理なので、ここで追加のAI呼び出しをためらう理由は
@@ -581,7 +685,164 @@ export default function ReceiptPage() {
     for (const entry of entries) URL.revokeObjectURL(entry.previewUrl);
     setEntries([]);
     setAiResults(new Map());
+    setManualCategoryOverrides(new Map());
+    setEditingKey(null);
   };
+
+  /**
+   * 分析後すぐに手で直す編集フォーム(本人発案:「編集はレシートの品目や
+   * 日付カテゴリ全て柔軟に手で編集できるようにして」)。分割対象(親自体は
+   * 分類しない、unclassifiedOf() 参照)かどうかで親のカテゴリ選択欄の
+   * 有無を分けるだけで、日付・品目の編集は両方の見た目で共通にする。
+   */
+  function renderEditControls(
+    entryId: string,
+    index: number,
+    t: StoredTransaction,
+    rawItems: readonly ParsedReceiptItem[],
+    classifiedItems: readonly StoredTransaction[] | undefined,
+    showParentCategory: boolean,
+  ) {
+    const key = `${entryId}:${index}`;
+    const isOpen = editingKey === key;
+    const categoryOptions = [...categoryNameById.entries()];
+
+    return (
+      <li className="px-4 pb-3 -mt-1">
+        <div className="flex items-center gap-4 text-[11px]">
+          <button
+            type="button"
+            onClick={() => setEditingKey(isOpen ? null : key)}
+            className="font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            {isOpen ? '編集を閉じる' : '編集する'}
+          </button>
+          <button
+            type="button"
+            onClick={() => removeEntry(entryId)}
+            className="font-semibold"
+            style={{ color: 'var(--over)' }}
+          >
+            この明細を削除する
+          </button>
+        </div>
+
+        {isOpen ? (
+          <div
+            className="mt-2 space-y-2.5 rounded-xl border p-3"
+            style={{ borderColor: 'var(--hairline)' }}
+          >
+            <label className="block">
+              <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                日付
+              </span>
+              <input
+                type="date"
+                value={t.occurredOn}
+                onChange={(e) => updateOccurredOn(entryId, index, e.target.value)}
+                className="mt-1 block w-full rounded-lg px-2 py-1.5 text-sm"
+                style={{
+                  background: 'var(--plane)',
+                  color: 'var(--ink)',
+                  border: '1px solid var(--hairline)',
+                }}
+              />
+            </label>
+
+            {showParentCategory ? (
+              <label className="block">
+                <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                  カテゴリ
+                </span>
+                <select
+                  value={t.categoryId ?? ''}
+                  onChange={(e) => setManualCategory(t.id, e.target.value || null)}
+                  className="mt-1 block w-full rounded-lg px-2 py-1.5 text-sm"
+                  style={{
+                    background: 'var(--plane)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--hairline)',
+                  }}
+                >
+                  <option value="">未分類</option>
+                  {categoryOptions.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {rawItems.length > 0 ? (
+              <div className="space-y-1.5">
+                <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                  品目
+                </span>
+                {rawItems.map((item, j) => {
+                  const classified = classifiedItems?.[j];
+                  return (
+                    <div key={j} className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) =>
+                          updateItem(entryId, index, j, { description: e.target.value })
+                        }
+                        placeholder="品名"
+                        className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-sm"
+                        style={{
+                          background: 'var(--plane)',
+                          color: 'var(--ink)',
+                          border: '1px solid var(--hairline)',
+                        }}
+                      />
+                      {classified ? (
+                        <select
+                          value={classified.categoryId ?? ''}
+                          onChange={(e) => setManualCategory(classified.id, e.target.value || null)}
+                          className="rounded-lg px-1.5 py-1.5 text-sm"
+                          style={{
+                            background: 'var(--plane)',
+                            color: 'var(--ink)',
+                            border: '1px solid var(--hairline)',
+                          }}
+                        >
+                          <option value="">未分類</option>
+                          {categoryOptions.map(([id, name]) => (
+                            <option key={id} value={id}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={String(Math.abs(item.amountYen))}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^0-9]/g, '');
+                          updateItem(entryId, index, j, { amountYen: -Number(digits || '0') });
+                        }}
+                        placeholder="金額"
+                        className="w-20 shrink-0 rounded-lg px-2 py-1.5 text-sm"
+                        style={{
+                          background: 'var(--plane)',
+                          color: 'var(--ink)',
+                          border: '1px solid var(--hairline)',
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </li>
+    );
+  }
 
   return (
     <div className="rise space-y-4">
@@ -776,16 +1037,12 @@ export default function ReceiptPage() {
           </ul>
         ) : null}
 
-        {pendingExtraction.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => void extractAll()}
-            disabled={extracting}
-            className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >
-            {extracting ? '読み取っています…' : `AI に読み取らせる(${pendingExtraction.length}枚)`}
-          </button>
+        {/* 撮影・選択の直後に自動で読み取るため(onFiles)、ここは押すボタン
+            ではなく進行中を知らせるだけの表示にする(本人発案)。 */}
+        {extracting ? (
+          <p className="mt-4 text-center text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
+            読み取っています…
+          </p>
         ) : null}
 
         {previews.map((p) => (
@@ -849,6 +1106,14 @@ export default function ReceiptPage() {
                             ) : null}
                           </li>
                         ) : null}
+                        {renderEditControls(
+                          p.entry.id,
+                          i,
+                          t,
+                          rawItems,
+                          p.itemPreviewByIndex.get(i),
+                          true,
+                        )}
                       </Fragment>
                     );
                   }
@@ -856,30 +1121,40 @@ export default function ReceiptPage() {
                   // 対象にしない(分類は商品行=splits 側にある)ため、通常の
                   // TransactionRow ではなく専用の見た目にする。
                   return (
-                    <li key={t.id} className="px-4 py-3">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
-                          {t.description}
+                    <Fragment key={t.id}>
+                      <li className="px-4 py-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
+                            {t.description}
+                          </p>
+                          <span
+                            className="tabular shrink-0 text-[15px] font-semibold"
+                            style={{ color: 'var(--ink)' }}
+                          >
+                            −{formatYen(Math.abs(t.amountYen))}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                          商品ごとに{items.length}件のカテゴリへ分けて取り込みます
                         </p>
-                        <span
-                          className="tabular shrink-0 text-[15px] font-semibold"
-                          style={{ color: 'var(--ink)' }}
+                        <ul
+                          className="mt-2 divide-y overflow-hidden rounded-xl"
+                          style={{ borderColor: 'var(--hairline)', background: 'var(--surface)' }}
                         >
-                          −{formatYen(Math.abs(t.amountYen))}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                        商品ごとに{items.length}件のカテゴリへ分けて取り込みます
-                      </p>
-                      <ul
-                        className="mt-2 divide-y overflow-hidden rounded-xl"
-                        style={{ borderColor: 'var(--hairline)', background: 'var(--surface)' }}
-                      >
-                        {items.map((item) => (
-                          <TransactionRow key={item.id} transaction={item} />
-                        ))}
-                      </ul>
-                    </li>
+                          {items.map((item) => (
+                            <TransactionRow key={item.id} transaction={item} />
+                          ))}
+                        </ul>
+                      </li>
+                      {renderEditControls(
+                        p.entry.id,
+                        i,
+                        t,
+                        p.entry.extracted.transactions[i]?.items ?? [],
+                        items,
+                        false,
+                      )}
+                    </Fragment>
                   );
                 })}
               </ul>
