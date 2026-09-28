@@ -72,7 +72,7 @@ const GROUPS = [
     title: '相談する',
     items: [
       { href: '/advisor', label: 'AI相談', dek: '目標設定・買う前相談' },
-      { href: '/rules/chat', label: 'ルール相談', dek: '会話でルールを変更' },
+      { href: '/assistant', label: 'AIに変更を頼む', dek: '設定・明細・ルールを会話で変更' },
     ],
   },
   {
