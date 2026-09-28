@@ -251,7 +251,6 @@ create type spending_persona_type as enum (
   'balanced'
 );
 
-
 -- =============================================================================
 --  2. 共通関数
 -- =============================================================================
@@ -1704,6 +1703,73 @@ create table public.transaction_expense_subtypes (
 
 create index ix_transaction_expense_subtypes_user on public.transaction_expense_subtypes (user_id);
 
+-- 3.30 genres — 支出の客観的なジャンル一覧(本人発案、ADR-056)
+-- -----------------------------------------------------------------------------
+-- 当初は固定enum(spending_genre)として設計したが、本人から「カテゴリはdbに
+-- 保存してenumじゃなくて、自由に変更できる仕組みに。追加削除容易にしたい」との
+-- 指摘を受け、categories(FR-13)と同じ「本人が自由に追加・削除できるDBテーブル」
+-- に変更した。categories と違い kind・budgetYen・show_on_home・is_system・
+-- 統合(merged_into_id)は持たない——ジャンルは予算やアラート判定に使う構造的な
+-- カテゴリではなく、AIが付ける補助的な分類タグであり、参照ロジックが無いため
+-- 削除も統合を経由せず即座に行える(genre_id 側を on delete cascade にする)。
+create table public.genres (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  name       text        not null,
+  sort_order integer     not null default 0,
+  created_at timestamptz not null default now(),
+
+  constraint ck_genres_name_not_blank check (btrim(name) <> '')
+);
+
+create unique index ux_genres_user_name on public.genres (user_id, name);
+create index ix_genres_user on public.genres (user_id, sort_order);
+
+-- 3.31 transaction_genres — 明細1件全体の客観ジャンル(本人発案、ADR-056)
+-- -----------------------------------------------------------------------------
+-- category_kind(生活費/浪費...)・カテゴリ名は本人が決めた主観的な分類。
+-- ここではレシート品目の無い明細(CSV・メール取り込み・手入力等)1件全体に
+-- 対して、AIが内容から機械的に割り当てる客観的なジャンル(genres)を保存する。
+-- レシート品目がある明細は品目ごとに receipt_item_genres 側で分類するため、
+-- このテーブルは対象にしない(store層が使い分ける)。1明細につき1行
+-- (再分類は upsert で上書き。transaction_diagnoses と同じ「履歴を重ねて
+-- 残さない」設計)。genre_id は on delete cascade——ジャンルを削除したときに
+-- 参照が残って本人を困らせない。
+create table public.transaction_genres (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+  genre_id       uuid        not null references public.genres(id) on delete cascade,
+
+  created_at     timestamptz not null default now()
+);
+
+create unique index ux_transaction_genres_transaction on public.transaction_genres (transaction_id);
+create index ix_transaction_genres_user on public.transaction_genres (user_id);
+create index ix_transaction_genres_genre on public.transaction_genres (genre_id);
+
+-- 3.32 receipt_item_genres — 品目1点ごとの客観ジャンル(本人発案、ADR-056)
+-- -----------------------------------------------------------------------------
+-- 本人発案「商品のカテゴリー分けを自動で行う」(例:外食費の中の清涼飲料水)。
+-- receipt_items.product_type(ADR-036)はAIの自由記述で、表記ゆれがあり
+-- 集計に向かない。ここでは同じ品目に対し、本人が管理する固定のジャンル一覧
+-- (genres)から機械的に1つ選んだ結果を保存する——product_type は「AIが見た
+-- ままを書く」役割のまま残し、こちらは「後で集計できる形に丸める」役割を
+-- 別テーブルで持たせる(両者の目的が違うため、同じ列に混ぜない)。
+-- 1品目につき1行。genre_id は on delete cascade(transaction_genres と同じ)。
+create table public.receipt_item_genres (
+  id              uuid        primary key default gen_random_uuid(),
+  user_id         uuid        not null references auth.users(id) on delete cascade,
+  receipt_item_id uuid        not null references public.receipt_items(id) on delete cascade,
+  genre_id        uuid        not null references public.genres(id) on delete cascade,
+
+  created_at      timestamptz not null default now()
+);
+
+create unique index ux_receipt_item_genres_item on public.receipt_item_genres (receipt_item_id);
+create index ix_receipt_item_genres_user on public.receipt_item_genres (user_id);
+create index ix_receipt_item_genres_genre on public.receipt_item_genres (genre_id);
+
 
 -- =============================================================================
 --  4. updated_at トリガの一括適用
@@ -2102,7 +2168,7 @@ begin
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
-    'transaction_expense_subtypes'
+    'transaction_expense_subtypes','genres','transaction_genres','receipt_item_genres'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

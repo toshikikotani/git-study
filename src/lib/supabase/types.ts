@@ -1711,6 +1711,69 @@ export type Database = {
           },
         ];
       };
+      genres: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          sort_order: number;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+          sort_order?: number;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          sort_order?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      transaction_genres: {
+        Row: {
+          created_at: string;
+          genre_id: string;
+          id: string;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          genre_id: string;
+          id?: string;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          genre_id?: string;
+          id?: string;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_genres_genre_id_fkey';
+            columns: ['genre_id'];
+            isOneToOne: false;
+            referencedRelation: 'genres';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'transaction_genres_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: true;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       ai_monthly_reports: {
         Row: {
           advice: string[];
@@ -1818,6 +1881,45 @@ export type Database = {
             columns: ['transaction_id'];
             isOneToOne: false;
             referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      receipt_item_genres: {
+        Row: {
+          created_at: string;
+          genre_id: string;
+          id: string;
+          receipt_item_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          genre_id: string;
+          id?: string;
+          receipt_item_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          genre_id?: string;
+          id?: string;
+          receipt_item_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'receipt_item_genres_genre_id_fkey';
+            columns: ['genre_id'];
+            isOneToOne: false;
+            referencedRelation: 'genres';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'receipt_item_genres_receipt_item_id_fkey';
+            columns: ['receipt_item_id'];
+            isOneToOne: true;
+            referencedRelation: 'receipt_items';
             referencedColumns: ['id'];
           },
         ];

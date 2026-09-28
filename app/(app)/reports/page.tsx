@@ -67,6 +67,14 @@ export default async function ReportsPage() {
         カテゴリを選んで年→月→日で掘り下げる →
       </Link>
 
+      <Link
+        href="/reports/genres"
+        className="block text-[13px] font-medium"
+        style={{ color: 'var(--accent)' }}
+      >
+        AIによる客観的なジャンルで見る →
+      </Link>
+
       <MerchantRankingCard ranking={merchantRanking} />
 
       <NetWorthChart points={netWorthPoints} />

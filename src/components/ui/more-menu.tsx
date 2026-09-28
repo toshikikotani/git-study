@@ -92,6 +92,7 @@ const GROUPS = [
     items: [
       { href: '/reports', label: 'レポート' },
       { href: '/reports/ai', label: 'AIレポート', dek: '日次・月次の気づき・アドバイス' },
+      { href: '/reports/genres', label: 'ジャンル別分析', dek: 'AIによる客観的な支出分類' },
       { href: '/briefs', label: '朝配信' },
     ],
   },

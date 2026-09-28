@@ -1,5 +1,5 @@
 -- =============================================================================
---  未適用のマイグレーションを、1回のコピペでまとめて適用する(B-17/B-18)
+--  未適用のマイグレーションを、1回のコピペでまとめて適用する(B-17)
 --
 --  使い方:
 --    1. https://supabase.com/dashboard で対象プロジェクトを開く
@@ -15,7 +15,8 @@
 --  scripts/verify-apply-pending.sh が検証する(CI でも実行する)。
 --
 --  B-4/B-5/B-7/B-10/B-12/B-13/B-14/B-15/B-16 は2026-09-22に本人が適用済み
---  (P10-30)。このファイルは以後、その時点で未適用だったものだけを持つ。
+--  (P10-30)。このファイルは以後、その時点で未適用だったものだけを持つ
+--  (ADR-056 で genres・transaction_genres・receipt_item_genres を追加)。
 -- =============================================================================
 
 begin;
@@ -54,6 +55,83 @@ create policy "own_rows" on public.transaction_expense_subtypes
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 4. genres — 支出の客観的なジャンル一覧(ADR-056、本人発案)
+-- -----------------------------------------------------------------------------
+create table if not exists public.genres (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  name       text        not null,
+  sort_order integer     not null default 0,
+  created_at timestamptz not null default now(),
+
+  constraint ck_genres_name_not_blank check (btrim(name) <> '')
+);
+
+create unique index if not exists ux_genres_user_name on public.genres (user_id, name);
+create index if not exists ix_genres_user on public.genres (user_id, sort_order);
+
+alter table public.genres enable row level security;
+alter table public.genres force row level security;
+
+drop policy if exists "own_rows" on public.genres;
+create policy "own_rows" on public.genres
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+-- 5. transaction_genres — 明細1件全体の客観ジャンル(ADR-056)
+-- -----------------------------------------------------------------------------
+create table if not exists public.transaction_genres (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+  genre_id       uuid        not null references public.genres(id) on delete cascade,
+
+  created_at     timestamptz not null default now()
+);
+
+create unique index if not exists ux_transaction_genres_transaction
+  on public.transaction_genres (transaction_id);
+create index if not exists ix_transaction_genres_user on public.transaction_genres (user_id);
+create index if not exists ix_transaction_genres_genre on public.transaction_genres (genre_id);
+
+alter table public.transaction_genres enable row level security;
+alter table public.transaction_genres force row level security;
+
+drop policy if exists "own_rows" on public.transaction_genres;
+create policy "own_rows" on public.transaction_genres
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+-- 6. receipt_item_genres — 品目1点ごとの客観ジャンル(ADR-056)
+-- -----------------------------------------------------------------------------
+create table if not exists public.receipt_item_genres (
+  id              uuid        primary key default gen_random_uuid(),
+  user_id         uuid        not null references auth.users(id) on delete cascade,
+  receipt_item_id uuid        not null references public.receipt_items(id) on delete cascade,
+  genre_id        uuid        not null references public.genres(id) on delete cascade,
+
+  created_at      timestamptz not null default now()
+);
+
+create unique index if not exists ux_receipt_item_genres_item
+  on public.receipt_item_genres (receipt_item_id);
+create index if not exists ix_receipt_item_genres_user on public.receipt_item_genres (user_id);
+create index if not exists ix_receipt_item_genres_genre on public.receipt_item_genres (genre_id);
+
+alter table public.receipt_item_genres enable row level security;
+alter table public.receipt_item_genres force row level security;
+
+drop policy if exists "own_rows" on public.receipt_item_genres;
+create policy "own_rows" on public.receipt_item_genres
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -80,4 +158,25 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'transaction_expense_subtypes'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'genres',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'genres'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'transaction_genres',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'transaction_genres'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'receipt_item_genres',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'receipt_item_genres'
   ) then 'ok' else 'NG: テーブルが無い' end;
