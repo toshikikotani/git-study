@@ -2,8 +2,12 @@
  * 本人設定(app_settings)のデータアクセス。
  *
  * ユーザーあたり1行(user_id が主キー)。RLS が本人の行に絞る(ADR-011)ので、
- * ここでも user_id を意識しない。まだ画面から編集する手段は無く、既定値を
- * 読むためだけに使う(ホームの完済見込み・負債タブのシミュレーション)。
+ * ここでも user_id を意識しない。長らく画面から編集する手段が無く既定値を
+ * 読むためだけに使っていたが、「AIに変更を頼む」統合チャット(本人発案、
+ * ADR-054)向けに updateAppSettings() を追加した。ここで公開する列は
+ * すべて「業務パラメータ」(ADR-014)であり、シークレット(env変数名の
+ * 参照値)を保持する列は元々このテーブルに存在しない——将来そのような列を
+ * 足す場合も、この汎用更新関数と会話ツールには決して含めないこと。
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -67,5 +71,41 @@ export async function getAppSettings(): Promise<AppSettings> {
   if (authError || !auth.user) {
     throw new SettingsStoreError('ログイン状態を確認できませんでした');
   }
+  return getAppSettingsAsAdmin(supabase, auth.user.id);
+}
+
+/** 変更したい項目だけを渡す(渡さなかった項目は変更しない)。 */
+export type AppSettingsPatch = Partial<AppSettings>;
+
+/**
+ * 本人設定を部分的に更新する(本人発案「AIに変更を頼む」、ADR-054)。
+ * `AppSettings` に無い列(シークレット等)は型上そもそも渡せない。
+ */
+export async function updateAppSettings(patch: AppSettingsPatch): Promise<AppSettings> {
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new SettingsStoreError('ログイン状態を確認できませんでした');
+  }
+
+  const row: Database['public']['Tables']['app_settings']['Update'] = {};
+  if (patch.monthlyRepaymentTargetYen !== undefined) {
+    row.monthly_repayment_target_yen = patch.monthlyRepaymentTargetYen;
+  }
+  if (patch.repaymentStrategy !== undefined) row.repayment_strategy = patch.repaymentStrategy;
+  if (patch.investmentRatioOfRepayment !== undefined) {
+    row.investment_ratio_of_repayment = patch.investmentRatioOfRepayment;
+  }
+  if (patch.isHighRiskUnlocked !== undefined) row.is_high_risk_unlocked = patch.isHighRiskUnlocked;
+  if (patch.highRiskAllocationRatio !== undefined) {
+    row.high_risk_allocation_ratio = patch.highRiskAllocationRatio;
+  }
+  if (patch.payday !== undefined) row.payday = patch.payday;
+  if (patch.sideIncomeRepaymentRatio !== undefined) {
+    row.side_income_repayment_ratio = patch.sideIncomeRepaymentRatio;
+  }
+
+  const { error } = await supabase.from('app_settings').update(row).eq('user_id', auth.user.id);
+  if (error) throw new SettingsStoreError(`設定を更新できませんでした: ${error.message}`);
   return getAppSettingsAsAdmin(supabase, auth.user.id);
 }

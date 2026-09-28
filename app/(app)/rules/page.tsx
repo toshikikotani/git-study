@@ -28,11 +28,11 @@ export default async function RulesPage() {
           カテゴリと分類ルール
         </h1>
         <Link
-          href="/rules/chat"
+          href="/assistant"
           className="text-[13px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
-          AIに相談する
+          AIに変更を頼む
         </Link>
       </header>
 

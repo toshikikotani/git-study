@@ -4,26 +4,29 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * ルールをAIに相談する(新機能、ADR-024)。
+ * AIに変更を頼む(本人発案「登録編集系のものは全てこの仕組みで会話から
+ * 操作したい」、ADR-054)。
  *
- * 「スターバックスは浪費にして」のように話すと、分類ルールの作成・変更・
- * 削除を代わりに行う。リボ払い・キャッシング・分割払いの検知ルールは
- * 会話からは触れない(app/api/rules/chat/route.ts で二重に守っている)。
+ * 「ルールをAIに相談する」(ADR-024)を汎用化したもの。分類ルールに加えて
+ * 本人設定(給料日など)・明細のカテゴリ/金額/日付/メモ・レシートの品目・
+ * 生活費の小分類を、この1画面の会話から変更できる。リボ払い・キャッシング・
+ * 分割払いの検知ルールは会話からは触れない(app/api/assistant/chat/route.ts で
+ * 二重に守っている)。
  *
  * 会話はこの画面を離れると消える(サーバー側に保存しない設計)。
  */
 
 type Role = 'user' | 'assistant';
-type RuleChange = { kind: 'created' | 'updated' | 'deleted'; ruleName: string; detail: string };
-type Message = { role: Role; content: string; changes?: RuleChange[] };
+type AssistantChange = { kind: 'created' | 'updated' | 'deleted'; target: string; detail: string };
+type Message = { role: Role; content: string; changes?: AssistantChange[] };
 
 const SUGGESTIONS = [
+  '給料日を20日にして',
   'スターバックスは浪費カテゴリにして',
-  '「Amazon」で始まる明細を投資的支出にして',
-  '使っていないルールを整理したい',
+  'さっき登録したコンビニの明細を食費にして',
 ];
 
-export default function RulesChatPage() {
+export default function AssistantChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -45,7 +48,7 @@ export default function RulesChatPage() {
     setSending(true);
 
     try {
-      const response = await fetch('/api/rules/chat', {
+      const response = await fetch('/api/assistant/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
@@ -54,7 +57,7 @@ export default function RulesChatPage() {
         setError('送信に失敗しました。時間をおいて試してください。');
         return;
       }
-      const result = (await response.json()) as { reply?: string; changes?: RuleChange[] };
+      const result = (await response.json()) as { reply?: string; changes?: AssistantChange[] };
       setMessages([
         ...next,
         { role: 'assistant', content: result.reply ?? '', changes: result.changes ?? [] },
@@ -71,14 +74,14 @@ export default function RulesChatPage() {
       <header className="flex items-baseline justify-between gap-3 pb-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-            ルールをAIに相談する
+            AIに変更を頼む
           </h1>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            話した内容でルールを作成・変更・削除します
+            設定・明細・ルールを話した内容で変更します
           </p>
         </div>
         <Link href="/rules" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-          一覧を見る
+          ルール一覧
         </Link>
       </header>
 
@@ -90,8 +93,9 @@ export default function RulesChatPage() {
               style={{ background: 'var(--accent-track)', boxShadow: 'var(--card-shadow)' }}
             >
               <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                リボ払い・キャッシング・分割払いの検知ルールには触れません。それ以外のカテゴリ分けの
-                ルールを、会話だけで整えられます。
+                給料日などの設定、明細のカテゴリ・金額・日付・メモ、レシートの品目、
+                分類ルールを会話だけで変更できます。リボ払い・キャッシング・分割払いの
+                検知ルールには触れません。
               </p>
             </div>
             <div className="space-y-1.5">
@@ -157,7 +161,7 @@ export default function RulesChatPage() {
             }
           }}
           rows={1}
-          placeholder="例:コンビニの明細は生活費にして"
+          placeholder="例:給料日を20日にして"
           className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl px-4 py-2.5 text-sm outline-none"
           style={{
             background: 'var(--surface)',
@@ -212,7 +216,7 @@ function Bubble({ message }: { message: Message }) {
                   {changeLabel(c.kind)}
                 </span>
                 <span style={{ color: 'var(--ink-secondary)' }}>
-                  {c.ruleName}
+                  {c.target}
                   {c.detail ? (
                     <span style={{ color: 'var(--ink-muted)' }}> — {c.detail}</span>
                   ) : null}
@@ -226,7 +230,7 @@ function Bubble({ message }: { message: Message }) {
   );
 }
 
-function changeLabel(kind: RuleChange['kind']): string {
+function changeLabel(kind: AssistantChange['kind']): string {
   switch (kind) {
     case 'created':
       return '作成';
@@ -237,7 +241,7 @@ function changeLabel(kind: RuleChange['kind']): string {
   }
 }
 
-function changeBadgeStyle(kind: RuleChange['kind']): React.CSSProperties {
+function changeBadgeStyle(kind: AssistantChange['kind']): React.CSSProperties {
   if (kind === 'deleted') return { background: 'var(--over-track)', color: 'var(--over)' };
   if (kind === 'created') return { background: 'var(--accent-track)', color: 'var(--income)' };
   return { background: 'var(--accent-track)', color: 'var(--accent)' };

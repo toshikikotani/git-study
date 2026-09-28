@@ -1,64 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildRuleChatSystemPrompt,
   ChatToolError,
   describeRuleUpdate,
+  formatCategoryContextLines,
+  formatRuleContextLines,
   isMatchType,
-  parseChatMessages,
   resolveCategoryByName,
 } from '@/features/classification/chat-tools';
 
 /**
- * 「ルールをAIに相談する」の純粋な部分(ADR-022)。
+ * 「分類ルール」を扱うAIチャット機能の純粋な部分(ADR-022)。
  * DB にもネットワークにも触れない検証・組み立てだけを試す
- * (実行そのものは app/api/rules/chat/route.ts の責務で、他の route と
+ * (実行そのものは app/api/assistant/chat/route.ts の責務で、他の route と
  * 同じく実際の Supabase プロジェクトに対して手動で検証する)。
+ * 会話履歴の検証(parseChatMessages)は @/lib/chat-tools 側でテストする。
  */
-
-describe('parseChatMessages', () => {
-  it('正しい形の配列をそのまま返す', () => {
-    const result = parseChatMessages([
-      { role: 'user', content: 'スタバは浪費にして' },
-      { role: 'assistant', content: '変更しました。' },
-    ]);
-    expect(result).toEqual([
-      { role: 'user', content: 'スタバは浪費にして' },
-      { role: 'assistant', content: '変更しました。' },
-    ]);
-  });
-
-  it('配列でなければ null', () => {
-    expect(parseChatMessages('not an array')).toBeNull();
-    expect(parseChatMessages(null)).toBeNull();
-    expect(parseChatMessages(undefined)).toBeNull();
-  });
-
-  it('role が user/assistant 以外の要素があれば null', () => {
-    expect(parseChatMessages([{ role: 'system', content: 'x' }])).toBeNull();
-  });
-
-  it('content が文字列でない要素があれば null', () => {
-    expect(parseChatMessages([{ role: 'user', content: 123 }])).toBeNull();
-  });
-
-  it('直近20件だけを残す', () => {
-    const many = Array.from({ length: 25 }, (_, i) => ({
-      role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
-      content: `msg-${i}`,
-    }));
-    const result = parseChatMessages(many);
-    expect(result).toHaveLength(20);
-    expect(result![0]!.content).toBe('msg-5');
-    expect(result![19]!.content).toBe('msg-24');
-  });
-
-  it('1通あたりの文字数を切り詰める', () => {
-    const long = 'あ'.repeat(3000);
-    const result = parseChatMessages([{ role: 'user', content: long }]);
-    expect(result![0]!.content.length).toBe(2000);
-  });
-});
 
 describe('isMatchType', () => {
   it('keyword/regex/exact のみ true', () => {
@@ -124,50 +81,52 @@ describe('describeRuleUpdate', () => {
   });
 });
 
-describe('buildRuleChatSystemPrompt', () => {
-  it('カテゴリ一覧とルール一覧を埋め込む', () => {
-    const prompt = buildRuleChatSystemPrompt(
-      [{ id: 'c1', name: '浪費' }],
-      [
-        {
-          id: 'r1',
-          name: '学習: スタバ',
-          matchType: 'keyword',
-          pattern: 'スタバ',
-          categoryName: '浪費',
-          isActive: true,
-          isProtected: false,
-        },
-      ],
-    );
-    expect(prompt).toContain('- 浪費');
-    expect(prompt).toContain('id=r1');
-    expect(prompt).toContain('スタバ');
+describe('formatCategoryContextLines', () => {
+  it('カテゴリ一覧を箇条書きにする', () => {
+    expect(formatCategoryContextLines([{ id: 'c1', name: '浪費' }])).toBe('- 浪費');
+  });
+
+  it('1件も無ければその旨を書く', () => {
+    expect(formatCategoryContextLines([])).toBe('(まだ1件もありません)');
+  });
+});
+
+describe('formatRuleContextLines', () => {
+  it('ルール一覧を箇条書きにする', () => {
+    const lines = formatRuleContextLines([
+      {
+        id: 'r1',
+        name: '学習: スタバ',
+        matchType: 'keyword',
+        pattern: 'スタバ',
+        categoryName: '浪費',
+        isActive: true,
+        isProtected: false,
+      },
+    ]);
+    expect(lines).toContain('id=r1');
+    expect(lines).toContain('スタバ');
     // 指示文には常に「変更不可」の語が出るため、行ごとの注記が付かないことで確認する
-    expect(prompt).not.toContain('(変更不可・リボ/キャッシング/分割払いの検知に使用中)');
+    expect(lines).not.toContain('(変更不可・リボ/キャッシング/分割払いの検知に使用中)');
   });
 
   it('保護対象のルールには行ごとに変更不可の注記を付ける', () => {
-    const prompt = buildRuleChatSystemPrompt(
-      [],
-      [
-        {
-          id: 'd1',
-          name: 'リボ払いの検知',
-          matchType: 'regex',
-          pattern: 'リボ',
-          categoryName: null,
-          isActive: true,
-          isProtected: true,
-        },
-      ],
-    );
-    expect(prompt).toContain('id=d1');
-    expect(prompt).toContain('(変更不可・リボ/キャッシング/分割払いの検知に使用中)');
+    const lines = formatRuleContextLines([
+      {
+        id: 'd1',
+        name: 'リボ払いの検知',
+        matchType: 'regex',
+        pattern: 'リボ',
+        categoryName: null,
+        isActive: true,
+        isProtected: true,
+      },
+    ]);
+    expect(lines).toContain('id=d1');
+    expect(lines).toContain('(変更不可・リボ/キャッシング/分割払いの検知に使用中)');
   });
 
-  it('ルールが1件も無ければその旨を書く', () => {
-    const prompt = buildRuleChatSystemPrompt([], []);
-    expect(prompt).toContain('まだ1件もありません');
+  it('1件も無ければその旨を書く', () => {
+    expect(formatRuleContextLines([])).toBe('(まだ1件もありません)');
   });
 });
