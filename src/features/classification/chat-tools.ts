@@ -1,38 +1,16 @@
 /**
- * 「ルールをAIに相談する」の純粋な部分(新機能、ADR-024)。
+ * 「分類ルール」を扱うAIチャット機能の純粋な部分(ADR-024)。
  *
  * DB にもネットワークにも触れない部分だけをここに集める
  * (`import/email.ts` や `import/receipt-ai.ts` と同じ考え方。テストしやすさのため)。
- * `app/api/rules/chat/route.ts` が Supabase・Anthropic の両方に触れる薄い層になる。
+ * 会話の履歴検証など、ルールに限らない汎用部分は `@/lib/chat-tools` へ
+ * 移した(ADR-054、「AIに変更を頼む」統合チャットとの共用)。
+ * `app/api/assistant/chat/route.ts` が Supabase・Anthropic の両方に触れる薄い層になる。
  */
 
-import { AppError } from '@/lib/errors';
+import { ChatToolError } from '@/lib/chat-tools';
 
-export class ChatToolError extends AppError {}
-
-export type ChatMessage = { role: 'user' | 'assistant'; content: string };
-
-/** 1通あたりの上限。長文を丸ごと送りつけられても費用が跳ねないようにする。 */
-export const MAX_MESSAGE_CHARS = 2000;
-/** 送り返す履歴の上限(直近分だけを見る。古い文脈は捨ててよい)。 */
-export const MAX_HISTORY_MESSAGES = 20;
-
-/**
- * リクエストボディの `messages` を検証する。
- * 形が不正なら null(呼び出し側が 400 を返す)。
- */
-export function parseChatMessages(value: unknown): ChatMessage[] | null {
-  if (!Array.isArray(value)) return null;
-  const messages: ChatMessage[] = [];
-  for (const item of value.slice(-MAX_HISTORY_MESSAGES)) {
-    if (typeof item !== 'object' || item === null) return null;
-    const role = (item as Record<string, unknown>).role;
-    const content = (item as Record<string, unknown>).content;
-    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') return null;
-    messages.push({ role, content: content.slice(0, MAX_MESSAGE_CHARS) });
-  }
-  return messages;
-}
+export { ChatToolError };
 
 export function isMatchType(value: unknown): value is 'keyword' | 'regex' | 'exact' {
   return value === 'keyword' || value === 'regex' || value === 'exact';
@@ -88,17 +66,18 @@ export type RuleContext = {
 };
 
 /**
- * モデルに渡すシステムプロンプトを組み立てる。
- *
- * カテゴリ・ルールの現在値をそのまま埋め込む(list 用の tool を往復させない。
- * どちらも高々数十件なので、埋め込んだ方が速く・安く済む)。
+ * システムプロンプトに埋め込むカテゴリ・ルールの現在値を整形する
+ * (list 用の tool を往復させない。どちらも高々数十件なので、埋め込んだ方が
+ * 速く・安く済む)。統合チャット(ADR-054、`features/assistant/chat-tools.ts`)が
+ * これらを他ドメインのセクションと組み合わせてシステムプロンプト全体を作る。
  */
-export function buildRuleChatSystemPrompt(
-  categories: readonly NamedCategory[],
-  rules: readonly RuleContext[],
-): string {
-  const categoryLines = categories.map((c) => `- ${c.name}`).join('\n');
-  const ruleLines = rules
+export function formatCategoryContextLines(categories: readonly NamedCategory[]): string {
+  const lines = categories.map((c) => `- ${c.name}`).join('\n');
+  return lines === '' ? '(まだ1件もありません)' : lines;
+}
+
+export function formatRuleContextLines(rules: readonly RuleContext[]): string {
+  const lines = rules
     .map((r) => {
       const protectedNote = r.isProtected
         ? '(変更不可・リボ/キャッシング/分割払いの検知に使用中)'
@@ -108,30 +87,5 @@ export function buildRuleChatSystemPrompt(
       return `- id=${r.id} 名前="${r.name}" 一致方式=${r.matchType} パターン=${JSON.stringify(r.pattern)} ${target} ${state} ${protectedNote}`;
     })
     .join('\n');
-
-  return [
-    'あなたは家計簿アプリの「分類ルール」を、会話を通じて整えるアシスタントです。',
-    '分類ルールは、明細の摘要が特定の文字列に一致したら、自動でカテゴリを付ける仕組みです。',
-    '',
-    '### できること',
-    '- 本人の自然な言葉(例:「スターバックスは浪費にして」「このルールを消して」)を、',
-    '  create_rule / update_rule / delete_rule の呼び出しに翻訳して実行する。',
-    '- 実行前にいちいち確認を取る必要はない。指示が具体的なら、そのまま実行してよい。',
-    '- 対象が曖昧なとき(同名のカテゴリが無い、どのルールを指すか特定できない等)は、',
-    '  ツールを呼ばずに質問して確認する。',
-    '- 実行後は、日本語で短く何をしたか報告する。',
-    '',
-    '### してはいけないこと',
-    '- 「変更不可」と書かれたルールを update_rule や delete_rule で操作しようとしない。',
-    '  これらはリボ払い・キャッシング・分割払いの検知に使われており、見逃すと本人に実害がある。',
-    '  求められても、理由を説明して断る(create_rule で新しいルールを作ることはできる)。',
-    '- 下のカテゴリ一覧に無い名前を作り出さない。近い名前があれば提案し、無ければ確認する。',
-    '- 不確かなことを断定しない。',
-    '',
-    '### 現在のカテゴリ一覧',
-    categoryLines,
-    '',
-    '### 現在の分類ルール一覧',
-    ruleLines === '' ? '(まだ1件もありません)' : ruleLines,
-  ].join('\n');
+  return lines === '' ? '(まだ1件もありません)' : lines;
 }
