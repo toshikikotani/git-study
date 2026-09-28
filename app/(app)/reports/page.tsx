@@ -59,6 +59,14 @@ export default async function ReportsPage() {
         <CategoryTrendChart trend={trend} />
       )}
 
+      <Link
+        href="/reports/categories"
+        className="block text-[13px] font-medium"
+        style={{ color: 'var(--accent)' }}
+      >
+        カテゴリを選んで年→月→日で掘り下げる →
+      </Link>
+
       <MerchantRankingCard ranking={merchantRanking} />
 
       <NetWorthChart points={netWorthPoints} />

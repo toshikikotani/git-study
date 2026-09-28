@@ -54,6 +54,57 @@ export function summarizeMonthlySpendByCategory(
   );
 }
 
+export type PeriodSpend = {
+  /** 'YYYY' | 'YYYY-MM' | 'YYYY-MM-DD'(呼び出し側が periodKeyLength を揃える)。 */
+  period: string;
+  /** 正の数。 */
+  spentYen: number;
+};
+
+/**
+ * 指定した期間キー(年'YYYY'・月'YYYY-MM'・日'YYYY-MM-DD')ごとに支出を合算する
+ * (カテゴリ別ページの年→月→日ドリルダウン、本人発案)。
+ *
+ * summarizeMonthlySpendByCategory() と違い、呼び出し側が既に1カテゴリへ
+ * 絞り込んだ取引を渡す前提でカテゴリの判定はしない——年・月・日のどの粒度でも
+ * 同じ関数で集計できるよう、期間キーの桁数(periodKeyLength)だけをパラメータに
+ * した。periodKeys に無い実績は無視し、periodKeys にある期間は実績が無くても
+ * 0円で埋める(「記録が無い」と「使っていない」を画面で区別できるようにする、
+ * summarizeMonthlySpendByCategory と同じ考え方)。
+ */
+export function summarizeSpendByPeriod(
+  transactions: readonly SpendingTransaction[],
+  periodKeys: readonly string[],
+  periodKeyLength: 4 | 7 | 10,
+): PeriodSpend[] {
+  const spentByPeriod = new Map<string, number>();
+
+  for (const tx of transactions) {
+    if (!isCountable(tx) || tx.amountYen >= 0) continue;
+    const period = tx.occurredOn.slice(0, periodKeyLength);
+    spentByPeriod.set(period, (spentByPeriod.get(period) ?? 0) - tx.amountYen);
+  }
+
+  return periodKeys.map((period) => ({ period, spentYen: spentByPeriod.get(period) ?? 0 }));
+}
+
+/**
+ * 支出の記録がある年の一覧、新しい順(カテゴリ別ページのドリルダウン最初の
+ * 階層、本人発案)。
+ *
+ * 「何年分のデータがあるか」は本人ごとに違い、固定の開始年を持たないため、
+ * 実際の取引から年を導く(月・日と違い、無い年を0円で埋める対象にはしない
+ * ——そのカテゴリがまだ存在しなかった年まで並べても情報にならない)。
+ */
+export function distinctYearsWithSpend(transactions: readonly SpendingTransaction[]): string[] {
+  const years = new Set<string>();
+  for (const tx of transactions) {
+    if (!isCountable(tx) || tx.amountYen >= 0) continue;
+    years.add(tx.occurredOn.slice(0, 4));
+  }
+  return [...years].sort((a, b) => b.localeCompare(a));
+}
+
 export type MonthlyIncomeExpense = {
   monthKey: string;
   incomeYen: number;
