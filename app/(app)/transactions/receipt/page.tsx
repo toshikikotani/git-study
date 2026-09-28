@@ -59,8 +59,9 @@ import {
  * (P9-3)の設計はそのまま保つ——写真ごとに個別の `import_batches` 行・
  * `receipt_image_path` を持たせるため、内部的には1枚=1エントリとして
  * 抽出・保存する(1枚の写真に複数の買い物が写っていても複製しない、という
- * P9-3 の前提を崩さない)。AI分類だけは全エントリをまとめて1回のリクエストに
- * する(枚数が増えても分類の呼び出し回数は増えない)。保存は1枚ずつ
+ * P9-3 の前提を崩さない)。ジャンルの分類は読み取りと同じリクエスト内で
+ * AIが行い(/api/import/receipt、本人発案「レシート登録時に分類もして欲しい」)、
+ * プレビューに先に埋める(本人は保存前に選び直せる)。保存は1枚ずつ
  * `saveImportBatchAction` を呼び、1枚の失敗が残りの取り込みを止めない
  * (NFR-06)。
  *
@@ -76,8 +77,8 @@ import {
  * 本体(親)の分類は変えない——実際の分類は商品行(=splits)側にある。
  *
  * ── 品目もできれば分類したい(本人発案、ADR-035) ────────────
- * 分割の対象になるかどうかに関わらず、商品行が1件でもあれば分類パイプライン
- * (ルール→自動AI)に通し、`receipt_items.category_id` として保存する。
+ * 分割の対象になるかどうかに関わらず、商品行が1件でもあればAIが付けた
+ * ジャンルを`receipt_items.genre_id` として保存する。
  * 合計不一致(mismatched)の品目にも同じ分類結果が付く——「合計が合わない
  * から分類しない」理由は無い(entryPreviews の itemRulePreviewByIndex 参照)。
  *
@@ -97,21 +98,35 @@ import {
 function applyManualGenreOverrides(
   rows: readonly StoredTransaction[],
   overrides: ReadonlyMap<string, string | null>,
+  aiGenres: ReadonlyMap<string, AiGenre>,
   genreNameById: ReadonlyMap<string, string>,
 ): StoredTransaction[] {
-  if (overrides.size === 0) return [...rows];
+  if (overrides.size === 0 && aiGenres.size === 0) return [...rows];
   return rows.map((t) => {
-    if (!overrides.has(t.id)) return t;
-    const genreId = overrides.get(t.id) ?? null;
+    if (overrides.has(t.id)) {
+      const genreId = overrides.get(t.id) ?? null;
+      return {
+        ...t,
+        genreId,
+        genreName: genreId === null ? null : (genreNameById.get(genreId) ?? null),
+        classifiedBy: 'manual',
+        confidence: null,
+      };
+    }
+    const ai = aiGenres.get(t.id);
+    if (ai === undefined) return t;
     return {
       ...t,
-      genreId,
-      genreName: genreId === null ? null : (genreNameById.get(genreId) ?? null),
-      classifiedBy: 'manual',
-      confidence: null,
+      genreId: ai.genreId,
+      genreName: genreNameById.get(ai.genreId) ?? null,
+      classifiedBy: 'ai',
+      confidence: ai.confidence,
     };
   });
 }
+
+/** 読み取り直後にAIが付けたジャンル(本人が手で選び直せば manual が優先される)。 */
+type AiGenre = { genreId: string; confidence: number };
 
 /** 写真1枚分の状態。「1枚=1バッチ」を保つため、抽出・保存の単位もここで揃える。 */
 type ReceiptEntry = {
@@ -148,6 +163,7 @@ export default function ReceiptPage() {
   // キーにしたMap」の形にする。日付・品目(名前・金額)はルール分類に影響
   // しないため、上書きMapを介さず entries state を直接書き換える(値が
   // そのまま rulePreview/itemRulePreviewByIndex に流れる)。
+  const [aiGenres, setAiGenres] = useState<Map<string, AiGenre>>(new Map());
   const [manualGenreOverrides, setManualGenreOverrides] = useState<Map<string, string | null>>(
     new Map(),
   );
@@ -333,10 +349,12 @@ export default function ReceiptPage() {
           const result = (await response.json()) as {
             transactions: ParsedReceiptTransaction[];
             warnings: string[];
+            classifications?: { key: string; genreId: string; confidence: number }[];
           };
           return {
             id: entry.id,
             extracted: { transactions: result.transactions, warnings: result.warnings },
+            classifications: result.classifications ?? [],
           };
         } catch {
           return {
@@ -346,6 +364,22 @@ export default function ReceiptPage() {
         }
       }),
     );
+    // 読み取り直後のAI分類を、合成id(receipt-${entryId}-${i}[-item-${j}])を
+    // キーにして反映する。撮り直した1枚は、古い分類を捨てて置き換える。
+    setAiGenres((prev) => {
+      const next = new Map(prev);
+      for (const r of results) {
+        for (const key of [...next.keys()]) {
+          if (key.startsWith(`receipt-${r.id}-`)) next.delete(key);
+        }
+        for (const c of 'classifications' in r ? r.classifications : []) {
+          const [i, j] = c.key.split(':');
+          const id = j === undefined ? `receipt-${r.id}-${i}` : `receipt-${r.id}-${i}-item-${j}`;
+          next.set(id, { genreId: c.genreId, confidence: c.confidence });
+        }
+      }
+      return next;
+    });
     const extractedById = new Map(results.map((r) => [r.id, r.extracted]));
     setEntries((prev) =>
       prev.map((e) =>
@@ -460,15 +494,20 @@ export default function ReceiptPage() {
     () =>
       entryPreviews.map((p) => ({
         ...p,
-        preview: applyManualGenreOverrides(p.rulePreview, manualGenreOverrides, genreNameById),
+        preview: applyManualGenreOverrides(
+          p.rulePreview,
+          manualGenreOverrides,
+          aiGenres,
+          genreNameById,
+        ),
         itemPreviewByIndex: new Map(
           [...p.itemRulePreviewByIndex].map(([i, rows]) => [
             i,
-            applyManualGenreOverrides(rows, manualGenreOverrides, genreNameById),
+            applyManualGenreOverrides(rows, manualGenreOverrides, aiGenres, genreNameById),
           ]),
         ),
       })),
-    [entryPreviews, manualGenreOverrides, genreNameById],
+    [entryPreviews, manualGenreOverrides, aiGenres, genreNameById],
   );
 
   const totalPreviewCount = previews.reduce((sum, p) => sum + p.preview.length, 0);
@@ -595,6 +634,7 @@ export default function ReceiptPage() {
     for (const entry of entries) URL.revokeObjectURL(entry.previewUrl);
     setEntries([]);
     setManualGenreOverrides(new Map());
+    setAiGenres(new Map());
     setEditingKey(null);
   };
 
