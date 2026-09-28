@@ -216,6 +216,64 @@ describe('buildFromAiRows(receipt) — モデルの出力を信用しきらな�
     ]);
   });
 
+  it('商品が1点だけなら、読み取った金額とずれていても支払合計に補正する(本人発案:税抜表示対策)', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        // レシート上は税抜462円と印字されていたが、支払合計(税込)は500円
+        amount_yen: 500,
+        store_name: 'コンビニ',
+        payment_method_text: '',
+        items: [{ name: 'コーヒー', amount_yen: 462, product_type: '' }],
+        expense_subtype: '',
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: 'コーヒー', amountYen: -500, productType: null },
+    ]);
+  });
+
+  it('2点以上で、差が商品点数以下(税の按分の丸め程度)なら最後の商品行で補正する', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 780,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        // 内訳の合計 778円、支払合計 780円(差2円 = 商品点数2件以下)
+        items: [
+          { name: 'おにぎり', amount_yen: 150, product_type: '' },
+          { name: '洗剤', amount_yen: 628, product_type: '' },
+        ],
+        expense_subtype: '',
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: 'おにぎり', amountYen: -150, productType: null },
+      { description: '洗剤', amountYen: -630, productType: null },
+    ]);
+  });
+
+  it('2点以上で、差が商品点数を超える大きなずれは補正しない(読み取りミスの可能性)', () => {
+    const result = buildFromAiRows([
+      {
+        occurred_on: '2026-09-03',
+        amount_yen: 780,
+        store_name: 'スーパー',
+        payment_method_text: '',
+        items: [
+          { name: 'おにぎり', amount_yen: 150, product_type: '' },
+          { name: '洗剤', amount_yen: 999, product_type: '' },
+        ],
+        expense_subtype: '',
+      },
+    ]);
+    expect(result.transactions[0]!.items).toEqual([
+      { description: 'おにぎり', amountYen: -150, productType: null },
+      { description: '洗剤', amountYen: -999, productType: null },
+    ]);
+  });
+
   it('金額が0の商品行は除いて、残りは items として返す', () => {
     const result = buildFromAiRows([
       {
