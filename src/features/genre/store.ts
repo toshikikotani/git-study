@@ -19,10 +19,10 @@ import { createClient } from '@/lib/supabase/server';
 
 export class GenreStoreError extends AppError {}
 
-/** 1回の「ジャンル分類する」で処理する上限(品目・明細の合計)。
- * reasoning が無く1件あたりの出力が軽いため、diagnosis(30件)より多めにできる。
- * 超えた分は次回のボタン操作で拾える。 */
-const MAX_BATCH_SIZE = 120;
+/** 1回の「ジャンル分類する」呼び出しで処理する上限(品目・明細の合計)。
+ * サーバーの実行時間に収めるためAIの1バッチ分(genre-ai.ts の DEFAULT_BATCH_SIZE)に
+ * 合わせ、残りは呼び出し側が繰り返し呼んで処理する。 */
+export const MAX_BATCH_SIZE = 40;
 
 export type Genre = {
   id: string;

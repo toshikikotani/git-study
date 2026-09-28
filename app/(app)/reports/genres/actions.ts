@@ -18,6 +18,7 @@ import {
   listGenres,
   listUngenredSpendTargets,
   listUngenredSpendTargetsAllPeriods,
+  MAX_BATCH_SIZE,
   saveGenres,
   setGenreShowOnHome,
   updateGenreBudget,
@@ -25,8 +26,6 @@ import {
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
-
-const MAX_TARGETS_PER_CALL = 120;
 
 export type ClassifyGenresActionResult = {
   classifiedCount: number;
@@ -36,7 +35,7 @@ export type ClassifyGenresActionResult = {
   error: string | null;
 };
 
-/** scope='all' は過去分も含めた全期間。1回の上限(120件)ずつ処理するため、
+/** scope='month' は今月分、'all' は過去分も含めた全期間。1回の上限(120件)ずつ処理するため、
  * 呼び出し側が hasMore の間くり返し呼ぶ。 */
 export async function classifyGenresAction(
   scope: 'month' | 'all' = 'month',
@@ -101,7 +100,7 @@ export async function classifyGenresAction(
   revalidatePath('/spending');
   return {
     classifiedCount: outcome.classifications.length,
-    hasMore: targets.length >= MAX_TARGETS_PER_CALL,
+    hasMore: targets.length >= MAX_BATCH_SIZE,
     warnings: outcome.warnings,
     error: null,
   };
