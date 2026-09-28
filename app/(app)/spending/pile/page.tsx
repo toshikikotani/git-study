@@ -53,7 +53,7 @@ export default async function SpendingPilePage() {
             {formatDateJa(view.period.from)} 〜 {formatDateJa(view.period.to)}
           </p>
         </div>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           明細
         </Link>
       </header>

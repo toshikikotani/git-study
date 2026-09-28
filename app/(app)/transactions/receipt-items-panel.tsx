@@ -5,20 +5,18 @@ import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
-import { DEFAULT_DETECTION_RULES } from '@/features/classification/rules';
-import type { CategoryOption } from '@/features/classification/store';
+import type { GenreOption } from '@/features/genre/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptParseResult } from '@/features/import/receipt-ai';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import { buildPreview } from '@/features/transactions/import-pipeline';
-import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import { replaceReceiptItemsAction, setExpenseSubtypeAction } from './actions';
 
 type EditRowState = {
   name: string;
   amountYen: string;
-  categoryId: string;
+  genreId: string;
   /** AIが付けた商品分類(ADR-036)。この手入力フォームでは編集させず、そのまま持ち回す。 */
   productType: string | null;
 };
@@ -27,7 +25,7 @@ function toEditRows(items: readonly ReceiptItem[]): EditRowState[] {
   return items.map((it) => ({
     name: it.name,
     amountYen: String(Math.abs(it.amountYen)),
-    categoryId: it.categoryId ?? '',
+    genreId: it.genreId ?? '',
     productType: it.productType,
   }));
 }
@@ -62,7 +60,6 @@ function toEditRows(items: readonly ReceiptItem[]): EditRowState[] {
 export function ReceiptItemsPanel({
   transaction,
   categories,
-  categoryCode,
   items,
   onItemsReplaced,
   subtype,
@@ -75,9 +72,7 @@ export function ReceiptItemsPanel({
     paymentMethod: PaymentMethod;
     amountYen: number;
   };
-  categories: readonly CategoryOption[];
-  /** 生活費の小分類(ADR-036)を出してよいかの判定。表示名ではなく code で見る(ADR-016)。 */
-  categoryCode: string | null;
+  categories: readonly GenreOption[];
   items: readonly ReceiptItem[];
   onItemsReplaced: (items: ReceiptItem[]) => void;
   subtype: string | null;
@@ -142,12 +137,9 @@ export function ReceiptItemsPanel({
       }
 
       if (receipt.items.length > 0) {
-        // 品目は既存の分類パイプライン(ルール)に通す。/transactions/receipt
-        // と同じ考え方(ADR-035)だが、こちらは1件だけの追加操作のため
-        // AIへの分類依頼(課金)まではせず、ルールだけで済ませる。読み違いが
-        // あればこの直後の編集行でその場に直せる。
-        const { rules: learnedRules, categoryNameById } = await fetchLearnedRules();
-        const classified = buildPreview(
+        // 品目は検知(支払方法のみ、ADR-057)だけ通す。ジャンルは取り込み時には
+        // 確定させない(本人がここで選ぶか、後からAIジャンル分類に任せる)。
+        const built = buildPreview(
           receipt.items.map((item) => ({
             occurredOn: transaction.occurredOn,
             description: item.description,
@@ -156,15 +148,13 @@ export function ReceiptItemsPanel({
           })),
           transaction.accountId,
           (i) => `attach-${transaction.id}-${i}`,
-          [...DEFAULT_DETECTION_RULES, ...learnedRules],
-          categoryNameById,
           'manual',
         );
         setEditRows(
-          classified.map((row, i) => ({
+          built.map((row, i) => ({
             name: row.description,
             amountYen: String(row.amountYen),
-            categoryId: row.categoryId ?? '',
+            genreId: '',
             productType: receipt.items[i]?.productType ?? null,
           })),
         );
@@ -200,7 +190,7 @@ export function ReceiptItemsPanel({
     const payload = editRows.map((r) => ({
       name: r.name.trim(),
       amountYen: editSign * Number(r.amountYen),
-      categoryId: r.categoryId || null,
+      genreId: r.genreId || null,
       // 商品分類(AIの自由記述、ADR-036)はこのフォームでは編集させないが、
       // 保存は全行の置き換えのため、渡さないと消えてしまう。そのまま持ち回す。
       productType: r.productType,
@@ -216,8 +206,8 @@ export function ReceiptItemsPanel({
         id: items[i]?.id ?? `pending-${i}`,
         name: p.name,
         amountYen: p.amountYen,
-        categoryId: p.categoryId,
-        categoryName: categories.find((c) => c.id === p.categoryId)?.name ?? null,
+        genreId: p.genreId,
+        genreName: categories.find((c) => c.id === p.genreId)?.name ?? null,
         productType: p.productType,
       })),
     );
@@ -280,8 +270,9 @@ export function ReceiptItemsPanel({
         </p>
       )}
 
-      {/* 生活費の小分類(本人発案、ADR-036)。「生活費」カテゴリのときだけ添える。 */}
-      {subtype && categoryCode === 'living' ? (
+      {/* 生活費の小分類(本人発案、ADR-036)。ADR-057によりジャンルに固定の
+          code は無くなったため、値があるときは常に添える。 */}
+      {subtype ? (
         <p className="mt-1.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
           生活費の内訳:{subtype}
         </p>
@@ -354,8 +345,8 @@ export function ReceiptItemsPanel({
                 }}
               />
               <select
-                value={row.categoryId}
-                onChange={(e) => updateEditRow(index, { categoryId: e.target.value })}
+                value={row.genreId}
+                onChange={(e) => updateEditRow(index, { genreId: e.target.value })}
                 className="rounded-xl px-2 py-2 text-sm"
                 style={{
                   background: 'var(--plane)',

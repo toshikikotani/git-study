@@ -31,7 +31,7 @@ const MID_MONTH = new Date('2026-09-15T03:00:00Z');
 type TableResponses = {
   app_settings?: { data?: unknown; error?: { code?: string; message: string } | null };
   transactions?: { data?: unknown[]; error?: { message: string } | null };
-  categories?: { data?: unknown[]; error?: { message: string } | null };
+  genres?: { data?: unknown[]; error?: { message: string } | null };
   accounts?: { data?: unknown[]; error?: { message: string } | null };
 };
 
@@ -65,8 +65,8 @@ function fakeClient(responses: TableResponses, updateSpy?: (payload: unknown) =>
         }),
       };
     }
-    if (table === 'categories') {
-      const response = responses.categories ?? { data: [] };
+    if (table === 'genres') {
+      const response = responses.genres ?? { data: [] };
       return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue(response) }) };
     }
     if (table === 'accounts') {
@@ -120,7 +120,7 @@ describe('backupTransactionsToSheetAsAdmin', () => {
               description: 'コンビニ',
               merchant_name: null,
               amount_yen: 500,
-              category_id: null,
+              genre_id: null,
               account_id: 'acc-1',
               review_status: 'confirmed',
             },
@@ -150,7 +150,7 @@ describe('backupTransactionsToSheetAsAdmin', () => {
       'sheet-123',
       '2026-09!A1',
       expect.arrayContaining([
-        ['日付', '摘要', '金額', 'カテゴリ', '口座', '状態'],
+        ['日付', '摘要', '金額', 'ジャンル', '口座', '状態'],
         ['2026-09-05', 'コンビニ', 500, '未分類', '銀行', 'confirmed'],
       ]),
     );

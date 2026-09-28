@@ -123,37 +123,37 @@ async function loadMonthTransactionRows(
 
   const [
     { data: rows, error },
-    { data: categories, error: categoriesError },
+    { data: genres, error: genresError },
     { data: accounts, error: accountsError },
   ] = await Promise.all([
     client
       .from('transactions')
       .select(
-        'occurred_on, description, merchant_name, amount_yen, category_id, account_id, review_status',
+        'occurred_on, description, merchant_name, amount_yen, genre_id, account_id, review_status',
       )
       .eq('user_id', userId)
       .gte('occurred_on', monthStart)
       .order('occurred_on', { ascending: true }),
-    client.from('categories').select('id, name').eq('user_id', userId),
+    client.from('genres').select('id, name').eq('user_id', userId),
     client.from('accounts').select('id, name').eq('user_id', userId),
   ]);
   if (error) throw new GoogleSheetsBackupError(`明細を取得できませんでした: ${error.message}`);
-  if (categoriesError) {
-    throw new GoogleSheetsBackupError(`カテゴリを取得できませんでした: ${categoriesError.message}`);
+  if (genresError) {
+    throw new GoogleSheetsBackupError(`ジャンルを取得できませんでした: ${genresError.message}`);
   }
   if (accountsError) {
     throw new GoogleSheetsBackupError(`口座を取得できませんでした: ${accountsError.message}`);
   }
 
-  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+  const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
   const accountNameById = new Map(accounts.map((a) => [a.id, a.name]));
 
-  const header = ['日付', '摘要', '金額', 'カテゴリ', '口座', '状態'];
+  const header = ['日付', '摘要', '金額', 'ジャンル', '口座', '状態'];
   const dataRows = rows.map((row) => [
     row.occurred_on,
     row.merchant_name ?? row.description,
     row.amount_yen,
-    row.category_id ? (categoryNameById.get(row.category_id) ?? '') : '未分類',
+    row.genre_id ? (genreNameById.get(row.genre_id) ?? '') : '未分類',
     accountNameById.get(row.account_id) ?? '',
     row.review_status,
   ]);

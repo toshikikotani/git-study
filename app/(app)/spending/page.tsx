@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 import { formatYen } from '@/domain/money';
 import { loadAccumulationView, type AccumulationView } from '@/features/accumulation/store';
-import { listCategoryOptions } from '@/features/classification/store';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
+import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import {
@@ -17,8 +17,12 @@ import { SpendingCalendar } from './calendar';
 import { CategoryBreakdownChart, type DrilldownTransaction } from './category-breakdown-chart';
 import { DiagnosisCard } from './diagnosis-card';
 import { ReorderableCards, type SpendingCardKey } from './reorderable-cards';
+import {
+  TransactionListSection,
+  type TransactionListSearchParams,
+} from './transaction-list-section';
 
-/** カードの既定の並び順(ADR-043/044 時点の並び、ADR-047参照)。 */
+/** カードの既定の並び順(ADR-043/044 時点の並び、ADR-047/ADR-057参照)。 */
 const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
   'summary',
   'calendar',
@@ -26,6 +30,7 @@ const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
   'diagnosis',
   'categoryBreakdown',
   'pile',
+  'transactionList',
 ];
 
 /**
@@ -39,12 +44,13 @@ const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
  * しており、新しい判断ロジックは着地予測(projectedMonthTotalYen)だけ
  * 追加した(features/spending/store.ts 参照)。
  *
- * ── 今月の明細一覧はここに置かない(本人からのUX指摘「情報の重複が
- *    あってはならない、どこか一箇所見ればその情報がわかるように」)─────
- * 以前はここに `MonthlyTransactionList`(今月分の再掲)を置いていたが、
- * `/transactions`(全期間、並び替え・分類編集も可能)と中身がほぼ
- * そのまま重複していた。同じ明細をこの画面だけ読み取り専用で見せる
- * 意味は薄く、ヘッダーの「明細(全期間)」リンク1本に統合した。
+ * ── 明細一覧(/transactions)をこの画面へ統合した(ADR-057) ─────────
+ * 本人発案「明細と家計簿については統合する。二つのタブの使い分けが
+ * わからん」への対応。旧 `/transactions` は独立したタブだったが、
+ * 家計簿と明細は本人にとって別々の概念ではなかったため、カレンダー・
+ * AI診断カードの下に明細一覧(`TransactionListSection`、全期間・
+ * 口座/ジャンル/月で絞り込み可能)をそのまま埋め込んだ。ボトムナビの
+ * 「明細」タブは廃止し、`/transactions` は `/spending` へリダイレクトする。
  *
  * ── ただしレシートの詳細だけは例外(本人発案、ADR-040)────────────
  * 「カテゴリ別の内訳を押したら使った一覧が見れて、さらにそこからレシート
@@ -100,7 +106,12 @@ const DEFAULT_CARD_ORDER: readonly SpendingCardKey[] = [
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default async function SpendingPage() {
+export default async function SpendingPage({
+  searchParams,
+}: {
+  searchParams: Promise<TransactionListSearchParams>;
+}) {
+  const params = await searchParams;
   const [ledger, pile, diagnosis] = await withMinDuration(
     Promise.all([loadMonthlyLedger(), loadAccumulationView(), loadSpendingDiagnosisView()]),
   );
@@ -111,11 +122,11 @@ export default async function SpendingPage() {
   // listReceiptItemsForTransactionIds・listExpenseSubtypesForTransactionIds)。
   const transactionIds = ledger.transactions.map((t) => t.id);
   const [categories, itemsByTransactionId, expenseSubtypeByTransactionId] = await Promise.all([
-    listCategoryOptions(),
+    listGenres(),
     listReceiptItemsForTransactionIds(transactionIds),
     listExpenseSubtypesForTransactionIds(transactionIds),
   ]);
-  // カテゴリ別内訳(CategoryBreakdownChart)とカレンダー(SpendingCalendar、
+  // ジャンル別内訳(CategoryBreakdownChart)とカレンダー(SpendingCalendar、
   // ADR-044)の両方から使う、明細1件分の共通の形。ここで1回だけ作り、
   // 両画面で共有する(ADR-033、同じ考慮を複数箇所で作らない)。
   const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
@@ -124,33 +135,28 @@ export default async function SpendingPage() {
       id: t.id,
       occurredOn: t.occurredOn,
       label: t.label,
-      categoryId: t.categoryId,
-      categoryName: t.categoryName,
+      genreId: t.genreId,
+      genreName: t.genreName,
       amountYen: t.amountYen,
       accountId: t.accountId,
       paymentMethod: t.paymentMethod,
       items: itemsByTransactionId.get(t.id) ?? [],
       expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
     };
-    const key = t.categoryId ?? 'uncategorized';
+    const key = t.genreId ?? 'uncategorized';
     transactionsByCategory[key] = [...(transactionsByCategory[key] ?? []), drilldown];
     return drilldown;
   });
 
   return (
     <div className="rise space-y-3">
-      <header className="flex items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-            家計簿
-          </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            {formatDateJa(ledger.period.from)} 〜 {formatDateJa(ledger.period.to)}
-          </p>
-        </div>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-          明細(全期間)
-        </Link>
+      <header>
+        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
+          家計簿
+        </h1>
+        <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          {formatDateJa(ledger.period.from)} 〜 {formatDateJa(ledger.period.to)}
+        </p>
       </header>
 
       <ReorderableCards
@@ -168,12 +174,13 @@ export default async function SpendingPage() {
           diagnosis: <DiagnosisCard view={diagnosis} />,
           categoryBreakdown: (
             <CategoryBreakdownChart
-              rows={ledger.categoryBreakdown}
+              rows={ledger.genreBreakdown}
               transactionsByCategory={transactionsByCategory}
               categories={categories}
             />
           ),
           pile: <PileTeaserCard view={pile} />,
+          transactionList: <TransactionListSection searchParams={params} />,
         }}
       />
     </div>

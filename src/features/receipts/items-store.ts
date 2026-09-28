@@ -1,9 +1,9 @@
 /**
  * レシートの品目(receipt_items)のデータアクセス(ADR-034/035/036)。
  *
- * `transaction_splits`(カテゴリ分割)とは独立している。品目は分割の対象に
- * なるかどうかに関わらず、常に付く記録(合計の一致は求めない)。カテゴリ
- * (category_id)も分割とは別に品目単体へ付けられる(ADR-035)。商品の種類
+ * `transaction_splits`(ジャンル分割)とは独立している。品目は分割の対象に
+ * なるかどうかに関わらず、常に付く記録(合計の一致は求めない)。ジャンル
+ * (genre_id)も分割とは別に品目単体へ付けられる(ADR-035/ADR-057)。商品の種類
  * そのもの(product_type)は固定カテゴリとは別の、AIの自由記述(ADR-036)。
  *
  * `receipt_items` は本番未適用。未適用時の扱いは lib/supabase/errors.ts
@@ -11,7 +11,7 @@
  * =レシート取り込みの一部だが、取り込み自体は失敗させず警告に留める、
  * receipt/page.tsx 参照)。
  *
- * `category_id`・`product_type` はどちらも receipt_items 自体より後に
+ * `genre_id`・`product_type` はどちらも receipt_items 自体より後に
  * 追加した列で、本番未適用(B-17/B-18)。同じタイミングで足した列なので
  * まとめて1つの「後発の列」として扱い、片方だけ落として片方だけ保存する
  * ような細かい組み合わせは持たない(2列×2列の総当たりは複雑さに見合わない
@@ -31,7 +31,7 @@ export class ReceiptItemStoreError extends AppError {}
 export type ReceiptItemInput = {
   name: string;
   amountYen: number;
-  categoryId?: string | null;
+  genreId?: string | null;
   productType?: string | null;
 };
 
@@ -88,7 +88,7 @@ export async function replaceReceiptItems(
 
   const rowsWithExtras = items.map((item, i) => ({
     ...baseRow(item, auth.user.id, transactionId, i),
-    category_id: item.categoryId ?? null,
+    genre_id: item.genreId ?? null,
     product_type: item.productType ?? null,
   }));
   let insertError = (await supabase.from('receipt_items').insert(rowsWithExtras)).error;
@@ -108,8 +108,8 @@ export type ReceiptItem = {
   id: string;
   name: string;
   amountYen: number;
-  categoryId: string | null;
-  categoryName: string | null;
+  genreId: string | null;
+  genreName: string | null;
   productType: string | null;
 };
 
@@ -129,12 +129,12 @@ export async function listReceiptItemsForTransactionIds(
     transaction_id: string;
     name: string;
     amount_yen: number;
-    category_id: string | null;
+    genre_id: string | null;
     product_type: string | null;
   }[];
   const withExtras = await supabase
     .from('receipt_items')
-    .select('id, transaction_id, name, amount_yen, category_id, product_type')
+    .select('id, transaction_id, name, amount_yen, genre_id, product_type')
     .in('transaction_id', transactionIds)
     .order('sort_order', { ascending: true });
   if (withExtras.error && isMissingColumnError(withExtras.error)) {
@@ -147,7 +147,7 @@ export async function listReceiptItemsForTransactionIds(
       if (isMissingTableError(withoutExtras.error)) return map;
       throw new ReceiptItemStoreError(`品目を取得できませんでした: ${withoutExtras.error.message}`);
     }
-    rows = withoutExtras.data.map((r) => ({ ...r, category_id: null, product_type: null }));
+    rows = withoutExtras.data.map((r) => ({ ...r, genre_id: null, product_type: null }));
   } else if (withExtras.error) {
     if (isMissingTableError(withExtras.error)) return map;
     throw new ReceiptItemStoreError(`品目を取得できませんでした: ${withExtras.error.message}`);
@@ -156,23 +156,21 @@ export async function listReceiptItemsForTransactionIds(
   }
   if (rows.length === 0) return map;
 
-  const { data: categories, error: categoriesError } = await supabase
-    .from('categories')
-    .select('id, name');
-  if (categoriesError) {
-    throw new ReceiptItemStoreError(`カテゴリを取得できませんでした: ${categoriesError.message}`);
+  const { data: genres, error: genresError } = await supabase.from('genres').select('id, name');
+  if (genresError) {
+    throw new ReceiptItemStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
   }
-  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+  const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
 
   for (const row of rows) {
     const list = map.get(row.transaction_id) ?? [];
-    const categoryId = row.category_id ?? null;
+    const genreId = row.genre_id ?? null;
     list.push({
       id: row.id,
       name: row.name,
       amountYen: row.amount_yen,
-      categoryId,
-      categoryName: categoryId ? (categoryNameById.get(categoryId) ?? null) : null,
+      genreId,
+      genreName: genreId ? (genreNameById.get(genreId) ?? null) : null,
       productType: row.product_type ?? null,
     });
     map.set(row.transaction_id, list);

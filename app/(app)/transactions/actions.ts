@@ -12,7 +12,6 @@ import { revalidatePath } from 'next/cache';
 
 import type { TransactionSplitInput } from '@/domain/transaction-splits';
 import { assertYen, MoneyError } from '@/domain/money';
-import { createLearnedRule } from '@/features/classification/store';
 import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
 import {
@@ -90,7 +89,7 @@ export async function saveImportBatchAction(
       error instanceof TransactionStoreError ? error.message : '取り込みに失敗しました。';
     return { imported: 0, duplicates: 0, error: message, splitWarnings: [] };
   }
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
 
   const splitWarnings: string[] = [];
   if (receiptSplits.length > 0) {
@@ -144,13 +143,10 @@ export async function saveImportBatchAction(
 }
 
 /**
- * 明細のカテゴリを本人が直接直す(確認待ちキューを介さない、本人発案・
- * ADR-045)。同じ摘要の学習ルールも合わせて作る——以前は確認待ちキューでの
- * 確定時だけ作っていた(`classification_rules.is_learned=true`)が、確認待ち
- * キュー自体を撤廃したため、本人が明細を直すたびにここで作る形へ引き継いだ。
- * P5-2(誤爆気味の学習ルールを検知して無効化する)は is_learned=true の
- * ルールを対象にしているため、この経路を絶やすとその安全網の入力が尽きる。
- * ルール作成の失敗は明細の更新自体は失敗させない(付随的な最適化のため)。
+ * 明細のジャンルを本人が直接直す(確認待ちキューを介さない、本人発案・
+ * ADR-045)。ADR-057によりパターンルールの学習(classification_rules)は
+ * 廃止したため、ここで学習ルールを作る経路は無い——本人の修正はこの明細
+ * 1件だけに反映される(ジャンルはAIが基本、本人の修正も残す設計)。
  *
  * 金額・日付の補正(`patch`)は任意(本人発案「今金額と日付が一切編集
  * できない」、ADR-048)。amountAbsYen は正の大きさ(符号は本人に意識させ
@@ -159,8 +155,7 @@ export async function saveImportBatchAction(
  */
 export async function updateTransactionAction(
   id: string,
-  categoryId: string,
-  description: string,
+  genreId: string,
   patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean },
 ): Promise<{ error: string | null }> {
   try {
@@ -176,18 +171,10 @@ export async function updateTransactionAction(
         occurredOn,
       };
     }
-    await updateTransaction(id, categoryId, storePatch);
+    await updateTransaction(id, genreId, storePatch);
   } catch (error) {
     return { error: describeUserError(error, '更新に失敗しました。') };
   }
-  try {
-    await createLearnedRule({ description, categoryId, accountId: null });
-  } catch {
-    // 学習ルールの作成に失敗しても、明細のカテゴリ更新は既に成功している。
-  }
-  revalidatePath('/transactions');
-  // /spending のカテゴリ別内訳・カレンダー(calendar.tsx、ADR-043)からも
-  // カテゴリを直せるため、こちらも最新化する。
   revalidatePath('/spending');
   return { error: null };
 }
@@ -205,7 +192,7 @@ export async function updateTransactionMemoAction(
   } catch (error) {
     return { error: describeUserError(error, 'メモの保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
   return { error: null };
 }
 
@@ -219,7 +206,7 @@ export async function replaceSplitsAction(
   } catch (error) {
     return { error: describeUserError(error, '分割の保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
   return { error: null };
 }
 
@@ -236,7 +223,6 @@ export async function replaceReceiptItemsAction(
   } catch (error) {
     return { error: describeUserError(error, '品目の保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
   revalidatePath('/spending');
   return { error: null };
 }
@@ -244,8 +230,7 @@ export async function replaceReceiptItemsAction(
 /**
  * 生活費の小分類を保存する(本人発案、ADR-036)。既存の明細へ後から
  * レシートを紐付ける機能(P10-40、receipt-items-panel.tsx)専用の入口。
- * 明細一覧(/transactions)・家計簿のカテゴリ内訳(/spending、ADR-040)の
- * 両方から呼ばれる。
+ * 家計簿(/spending、ADR-040)の明細一覧・ジャンル内訳の両方から呼ばれる。
  */
 export async function setExpenseSubtypeAction(
   transactionId: string,
@@ -256,7 +241,6 @@ export async function setExpenseSubtypeAction(
   } catch (error) {
     return { error: describeUserError(error, '生活費の小分類の保存に失敗しました。') };
   }
-  revalidatePath('/transactions');
   revalidatePath('/spending');
   return { error: null };
 }

@@ -7,8 +7,9 @@ import type { StoredTransaction } from '@/features/transactions/types';
 /**
  * 「AIに変更を頼む」の統合部分(ADR-054)。各ドメインの純粋な部分を
  * 束ねてシステムプロンプトを組み立てる、その合成だけを試す
- * (各セクションの中身自体は features/{classification,settings,transactions}/
- * chat-tools.ts 側でテストする)。
+ * (各セクションの中身自体は features/{genre,settings,transactions}/
+ * chat-tools.ts 側でテストする)。ADR-057によりパターンルール
+ * (classification_rules)は廃止したため、ルールのセクションは無い。
  */
 
 const SETTINGS: AppSettings = {
@@ -29,12 +30,12 @@ const TRANSACTION: StoredTransaction = {
   merchantName: null,
   amountYen: -500,
   paymentMethod: 'one_time',
-  categoryId: 'c1',
-  categoryName: '生活費',
-  matchedRuleId: null,
+  genreId: 'g1',
+  genreName: '生活費',
   classifiedBy: 'manual',
   confidence: null,
   reviewStatus: 'auto_ok',
+  mustPay: false,
   source: 'manual',
   fingerprint: 'f1',
   batchId: null,
@@ -45,24 +46,12 @@ const TRANSACTION: StoredTransaction = {
 describe('buildAssistantSystemPrompt', () => {
   it('各ドメインのセクションをすべて含める', () => {
     const prompt = buildAssistantSystemPrompt({
-      categories: [{ id: 'c1', name: '浪費' }],
-      rules: [
-        {
-          id: 'r1',
-          name: '学習: スタバ',
-          matchType: 'keyword',
-          pattern: 'スタバ',
-          categoryName: '浪費',
-          isActive: true,
-          isProtected: false,
-        },
-      ],
+      genres: [{ id: 'g1', name: '浪費' }],
       settings: SETTINGS,
       recentTransactions: [TRANSACTION],
     });
 
     expect(prompt).toContain('- 浪費');
-    expect(prompt).toContain('id=r1');
     expect(prompt).toContain('給料日=25日');
     expect(prompt).toContain('id=t1');
     expect(prompt).toContain('update_settings');
@@ -70,10 +59,9 @@ describe('buildAssistantSystemPrompt', () => {
     expect(prompt).toContain('set_expense_subtype');
   });
 
-  it('空のカテゴリ・ルール・明細でも組み立てられる', () => {
+  it('空のジャンル・明細でも組み立てられる', () => {
     const prompt = buildAssistantSystemPrompt({
-      categories: [],
-      rules: [],
+      genres: [],
       settings: SETTINGS,
       recentTransactions: [],
     });

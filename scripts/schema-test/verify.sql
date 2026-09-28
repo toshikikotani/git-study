@@ -7,12 +7,13 @@ values ('11111111-1111-1111-1111-111111111111', 'test@example.com');
 
 select public.seed_defaults('11111111-1111-1111-1111-111111111111');
 
-\echo '--- カテゴリ ---'
-select code, name, kind, default_monthly_budget_yen
-from public.categories order by sort_order;
+\echo '--- ジャンル(ADR-057:唯一の分類) ---'
+select name, sort_order, budget_yen, show_on_home
+from public.genres order by sort_order;
 
-\echo '--- 検知ルール(FR-21) ---'
-select priority, name, set_payment_method from public.classification_rules order by priority;
+-- FR-21(リボ・キャッシング・分割の検知)は DB に保存せず
+-- features/classification/rules.ts の DEFAULT_DETECTION_RULES に固定してある
+-- (ADR-010・ADR-057)。よってここでは検証しない(vitest 側で検証する)。
 
 \echo '--- 振替ルール(FR-15) ---'
 select execution_order, name, amount_type, amount_yen from public.transfer_rules order by execution_order;
@@ -120,9 +121,9 @@ begin
   -- AI 分類なのに確信度が無い
   begin
     insert into public.transactions (user_id, account_id, occurred_on, amount_yen,
-                                     description, source, classified_by, category_id)
+                                     description, source, classified_by, genre_id)
     values (u, 'aaaaaaaa-0000-0000-0000-000000000001', '2026-09-05', -1200, 'テスト', 'csv',
-            'ai', (select id from public.categories where code='living'));
+            'ai', (select id from public.genres where user_id = u and name = '食料品'));
     raise exception 'FAIL: 確信度なしの AI 分類が通ってしまった';
   exception when check_violation then
     raise notice 'OK: 確信度なしの AI 分類を拒否した(ck_transactions_ai_needs_confidence)';
@@ -146,13 +147,13 @@ begin
     raise notice 'OK: 環境変数名ではなく URL 実値の保存を拒否した(ck_app_settings_env_key_is_name)';
   end;
 
-  -- 月初以外の予算月
+  -- ジャンルの予算にマイナス値
   begin
-    insert into public.budgets (user_id, category_id, month, amount_yen)
-    values (u, (select id from public.categories where code='living'), '2026-09-15', 60000);
-    raise exception 'FAIL: 月初以外の budgets.month が通ってしまった';
+    update public.genres set budget_yen = -1000
+     where user_id = u and name = '食料品';
+    raise exception 'FAIL: マイナスの genres.budget_yen が通ってしまった';
   exception when check_violation then
-    raise notice 'OK: 月初以外の予算月を拒否した(ck_budgets_month_is_first_day)';
+    raise notice 'OK: マイナスの予算を拒否した(ck_genres_budget)';
   end;
 
   -- 返済額が利息を下回るケース
@@ -164,22 +165,29 @@ begin
   end;
 end $$;
 
-\echo '--- FR-14: 予算消化状況 ---'
-insert into public.budgets (user_id, category_id, month, amount_yen)
-select '11111111-1111-1111-1111-111111111111', id, public.month_start_jst(), 40000
-from public.categories where code = 'sanctuary';
+-- FR-14 の予算消化状況(残額・使用率)は SQL ビューではなく domain/budget.ts が
+-- 計算する(ADR-057 で v_current_month_budget_status を廃止した際の判断、
+-- docs/schema.sql 参照)。ここでは genres.budget_yen と genre_id 紐付けの
+-- データモデルが機能することだけを素のSQLで疎通確認する。
+\echo '--- FR-14: ジャンル予算とジャンル別支出の疎通確認 ---'
+update public.genres set budget_yen = 40000
+where user_id = '11111111-1111-1111-1111-111111111111' and name = '娯楽・趣味';
 
 insert into public.transactions (user_id, account_id, occurred_on, amount_yen, description,
-                                 source, category_id, classified_by, confidence, review_status)
+                                 source, genre_id, classified_by, confidence, review_status)
 select '11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001',
-       public.month_start_jst() + 5, -30000, 'キャバクラ', 'csv',
+       public.month_start_jst() + 5, -30000, '映画館', 'csv',
        id, 'ai', 0.910, 'auto_ok'
-from public.categories where code = 'sanctuary';
+from public.genres
+where user_id = '11111111-1111-1111-1111-111111111111' and name = '娯楽・趣味';
 
-select code, budget_yen, spent_yen, remaining_yen, usage_ratio
-from public.v_current_month_budget_status
-where code in ('sanctuary','living','waste')
-order by code;
+select g.name, g.budget_yen, sum(-t.amount_yen) as spent_yen,
+       g.budget_yen - sum(-t.amount_yen) as remaining_yen
+from public.genres g
+join public.transactions t
+  on t.genre_id = g.id and t.occurred_on >= public.month_start_jst()
+where g.user_id = '11111111-1111-1111-1111-111111111111'
+group by g.name, g.budget_yen;
 
 \echo '--- FR-62: ストリーク ---'
 insert into public.app_checkins (user_id, checked_on)

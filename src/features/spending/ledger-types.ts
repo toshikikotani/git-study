@@ -15,23 +15,22 @@ export type LedgerTransaction = {
   occurredOn: string;
   /** 店名(無ければ摘要)。 */
   label: string;
-  /** カテゴリ統廃合(merged_into_id)を解決済みのルートID(ADR-016)。 */
-  categoryId: string | null;
-  categoryName: string | null;
+  genreId: string | null;
+  genreName: string | null;
   /** 支出が負、収入が正(ADR-008)。 */
   amountYen: number;
-  /** カテゴリ別内訳からレシートの再登録ができるように持ち回る(ADR-040)。 */
+  /** ジャンル別内訳からレシートの再登録ができるように持ち回る(ADR-040)。 */
   accountId: string;
   paymentMethod: PaymentMethod;
 };
 
-export type CategoryBreakdownRow = {
-  categoryId: string | null;
-  /** null は未分類(categoryId が無い明細)。 */
-  categoryName: string;
+export type GenreBreakdownRow = {
+  genreId: string | null;
+  /** null は未分類(genreId が無い明細)。 */
+  genreName: string;
   /** 使った額(正の数)。 */
   spentYen: number;
-  /** 当月の予算。未設定なら null。 */
+  /** 当月の予算(ジャンルの genres.budget_yen)。未設定なら null。 */
   budgetYen: number | null;
   /** domain/budget.ts の budgetTone() で判定済み(サーバー側で計算し、ここでは持ち回るだけ)。 */
   tone: BudgetTone;
@@ -42,7 +41,7 @@ export type MonthlyForecast = {
   totalDaysInMonth: number;
   /** このペースが続いた場合の月末着地見込み(正の数)。 */
   projectedTotalYen: number;
-  /** カテゴリ予算の合計。1件も設定が無ければ null(比較対象がない)。 */
+  /** ジャンル予算の合計。1件も設定が無ければ null(比較対象がない)。 */
   totalBudgetYen: number | null;
 };
 
@@ -58,7 +57,7 @@ export type MonthlyLedgerView = {
   period: { from: string; to: string };
   totalSpentYen: number;
   totalIncomeYen: number;
-  categoryBreakdown: readonly CategoryBreakdownRow[];
+  genreBreakdown: readonly GenreBreakdownRow[];
   transactions: readonly LedgerTransaction[];
   forecast: MonthlyForecast;
   pace: MonthlyPace;

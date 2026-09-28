@@ -40,10 +40,10 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
     necessaryYen: diagnosis.currentMonth.summary.necessaryYen,
     wasteRatio: diagnosis.currentMonth.summary.wasteRatio,
     undiagnosedCount: diagnosis.currentMonth.undiagnosedCount,
-    categoryBreakdown: ledger.categoryBreakdown
-      .filter((c) => c.spentYen > 0)
+    categoryBreakdown: ledger.genreBreakdown
+      .filter((g) => g.spentYen > 0)
       .slice(0, MAX_ITEMS_PER_LIST)
-      .map((c) => ({ name: c.categoryName, spentYen: c.spentYen, budgetYen: c.budgetYen })),
+      .map((g) => ({ name: g.genreName, spentYen: g.spentYen, budgetYen: g.budgetYen })),
     topWasteItems: diagnosis.currentMonth.wasteItems.slice(0, MAX_ITEMS_PER_LIST).map((item) => ({
       label: item.label,
       amountYen: item.amountYen,
@@ -169,7 +169,7 @@ export async function loadDailyReportInput(now: Date = new Date()): Promise<Dail
 
   const categoryTotals = new Map<string, number>();
   for (const tx of todaysSpending) {
-    const name = tx.categoryName ?? '未分類';
+    const name = tx.genreName ?? '未分類';
     categoryTotals.set(name, (categoryTotals.get(name) ?? 0) - tx.amountYen);
   }
   const categoryBreakdown = [...categoryTotals.entries()]

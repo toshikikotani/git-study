@@ -64,7 +64,7 @@ export async function listDuplicateCandidates(
     supabase
       .from('transactions')
       .select(
-        'id, account_id, occurred_on, amount_yen, merchant_name, description, source, is_transfer, review_status, category_id, import_batch_id',
+        'id, account_id, occurred_on, amount_yen, merchant_name, description, source, is_transfer, review_status, genre_id, import_batch_id',
       )
       .gte('occurred_on', rangeStart),
     supabase.from('accounts').select('id, name'),
@@ -80,7 +80,7 @@ export async function listDuplicateCandidates(
     accountId: row.account_id,
     occurredOn: row.occurred_on,
     amountYen: row.amount_yen,
-    categoryId: row.category_id,
+    categoryId: row.genre_id,
     isTransfer: row.is_transfer,
     reviewStatus: row.review_status,
     source: row.source,

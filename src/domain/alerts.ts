@@ -28,7 +28,7 @@ import {
   type DateOnly,
 } from '@/lib/date';
 
-/** P6-1 の月次振り返りに載せる、浪費カテゴリ1件分の消化状況。 */
+/** P6-1 の月次振り返りに載せる、予算設定済みジャンル1件分の消化状況。 */
 export type RecapWasteCategory = { name: string; status: BudgetStatus };
 
 export type MonthlyRecapSummary = {
@@ -152,8 +152,11 @@ export function detectRiskyTransaction(transaction: {
 }
 
 /**
- * FR-20:浪費カテゴリ(categories.kind='waste')が月予算の閾値(既定70%)に
- * 達したら知らせる。判定そのものは `domain/budget.ts` の
+ * FR-20:予算を設定したジャンル(genres.budget_yen)が月予算の閾値(既定70%)に
+ * 達したら知らせる(ADR-057より前は categories.kind='waste' のカテゴリだけが
+ * 対象だったが、category_kind の廃止に伴い「予算を設定した全ジャンル」に
+ * 一般化した——本人の提案:「各カテゴリの設定した金額ごとにalertを設定すれば
+ * いいのでは?」)。判定そのものは `domain/budget.ts` の
  * `hasReachedAlertThreshold()` が正(ここで再定義しない)。
  *
  * 100%到達では遅い、まだ使える段階で知らせる(設計原則3)。文言は
@@ -200,50 +203,6 @@ export function buildJobFailureAlert(
     title: `${jobName}が失敗しました`,
     body: errorMessage,
     dedupKey: `job_failure:${jobName}:${today}`,
-    debtId: null,
-    transactionId: null,
-  };
-}
-
-/**
- * 学習ルール(classification_rules.is_learned=true)が誤爆気味かどうかを
- * 判定する(P5-2)。本人が後から修正した(review_status='corrected')
- * 割合が高いルールは、間違った分類を量産している可能性が高い。
- *
- * 母数が少ないうちは1件の修正でも比率が跳ね上がるため、最低ヒット数
- * (既定3件)に満たなければ判定しない。
- */
-export function isMisfiringRule(
-  check: { hitCount: number; correctedCount: number },
-  options: { minHits?: number; correctionRateThreshold?: number } = {},
-): boolean {
-  const minHits = options.minHits ?? 3;
-  const threshold = options.correctionRateThreshold ?? 0.5;
-  if (check.hitCount < minHits) return false;
-  return check.correctedCount / check.hitCount >= threshold;
-}
-
-/**
- * ルール誤爆の通知を組み立てる(P5-2)。ルール自体は呼び出し側が
- * `is_active=false` にする(ここでは alerts 用の候補を返すだけ)。
- *
- * dedup_key はルール単位の固定文字列。同じルールを無効化するのは
- * 一度きりの事象のため、再度有効化して再び誤爆しても改めて通知したい
- * 場合は本人が手動で有効化した時点でこの dedup は意味を持たなくなる
- * (無効化のたびに一度だけ知らせれば十分)。
- */
-export function buildRuleMisfireAlert(
-  ruleId: string,
-  ruleName: string,
-  correctedCount: number,
-  hitCount: number,
-): CandidateAlert {
-  return {
-    kind: 'other',
-    severity: 'warn',
-    title: `ルール「${ruleName}」を無効化しました`,
-    body: `${hitCount}件中${correctedCount}件が後から修正されたため、誤って分類している可能性があります。/rules で見直してください。`,
-    dedupKey: `rule_misfire:${ruleId}`,
     debtId: null,
     transactionId: null,
   };

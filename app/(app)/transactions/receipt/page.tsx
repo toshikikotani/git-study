@@ -12,8 +12,6 @@ import {
 import { ensureDefaultAccountAction } from '../../accounts/actions';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
-import { DEFAULT_DETECTION_RULES, type ClassificationRule } from '@/features/classification/rules';
-import type { ClassifyResult } from '@/features/classification/store';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import {
@@ -24,9 +22,8 @@ import {
 } from '@/features/import/receipt-ai';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
-import { requestAiClassification } from '@/features/transactions/classify-client';
+import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
 import { buildPreview, type ImportableRow } from '@/features/transactions/import-pipeline';
-import { fetchLearnedRules } from '@/features/transactions/rules-client';
 import type { StoredTransaction } from '@/features/transactions/store';
 import {
   subscribePendingReceiptFiles,
@@ -48,9 +45,14 @@ import {
  * 「撮影後はすぐ読みとって。もう押すしかないんだからAI分析はちゃっちゃ
  * かけて」という指摘を受け、撮る・選ぶという操作自体をその課金判断とみなす
  * ことにした——レシートを撮る・選ぶ以外にこの画面で本人がすることは無く、
- * 読み取りボタンは「必ず次に押す」だけの1手間になっていた。読み取りが
- * 終わった後の「分類」は、既に自動になった読み取りの続きとして変わらず
- * 自動で行う(本人発案、wasExtractingRef の effect 参照)。
+ * 読み取りボタンは「必ず次に押す」だけの1手間になっていた。
+ *
+ * ── ジャンルは取り込み時にAIで確定させない(ADR-057) ─────────────
+ * 以前は読み取り直後に自動でAI分類(カテゴリ)まで済ませていたが、ADR-057
+ * によりジャンルは唯一の分類となり、取り込み経路すべてで一貫して
+ * 「本人がその場で選ぶか、後から /reports/genres でまとめてAI分類する」
+ * 方針に統一した(features/transactions/genres-client.ts 参照)。ここでの
+ * 「分類」は支払方法の検知(FR-21、features/classification/rules.ts)だけ。
  *
  * ── 複数枚まとめて取り込み(本人発案) ─────────────────────────
  * 1回の選択で複数枚を渡せる(`<input multiple>`)。「1回の撮影=1バッチ」
@@ -86,45 +88,25 @@ import {
  * どちらも本人必須の操作ではなく、そのまま保存して後から手入力で直せる。
  */
 
-/** AI分類の結果(押されたときだけ)を、ルール分類済みの行に上書きで反映する。 */
-function applyAiResults(
-  rows: readonly StoredTransaction[],
-  aiResults: ReadonlyMap<string, ClassifyResult>,
-): StoredTransaction[] {
-  if (aiResults.size === 0) return [...rows];
-  return rows.map((t) => {
-    const applied = aiResults.get(t.id);
-    if (!applied) return t;
-    return {
-      ...t,
-      categoryId: applied.categoryId,
-      categoryName: applied.categoryName,
-      classifiedBy: applied.classifiedBy,
-      confidence: applied.confidence,
-    };
-  });
-}
-
 /**
- * 本人が手でカテゴリを直した結果(押されたときだけ)を、AI分類済みの行に
- * さらに上書きで反映する(本人発案:「編集はレシートの品目や日付カテゴリ
- * 全て柔軟に手で編集できるようにして」)。applyAiResults と同じ「合成id
- * をキーにした上書きMap」の形だが、優先順位はこちらが最も高い
- * (手動 > AI > ルール、本人が直接選んだ値を機械分類が覆すことは無い)。
+ * 本人が手でジャンルを直した結果を、ルール分類済み(支払方法のみ)の行に
+ * 上書きで反映する(本人発案:「編集はレシートの品目や日付カテゴリ
+ * 全て柔軟に手で編集できるようにして」)。「合成id(receipt-${entryId}-${i})
+ * をキーにした上書きMap」の形にする。
  */
-function applyManualCategoryOverrides(
+function applyManualGenreOverrides(
   rows: readonly StoredTransaction[],
   overrides: ReadonlyMap<string, string | null>,
-  categoryNameById: ReadonlyMap<string, string>,
+  genreNameById: ReadonlyMap<string, string>,
 ): StoredTransaction[] {
   if (overrides.size === 0) return [...rows];
   return rows.map((t) => {
     if (!overrides.has(t.id)) return t;
-    const categoryId = overrides.get(t.id) ?? null;
+    const genreId = overrides.get(t.id) ?? null;
     return {
       ...t,
-      categoryId,
-      categoryName: categoryId === null ? null : (categoryNameById.get(categoryId) ?? null),
+      genreId,
+      genreName: genreId === null ? null : (genreNameById.get(genreId) ?? null),
       classifiedBy: 'manual',
       confidence: null,
     };
@@ -156,35 +138,30 @@ export default function ReceiptPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<{ imported: number; duplicates: number } | null>(null);
   const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
-  const [aiResults, setAiResults] = useState<Map<string, ClassifyResult>>(new Map());
-  const [classifying, setClassifying] = useState(false);
-  const [classifyWarnings, setClassifyWarnings] = useState<string[]>([]);
-  const [learnedRules, setLearnedRules] = useState<ClassificationRule[]>([]);
-  const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
+  const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountId, setAccountId] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   // 分析後すぐに手で直せるようにする(本人発案:「分析後すぐに編集または
   // 削除できるようにして。編集はレシートの品目や日付カテゴリ全て柔軟に
-  // 手で編集できるようにして」)。カテゴリはルール→AIの結果を上書きする
-  // 追加の1段として、aiResults と同じ「合成id(receipt-${entryId}-${i})
-  // をキーにしたMap」の形にする(applyAiResults と同じ考え方、優先順位は
-  // 手動 > AI > ルール)。日付・品目(名前・金額)はルール分類に影響しない
-  // ため、上書きMapを介さず entries state を直接書き換える(値がそのまま
-  // rulePreview/itemRulePreviewByIndex に流れる)。
-  const [manualCategoryOverrides, setManualCategoryOverrides] = useState<
-    Map<string, string | null>
-  >(new Map());
+  // 手で編集できるようにして」)。「合成id(receipt-${entryId}-${i})を
+  // キーにしたMap」の形にする。日付・品目(名前・金額)はルール分類に影響
+  // しないため、上書きMapを介さず entries state を直接書き換える(値が
+  // そのまま rulePreview/itemRulePreviewByIndex に流れる)。
+  const [manualGenreOverrides, setManualGenreOverrides] = useState<Map<string, string | null>>(
+    new Map(),
+  );
   // 一度に1件だけ編集フォームを開く(`${entryId}:${index}` 形式のキー)。
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
-  // 学習済みルール(M2-5)。取得に失敗しても固定の検知ルールだけで取り込みは動く
+  // ジャンル一覧(ADR-057)。取り込み時にAIで確定させることはしない。
   useEffect(() => {
-    void fetchLearnedRules().then((fetched) => {
-      setLearnedRules(fetched.rules);
-      setCategoryNameById(fetched.categoryNameById);
-    });
+    void fetchGenreOptions().then(setGenreOptions);
   }, []);
+  const genreNameById = useMemo(
+    () => new Map(genreOptions.map((g) => [g.id, g.name])),
+    [genreOptions],
+  );
 
   // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)。
   //
@@ -209,11 +186,6 @@ export default function ReceiptPage() {
       }
     });
   }, []);
-
-  const rules = useMemo<ClassificationRule[]>(
-    () => [...DEFAULT_DETECTION_RULES, ...learnedRules],
-    [learnedRules],
-  );
 
   // 撮影・選択の直後に自動でAIに読み取らせる(本人発案:「撮影後はすぐ
   // 読みとって。もう押すしかないんだからAI分析はちゃっちゃとかけて」)。
@@ -272,7 +244,7 @@ export default function ReceiptPage() {
   // Router Cache がこの画面を使い回すため、一度開いた後にまた FAB を押すと
   // この画面はマウントし直されず、マウント時1回きりの取得だけでは2回目
   // 以降のファイルに気づけなかった(pending-receipt-files.ts 参照)。
-  // fetchAccounts()/fetchLearnedRules() と同じく、setState は Promise の
+  // fetchAccounts()/fetchGenreOptions() と同じく、setState は Promise の
   // コールバック内で行う(react-hooks/set-state-in-effect:effect の中で
   // 直接 setState を呼ぶとカスケードするレンダーになるため)。購読側の
   // コールバックは effect の外(別のユーザー操作)から呼ばれるため対象外。
@@ -334,8 +306,8 @@ export default function ReceiptPage() {
     );
   }
 
-  function setManualCategory(syntheticId: string, categoryId: string | null): void {
-    setManualCategoryOverrides((prev) => new Map(prev).set(syntheticId, categoryId));
+  function setManualGenre(syntheticId: string, genreId: string | null): void {
+    setManualGenreOverrides((prev) => new Map(prev).set(syntheticId, genreId));
   }
 
   // 撮影・選択直後の自動読み取り(onFiles)、撮り直した1枚だけ(retakeEntry)
@@ -454,8 +426,6 @@ export default function ReceiptPage() {
           extracted.transactions,
           accountId,
           (i) => `receipt-${entry.id}-${i}`,
-          rules,
-          categoryNameById,
           'manual',
         );
 
@@ -476,8 +446,6 @@ export default function ReceiptPage() {
               itemRows,
               accountId,
               (j) => `receipt-${entry.id}-${i}-item-${j}`,
-              rules,
-              categoryNameById,
               'manual',
             ),
           );
@@ -485,83 +453,25 @@ export default function ReceiptPage() {
 
         return { entry, splitEligible, rulePreview, itemRulePreviewByIndex };
       });
-  }, [entries, accountId, rules, categoryNameById]);
+  }, [entries, accountId]);
 
-  // AI分類の結果(押されたときだけ)を写真ごとのプレビューへ反映する。
+  // 本人が手で直したジャンル(押されたときだけ)を写真ごとのプレビューへ反映する。
   const previews = useMemo(
     () =>
       entryPreviews.map((p) => ({
         ...p,
-        preview: applyManualCategoryOverrides(
-          applyAiResults(p.rulePreview, aiResults),
-          manualCategoryOverrides,
-          categoryNameById,
-        ),
+        preview: applyManualGenreOverrides(p.rulePreview, manualGenreOverrides, genreNameById),
         itemPreviewByIndex: new Map(
           [...p.itemRulePreviewByIndex].map(([i, rows]) => [
             i,
-            applyManualCategoryOverrides(
-              applyAiResults(rows, aiResults),
-              manualCategoryOverrides,
-              categoryNameById,
-            ),
+            applyManualGenreOverrides(rows, manualGenreOverrides, genreNameById),
           ]),
         ),
       })),
-    [entryPreviews, aiResults, manualCategoryOverrides, categoryNameById],
+    [entryPreviews, manualGenreOverrides, genreNameById],
   );
 
-  // 分割対象の親(明細本体)自身の分類は「AIに回す」の対象にしない(save() 参照)。
-  function unclassifiedOf(p: (typeof previews)[number]): StoredTransaction[] {
-    const topLevel = p.preview.filter(
-      (t, i) => t.classifiedBy === 'unclassified' && !p.splitEligible[i],
-    );
-    const items = [...p.itemPreviewByIndex.values()].flatMap((rows) =>
-      rows.filter((t) => t.classifiedBy === 'unclassified'),
-    );
-    return [...topLevel, ...items];
-  }
-
-  const unclassifiedCount = previews.reduce((sum, p) => sum + unclassifiedOf(p).length, 0);
   const totalPreviewCount = previews.reduce((sum, p) => sum + p.preview.length, 0);
-
-  const classify = async () => {
-    // 枚数が増えても呼び出し回数は増やさない。全写真分をまとめて1回で送る。
-    const targets = previews.flatMap(unclassifiedOf);
-    if (targets.length === 0) return;
-    setClassifying(true);
-    try {
-      const outcome = await requestAiClassification(targets);
-      setAiResults((prev) => {
-        const next = new Map(prev);
-        for (const r of outcome.results) next.set(r.id, r);
-        return next;
-      });
-      setClassifyWarnings(outcome.warnings);
-    } finally {
-      setClassifying(false);
-    }
-  };
-
-  // 読み取り(onFiles・retakeEntry)が終わった直後に、押されるのを待たず
-  // 自動でAI分類まで済ませる(本人発案:「分類させるボタンはもう最初から
-  // 分類させた状態にして」)。読み取り自体は既に本人の明示操作(撮る/選ぶ)
-  // で呼ばれた後の続きの処理なので、ここで追加のAI呼び出しをためらう理由は
-  // 無い。ボタンは失敗時の再試行用に残す。
-  //
-  // classify を effect の依存に含めると(previews が変わるたびに参照が
-  // 変わるため)classify() の結果自体で毎回 effect が再実行されてしまう。
-  // ref 越しに最新の classify を呼ぶことで、発火条件を「読み取りが終わった
-  // 瞬間」だけに保つ。
-  const classifyRef = useRef(classify);
-  classifyRef.current = classify;
-  const wasExtractingRef = useRef(false);
-  useEffect(() => {
-    if (wasExtractingRef.current && !extracting && unclassifiedCount > 0) {
-      void classifyRef.current();
-    }
-    wasExtractingRef.current = extracting;
-  }, [extracting, unclassifiedCount]);
 
   const save = async () => {
     if (!accountId || previews.length === 0) return;
@@ -623,7 +533,7 @@ export default function ReceiptPage() {
             items: classifiedItems.map((item, j) => ({
               name: item.description,
               amountYen: item.amountYen,
-              categoryId: item.categoryId,
+              genreId: item.genreId,
               productType: rawItems[j]?.productType ?? null,
             })),
           });
@@ -633,7 +543,7 @@ export default function ReceiptPage() {
             receiptSplits.push({
               sourceRef,
               splits: classifiedItems.map((item) => ({
-                categoryId: item.categoryId,
+                genreId: item.genreId,
                 amountYen: item.amountYen,
                 note: item.description,
               })),
@@ -684,15 +594,14 @@ export default function ReceiptPage() {
     ]);
     for (const entry of entries) URL.revokeObjectURL(entry.previewUrl);
     setEntries([]);
-    setAiResults(new Map());
-    setManualCategoryOverrides(new Map());
+    setManualGenreOverrides(new Map());
     setEditingKey(null);
   };
 
   /**
    * 分析後すぐに手で直す編集フォーム(本人発案:「編集はレシートの品目や
    * 日付カテゴリ全て柔軟に手で編集できるようにして」)。分割対象(親自体は
-   * 分類しない、unclassifiedOf() 参照)かどうかで親のカテゴリ選択欄の
+   * ジャンルを持たない、p.splitEligible 参照)かどうかで親のジャンル選択欄の
    * 有無を分けるだけで、日付・品目の編集は両方の見た目で共通にする。
    */
   function renderEditControls(
@@ -701,11 +610,11 @@ export default function ReceiptPage() {
     t: StoredTransaction,
     rawItems: readonly ParsedReceiptItem[],
     classifiedItems: readonly StoredTransaction[] | undefined,
-    showParentCategory: boolean,
+    showParentGenre: boolean,
   ) {
     const key = `${entryId}:${index}`;
     const isOpen = editingKey === key;
-    const categoryOptions = [...categoryNameById.entries()];
+    const genreEntries = [...genreNameById.entries()];
 
     return (
       <li className="px-4 pb-3 -mt-1">
@@ -750,14 +659,14 @@ export default function ReceiptPage() {
               />
             </label>
 
-            {showParentCategory ? (
+            {showParentGenre ? (
               <label className="block">
                 <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                  カテゴリ
+                  ジャンル
                 </span>
                 <select
-                  value={t.categoryId ?? ''}
-                  onChange={(e) => setManualCategory(t.id, e.target.value || null)}
+                  value={t.genreId ?? ''}
+                  onChange={(e) => setManualGenre(t.id, e.target.value || null)}
                   className="mt-1 block w-full rounded-lg px-2 py-1.5 text-sm"
                   style={{
                     background: 'var(--plane)',
@@ -766,7 +675,7 @@ export default function ReceiptPage() {
                   }}
                 >
                   <option value="">未分類</option>
-                  {categoryOptions.map(([id, name]) => (
+                  {genreEntries.map(([id, name]) => (
                     <option key={id} value={id}>
                       {name}
                     </option>
@@ -800,8 +709,8 @@ export default function ReceiptPage() {
                       />
                       {classified ? (
                         <select
-                          value={classified.categoryId ?? ''}
-                          onChange={(e) => setManualCategory(classified.id, e.target.value || null)}
+                          value={classified.genreId ?? ''}
+                          onChange={(e) => setManualGenre(classified.id, e.target.value || null)}
                           className="rounded-lg px-1.5 py-1.5 text-sm"
                           style={{
                             background: 'var(--plane)',
@@ -810,7 +719,7 @@ export default function ReceiptPage() {
                           }}
                         >
                           <option value="">未分類</option>
-                          {categoryOptions.map(([id, name]) => (
+                          {genreEntries.map(([id, name]) => (
                             <option key={id} value={id}>
                               {name}
                             </option>
@@ -850,7 +759,7 @@ export default function ReceiptPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           レシートを撮る
         </h1>
-        <Link href="/transactions" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           やめる
         </Link>
       </header>
@@ -880,7 +789,7 @@ export default function ReceiptPage() {
             </ul>
           ) : null}
           <Link
-            href="/transactions"
+            href="/spending"
             className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >
@@ -1173,41 +1082,8 @@ export default function ReceiptPage() {
         {totalPreviewCount > 0 ? (
           <>
             <p className="mt-4 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              金額と日付が合っているか確認してください。
+              金額と日付が合っているか確認してください。ジャンルは「編集する」から選べます。
             </p>
-
-            {/*
-             * ルールに当たらなかった分は読み取り直後に自動でAIへ回す
-             * (本人発案、wasExtractingRef の effect 参照)。このボタンは
-             * その自動分類が終わってもなお残った分(通信失敗など)の
-             * 再試行用。
-             */}
-            {unclassifiedCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => void classify()}
-                disabled={classifying}
-                className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
-                style={{
-                  background: 'var(--plane)',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--hairline)',
-                  opacity: classifying ? 0.6 : 1,
-                }}
-              >
-                {classifying
-                  ? '分類しています…'
-                  : `分類できなかった ${unclassifiedCount} 件を AI に回す`}
-              </button>
-            ) : null}
-
-            {classifyWarnings.length > 0 ? (
-              <ul className="mt-3 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-                {classifyWarnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            ) : null}
 
             <button
               type="button"

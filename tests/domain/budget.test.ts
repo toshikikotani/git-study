@@ -12,23 +12,20 @@ import {
 } from '@/domain/budget';
 
 const SANCTUARY: CategoryBudget = {
-  categoryId: 'cat-sanctuary',
-  code: 'sanctuary',
+  categoryId: 'genre-sanctuary',
   budgetYen: 40_000,
   carryOverYen: 0,
 };
 
 const WASTE: CategoryBudget = {
-  categoryId: 'cat-waste',
-  code: 'waste',
+  categoryId: 'genre-waste',
   budgetYen: 20_000,
   carryOverYen: 0,
 };
 
-/** 予算上限を持たないカテゴリ(返済・投資など)。 */
+/** 予算上限を持たないジャンル(返済・投資など)。 */
 const REPAYMENT: CategoryBudget = {
-  categoryId: 'cat-repayment',
-  code: 'repayment',
+  categoryId: 'genre-repayment',
   budgetYen: null,
   carryOverYen: 0,
 };
@@ -39,13 +36,13 @@ function spend(categoryId: string | null, amountYen: number): BudgetTransaction 
 
 describe('summarizeBudgets', () => {
   it('支出を正の数に反転して集計する', () => {
-    const [status] = summarizeBudgets([SANCTUARY], [spend('cat-sanctuary', -30_000)]);
+    const [status] = summarizeBudgets([SANCTUARY], [spend('genre-sanctuary', -30_000)]);
     expect(status!.spentYen).toBe(30_000);
     expect(status!.remainingYen).toBe(10_000);
     expect(status!.usageRatio).toBeCloseTo(0.75);
   });
 
-  it('支出が無いカテゴリも結果に残す(枠の有無と未使用を区別する)', () => {
+  it('支出が無いジャンルも結果に残す(枠の有無と未使用を区別する)', () => {
     const [status] = summarizeBudgets([WASTE], []);
     expect(status!.spentYen).toBe(0);
     expect(status!.remainingYen).toBe(20_000);
@@ -57,7 +54,7 @@ describe('summarizeBudgets', () => {
       [SANCTUARY],
       [
         {
-          categoryId: 'cat-sanctuary',
+          categoryId: 'genre-sanctuary',
           amountYen: -30_000,
           isTransfer: true,
           reviewStatus: 'auto_ok',
@@ -72,12 +69,12 @@ describe('summarizeBudgets', () => {
       [SANCTUARY],
       [
         {
-          categoryId: 'cat-sanctuary',
+          categoryId: 'genre-sanctuary',
           amountYen: -30_000,
           isTransfer: false,
           reviewStatus: 'ignored',
         },
-        spend('cat-sanctuary', -5_000),
+        spend('genre-sanctuary', -5_000),
       ],
     );
     expect(status!.spentYen).toBe(5_000);
@@ -88,7 +85,7 @@ describe('summarizeBudgets', () => {
       [SANCTUARY],
       [
         {
-          categoryId: 'cat-sanctuary',
+          categoryId: 'genre-sanctuary',
           amountYen: -8_000,
           isTransfer: false,
           reviewStatus: 'pending',
@@ -101,18 +98,18 @@ describe('summarizeBudgets', () => {
   it('返金(収入)は支出から差し引く', () => {
     const [status] = summarizeBudgets(
       [SANCTUARY],
-      [spend('cat-sanctuary', -30_000), spend('cat-sanctuary', 5_000)],
+      [spend('genre-sanctuary', -30_000), spend('genre-sanctuary', 5_000)],
     );
     expect(status!.spentYen).toBe(25_000);
   });
 
-  it('未分類の明細はどのカテゴリにも入れない', () => {
+  it('未分類の明細はどのジャンルにも入れない', () => {
     const [status] = summarizeBudgets([SANCTUARY], [spend(null, -30_000)]);
     expect(status!.spentYen).toBe(0);
   });
 
   it('予算を超えると残額はマイナスになる(隠さない)', () => {
-    const [status] = summarizeBudgets([WASTE], [spend('cat-waste', -25_000)]);
+    const [status] = summarizeBudgets([WASTE], [spend('genre-waste', -25_000)]);
     expect(status!.remainingYen).toBe(-5_000);
     expect(status!.usageRatio).toBeCloseTo(1.25);
   });
@@ -120,35 +117,35 @@ describe('summarizeBudgets', () => {
   it('繰越を残額に加える', () => {
     const [status] = summarizeBudgets(
       [{ ...SANCTUARY, carryOverYen: 5_000 }],
-      [spend('cat-sanctuary', -30_000)],
+      [spend('genre-sanctuary', -30_000)],
     );
     expect(status!.remainingYen).toBe(15_000);
   });
 
-  it('予算未設定のカテゴリは残額も消化率も null', () => {
-    const [status] = summarizeBudgets([REPAYMENT], [spend('cat-repayment', -100_000)]);
+  it('予算未設定のジャンルは残額も消化率も null', () => {
+    const [status] = summarizeBudgets([REPAYMENT], [spend('genre-repayment', -100_000)]);
     expect(status!.spentYen).toBe(100_000);
     expect(status!.remainingYen).toBeNull();
     expect(status!.usageRatio).toBeNull();
   });
 
-  it('複数カテゴリを取り違えない', () => {
+  it('複数ジャンルを取り違えない', () => {
     const statuses = summarizeBudgets(
       [SANCTUARY, WASTE],
-      [spend('cat-sanctuary', -30_000), spend('cat-waste', -8_000)],
+      [spend('genre-sanctuary', -30_000), spend('genre-waste', -8_000)],
     );
-    expect(statuses.map((s) => [s.code, s.spentYen])).toEqual([
-      ['sanctuary', 30_000],
-      ['waste', 8_000],
+    expect(statuses.map((s) => [s.categoryId, s.spentYen])).toEqual([
+      ['genre-sanctuary', 30_000],
+      ['genre-waste', 8_000],
     ]);
   });
 });
 
 describe('budgetStatusFor', () => {
-  it('1カテゴリ分だけを返す', () => {
+  it('1ジャンル分だけを返す', () => {
     const status = budgetStatusFor(SANCTUARY, [
-      spend('cat-sanctuary', -12_000),
-      spend('cat-waste', -8_000),
+      spend('genre-sanctuary', -12_000),
+      spend('genre-waste', -8_000),
     ]);
     expect(status.spentYen).toBe(12_000);
     expect(status.remainingYen).toBe(28_000);
@@ -157,17 +154,17 @@ describe('budgetStatusFor', () => {
 
 describe('hasReachedAlertThreshold(FR-20)', () => {
   it('70% に到達したら true(100% を待たない)', () => {
-    const status = budgetStatusFor(WASTE, [spend('cat-waste', -14_000)]);
+    const status = budgetStatusFor(WASTE, [spend('genre-waste', -14_000)]);
     expect(hasReachedAlertThreshold(status, 0.7)).toBe(true);
   });
 
   it('69% では false', () => {
-    const status = budgetStatusFor(WASTE, [spend('cat-waste', -13_000)]);
+    const status = budgetStatusFor(WASTE, [spend('genre-waste', -13_000)]);
     expect(hasReachedAlertThreshold(status, 0.7)).toBe(false);
   });
 
-  it('予算未設定のカテゴリでは発火しない', () => {
-    const status = budgetStatusFor(REPAYMENT, [spend('cat-repayment', -100_000)]);
+  it('予算未設定のジャンルでは発火しない', () => {
+    const status = budgetStatusFor(REPAYMENT, [spend('genre-repayment', -100_000)]);
     expect(hasReachedAlertThreshold(status, 0.7)).toBe(false);
   });
 
@@ -180,10 +177,15 @@ describe('hasReachedAlertThreshold(FR-20)', () => {
 
 describe('netAmountYen / totalSpentYen', () => {
   const transactions: BudgetTransaction[] = [
-    spend('cat-income', 250_000),
-    spend('cat-sanctuary', -30_000),
-    spend('cat-living', -50_000),
-    { categoryId: 'cat-transfer', amountYen: -100_000, isTransfer: true, reviewStatus: 'auto_ok' },
+    spend('genre-income', 250_000),
+    spend('genre-sanctuary', -30_000),
+    spend('genre-living', -50_000),
+    {
+      categoryId: 'genre-transfer',
+      amountYen: -100_000,
+      isTransfer: true,
+      reviewStatus: 'auto_ok',
+    },
   ];
 
   it('振替を除いた収支を返す(支出は負のまま)', () => {
@@ -200,48 +202,36 @@ describe('netAmountYen / totalSpentYen', () => {
   });
 });
 
-describe('budgetTone(FR-20 / FR-64)', () => {
+describe('budgetTone(FR-20 / FR-64、ADR-057で聖域の例外を廃止)', () => {
   function status(budgetYen: number | null, spentYen: number) {
     return budgetStatusFor(
-      { categoryId: 'c', code: 'x', budgetYen, carryOverYen: 0 },
-      budgetYen === null ? [] : [spend('c', -spentYen)],
+      { categoryId: 'g', budgetYen, carryOverYen: 0 },
+      budgetYen === null ? [] : [spend('g', -spentYen)],
     );
   }
 
   it('余裕があれば normal', () => {
-    expect(budgetTone(status(20_000, 5_000), 'other')).toBe('normal');
+    expect(budgetTone(status(20_000, 5_000))).toBe('normal');
   });
 
   it('閾値(既定70%)に達したら attention', () => {
-    expect(budgetTone(status(20_000, 14_000), 'other')).toBe('attention');
+    expect(budgetTone(status(20_000, 14_000))).toBe('attention');
   });
 
   it('予算を超えたら over', () => {
-    expect(budgetTone(status(20_000, 25_000), 'other')).toBe('over');
+    expect(budgetTone(status(20_000, 25_000))).toBe('over');
   });
 
-  it('聖域は閾値を超えても normal のまま(設計原則5・FR-64)', () => {
-    // 削減対象ではない枠を警告色に振ると「叱る家計簿」になる
-    expect(budgetTone(status(40_000, 31_200), 'sanctuary')).toBe('normal');
-    expect(budgetTone(status(40_000, 39_999), 'sanctuary')).toBe('normal');
-  });
-
-  it('聖域でも超過は隠さない(設計原則3は「叱らず見せる」)', () => {
-    expect(budgetTone(status(40_000, 45_000), 'sanctuary')).toBe('over');
-  });
-
-  it('同じ消化率でも、聖域とそれ以外で扱いが変わる', () => {
-    const usage78 = status(40_000, 31_200);
-    expect(budgetTone(usage78, 'other')).toBe('attention');
-    expect(budgetTone(usage78, 'sanctuary')).toBe('normal');
+  it('超過は常に隠さない(設計原則3は「叱らず見せる」)', () => {
+    expect(budgetTone(status(40_000, 45_000))).toBe('over');
   });
 
   it('閾値は差し替えられる(app_settings.waste_alert_threshold)', () => {
-    expect(budgetTone(status(20_000, 11_000), 'other', 0.5)).toBe('attention');
-    expect(budgetTone(status(20_000, 11_000), 'other', 0.9)).toBe('normal');
+    expect(budgetTone(status(20_000, 11_000), 0.5)).toBe('attention');
+    expect(budgetTone(status(20_000, 11_000), 0.9)).toBe('normal');
   });
 
-  it('予算未設定の枠は normal(超過の概念が無い)', () => {
-    expect(budgetTone(status(null, 100_000), 'other')).toBe('normal');
+  it('予算未設定の枠は normal(超過の概念が無い。警告を出したくなければ予算を未設定のままにできる)', () => {
+    expect(budgetTone(status(null, 100_000))).toBe('normal');
   });
 });

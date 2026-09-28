@@ -4,16 +4,17 @@
  * 明細一覧の絞り込み(本人発案:「プルダウンなどで表示するっていうのもあり」)。
  *
  * 「全期間・全件」が既定の一覧は、明細が増えるほど目的の行を探しにくくなる。
- * 口座・カテゴリ・月の3つで絞り込めるようにする。選択状態は URL のクエリ
+ * 口座・ジャンル・月の3つで絞り込めるようにする。選択状態は URL のクエリ
  * パラメータに持たせ(サーバー側で絞り込む)、ブックマーク・共有・再読み込みで
- * 状態が消えないようにした。
+ * 状態が消えないようにした。ADR-057により明細一覧は /spending へ統合した
+ * ため、遷移先もそちらになる。
  */
 
 import { useRouter } from 'next/navigation';
 
 export type TransactionFilterState = {
   accountId: string;
-  categoryId: string;
+  genreId: string;
   month: string;
 };
 
@@ -40,10 +41,10 @@ export function TransactionFilters({
     const next = { ...current, ...patch };
     const params = new URLSearchParams();
     if (next.accountId) params.set('account', next.accountId);
-    if (next.categoryId) params.set('category', next.categoryId);
+    if (next.genreId) params.set('category', next.genreId);
     if (next.month) params.set('month', next.month);
     const query = params.toString();
-    router.push(query ? `/transactions?${query}` : '/transactions');
+    router.push(query ? `/spending?${query}` : '/spending');
   }
 
   return (
@@ -64,13 +65,13 @@ export function TransactionFilters({
       </select>
 
       <select
-        value={current.categoryId}
-        onChange={(e) => update({ categoryId: e.target.value })}
-        aria-label="カテゴリで絞り込む"
+        value={current.genreId}
+        onChange={(e) => update({ genreId: e.target.value })}
+        aria-label="ジャンルで絞り込む"
         className="rounded-full px-2.5 py-1 text-[11px] font-medium"
         style={SELECT_STYLE}
       >
-        <option value="">すべてのカテゴリ</option>
+        <option value="">すべてのジャンル</option>
         <option value="none">未分類</option>
         {categories.map((category) => (
           <option key={category.id} value={category.id}>

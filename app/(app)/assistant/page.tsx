@@ -7,11 +7,11 @@ import { useEffect, useRef, useState } from 'react';
  * AIに変更を頼む(本人発案「登録編集系のものは全てこの仕組みで会話から
  * 操作したい」、ADR-054)。
  *
- * 「ルールをAIに相談する」(ADR-024)を汎用化したもの。分類ルールに加えて
- * 本人設定(給料日など)・明細のカテゴリ/金額/日付/メモ・レシートの品目・
- * 生活費の小分類を、この1画面の会話から変更できる。リボ払い・キャッシング・
- * 分割払いの検知ルールは会話からは触れない(app/api/assistant/chat/route.ts で
- * 二重に守っている)。
+ * 「ルールをAIに相談する」(ADR-024)を汎用化したもの。本人設定(給料日など)・
+ * 明細のジャンル/金額/日付/メモ・レシートの品目・生活費の小分類を、
+ * この1画面の会話から変更できる。ADR-057によりパターンルール
+ * (classification_rules)は廃止されたため、リボ払い・キャッシング・
+ * 分割払いの検知(FR-21)は固定ロジックであり、会話から変更する手段自体が無い。
  *
  * 会話はこの画面を離れると消える(サーバー側に保存しない設計)。
  */
@@ -22,8 +22,8 @@ type Message = { role: Role; content: string; changes?: AssistantChange[] };
 
 const SUGGESTIONS = [
   '給料日を20日にして',
-  'スターバックスは浪費カテゴリにして',
   'さっき登録したコンビニの明細を食費にして',
+  'スーパーで買った明細のジャンルを日用品にして',
 ];
 
 export default function AssistantChatPage() {
@@ -77,11 +77,11 @@ export default function AssistantChatPage() {
             AIに変更を頼む
           </h1>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            設定・明細・ルールを話した内容で変更します
+            設定・明細・ジャンルを話した内容で変更します
           </p>
         </div>
-        <Link href="/rules" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-          ルール一覧
+        <Link href="/reports/genres" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          ジャンル一覧
         </Link>
       </header>
 
@@ -93,9 +93,8 @@ export default function AssistantChatPage() {
               style={{ background: 'var(--accent-track)', boxShadow: 'var(--card-shadow)' }}
             >
               <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                給料日などの設定、明細のカテゴリ・金額・日付・メモ、レシートの品目、
-                分類ルールを会話だけで変更できます。リボ払い・キャッシング・分割払いの
-                検知ルールには触れません。
+                給料日などの設定、明細のジャンル・金額・日付・メモ、レシートの品目を
+                会話だけで変更できます。リボ払い・キャッシング・分割払いの 検知には触れません。
               </p>
             </div>
             <div className="space-y-1.5">

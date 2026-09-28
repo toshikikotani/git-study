@@ -60,11 +60,11 @@ export default async function ReportsPage() {
       )}
 
       <Link
-        href="/reports/categories"
+        href="/reports/genres"
         className="block text-[13px] font-medium"
         style={{ color: 'var(--accent)' }}
       >
-        カテゴリを選んで年→月→日で掘り下げる →
+        AIによる客観的なジャンルで見る →
       </Link>
 
       <MerchantRankingCard ranking={merchantRanking} />

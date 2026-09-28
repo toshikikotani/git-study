@@ -7,7 +7,7 @@ import { ProgressGauge } from '@/components/ui/meter';
 import { budgetTone } from '@/domain/budget';
 import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { streakBadgeFor } from '@/domain/streak';
-import { loadCategoryMonthDetail } from '@/features/categories/category-detail-store';
+import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
 import { formatDateJa, formatTimeJa } from '@/lib/date';
@@ -40,9 +40,7 @@ export default async function HomePage() {
 
   // タイルを押すとその場で内訳を開く(本人発案:遷移せずに見たい)。
   // タイルは高々数枠(FR-61)なので、ここで内訳もまとめて先読みしておく。
-  const tileDetails = await Promise.all(
-    tiles.map((tile) => loadCategoryMonthDetail(tile.categoryId)),
-  );
+  const tileDetails = await Promise.all(tiles.map((tile) => loadGenreMonthDetail(tile.genreId)));
 
   // この関数が実際に実行された時刻(=最後にサーバーへ取りに行った時刻)。
   // ADR-029:画面は pull-to-refresh するまで保持されるため、いつ時点の
@@ -166,26 +164,22 @@ export default async function HomePage() {
       </section>
 
       {/* FR-14 / FR-64:残額は肯定形で示す。責める文言を使わない。
-          ラベルも表示対象も categories から来る。ここに枠の名前を書かない(ADR-016)。 */}
+          ラベルも表示対象も genres から来る。ここに枠の名前を書かない(ADR-016)。 */}
       <div className="grid gap-3 sm:grid-cols-2">
         {tiles.map((tile, index) => {
-          const tone = budgetTone(
-            {
-              categoryId: tile.categoryId,
-              code: tile.code,
-              budgetYen: tile.budgetYen,
-              carryOverYen: 0,
-              spentYen: tile.spentYen,
-              remainingYen: tile.remainingYen,
-              usageRatio: tile.usageRatio,
-              transactionCount: 0,
-            },
-            tile.code === 'sanctuary' ? 'sanctuary' : 'other',
-          );
+          const tone = budgetTone({
+            categoryId: tile.genreId,
+            budgetYen: tile.budgetYen,
+            carryOverYen: 0,
+            spentYen: tile.spentYen,
+            remainingYen: tile.remainingYen,
+            usageRatio: tile.usageRatio,
+            transactionCount: 0,
+          });
 
           return (
             <ExpandableBudgetTile
-              key={tile.categoryId}
+              key={tile.genreId}
               style={{ animationDelay: `${100 + index * 70}ms` }}
               transactions={tileDetails[index]?.transactions ?? []}
               tile={{
@@ -211,11 +205,11 @@ export default async function HomePage() {
         <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
           ホームに出す枠が選ばれていません。
           <a
-            href="/rules"
+            href="/reports/genres"
             className="underline decoration-dotted underline-offset-4"
             style={{ color: 'var(--accent)' }}
           >
-            カテゴリの設定
+            ジャンルの設定
           </a>
           で表示したい枠を選んでください。
         </p>
