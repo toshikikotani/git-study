@@ -71,7 +71,7 @@ export function DuplicateList({ initial }: { initial: readonly DuplicateCandidat
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               {formatYen(candidate.earlier.amountYen, { sign: 'never' })} が2件
             </p>
-            <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               {candidate.dayGap === 0 ? '同じ日' : `${candidate.dayGap}日違い`}
             </p>
           </div>
@@ -83,7 +83,7 @@ export function DuplicateList({ initial }: { initial: readonly DuplicateCandidat
                   type="button"
                   onClick={() => keep(candidate, side.id)}
                   disabled={savingId !== null}
-                  className="w-full rounded-xl p-3 text-left disabled:opacity-50"
+                  className="min-h-11 w-full rounded-xl p-3 text-left disabled:opacity-50"
                   style={{ background: 'var(--plane)' }}
                 >
                   <div className="flex items-baseline justify-between gap-3">
@@ -91,13 +91,13 @@ export function DuplicateList({ initial }: { initial: readonly DuplicateCandidat
                       {side.label}
                     </span>
                     <span
-                      className="shrink-0 text-[13px] font-semibold"
+                      className="shrink-0 text-xs font-semibold"
                       style={{ color: 'var(--accent)' }}
                     >
                       これを残す
                     </span>
                   </div>
-                  <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {formatDateJa(side.occurredOn)} / {SOURCE_LABEL[side.source]} /{' '}
                     {side.accountName}
                   </p>
@@ -109,7 +109,7 @@ export function DuplicateList({ initial }: { initial: readonly DuplicateCandidat
                     href={side.receiptImageUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-1 inline-block px-3 text-[13px] font-medium underline decoration-dotted underline-offset-4"
+                    className="min-h-11 mt-1 inline-block px-3 text-xs font-medium underline decoration-dotted underline-offset-4"
                     style={{ color: 'var(--accent)' }}
                   >
                     レシートの写真を見る
@@ -123,7 +123,7 @@ export function DuplicateList({ initial }: { initial: readonly DuplicateCandidat
             type="button"
             onClick={() => dismiss(candidate)}
             disabled={savingId !== null}
-            className="mt-2 text-[13px] disabled:opacity-50"
+            className="min-h-11 mt-2 text-xs disabled:opacity-50"
             style={{ color: 'var(--ink-muted)' }}
           >
             別の買い物なので、どちらも残す

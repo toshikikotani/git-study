@@ -66,7 +66,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
           ジャンル別の内訳
         </h2>
         {goalRows !== null && isCurrentMonth ? (
-          <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-[13px]">
+          <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-xs">
             {(
               [
                 ['month', '今月'],
@@ -79,7 +79,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                 role="radio"
                 aria-checked={scope === value}
                 onClick={() => setScope(value)}
-                className="rounded-full px-3 py-1 font-semibold"
+                className="min-h-11 rounded-full px-3 py-1 font-semibold"
                 style={{
                   background: scope === value ? 'var(--accent)' : 'var(--plane)',
                   color: scope === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -154,7 +154,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
               );
             })}
           </ul>
-          <p className="tabular mt-2 text-right text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="tabular mt-2 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
             合計 {formatYen(total, { sign: 'never' })}
           </p>
         </>

@@ -22,6 +22,7 @@ import { buildGoalCard } from '@/features/goals/card';
 import { InsightsCard } from './insights-card';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
+import { ViewSwitch } from './view-switch';
 import { SpendingMonthProvider } from './spending-month-provider';
 import { SubscriptionsCard } from './subscriptions-card';
 import { SummaryCard } from './summary-card';
@@ -106,6 +107,7 @@ export default async function SpendingPage() {
         captures={captures}
       >
         <PeriodSwitcher />
+        <ViewSwitch />
         <SummaryCard
           pace={pace}
           forecast={forecast}

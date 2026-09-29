@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { createLongPress } from '@/lib/long-press';
+import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
@@ -18,6 +21,7 @@ import {
   restoreWaitingReceipts,
   useReceiptJobs,
 } from '@/features/import/receipt-queue';
+import { scrollToTop, tabTapAction } from '@/lib/scroll';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
 
 // 読み取れなかったレシートを「入力待ち」にする処理を、キューへ渡す(features は app に依存しない)。
@@ -109,6 +113,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </PullToRefresh>
 
+      <UndoToastHost />
+
       {/* document.body 直下に描画する(上のコメント参照)。ハイドレーション
           前(document が無い、または起動が遅く isClient がまだ true に
           なっていない間)は、この場に直接描画しておく——本人からの不具合
@@ -132,15 +138,35 @@ function BottomBar() {
     void restoreWaitingReceipts();
   }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'single' | 'continuous'>('single');
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const longPress = useMemo(() => createLongPress({ onLongPress: () => setFabMenuOpen(true) }), []);
   const reading = countReading(jobs);
   const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
   const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
   const needInput = jobs.filter((j) => j.status === 'needs_input').length;
+  // ホーム画面のショートカット(/spending?capture=1)から開いたら、撮影をすぐ開く。
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('capture') !== '1') return;
+    url.searchParams.delete('capture');
+    window.history.replaceState(null, '', url.pathname + url.search);
+    if (typeof navigator.mediaDevices?.getUserMedia === 'function') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL(外部)からの一度きりの起動
+      setCameraOpen(true);
+    }
+  }, []);
   // ハイドレーション前は、JS 無しでも動くネイティブの入力(撮る/選ぶ)を出しておく。
   const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
 
   const fab = canStream ? (
-    <Fab label="レシートを撮る" onPress={() => setCameraOpen(true)}>
+    <Fab
+      label="レシートを撮る"
+      onPress={() => {
+        setCameraMode('single');
+        setCameraOpen(true);
+      }}
+    >
       <MdCameraAlt aria-hidden size={26} />
     </Fab>
   ) : (
@@ -168,7 +194,7 @@ function BottomBar() {
           href="/transactions/receipt"
           prefetch={false}
           role="status"
-          className="label-text px-4 py-2 text-xs"
+          className="min-h-11 inline-flex items-center label-text px-4 py-2 text-xs"
           style={{
             borderRadius: 'var(--radius-full)',
             background: 'var(--glass-tint-strong)',
@@ -191,10 +217,66 @@ function BottomBar() {
 
       {cameraOpen ? (
         <ReceiptCamera
+          initialMode={cameraMode}
           onCapture={(files) => enqueueReceiptFiles(files)}
           onClose={() => setCameraOpen(false)}
         />
       ) : null}
+
+      {/* 撮影ボタンの長押し:手入力 / 写真から選ぶ / 連続撮影 */}
+      <BottomSheet open={fabMenuOpen} onClose={() => setFabMenuOpen(false)} role="menu">
+        <ul className="px-2 pb-2">
+          <li>
+            <Link
+              href="/transactions/new"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              手入力
+            </Link>
+          </li>
+          <li>
+            <label
+              role="menuitem"
+              className="flex min-h-11 cursor-pointer items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              写真から選ぶ
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  enqueueReceiptFiles(Array.from(e.target.files ?? []));
+                  e.target.value = '';
+                  setFabMenuOpen(false);
+                }}
+              />
+            </label>
+          </li>
+          {canStream ? (
+            <li>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFabMenuOpen(false);
+                  setCameraMode('continuous');
+                  setCameraOpen(true);
+                }}
+                className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold"
+                style={{ color: 'var(--ink)' }}
+              >
+                連続撮影
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      </BottomSheet>
 
       {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
           以前はその他もピルの6項目目だったため1項目が詰まって小さかった
@@ -223,7 +305,21 @@ function BottomBar() {
                       aria-label="レシートを撮る"
                     >
                       {/* 撮影ボタン(56pt)はタブバーから少しだけ浮かせる */}
-                      <div style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}>
+                      <div
+                        style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}
+                        onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
+                        onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
+                        onPointerUp={longPress.end}
+                        onPointerCancel={longPress.end}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClickCapture={(e) => {
+                          // 長押しが成立したあとのクリックは、撮影を始めずに打ち消す。
+                          if (longPress.consumeClick()) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
+                      >
                         {fab}
                       </div>
                     </li>
@@ -233,13 +329,20 @@ function BottomBar() {
                       href={item.href}
                       prefetch={false}
                       aria-current={isActive ? 'page' : undefined}
-                      className="flex flex-col items-center gap-1 py-2"
+                      onClick={(e) => {
+                        // 開いているタブをもう一度タップしたら、一番上へ戻る。
+                        if (tabTapAction(pathname, item.href) === 'scroll-top') {
+                          e.preventDefault();
+                          scrollToTop();
+                        }
+                      }}
+                      className="min-h-11 flex flex-col items-center gap-1 py-2"
                     >
                       {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
                         遷移させ、スプリングのイージングで一瞬 1 を超えてから
                         収まることで「弾む」感触を作る(ADR-028)。 */}
                       <span
-                        className="label-text px-2 py-1 text-[13px] whitespace-nowrap"
+                        className="label-text px-2 py-1 text-xs whitespace-nowrap"
                         style={{
                           borderRadius: 'var(--radius-full)',
                           transform: isActive ? 'scale(1)' : 'scale(0.9)',

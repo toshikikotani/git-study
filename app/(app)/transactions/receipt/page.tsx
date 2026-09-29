@@ -178,14 +178,18 @@ export default function ReceiptPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           レシートを確認
         </h1>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link
+          href="/spending"
+          className="min-h-11 inline-flex items-center text-xs"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           家計簿へ戻る
         </Link>
       </header>
 
       {accounts !== null && accounts.length > 1 ? (
         <label className="block">
-          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             口座
           </span>
           <select
@@ -209,7 +213,10 @@ export default function ReceiptPage() {
       {accounts !== null && accounts.length === 0 ? (
         <p className="text-xs" style={{ color: 'var(--over)' }}>
           口座を用意できませんでした。時間をおいてから開き直してください。
-          <Link href="/accounts" className="ml-1 font-semibold underline">
+          <Link
+            href="/accounts"
+            className="min-h-11 inline-flex items-center ml-1 font-semibold underline"
+          >
             口座を登録する
           </Link>
         </p>
@@ -222,7 +229,7 @@ export default function ReceiptPage() {
       >
         <div className="flex justify-center gap-3">
           <label
-            className="label-text cursor-pointer px-6 py-3"
+            className="min-h-11 label-text cursor-pointer px-6 py-3"
             style={{
               borderRadius: 'var(--radius-full)',
               background: 'var(--action)',
@@ -243,7 +250,7 @@ export default function ReceiptPage() {
             撮る
           </label>
           <label
-            className="label-text cursor-pointer px-6 py-3"
+            className="min-h-11 label-text cursor-pointer px-6 py-3"
             style={{
               borderRadius: 'var(--radius-full)',
               border: '1px solid var(--hairline)',
@@ -335,7 +342,7 @@ export default function ReceiptPage() {
             <button
               type="button"
               onClick={() => removeReceiptJob(job.id)}
-              className="text-xs font-semibold"
+              className="min-h-11 text-xs font-semibold"
               style={{ color: 'var(--accent)' }}
             >
               閉じる
@@ -385,12 +392,17 @@ export default function ReceiptPage() {
                 type="button"
                 onClick={() => void undo()}
                 disabled={toast.undoing}
-                className="font-semibold underline disabled:opacity-50"
+                className="min-h-11 font-semibold underline disabled:opacity-50"
               >
                 元に戻す
               </button>
             ) : null}
-            <button type="button" aria-label="閉じる" onClick={() => setToast(null)}>
+            <button
+              className="min-h-11"
+              type="button"
+              aria-label="閉じる"
+              onClick={() => setToast(null)}
+            >
               ×
             </button>
           </span>
@@ -415,19 +427,19 @@ function ParkedJobCard({ job }: { job: ReceiptJob }) {
       <div className="min-w-0 flex-1">
         {job.status === 'waiting' ? (
           <>
-            <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               読み取り待ち
             </p>
-            <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+            <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
               オンラインに戻ると自動で読み取ります。画像は端末に残してあります。
             </p>
           </>
         ) : (
           <>
-            <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               入力待ち
             </p>
-            <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+            <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
               {job.receiptStatus === 'partial'
                 ? '一部だけ読み取れました。残りを入力してください。'
                 : '読み取れませんでした。画像を見ながら入力できます。'}
@@ -439,7 +451,7 @@ function ParkedJobCard({ job }: { job: ReceiptJob }) {
         <button
           type="button"
           onClick={() => retryWaitingJobs()}
-          className="min-h-11 shrink-0 px-2 text-[13px] font-semibold"
+          className="min-h-11 shrink-0 px-2 text-xs font-semibold"
           style={{ color: 'var(--ink)' }}
         >
           今すぐ読み取る →
@@ -448,7 +460,7 @@ function ParkedJobCard({ job }: { job: ReceiptJob }) {
         <Link
           href={`/transactions/receipt/${job.captureId}` as Route}
           prefetch={false}
-          className="flex min-h-11 shrink-0 items-center px-2 text-[13px] font-semibold"
+          className="flex min-h-11 shrink-0 items-center px-2 text-xs font-semibold"
           style={{ color: 'var(--ink)' }}
         >
           入力する →

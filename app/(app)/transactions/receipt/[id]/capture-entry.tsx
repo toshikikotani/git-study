@@ -258,7 +258,7 @@ export function CaptureEntry({
   if (done !== null) {
     return (
       <div className="space-y-4 py-8 text-center" role="status">
-        <p className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+        <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
           {done.kind === 'saved'
             ? `${done.label} を保存しました`
             : done.kind === 'attached'
@@ -269,7 +269,7 @@ export function CaptureEntry({
           <button
             type="button"
             onClick={() => void undo()}
-            className="min-h-11 px-4 text-[15px] font-semibold"
+            className="min-h-11 px-4 text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
             元に戻す
@@ -278,14 +278,14 @@ export function CaptureEntry({
         <div>
           <Link
             href="/spending"
-            className="inline-flex min-h-11 items-center px-4 text-[15px] font-semibold"
+            className="inline-flex min-h-11 items-center px-4 text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
             家計簿へ →
           </Link>
         </div>
         {message ? (
-          <p className="text-[13px]" style={{ color: 'var(--over)' }}>
+          <p className="text-xs" style={{ color: 'var(--over)' }}>
             {message}
           </p>
         ) : null}
@@ -308,7 +308,7 @@ export function CaptureEntry({
             className="h-[34dvh]"
           />
         ) : (
-          <p className="p-6 text-center text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="p-6 text-center text-xs" style={{ color: 'var(--ink-secondary)' }}>
             画像を表示できませんでした
           </p>
         )}
@@ -351,11 +351,11 @@ export function CaptureEntry({
       </div>
 
       {busy === 'rescan' ? (
-        <p role="status" className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+        <p role="status" className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
           読み取り中…(入力した内容はそのまま残ります)
         </p>
       ) : message ? (
-        <p role="status" className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+        <p role="status" className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {message}
         </p>
       ) : null}
@@ -367,11 +367,11 @@ export function CaptureEntry({
           className="space-y-2 rounded-2xl p-4"
           style={{ background: 'var(--surface)', border: '1px solid var(--state-caution)' }}
         >
-          <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             <span aria-hidden>▲ </span>読み取り結果と、入力済みの内容が違います
           </p>
           {conflicts.map((c) => (
-            <div key={c.field} className="flex items-center justify-between gap-2 text-[15px]">
+            <div key={c.field} className="flex items-center justify-between gap-2 text-sm">
               <span className="tabular min-w-0" style={{ color: 'var(--ink)' }}>
                 {CAPTURE_FIELD_LABEL[c.field]}:{c.current} → {c.rescanned}
               </span>
@@ -382,7 +382,7 @@ export function CaptureEntry({
                     setValues((v) => applyConflict(v, c));
                     setConflicts((prev) => prev.filter((x) => x.field !== c.field));
                   }}
-                  className="min-h-11 px-2 text-[13px] font-semibold"
+                  className="min-h-11 px-2 text-xs font-semibold"
                   style={{ color: 'var(--ink)' }}
                 >
                   置き換える
@@ -390,7 +390,7 @@ export function CaptureEntry({
                 <button
                   type="button"
                   onClick={() => setConflicts((prev) => prev.filter((x) => x.field !== c.field))}
-                  className="min-h-11 px-2 text-[13px]"
+                  className="min-h-11 px-2 text-xs"
                   style={{ color: 'var(--ink-secondary)' }}
                 >
                   そのまま
@@ -419,11 +419,11 @@ export function CaptureEntry({
           className="space-y-2 rounded-2xl p-4"
           style={{ background: 'var(--surface)', border: '1px solid var(--state-caution)' }}
         >
-          <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             <span aria-hidden>▲ </span>同じ日・同じ店・近い金額の明細が既にあります
           </p>
           {duplicates.map((d) => (
-            <div key={d.id} className="flex items-center justify-between gap-2 text-[15px]">
+            <div key={d.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="tabular" style={{ color: 'var(--ink-secondary)' }}>
                 {d.occurredOn.slice(5).replace('-', '/')}{' '}
                 {Math.abs(d.amountYen).toLocaleString('ja-JP')}円
@@ -432,14 +432,14 @@ export function CaptureEntry({
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void attach(d.id)}
-                className="min-h-11 px-2 text-[13px] font-semibold"
+                className="min-h-11 px-2 text-xs font-semibold"
                 style={{ color: 'var(--ink)' }}
               >
                 この明細に添付する
               </button>
             </div>
           ))}
-          <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             別の買い物なら、そのまま保存できます。
           </p>
         </div>
@@ -450,7 +450,7 @@ export function CaptureEntry({
           type="button"
           onClick={() => void save()}
           disabled={busy !== null}
-          className="min-h-12 w-full rounded-2xl text-[17px] font-semibold disabled:opacity-50"
+          className="min-h-12 w-full rounded-2xl text-base font-semibold disabled:opacity-50"
           style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {busy === 'save' ? '保存しています…' : '保存する'}
@@ -461,7 +461,7 @@ export function CaptureEntry({
         <button
           type="button"
           onClick={() => setConfirmDiscard(true)}
-          className="min-h-11 px-4 text-[13px] font-semibold"
+          className="min-h-11 px-4 text-xs font-semibold"
           style={{ color: 'var(--over)' }}
         >
           このレシートを破棄する
@@ -470,17 +470,17 @@ export function CaptureEntry({
 
       <BottomSheet open={confirmDiscard} onClose={() => setConfirmDiscard(false)} role="dialog">
         <div className="space-y-3 px-4 pt-2 pb-4">
-          <p className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
             このレシートを破棄しますか?
           </p>
-          <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             入力待ちから外れます。画像は残り、破棄した直後なら元に戻せます。
           </p>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setConfirmDiscard(false)}
-              className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
+              className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
               style={{ background: 'var(--plane)', color: 'var(--ink)' }}
             >
               やめる
@@ -488,7 +488,7 @@ export function CaptureEntry({
             <button
               type="button"
               onClick={() => void discard()}
-              className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
+              className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
               style={{ background: 'var(--over)', color: 'var(--on-accent)' }}
             >
               破棄する
@@ -528,7 +528,7 @@ function ActionChip({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="min-h-11 rounded-full px-4 text-[13px] font-semibold disabled:opacity-40"
+      className="min-h-11 rounded-full px-4 text-xs font-semibold disabled:opacity-40"
       style={{
         background: 'var(--surface)',
         color: 'var(--ink)',

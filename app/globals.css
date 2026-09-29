@@ -37,24 +37,26 @@
 
   /* 文字の段階は5つだけ(34 大見出し / 40 金額の主役 / 17 見出し(太字)/ 15 本文 / 13 補足)。
      Tailwind の text-* もこの5つのどれかに寄せる。 */
-  --text-xs: 13px;
+  --text-xs: calc(13 / 17 * 1rem);
   --text-xs--line-height: 18px;
-  --text-sm: 15px;
+  --text-sm: calc(15 / 17 * 1rem);
   --text-sm--line-height: 22px;
-  --text-base: 17px;
+  --text-base: 1rem;
   --text-base--line-height: 24px;
-  --text-lg: 17px;
+  --text-lg: 1rem;
   --text-lg--line-height: 24px;
-  --text-xl: 34px;
+  --text-xl: 2rem;
   --text-xl--line-height: 40px;
-  --text-2xl: 34px;
+  --text-2xl: 2rem;
   --text-2xl--line-height: 40px;
-  --text-3xl: 34px;
+  --text-3xl: 2rem;
   --text-3xl--line-height: 40px;
-  --text-4xl: 40px;
+  --text-4xl: calc(40 / 17 * 1rem);
   --text-4xl--line-height: 48px;
 
   /* 角丸は カード16 / 内側の要素12 / チップは完全な丸 の3つだけ。 */
+  --spacing: 4px;
+
   --radius-xs: 12px;
   --radius-sm: 12px;
   --radius-md: 12px;
@@ -266,11 +268,11 @@
   --gutter: 16px;
 
   /* 文字の段階(上の @theme と同じ5つ)。 */
-  --font-title: 34px;
-  --font-amount: 40px;
-  --font-heading: 17px;
-  --font-body: 15px;
-  --font-caption: 13px;
+  --font-title: 2rem;
+  --font-amount: calc(40 / 17 * 1rem);
+  --font-heading: 1rem;
+  --font-body: calc(15 / 17 * 1rem);
+  --font-caption: calc(13 / 17 * 1rem);
 
   /* 金額の「円」は数字の0.7倍で、少し細く。 */
   --yen-unit-scale: 0.7;
@@ -337,7 +339,22 @@
   --glass-shadow-float: 0 14px 38px rgba(0, 0, 0, 0.55);
 }
 
+/* Dynamic Type(文字サイズの設定)。iOS/iPadOS の Safari では、システムの文字サイズを
+   -apple-system-body で受け取り、rem で書いた文字の段階(13/15/17/34/40 = 17px 基準の比)が
+   一緒に拡大縮小する。余白・タップ領域は px(--spacing: 4px)のままで、文字が大きくなったら
+   min-h と折り返しで広がる。長い名前は折り返して、はみ出さない。 */
+html {
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+}
+@supports (font: -apple-system-body) {
+  html {
+    font: -apple-system-body;
+  }
+}
+
 body {
+  overflow-wrap: anywhere;
   background: var(--plane);
   color: var(--ink);
   /* 金額は等幅数字(縦に並べたとき桁がそろう)。 */

@@ -30,7 +30,7 @@ export function Placeholder({
             aria-hidden
           />
           <span
-            className="text-[13px] font-medium tracking-[0.08em] uppercase"
+            className="text-xs font-medium tracking-[0.08em] uppercase"
             style={{ color: 'var(--ink-muted)' }}
           >
             未実装

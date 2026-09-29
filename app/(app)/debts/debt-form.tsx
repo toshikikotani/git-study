@@ -159,7 +159,7 @@ function Field({
       </span>
       <div className="mt-1">{children}</div>
       {hint ? (
-        <span className="mt-1 block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <span className="mt-1 block text-xs" style={{ color: 'var(--ink-muted)' }}>
           {hint}
         </span>
       ) : null}

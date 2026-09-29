@@ -44,7 +44,7 @@ export default async function ReportsPage() {
             収支・カテゴリ別支出・店舗別支出・資産推移・用途別残高
           </p>
         </div>
-        <Link href="/reports/ai" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/reports/ai" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           AIレポート →
         </Link>
       </header>
@@ -61,7 +61,7 @@ export default async function ReportsPage() {
 
       <Link
         href="/reports/genres"
-        className="block text-[13px] font-medium"
+        className="block text-xs font-medium"
         style={{ color: 'var(--accent)' }}
       >
         AIによる客観的なジャンルで見る →

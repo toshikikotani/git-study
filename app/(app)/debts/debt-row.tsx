@@ -48,7 +48,7 @@ export function DebtRow({
             {/* ADR-006:推定値である間は必ずこのバッジを出す */}
             {debt.isEstimated ? (
               <span
-                className="rounded-full px-2 py-1 text-[13px] font-medium"
+                className="rounded-full px-2 py-1 text-xs font-medium"
                 style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
               >
                 推定
@@ -76,7 +76,7 @@ export function DebtRow({
       </dl>
 
       {debt.isEstimated ? (
-        <p className="mt-3 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
           仮の値が入っています。実際の請求書を見ながら「編集」で正確な値に直してください。
         </p>
       ) : null}

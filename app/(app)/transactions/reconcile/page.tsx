@@ -86,7 +86,11 @@ export default function ReconcilePage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           請求金額と突き合わせる
         </h1>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link
+          href="/spending"
+          className="min-h-11 inline-flex items-center text-xs"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           やめる
         </Link>
       </header>
@@ -99,7 +103,7 @@ export default function ReconcilePage() {
       {/* 口座(M6-2) */}
       <Card>
         <label
-          className="text-[13px] font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           口座
@@ -113,7 +117,7 @@ export default function ReconcilePage() {
             口座がまだ登録されていません。
             <Link
               href="/accounts"
-              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
+              className="min-h-11 inline-flex items-center ml-1 font-semibold underline decoration-dotted underline-offset-4"
               style={{ color: 'var(--accent)' }}
             >
               先に登録する →
@@ -145,7 +149,7 @@ export default function ReconcilePage() {
             この口座は締め日が未設定です。メールに期間の記載が無い場合は、
             <Link
               href="/accounts"
-              className="ml-1 underline decoration-dotted underline-offset-4"
+              className="min-h-11 inline-flex items-center ml-1 underline decoration-dotted underline-offset-4"
               style={{ color: 'var(--accent)' }}
             >
               締め日を設定する
@@ -157,7 +161,7 @@ export default function ReconcilePage() {
 
       <Card>
         <label
-          className="text-[13px] font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           メール本文
@@ -178,7 +182,7 @@ export default function ReconcilePage() {
           type="button"
           onClick={readEmail}
           disabled={body.trim() === ''}
-          className="mt-3 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          className="min-h-11 mt-3 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
           style={{
             background: 'var(--plane)',
             color: 'var(--accent)',
@@ -199,7 +203,7 @@ export default function ReconcilePage() {
 
       <Card>
         <label
-          className="text-[13px] font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           金額・期間(読み取り後に修正できます)
@@ -252,7 +256,7 @@ export default function ReconcilePage() {
           type="button"
           onClick={() => void check()}
           disabled={!accountId || announcedTotalYen === '' || checking}
-          className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          className="min-h-11 mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {checking ? '突き合わせています…' : '突き合わせる'}

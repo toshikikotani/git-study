@@ -182,7 +182,7 @@ export default function ImportPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           CSV を取り込む
         </h1>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           やめる
         </Link>
       </header>
@@ -458,7 +458,7 @@ function Step({ n, title }: { n: number; title: string }) {
   return (
     <div className="flex items-center gap-2">
       <span
-        className="tabular flex size-5 items-center justify-center rounded-full text-[13px] font-semibold"
+        className="tabular flex size-5 items-center justify-center rounded-full text-xs font-semibold"
         style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
       >
         {n}
@@ -488,7 +488,7 @@ function Count({ label, value, tone }: { label: string; value: number; tone: 'ac
   const bg = tone === 'over' && value > 0 ? 'var(--over-track)' : 'var(--accent-track)';
   return (
     <div className="flex-1 rounded-2xl px-3 py-3" style={{ background: bg }}>
-      <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+      <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </p>
       <p className="tabular text-lg font-semibold" style={{ color }}>

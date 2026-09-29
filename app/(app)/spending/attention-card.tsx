@@ -8,10 +8,12 @@ import { useMemo, useState } from 'react';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { buildAttention } from '@/features/spending/views';
+import { pushUndo } from '@/lib/undo';
 import { formatDateJa } from '@/lib/date';
 import {
   recordGenreCorrectionAction,
   resolveReconcileAction,
+  restoreRowFieldsAction,
   updateTransactionAction,
 } from '../transactions/actions';
 import type { DrilldownTransaction } from './drilldown';
@@ -64,15 +66,15 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
             aria-label={`要確認 ${queue.length}件。タップして順番に直す`}
           >
             <div className="flex items-baseline justify-between gap-3">
-              <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                 <span aria-hidden>▲ </span>要確認
               </p>
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
                 順番に直す →
               </span>
             </div>
             <ul
-              className="tabular mt-2 space-y-1 text-[13px]"
+              className="tabular mt-2 space-y-1 text-xs"
               style={{ color: 'var(--ink-secondary)' }}
             >
               {attention.uncategorized.count > 0 ? (
@@ -89,7 +91,7 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
             </ul>
           </button>
         ) : (
-          <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             <span aria-hidden>▲ </span>要確認
           </p>
         )}
@@ -97,7 +99,7 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
           <Link
             href={`/transactions/receipt/${captures[0]!.id}` as Route}
             prefetch={false}
-            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-[13px]"
+            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
             style={{ color: 'var(--ink-secondary)' }}
           >
             <span className="tabular">
@@ -161,7 +163,21 @@ function AttentionFixer({
       itemName: current.tx.label,
       genreId,
     });
-    markHandled(`${current.reason}:${current.tx.id}`);
+    const key = `${current.reason}:${current.tx.id}`;
+    markHandled(key);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo(`${current.tx.label} のジャンルを変更しました`, async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setHandled((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        return null;
+      });
+    }
   }
 
   async function acceptDiff(): Promise<void> {
@@ -174,7 +190,21 @@ function AttentionFixer({
       setError(result.error);
       return;
     }
-    markHandled(`${current.reason}:${current.tx.id}`);
+    const key = `${current.reason}:${current.tx.id}`;
+    markHandled(key);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo(`${current.tx.label} の差額を認めました`, async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setHandled((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        return null;
+      });
+    }
   }
 
   return (
@@ -188,7 +218,7 @@ function AttentionFixer({
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 rounded-full px-5 py-2 text-sm font-semibold"
+              className="min-h-11 mt-3 rounded-full px-5 py-2 text-sm font-semibold"
               style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               閉じる
@@ -203,7 +233,7 @@ function AttentionFixer({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-xs"
+                className="min-h-11 text-xs"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 あとで
@@ -241,7 +271,7 @@ function AttentionFixer({
                       type="button"
                       disabled={busy}
                       onClick={() => void pickGenre(g.id)}
-                      className="rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50"
                       style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                     >
                       {g.name}
@@ -260,7 +290,7 @@ function AttentionFixer({
                     type="button"
                     disabled={busy}
                     onClick={() => void acceptDiff()}
-                    className="flex-1 rounded-full py-2 text-sm font-semibold disabled:opacity-50"
+                    className="min-h-11 flex-1 rounded-full py-2 text-sm font-semibold disabled:opacity-50"
                     style={{ background: 'var(--action)', color: 'var(--on-action)' }}
                   >
                     この差額でOK
@@ -268,7 +298,7 @@ function AttentionFixer({
                   <button
                     type="button"
                     onClick={() => markHandled(`${current.reason}:${current.tx.id}`)}
-                    className="rounded-full px-4 py-2 text-sm"
+                    className="min-h-11 rounded-full px-4 py-2 text-sm"
                     style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
                   >
                     スキップ

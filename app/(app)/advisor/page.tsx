@@ -24,7 +24,7 @@ export default async function AdvisorPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           目標
         </h1>
-        <Link href="/" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           ホームへ戻る
         </Link>
       </header>
@@ -45,7 +45,7 @@ export default async function AdvisorPage() {
 
       <Link
         href="/assistant"
-        className="block text-[13px] font-medium"
+        className="block text-xs font-medium"
         style={{ color: 'var(--accent)' }}
       >
         AIに相談して目標を立てる →

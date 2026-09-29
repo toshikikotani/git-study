@@ -137,7 +137,7 @@ export function GenreBreakdownCard({
               className="mt-3 space-y-3 border-t pt-3"
               style={{ borderColor: 'var(--hairline)' }}
             >
-              <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
                 明細1件ごとに本人が付けた「絶対払わざるを得ないもの」のラベル
                 (ジャンルとは独立)で、今月の支出を分けています。
               </p>

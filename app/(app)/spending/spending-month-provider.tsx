@@ -1,11 +1,20 @@
 'use client';
 
 import type { CaptureView } from '@/features/receipt-captures/types';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import type { GenreOption } from '@/features/genre/store';
 import type { GenreBreakdownRow, MonthTotals } from '@/features/spending/ledger-types';
 import { EMPTY_FILTER, type LedgerFilter } from '@/features/spending/views';
+import { VIEW_STATE_KEY, parseViewState, serializeViewState } from '@/lib/scroll';
 import { loadCalendarMonthAction } from './actions';
 import type { DrilldownTransaction } from './drilldown';
 
@@ -102,6 +111,65 @@ export function SpendingMonthProvider({
     ...EMPTY_FILTER,
     ...initialFilter,
   });
+
+  // 家計簿を離れて戻ったとき(レシートの入力・目標画面などから)、絞り込みとスクロール位置を復元する。
+  useEffect(() => {
+    if (initialFilter !== undefined) return;
+    try {
+      const saved = parseViewState(window.sessionStorage.getItem(VIEW_STATE_KEY), Date.now());
+      if (saved === null) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 外部(sessionStorage)からの一度きりの復元
+      setFilterState(saved.filter);
+      window.requestAnimationFrame(() => window.scrollTo(0, saved.scrollY));
+    } catch {
+      // 復元できなくても通常どおり開く
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // アプリのバッジ(ホーム画面のアイコン)に、入力待ちのレシートの件数を出す(対応する環境だけ)。
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (n: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (captures.length > 0) void nav.setAppBadge?.(captures.length)?.catch(() => {});
+    else void nav.clearAppBadge?.()?.catch(() => {});
+  }, [captures.length]);
+
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+  useEffect(() => {
+    let timer: number | undefined;
+    const save = () => {
+      try {
+        window.sessionStorage.setItem(
+          VIEW_STATE_KEY,
+          serializeViewState({
+            filter: filterRef.current,
+            scrollY: window.scrollY,
+            savedAt: Date.now(),
+          }),
+        );
+      } catch {
+        // 保存できなくても復元されないだけ
+      }
+    };
+    const onScroll = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(save, 150);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pagehide', save);
+      window.clearTimeout(timer);
+      save();
+    };
+  }, []);
 
   const load = async (monthStart: string, force: boolean) => {
     if (monthStart === currentMonthStart || (!force && otherMonths.has(monthStart))) return;

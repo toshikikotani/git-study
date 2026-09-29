@@ -1,5 +1,6 @@
 'use client';
 
+import { pushUndo } from '@/lib/undo';
 import { useEffect, useRef, useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -211,6 +212,21 @@ export function ReceiptItemsPanel({
         productType: p.productType,
       })),
     );
+    const prevItems = items;
+    pushUndo('品目を変更しました', async () => {
+      const r = await replaceReceiptItemsAction(
+        transaction.id,
+        prevItems.map((p) => ({
+          name: p.name,
+          amountYen: p.amountYen,
+          genreId: p.genreId,
+          productType: p.productType,
+        })),
+      );
+      if (r.error) return r.error;
+      onItemsReplaced([...prevItems]);
+      return null;
+    });
     setEditSaving(false);
     setDialogOpen(false);
   }
@@ -218,13 +234,13 @@ export function ReceiptItemsPanel({
   return (
     <div className="rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           レシートの品目
         </p>
         <button
           type="button"
           onClick={openDialog}
-          className="text-[13px] font-semibold"
+          className="min-h-11 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           {items.length > 0 ? '編集する' : 'レシートを登録する'}
@@ -259,7 +275,7 @@ export function ReceiptItemsPanel({
           {/* 品目の合計が明細額と一致しない(ADR-035)。編集は常にできるが、
               読み取りが不正確だった可能性を控えめに知らせる。 */}
           {itemsStatus === 'mismatched' ? (
-            <p className="mt-1 text-[13px]" style={{ color: 'var(--over)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
               品目の合計が金額と一致しません
             </p>
           ) : null}
@@ -273,17 +289,17 @@ export function ReceiptItemsPanel({
       {/* 生活費の小分類(本人発案、ADR-036)。ADR-057によりジャンルに固定の
           code は無くなったため、値があるときは常に添える。 */}
       {subtype ? (
-        <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
           生活費の内訳:{subtype}
         </p>
       ) : null}
 
       <BottomSheet open={dialogOpen} onClose={closeDialog} role="dialog">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
-          <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             品目を編集
           </h2>
-          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             外側をタップで閉じる
           </span>
         </div>
@@ -311,7 +327,7 @@ export function ReceiptItemsPanel({
             type="button"
             onClick={() => receiptInputRef.current?.click()}
             disabled={rescanning}
-            className="w-full rounded-xl py-2 text-sm font-semibold disabled:opacity-40"
+            className="min-h-11 w-full rounded-xl py-2 text-sm font-semibold disabled:opacity-40"
             style={{
               background: 'var(--plane)',
               color: 'var(--accent)',
@@ -325,7 +341,7 @@ export function ReceiptItemsPanel({
                 : 'レシートを読み込む'}
           </button>
           {rescanError ? (
-            <p className="text-[13px]" style={{ color: 'var(--over)' }}>
+            <p className="text-xs" style={{ color: 'var(--over)' }}>
               {rescanError}
             </p>
           ) : null}
@@ -398,7 +414,7 @@ export function ReceiptItemsPanel({
               type="button"
               onClick={() => void saveEdit()}
               disabled={editSaving || !canSaveEdit}
-              className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               {editSaving ? '保存中…' : '保存'}
@@ -407,7 +423,7 @@ export function ReceiptItemsPanel({
               type="button"
               onClick={closeDialog}
               disabled={editSaving}
-              className="rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
             >
               やめる

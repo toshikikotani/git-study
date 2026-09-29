@@ -96,7 +96,7 @@ export function InsightsCard({
           <button
             type="button"
             onClick={() => setDetailsOpen((v) => !v)}
-            className="mt-2 flex w-full items-center justify-between gap-3 text-left"
+            className="min-h-11 mt-2 flex w-full items-center justify-between gap-3 text-left"
           >
             <span className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
               見直し候補 {formatYen(breakdown.reviewYen, { sign: 'never' })} ・ 必要経費{' '}
@@ -133,7 +133,7 @@ export function InsightsCard({
           type="button"
           onClick={() => void run()}
           disabled={pending}
-          className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          className="min-h-11 mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '診断しています…' : `今月の${undiagnosedCount}件をAIで診断する`}
@@ -157,7 +157,7 @@ export function InsightsCard({
       {/* ちりつも(小口支出の積み重ね)は補助。要約1行だけ見せて詳細へ */}
       <Link
         href="/spending/pile"
-        className="mt-3 flex items-center justify-between gap-3 border-t pt-3"
+        className="min-h-11 mt-3 flex items-center justify-between gap-3 border-t pt-3"
         style={{ borderColor: 'var(--hairline)' }}
       >
         <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
@@ -186,7 +186,7 @@ function DiagnosisItemList({
 
   return (
     <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
         {heading}
       </p>
       <ul className="mt-2 space-y-3">
@@ -200,7 +200,7 @@ function DiagnosisItemList({
                 {formatYen(item.amountYen)}
               </span>
             </div>
-            <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+            <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
               {formatDateJa(item.occurredOn)} ・ {item.reasoning}
             </p>
           </li>

@@ -39,7 +39,7 @@ export function LedgerMenu() {
                 className="flex min-h-11 items-baseline justify-between gap-3 px-2 py-2"
                 style={{ color: 'var(--ink)' }}
               >
-                <span className="text-[17px] font-semibold">{i.label}</span>
+                <span className="text-base font-semibold">{i.label}</span>
                 <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                   {i.hint} →
                 </span>

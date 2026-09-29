@@ -2,6 +2,8 @@
 
 import { useId } from 'react';
 
+import { GenreBadge } from '@/components/ui/genre-badge';
+
 import {
   CAPTURE_FIELD_LABEL,
   itemsBar,
@@ -33,6 +35,7 @@ export function ManualEntryForm({
   autofilled = [],
   errors = {},
   showErrors = false,
+  variant = 'receipt',
 }: {
   values: ManualEntryValues;
   /** field は本人が触った項目(再読み取りの上書き防止の印に使う)。 */
@@ -44,6 +47,11 @@ export function ManualEntryForm({
   autofilled?: readonly CaptureField[];
   errors?: ManualEntryErrors;
   showErrors?: boolean;
+  /**
+   * receipt: 金額 → 日付 → 店名 → ジャンル → 口座 → メモ(画像を見ながら入力する画面)
+   * quick  : 金額 → ジャンル(アイコンの格子)→ 最近使った店 → 日付 → 口座 → メモ(レシートなしの手入力)
+   */
+  variant?: 'receipt' | 'quick';
 }) {
   const id = useId();
   const bar = itemsBar(values.items, values.amountYen);
@@ -56,9 +64,8 @@ export function ManualEntryForm({
       ...values,
       items: values.items.map((i) => (i.id === itemId ? { ...i, ...patch } : i)),
     });
-
-  return (
-    <div className="space-y-5">
+  const fields = {
+    amount: (
       <Field
         label={CAPTURE_FIELD_LABEL.amountYen}
         htmlFor={`${id}-amount`}
@@ -79,15 +86,16 @@ export function ManualEntryForm({
                 'amountYen',
               );
             }}
-            className="tabular min-h-11 w-full bg-transparent text-[34px] font-semibold outline-none"
+            className="tabular min-h-11 w-full bg-transparent text-3xl font-semibold outline-none"
             style={{ color: 'var(--ink)' }}
           />
-          <span className="text-[17px]" style={{ color: 'var(--ink-secondary)' }}>
+          <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
             円
           </span>
         </div>
       </Field>
-
+    ),
+    date: (
       <Field
         label={CAPTURE_FIELD_LABEL.occurredOn}
         htmlFor={`${id}-date`}
@@ -99,11 +107,12 @@ export function ManualEntryForm({
           type="date"
           value={values.occurredOn}
           onChange={(e) => onChange({ ...values, occurredOn: e.target.value }, 'occurredOn')}
-          className="min-h-11 w-full bg-transparent text-[17px] outline-none"
+          className="min-h-11 w-full bg-transparent text-base outline-none"
           style={{ color: 'var(--ink)' }}
         />
       </Field>
-
+    ),
+    store: (
       <Field
         label={CAPTURE_FIELD_LABEL.storeName}
         htmlFor={`${id}-store`}
@@ -116,7 +125,7 @@ export function ManualEntryForm({
           placeholder="例:ファミリーマート"
           value={values.storeName}
           onChange={(e) => onChange({ ...values, storeName: e.target.value }, 'storeName')}
-          className="min-h-11 w-full bg-transparent text-[17px] outline-none"
+          className="min-h-11 w-full bg-transparent text-base outline-none"
           style={{ color: 'var(--ink)' }}
         />
         <datalist id={`${id}-stores`}>
@@ -131,7 +140,7 @@ export function ManualEntryForm({
                 key={s}
                 type="button"
                 onClick={() => onChange({ ...values, storeName: s }, 'storeName')}
-                className="min-h-11 rounded-full px-3 text-[13px] font-semibold"
+                className="min-h-11 rounded-full px-3 text-xs font-semibold"
                 style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
               >
                 {s}
@@ -140,7 +149,8 @@ export function ManualEntryForm({
           </div>
         ) : null}
       </Field>
-
+    ),
+    genre: (
       <Field label="ジャンル" tone="plain">
         <div role="group" aria-label="ジャンル" className="flex flex-wrap gap-2">
           {genres.map((g) => {
@@ -151,7 +161,7 @@ export function ManualEntryForm({
                 type="button"
                 aria-pressed={on}
                 onClick={() => onChange({ ...values, genreId: on ? null : g.id })}
-                className="min-h-11 rounded-full px-4 text-[15px] font-semibold"
+                className="min-h-11 rounded-full px-4 text-sm font-semibold"
                 style={{
                   background: on ? 'var(--ink)' : 'var(--plane)',
                   color: on ? 'var(--surface)' : 'var(--ink-secondary)',
@@ -162,11 +172,38 @@ export function ManualEntryForm({
             );
           })}
         </div>
-        <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           選ばなければ未分類になります(あとで家計簿から2タップで分類できます)
         </p>
       </Field>
-
+    ),
+    quickGenre: (
+      <Field label="ジャンル" tone="plain">
+        <div role="group" aria-label="ジャンル" className="grid grid-cols-4 gap-2">
+          {genres.map((g) => {
+            const on = values.genreId === g.id;
+            return (
+              <button
+                key={g.id}
+                type="button"
+                aria-pressed={on}
+                aria-label={g.name}
+                onClick={() => onChange({ ...values, genreId: on ? null : g.id })}
+                className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2"
+                style={{
+                  background: on ? 'var(--accent)' : 'var(--surface-raised)',
+                  color: on ? 'var(--on-accent)' : 'var(--ink-secondary)',
+                }}
+              >
+                <GenreBadge name={g.name} size={28} />
+                <span className="w-full truncate text-center text-xs font-semibold">{g.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+    ),
+    account: (
       <Field
         label="口座"
         htmlFor={`${id}-account`}
@@ -177,7 +214,7 @@ export function ManualEntryForm({
           id={`${id}-account`}
           value={values.accountId}
           onChange={(e) => onChange({ ...values, accountId: e.target.value })}
-          className="min-h-11 w-full bg-transparent text-[17px] outline-none"
+          className="min-h-11 w-full bg-transparent text-base outline-none"
           style={{ color: 'var(--ink)' }}
         >
           {accounts.map((a) => (
@@ -187,7 +224,8 @@ export function ManualEntryForm({
           ))}
         </select>
       </Field>
-
+    ),
+    memo: (
       <Field label="メモ" htmlFor={`${id}-memo`} tone="plain">
         <input
           id={`${id}-memo`}
@@ -195,17 +233,29 @@ export function ManualEntryForm({
           placeholder="任意"
           value={values.memo}
           onChange={(e) => onChange({ ...values, memo: e.target.value })}
-          className="min-h-11 w-full bg-transparent text-[17px] outline-none"
+          className="min-h-11 w-full bg-transparent text-base outline-none"
           style={{ color: 'var(--ink)' }}
         />
       </Field>
+    ),
+  };
+  const ordered =
+    variant === 'quick'
+      ? [fields.amount, fields.quickGenre, fields.store, fields.date, fields.account, fields.memo]
+      : [fields.amount, fields.date, fields.store, fields.genre, fields.account, fields.memo];
+
+  return (
+    <div className="space-y-5">
+      {ordered.map((node, i) => (
+        <div key={i}>{node}</div>
+      ))}
 
       <details
         className="rounded-2xl"
         style={{ background: 'var(--surface)', border: '1px solid var(--hairline)' }}
         open={values.items.length > 0}
       >
-        <summary className="flex min-h-11 cursor-pointer items-center px-4 text-[15px] font-semibold">
+        <summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-semibold">
           品目を入力する(任意)
         </summary>
         <div className="space-y-3 px-4 pb-4">
@@ -216,7 +266,7 @@ export function ManualEntryForm({
                 placeholder="品名"
                 value={item.name}
                 onChange={(e) => setItem(item.id, { name: e.target.value })}
-                className="min-h-11 min-w-0 flex-1 rounded-xl bg-transparent px-2 text-[15px] outline-none"
+                className="min-h-11 min-w-0 flex-1 rounded-xl bg-transparent px-2 text-sm outline-none"
                 style={{ border: '1px solid var(--hairline)', color: 'var(--ink)' }}
               />
               <input
@@ -230,14 +280,14 @@ export function ManualEntryForm({
                     amountYen: digits === '' ? null : Number(digits.slice(0, 9)),
                   });
                 }}
-                className="tabular min-h-11 w-24 rounded-xl bg-transparent px-2 text-right text-[15px] outline-none"
+                className="tabular min-h-11 w-24 rounded-xl bg-transparent px-2 text-right text-sm outline-none"
                 style={{ border: '1px solid var(--hairline)', color: 'var(--ink)' }}
               />
               <button
                 type="button"
                 aria-label={`税率 ${item.taxRate}%(押すと切り替え)`}
                 onClick={() => setItem(item.id, { taxRate: item.taxRate === 8 ? 10 : 8 })}
-                className="tabular min-h-11 w-14 rounded-xl text-[15px] font-semibold"
+                className="tabular min-h-11 w-14 rounded-xl text-sm font-semibold"
                 style={{ background: 'var(--plane)', color: 'var(--ink)' }}
               >
                 {item.taxRate}%
@@ -248,7 +298,7 @@ export function ManualEntryForm({
                 onClick={() =>
                   onChange({ ...values, items: values.items.filter((i) => i.id !== item.id) })
                 }
-                className="min-h-11 w-11 text-[17px]"
+                className="min-h-11 w-11 text-base"
                 style={{ color: 'var(--ink-secondary)' }}
               >
                 ×
@@ -266,7 +316,7 @@ export function ManualEntryForm({
                 ],
               })
             }
-            className="min-h-11 text-[15px] font-semibold"
+            className="min-h-11 text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
             品目を追加 +
@@ -274,7 +324,7 @@ export function ManualEntryForm({
 
           <div
             role="status"
-            className="rounded-xl px-3 py-2 text-[13px]"
+            className="rounded-xl px-3 py-2 text-xs"
             style={{
               background: 'var(--plane)',
               color:
@@ -331,24 +381,24 @@ function Field({
       <div className="flex items-baseline justify-between gap-2">
         <label
           htmlFor={htmlFor}
-          className="text-[13px] font-semibold"
+          className="text-xs font-semibold"
           style={{ color: 'var(--ink-secondary)' }}
         >
           {label}
         </label>
         {tone === 'unread' ? (
-          <span className="text-[13px] font-semibold" style={{ color: 'var(--state-caution)' }}>
+          <span className="text-xs font-semibold" style={{ color: 'var(--state-caution)' }}>
             <span aria-hidden>▲ </span>読み取れませんでした
           </span>
         ) : tone === 'auto' ? (
-          <span className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             読み取り結果
           </span>
         ) : null}
       </div>
       {children}
       {error ? (
-        <p role="alert" className="mt-1 text-[13px]" style={{ color: 'var(--over)' }}>
+        <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
           {error}
         </p>
       ) : null}

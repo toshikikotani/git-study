@@ -30,14 +30,18 @@ export default async function DuplicatesPage() {
             同じ金額・近い日付で、別の経路から入った明細
           </p>
         </div>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link
+          href="/spending"
+          className="min-h-11 inline-flex items-center text-xs"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           明細
         </Link>
       </header>
 
       <DuplicateList initial={candidates} />
 
-      <p className="px-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+      <p className="px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         残さなかった方は削除せず、集計の対象から外すだけです(予算・レポート・
         ちりつも・アラートから一斉に消えます)。
       </p>

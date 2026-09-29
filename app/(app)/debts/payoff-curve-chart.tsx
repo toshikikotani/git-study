@@ -154,7 +154,7 @@ export function PayoffCurveChart({
 
       {hoverMonth !== null && hoverBaseline !== null && hoverProposed !== null ? (
         <div
-          className="mt-1 flex justify-between text-[13px]"
+          className="mt-1 flex justify-between text-xs"
           style={{ color: 'var(--ink-secondary)' }}
         >
           <span>{hoverMonth}ヶ月後</span>
@@ -164,17 +164,14 @@ export function PayoffCurveChart({
           </span>
         </div>
       ) : (
-        <div
-          className="mt-1 flex items-center gap-4 text-[13px]"
-          style={{ color: 'var(--ink-muted)' }}
-        >
+        <div className="mt-1 flex items-center gap-4 text-xs" style={{ color: 'var(--ink-muted)' }}>
           <Legend color="var(--ink-muted)" dashed label="最低返済のみ" />
           <Legend color="var(--accent)" label="この金額で返済" />
         </div>
       )}
 
       {truncated ? (
-        <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
           最低返済のみの場合は{MAX_CHART_MONTHS}ヶ月以上かかるため、グラフは{MAX_CHART_MONTHS}
           ヶ月目までを表示しています
         </p>
@@ -206,7 +203,7 @@ function MilestoneTable({
 
   return (
     <div className="mt-3 overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-xs">
         <caption className="sr-only">経過月ごとの残高(最低返済のみ・選択中のプラン)</caption>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--hairline)' }}>

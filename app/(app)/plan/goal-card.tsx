@@ -23,7 +23,10 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
       </p>
 
       <details className="mt-2">
-        <summary className="cursor-pointer list-none" aria-label="今日あと使える額(タップで内訳)">
+        <summary
+          className="min-h-11 cursor-pointer list-none"
+          aria-label="今日あと使える額(タップで内訳)"
+        >
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
@@ -79,7 +82,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
 
       {model.scheduled ? (
         <details className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-          <summary className="flex cursor-pointer items-baseline justify-between gap-3 text-sm">
+          <summary className="min-h-11 flex cursor-pointer items-baseline justify-between gap-3 text-sm">
             <span style={{ color: 'var(--ink-secondary)' }}>
               予定の支出 {model.scheduled.count}件
             </span>
@@ -111,7 +114,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
       {model.uncategorized ? (
         <Link
           href="/reports/genres"
-          className="mt-3 flex items-baseline justify-between gap-3 border-t pt-3 text-sm"
+          className="min-h-11 mt-3 flex items-baseline justify-between gap-3 border-t pt-3 text-sm"
           style={{ borderColor: 'var(--hairline)' }}
         >
           <span style={{ color: 'var(--ink-secondary)' }}>

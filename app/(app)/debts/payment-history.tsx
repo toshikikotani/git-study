@@ -42,7 +42,7 @@ export function PaymentHistory({
       </div>
 
       {planActualDelta ? (
-        <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
           計画との差:
           {planActualDelta.deltaYen === 0
             ? '計画どおり'

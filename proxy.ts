@@ -21,7 +21,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { getPublicEnv } from '@/lib/env';
 
-const PUBLIC_PATHS = ['/login'];
+const PUBLIC_PATHS = ['/login', '/manifest.webmanifest'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

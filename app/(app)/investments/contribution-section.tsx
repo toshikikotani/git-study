@@ -38,7 +38,7 @@ export function ContributionSection({
                     {contribution.productName ?? '(商品未指定)'}
                     {contribution.isHighRisk ? (
                       <span
-                        className="ml-2 rounded-full px-2 py-1 text-[13px] font-medium"
+                        className="ml-2 rounded-full px-2 py-1 text-xs font-medium"
                         style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                       >
                         高リスク枠

@@ -94,7 +94,7 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
                 }}
               >
                 <span
-                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
                   style={{
                     background: item.isDone ? 'var(--accent)' : 'transparent',
                     border: item.isDone ? 'none' : '1px solid var(--hairline)',

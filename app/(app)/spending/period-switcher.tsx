@@ -26,7 +26,7 @@ export function PeriodSwitcher() {
       <button
         type="button"
         aria-label="前の月"
-        className={button}
+        className={`min-h-11 ${button}`}
         style={{ color: 'var(--ink-secondary)' }}
         disabled={prev < earliest}
         onClick={() => goToMonth(prev)}
@@ -46,7 +46,7 @@ export function PeriodSwitcher() {
           <button
             type="button"
             onClick={() => goToMonth(currentMonthStart)}
-            className="text-[13px] font-semibold"
+            className="min-h-11 text-xs font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             今月へ戻る
@@ -56,7 +56,7 @@ export function PeriodSwitcher() {
       <button
         type="button"
         aria-label="次の月"
-        className={button}
+        className={`min-h-11 ${button}`}
         style={{ color: 'var(--ink-secondary)' }}
         disabled={next > latest}
         onClick={() => goToMonth(next)}

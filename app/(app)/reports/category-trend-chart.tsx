@@ -63,7 +63,7 @@ export function CategoryTrendChart({ trend }: { trend: CategorySpendingTrend }) 
                     >
                       {index === peakIndex && spentYen > 0 ? (
                         <span
-                          className="tabular absolute inset-x-0 -top-4 text-center text-[13px]"
+                          className="tabular absolute inset-x-0 -top-4 text-center text-xs"
                           style={{ color: 'var(--ink-muted)' }}
                           aria-hidden
                         >
@@ -83,7 +83,7 @@ export function CategoryTrendChart({ trend }: { trend: CategorySpendingTrend }) 
                 {monthKeys.map((monthKey) => (
                   <span
                     key={monthKey}
-                    className="tabular flex-1 text-center text-[13px]"
+                    className="tabular flex-1 text-center text-xs"
                     style={{ color: 'var(--ink-muted)' }}
                   >
                     {formatMonthJa(monthKey)}

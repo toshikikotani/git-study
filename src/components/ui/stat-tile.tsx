@@ -48,7 +48,7 @@ export function StatTile({
     >
       <div className="flex items-center justify-between gap-2">
         <span
-          className="text-[13px] font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           {label}
@@ -63,15 +63,13 @@ export function StatTile({
             <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
               {valueParts.prefix}
             </span>
-            <span className="text-[34px] font-semibold tracking-[-0.03em]">
-              {valueParts.amount}
-            </span>
+            <span className="text-3xl font-semibold tracking-[-0.03em]">{valueParts.amount}</span>
             <span className="ml-1 text-base" style={{ color: 'var(--ink-secondary)' }}>
               {valueParts.suffix}
             </span>
           </>
         ) : (
-          <span className="text-[34px] font-semibold tracking-[-0.02em]">{value}</span>
+          <span className="text-3xl font-semibold tracking-[-0.02em]">{value}</span>
         )}
       </p>
 
@@ -89,7 +87,7 @@ export function StatTile({
 
       {hint ? (
         <p
-          className="mt-3 flex items-center gap-1 text-[13px] font-medium"
+          className="mt-3 flex items-center gap-1 text-xs font-medium"
           style={{ color: 'var(--ink-muted)' }}
         >
           {hint.text}
@@ -119,7 +117,7 @@ function ToneBadge({ tone, text }: { tone: BudgetTone; text: string }) {
   }[tone];
 
   return (
-    <span className="inline-flex items-center gap-2 text-[13px] font-medium">
+    <span className="inline-flex items-center gap-2 text-xs font-medium">
       <span className="size-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
       <span style={{ color: tone === 'normal' ? 'var(--ink-muted)' : 'var(--ink-secondary)' }}>
         {text}

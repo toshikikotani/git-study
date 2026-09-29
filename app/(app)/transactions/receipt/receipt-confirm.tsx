@@ -262,7 +262,7 @@ export function ReceiptConfirm({
       <div className="space-y-4 p-4 pb-2">
         <div className="grid grid-cols-2 gap-2">
           <label className="col-span-2 block">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               店名{original.branchName ? `(${original.branchName})` : ''}
             </span>
             <input
@@ -273,7 +273,7 @@ export function ReceiptConfirm({
             />
           </label>
           <label className="block">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               日付
             </span>
             <input
@@ -285,7 +285,7 @@ export function ReceiptConfirm({
             />
           </label>
           <label className="block">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               支払額(円)
             </span>
             <input
@@ -332,7 +332,7 @@ export function ReceiptConfirm({
                   role="radio"
                   aria-checked={draft.priceBasis === value}
                   onClick={() => update((d) => ({ ...d, priceBasis: value }))}
-                  className="rounded-full px-3 py-2 font-semibold"
+                  className="min-h-11 rounded-full px-3 py-2 font-semibold"
                   style={{
                     background: draft.priceBasis === value ? 'var(--accent)' : 'var(--plane)',
                     color: draft.priceBasis === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -351,7 +351,7 @@ export function ReceiptConfirm({
               return (
                 <div key={String(g.rate)}>
                   <div
-                    className="flex items-baseline justify-between text-[13px]"
+                    className="flex items-baseline justify-between text-xs"
                     style={{ color: 'var(--ink-muted)' }}
                   >
                     <span className="font-semibold">{RATE_LABEL[String(g.rate)]}</span>
@@ -412,7 +412,7 @@ export function ReceiptConfirm({
 
             {/* ジャンル:選んだ品目を、チップで一括変更 */}
             <div>
-              <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                 {selected.size > 0
                   ? `${selected.size}件を選択中 ─ ジャンルをタップで一括変更`
                   : '品目をタップして選ぶと、ジャンルを一括で変えられます'}
@@ -428,7 +428,7 @@ export function ReceiptConfirm({
                     type="button"
                     disabled={selected.size === 0}
                     onClick={() => setGenreFor(selected, g.id)}
-                    className="shrink-0 rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                    className="min-h-11 shrink-0 rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-40"
                     style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                   >
                     {g.name}
@@ -438,7 +438,7 @@ export function ReceiptConfirm({
                   <button
                     type="button"
                     onClick={() => setSelected(new Set())}
-                    className="shrink-0 rounded-full px-3 py-2 text-xs"
+                    className="min-h-11 shrink-0 rounded-full px-3 py-2 text-xs"
                     style={{ color: 'var(--ink-muted)' }}
                   >
                     選択を解除
@@ -467,7 +467,7 @@ export function ReceiptConfirm({
                   ],
                 }))
               }
-              className="text-xs font-semibold"
+              className="min-h-11 text-xs font-semibold"
               style={{ color: 'var(--accent)' }}
             >
               ＋ 品目を追加
@@ -481,7 +481,7 @@ export function ReceiptConfirm({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               明細のジャンル
             </span>
             <select
@@ -499,7 +499,7 @@ export function ReceiptConfirm({
             </select>
           </label>
           <label className="block">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               目標の扱い
             </span>
             <select
@@ -548,7 +548,7 @@ export function ReceiptConfirm({
                     setKind(value);
                     setKindChosen(true);
                   }}
-                  className="flex-1 rounded-full px-3 py-2 text-xs font-semibold"
+                  className="min-h-11 flex-1 rounded-full px-3 py-2 text-xs font-semibold"
                   style={{
                     background: kindChosen && kind === value ? 'var(--accent)' : 'var(--surface)',
                     color:
@@ -587,7 +587,7 @@ export function ReceiptConfirm({
             <button
               type="button"
               onClick={onDiscard}
-              className="rounded-full px-4 py-3 text-sm"
+              className="min-h-11 rounded-full px-4 py-3 text-sm"
               style={{ color: 'var(--ink-muted)', border: '1px solid var(--hairline)' }}
             >
               破棄
@@ -598,7 +598,7 @@ export function ReceiptConfirm({
               disabled={
                 saving || !accountId || mustChoose || (draft !== null && draft.paidYen <= 0)
               }
-              className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               {saving
@@ -650,24 +650,21 @@ function LineRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-baseline justify-between gap-2 text-left"
+          className="min-h-11 flex min-w-0 flex-1 items-baseline justify-between gap-2 text-left"
         >
           <span
-            className="min-w-0 truncate text-[13px]"
+            className="min-w-0 truncate text-xs"
             style={{ color: 'var(--ink)', ...underline(low) }}
           >
             {isDiscount ? '値引き ' : ''}
             {line.name}
             {genreLabel !== null ? (
-              <span className="ml-2 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+              <span className="ml-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
                 {genreLabel}
               </span>
             ) : null}
           </span>
-          <span
-            className="tabular shrink-0 text-[13px] font-semibold"
-            style={{ color: 'var(--ink)' }}
-          >
+          <span className="tabular shrink-0 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             {isDiscount ? '−' : ''}
             {formatYen(line.amountYen)}
           </span>
@@ -677,7 +674,7 @@ function LineRow({
           onClick={onEdit}
           aria-label={`${line.name}を編集`}
           aria-expanded={editing}
-          className="shrink-0 text-[13px] font-semibold"
+          className="min-h-11 shrink-0 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           編集
@@ -731,7 +728,7 @@ function LineRow({
           <button
             type="button"
             onClick={onRemove}
-            className="col-span-6 text-left text-xs"
+            className="min-h-11 col-span-6 text-left text-xs"
             style={{ color: 'var(--ink-muted)' }}
           >
             この行を削除
@@ -755,7 +752,7 @@ function NumberField({
 }) {
   return (
     <label className="block">
-      <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+      <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
         {label}
       </span>
       <input
@@ -787,7 +784,7 @@ function ReconcileBar({
   const discounts = result.discountYen + result.pointsYen + result.couponYen;
   return (
     <div role="status" aria-live="polite">
-      <p className="tabular text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+      <p className="tabular text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         品目 {formatYen(result.itemsYen)} + 税 {formatYen(result.taxYen)} − 値引き・ポイント{' '}
         {formatYen(discounts)} = {formatYen(result.expectedPaidYen)}
         <span style={{ color: 'var(--ink-muted)' }}> / 支払 {formatYen(result.paidYen)}</span>
@@ -809,7 +806,7 @@ function ReconcileBar({
                 key={s.type}
                 type="button"
                 onClick={() => onFix(s)}
-                className="rounded-full px-3 py-1 text-[13px] font-semibold"
+                className="min-h-11 rounded-full px-3 py-1 text-xs font-semibold"
                 style={{
                   background: s.recommended ? 'var(--accent)' : 'var(--plane)',
                   color: s.recommended ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -843,7 +840,7 @@ function GoalImpactView({ impact }: { impact: ReturnType<typeof goalImpact> }) {
       role="group"
       aria-label="目標への影響"
     >
-      <p className="text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
         目標への影響(保存前 → 保存後の残り予算)
       </p>
       {!impact.counts && impact.reason !== 'included' ? (
@@ -892,7 +889,7 @@ function GoalImpactView({ impact }: { impact: ReturnType<typeof goalImpact> }) {
           );
         })}
       </ul>
-      <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
         縦線=保存前の使用額、色のバー=保存後
       </p>
     </div>

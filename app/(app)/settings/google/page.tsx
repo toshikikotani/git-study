@@ -24,7 +24,7 @@ export default function GoogleSettingsPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           Google 連携
         </h1>
-        <Link href="/" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           戻る
         </Link>
       </header>
@@ -47,7 +47,7 @@ export default function GoogleSettingsPage() {
             </p>
           </div>
           <span
-            className="shrink-0 rounded-full px-3 py-1 text-[13px] font-semibold"
+            className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
             style={{
               background: connected ? 'var(--accent-track)' : 'var(--plane)',
               color: connected ? 'var(--accent)' : 'var(--ink-muted)',
@@ -136,7 +136,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
       <span
-        className="tabular flex size-5 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold"
+        className="tabular flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
       >
         {n}
@@ -149,7 +149,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 function Code({ children }: { children: React.ReactNode }) {
   return (
     <code
-      className="rounded-lg px-2 py-1 font-mono text-[13px] break-all"
+      className="rounded-lg px-2 py-1 font-mono text-xs break-all"
       style={{ background: 'var(--plane)', color: 'var(--ink)' }}
     >
       {children}

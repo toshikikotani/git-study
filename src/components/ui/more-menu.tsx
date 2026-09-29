@@ -157,10 +157,10 @@ export function MoreMenu() {
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
-          <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             その他の機能
           </h2>
-          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             外側をタップで閉じる
           </span>
         </div>
@@ -169,7 +169,7 @@ export function MoreMenu() {
           {GROUPS.map((group) => (
             <section key={group.title}>
               <h3
-                className="px-2 pb-2 text-[13px] font-medium tracking-[0.06em] uppercase"
+                className="px-2 pb-2 text-xs font-medium tracking-[0.06em] uppercase"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 {group.title}
@@ -188,16 +188,13 @@ export function MoreMenu() {
                     prefetch={false}
                     role="menuitem"
                     onClick={() => setOpen(false)}
-                    className="flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
+                    className="min-h-11 flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
                     style={{
                       borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
                     }}
                   >
                     <span>
-                      <span
-                        className="block text-[15px] font-medium"
-                        style={{ color: 'var(--ink)' }}
-                      >
+                      <span className="block text-sm font-medium" style={{ color: 'var(--ink)' }}>
                         {item.label}
                       </span>
                       {'dek' in item ? (

@@ -15,9 +15,10 @@ import {
   splitShares,
 } from '@/features/spending/views';
 import { useJustSaved } from '@/lib/just-saved';
-import { addDays, formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
+import { formatDateJa, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
+import { ActiveFilterChips, FilterSheet } from './filter-sheet';
 import { LedgerMenu } from './ledger-menu';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
@@ -35,11 +36,6 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
  *
  * フィルターは横スクロールのチップ1行(口座/ジャンル/期間/目標期間)+検索。
  */
-function formatMonthDay(date: string): string {
-  const [, m, d] = splitDateOnly(date);
-  return `${m}/${d}`;
-}
-
 export function LedgerList({
   goalRange,
   duplicateCount,
@@ -52,13 +48,11 @@ export function LedgerList({
     today,
     filter,
     setFilter,
-    clearFilter,
-    genres,
-    accounts,
     loading,
     error,
     isCurrentMonth,
     reloadVisibleMonth,
+    captures,
   } = useSpendingMonth();
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
@@ -69,15 +63,8 @@ export function LedgerList({
   );
   const active = isFilterActive(filter);
 
-  const periodValue =
-    filter.date !== null
-      ? `date:${filter.date}`
-      : filter.range !== null && (goalRange === null || filter.range.from !== goalRange.from)
-        ? 'week'
-        : '';
-
   return (
-    <section aria-label="明細" className="space-y-3">
+    <section id="ledger" aria-label="明細" className="scroll-mt-16 space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           明細
@@ -85,111 +72,24 @@ export function LedgerList({
         <LedgerMenu />
       </div>
 
-      {/* 検索 + 横スクロールのフィルターチップ(1行) */}
-      <input
-        type="search"
-        value={filter.search}
-        onChange={(e) => setFilter({ search: e.target.value })}
-        placeholder="店名・品目・メモを検索"
-        aria-label="明細を検索"
-        className="w-full rounded-xl px-3 py-2 text-sm"
-        style={{
-          background: 'var(--plane)',
-          color: 'var(--ink)',
-          border: '1px solid var(--hairline)',
-        }}
-      />
-      <div
-        role="group"
-        aria-label="明細の絞り込み"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        <ChipSelect
-          label="口座で絞り込む"
-          value={filter.accountId ?? ''}
-          onChange={(v) => setFilter({ accountId: v || null })}
-          options={[
-            ['', 'すべての口座'],
-            ...accounts.map((a) => [a.id, a.name] as [string, string]),
-          ]}
-        />
-        <ChipSelect
-          label="ジャンルで絞り込む"
-          value={filter.genreId ?? ''}
-          onChange={(v) => setFilter({ genreId: v || null })}
-          options={[
-            ['', 'すべてのジャンル'],
-            ['none', '未分類'],
-            ...genres.map((g) => [g.id, g.name] as [string, string]),
-          ]}
-        />
-        <ChipSelect
-          label="期間で絞り込む"
-          value={periodValue}
-          onChange={(v) => {
-            if (v === '') setFilter({ date: null, range: null });
-            else if (v === 'week')
-              setFilter({ date: null, range: { from: addDays(today, -6), to: today } });
-            else if (v === 'today') setFilter({ date: today, range: null });
-          }}
-          options={[
-            ['', '月全体'],
-            ['today', '今日'],
-            ['week', '直近7日'],
-            ...(filter.date !== null && filter.date !== today
-              ? ([[`date:${filter.date}`, formatDateJa(filter.date)]] as [string, string][])
-              : []),
-          ]}
-        />
-        {goalRange !== null ? (
-          <button
-            type="button"
-            aria-pressed={filter.range?.from === goalRange.from}
-            onClick={() =>
-              setFilter({
-                date: null,
-                range: filter.range?.from === goalRange.from ? null : goalRange,
-              })
-            }
-            className="shrink-0 rounded-full px-3 py-2 text-[13px] font-semibold"
-            style={{
-              background: filter.range?.from === goalRange.from ? 'var(--accent)' : 'var(--plane)',
-              color:
-                filter.range?.from === goalRange.from ? 'var(--on-accent)' : 'var(--ink-secondary)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            目標期間
-          </button>
-        ) : null}
-        {active ? (
-          <button
-            type="button"
-            onClick={clearFilter}
-            className="shrink-0 rounded-full px-3 py-2 text-[13px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            解除
-          </button>
-        ) : null}
-      </div>
-
-      {filter.date !== null ? (
-        <button
-          type="button"
-          onClick={() => setFilter({ date: null })}
-          aria-label={`${formatMonthDay(filter.date)}の絞り込みを解除`}
-          className="tabular inline-flex min-h-11 items-center gap-2 self-start rounded-full px-3 text-xs font-semibold"
+      {/* 検索 + フィルター(ボトムシート)。選んでいる条件は下のチップで見せる */}
+      <div className="flex items-center gap-2">
+        <input
+          type="search"
+          value={filter.search}
+          onChange={(e) => setFilter({ search: e.target.value })}
+          placeholder="店名・品目・メモを検索"
+          aria-label="明細を検索"
+          className="min-h-11 min-w-0 flex-1 rounded-xl px-3 text-sm"
           style={{
-            background: 'var(--plane)',
+            background: 'var(--surface-raised)',
             color: 'var(--ink)',
             border: '1px solid var(--hairline)',
           }}
-        >
-          {formatMonthDay(filter.date)}で絞り込み中<span aria-hidden>×</span>
-        </button>
-      ) : null}
+        />
+        <FilterSheet goalRange={goalRange} />
+      </div>
+      <ActiveFilterChips goalRange={goalRange} />
 
       <PendingReceiptRows />
 
@@ -213,7 +113,7 @@ export function LedgerList({
       {duplicateCount > 0 ? (
         <Link
           href="/transactions/duplicates"
-          className="flex items-center justify-between gap-3 rounded-2xl p-4"
+          className="min-h-11 flex items-center justify-between gap-3 rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -233,12 +133,18 @@ export function LedgerList({
           <button
             type="button"
             onClick={reloadVisibleMonth}
-            className="mt-2 text-sm font-semibold"
+            className="min-h-11 mt-2 text-sm font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             もう一度読み込む
           </button>
         </div>
+      ) : filter.pendingOnly ? (
+        captures.length === 0 ? (
+          <p className="px-1 py-6 text-center text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            入力待ちのレシートはありません。
+          </p>
+        ) : null
       ) : loading && !isCurrentMonth ? (
         <ListSkeleton />
       ) : transactions.length === 0 ? (
@@ -251,7 +157,7 @@ export function LedgerList({
           <button
             type="button"
             onClick={() => setFilter(EMPTY_FILTER)}
-            className="mt-2 text-sm font-semibold"
+            className="min-h-11 mt-2 text-sm font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             絞り込みを解除
@@ -275,7 +181,7 @@ export function LedgerList({
               transactions={g.transactions}
             />
           ))}
-          <p className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             {active
               ? `${filtered.length}件 / この月 ${transactions.length}件`
               : `${transactions.length}件`}
@@ -283,41 +189,6 @@ export function LedgerList({
         </>
       )}
     </section>
-  );
-}
-
-function ChipSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: [string, string][];
-}) {
-  const active = value !== '';
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={label}
-      className="shrink-0 rounded-full px-3 py-2 text-[13px] font-semibold"
-      style={{
-        background: active ? 'var(--accent-track)' : 'var(--plane)',
-        color: active ? 'var(--accent)' : 'var(--ink-secondary)',
-        border: '1px solid var(--hairline)',
-        // iOS はフォント 16px 未満だと拡大されるが、チップは見た目を優先して小さく保つ。
-        fontSize: 13,
-      }}
-    >
-      {options.map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -361,7 +232,7 @@ function DaySection({
       >
         <span className="text-xs font-medium">
           {heading}
-          {sub ? <span className="ml-2 text-[13px] font-normal">{sub}</span> : null}
+          {sub ? <span className="ml-2 text-xs font-normal">{sub}</span> : null}
         </span>
         {total !== undefined && total > 0 ? (
           <span className="tabular text-xs">
@@ -441,7 +312,7 @@ function EmptyState() {
         className="rounded-3xl p-6"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
-        <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           この月の明細はまだありません。
           <br />
           レシートを撮るか、銀行・カードの CSV を取り込むと、自動で分類されます。

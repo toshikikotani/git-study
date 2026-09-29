@@ -131,7 +131,7 @@ export default async function PlanPage() {
           {view.noBudget.length > 0 ? (
             <details className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
               <summary
-                className="cursor-pointer text-xs font-semibold"
+                className="min-h-11 cursor-pointer text-xs font-semibold"
                 style={{ color: 'var(--ink-secondary)' }}
               >
                 予算なし({view.noBudget.length}件)
@@ -149,7 +149,7 @@ export default async function PlanPage() {
                 ))}
               </ul>
               {view.uncategorizedYen > 0 ? (
-                <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                   未分類の {formatYen(view.uncategorizedYen, { sign: 'never' })}{' '}
                   は、ジャンルが決まるまで目標に反映されません。
                 </p>

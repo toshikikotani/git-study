@@ -41,7 +41,7 @@ export default async function GenresPage() {
             唯一の分類。追加削除・予算はここで、分類はAIが行う
           </p>
         </div>
-        <Link href="/reports" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/reports" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           レポートへ →
         </Link>
       </header>

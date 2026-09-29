@@ -21,7 +21,7 @@ export function DeletePlanButton({ planId }: { planId: string }) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="min-h-11 text-[13px] font-semibold"
+        className="min-h-11 text-xs font-semibold"
         style={{ color: 'var(--over)' }}
       >
         この目標を削除する
@@ -32,14 +32,14 @@ export function DeletePlanButton({ planId }: { planId: string }) {
         role="dialog"
       >
         <div className="space-y-3 px-4 pt-2 pb-4">
-          <p className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
             この目標を削除しますか?
           </p>
-          <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             目標の予算と期間が消えます。記録した明細は消えません。
           </p>
           {error ? (
-            <p role="alert" className="text-[13px]" style={{ color: 'var(--over)' }}>
+            <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
               {error}
             </p>
           ) : null}
@@ -48,7 +48,7 @@ export function DeletePlanButton({ planId }: { planId: string }) {
               type="button"
               disabled={busy}
               onClick={() => setConfirming(false)}
-              className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
+              className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
               style={{ background: 'var(--plane)', color: 'var(--ink)' }}
             >
               やめる
@@ -66,7 +66,7 @@ export function DeletePlanButton({ planId }: { planId: string }) {
                   router.refresh();
                 }
               }}
-              className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--over)', color: 'var(--on-accent)' }}
             >
               {busy ? '削除しています…' : '削除する'}

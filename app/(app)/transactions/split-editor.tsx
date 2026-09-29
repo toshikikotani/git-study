@@ -19,11 +19,16 @@ import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
+import { pushUndo } from '@/lib/undo';
+import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import {
   deleteTransactionAction,
   duplicateTransactionAction,
   recordGenreCorrectionAction,
+  replaceReceiptItemsAction,
   replaceSplitsAction,
+  restoreDeletedTransactionAction,
+  restoreRowFieldsAction,
   setTransactionKindAction,
   updateTransactionAction,
   updateTransactionMemoAction,
@@ -197,6 +202,8 @@ export function TransactionRowWithSplit({
   const [pickOpen, setPickOpen] = useState(false);
   const [flash, setFlash] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  // 長押しのメニュー(ジャンル変更・分割・複製・削除、レシート付きは画像を見る・もう一度読み取る)。
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -238,6 +245,20 @@ export function TransactionRowWithSplit({
       setError(result.error);
       return;
     }
+    const prevGenreId = transaction.genreId ?? '';
+    const prevAmount = String(targetAbsYen);
+    const prevDate = transaction.occurredOn;
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo('変更しました', async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setGenreId(prevGenreId);
+        setAmountAbsYenInput(prevAmount);
+        setOccurredOnInput(prevDate);
+        return null;
+      });
+    }
     setOpen(false);
     setCategoryFormOpen(false);
   }
@@ -252,8 +273,18 @@ export function TransactionRowWithSplit({
       return;
     }
     const trimmed = memoInput.trim();
+    const prevMemo = memo;
     setMemo(trimmed === '' ? null : trimmed);
     setMemoFormOpen(false);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo('メモを変更しました', async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setMemo(prevMemo);
+        return null;
+      });
+    }
   }
 
   async function save(): Promise<void> {
@@ -282,8 +313,24 @@ export function TransactionRowWithSplit({
       })),
     );
     setSaving(false);
+    pushSplitsUndo(splits, '分割を保存しました');
     setOpen(false);
     setCategoryFormOpen(false);
+  }
+
+  /** 分割の変更を元に戻す(変更前の分割を書き戻す)。 */
+  function pushSplitsUndo(prevSplits: readonly TransactionSplit[], message: string): void {
+    pushUndo(message, async () => {
+      const r = await replaceSplitsAction(
+        transaction.id,
+        prevSplits.map((p) => ({ genreId: p.genreId, amountYen: p.amountYen, note: p.note })),
+      );
+      if (r.error) return r.error;
+      setSplits(prevSplits);
+      setRows(initialRows(prevSplits, categories));
+      setMode(prevSplits.length > 0 ? 'split' : 'simple');
+      return null;
+    });
   }
 
   async function clearSplits(): Promise<void> {
@@ -295,9 +342,11 @@ export function TransactionRowWithSplit({
       setSaving(false);
       return;
     }
+    const prevSplits = splits;
     setSplits([]);
     setRows(initialRows([], categories));
     setSaving(false);
+    pushSplitsUndo(prevSplits, '分割を解除しました');
     // 分割を解除した直後は「じゃあ1つのカテゴリで」が次にやりたいことの
     // はずなので、閉じずに単純なカテゴリ変更フォームへ戻す。
     setMode('simple');
@@ -333,7 +382,17 @@ export function TransactionRowWithSplit({
       setRowError(result.error);
       return;
     }
+    const prevGenreId = genreId;
     setGenreId(newGenreId);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo('ジャンルを変更しました', async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setGenreId(prevGenreId);
+        return null;
+      });
+    }
     // 確定の手応え:行のアニメーションとハプティクス。
     setFlash(true);
     window.setTimeout(() => setFlash(false), 300);
@@ -355,6 +414,15 @@ export function TransactionRowWithSplit({
       return;
     }
     setSpecial(next);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo(next ? '特別費にしました' : '通常の支出に戻しました', async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setSpecial(!next);
+        return null;
+      });
+    }
   }
 
   async function remove(): Promise<void> {
@@ -365,12 +433,99 @@ export function TransactionRowWithSplit({
       return;
     }
     setRemoved(true);
+    setMenuOpen(false);
+    const snapshot = result.snapshot;
+    if (snapshot) {
+      pushUndo('削除しました', async () => {
+        const r = await restoreDeletedTransactionAction(snapshot);
+        if (r.error) return r.error;
+        setRemoved(false);
+        return null;
+      });
+    }
   }
 
   async function duplicate(): Promise<void> {
     setRowError(null);
+    setMenuOpen(false);
     const result = await duplicateTransactionAction(transaction.id);
-    setRowError(result.error ?? '複製しました(「(複製)」の明細を編集してください)');
+    if (result.error) {
+      setRowError(result.error);
+      return;
+    }
+    const createdId = result.createdId;
+    pushUndo('複製しました(「(複製)」の明細を編集してください)', async () => {
+      if (!createdId) return '元に戻せませんでした。';
+      const r = await deleteTransactionAction(createdId);
+      return r.error;
+    });
+  }
+
+  /** レシート付きの行:画像を読み取り直し、品目を更新する(更新は元に戻せる)。 */
+  async function rereadReceipt(): Promise<void> {
+    setMenuOpen(false);
+    setRowError(null);
+    const url = display?.thumbnailUrl;
+    if (!url) return;
+    try {
+      const blob = await (await fetch(url)).blob();
+      const image = await resizeToJpegBase64(new File([blob], 'receipt.jpg', { type: blob.type }));
+      const response = await fetch('/api/import/receipt', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image, mediaType: 'image/jpeg' }),
+      });
+      const result = (await response.json()) as {
+        transactions?: {
+          amountYen: number;
+          items: { description: string; amountYen: number; productType: string | null }[];
+        }[];
+      };
+      const parsed = result.transactions?.[0];
+      if (!response.ok || !parsed || parsed.items.length === 0) {
+        setRowError('読み取り直しても、品目は読み取れませんでした。');
+        return;
+      }
+      const prevItems = items;
+      const payload = parsed.items.map((i) => ({
+        name: i.description,
+        amountYen: Math.abs(i.amountYen),
+        genreId: transaction.genreId,
+        productType: i.productType,
+      }));
+      const replaced = await replaceReceiptItemsAction(transaction.id, payload);
+      if (replaced.error) {
+        setRowError(replaced.error);
+        return;
+      }
+      setItems(
+        payload.map((p, i) => ({
+          id: `reread-${i}`,
+          name: p.name,
+          amountYen: p.amountYen,
+          genreId: p.genreId,
+          genreName: transaction.genreName,
+          productType: p.productType,
+          sortOrder: i,
+        })) as unknown as readonly ReceiptItem[],
+      );
+      pushUndo('読み取り直して品目を更新しました', async () => {
+        const r = await replaceReceiptItemsAction(
+          transaction.id,
+          prevItems.map((p) => ({
+            name: p.name,
+            amountYen: p.amountYen,
+            genreId: p.genreId,
+            productType: p.productType,
+          })),
+        );
+        if (r.error) return r.error;
+        setItems(prevItems);
+        return null;
+      });
+    } catch {
+      setRowError('読み取り直せませんでした。通信状況を確かめてください。');
+    }
   }
 
   if (removed) return null;
@@ -379,13 +534,13 @@ export function TransactionRowWithSplit({
     <li className="py-1" style={display?.scheduled ? { opacity: 0.85 } : undefined}>
       <SwipeableRow
         onSwipeRight={() => setGenreSheetOpen(true)}
-        onLongPress={() => setPreviewOpen(true)}
+        onLongPress={() => setMenuOpen(true)}
         actions={
           <>
             <button
               type="button"
               onClick={() => void duplicate()}
-              className="flex-1 text-xs font-semibold"
+              className="min-h-11 flex-1 text-xs font-semibold"
               style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
             >
               複製
@@ -393,7 +548,7 @@ export function TransactionRowWithSplit({
             <button
               type="button"
               onClick={() => void remove()}
-              className="flex-1 text-xs font-semibold"
+              className="min-h-11 flex-1 text-xs font-semibold"
               style={{ background: 'var(--ink)', color: 'var(--surface)' }}
             >
               削除
@@ -415,7 +570,7 @@ export function TransactionRowWithSplit({
                 return next;
               });
             }}
-            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+            className="min-h-11 flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
             aria-label={rowAriaLabel}
           >
             {uncategorized ? (
@@ -430,11 +585,11 @@ export function TransactionRowWithSplit({
             )}
             <div className="min-w-0 flex-1">
               {/* 1行目:正規化した店名(切れないように折り返す) */}
-              <p className="text-[15px] leading-snug break-words" style={{ color: 'var(--ink)' }}>
+              <p className="text-sm leading-snug break-words" style={{ color: 'var(--ink)' }}>
                 {display?.name ?? transaction.description}
                 {special ? (
                   <span
-                    className="ml-2 rounded-full px-2 py-1 align-middle text-[13px] font-semibold"
+                    className="ml-2 rounded-full px-2 py-1 align-middle text-xs font-semibold"
                     style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
                   >
                     特別費
@@ -442,7 +597,7 @@ export function TransactionRowWithSplit({
                 ) : null}
                 {risky && methodLabel ? (
                   <span
-                    className="ml-2 rounded-full px-2 py-1 align-middle text-[13px] font-semibold"
+                    className="ml-2 rounded-full px-2 py-1 align-middle text-xs font-semibold"
                     style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
                   >
                     {methodLabel}
@@ -451,7 +606,7 @@ export function TransactionRowWithSplit({
               </p>
               {/* 2行目:支店名と品目のプレビュー(分割は品目の羅列ではなく比率の細いバー) */}
               {subtitle !== '' ? (
-                <p className="mt-1 truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                <p className="mt-1 truncate text-xs" style={{ color: 'var(--ink-muted)' }}>
                   {subtitle}
                 </p>
               ) : null}
@@ -478,7 +633,7 @@ export function TransactionRowWithSplit({
 
             <LedgerAmount
               amountYen={isIncome ? targetAbsYen : -targetAbsYen}
-              className="shrink-0 text-[15px] font-semibold"
+              className="shrink-0 text-sm font-semibold"
             />
           </button>
           {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
@@ -509,7 +664,7 @@ export function TransactionRowWithSplit({
         ) : null}
       </SwipeableRow>
       {rowError ? (
-        <p role="status" className="px-4 pb-2 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <p role="status" className="px-4 pb-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
           {rowError}
         </p>
       ) : null}
@@ -550,7 +705,7 @@ export function TransactionRowWithSplit({
             type="button"
             onClick={() => void toggleSpecial()}
             aria-pressed={special}
-            className="mt-3 text-xs font-semibold"
+            className="min-h-11 mt-3 text-xs font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             {special ? '特別費を通常の支出に戻す' : '特別費にする(目標のペースから除く)'}
@@ -577,7 +732,7 @@ export function TransactionRowWithSplit({
                 setMemoInput(memo ?? '');
                 setMemoFormOpen(true);
               }}
-              className="shrink-0 text-xs font-semibold"
+              className="min-h-11 shrink-0 text-xs font-semibold"
               style={{ color: 'var(--accent)' }}
             >
               {memo ? 'メモを編集する' : 'メモを追加する'}
@@ -607,7 +762,7 @@ export function TransactionRowWithSplit({
                 type="button"
                 onClick={() => void saveMemo()}
                 disabled={memoSaving}
-                className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
                 style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {memoSaving ? '保存中…' : '保存'}
@@ -619,7 +774,7 @@ export function TransactionRowWithSplit({
                   setMemoFormOpen(false);
                   setMemoError(null);
                 }}
-                className="rounded-full px-4 py-2 text-sm font-semibold"
+                className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold"
                 style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
               >
                 やめる
@@ -642,7 +797,7 @@ export function TransactionRowWithSplit({
           <button
             type="button"
             onClick={() => setCategoryFormOpen(true)}
-            className="mt-2 text-xs font-semibold"
+            className="min-h-11 mt-2 text-xs font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             金額・日付・カテゴリを編集する
@@ -706,7 +861,7 @@ export function TransactionRowWithSplit({
                 type="button"
                 onClick={() => void saveSimpleEdit()}
                 disabled={saving || !canSaveSimpleEdit}
-                className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
                 style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {saving ? '保存中…' : '保存'}
@@ -714,7 +869,7 @@ export function TransactionRowWithSplit({
               <button
                 type="button"
                 onClick={() => setMode('split')}
-                className="rounded-full px-4 py-2 text-sm font-semibold"
+                className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold"
                 style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
               >
                 カテゴリを分ける
@@ -776,7 +931,7 @@ export function TransactionRowWithSplit({
                   <button
                     type="button"
                     onClick={() => removeRow(index)}
-                    className="shrink-0 px-2 text-xs"
+                    className="min-h-11 shrink-0 px-2 text-xs"
                     style={{ color: 'var(--ink-muted)' }}
                   >
                     削除
@@ -803,7 +958,7 @@ export function TransactionRowWithSplit({
               <button
                 type="button"
                 onClick={addRow}
-                className="text-xs font-semibold"
+                className="min-h-11 text-xs font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
                 + カテゴリを追加
@@ -821,7 +976,7 @@ export function TransactionRowWithSplit({
                 type="button"
                 onClick={() => void save()}
                 disabled={saving || !canSave}
-                className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
                 style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {saving ? '保存中…' : '保存'}
@@ -831,7 +986,7 @@ export function TransactionRowWithSplit({
                   type="button"
                   onClick={() => void clearSplits()}
                   disabled={saving}
-                  className="rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                  className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
                   style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
                 >
                   分割を解除
@@ -843,7 +998,7 @@ export function TransactionRowWithSplit({
                   type="button"
                   onClick={() => setMode('simple')}
                   disabled={saving}
-                  className="rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                  className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
                   style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
                 >
                   やめる
@@ -865,7 +1020,7 @@ export function TransactionRowWithSplit({
 
       <BottomSheet open={pickOpen} onClose={() => setPickOpen(false)} role="dialog">
         <div className="space-y-2 px-2 pb-2">
-          <p className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
             {display?.name ?? transaction.description} のジャンル
           </p>
           <ul className="space-y-2">
@@ -881,7 +1036,7 @@ export function TransactionRowWithSplit({
                   style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
                 >
                   <GenreBadge name={p.genreName} size={28} />
-                  <span className="flex-1 text-[15px] font-semibold">{p.genreName}</span>
+                  <span className="flex-1 text-sm font-semibold">{p.genreName}</span>
                   <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {p.reason === 'history'
                       ? 'いつもの'
@@ -909,6 +1064,62 @@ export function TransactionRowWithSplit({
         </div>
       </BottomSheet>
 
+      <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} role="menu">
+        <ul className="px-2 pb-2">
+          {[
+            {
+              label: 'ジャンルを変更',
+              run: () => {
+                setMenuOpen(false);
+                setGenreSheetOpen(true);
+              },
+            },
+            {
+              label: '分割する',
+              run: () => {
+                setMenuOpen(false);
+                setOpen(true);
+                setCategoryFormOpen(true);
+                setMode('split');
+              },
+            },
+            { label: '複製', run: () => void duplicate() },
+            {
+              label: '内容を見る',
+              run: () => {
+                setMenuOpen(false);
+                setPreviewOpen(true);
+              },
+            },
+            ...(display?.thumbnailUrl
+              ? [
+                  {
+                    label: '画像を見る',
+                    run: () => {
+                      setMenuOpen(false);
+                      setViewerOpen(true);
+                    },
+                  },
+                  { label: 'もう一度読み取る', run: () => void rereadReceipt() },
+                ]
+              : []),
+            { label: '削除', run: () => void remove(), danger: true },
+          ].map((item) => (
+            <li key={item.label}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={item.run}
+                className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold"
+                style={{ color: 'danger' in item && item.danger ? 'var(--over)' : 'var(--ink)' }}
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </BottomSheet>
+
       {viewerOpen && display?.thumbnailUrl ? (
         <ReceiptImageViewer src={display.thumbnailUrl} onClose={() => setViewerOpen(false)} />
       ) : null}
@@ -924,7 +1135,7 @@ export function TransactionRowWithSplit({
                 key={c.id}
                 type="button"
                 onClick={() => void changeGenre(c.id)}
-                className="rounded-full px-3 py-2 text-xs font-semibold"
+                className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold"
                 style={{
                   background:
                     c.id === (transaction.genreId ?? '') ? 'var(--accent)' : 'var(--accent-track)',
@@ -941,26 +1152,26 @@ export function TransactionRowWithSplit({
 
       <BottomSheet open={previewOpen} onClose={() => setPreviewOpen(false)} role="dialog">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
-          <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             明細のプレビュー
           </h2>
-          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             外側をタップで閉じる
           </span>
         </div>
 
         <div className="space-y-3 px-3 pb-3">
           <div>
-            <p className="text-[15px]" style={{ color: 'var(--ink)' }}>
+            <p className="text-sm" style={{ color: 'var(--ink)' }}>
               {transaction.description}
             </p>
-            <p className="text-[15px] font-semibold">
+            <p className="text-sm font-semibold">
               <LedgerAmount amountYen={isIncome ? targetAbsYen : -targetAbsYen} />
             </p>
           </div>
 
           <div>
-            <p className="text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
               分類
             </p>
             {splits.length > 0 ? (
@@ -982,7 +1193,7 @@ export function TransactionRowWithSplit({
               </p>
             )}
             {subtype ? (
-              <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+              <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                 生活費の内訳:{subtype}
               </p>
             ) : null}
@@ -990,7 +1201,7 @@ export function TransactionRowWithSplit({
 
           {items.length > 0 ? (
             <div>
-              <p className="text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
                 レシートの品目
               </p>
               <ul className="mt-1 space-y-1">
@@ -1015,7 +1226,7 @@ export function TransactionRowWithSplit({
                 ))}
               </ul>
               {splits.length === 0 && itemsStatus === 'mismatched' ? (
-                <p className="mt-1 text-[13px]" style={{ color: 'var(--over)' }}>
+                <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
                   品目の合計が金額と一致しません
                 </p>
               ) : null}

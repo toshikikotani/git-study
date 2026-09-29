@@ -50,7 +50,7 @@ export default async function SideHustlePage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           副業トラッカー
         </h1>
-        <Link href="/" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           ホームへ
         </Link>
       </header>

@@ -137,34 +137,56 @@ describe('G 青は主要な操作だけ(受け入れ基準8)', () => {
   });
 });
 
-describe('G 文字は5段階だけ(受け入れ基準9)', () => {
+describe('G 文字は5段階だけ(受け入れ基準9)+ Dynamic Type', () => {
   const ALLOWED = new Set([13, 15, 17, 34, 40]);
+  /** 17px 基準の rem を px に直す(Dynamic Type: 文字は rem、基準は -apple-system-body)。 */
+  const toPx = (v: string): number | null => {
+    const calc = v.match(/^calc\((\d+)\s*\/\s*17\s*\*\s*1rem\)$/);
+    if (calc) return Number(calc[1]);
+    const rem = v.match(/^([\d.]+)rem$/);
+    if (rem) return Math.round(Number(rem[1]) * 17);
+    const px = v.match(/^(\d+)px$/);
+    return px ? Number(px[1]) : null;
+  };
 
-  it('text-[Npx] と fontSize は 13/15/17/34/40 のどれか', () => {
-    const found = new Set<number>();
-    for (const s of sources) {
-      for (const m of s.text.matchAll(/text-\[(\d+)px\]/g)) found.add(Number(m[1]));
-      for (const m of s.text.matchAll(/fontSize:\s*(\d+)/g)) found.add(Number(m[1]));
+  it('文字の大きさは rem のトークン(text-xs〜)だけで、text-[Npx] や px 直書きは無い', () => {
+    const bad: string[] = [];
+    for (const s of sources.filter((x) => x.path.endsWith('.tsx'))) {
+      for (const m of s.text.matchAll(/text-\[(\d+)px\]/g)) bad.push(`${s.path}: ${m[0]}`);
+      for (const m of s.text.matchAll(/fontSize:\s*(\d+)/g))
+        bad.push(`${s.path}: fontSize ${m[1]}`);
     }
-    expect([...found].filter((n) => !ALLOWED.has(n))).toEqual([]);
+    expect(bad).toEqual([]);
   });
 
-  it('Tailwind の text-xs〜text-4xl は @theme で5段階のどれかに束ねてある', () => {
+  it('Tailwind の text-xs〜text-4xl は @theme で 13/15/17/34/40 のどれかに束ねてある', () => {
     const theme = Object.fromEntries(
-      [...css.matchAll(/--text-([a-z0-9]+):\s*(\d+)px;/g)].map((m) => [m[1]!, Number(m[2])]),
+      [...css.matchAll(/--text-([a-z0-9]+):\s*([^;]+);/g)].map((m) => [m[1]!, toPx(m[2]!.trim())]),
     );
     for (const k of ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl']) {
       expect(ALLOWED.has(theme[k]!), `text-${k}`).toBe(true);
     }
-    // 使われていない大きなサイズ(text-5xl 以上)は使わない
     for (const s of sources) expect(s.text, s.path).not.toMatch(/\btext-(5|6|7|8|9)xl\b/);
   });
 
-  it('CSS の font-size も5段階(またはトークン)だけ', () => {
+  it('デザイントークン --font-* も5段階', () => {
+    const sizes = [...css.matchAll(/--font-(title|amount|heading|body|caption):\s*([^;]+);/g)].map(
+      (m) => toPx(m[2]!.trim()),
+    );
+    expect(new Set(sizes)).toEqual(ALLOWED);
+  });
+
+  it('CSS の font-size はトークン(または 1em 基準・html の基準17px)だけ', () => {
     const sizes = [...css.matchAll(/font-size:\s*([^;]+);/g)].map((m) => m[1]!.trim());
     for (const v of sizes) {
-      expect(v.startsWith('var(--font-') || v.startsWith('calc(1em'), v).toBe(true);
+      expect(v.startsWith('var(--font-') || v.startsWith('calc(1em') || v === '17px', v).toBe(true);
     }
+  });
+
+  it('Dynamic Type:html は -apple-system-body を受け、余白は px のまま', () => {
+    expect(css).toContain('font: -apple-system-body');
+    expect(css).toMatch(/--spacing:\s*4px/);
+    expect(css).toMatch(/overflow-wrap:\s*anywhere/);
   });
 });
 

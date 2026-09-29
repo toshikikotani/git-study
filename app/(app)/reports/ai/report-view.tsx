@@ -57,13 +57,13 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
       ) : (
         <>
           <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-            <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               浪費傾向のタイプ
             </p>
             <p className="mt-1 text-base font-semibold" style={{ color: 'var(--accent)' }}>
               {SPENDING_PERSONA_LABELS[report.personaType]}
             </p>
-            <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
               {SPENDING_PERSONA_DESCRIPTIONS[report.personaType]}
             </p>
             <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -80,7 +80,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
       <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             負債返済の進捗
           </p>
           <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>

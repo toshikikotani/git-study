@@ -72,7 +72,11 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
 
   if (props.href !== undefined) {
     return (
-      <Link href={props.href as Route} className={sharedClassName} style={sharedStyle}>
+      <Link
+        href={props.href as Route}
+        className={`min-h-11 inline-flex items-center ${sharedClassName}`}
+        style={sharedStyle}
+      >
         {children}
       </Link>
     );
@@ -83,7 +87,7 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
       type={props.type ?? 'button'}
       onClick={props.onClick}
       disabled={disabled}
-      className={sharedClassName}
+      className={`min-h-11 ${sharedClassName}`}
       style={sharedStyle}
     >
       {children}

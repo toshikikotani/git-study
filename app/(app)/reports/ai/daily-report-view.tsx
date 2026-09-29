@@ -42,7 +42,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
           {formatYen(input.totalSpentYen, { sign: 'never' })}
         </p>
       </div>
-      <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
         今月のここまでの1日あたり平均 {formatYen(input.averageDailySpendYen, { sign: 'never' })}
       </p>
 

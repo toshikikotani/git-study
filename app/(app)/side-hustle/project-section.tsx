@@ -48,7 +48,7 @@ export function ProjectSection({ summaries }: { summaries: readonly ProjectSumma
                       ? '—'
                       : `${formatYen(hourlyRateYen, { sign: 'never' })}/時`}
                   </p>
-                  <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                  <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                     合計 {Math.round((totalMinutes / 60) * 10) / 10} 時間
                   </p>
                 </div>

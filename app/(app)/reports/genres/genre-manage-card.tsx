@@ -146,7 +146,7 @@ function GenreListItem({ genre }: { genre: Genre }) {
           </label>
 
           <label
-            className="flex shrink-0 items-center gap-1 text-[13px]"
+            className="flex shrink-0 items-center gap-1 text-xs"
             style={{ color: 'var(--ink-muted)' }}
           >
             <input

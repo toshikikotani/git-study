@@ -124,7 +124,7 @@ export function ImageEditor({
         {image ? (
           <canvas ref={canvasRef} className="max-h-full max-w-full" aria-label="補正のプレビュー" />
         ) : (
-          <p className="text-[13px]" style={{ color: '#fff' }}>
+          <p className="text-xs" style={{ color: '#fff' }}>
             {error ?? '読み込んでいます…'}
           </p>
         )}
@@ -134,7 +134,7 @@ export function ImageEditor({
           <button
             type="button"
             onClick={() => setRotation((r) => rotateBy(r, -90))}
-            className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
+            className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
             style={{ background: 'var(--surface)', color: 'var(--ink)' }}
           >
             ⟲ 左に回す
@@ -142,13 +142,13 @@ export function ImageEditor({
           <button
             type="button"
             onClick={() => setRotation((r) => rotateBy(r, 90))}
-            className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
+            className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
             style={{ background: 'var(--surface)', color: 'var(--ink)' }}
           >
             右に回す ⟳
           </button>
         </div>
-        <label className="block text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+        <label className="block text-xs" style={{ color: 'var(--ink-secondary)' }}>
           明るさ
           <input
             type="range"
@@ -162,11 +162,7 @@ export function ImageEditor({
         </label>
         <div className="grid grid-cols-2 gap-x-4">
           {SIDES.map(([side, label]) => (
-            <label
-              key={side}
-              className="block text-[13px]"
-              style={{ color: 'var(--ink-secondary)' }}
-            >
+            <label key={side} className="block text-xs" style={{ color: 'var(--ink-secondary)' }}>
               {label}を切り取る
               <input
                 type="range"
@@ -181,7 +177,7 @@ export function ImageEditor({
           ))}
         </div>
         {error && image ? (
-          <p role="alert" className="text-[13px]" style={{ color: 'var(--over)' }}>
+          <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
             {error}
           </p>
         ) : null}
@@ -190,7 +186,7 @@ export function ImageEditor({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
+            className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
             style={{ background: 'var(--surface)', color: 'var(--ink)' }}
           >
             やめる
@@ -199,7 +195,7 @@ export function ImageEditor({
             type="button"
             onClick={() => void save()}
             disabled={busy || image === null || isUnadjusted(rotation, insets, brightness)}
-            className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
+            className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"
             style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
             {busy ? '保存しています…' : 'この画像を使う'}

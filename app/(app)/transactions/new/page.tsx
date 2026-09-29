@@ -1,4 +1,5 @@
 import { parseDateOnlyOr, todayJst } from '@/lib/date';
+import { recentStoreNames } from '@/features/transactions/recent-stores';
 import { NewTransactionForm } from './new-transaction-form';
 
 /**
@@ -16,6 +17,7 @@ export default async function NewTransactionPage({
     <NewTransactionForm
       initialDate={parseDateOnlyOr(date, todayJst())}
       initialIncome={type === 'income'}
+      recentStores={await recentStoreNames()}
     />
   );
 }

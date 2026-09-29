@@ -66,7 +66,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
-                className="text-[13px] font-medium tracking-[0.1em] uppercase"
+                className="text-xs font-medium tracking-[0.1em] uppercase"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 完済まで
@@ -74,7 +74,7 @@ export default async function HomePage() {
               {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
               {payoff.isEstimated ? (
                 <span
-                  className="rounded-full px-2 py-1 text-[13px] font-medium"
+                  className="rounded-full px-2 py-1 text-xs font-medium"
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
                   推定
@@ -84,13 +84,13 @@ export default async function HomePage() {
             <StreakBadge streak={streak} />
           </div>
 
-          <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             最終更新 {updatedAt}
           </p>
 
           {payoff.daysRemaining === null ? (
             <p
-              className="mt-2 text-[40px] leading-none font-semibold tracking-[-0.03em]"
+              className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em]"
               style={{ color: 'var(--income)' }}
             >
               完済済み
@@ -100,7 +100,7 @@ export default async function HomePage() {
               <p className="mt-2 flex items-baseline gap-2">
                 <CountUp
                   value={payoff.daysRemaining}
-                  className="text-[40px] leading-[0.88] font-semibold tracking-[-0.05em]"
+                  className="text-4xl leading-[0.88] font-semibold tracking-[-0.05em]"
                   style={{ color: 'var(--ink)' }}
                 />
                 <span className="text-xl font-medium" style={{ color: 'var(--ink-secondary)' }}>
@@ -253,7 +253,7 @@ function StreakBadge({ streak }: { streak: CheckinStreak }) {
 
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[13px] font-medium"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
       style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
     >
       {badge.kind === 'active' ? (

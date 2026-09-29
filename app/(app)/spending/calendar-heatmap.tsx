@@ -73,7 +73,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                 type="button"
                 aria-label="前の週"
                 onClick={() => moveWeek(-1)}
-                className="size-8 rounded-full text-sm"
+                className="min-h-11 size-8 rounded-full text-sm"
                 style={{ color: 'var(--ink-secondary)' }}
               >
                 ‹
@@ -82,7 +82,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                 type="button"
                 aria-label="次の週"
                 onClick={() => moveWeek(1)}
-                className="size-8 rounded-full text-sm"
+                className="min-h-11 size-8 rounded-full text-sm"
                 style={{ color: 'var(--ink-secondary)' }}
               >
                 ›
@@ -93,7 +93,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((v) => !v)}
-            className="rounded-full px-3 py-1 text-[13px] font-semibold"
+            className="min-h-11 rounded-full px-3 py-1 text-xs font-semibold"
             style={{ background: 'var(--plane)', color: 'var(--accent)' }}
           >
             {expanded ? '週表示' : '月表示'}
@@ -107,7 +107,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
             <span
               key={w}
               role="columnheader"
-              className="text-[13px]"
+              className="text-xs"
               style={{ color: 'var(--ink-muted)' }}
             >
               {w}
@@ -166,7 +166,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                     }}
                   >
                     <span
-                      className="tabular text-[13px]"
+                      className="tabular text-xs"
                       style={{
                         color: 'var(--ink)',
                         fontWeight: date === today ? 700 : 500,
@@ -181,7 +181,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                     {status ? (
                       <span
                         aria-hidden
-                        className="absolute top-1 right-1 text-[13px] leading-none font-bold"
+                        className="absolute top-1 right-1 text-xs leading-none font-bold"
                         style={{ color: STATE_COLOR[status] }}
                       >
                         {STATE_ICON[status]}
@@ -210,7 +210,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
       </div>
 
       <div
-        className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[13px]"
+        className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"
         style={{ color: 'var(--ink-muted)' }}
       >
         <span aria-hidden className="flex items-center gap-1">
@@ -228,7 +228,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
           <Link
             href={`/transactions/new?date=${filter.date}`}
             prefetch={false}
-            className="font-semibold"
+            className="min-h-11 inline-flex items-center font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             {formatDateJa(filter.date)}に手で登録
@@ -239,7 +239,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
         <button
           type="button"
           onClick={() => goToMonth(currentMonthStart)}
-          className="mt-1 text-[13px] font-semibold"
+          className="min-h-11 mt-1 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           今月へ戻る

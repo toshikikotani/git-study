@@ -34,7 +34,7 @@ export default async function JobChangePage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           転職準備
         </h1>
-        <Link href="/" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           ホームへ
         </Link>
       </header>

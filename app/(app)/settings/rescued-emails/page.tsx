@@ -30,7 +30,7 @@ export default async function RescuedEmailsPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           AI救済メールの見直し
         </h1>
-        <Link href="/settings/gmail" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/settings/gmail" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           戻る
         </Link>
       </header>

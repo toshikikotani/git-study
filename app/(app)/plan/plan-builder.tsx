@@ -148,7 +148,7 @@ export function PlanBuilder({
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <summary
-        className="cursor-pointer list-none text-sm font-semibold"
+        className="min-h-11 cursor-pointer list-none text-sm font-semibold"
         style={{ color: 'var(--ink)' }}
       >
         {reserving ? '次の目標を予約' : '新しい目標を立てる'}
@@ -174,7 +174,7 @@ export function PlanBuilder({
               setRange({ start: range.start, end: range.end });
               setPreset(id);
             }}
-            className="rounded-full px-3 py-1 text-xs font-semibold"
+            className="min-h-11 rounded-full px-3 py-1 text-xs font-semibold"
             style={{
               background: preset === id ? 'var(--accent)' : 'var(--accent-track)',
               color: preset === id ? 'var(--on-accent)' : 'var(--accent)',
@@ -224,7 +224,7 @@ export function PlanBuilder({
                 setStep(option);
                 setSuggestion(null);
               }}
-              className="flex-1 rounded-full py-2 text-xs font-semibold"
+              className="min-h-11 flex-1 rounded-full py-2 text-xs font-semibold"
               style={{
                 background: step === option ? 'var(--accent)' : 'var(--accent-track)',
                 color: step === option ? 'var(--on-accent)' : 'var(--accent)',
@@ -258,7 +258,7 @@ export function PlanBuilder({
               </span>
               {suggestion.evidence.provisional ? (
                 <span
-                  className="rounded-full px-2 py-1 text-[13px] font-semibold"
+                  className="rounded-full px-2 py-1 text-xs font-semibold"
                   style={{ background: 'var(--attention-track)', color: 'var(--state-caution)' }}
                 >
                   暫定
@@ -293,7 +293,7 @@ export function PlanBuilder({
               あり、目標に含まれていません。先に
               <Link
                 href="/reports/genres"
-                className="font-semibold"
+                className="min-h-11 inline-flex items-center font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
                 ジャンル分類
@@ -304,7 +304,7 @@ export function PlanBuilder({
 
           {suggestion.noRecord.length > 0 ? (
             <details className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              <summary className="cursor-pointer font-semibold">
+              <summary className="min-h-11 cursor-pointer font-semibold">
                 予算なし({suggestion.noRecord.length}件・記録がないジャンル)
               </summary>
               <p className="mt-1 leading-relaxed">{suggestion.noRecord.join('、')}</p>

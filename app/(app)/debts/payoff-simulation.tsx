@@ -112,10 +112,7 @@ export function PayoffSimulation({
           className="mt-2 w-full accent-[var(--accent)]"
           aria-label="毎月の返済額"
         />
-        <div
-          className="mt-1 flex justify-between text-[13px]"
-          style={{ color: 'var(--ink-muted)' }}
-        >
+        <div className="mt-1 flex justify-between text-xs" style={{ color: 'var(--ink-muted)' }}>
           <span>{formatYen(minYen, { sign: 'never' })}</span>
           <span>{formatYen(maxYen, { sign: 'never' })}</span>
         </div>

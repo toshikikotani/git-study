@@ -23,7 +23,7 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
   return (
     <li className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
+        <p className="truncate text-sm" style={{ color: 'var(--ink)' }}>
           {transaction.description}
         </p>
 
@@ -35,7 +35,7 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
           {/* FR-21:増やしてはいけない借入は、一覧の時点で目に入るようにする */}
           {risky && methodLabel ? (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[13px] font-semibold"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold"
               style={{ background: 'var(--over-track)', color: 'var(--over)' }}
             >
               <span aria-hidden>!</span>
@@ -48,7 +48,7 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
       {/* 符号は色の予備。色が落ちても収支が読める */}
       <LedgerAmount
         amountYen={isIncome ? Math.abs(transaction.amountYen) : -Math.abs(transaction.amountYen)}
-        className="shrink-0 text-[15px] font-semibold"
+        className="shrink-0 text-sm font-semibold"
       />
     </li>
   );

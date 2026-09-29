@@ -38,17 +38,20 @@ const COOLDOWN_MS = 1600;
 export function ReceiptCamera({
   onCapture,
   onClose,
+  initialMode = 'single',
 }: {
   onCapture: (files: File[]) => void;
   onClose: () => void;
+  /** 最初のモード(撮影ボタンの長押しから「連続撮影」を選んだときは continuous)。 */
+  initialMode?: 'single' | 'continuous' | 'long';
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const trackerRef = useRef(createStabilityTracker());
   const lastCaptureRef = useRef(0);
   const boxRef = useRef<Box | null>(null);
-  const [mode, setMode] = useState<Mode>('single');
-  const modeRef = useRef<Mode>('single');
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const modeRef = useRef<Mode>(initialMode);
   const [box, setBox] = useState<Box | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -212,7 +215,7 @@ export function ReceiptCamera({
             stop();
             onClose();
           }}
-          className="flex size-10 items-center justify-center rounded-full"
+          className="min-h-11 flex size-10 items-center justify-center rounded-full"
           style={{ background: 'rgba(255,255,255,0.18)' }}
         >
           <MdClose aria-hidden size={22} />
@@ -230,7 +233,7 @@ export function ReceiptCamera({
                 partsRef.current = [];
                 setParts([]);
               }}
-              className="rounded-full px-3 py-2 text-xs font-semibold"
+              className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold"
               style={{
                 background: mode === m.value ? '#fff' : 'rgba(255,255,255,0.18)',
                 color: mode === m.value ? '#000' : '#fff',
@@ -318,7 +321,7 @@ export function ReceiptCamera({
             type="button"
             disabled={parts.length === 0}
             onClick={() => void finishLong()}
-            className="rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-30"
+            className="min-h-11 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-30"
             style={{ background: '#fff', color: '#000' }}
           >
             つなげて完了
@@ -330,7 +333,7 @@ export function ReceiptCamera({
               stop();
               onClose();
             }}
-            className="rounded-full px-4 py-2 text-xs font-semibold"
+            className="min-h-11 rounded-full px-4 py-2 text-xs font-semibold"
             style={{ background: '#fff', color: '#000' }}
           >
             完了

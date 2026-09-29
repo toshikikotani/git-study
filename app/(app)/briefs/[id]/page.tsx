@@ -27,7 +27,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           {formatDateJa(brief.briefOn)}
         </h1>
-        <Link href="/briefs" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/briefs" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           一覧へ戻る
         </Link>
       </header>
@@ -36,7 +36,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
         {brief.items.map((item) => (
           <Card key={item.id}>
             <p
-              className="text-[13px] font-medium tracking-[0.08em] uppercase"
+              className="text-xs font-medium tracking-[0.08em] uppercase"
               style={{ color: 'var(--ink-muted)' }}
             >
               {BRIEF_ITEM_KIND_LABELS[item.kind]}

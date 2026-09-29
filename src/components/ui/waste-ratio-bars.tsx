@@ -12,7 +12,7 @@ export function WasteRatioBars({ points }: { points: readonly WasteRatioPoint[] 
 
   return (
     <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
         浪費比率の推移
       </p>
       <div className="mt-2 flex h-16 items-end gap-[3px]">
@@ -40,7 +40,7 @@ export function WasteRatioBars({ points }: { points: readonly WasteRatioPoint[] 
         {points.map((point) => (
           <span
             key={point.monthKey}
-            className="tabular flex-1 text-center text-[13px]"
+            className="tabular flex-1 text-center text-xs"
             style={{ color: 'var(--ink-muted)' }}
           >
             {formatMonthJa(point.monthKey)}

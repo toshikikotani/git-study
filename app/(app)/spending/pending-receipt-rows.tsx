@@ -18,7 +18,16 @@ import { useSpendingMonth } from './spending-month-provider';
  */
 export function PendingReceiptRows() {
   const jobs = useReceiptJobs();
-  const { captures } = useSpendingMonth();
+  const { captures, filter } = useSpendingMonth();
+  // ほかの条件(日付・ジャンル・口座・期間)で絞っている間は、入力待ちは出さない。
+  if (
+    filter.date !== null ||
+    filter.genreId !== null ||
+    filter.accountId !== null ||
+    filter.range !== null
+  ) {
+    return null;
+  }
 
   // サーバー側の入力待ちに載った分は、撮影直後の仮の行を重ねて出さない。
   const shownJobs = jobs.filter(
@@ -65,27 +74,27 @@ function CaptureRow({ capture }: { capture: CaptureView }) {
       <Link
         href={`/transactions/receipt/${capture.id}` as Route}
         prefetch={false}
-        className={ROW}
+        className={`min-h-11 inline-flex items-center ${ROW}`}
         aria-label={`入力待ちのレシート、${Number(m)}月${Number(d)}日に撮影。タップして入力する`}
       >
         <Thumb src={capture.imageUrl} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
+          <p className="truncate text-sm" style={{ color: 'var(--ink)' }}>
             入力待ち
             <span
-              className="ml-2 rounded-full px-2 py-1 text-[13px] font-semibold"
+              className="ml-2 rounded-full px-2 py-1 text-xs font-semibold"
               style={{ background: 'var(--attention-track)', color: 'var(--ink)' }}
             >
               <span aria-hidden>▲ </span>集計に未反映
             </span>
           </p>
-          <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
             {capture.receiptStatus === 'partial'
               ? '一部だけ読み取れました。残りを入力してください'
               : '読み取れませんでした。画像を見て入力できます'}
           </p>
         </div>
-        <span className="shrink-0 text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+        <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
           入力する →
         </span>
       </Link>
@@ -101,7 +110,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
       : '/transactions/receipt';
   return (
     <li>
-      <Link href={href} prefetch={false} className={ROW}>
+      <Link href={href} prefetch={false} className={`min-h-11 inline-flex items-center ${ROW}`}>
         <Thumb src={job.previewUrl} />
         <div className="min-w-0 flex-1">
           {job.status === 'reading' ? (
@@ -110,13 +119,13 @@ function JobRow({ job }: { job: ReceiptJob }) {
                 className="h-4 w-1/2 animate-pulse rounded-lg"
                 style={{ background: 'var(--hairline)' }}
               />
-              <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
                 読み取り中…
               </p>
             </>
           ) : (
             <>
-              <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
+              <p className="truncate text-sm" style={{ color: 'var(--ink)' }}>
                 {job.status === 'ready'
                   ? (job.parsed[0]?.storeName ?? job.parsed[0]?.description ?? 'レシート')
                   : job.status === 'waiting'
@@ -125,7 +134,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
                       ? '入力待ち'
                       : 'レシート'}
               </p>
-              <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
                 {job.status === 'ready'
                   ? '確認して保存する'
                   : job.status === 'waiting'
@@ -137,7 +146,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
             </>
           )}
         </div>
-        <span className="shrink-0 text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+        <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
           {job.status === 'reading' || job.status === 'waiting'
             ? ''
             : job.status === 'needs_input'
