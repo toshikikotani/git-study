@@ -13,7 +13,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { entryStatus } from '@/domain/ledger';
 import { resolveItemGenres } from '@/features/genre/item-genres';
+import { todayJst } from '@/lib/date';
+import { isMissingColumnError } from '@/lib/supabase/errors';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
@@ -205,34 +208,47 @@ export async function importTransactionsAsAdmin(
     return { importedCount: 0, duplicateCount: 0, insertedTransactions: [] };
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('transactions')
-    .upsert(
-      transactions.map((t) => ({
-        user_id: userId,
-        account_id: meta.accountId,
-        occurred_on: t.occurredOn,
-        description: t.description,
-        merchant_name: t.merchantName,
-        amount_yen: t.amountYen,
-        payment_method: t.paymentMethod,
-        genre_id: t.genreId,
-        classified_by: t.classifiedBy,
-        confidence: t.confidence,
-        review_status: t.reviewStatus,
-        must_pay: t.mustPay,
-        source: meta.source,
-        import_batch_id: batch.id,
-        fingerprint: t.fingerprint,
-        source_ref: t.sourceRef,
-      })),
-      { onConflict: 'user_id,fingerprint', ignoreDuplicates: true },
-    )
-    // fingerprint はトリガが上書きする値なので、渡した行との対応付けには使えない
-    // (types.ts の fingerprintOf() のコメント参照)。source_ref はトリガが
-    // 触らずそのまま入るため、こちらで対応付ける(レシート商品行の自動分割、
-    // 本人発案)。
-    .select('id, source_ref');
+  const rows = transactions.map((t) => ({
+    user_id: userId,
+    account_id: meta.accountId,
+    occurred_on: t.occurredOn,
+    description: t.description,
+    merchant_name: t.merchantName,
+    amount_yen: t.amountYen,
+    payment_method: t.paymentMethod,
+    genre_id: t.genreId,
+    classified_by: t.classifiedBy,
+    confidence: t.confidence,
+    review_status: t.reviewStatus,
+    must_pay: t.mustPay,
+    source: meta.source,
+    import_batch_id: batch.id,
+    fingerprint: t.fingerprint,
+    source_ref: t.sourceRef,
+  }));
+  const insertRows = (values: readonly Record<string, unknown>[]) =>
+    supabase
+      .from('transactions')
+      .upsert(values as typeof rows, { onConflict: 'user_id,fingerprint', ignoreDuplicates: true })
+      // fingerprint はトリガが上書きする値なので、渡した行との対応付けには使えない
+      // (types.ts の fingerprintOf() のコメント参照)。source_ref はトリガが
+      // 触らずそのまま入るため、こちらで対応付ける(レシート商品行の自動分割、
+      // 本人発案)。
+      .select('id, source_ref');
+
+  // status / kind は本番未適用の間は列が無い(supabase/apply-pending.sql)。
+  // 列付きで失敗したら外して入れ直し、取り込み自体は止めない。
+  const today = todayJst();
+  let { data: inserted, error: insertError } = await insertRows(
+    rows.map((row, i) => ({
+      ...row,
+      status: entryStatus(row.occurred_on, today),
+      kind: transactions[i]!.kind ?? 'normal',
+    })),
+  );
+  if (insertError && isMissingColumnError(insertError)) {
+    ({ data: inserted, error: insertError } = await insertRows(rows));
+  }
 
   if (insertError) {
     await supabase
@@ -246,7 +262,7 @@ export async function importTransactionsAsAdmin(
     throw new TransactionStoreError(`明細を保存できませんでした: ${insertError.message}`);
   }
 
-  const importedCount = inserted.length;
+  const importedCount = inserted?.length ?? 0;
   const duplicateCount = transactions.length - importedCount;
 
   await supabase
@@ -262,7 +278,10 @@ export async function importTransactionsAsAdmin(
   return {
     importedCount,
     duplicateCount,
-    insertedTransactions: inserted.map((row) => ({ id: row.id, sourceRef: row.source_ref })),
+    insertedTransactions: (inserted ?? []).map((row) => ({
+      id: row.id,
+      sourceRef: row.source_ref,
+    })),
   };
 }
 

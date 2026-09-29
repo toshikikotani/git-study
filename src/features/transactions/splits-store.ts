@@ -44,7 +44,7 @@ export async function replaceSplits(
 
   const { data: transaction, error: transactionError } = await supabase
     .from('transactions')
-    .select('amount_yen')
+    .select('amount_yen, genre_id')
     .eq('id', transactionId)
     .single();
   if (transactionError) {
@@ -81,7 +81,8 @@ export async function replaceSplits(
     splits.map((s) => ({
       user_id: auth.user.id,
       transaction_id: transactionId,
-      genre_id: s.genreId,
+      // 子のジャンルが未設定なら親を引き継ぐ(「(未分類)」の子を作らない)。
+      genre_id: s.genreId ?? transaction.genre_id,
       amount_yen: s.amountYen,
       note: s.note,
     })),

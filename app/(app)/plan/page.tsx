@@ -7,7 +7,8 @@ import {
   type GuidanceStatus,
 } from '@/domain/spending-plan';
 import { getLatestPlan, loadGenreSpend } from '@/features/spending-plan/store';
-import { addDays, daysBetween, formatDateJa, todayJst } from '@/lib/date';
+import { formatRemainingDays } from '@/domain/period';
+import { formatDateJa, todayJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { DeletePlanButton } from './delete-plan-button';
 import { EditPlanSection } from './edit-plan-section';
@@ -197,7 +198,5 @@ const STATUS_COLOR: Record<GuidanceStatus, string> = {
 };
 
 function periodStatus(start: string, end: string, today: string): string {
-  if (today < start) return `${daysBetween(today, start)}日後に開始`;
-  if (today > end) return '終了';
-  return `残り${daysBetween(today, addDays(end, 1))}日`;
+  return formatRemainingDays(start, end, today);
 }

@@ -84,6 +84,45 @@ create policy "own_rows" on public.spending_plan_items
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 2. transactions.status / kind — 実績/予定・通常/特別費、分割の子のジャンル補完
+-- -----------------------------------------------------------------------------
+alter table public.transactions
+  add column if not exists status text not null default 'actual',
+  add column if not exists kind   text not null default 'normal';
+
+do $$
+begin
+  alter table public.transactions
+    add constraint ck_transactions_status check (status in ('actual', 'scheduled'));
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.transactions
+    add constraint ck_transactions_kind check (kind in ('normal', 'special'));
+exception when duplicate_object then null;
+end $$;
+
+update public.transactions
+  set status = 'scheduled'
+  where occurred_on > (now() at time zone 'Asia/Tokyo')::date
+    and status <> 'scheduled';
+
+update public.transaction_splits s
+  set genre_id = t.genre_id
+  from public.transactions t
+  where s.transaction_id = t.id
+    and s.genre_id is null
+    and t.genre_id is not null;
+
+update public.receipt_items i
+  set genre_id = t.genre_id
+  from public.transactions t
+  where i.transaction_id = t.id
+    and i.genre_id is null
+    and t.genre_id is not null;
+
 commit;
 
 -- =============================================================================
@@ -101,4 +140,12 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'spending_plan_items'
-  ) then 'ok' else 'NG: テーブルが無い' end;
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'transactions.status / kind',
+  case when (
+    select count(*) from information_schema.columns
+    where table_schema = 'public' and table_name = 'transactions'
+      and column_name in ('status', 'kind')
+  ) = 2 then 'ok' else 'NG: 列が無い' end;

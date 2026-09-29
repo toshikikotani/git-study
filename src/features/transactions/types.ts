@@ -34,6 +34,8 @@ export type StoredTransaction = {
   reviewStatus: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
   /** 本人発案「絶対払わざるを得ないもの」のラベル(ADR-057)。ジャンルとは独立した軸。 */
   mustPay: boolean;
+  /** 通常/特別費。省略は通常。特別費は目標のペース計算から除く(domain/ledger.ts)。 */
+  kind?: 'normal' | 'special';
   source: TransactionSource;
   /** 重複排除キー。DB のトリガ(md5)が自動設定するため、ここの値は上書きされる。 */
   fingerprint: string;

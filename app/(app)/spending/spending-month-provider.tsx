@@ -36,6 +36,15 @@ type SpendingMonth = MonthData & {
   reloadVisibleMonth: () => void;
 };
 
+const EMPTY_TOTALS: MonthTotals = {
+  spentYen: 0,
+  incomeYen: 0,
+  specialYen: 0,
+  scheduledYen: 0,
+  daySpend: {},
+  scheduledDaySpend: {},
+};
+
 const SpendingMonthContext = createContext<SpendingMonth | null>(null);
 
 export function useSpendingMonth(): SpendingMonth {
@@ -97,7 +106,7 @@ export function SpendingMonthProvider({
         : (otherMonths.get(visibleMonth) ?? {
             transactions: [],
             genreBreakdown: [],
-            totals: { spentYen: 0, incomeYen: 0 },
+            totals: EMPTY_TOTALS,
           }),
     [
       isCurrentMonth,

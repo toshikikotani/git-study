@@ -5,7 +5,10 @@
  */
 
 import { baselineForPeriod, planPeriodDays, type PlanGenreFacts } from '@/domain/spending-plan';
-import { resolveItemGenres } from '@/features/genre/item-genres';
+import { isCountable } from '@/domain/budget';
+import { entryStatus } from '@/domain/ledger';
+import { loadLedgerTransactions } from '@/features/spending/entries';
+import { toLedgerEntries } from '@/features/spending/views';
 import { addDays, daysBetween, todayJst, type DateOnly } from '@/lib/date';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -60,33 +63,33 @@ export async function loadPlanContext(
   const today = todayJst(now);
   const lookbackFrom = addDays(today, -(LOOKBACK_DAYS - 1));
 
-  const [{ data: genres, error: genresError }, { data: rows, error: rowsError }, latestPlan] =
-    await Promise.all([
-      supabase.from('genres').select('id, name, budget_yen').order('sort_order'),
-      supabase
-        .from('transactions')
-        .select('id, occurred_on, amount_yen, genre_id, is_transfer, review_status, must_pay')
-        .gte('occurred_on', lookbackFrom)
-        .lte('occurred_on', today)
-        .lt('amount_yen', 0),
-      getLatestPlan(),
-    ]);
+  const [{ data: genres, error: genresError }, ledger, latestPlan] = await Promise.all([
+    supabase.from('genres').select('id, name, budget_yen').order('sort_order'),
+    loadLedgerTransactions({ from: lookbackFrom, to: today }, today),
+    getLatestPlan(),
+  ]);
   if (genresError) {
     throw new SpendingPlanStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
   }
-  if (rowsError)
-    throw new SpendingPlanStoreError(`明細を取得できませんでした: ${rowsError.message}`);
 
-  const countable = rows.filter((r) => !r.is_transfer && r.review_status !== 'ignored');
-  const inherited = await resolveItemGenres(countable);
+  // 家計簿と同じ集計の入力(分割の子へ展開済み)。予定と特別費はペースの基準に
+  // 混ぜない(未来日の大きな支払いが「いつもの水準」に見えてしまうため)。
+  const mustPayById = new Map(ledger.transactions.map((t) => [t.id, t.mustPay]));
+  const countable = toLedgerEntries(ledger.transactions).filter(
+    (e) =>
+      isCountable(e) &&
+      e.amountYen < 0 &&
+      e.kind === 'normal' &&
+      entryStatus(e.occurredOn, today) === 'actual',
+  );
   const earliest = countable.reduce<DateOnly | null>(
-    (min, r) => (min === null || r.occurred_on < min ? r.occurred_on : min),
+    (min, r) => (min === null || r.occurredOn < min ? r.occurredOn : min),
     null,
   );
   const lookbackDays = earliest === null ? 0 : daysBetween(earliest, today) + 1;
   const periodDays = planPeriodDays(periodStart, periodEnd);
 
-  const wasteIds = await loadWasteTransactionIds(countable.map((r) => r.id));
+  const wasteIds = await loadWasteTransactionIds([...new Set(countable.map((r) => r.id))]);
   const recentFrom = addDays(today, -(RECENT_DAYS - 1));
 
   type Acc = {
@@ -99,17 +102,17 @@ export async function loadPlanContext(
   const accByGenre = new Map<string, Acc>();
   let uncategorizedYen = 0;
   for (const r of countable) {
-    const genreId = r.genre_id ?? inherited.get(r.id) ?? null;
-    const yen = -r.amount_yen;
+    const genreId = r.categoryId;
+    const yen = -r.amountYen;
     if (genreId === null) {
       uncategorizedYen += yen;
       continue;
     }
     const acc = accByGenre.get(genreId) ?? { spent: 0, mustPay: 0, waste: 0, recent: 0, prior: 0 };
     acc.spent += yen;
-    if (r.must_pay) acc.mustPay += yen;
+    if (mustPayById.get(r.id)) acc.mustPay += yen;
     if (wasteIds.has(r.id)) acc.waste += yen;
-    if (r.occurred_on >= recentFrom) acc.recent += yen;
+    if (r.occurredOn >= recentFrom) acc.recent += yen;
     else acc.prior += yen;
     accByGenre.set(genreId, acc);
   }

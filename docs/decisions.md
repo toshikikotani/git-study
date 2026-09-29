@@ -1593,6 +1593,30 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 **検証**:`npx tsc --noEmit -p .`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(`parseStructured`が thinking・effort を渡す/渡さないことのテストを含め全通過)/`npx next build`。**未検証**:このセッションにはAnthropic APIキーが無く、実際の応答速度・途中切れが直ったことは計測できていない。
 
+## ADR-061:家計簿の集計統一・レシート取り込み・目標連携の刷新(自律実装での仮定とフォールバックの記録)
+
+**位置づけ**:依頼どおり「DECISIONS.md」に相当する記録。既存の `docs/decisions.md`(ADR 形式)と大文字小文字違いのファイルを並べると、macOS などの大文字小文字を区別しない環境で衝突するため、新しいファイルは作らずこの ADR に追記する。質問せずに置いた仮定と、実現できなかった機能の代替(フォールバック)を、コミットごとに記録する。
+
+### コミット0:集計の基盤
+
+**背景**:画面ごとに合計が違った(ヘッダー31,542円/明細サマリー63,082円=未来日を含む/ジャンル別の外食12,279円と明細サマリー12,656円)。原因は、画面ごとに別々に足し算していたこと(`loadMonthlyLedger` は分割を展開せず、`/reports` と `loadGenreSpend` は別の読み方、目標は未来日も数えていた)。
+
+**決定**
+
+1. **集計関数は `domain/ledger.ts` の `summarizeLedger()` 1つ**。`features/spending/views.ts` の `buildLedgerViews()` がその結果から、ヘッダー・ジャンル内訳・日別合計・カレンダーの日別金額・予定の一覧を組み立て、目標(`loadGenreSpend`・`loadPlanContext`)とAI診断(ジャンル別の今月額)も同じ関数を通す。明細を読む入口は `features/spending/entries.ts` の `loadLedgerTransactions()` の1つ。
+2. **status(actual/scheduled)は日付から導く**:今日(JST)より未来は `scheduled`。DB の `transactions.status` 列は保存時点の記録と SQL 側から見る用で、アプリの判定は常に `entryStatus(occurredOn, today)`(日付が今日に追いついたら自動で実績になる。列を更新するジョブを要らなくする)。
+3. **kind(normal/special)は DB 列**。特別費は「使った額」には入るが、ペース(`paceSpentYen`・`byGenrePace`)と予測からは外す。月末の着地見込みは「特別費を除いたペースの外挿 + 特別費の実績」。
+4. **分割の子は親のジャンルを継承**:読み込み時(`loadLedgerTransactions`・`expandLedger`)と書き込み時(`replaceSplits`)の両方で、子のジャンルが未設定なら親を入れる(個別に付けたものは活かす)。分割の合計が親の金額と合わないデータは分割として扱わない(集計が親とずれるため)。
+5. **マイグレーション** `20260930000100_transaction_status_kind.sql`:列追加、未来日の明細を scheduled に、`transaction_splits`・`receipt_items` の未設定ジャンルを親の値に揃える(親も未設定なら「未分類」のまま=要確認に出す)。`docs/schema.sql`・`supabase/apply-pending.sql` にも反映し、`verify-migrations.sh`・`verify-apply-pending.sh` で一致を確認済み。データ補正の SQL は使い捨ての PostgreSQL で実データに近い行を入れて確認した。
+6. **本番に列が無い間の扱い**(既存の `isMissingColumnError` の流儀):`status`/`kind` 付きの insert・select が失敗したら列を外して再実行する。取り込み・表示は止めない。
+7. **残り日数は `domain/period.ts` の1か所**:**今日を含める**(期末が今日なら「残り1日」)。「今日使える額」= 残額 ÷ 残り日数と噛み合うため。以前は目標の指針(今日を除く)と期間表示(今日を含む)で1日ずれていた。
+8. **金額は整数の円**:`summarizeLedger` は小数が来たら例外にする(`assertYen`)。
+9. **給料日タブ・ホームは触らない**:`features/transactions/period-summary.ts`(給料日)・`features/home/summary.ts` は従来のまま。これらは別の期間定義で、既存テストが全て通ることを確認している。
+
+**却下**:`status` を DB の値だけで判定する案(日付が過ぎても scheduled のまま残り、更新ジョブが要る)。集計関数を複数用意して画面ごとに使い分ける案(食い違いの再発)。
+
+<!-- LEDGER-ADR-END -->
+
 ---
 
 ## 未決のまま残す事項

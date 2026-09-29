@@ -104,6 +104,7 @@ export function SpendingCalendar({ categories }: { categories: readonly GenreOpt
     today,
     isCurrentMonth,
     transactions: visibleTransactions,
+    totals: visibleTotals,
     loading: loadingMonth,
     error: monthError,
     goToMonth,
@@ -123,14 +124,11 @@ export function SpendingCalendar({ categories }: { categories: readonly GenreOpt
     return map;
   }, [visibleTransactions]);
 
-  const spentByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const [date, list] of transactionsByDate) {
-      const spentYen = list.filter((t) => t.amountYen < 0).reduce((acc, t) => acc - t.amountYen, 0);
-      if (spentYen > 0) map.set(date, spentYen);
-    }
-    return map;
-  }, [transactionsByDate]);
+  // 日別の金額は、集計関数(domain/ledger.ts)が出した値をそのまま使う。
+  const spentByDate = useMemo(
+    () => new Map(Object.entries(visibleTotals.daySpend)),
+    [visibleTotals.daySpend],
+  );
 
   const selectedByCategory = useMemo(
     () => groupByGenre(transactionsByDate.get(selectedDate) ?? []),

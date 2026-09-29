@@ -690,6 +690,11 @@ create table public.transactions (
   -- (ジャンルとは独立した軸。ADR-057)。裁量的な支出と分けてグラフ表示する。
   must_pay          boolean            not null default false,
 
+  -- 実績/予定(今日より未来は予定として実績の集計から外す)と、通常/特別費
+  -- (特別費は目標のペース計算から除く)。domain/ledger.ts 参照。
+  status            text               not null default 'actual',
+  kind              text               not null default 'normal',
+
   note              text,
   created_at        timestamptz        not null default now(),
   updated_at        timestamptz        not null default now(),
@@ -711,7 +716,9 @@ create table public.transactions (
   constraint ck_transactions_not_self_counter
     check (counter_transaction_id is null or counter_transaction_id <> id),
   constraint ck_transactions_posted_after_occurred
-    check (posted_on is null or posted_on >= occurred_on)
+    check (posted_on is null or posted_on >= occurred_on),
+  constraint ck_transactions_status check (status in ('actual', 'scheduled')),
+  constraint ck_transactions_kind   check (kind in ('normal', 'special'))
 );
 
 -- 重複排除:同一ファイルを別名で取り込んでも同じ明細は入らない

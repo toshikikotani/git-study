@@ -203,7 +203,7 @@ describe('planGuidance', () => {
     expect(dining.status).toBe('over_pace');
     expect(dining.projectedYen).toBe(60000);
     expect(dining.projectedOverYen).toBe(30000);
-    expect(dining.dailyAllowanceYen).toBe(500); // 残り10000円 ÷ 残り20日
+    expect(dining.dailyAllowanceYen).toBe(476); // 残り10000円 ÷ 残り21日(今日を含む)
     expect(dining.message).toContain('30,000円超える見込み');
     expect(g.actions[0]).toContain('外食');
   });

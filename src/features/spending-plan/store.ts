@@ -8,8 +8,10 @@
  */
 
 import { planPeriodDays } from '@/domain/spending-plan';
-import { resolveItemGenres } from '@/features/genre/item-genres';
-import { assertDateOnly, type DateOnly } from '@/lib/date';
+import { summarizeLedger } from '@/domain/ledger';
+import { loadLedgerTransactions } from '@/features/spending/entries';
+import { toLedgerEntries } from '@/features/spending/views';
+import { assertDateOnly, todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -197,34 +199,42 @@ export async function deletePlan(id: string): Promise<void> {
 }
 
 /**
- * 期間内のジャンル別の実支出(正の円)。ジャンルが空でも、品目がすべて分類済みなら
- * 品目から決めた代表ジャンルで数える(家計簿と同じ見え方)。未分類は
- * `uncategorizedYen` にまとめる。振替・対象外は除く。
+ * 期間内のジャンル別の実支出(正の円)。集計は家計簿と同じ domain/ledger.ts の
+ * summarizeLedger() で、分割した明細は子のジャンルで数える。
+ *
+ *   - 今日より未来の明細(予定)は実績に入れない(scheduledYen に分ける)
+ *   - 特別費は byGenre / uncategorizedYen に入れず specialYen に分ける
+ *     (目標のペース計算・見込みに混ぜない)
+ *   - 未分類は uncategorizedYen にまとめる。振替・対象外は除く
  */
 export async function loadGenreSpend(
   start: DateOnly,
   end: DateOnly,
-): Promise<{ byGenre: Map<string, number>; uncategorizedYen: number }> {
-  const supabase = await createClient();
-  const { data: rows, error } = await supabase
-    .from('transactions')
-    .select('id, amount_yen, genre_id, is_transfer, review_status')
-    .gte('occurred_on', start)
-    .lte('occurred_on', end)
-    .lt('amount_yen', 0);
-  if (error) throw new SpendingPlanStoreError(`明細を取得できませんでした: ${error.message}`);
-
-  const inherited = await resolveItemGenres(rows);
-  const byGenre = new Map<string, number>();
-  let uncategorizedYen = 0;
-  for (const row of rows) {
-    if (row.is_transfer || row.review_status === 'ignored') continue;
-    const genreId = row.genre_id ?? inherited.get(row.id) ?? null;
-    if (genreId === null) {
-      uncategorizedYen -= row.amount_yen;
-      continue;
-    }
-    byGenre.set(genreId, (byGenre.get(genreId) ?? 0) - row.amount_yen);
+  now: Date = new Date(),
+): Promise<{
+  byGenre: Map<string, number>;
+  uncategorizedYen: number;
+  specialYen: number;
+  scheduledYen: number;
+}> {
+  const today = todayJst(now);
+  let transactions;
+  try {
+    ({ transactions } = await loadLedgerTransactions({ from: start, to: end }, today));
+  } catch (error) {
+    throw new SpendingPlanStoreError(
+      error instanceof Error ? error.message : '明細を取得できませんでした',
+    );
   }
-  return { byGenre, uncategorizedYen };
+  const summary = summarizeLedger(toLedgerEntries(transactions), { from: start, to: end }, today);
+  const byGenre = new Map<string, number>();
+  for (const [genreId, yen] of summary.byGenrePace) {
+    if (genreId !== null) byGenre.set(genreId, yen);
+  }
+  return {
+    byGenre,
+    uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
+    specialYen: summary.specialYen,
+    scheduledYen: summary.scheduledYen,
+  };
 }

@@ -6,6 +6,11 @@
  */
 
 import { daysBetween, type DateOnly } from '@/lib/date';
+import {
+  elapsedDays as elapsedDaysOf,
+  periodDays,
+  remainingDays as remainingDaysOf,
+} from '@/domain/period';
 
 /** 提案・丸めの単位(円)。目標は100円単位にそろえる。 */
 export const PLAN_ROUNDING_YEN = 100;
@@ -15,7 +20,7 @@ export const PLAN_STEP_OPTIONS = [5, 10, 20] as const;
 
 /** 期間の日数(開始日・終了日を含む)。 */
 export function planPeriodDays(start: DateOnly, end: DateOnly): number {
-  return daysBetween(start, end) + 1;
+  return periodDays(start, end);
 }
 
 /** 過去の実績から期間ぶんの目安額を出す(1日あたりの平均 × 期間の日数)。 */
@@ -244,8 +249,9 @@ export function planGuidance(input: {
   const totalDays = planPeriodDays(periodStart, periodEnd);
   const started = today >= periodStart;
   const ended = today > periodEnd;
-  const elapsedDays = !started ? 0 : ended ? totalDays : planPeriodDays(periodStart, today);
-  const remainingDays = totalDays - elapsedDays;
+  // 日数の数え方は domain/period.ts に統一(今日を含む。「残りN日」が画面で食い違わない)。
+  const elapsedDays = elapsedDaysOf(periodStart, periodEnd, today);
+  const remainingDays = remainingDaysOf(periodStart, periodEnd, today);
 
   const genres: GenreGuidance[] = input.items.map((item) => {
     const remainingYen = item.targetYen - item.spentYen;

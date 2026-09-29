@@ -151,7 +151,7 @@ export default async function SpendingPage({
         currentMonthStart={ledger.period.from}
         currentTransactions={drilldownTransactions}
         currentGenreBreakdown={ledger.genreBreakdown}
-        currentTotals={{ spentYen: ledger.totalSpentYen, incomeYen: ledger.totalIncomeYen }}
+        currentTotals={ledger.totals}
       >
         <ReorderableCards
           defaultOrder={DEFAULT_CARD_ORDER}

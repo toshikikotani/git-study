@@ -8,6 +8,7 @@
  */
 
 import type { BudgetTone } from '@/domain/budget';
+import type { EntryKind, EntryStatus } from '@/domain/ledger';
 import type { PaymentMethod } from '@/features/import/adapters';
 
 export type LedgerTransaction = {
@@ -22,10 +23,44 @@ export type LedgerTransaction = {
   /** ジャンル別内訳からレシートの再登録ができるように持ち回る(ADR-040)。 */
   accountId: string;
   paymentMethod: PaymentMethod;
+  /** 「絶対払わざるを得ないもの」のラベル(ジャンルとは独立した軸)。 */
+  mustPay: boolean;
+  /** 振替・対象外の判定に使う(集計は domain/ledger.ts が行う)。 */
+  isTransfer: boolean;
+  reviewStatus: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
+  /** 日付から導いた実効の状態。今日より未来は 'scheduled'(予定)。 */
+  status: EntryStatus;
+  /** 特別費('special')は目標のペース計算から除く。 */
+  kind: EntryKind;
+  /**
+   * 分割(レシートの品目・ジャンル按分)の子。空なら分割なし。子のジャンルが
+   * 未設定のものは親のジャンルを引き継いだ値が入る(「未分類」の子を作らない)。
+   */
+  splits: readonly LedgerSplit[];
 };
 
-/** 1か月の支出・収入の合計(どちらも正の数)。 */
-export type MonthTotals = { spentYen: number; incomeYen: number };
+export type LedgerSplit = {
+  genreId: string | null;
+  genreName: string | null;
+  amountYen: number;
+};
+
+/**
+ * 1か月の合計(正の数)。すべて domain/ledger.ts の summarizeLedger() の値で、
+ * 予定(未来日)は spentYen に含めず scheduledYen に分ける。
+ */
+export type MonthTotals = {
+  spentYen: number;
+  incomeYen: number;
+  /** うち特別費(目標のペース計算から除く)。 */
+  specialYen: number;
+  /** 未来日の予定の支出。 */
+  scheduledYen: number;
+  /** 日別の使った額(実績のみ)。カレンダーのヒートマップに使う。 */
+  daySpend: Readonly<Record<string, number>>;
+  /** 日別の予定の支出。 */
+  scheduledDaySpend: Readonly<Record<string, number>>;
+};
 
 export type GenreBreakdownRow = {
   genreId: string | null;
@@ -58,6 +93,7 @@ export type MonthlyPace = {
 
 export type MonthlyLedgerView = {
   period: { from: string; to: string };
+  totals: MonthTotals;
   totalSpentYen: number;
   totalIncomeYen: number;
   genreBreakdown: readonly GenreBreakdownRow[];

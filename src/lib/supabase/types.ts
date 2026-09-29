@@ -1281,6 +1281,8 @@ export type Database = {
           is_expense: boolean | null;
           is_transfer: boolean;
           must_pay: boolean;
+          status: string;
+          kind: string;
           merchant_name: string | null;
           note: string | null;
           occurred_on: string;
@@ -1309,6 +1311,8 @@ export type Database = {
           is_expense?: boolean | null;
           is_transfer?: boolean;
           must_pay?: boolean;
+          status?: string;
+          kind?: string;
           merchant_name?: string | null;
           note?: string | null;
           occurred_on: string;
@@ -1337,6 +1341,8 @@ export type Database = {
           is_expense?: boolean | null;
           is_transfer?: boolean;
           must_pay?: boolean;
+          status?: string;
+          kind?: string;
           merchant_name?: string | null;
           note?: string | null;
           occurred_on?: string;
