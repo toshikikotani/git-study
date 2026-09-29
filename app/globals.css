@@ -659,6 +659,16 @@ button {
   overflow: hidden;
 }
 
+/* グラフの棒:単位を切り替えると、位置・幅・高さがスプリングで変形する。 */
+.chart-bar {
+  transition:
+    left var(--motion-spring-duration) var(--motion-spring),
+    width var(--motion-spring-duration) var(--motion-spring),
+    height var(--motion-spring-duration) var(--motion-spring),
+    bottom var(--motion-spring-duration) var(--motion-spring),
+    opacity var(--motion-small) var(--motion-ease-out);
+}
+
 /* 共有要素の遷移(行のアイコン・名前・金額 → 詳細のヘッダー)。スプリングで動く。 */
 ::view-transition-group(.morph) {
   animation-duration: var(--motion-spring-duration);
@@ -676,6 +686,9 @@ button {
     animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
   }
   .row-shell {
+    transition: opacity var(--motion-small) linear;
+  }
+  .chart-bar {
     transition: opacity var(--motion-small) linear;
   }
   ::view-transition-group(*) {
