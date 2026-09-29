@@ -137,4 +137,9 @@ describe('loadCalendarMonth', () => {
     const { genreBreakdown } = await loadCalendarMonth('2026-10-01');
     expect(genreBreakdown.reduce((acc, r) => acc + r.spentYen, 0)).toBe(1200);
   });
+
+  it('その月の支出・収入の合計を返す(振替・対象外は含めない)', async () => {
+    const { totals } = await loadCalendarMonth('2026-10-01');
+    expect(totals).toEqual({ spentYen: 1200, incomeYen: 0 });
+  });
 });

@@ -23,7 +23,12 @@ import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { buildGenreBreakdown } from './breakdown';
-import type { GenreBreakdownRow, LedgerTransaction, MonthlyLedgerView } from './ledger-types';
+import type {
+  GenreBreakdownRow,
+  LedgerTransaction,
+  MonthlyLedgerView,
+  MonthTotals,
+} from './ledger-types';
 
 export type {
   GenreBreakdownRow,
@@ -140,9 +145,11 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
  * 代表ジャンル込み・収入も含む)で新しい日付が先頭。内訳は今月と同じ
  * buildGenreBreakdown で組み立てるため、過去・未来の月も今月と同じ見た目になる。
  */
-export async function loadCalendarMonth(
-  monthStart: string,
-): Promise<{ transactions: LedgerTransaction[]; genreBreakdown: GenreBreakdownRow[] }> {
+export async function loadCalendarMonth(monthStart: string): Promise<{
+  transactions: LedgerTransaction[];
+  genreBreakdown: GenreBreakdownRow[];
+  totals: MonthTotals;
+}> {
   const supabase = await createClient();
   const nextMonthStart = addMonths(monthStart, 1);
 
@@ -190,8 +197,12 @@ export async function loadCalendarMonth(
       paymentMethod: tx.paymentMethod,
     }));
 
+  const monthKey = monthStart.slice(0, 7);
+  const [incomeExpense] = summarizeMonthlyIncomeExpense(mapped, [monthKey]);
+
   return {
     transactions,
-    genreBreakdown: buildGenreBreakdown(genres, mapped, monthStart.slice(0, 7)),
+    genreBreakdown: buildGenreBreakdown(genres, mapped, monthKey),
+    totals: { spentYen: incomeExpense!.expenseYen, incomeYen: incomeExpense!.incomeYen },
   };
 }

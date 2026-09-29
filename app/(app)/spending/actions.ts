@@ -15,7 +15,7 @@ import {
 } from '@/features/diagnosis/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
-import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
+import type { GenreBreakdownRow, MonthTotals } from '@/features/spending/ledger-types';
 import { loadCalendarMonth } from '@/features/spending/store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { addMonths, nthDayOfMonth, parseDateOnlyOr, todayJst } from '@/lib/date';
@@ -89,6 +89,7 @@ export type CalendarMonthResult =
       error: null;
       transactions: DrilldownTransaction[];
       genreBreakdown: GenreBreakdownRow[];
+      totals: MonthTotals;
     }
   | { error: string };
 
@@ -106,7 +107,7 @@ export async function loadCalendarMonthAction(month: string): Promise<CalendarMo
       return { error: 'この月のカレンダーは表示できません' };
     }
 
-    const { transactions, genreBreakdown } = await loadCalendarMonth(monthStart);
+    const { transactions, genreBreakdown, totals } = await loadCalendarMonth(monthStart);
     const ids = transactions.map((t) => t.id);
     const [items, subtypes] = await Promise.all([
       listReceiptItemsForTransactionIds(ids),
@@ -116,6 +117,7 @@ export async function loadCalendarMonthAction(month: string): Promise<CalendarMo
       error: null,
       transactions: toDrilldownTransactions(transactions, items, subtypes),
       genreBreakdown,
+      totals,
     };
   } catch (error) {
     return {

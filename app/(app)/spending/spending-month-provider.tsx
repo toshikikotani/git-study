@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
+import type { GenreBreakdownRow, MonthTotals } from '@/features/spending/ledger-types';
 import { loadCalendarMonthAction } from './actions';
 import type { DrilldownTransaction } from './category-breakdown-chart';
 
@@ -19,6 +19,7 @@ import type { DrilldownTransaction } from './category-breakdown-chart';
 type MonthData = {
   transactions: readonly DrilldownTransaction[];
   genreBreakdown: readonly GenreBreakdownRow[];
+  totals: MonthTotals;
 };
 
 type SpendingMonth = MonthData & {
@@ -50,12 +51,14 @@ export function SpendingMonthProvider({
   currentMonthStart,
   currentTransactions,
   currentGenreBreakdown,
+  currentTotals,
   children,
 }: {
   today: string;
   currentMonthStart: string;
   currentTransactions: readonly DrilldownTransaction[];
   currentGenreBreakdown: readonly GenreBreakdownRow[];
+  currentTotals: MonthTotals;
   children: ReactNode;
 }) {
   const [visibleMonth, setVisibleMonth] = useState(currentMonthStart);
@@ -77,6 +80,7 @@ export function SpendingMonthProvider({
       new Map(prev).set(monthStart, {
         transactions: result.transactions,
         genreBreakdown: result.genreBreakdown,
+        totals: result.totals,
       }),
     );
   };
@@ -85,9 +89,24 @@ export function SpendingMonthProvider({
   const data: MonthData = useMemo(
     () =>
       isCurrentMonth
-        ? { transactions: currentTransactions, genreBreakdown: currentGenreBreakdown }
-        : (otherMonths.get(visibleMonth) ?? { transactions: [], genreBreakdown: [] }),
-    [isCurrentMonth, currentTransactions, currentGenreBreakdown, otherMonths, visibleMonth],
+        ? {
+            transactions: currentTransactions,
+            genreBreakdown: currentGenreBreakdown,
+            totals: currentTotals,
+          }
+        : (otherMonths.get(visibleMonth) ?? {
+            transactions: [],
+            genreBreakdown: [],
+            totals: { spentYen: 0, incomeYen: 0 },
+          }),
+    [
+      isCurrentMonth,
+      currentTransactions,
+      currentGenreBreakdown,
+      currentTotals,
+      otherMonths,
+      visibleMonth,
+    ],
   );
 
   const value: SpendingMonth = {

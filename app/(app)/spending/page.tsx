@@ -6,11 +6,7 @@ import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
-import {
-  loadMonthlyLedger,
-  type MonthlyForecast,
-  type MonthlyLedgerView,
-} from '@/features/spending/store';
+import { loadMonthlyLedger, type MonthlyForecast } from '@/features/spending/store';
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { SpendingCalendar } from './calendar';
@@ -18,6 +14,7 @@ import { MonthLinkedCategoryBreakdown } from './category-breakdown-chart';
 import { toDrilldownTransactions } from './drilldown';
 import { DiagnosisCard } from './diagnosis-card';
 import { ReorderableCards, type SpendingCardKey } from './reorderable-cards';
+import { CurrentMonthOnly, MonthLinkedSummaryCard } from './month-linked-cards';
 import { SpendingMonthProvider } from './spending-month-provider';
 import {
   TransactionListSection,
@@ -117,7 +114,6 @@ export default async function SpendingPage({
   const [ledger, pile, diagnosis] = await withMinDuration(
     Promise.all([loadMonthlyLedger(), loadAccumulationView(), loadSpendingDiagnosisView()]),
   );
-  const netYen = ledger.totalIncomeYen - ledger.totalSpentYen;
 
   // カテゴリ別内訳からの深掘り(ADR-040)用。ledger.transactions は当月分
   // だけのため、件数は少なく1回にまとめて読める(/transactions と同じ
@@ -155,13 +151,18 @@ export default async function SpendingPage({
         currentMonthStart={ledger.period.from}
         currentTransactions={drilldownTransactions}
         currentGenreBreakdown={ledger.genreBreakdown}
+        currentTotals={{ spentYen: ledger.totalSpentYen, incomeYen: ledger.totalIncomeYen }}
       >
         <ReorderableCards
           defaultOrder={DEFAULT_CARD_ORDER}
           cards={{
-            summary: <SummaryCard ledger={ledger} netYen={netYen} />,
+            summary: <MonthLinkedSummaryCard pace={ledger.pace} />,
             calendar: <SpendingCalendar categories={categories} />,
-            forecast: <ForecastCard forecast={ledger.forecast} />,
+            forecast: (
+              <CurrentMonthOnly>
+                <ForecastCard forecast={ledger.forecast} />
+              </CurrentMonthOnly>
+            ),
             diagnosis: <DiagnosisCard view={diagnosis} />,
             categoryBreakdown: <MonthLinkedCategoryBreakdown categories={categories} />,
             pile: <PileTeaserCard view={pile} />,
@@ -169,78 +170,6 @@ export default async function SpendingPage({
           }}
         />
       </SpendingMonthProvider>
-    </div>
-  );
-}
-
-/**
- * 今月使った額をヒーロー数値にし、収入・差額(貯蓄)・先月同日比を添える。
- * 先月同日比(pace)は domain/accumulation.ts の compareToPreviousMonthPace を
- * 小口支出だけでなく全支出に対して使う(月末を待たずに差が見える)。
- */
-function SummaryCard({ ledger, netYen }: { ledger: MonthlyLedgerView; netYen: number }) {
-  const { pace } = ledger;
-  const isLess = pace.differenceYen < 0;
-  const hasDifference = pace.differenceYen !== 0;
-
-  return (
-    <div
-      className="rounded-3xl p-6"
-      style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
-    >
-      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-        今月使った額
-      </p>
-      <p
-        className="mt-1 text-4xl leading-none font-semibold tracking-tight"
-        style={{ color: 'var(--ink)' }}
-      >
-        {formatYen(ledger.totalSpentYen, { sign: 'never' })}
-      </p>
-
-      <dl
-        className="mt-4 grid grid-cols-2 gap-3 border-t pt-4"
-        style={{ borderColor: 'var(--hairline)' }}
-      >
-        <div>
-          <dt className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-            収入
-          </dt>
-          <dd className="tabular text-sm font-semibold" style={{ color: 'var(--income)' }}>
-            {formatYen(ledger.totalIncomeYen, { sign: 'never' })}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-            差額
-          </dt>
-          <dd
-            className="tabular text-sm font-semibold"
-            style={{ color: netYen >= 0 ? 'var(--income)' : 'var(--over)' }}
-          >
-            {formatYen(netYen)}
-          </dd>
-        </div>
-      </dl>
-
-      <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        先月の{pace.dayOfMonth}日時点は {formatYen(pace.lastMonthSameDayYen, { sign: 'never' })}。
-        {hasDifference ? (
-          <>
-            {' '}
-            今月は{' '}
-            <span
-              className="tabular font-semibold whitespace-nowrap"
-              style={{ color: isLess ? 'var(--income)' : 'var(--over)' }}
-            >
-              {formatYen(pace.differenceYen, { sign: 'never' })} {isLess ? '少ない' : '多い'}
-            </span>
-            。
-          </>
-        ) : (
-          ' 今月はちょうど同じです。'
-        )}
-      </p>
     </div>
   );
 }
