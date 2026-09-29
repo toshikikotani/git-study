@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import { STATE_COLOR, STATE_ICON, STATE_LABEL } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
+import { bandInWeek } from '@/features/goals/range-calendar-model';
 import { dayStatus } from '@/features/goals/view';
 import { heatLevel, monthGrid, weekOf } from '@/features/spending/heatmap';
 import { addDays, formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
@@ -24,8 +25,8 @@ const HEAT_ALPHA = [0, 0.12, 0.26, 0.42, 0.62];
  * 「月表示」に展開できる。日付をタップすると明細リストがその日に絞り込まれる
  * (もう一度タップで解除)——以前の日別詳細欄は廃止した。
  *
- * 目標期間は背景の帯で示し、各日に「1日の目安に対する状態」の点(余裕=●/注意=▲/超過=!)を
- * 付ける。今日より先の予定の支出は、金額の代わりに「予」で示す(実績には数えない)。
+ * 目標期間は、週の行の背後に連続した1本の帯で示す。状態の印は注意(▲)と超過(!)の日だけに付ける
+ * (余裕の日は何も付けない)。予定のある日には小さなカレンダーのマークを付ける。今日より先の予定の支出は、金額の代わりに「予」で示す(実績には数えない)。
  * 金額は色の濃さだけに頼らず、数字でも添える。
  */
 export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
@@ -45,7 +46,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
   const monthKey = visibleMonth.slice(0, 7);
   // 表示中の月に無い anchor は、その月の今日(今月)または1日に寄せる。
   const weekAnchor = anchor.startsWith(monthKey) ? anchor : isCurrentMonth ? today : visibleMonth;
-  const days = expanded ? monthGrid(monthKey).flat() : weekOf(weekAnchor);
+  const weeks = expanded ? monthGrid(monthKey) : [weekOf(weekAnchor)];
 
   const max = useMemo(() => Math.max(...Object.values(totals.daySpend), 0), [totals.daySpend]);
 
@@ -100,82 +101,115 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
         </div>
       </div>
 
-      <div
-        className="mt-2 grid grid-cols-7 gap-1 text-center"
-        role="grid"
-        aria-label="日付ごとの支出"
-      >
-        {WEEKDAYS.map((w) => (
-          <span
-            key={w}
-            role="columnheader"
-            className="text-[10px]"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            {w}
-          </span>
-        ))}
-        {days.map((date) => {
-          const inMonth = date.startsWith(monthKey);
-          const spent = totals.daySpend[date] ?? 0;
-          const scheduled = totals.scheduledDaySpend[date] ?? 0;
-          const level = inMonth ? heatLevel(spent, max) : 0;
-          const inGoal = goal !== null && date >= goal.range.from && date <= goal.range.to;
-          const status = inGoal && date <= today ? dayStatus(spent, goal!.dailyAllowanceYen) : null;
-          const selected = filter.date === date;
-          const [, m, d] = splitDateOnly(date);
-          const label = `${formatDateJa(date)}(${WEEKDAYS[weekdayOf(date)]})、${
-            spent > 0 ? `使った額 ${formatYen(spent, { sign: 'never' })}` : '支出なし'
-          }${scheduled > 0 ? `、予定 ${formatYen(scheduled, { sign: 'never' })}` : ''}${
-            status ? `、目安に対して${STATE_LABEL[status]}` : ''
-          }${date === today ? '、今日' : ''}`;
-
-          return (
-            <button
-              key={date}
-              type="button"
-              role="gridcell"
-              aria-label={label}
-              aria-selected={selected}
-              onClick={() => setFilter({ date: selected ? null : date })}
-              className="relative flex h-14 flex-col items-center justify-center rounded-xl"
-              style={{
-                background: `color-mix(in srgb, var(--accent) ${HEAT_ALPHA[level]! * 100}%, transparent)`,
-                outline: selected ? '2px solid var(--accent)' : 'none',
-                outlineOffset: '-2px',
-                opacity: inMonth ? 1 : 0.4,
-                // 目標期間は下辺の帯で示す。
-                boxShadow: inGoal ? 'inset 0 -3px 0 var(--accent)' : 'none',
-              }}
+      <div className="mt-2" role="grid" aria-label="日付ごとの支出">
+        <div className="grid grid-cols-7 gap-1 text-center" role="row">
+          {WEEKDAYS.map((w) => (
+            <span
+              key={w}
+              role="columnheader"
+              className="text-[10px]"
+              style={{ color: 'var(--ink-muted)' }}
             >
-              <span
-                className="tabular text-[13px]"
-                style={{
-                  color: 'var(--ink)',
-                  fontWeight: date === today ? 700 : 500,
-                  textDecoration: date === today ? 'underline' : 'none',
-                  textUnderlineOffset: '3px',
-                }}
-              >
-                {expanded && d === 1 ? `${m}/` : ''}
-                {d}
-              </span>
-              <span
-                className="tabular text-[9px] leading-none"
-                style={{ color: 'var(--ink-secondary)', minHeight: 9 }}
-              >
-                {spent > 0 ? spent.toLocaleString('ja-JP') : scheduled > 0 ? '予' : ''}
-              </span>
-              {status ? (
+              {w}
+            </span>
+          ))}
+        </div>
+        {weeks.map((week, wi) => {
+          const band = goal !== null ? bandInWeek(week, goal.range.from, goal.range.to) : null;
+          return (
+            <div key={wi} role="row" className="relative mt-1 grid grid-cols-7 gap-1">
+              {band !== null ? (
                 <span
                   aria-hidden
-                  className="absolute top-0.5 right-1 text-[9px] leading-none font-bold"
-                  style={{ color: STATE_COLOR[status] }}
-                >
-                  {STATE_ICON[status]}
-                </span>
+                  data-goal-band
+                  className="absolute inset-y-1"
+                  style={{
+                    left: `${(band.from / 7) * 100}%`,
+                    width: `${((band.to - band.from + 1) / 7) * 100}%`,
+                    background: 'var(--accent-track)',
+                    borderRadius: `${week[band.from] === goal!.range.from ? 999 : 0}px ${week[band.to] === goal!.range.to ? 999 : 0}px ${week[band.to] === goal!.range.to ? 999 : 0}px ${week[band.from] === goal!.range.from ? 999 : 0}px`,
+                  }}
+                />
               ) : null}
-            </button>
+              {week.map((date) => {
+                const inMonth = date.startsWith(monthKey);
+                const spent = totals.daySpend[date] ?? 0;
+                const scheduled = totals.scheduledDaySpend[date] ?? 0;
+                const level = inMonth ? heatLevel(spent, max) : 0;
+                const inGoal = goal !== null && date >= goal.range.from && date <= goal.range.to;
+                const rawStatus =
+                  inGoal && date <= today ? dayStatus(spent, goal!.dailyAllowanceYen) : null;
+                // 状態の印は注意・超過の日だけ(余裕は何も付けない)。
+                const status = rawStatus === 'caution' || rawStatus === 'over' ? rawStatus : null;
+                const selected = filter.date === date;
+                const [, m, d] = splitDateOnly(date);
+                const label = `${formatDateJa(date)}(${WEEKDAYS[weekdayOf(date)]})、${
+                  spent > 0 ? `使った額 ${formatYen(spent, { sign: 'never' })}` : '支出なし'
+                }${scheduled > 0 ? `、予定 ${formatYen(scheduled, { sign: 'never' })}` : ''}${
+                  status ? `、目安に対して${STATE_LABEL[status]}` : ''
+                }${date === today ? '、今日' : ''}`;
+
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    role="gridcell"
+                    aria-label={label}
+                    aria-selected={selected}
+                    onClick={() => setFilter({ date: selected ? null : date })}
+                    className="relative z-10 flex h-14 flex-col items-center justify-center rounded-xl"
+                    style={{
+                      background: `color-mix(in srgb, var(--accent) ${HEAT_ALPHA[level]! * 100}%, transparent)`,
+                      outline: selected ? '2px solid var(--accent)' : 'none',
+                      outlineOffset: '-2px',
+                      opacity: inMonth ? 1 : 0.4,
+                    }}
+                  >
+                    <span
+                      className="tabular text-[13px]"
+                      style={{
+                        color: 'var(--ink)',
+                        fontWeight: date === today ? 700 : 500,
+                        textDecoration: date === today ? 'underline' : 'none',
+                        textUnderlineOffset: '3px',
+                      }}
+                    >
+                      {expanded && d === 1 ? `${m}/` : ''}
+                      {d}
+                    </span>
+                    <span
+                      className="tabular text-[9px] leading-none"
+                      style={{ color: 'var(--ink-secondary)', minHeight: 9 }}
+                    >
+                      {spent > 0 ? spent.toLocaleString('ja-JP') : ''}
+                    </span>
+                    {status ? (
+                      <span
+                        aria-hidden
+                        className="absolute top-0.5 right-1 text-[9px] leading-none font-bold"
+                        style={{ color: STATE_COLOR[status] }}
+                      >
+                        {STATE_ICON[status]}
+                      </span>
+                    ) : null}
+                    {scheduled > 0 ? (
+                      <svg
+                        aria-hidden
+                        data-scheduled-mark
+                        viewBox="0 0 12 12"
+                        className="absolute top-0.5 left-1 size-2.5"
+                        fill="none"
+                        stroke="var(--ink-secondary)"
+                        strokeWidth="1.2"
+                      >
+                        <rect x="1.5" y="2.5" width="9" height="8" rx="1.5" />
+                        <path d="M1.5 5h9M4 1.5v2M8 1.5v2" />
+                      </svg>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
       </div>
@@ -195,9 +229,6 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
           ))}
           多
         </span>
-        {goal !== null ? (
-          <span>下の帯=目標期間 ・ ●余裕 ▲注意 !超過(1日の目安に対して)</span>
-        ) : null}
         {filter.date !== null ? (
           <Link
             href={`/transactions/new?date=${filter.date}`}

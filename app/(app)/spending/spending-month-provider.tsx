@@ -74,6 +74,7 @@ export function SpendingMonthProvider({
   currentTotals,
   genres,
   accounts,
+  initialFilter,
   children,
 }: {
   today: string;
@@ -83,13 +84,18 @@ export function SpendingMonthProvider({
   currentTotals: MonthTotals;
   genres: readonly GenreOption[];
   accounts: readonly { id: string; name: string }[];
+  /** 絞り込みの初期値(テスト用)。 */
+  initialFilter?: Partial<LedgerFilter>;
   children: ReactNode;
 }) {
   const [visibleMonth, setVisibleMonth] = useState(currentMonthStart);
   const [otherMonths, setOtherMonths] = useState<ReadonlyMap<string, MonthData>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilterState] = useState<LedgerFilter>(EMPTY_FILTER);
+  const [filter, setFilterState] = useState<LedgerFilter>({
+    ...EMPTY_FILTER,
+    ...initialFilter,
+  });
 
   const load = async (monthStart: string, force: boolean) => {
     if (monthStart === currentMonthStart || (!force && otherMonths.has(monthStart))) return;

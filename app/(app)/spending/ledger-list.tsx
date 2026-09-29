@@ -14,7 +14,7 @@ import {
   isFilterActive,
   splitShares,
 } from '@/features/spending/views';
-import { addDays, formatDateJa, weekdayOf } from '@/lib/date';
+import { addDays, formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { LedgerMenu } from './ledger-menu';
@@ -34,6 +34,11 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
  *
  * フィルターは横スクロールのチップ1行(口座/ジャンル/期間/目標期間)+検索。
  */
+function formatMonthDay(date: string): string {
+  const [, m, d] = splitDateOnly(date);
+  return `${m}/${d}`;
+}
+
 export function LedgerList({
   goalRange,
   duplicateCount,
@@ -168,6 +173,22 @@ export function LedgerList({
           </button>
         ) : null}
       </div>
+
+      {filter.date !== null ? (
+        <button
+          type="button"
+          onClick={() => setFilter({ date: null })}
+          aria-label={`${formatMonthDay(filter.date)}の絞り込みを解除`}
+          className="tabular inline-flex min-h-11 items-center gap-2 self-start rounded-full px-3 text-xs font-semibold"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink)',
+            border: '1px solid var(--hairline)',
+          }}
+        >
+          {formatMonthDay(filter.date)}で絞り込み中<span aria-hidden>×</span>
+        </button>
+      ) : null}
 
       <PendingReceiptRows />
 

@@ -235,3 +235,62 @@ describe('ジャンル行(目標画面と共通)', () => {
     expect(none).toContain('予算なし');
   });
 });
+
+describe('F5 カレンダー', () => {
+  const render = (date: string | null, goal: boolean) =>
+    visible(
+      renderToString(
+        h(SpendingMonthProvider, {
+          today: '2026-09-29',
+          currentMonthStart: '2026-09-01',
+          currentTransactions: txs,
+          currentGenreBreakdown: views.genreBreakdown,
+          currentTotals: {
+            ...views.totals,
+            scheduledDaySpend: { ...views.totals.scheduledDaySpend, '2026-09-30': 5000 },
+          },
+          genres,
+          accounts: [{ id: 'a', name: '現金' }],
+          initialFilter: date !== null ? { date } : {},
+          children: [
+            h(CalendarHeatmap, {
+              key: 'c',
+              goal: goal
+                ? {
+                    range: { from: '2026-09-25', to: '2026-10-05' },
+                    dailyAllowanceYen: 2300,
+                  }
+                : null,
+            }),
+            h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
+          ],
+        }),
+      ),
+    );
+
+  it('凡例は「少〜多」の1行だけで、目標期間の凡例(●余裕 ▲注意 !超過)は無い', () => {
+    const html = render(null, true);
+    expect(html).toContain('少');
+    expect(html).not.toContain('下の帯=目標期間');
+    expect(html).not.toContain('●余裕');
+  });
+
+  it('目標期間は週の行の背後に帯として描かれる', () => {
+    expect(render(null, true)).toContain('data-goal-band');
+    expect(render(null, false)).not.toContain('data-goal-band');
+  });
+
+  it('状態の印は注意・超過の日だけ(余裕の日に ● は付かない)', () => {
+    const html = render(null, true);
+    expect(html).not.toContain('●');
+  });
+
+  it('予定のある日にはカレンダーのマークが付く', () => {
+    expect(render(null, false)).toContain('data-scheduled-mark');
+  });
+
+  it('日付で絞り込み中は「9/29で絞り込み中 ×」のチップが出る', () => {
+    expect(render('2026-09-29', false)).toContain('9/29で絞り込み中');
+    expect(render(null, false)).not.toContain('で絞り込み中');
+  });
+});
