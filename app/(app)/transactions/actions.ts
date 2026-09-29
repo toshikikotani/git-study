@@ -360,27 +360,54 @@ export async function duplicateTransactionAction(id: string): Promise<{ error: s
       .single();
     if (error || !row) return { error: '複製できませんでした。' };
     const description = `${row.description}(複製)`;
-    const { error: insertError } = await supabase.from('transactions').insert({
-      user_id: row.user_id,
-      account_id: row.account_id,
-      occurred_on: row.occurred_on,
-      amount_yen: row.amount_yen,
-      description,
-      merchant_name: row.merchant_name,
-      payment_method: row.payment_method,
-      genre_id: row.genre_id,
-      classified_by: row.classified_by,
-      confidence: row.confidence,
-      review_status: 'auto_ok',
-      must_pay: row.must_pay,
-      source: 'manual',
-      fingerprint: fingerprintOf({
-        occurredOn: row.occurred_on,
-        amountYen: row.amount_yen,
+    const { data: created, error: insertError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: row.user_id,
+        account_id: row.account_id,
+        occurred_on: row.occurred_on,
+        amount_yen: row.amount_yen,
         description,
-      }),
-    });
-    if (insertError) return { error: '複製できませんでした。すでに複製済みかもしれません。' };
+        merchant_name: row.merchant_name,
+        payment_method: row.payment_method,
+        genre_id: row.genre_id,
+        classified_by: row.classified_by,
+        confidence: row.confidence,
+        review_status: 'auto_ok',
+        must_pay: row.must_pay,
+        source: 'manual',
+        fingerprint: fingerprintOf({
+          occurredOn: row.occurred_on,
+          amountYen: row.amount_yen,
+          description,
+        }),
+      })
+      .select('id')
+      .single();
+    if (insertError || !created)
+      return { error: '複製できませんでした。すでに複製済みかもしれません。' };
+
+    // 分割・品目も複製する(失敗しても複製した明細自体は残す)。
+    const [{ data: splits }, { data: items }] = await Promise.all([
+      supabase
+        .from('transaction_splits')
+        .select('genre_id, amount_yen, note')
+        .eq('transaction_id', id),
+      supabase
+        .from('receipt_items')
+        .select('name, amount_yen, sort_order, genre_id')
+        .eq('transaction_id', id),
+    ]);
+    if (splits && splits.length > 0) {
+      await supabase
+        .from('transaction_splits')
+        .insert(splits.map((x) => ({ ...x, user_id: row.user_id, transaction_id: created.id })));
+    }
+    if (items && items.length > 0) {
+      await supabase
+        .from('receipt_items')
+        .insert(items.map((x) => ({ ...x, user_id: row.user_id, transaction_id: created.id })));
+    }
   } catch (error) {
     return { error: describeUserError(error, '複製できませんでした。') };
   }
