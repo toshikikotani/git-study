@@ -30,12 +30,21 @@ export type StructuredRequest<S extends z.ZodType> = {
   schema: S;
   /** 既定文に足す一言。機能ごとに次の一手が違うため呼び出し側が渡す。 */
   hints?: { truncated?: string; rateLimit?: string };
+  /**
+   * Sonnet 5 は thinking を指定しないと常に適応的に考え(effort 既定 high)、その分も
+   * max_tokens に数えられる——短い構造化出力でも遅くなり、答えを書く前に上限で切れる。
+   * 判断が軽い呼び出しでは disableThinking と低い effort で抑える(Haiku 4.5 は
+   * effort 非対応のため渡さない)。
+   */
+  disableThinking?: boolean;
+  effort?: 'low' | 'medium' | 'high';
 };
 
 export async function parseStructured<S extends z.ZodType>(
   request: StructuredRequest<S>,
 ): Promise<StructuredResult<z.infer<S>>> {
-  const { client, model, maxTokens, system, messages, schema, hints } = request;
+  const { client, model, maxTokens, system, messages, schema, hints, disableThinking, effort } =
+    request;
 
   try {
     const response = await client.messages.parse({
@@ -43,7 +52,11 @@ export async function parseStructured<S extends z.ZodType>(
       max_tokens: maxTokens,
       system,
       messages,
-      output_config: { format: zodOutputFormat(schema) },
+      ...(disableThinking ? { thinking: { type: 'disabled' as const } } : {}),
+      output_config: {
+        format: zodOutputFormat(schema),
+        ...(effort ? { effort } : {}),
+      },
     });
 
     const usage = {

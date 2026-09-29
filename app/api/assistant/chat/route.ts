@@ -348,6 +348,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       const response = await client.messages.create({
         model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
+        // Sonnet 5 は既定で高強度に考え、その分も max_tokens に数えられる。
+        // 変更案づくりは低強度で足りるため、遅さと途中切れを避ける。
+        output_config: { effort: 'low' },
         system,
         tools: TOOLS,
         messages: anthropicMessages,
