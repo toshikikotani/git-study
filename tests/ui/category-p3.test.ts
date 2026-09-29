@@ -46,6 +46,7 @@ const base: CategoryDetailData = {
   ],
   genres: [{ id: 'dining', name: '外食' }],
   accounts: [{ id: 'a', name: '現金' }],
+  genreHistory: [],
   goal: null,
 };
 

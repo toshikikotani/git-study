@@ -12,12 +12,28 @@ import { revalidatePath } from 'next/cache';
 
 import {
   MovePlanError,
+  applyPlanToInput,
   planCategoryMove,
   planItemMove,
+  planWholeMove,
   splitsAreConsistent,
   type MoveInput,
   type MovePlan,
 } from '@/domain/category-move';
+import { comparableKey } from '@/domain/store-name';
+import {
+  findRuleMatches,
+  storeKeyOf,
+  type RuleCandidate,
+  type RuleScope,
+} from '@/domain/rule-match';
+import {
+  deleteRule,
+  listRulesForGenre,
+  saveStoreRule,
+  updateRuleGenre,
+} from '@/features/genre/memory-store';
+import { recordCorrection } from '@/features/genre/memory-store';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { describeUserError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -289,5 +305,235 @@ export async function restoreFieldsAction(
   if (error) return { error: '元に戻せませんでした。' };
   revalidatePath('/spending');
   revalidatePath('/plan');
+  return { error: null };
+}
+
+// ---- 分類ルール(P7・P8)-------------------------------------------------------------------
+
+export type RuleMatchRow = {
+  id: string;
+  occurredOn: string;
+  label: string;
+  amountYen: number;
+  genreId: string | null;
+  genreName: string | null;
+};
+
+/** ルールの対象になりうる過去の取引(店で絞り、品目のルールは品目を読んで確かめる)。 */
+async function loadRuleCandidates(
+  supabase: Client,
+  scope: RuleScope,
+): Promise<{ candidates: RuleCandidate[]; genreNames: Map<string, string> }> {
+  const [{ data: txs }, { data: genres }] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('id, occurred_on, description, merchant_name, amount_yen, genre_id')
+      .lt('amount_yen', 0)
+      .order('occurred_on', { ascending: false })
+      .limit(5000),
+    supabase.from('genres').select('id, name'),
+  ]);
+  const storeKey = storeKeyOf(scope.storeName);
+  const inStore = (txs ?? []).filter(
+    (t) => storeKeyOf(t.merchant_name ?? t.description) === storeKey && storeKey !== '',
+  );
+  const itemsByTx = new Map<string, string[]>();
+  if (scope.kind === 'item' && inStore.length > 0) {
+    const ids = inStore.map((t) => t.id);
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: items } = await supabase
+        .from('receipt_items')
+        .select('transaction_id, name')
+        .in('transaction_id', ids.slice(i, i + 200));
+      for (const it of items ?? []) {
+        const list = itemsByTx.get(it.transaction_id) ?? [];
+        list.push(it.name);
+        itemsByTx.set(it.transaction_id, list);
+      }
+    }
+  }
+  return {
+    candidates: inStore.map((t) => ({
+      id: t.id,
+      occurredOn: t.occurred_on,
+      label: t.merchant_name ?? t.description,
+      amountYen: t.amount_yen,
+      genreId: t.genre_id,
+      itemNames: itemsByTx.get(t.id) ?? [],
+    })),
+    genreNames: new Map((genres ?? []).map((g) => [g.id, g.name])),
+  };
+}
+
+/** ルールを保存する前の事前確認:一致する過去の取引の件数と一覧。 */
+export async function previewRuleAction(input: {
+  scope: RuleScope;
+  toGenreId: string;
+}): Promise<{ error: string | null; matches: RuleMatchRow[] }> {
+  try {
+    const supabase = await createClient();
+    const { candidates, genreNames } = await loadRuleCandidates(supabase, input.scope);
+    const matches = findRuleMatches(input.scope, input.toGenreId, candidates).map((c) => ({
+      id: c.id,
+      occurredOn: c.occurredOn,
+      label: c.label,
+      amountYen: c.amountYen,
+      genreId: c.genreId,
+      genreName: c.genreId === null ? null : (genreNames.get(c.genreId) ?? null),
+    }));
+    return { error: null, matches };
+  } catch (e) {
+    return { error: describeUserError(e, '一致する取引を調べられませんでした。'), matches: [] };
+  }
+}
+
+export type SaveRuleResult = {
+  error: string | null;
+  /** 過去に当てた件数。 */
+  applied: number;
+  previous?: MovePrevious[];
+};
+
+/**
+ * ルールを保存する。applyToPast なら、一致する過去の取引にも当てる(移す前の状態を返し、Undo できる)。
+ * 一致する取引は、クライアントの値を信じず、サーバーで探し直す。
+ */
+export async function saveRuleAction(input: {
+  scope: RuleScope;
+  toGenreId: string;
+  applyToPast: boolean;
+}): Promise<SaveRuleResult> {
+  const supabase = await createClient();
+  try {
+    if (input.scope.kind === 'store') {
+      await saveStoreRule(input.scope.storeName, input.toGenreId);
+    } else {
+      await recordCorrection({
+        storeName: input.scope.storeName,
+        itemName: input.scope.itemName,
+        genreId: input.toGenreId,
+        pin: true,
+      });
+    }
+  } catch (e) {
+    return { error: describeUserError(e, 'ルールを保存できませんでした。'), applied: 0 };
+  }
+  if (!input.applyToPast) {
+    revalidatePath('/spending');
+    return { error: null, applied: 0 };
+  }
+
+  const done: MovePrevious[] = [];
+  try {
+    const { candidates } = await loadRuleCandidates(supabase, input.scope);
+    const matches = findRuleMatches(input.scope, input.toGenreId, candidates);
+    for (const m of matches) {
+      const state = await loadState(supabase, m.id);
+      if (state === null) continue;
+      let plan: MovePlan;
+      if (input.scope.kind === 'store') {
+        plan = planWholeMove(state.input, input.toGenreId);
+      } else {
+        // 一致する品目を、1つずつ移す(続けて計画を作る)。
+        const key = comparableKey(input.scope.itemName);
+        let current = state.input;
+        const itemGenres = new Map<string, string | null>();
+        let last: MovePlan | null = null;
+        for (const item of state.input.items) {
+          if (comparableKey(item.name) !== key) continue;
+          last = planItemMove(current, item.id, input.toGenreId);
+          current = applyPlanToInput(current, last);
+          for (const [k, v] of last.itemGenres) itemGenres.set(k, v);
+        }
+        if (last === null) continue;
+        plan = { genreId: last.genreId, splits: last.splits, itemGenres };
+      }
+      if (!splitsAreConsistent(state.input.amountYen, plan)) continue;
+      await applyPlan(supabase, m.id, plan, state.input.splits.length > 0);
+      done.push(state.previous);
+    }
+  } catch (e) {
+    for (const p of done.reverse()) {
+      try {
+        await restoreOne(supabase, p);
+      } catch {
+        // 戻せなかった分は、そのまま
+      }
+    }
+    return { error: describeUserError(e, '過去の取引に当てられませんでした。'), applied: 0 };
+  }
+  revalidatePath('/spending');
+  revalidatePath('/plan');
+  return { error: null, applied: done.length, previous: done };
+}
+
+/** ルールの Undo(保存したルールを消す。過去に当てた分は restoreMovesAction で戻す)。 */
+export async function undoRuleAction(input: {
+  scope: RuleScope;
+  previous?: MovePrevious[];
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  try {
+    if (input.previous && input.previous.length > 0) {
+      for (const p of input.previous) await restoreOne(supabase, p);
+    }
+    const storeKey = comparableKey(input.scope.storeName);
+    const itemKey = input.scope.kind === 'store' ? '*' : comparableKey(input.scope.itemName);
+    const { data } = await supabase
+      .from('genre_memory')
+      .select('id')
+      .eq('store_key', storeKey)
+      .eq('item_key', itemKey)
+      .maybeSingle();
+    if (data) await deleteRule(data.id);
+  } catch (e) {
+    return { error: describeUserError(e, '元に戻せませんでした。') };
+  }
+  revalidatePath('/spending');
+  revalidatePath('/plan');
+  return { error: null };
+}
+
+/** このカテゴリに固定されているルール(P8 の管理画面用)。 */
+export async function listRulesAction(genreId: string): Promise<{
+  error: string | null;
+  rules: { id: string; storeKey: string; itemKey: string; hits: number }[];
+}> {
+  try {
+    const rules = await listRulesForGenre(genreId);
+    return {
+      error: null,
+      rules: rules.map((r) => ({
+        id: r.id,
+        storeKey: r.storeKey,
+        itemKey: r.itemKey,
+        hits: r.hits,
+      })),
+    };
+  } catch (e) {
+    return { error: describeUserError(e, 'ルールを取得できませんでした。'), rules: [] };
+  }
+}
+
+export async function deleteRuleAction(id: string): Promise<{ error: string | null }> {
+  try {
+    await deleteRule(id);
+  } catch (e) {
+    return { error: describeUserError(e, 'ルールを削除できませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+export async function updateRuleGenreAction(
+  id: string,
+  genreId: string,
+): Promise<{ error: string | null }> {
+  try {
+    await updateRuleGenre(id, genreId);
+  } catch (e) {
+    return { error: describeUserError(e, 'ルールを変更できませんでした。') };
+  }
+  revalidatePath('/spending');
   return { error: null };
 }

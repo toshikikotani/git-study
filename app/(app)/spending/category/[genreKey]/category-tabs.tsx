@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
@@ -25,6 +25,7 @@ import {
 } from '@/features/category/model';
 import { formatDateJa, weekdayOf } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
+import { DragSelect } from '@/lib/drag-select';
 import { ScrollMemory } from '@/lib/virtual';
 import { CategoryTransactionRow } from './transaction-row';
 import { VirtualList } from './virtual-list';
@@ -59,6 +60,11 @@ export function CategoryTabs({
   onQuickMove,
   onMoveMenu,
   ghostLines,
+  selectMode,
+  selectedIds,
+  onSelectedChange,
+  predictionsFor,
+  onPredict,
 }: {
   genreKey: string;
   /** 選んだ月の行(実績・予定)。 */
@@ -79,11 +85,21 @@ export function CategoryTabs({
   onMoveMenu: (line: CategoryLine) => void;
   /** 別のカテゴリへ移って消えていく途中の行(250ms の間だけ一覧に残す)。 */
   ghostLines: readonly CategoryLine[];
+  /** 複数選択のモード(なぞって選べる)。 */
+  selectMode: boolean;
+  selectedIds: ReadonlySet<string>;
+  onSelectedChange: (ids: ReadonlySet<string>) => void;
+  /** 未分類の行の予測(上位3件)。 */
+  predictionsFor?: (line: CategoryLine) => readonly { genreId: string; genreName: string }[];
+  onPredict?: (line: CategoryLine, genreId: string) => void;
 }) {
   const [sort, setSort] = useState<LineSort>('newest');
   const [query, setQuery] = useState('');
   const [memory] = useState(() => new ScrollMemory<CategoryTab>());
   const [itemKey, setItemKey] = useState<string | null>(null);
+  // なぞって複数選択(写真アプリと同じ操作)。
+  const [drag] = useState(() => new DragSelect());
+  const [dragging, setDragging] = useState(false);
 
   const items = useMemo(() => aggregateItems(lines, genreKey), [lines, genreKey]);
   const stores = useMemo(() => aggregateStores(lines), [lines]);
@@ -113,6 +129,44 @@ export function CategoryTabs({
     // そのタブで最後に見ていた位置へ戻す(初めて開くなら、いまの位置のまま)。
     const y = memory.get(next);
     if (y !== null) window.requestAnimationFrame(() => window.scrollTo(0, y));
+  };
+
+  const lineOrder = useMemo(
+    () => rows.flatMap((r) => (r.kind === 'line' ? [r.line.txId] : [])),
+    [rows],
+  );
+
+  // なぞっている間は、指の下の行を選ぶ(画面の端に近づいたら、自動でスクロールする)。
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e: PointerEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-row-id]');
+      const id = el?.getAttribute('data-row-id');
+      if (id) {
+        const next = drag.visit(id);
+        if (next) onSelectedChange(next);
+      }
+      if (e.clientY < 120) window.scrollBy(0, -16);
+      else if (e.clientY > window.innerHeight - 180) window.scrollBy(0, 16);
+    };
+    const up = () => {
+      drag.end();
+      setDragging(false);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, [dragging, drag, onSelectedChange]);
+
+  const startDrag = (id: string) => {
+    onSelectedChange(drag.begin(lineOrder, selectedIds, id));
+    hapticFor('filterChange');
+    setDragging(true);
   };
 
   const txTotal = actualSpentYen(txLines);
@@ -246,6 +300,11 @@ export function CategoryTabs({
                       onQuickMove={onQuickMove}
                       onMoveMenu={onMoveMenu}
                       leaving={ghostIds.has(r.line.txId)}
+                      selectMode={selectMode}
+                      selected={selectedIds.has(r.line.txId)}
+                      onSelectStart={startDrag}
+                      {...(predictionsFor ? { predictions: predictionsFor(r.line) } : {})}
+                      {...(onPredict ? { onPredict } : {})}
                     />
                   )
                 }

@@ -9,6 +9,10 @@ import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/se
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { Yen } from '@/components/ui/money';
+import { CONFIDENT, predictGenres, type GenrePrediction } from '@/domain/genre-prediction';
+import { suggestRule, type RuleSuggestion } from '@/domain/rule-match';
+import { hapticFor } from '@/lib/haptics';
 import { pickQuickDestination, useMoveCounts } from '@/features/category/destinations';
 import { genreIdOfKey } from '@/features/category/model';
 import { formatMonthJa } from '@/lib/date';
@@ -19,6 +23,7 @@ import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
+import { RuleSheet } from './rule-sheet';
 import { useCategoryEdits } from './use-category-edits';
 import { InsightsSection } from './insights-section';
 import { SummarySection } from './summary-section';
@@ -41,12 +46,22 @@ export type LineFocus = {
 
 function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const router = useRouter();
-  const { transactions, ghosts, banner, dismissBanner, moveLines, moveOneItem, saveEdit } =
-    useCategoryEdits({
-      initial: data.transactions,
-      genreKey: data.genreKey,
-      genres: data.genres,
-    });
+  const {
+    transactions,
+    ghosts,
+    banner,
+    dismissBanner,
+    moveLines,
+    moveOneItem,
+    saveEdit,
+    moveMany,
+    deleteLines,
+    applyRuleResult,
+  } = useCategoryEdits({
+    initial: data.transactions,
+    genreKey: data.genreKey,
+    genres: data.genres,
+  });
   const counts = useMoveCounts();
   const [movePicker, setMovePicker] = useState<CategoryLine | null>(null);
   const [focus, setFocus] = useState<LineFocus | null>(null);
@@ -54,6 +69,15 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const [showPrevious, setShowPrevious] = useState(true);
   const [tab, setTab] = useState<CategoryTab>('tx');
   const [openLine, setOpenLine] = useState<CategoryLine | null>(null);
+  // まとめて修正:選択モード(なぞって選べる)、選んだ行、一括の移動・削除、ルールの提案。
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [bulkPicker, setBulkPicker] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rule, setRule] = useState<{
+    suggestion: RuleSuggestion;
+    toGenre: { id: string; name: string };
+  } | null>(null);
 
   // 選んだ月の行と、履歴を含む全部の行(前月の比較・単価の推移に使う)。
   const lines = useMemo(
@@ -117,6 +141,72 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
     () => pickQuickDestination({ counts, genres: data.genres, currentGenreId }),
     [counts, data.genres, currentGenreId],
   );
+
+  const nameOfGenre = (id: string) => data.genres.find((g) => g.id === id)?.name ?? '';
+
+  /** このカテゴリに属する品目の名前(移した部分の品目)。 */
+  const itemNamesOf = (l: CategoryLine): string[] =>
+    l.tx.items.filter((i) => (i.genreId ?? l.tx.genreId) === currentGenreId).map((i) => i.name);
+
+  /** カテゴリを移し、成功したら、ルール化を提案する。 */
+  const moveWithRule = async (targets: readonly CategoryLine[], toGenreId: string | null) => {
+    const ok = await moveLines(targets, toGenreId);
+    if (!ok || toGenreId === null) return ok;
+    const suggestion = suggestRule(
+      targets.map((l) => ({ storeName: l.label, itemNames: itemNamesOf(l) })),
+      nameOfGenre(toGenreId),
+    );
+    if (suggestion)
+      setRule({ suggestion, toGenre: { id: toGenreId, name: nameOfGenre(toGenreId) } });
+    return ok;
+  };
+
+  const moveItemWithRule = async (line: CategoryLine, itemId: string, toGenreId: string | null) => {
+    const ok = await moveOneItem(line, itemId, toGenreId);
+    if (!ok || toGenreId === null) return ok;
+    const name = line.tx.items.find((i) => i.id === itemId)?.name;
+    const suggestion = suggestRule(
+      [{ storeName: line.label, itemNames: name ? [name] : [] }],
+      nameOfGenre(toGenreId),
+    );
+    if (suggestion)
+      setRule({ suggestion, toGenre: { id: toGenreId, name: nameOfGenre(toGenreId) } });
+    return ok;
+  };
+
+  // 未分類の画面:行ごとの予測(上位3件)と、信頼度0.9以上だけの一括確定。
+  const isUncategorizedScreen = data.genreKey === 'none';
+  const predictionMap = useMemo(() => {
+    const map = new Map<string, GenrePrediction[]>();
+    if (!isUncategorizedScreen) return map;
+    for (const l of lines) {
+      if (l.status !== 'actual' || l.amountYen >= 0) continue;
+      map.set(
+        l.txId,
+        predictGenres({
+          storeName: l.label,
+          itemNames: l.tx.items.map((i) => i.name),
+          genres: data.genres,
+          history: data.genreHistory,
+        }),
+      );
+    }
+    return map;
+  }, [isUncategorizedScreen, lines, data.genres, data.genreHistory]);
+  const confident = useMemo(
+    () =>
+      lines.flatMap((l) => {
+        const top = predictionMap.get(l.txId)?.[0];
+        return top && top.confidence >= CONFIDENT ? [{ line: l, toGenreId: top.genreId }] : [];
+      }),
+    [lines, predictionMap],
+  );
+
+  const selectedLines = lines.filter((l) => selectedIds.has(l.txId) && l.status === 'actual');
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
 
   /** 絞り込んだ取引を見せる:取引のタブへ切り替え、一覧の先頭までスクロールする。 */
   const showTransactions = (next: LineFocus) => {
@@ -187,7 +277,29 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         isCurrentMonth={data.isCurrentMonth}
         totalYen={totalYen}
         onBack={() => router.back()}
+        menu={
+          <button
+            type="button"
+            onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+            aria-pressed={selectMode}
+            className="min-h-11 rounded-full px-4 text-sm font-semibold"
+            style={{ color: 'var(--ink)' }}
+          >
+            {selectMode ? '完了' : '選択'}
+          </button>
+        }
       />
+
+      {isUncategorizedScreen && confident.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => void moveMany(confident)}
+          className="min-h-12 w-full rounded-2xl text-base font-semibold"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        >
+          すべて予測どおりに確定({confident.length}件)
+        </button>
+      ) : null}
 
       <SummarySection
         summary={summary}
@@ -218,9 +330,30 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         focusedLines={focus ? shown : null}
         focusLabel={focus?.label ?? null}
         onClearFocus={() => setFocus(null)}
-        onOpenLine={setOpenLine}
+        onOpenLine={(line) => {
+          if (!selectMode) {
+            setOpenLine(line);
+            return;
+          }
+          // 選択モード:タップで選択を切り替える
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(line.txId)) next.delete(line.txId);
+            else next.add(line.txId);
+            return next;
+          });
+        }}
+        selectMode={selectMode}
+        selectedIds={selectedIds}
+        onSelectedChange={setSelectedIds}
+        {...(isUncategorizedScreen
+          ? {
+              predictionsFor: (l: CategoryLine) => predictionMap.get(l.txId) ?? [],
+              onPredict: (l: CategoryLine, genreId: string) => void moveWithRule([l], genreId),
+            }
+          : {})}
         quickDestination={quickDestination}
-        onQuickMove={(line) => quickDestination && void moveLines([line], quickDestination.id)}
+        onQuickMove={(line) => quickDestination && void moveWithRule([line], quickDestination.id)}
         onMoveMenu={setMovePicker}
         ghostLines={ghosts}
         onFocusStore={(store) =>
@@ -260,11 +393,11 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         }}
         onMove={(line, to) => {
           setOpenLine(null);
-          void moveLines([line], to);
+          void moveWithRule([line], to);
         }}
         onMoveItem={(line, itemId, to) => {
           setOpenLine(null);
-          void moveOneItem(line, itemId, to);
+          void moveItemWithRule(line, itemId, to);
         }}
       />
 
@@ -282,11 +415,120 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
             onPick={(to) => {
               const line = movePicker;
               setMovePicker(null);
-              if (line) void moveLines([line], to);
+              if (line) void moveWithRule([line], to);
             }}
           />
         </div>
       </BottomSheet>
+
+      {/* まとめて修正:選択モードのあいだ、下部に固定(選択件数・合計・操作) */}
+      {selectMode ? (
+        <div
+          role="toolbar"
+          aria-label="選択した取引の操作"
+          className="fixed inset-x-4 z-40 mx-auto flex max-w-md items-center justify-between gap-2 rounded-2xl px-4 py-2"
+          style={{
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)',
+            background: 'var(--surface-raised)',
+            boxShadow: 'var(--glass-shadow-float)',
+            border: '1px solid var(--hairline)',
+          }}
+        >
+          <p
+            className="tabular min-w-0 text-sm"
+            style={{ color: 'var(--ink)' }}
+            aria-live="polite"
+            aria-label={`${selectedLines.length}件を選択、合計${Math.abs(actualSpentYen(selectedLines)).toLocaleString('ja-JP')}円`}
+          >
+            {selectedLines.length}件
+            <span className="ml-2" style={{ color: 'var(--ink-secondary)' }}>
+              <Yen value={actualSpentYen(selectedLines)} />
+            </span>
+          </p>
+          <span className="flex shrink-0 gap-1">
+            <button
+              type="button"
+              disabled={selectedLines.length === 0}
+              onClick={() => setBulkPicker(true)}
+              className="min-h-11 rounded-full px-3 text-sm font-semibold disabled:opacity-40"
+              style={{ color: 'var(--ink)' }}
+            >
+              カテゴリを移す
+            </button>
+            <button
+              type="button"
+              disabled={selectedLines.length === 0}
+              onClick={() => setConfirmDelete(true)}
+              className="min-h-11 rounded-full px-3 text-sm font-semibold disabled:opacity-40"
+              style={{ color: 'var(--over)' }}
+            >
+              削除
+            </button>
+          </span>
+        </div>
+      ) : null}
+
+      <BottomSheet open={bulkPicker} onClose={() => setBulkPicker(false)} role="dialog">
+        <div className="space-y-2 px-3 pb-3">
+          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            {selectedLines.length}件のカテゴリを移す
+          </p>
+          <CategoryPicker
+            genres={data.genres}
+            currentId={currentGenreId}
+            suggestedId={quickDestination?.id ?? null}
+            includeUncategorized
+            onPick={(to) => {
+              const targets = selectedLines;
+              setBulkPicker(false);
+              exitSelect();
+              void moveWithRule(targets, to).then((ok) => ok && hapticFor('bulkComplete'));
+            }}
+          />
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={confirmDelete} onClose={() => setConfirmDelete(false)} role="dialog">
+        <div className="space-y-3 px-3 pb-3">
+          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            {selectedLines.length}件を削除しますか?
+          </p>
+          <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            削除した直後なら、元に戻せます。
+          </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+            >
+              やめる
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const targets = selectedLines;
+                setConfirmDelete(false);
+                exitSelect();
+                hapticFor('deleteConfirm');
+                void deleteLines(targets);
+              }}
+              className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--over)', color: 'var(--on-action)' }}
+            >
+              削除する
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      <RuleSheet
+        suggestion={rule?.suggestion ?? null}
+        toGenre={rule?.toGenre ?? null}
+        onClose={() => setRule(null)}
+        onApplied={(scope, toGenreId, ids) => applyRuleResult(scope, toGenreId, ids)}
+      />
     </div>
   );
 }

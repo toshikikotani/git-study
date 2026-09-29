@@ -5,11 +5,15 @@
  */
 
 import {
+  applyPlanToInput,
   planCategoryMove,
   planItemMove,
+  planWholeMove,
   type MoveInput,
   type MovePlan,
 } from '@/domain/category-move';
+import { comparableKey } from '@/domain/store-name';
+import type { RuleScope } from '@/domain/rule-match';
 import type { CategoryTx } from './model';
 
 export type GenreRef = { id: string; name: string };
@@ -126,4 +130,39 @@ export function restoreTransactions(
   });
   for (const o of originals) if (!seen.has(o.id)) next.push(o);
   return next;
+}
+
+/** 分類ルールを、すでにある明細に当てた結果(画面の状態にも同じ変更を反映する)。 */
+export function applyRuleLocally(
+  txs: readonly CategoryTx[],
+  scope: RuleScope,
+  ids: ReadonlySet<string>,
+  toGenreId: string,
+  genres: readonly GenreRef[],
+): CategoryTx[] {
+  return txs.map((t) => {
+    if (!ids.has(t.id)) return t;
+    const input = toMoveInput(t);
+    if (scope.kind === 'store') return applyMovePlan(t, planWholeMove(input, toGenreId), genres);
+    const key = comparableKey(scope.itemName);
+    let current = input;
+    const itemGenres = new Map<string, string | null>();
+    let last: MovePlan | null = null;
+    for (const item of input.items) {
+      if (comparableKey(item.name) !== key) continue;
+      last = planItemMove(current, item.id, toGenreId);
+      current = applyPlanToInput(current, last);
+      for (const [k, v] of last.itemGenres) itemGenres.set(k, v);
+    }
+    if (last === null) return t;
+    return applyMovePlan(t, { genreId: last.genreId, splits: last.splits, itemGenres }, genres);
+  });
+}
+
+/** 明細を消す(一括削除の楽観的更新)。 */
+export function removeTransactions(
+  txs: readonly CategoryTx[],
+  ids: ReadonlySet<string>,
+): CategoryTx[] {
+  return txs.filter((t) => !ids.has(t.id));
 }

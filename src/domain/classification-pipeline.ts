@@ -30,6 +30,9 @@ export function memoryKey(storeName: string, itemName: string): string {
   return `${comparableKey(storeName)}|${comparableKey(itemName)}`;
 }
 
+/** 店ごとのルールの品目キー(「この店はすべて○○」)。comparableKey は記号を消すので固定の文字で持つ。 */
+export const STORE_WIDE_ITEM = '*';
+
 export type ClassifyContext = {
   memory: ClassificationMemory;
   /** ジャンル名 → id(利用者のジャンル一覧)。 */
@@ -51,9 +54,11 @@ export function classifyLine(
 ): LineClassification | null {
   const exact = ctx.memory.get(memoryKey(storeName, itemName));
   const anyStore = ctx.memory.get(memoryKey('', itemName));
+  // 店ごとのルール(この店はすべて○○):品目が「*」のとき。店×品目の指定のあとに当てる。
+  const storeWide = ctx.memory.get(`${comparableKey(storeName)}|${STORE_WIDE_ITEM}`);
 
-  // 1. 利用者のルール(店×品目、次に品目だけ)
-  for (const m of [exact, anyStore]) {
+  // 1. 利用者のルール(店×品目、次に店ごと、次に品目だけ)
+  for (const m of [exact, storeWide, anyStore]) {
     if (m?.pinned) return { genreId: m.genreId, source: 'rule', confidence: 1 };
   }
   // 2. 個人の履歴(その店での選び方を優先)

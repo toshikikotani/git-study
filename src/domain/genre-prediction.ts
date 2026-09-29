@@ -16,15 +16,27 @@ export type GenrePrediction = {
   genreId: string;
   genreName: string;
   reason: 'history' | 'dictionary' | 'store_type' | 'frequent';
+  /**
+   * 0〜1。同じ店で同じジャンルを選んだ回数が多いほど、辞書は0.9、店の種類は0.6、よく使うだけなら0.3。
+   * 「すべて予測どおりに確定」は 0.9 以上のものだけを対象にする。
+   */
+  confidence: number;
 };
 
-export type GenreHistoryEntry = { storeName: string; genreId: string };
+/** count は同じ組み合わせの回数(まとめて渡すとき。省略は1回)。 */
+export type GenreHistoryEntry = { storeName: string; genreId: string; count?: number };
+
+/** この信頼度以上だけを、まとめて確定する。 */
+export const CONFIDENT = 0.9;
 
 export const PREDICTION_COUNT = 3;
 
-function countBy<T>(items: readonly T[], key: (t: T) => string): [string, number][] {
+function countBy<T extends { count?: number }>(
+  items: readonly T[],
+  key: (t: T) => string,
+): [string, number][] {
   const m = new Map<string, number>();
-  for (const i of items) m.set(key(i), (m.get(key(i)) ?? 0) + 1);
+  for (const i of items) m.set(key(i), (m.get(key(i)) ?? 0) + (i.count ?? 1));
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
@@ -37,11 +49,15 @@ export function predictGenres(input: {
   const byId = new Map(input.genres.map((g) => [g.id, g.name]));
   const byName = new Map(input.genres.map((g) => [g.name, g.id]));
   const out: GenrePrediction[] = [];
-  const add = (genreId: string | undefined, reason: GenrePrediction['reason']) => {
+  const add = (
+    genreId: string | undefined,
+    reason: GenrePrediction['reason'],
+    confidence: number,
+  ) => {
     if (genreId === undefined || !byId.has(genreId)) return;
     if (out.some((p) => p.genreId === genreId)) return;
     if (out.length >= PREDICTION_COUNT) return;
-    out.push({ genreId, genreName: byId.get(genreId)!, reason });
+    out.push({ genreId, genreName: byId.get(genreId)!, reason, confidence });
   };
 
   const store = normalizeStoreName(input.storeName);
@@ -51,22 +67,28 @@ export function predictGenres(input: {
   const sameStore = input.history.filter(
     (h) => comparableKey(normalizeStoreName(h.storeName).name || h.storeName) === storeKey,
   );
-  for (const [genreId] of countBy(sameStore, (h) => h.genreId)) add(genreId, 'history');
+  const storeCounts = countBy(sameStore, (h) => h.genreId);
+  const storeTotal = storeCounts.reduce((a, [, n]) => a + n, 0);
+  for (const [genreId, n] of storeCounts) {
+    // 同じ店で同じジャンルをほぼ毎回選んでいるほど高い(回数が多いほど、上限0.95まで)。
+    const pure = n / storeTotal >= 0.9;
+    add(genreId, 'history', pure ? Math.min(Math.round((0.7 + 0.1 * n) * 100) / 100, 0.95) : 0.6);
+  }
 
   // 2. 辞書(品目 → 店名)
   for (const name of [...(input.itemNames ?? []), input.storeName]) {
     const g = lookupItemDictionary(name);
-    if (g !== null) add(byName.get(g), 'dictionary');
+    if (g !== null) add(byName.get(g), 'dictionary', 0.9);
   }
 
   // 3. 店の種類
   const typeGenre = STORE_TYPE_GENRE[store.type];
-  if (typeGenre !== null) add(byName.get(typeGenre), 'store_type');
+  if (typeGenre !== null) add(byName.get(typeGenre), 'store_type', 0.6);
 
   // 4. よく使うジャンル
-  for (const [genreId] of countBy(input.history, (h) => h.genreId)) add(genreId, 'frequent');
+  for (const [genreId] of countBy(input.history, (h) => h.genreId)) add(genreId, 'frequent', 0.3);
   // 履歴が無い利用者でも3件は出す(ジャンルの並び順で補う)。
-  for (const g of input.genres) add(g.id, 'frequent');
+  for (const g of input.genres) add(g.id, 'frequent', 0.3);
 
   return out;
 }

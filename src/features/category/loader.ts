@@ -36,6 +36,11 @@ export type CategoryDetailData = {
   transactions: CategoryTx[];
   genres: { id: string; name: string }[];
   accounts: { id: string; name: string }[];
+  /**
+   * 「店 → ジャンル」の過去の選び方(未分類の予測に使う)。履歴を含む全部の明細から、
+   * 店とジャンルの組ごとに回数をまとめたもの。
+   */
+  genreHistory: { storeName: string; genreId: string; count: number }[];
   goal: null | {
     range: { from: string; to: string };
     dailyAllowanceYen: number | null;
@@ -78,6 +83,14 @@ export async function loadCategoryDetail(input: {
   const items = await listReceiptItemsForTransactionIds(withThumbs.map((t) => t.id));
 
   const view = goalLoaded?.view ?? null;
+  const history = new Map<string, { storeName: string; genreId: string; count: number }>();
+  for (const t of listed) {
+    if (t.genreId === null || t.amountYen >= 0 || t.needsInput) continue;
+    const key = `${t.label}\u0000${t.genreId}`;
+    const e = history.get(key) ?? { storeName: t.label, genreId: t.genreId, count: 0 };
+    e.count += 1;
+    history.set(key, e);
+  }
   return {
     genreKey: input.genreKey,
     genreName: genre?.name ?? '未分類',
@@ -91,6 +104,7 @@ export async function loadCategoryDetail(input: {
     transactions: withThumbs.map((t) => ({ ...t, items: items.get(t.id) ?? [] })),
     genres: loaded.genres.map((g) => ({ id: g.id, name: g.name })),
     accounts: accounts.map((a) => ({ id: a.id, name: a.name })),
+    genreHistory: [...history.values()].sort((a, b) => b.count - a.count).slice(0, 1500),
     goal:
       view === null
         ? null

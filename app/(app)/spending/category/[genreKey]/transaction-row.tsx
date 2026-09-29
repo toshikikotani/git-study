@@ -27,6 +27,9 @@ export function CategoryTransactionRow({
   onQuickMove,
   onMoveMenu,
   leaving = false,
+  predictions,
+  onPredict,
+  onSelectStart,
 }: {
   line: CategoryLine;
   onOpen: (line: CategoryLine) => void;
@@ -40,6 +43,11 @@ export function CategoryTransactionRow({
   onMoveMenu?: (line: CategoryLine) => void;
   /** 別のカテゴリへ移って一覧から消えていく途中(高さと透明度を同時に変える、250ms)。 */
   leaving?: boolean;
+  /** 未分類の行:予測されるカテゴリ(上位3件)。1タップで確定する。 */
+  predictions?: readonly { genreId: string; genreName: string }[];
+  onPredict?: (line: CategoryLine, genreId: string) => void;
+  /** 選択モードで、左の丸を押してなぞり始める(なぞって複数選択)。 */
+  onSelectStart?: (id: string) => void;
 }) {
   const subtitle = [line.branchName, itemsPreview(line)].filter((x) => x && x !== '').join(' ・ ');
   const spoken = `${line.label}、${line.refund ? '返品・返金' : '支出'}${Math.abs(line.amountYen).toLocaleString('ja-JP')}円${line.receiptTotalYen !== null ? `、レシート全体${line.receiptTotalYen.toLocaleString('ja-JP')}円のうち` : ''}${line.status === 'scheduled' ? '、予定' : ''}${quickDestination ? `。右にスワイプで${quickDestination.name}へ移動` : ''}`;
@@ -60,7 +68,13 @@ export function CategoryTransactionRow({
         {selectMode ? (
           <span
             aria-hidden
-            className="flex size-6 shrink-0 items-center justify-center rounded-full border text-xs"
+            onPointerDown={(e) => {
+              if (onSelectStart) {
+                e.preventDefault();
+                onSelectStart(line.txId);
+              }
+            }}
+            className="flex size-6 shrink-0 touch-none items-center justify-center rounded-full border text-xs"
             style={{
               borderColor: 'var(--ink-muted)',
               background: selected ? 'var(--accent)' : 'transparent',
@@ -106,6 +120,25 @@ export function CategoryTransactionRow({
         ) : null}
         <LedgerAmount amountYen={line.amountYen} className="shrink-0 text-sm font-semibold" />
       </button>
+      {predictions && predictions.length > 0 && !selectMode && line.status === 'actual' ? (
+        <div
+          role="group"
+          aria-label={`${line.label}の予測されるカテゴリ`}
+          className="flex flex-wrap gap-2 px-4 pb-3"
+        >
+          {predictions.map((p) => (
+            <button
+              key={p.genreId}
+              type="button"
+              onClick={() => onPredict?.(line, p.genreId)}
+              className="min-h-11 rounded-full px-4 text-sm font-semibold"
+              style={{ border: '1px solid var(--ink-muted)', color: 'var(--ink)' }}
+            >
+              {p.genreName}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 

@@ -3,9 +3,11 @@
 import { useCallback, useState } from 'react';
 
 import {
+  applyRuleLocally,
   moveItem,
   moveTransactions,
   patchTransaction,
+  removeTransactions,
   restoreTransactions,
   type GenreRef,
   type TxPatch,
@@ -15,11 +17,18 @@ import { recordMove } from '@/features/category/destinations';
 import { hapticFor } from '@/lib/haptics';
 import { MOTION } from '@/lib/motion';
 import { optimistic } from '@/lib/optimistic';
+import type { RuleScope } from '@/domain/rule-match';
 import { pushUndo } from '@/lib/undo';
+import {
+  deleteTransactionAction,
+  restoreDeletedTransactionAction,
+  type DeletedSnapshot,
+} from '../../../transactions/actions';
 import {
   moveItemAction,
   moveTransactionsAction,
   restoreFieldsAction,
+  type MovePrevious,
   restoreMovesAction,
   updateFieldsAction,
 } from '../actions';
@@ -146,6 +155,98 @@ export function useCategoryEdits(input: {
     return true;
   };
 
+  /**
+   * 複数の明細を、それぞれの移し先へまとめて移す(予測どおりに確定)。移し先ごとに保存し、
+   * 途中で失敗したら、すでに移した分も元に戻す。取り消しは1回で全部。
+   */
+  const moveMany = async (
+    assignments: readonly { line: CategoryLine; toGenreId: string | null }[],
+  ) => {
+    if (assignments.length === 0) return false;
+    const ids = new Set(assignments.map((a) => a.line.txId));
+    const originals = transactions.filter((t) => ids.has(t.id));
+    const groups = new Map<string | null, CategoryLine[]>();
+    for (const a of assignments) {
+      const list = groups.get(a.toGenreId) ?? [];
+      list.push(a.line);
+      groups.set(a.toGenreId, list);
+    }
+    const savedPrevious: MovePrevious[] = [];
+    setGhosts((prev) => [...prev, ...assignments.map((a) => a.line)]);
+    for (const [toGenreId, group] of groups) {
+      const groupIds = new Set(group.map((l) => l.txId));
+      setTransactions((t) => moveTransactions(t, groupIds, fromGenreId, toGenreId, genres));
+    }
+    dropGhosts(ids);
+    try {
+      for (const [toGenreId, group] of groups) {
+        const r = await moveTransactionsAction({
+          ids: group.map((l) => l.txId),
+          fromGenreId,
+          toGenreId,
+        });
+        if (r.error !== null) throw new Error(r.error);
+        savedPrevious.push(...(r.previous ?? []));
+      }
+    } catch (e) {
+      if (savedPrevious.length > 0) await restoreMovesAction(savedPrevious);
+      setGhosts((prev) => prev.filter((g) => !ids.has(g.txId)));
+      setTransactions((t) => restoreTransactions(t, originals));
+      setBanner(`移せませんでした。${e instanceof Error ? e.message : ''}`);
+      return false;
+    }
+    hapticFor('bulkComplete');
+    for (const a of assignments) recordMove(a.toGenreId);
+    pushUndo(`${assignments.length}件を予測どおりに移しました`, async () => {
+      const r = await restoreMovesAction(savedPrevious);
+      if (r.error) return r.error;
+      setTransactions((t) => restoreTransactions(t, originals));
+      return null;
+    });
+    return true;
+  };
+
+  /** 明細を削除する(一括でも使う)。取り消しは、消した明細を同じ id のまま戻す。 */
+  const deleteLines = async (lines: readonly CategoryLine[]) => {
+    if (lines.length === 0) return false;
+    const ids = new Set(lines.map((l) => l.txId));
+    const originals = transactions.filter((t) => ids.has(t.id));
+    const snapshots: DeletedSnapshot[] = [];
+    setGhosts((prev) => [...prev, ...lines]);
+    setTransactions((t) => removeTransactions(t, ids));
+    dropGhosts(ids);
+    try {
+      for (const id of ids) {
+        const r = await deleteTransactionAction(id);
+        if (r.error !== null) throw new Error(r.error);
+        if (r.snapshot) snapshots.push(r.snapshot);
+      }
+    } catch (e) {
+      for (const snap of snapshots) await restoreDeletedTransactionAction(snap);
+      setGhosts((prev) => prev.filter((g) => !ids.has(g.txId)));
+      setTransactions((t) => restoreTransactions(t, originals));
+      setBanner(`削除できませんでした。${e instanceof Error ? e.message : ''}`);
+      return false;
+    }
+    hapticFor('bulkComplete');
+    pushUndo(`${lines.length}件を削除しました`, async () => {
+      for (const snap of snapshots) {
+        const r = await restoreDeletedTransactionAction(snap);
+        if (r.error) return r.error;
+      }
+      setTransactions((t) => restoreTransactions(t, originals));
+      return null;
+    });
+    return true;
+  };
+
+  /** 分類ルールを過去の明細に当てた結果を、画面の状態にも反映する。 */
+  const applyRuleResult = (scope: RuleScope, toGenreId: string, ids: ReadonlySet<string>) => {
+    const originals = transactions.filter((t) => ids.has(t.id));
+    setTransactions((t) => applyRuleLocally(t, scope, ids, toGenreId, genres));
+    return () => setTransactions((t) => restoreTransactions(t, originals));
+  };
+
   return {
     transactions,
     setTransactions,
@@ -155,5 +256,8 @@ export function useCategoryEdits(input: {
     moveLines,
     moveOneItem,
     saveEdit,
+    moveMany,
+    deleteLines,
+    applyRuleResult,
   };
 }

@@ -115,3 +115,24 @@ export function planItemMove(input: MoveInput, itemId: string, toGenreId: string
 export function splitsAreConsistent(amountYen: number, plan: MovePlan): boolean {
   return plan.splits.length === 0 || plan.splits.reduce((a, s) => a + s.amountYen, 0) === amountYen;
 }
+
+/** 明細のすべて(分割も品目も)を1つのカテゴリへ移す(店ごとのルールを過去にも当てるとき)。 */
+export function planWholeMove(input: MoveInput, toGenreId: string | null): MovePlan {
+  return {
+    genreId: toGenreId,
+    splits: [],
+    itemGenres: new Map(input.items.map((i) => [i.id, toGenreId])),
+  };
+}
+
+/** 計画を適用した「次の状態」(続けて別の品目を移すとき)。 */
+export function applyPlanToInput(input: MoveInput, plan: MovePlan): MoveInput {
+  return {
+    amountYen: input.amountYen,
+    genreId: plan.genreId,
+    splits: plan.splits,
+    items: input.items.map((i) =>
+      plan.itemGenres.has(i.id) ? { ...i, genreId: plan.itemGenres.get(i.id)! } : i,
+    ),
+  };
+}
