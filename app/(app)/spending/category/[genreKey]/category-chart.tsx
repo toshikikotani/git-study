@@ -148,15 +148,26 @@ export function CategoryChart({
         </div>
         <label
           className="flex min-h-11 items-center gap-2 text-xs"
-          style={{ color: 'var(--ink-secondary)' }}
+          style={{
+            color: 'var(--ink-secondary)',
+            opacity: series.hasPrevious ? 1 : 0.6,
+          }}
         >
           <input
             type="checkbox"
-            checked={showPrevious}
+            checked={showPrevious && series.hasPrevious}
+            disabled={!series.hasPrevious}
             onChange={(e) => onShowPrevious(e.target.checked)}
             className="size-5"
           />
-          前期間を重ねる
+          <span>
+            前期間と比べる
+            {series.hasPrevious ? null : (
+              <span className="block text-xs" style={{ color: 'var(--ink-muted)' }}>
+                前月のデータがありません
+              </span>
+            )}
+          </span>
         </label>
       </div>
 
@@ -176,11 +187,11 @@ export function CategoryChart({
           onContextMenu={(e) => e.preventDefault()}
         >
           {/* 平均(点線)と1日の目安(線) */}
-          {series.averageYen !== null ? (
+          {series.averageLineYen !== null ? (
             <Line
-              ratio={barRatio(series.averageYen, series.maxYen)}
+              ratio={barRatio(series.averageLineYen, series.maxYen)}
               dashed
-              label={`平均 ${series.averageYen.toLocaleString('ja-JP')}円`}
+              label={`1日平均 ${series.averageYen!.toLocaleString('ja-JP')}円(${Number(series.recordStart.slice(5, 7))}/${Number(series.recordStart.slice(8, 10))}〜)`}
             />
           ) : null}
           {series.allowanceYen !== null ? (
@@ -199,7 +210,7 @@ export function CategoryChart({
             const actual = b ? barRatio(b.actualYen, series.maxYen) : 0;
             const sched = b ? barRatio(b.scheduledYen, series.maxYen) : 0;
             const prev =
-              b && showPrevious && b.previousYen !== null
+              b && showPrevious && series.hasPrevious && b.previousYen !== null
                 ? barRatio(b.previousYen, series.maxYen)
                 : 0;
             return (

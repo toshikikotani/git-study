@@ -123,12 +123,14 @@ describe('P4 系列(日・週・月)', () => {
 
   it('平均は今日までの区間の平均。目標期間中は1日の目安(週は×7、月は出さない)', () => {
     const day = build('day', 2300);
-    expect(day.averageYen).toBe(Math.round(total / 29)); // 9/1〜9/29
+    expect(day.averageYen).toBe(Math.round(total / 29)); // 履歴があるので月初(9/1)〜9/29
     expect(day.allowanceYen).toBe(2300);
     expect(build('week', 2300).allowanceYen).toBe(16100);
     expect(build('month', 2300).allowanceYen).toBeNull();
     expect(build('day').allowanceYen).toBeNull();
     expect(day.maxYen).toBeGreaterThanOrEqual(5000); // 予定の棒も収まる
+    expect(day.averageLineYen).toBe(day.averageYen);
+    expect(build('month', 2300).averageLineYen).toBeNull();
   });
 
   it('棒の高さの割合・なぞる位置から区間の番号', () => {

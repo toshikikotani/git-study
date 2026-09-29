@@ -63,10 +63,10 @@ const render = (unit: ChartUnit, allowance: number | null = null, showPrevious =
 describe('P4 グラフの画面', () => {
   const html = render('day', 2300);
 
-  it('日 / 週 / 月 の切り替えと、前期間を重ねるスイッチ(どちらも44pt以上)', () => {
+  it('日 / 週 / 月 の切り替えと、前期間と比べるスイッチ(どちらも44pt以上)', () => {
     for (const u of ['日', '週', '月']) expect(html).toContain(`>${u}</button>`);
     expect(html).toContain('role="tablist"');
-    expect(html).toContain('前期間を重ねる');
+    expect(html).toContain('前期間と比べる');
     expect((html.match(/min-h-11/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 

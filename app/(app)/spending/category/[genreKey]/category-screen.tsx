@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildCategorySummary, buildInsights, type Insight } from '@/features/category/insights';
+import { categoryAllowanceYen, goalOverlaps } from '@/features/category/pace';
 import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/series';
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
@@ -124,6 +125,21 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
     [lines, historyLines, data.genreKey, data.monthStart, data.today, data.isCurrentMonth],
   );
 
+  // 目標期間中の、このカテゴリの1日の目安(全カテゴリ合計の目安ではない)。表示中の期間が
+  // 目標期間と重なるときだけ。
+  const categoryAllowance = useMemo(() => {
+    const g = data.goal;
+    if (!g || !g.active || !g.row || g.row.targetYen === null) return null;
+    if (!goalOverlaps(g.range, data.monthStart, data.range.to)) return null;
+    return categoryAllowanceYen({
+      budgetYen: g.row.targetYen,
+      scheduledYen: g.row.scheduledYen,
+      lines: historyLines,
+      goalRange: g.range,
+      today: data.today,
+    });
+  }, [data.goal, data.monthStart, data.range.to, data.today, historyLines]);
+
   const series = useMemo(
     () =>
       buildSeries({
@@ -132,12 +148,9 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         monthStart: data.monthStart,
         monthEnd: data.range.to,
         today: data.today,
-        dailyAllowanceYen:
-          data.goal?.active && data.goal.row?.targetYen !== null
-            ? data.goal.dailyAllowanceYen
-            : null,
+        dailyAllowanceYen: categoryAllowance,
       }),
-    [historyLines, unit, data.monthStart, data.range.to, data.today, data.goal],
+    [historyLines, unit, data.monthStart, data.range.to, data.today, categoryAllowance],
   );
 
   const currentGenreId = genreIdOfKey(data.genreKey);
