@@ -16,7 +16,19 @@ type VT = React.ComponentType<{
   children: React.ReactNode;
 }>;
 
-const ViewTransition = (React as unknown as { ViewTransition?: VT }).ViewTransition;
+/**
+ * iOS の WebKit(Safari・アプリ内ブラウザ・iOS 上の全ブラウザ)では、名前付きの要素が多い画面
+ * (家計簿のジャンル行)で View Transitions が描画プロセスを落とすことがあった。iOS では
+ * 共有要素を使わず、通常の画面遷移(クロスフェード)にする。
+ */
+export function isIOSWebKit(ua: string, maxTouchPoints = 0): boolean {
+  return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && maxTouchPoints > 1);
+}
+
+const ViewTransition =
+  typeof navigator !== 'undefined' && isIOSWebKit(navigator.userAgent, navigator.maxTouchPoints)
+    ? undefined
+    : (React as unknown as { ViewTransition?: VT }).ViewTransition;
 
 export function SharedElement({ name, children }: { name: string; children: React.ReactNode }) {
   if (!ViewTransition) return <>{children}</>;
