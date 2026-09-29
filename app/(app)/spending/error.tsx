@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { MdErrorOutline } from 'react-icons/md';
 
 import { Button } from '@/components/ui/button';
+import { ErrorDetail } from '@/components/ui/error-detail';
 
 /** 家計簿の読み込みエラー。ほかのタブには波及させず、この画面だけやり直せる。 */
 export default function SpendingError({
@@ -28,6 +29,7 @@ export default function SpendingError({
           記録は消えていません。通信を確認して、もう一度お試しください。
         </p>
       </div>
+      <ErrorDetail error={error} />
       <Button onClick={reset} variant="filled" className="mt-1">
         もう一度試す
       </Button>
