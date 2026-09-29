@@ -7,6 +7,8 @@ import {
   assertDateOnly,
   billingCycleStartFor,
   daysBetween,
+  dateOnlyToLocalDate,
+  localDateToDateOnly,
   formatDateJa,
   monthStartJst,
   mostRecentClosingOnOrBefore,
@@ -200,5 +202,18 @@ describe('parseDateOnlyOr', () => {
     expect(parseDateOnlyOr('2026-02-31', '2026-01-01')).toBe('2026-01-01');
     expect(parseDateOnlyOr(undefined, '2026-01-01')).toBe('2026-01-01');
     expect(parseDateOnlyOr(['2026-09-20'], '2026-01-01')).toBe('2026-01-01');
+  });
+});
+
+describe('dateOnlyToLocalDate / localDateToDateOnly', () => {
+  it('往復しても同じ日になる(月末・年末・うるう日を含む)', () => {
+    for (const d of ['2026-09-29', '2026-01-01', '2026-12-31', '2028-02-29', '2026-03-01']) {
+      expect(localDateToDateOnly(dateOnlyToLocalDate(d))).toBe(d);
+    }
+  });
+
+  it('ローカルの年月日を持つ(UTC にずれない)', () => {
+    const date = dateOnlyToLocalDate('2026-10-05');
+    expect([date.getFullYear(), date.getMonth() + 1, date.getDate()]).toEqual([2026, 10, 5]);
   });
 });

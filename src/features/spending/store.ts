@@ -185,3 +185,62 @@ function toneFor(genreId: string, budgetYen: number | null, spentYen: number) {
     transactionCount: 0,
   });
 }
+
+/**
+ * カレンダー(家計簿トップ)向けに、任意の月の明細(収支の対象になるものだけ)を返す。
+ * loadMonthlyLedger と同じ見え方(品目から決めた代表ジャンル込み・収入も含む)で、
+ * 新しい日付が先頭。過去・未来の月へ移るたびに呼ばれる。
+ */
+export async function listCalendarTransactions(monthStart: string): Promise<LedgerTransaction[]> {
+  const supabase = await createClient();
+  const nextMonthStart = addMonths(monthStart, 1);
+
+  const [{ data: genres, error: genresError }, { data: rows, error: txError }] = await Promise.all([
+    supabase.from('genres').select('id, name'),
+    supabase
+      .from('transactions')
+      .select(
+        'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method',
+      )
+      .gte('occurred_on', monthStart)
+      .lt('occurred_on', nextMonthStart)
+      .order('occurred_on', { ascending: false }),
+  ]);
+  if (genresError) {
+    throw new SpendingStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+  }
+  if (txError) throw new SpendingStoreError(`明細を取得できませんでした: ${txError.message}`);
+
+  const nameById = new Map(genres.map((g) => [g.id, g.name]));
+  const inherited = await resolveItemGenres(rows);
+
+  return rows
+    .filter((row) => isCountable({ ...toBudgetFields(row) }))
+    .map((row) => {
+      const genreId = row.genre_id ?? inherited.get(row.id) ?? null;
+      return {
+        id: row.id,
+        occurredOn: row.occurred_on,
+        label: row.merchant_name ?? row.description,
+        genreId,
+        genreName: genreId === null ? null : (nameById.get(genreId) ?? null),
+        amountYen: row.amount_yen,
+        accountId: row.account_id,
+        paymentMethod: row.payment_method,
+      };
+    });
+}
+
+function toBudgetFields(row: {
+  genre_id: string | null;
+  amount_yen: number;
+  is_transfer: boolean;
+  review_status: BudgetTransaction['reviewStatus'];
+}): BudgetTransaction {
+  return {
+    categoryId: row.genre_id,
+    amountYen: row.amount_yen,
+    isTransfer: row.is_transfer,
+    reviewStatus: row.review_status,
+  };
+}

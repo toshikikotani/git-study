@@ -205,3 +205,19 @@ export function parseDateOnlyOr(value: unknown, fallback: DateOnly): DateOnly {
     parsed.getUTCDate() === day;
   return exists ? value : fallback;
 }
+
+/**
+ * 'YYYY-MM-DD' を、その日のローカル正午の Date にする(カレンダー部品向け)。
+ * UTC 0時で作ると、UTC より西のタイムゾーンでは前日に見えるため使わない。
+ */
+export function dateOnlyToLocalDate(date: DateOnly): Date {
+  const [year, month, day] = splitDateOnly(date);
+  return new Date(year, month - 1, day, 12);
+}
+
+/** ローカルの Date が指す日を 'YYYY-MM-DD' にする(toISOString は UTC になるため使わない)。 */
+export function localDateToDateOnly(date: Date): DateOnly {
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}

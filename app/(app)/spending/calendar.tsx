@@ -1,25 +1,26 @@
 'use client';
 
+import { DayPicker, type DayButtonProps } from '@daypicker/react';
+import { ja } from '@daypicker/react/locale';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createContext, useContext, useMemo, useState } from 'react';
 
 import { formatYen } from '@/domain/money';
 import type { GenreOption } from '@/features/genre/store';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import {
-  addDays,
   addMonths,
-  daysBetween,
+  dateOnlyToLocalDate,
   formatDateJa,
+  localDateToDateOnly,
+  nthDayOfMonth,
   splitDateOnly,
-  weekdayOf,
 } from '@/lib/date';
+import { loadCalendarMonthAction } from './actions';
 import { updateTransactionAction } from '../transactions/actions';
 import { ReceiptItemsPanel } from '../transactions/receipt-items-panel';
 import type { DrilldownTransaction } from './category-breakdown-chart';
-
-const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 /**
  * 家計簿トップのカレンダー(本人発案、ADR-043/044:「カレンダー追加。家計簿の
@@ -60,6 +61,40 @@ const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as cons
  * 限られるため、保存直後は現在のルートの Server Component を再取得して
  * ページ全体を最新化する。
  */
+/** カレンダーで移動できる範囲(今日から前後何か月まで。actions.ts と揃える)。 */
+const MONTHS_BACK = 120;
+const MONTHS_FORWARD = 24;
+
+/** 日付ごとの支出額を、日付ボタン(DayButton)へ渡す。 */
+const SpentByDateContext = createContext<ReadonlyMap<string, number>>(new Map());
+
+/**
+ * ライブラリ標準のスタイル(style.css)は使わず、このアプリの見た目(CSS 変数)に
+ * 合わせたクラスだけを当てる。標準のスタイルは日付セルの幅を固定するため、
+ * スマートフォンの幅いっぱいに広げると崩れる。
+ */
+const CALENDAR_CLASS_NAMES = {
+  root: 'w-full',
+  months: 'relative w-full',
+  month: 'w-full',
+  nav: 'absolute top-0 right-0 flex h-9 items-center gap-1',
+  button_previous:
+    'flex size-9 items-center justify-center rounded-full text-[var(--ink-secondary)] disabled:opacity-30',
+  button_next:
+    'flex size-9 items-center justify-center rounded-full text-[var(--ink-secondary)] disabled:opacity-30',
+  chevron: 'fill-current',
+  month_caption: 'flex h-9 items-center',
+  caption_label: 'text-sm font-semibold text-[var(--ink)]',
+  month_grid: 'mt-1 w-full table-fixed border-collapse',
+  weekday: 'py-1 text-center text-[10px] font-medium text-[var(--ink-muted)]',
+  day: 'p-0.5 text-center',
+  day_button: 'flex h-12 w-full items-center justify-center rounded-xl border border-transparent',
+  selected: '[&>button]:border-[var(--accent)] [&>button]:bg-[var(--accent-track)]',
+  today: '[&>button]:border-[var(--accent)]',
+  outside: 'opacity-40',
+  hidden: 'invisible',
+} as const;
+
 export function SpendingCalendar({
   transactions,
   period,
@@ -70,19 +105,35 @@ export function SpendingCalendar({
   categories: readonly GenreOption[];
 }) {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState(period.to);
+  const today = period.to;
+  const currentMonthStart = period.from;
+  const [selectedDate, setSelectedDate] = useState(today);
+  // 表示中の月の1日。過去・未来の月へ移動できる(本人発案)。
+  const [visibleMonth, setVisibleMonth] = useState(currentMonthStart);
+  // 今月以外の月の明細(月の1日 → 明細)。今月は常に page.tsx が渡す最新の値を使う。
+  const [otherMonths, setOtherMonths] = useState<ReadonlyMap<string, DrilldownTransaction[]>>(
+    new Map(),
+  );
+  const [loadingMonth, setLoadingMonth] = useState(false);
+  const [monthError, setMonthError] = useState<string | null>(null);
   // 日付を押すと、その日の明細の上に開くメニュー(家計簿を手で登録する)。
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const visibleTransactions = useMemo(
+    () =>
+      visibleMonth === currentMonthStart ? transactions : (otherMonths.get(visibleMonth) ?? []),
+    [visibleMonth, currentMonthStart, transactions, otherMonths],
+  );
+
   const transactionsByDate = useMemo(() => {
     const map = new Map<string, DrilldownTransaction[]>();
-    for (const t of transactions) {
+    for (const t of visibleTransactions) {
       const list = map.get(t.occurredOn) ?? [];
       list.push(t);
       map.set(t.occurredOn, list);
     }
     return map;
-  }, [transactions]);
+  }, [visibleTransactions]);
 
   const spentByDate = useMemo(() => {
     const map = new Map<string, number>();
@@ -93,49 +144,82 @@ export function SpendingCalendar({
     return map;
   }, [transactionsByDate]);
 
-  const daysInMonth = daysBetween(period.from, addMonths(period.from, 1));
-  const leadingBlanks = weekdayOf(period.from);
-  const cells: (string | null)[] = [
-    ...Array.from({ length: leadingBlanks }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => addDays(period.from, i)),
-  ];
-
   const selectedByCategory = useMemo(
     () => groupByGenre(transactionsByDate.get(selectedDate) ?? []),
     [transactionsByDate, selectedDate],
   );
+
+  /** 月を移ったら、その月の明細を取りに行く(今月はページが持っている)。 */
+  const loadMonth = async (monthStart: string, force = false) => {
+    if (monthStart === currentMonthStart || (!force && otherMonths.has(monthStart))) return;
+    setLoadingMonth(true);
+    setMonthError(null);
+    const result = await loadCalendarMonthAction(monthStart);
+    setLoadingMonth(false);
+    if (result.error !== null) {
+      setMonthError(result.error);
+      return;
+    }
+    setOtherMonths((prev) => new Map(prev).set(monthStart, result.transactions));
+  };
+
+  const changeMonth = (month: Date) => {
+    const monthStart = nthDayOfMonth(localDateToDateOnly(month), 1);
+    setVisibleMonth(monthStart);
+    // 移動先では、今月なら今日、それ以外は1日を選んでおく。
+    setSelectedDate(monthStart === currentMonthStart ? today : monthStart);
+    setMenuOpen(false);
+    void loadMonth(monthStart);
+  };
+
+  const selectDate = (date: string) => {
+    // 選択中の日をもう一度押すとメニューを閉じる。
+    setMenuOpen(date !== selectedDate || !menuOpen);
+    setSelectedDate(date);
+  };
 
   return (
     <div
       className="rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {WEEKDAY_LABELS.map((w) => (
-          <span key={w} className="text-[10px] font-medium" style={{ color: 'var(--ink-muted)' }}>
-            {w}
-          </span>
-        ))}
-        {cells.map((date, i) =>
-          date === null ? (
-            <span key={`blank-${i}`} />
-          ) : (
-            <CalendarDayCell
-              key={date}
-              date={date}
-              isFuture={date > period.to}
-              isSelected={date === selectedDate}
-              isToday={date === period.to}
-              spentYen={spentByDate.get(date) ?? 0}
-              onSelect={() => {
-                // 選択中の日をもう一度押すとメニューを閉じる。
-                setMenuOpen(date !== selectedDate || !menuOpen);
-                setSelectedDate(date);
-              }}
-            />
-          ),
-        )}
+      <SpentByDateContext.Provider value={spentByDate}>
+        <DayPicker
+          mode="single"
+          locale={ja}
+          weekStartsOn={0}
+          month={dateOnlyToLocalDate(visibleMonth)}
+          onMonthChange={changeMonth}
+          startMonth={dateOnlyToLocalDate(addMonths(nthDayOfMonth(today, 1), -MONTHS_BACK))}
+          endMonth={dateOnlyToLocalDate(addMonths(nthDayOfMonth(today, 1), MONTHS_FORWARD))}
+          selected={dateOnlyToLocalDate(selectedDate)}
+          onDayClick={(day) => selectDate(localDateToDateOnly(day))}
+          modifiers={{ today: dateOnlyToLocalDate(today) }}
+          components={{ DayButton: CalendarDayButton }}
+          classNames={CALENDAR_CLASS_NAMES}
+        />
+      </SpentByDateContext.Provider>
+
+      <div className="mt-1 flex items-center justify-between text-xs">
+        <span style={{ color: 'var(--ink-muted)' }}>
+          {loadingMonth ? 'この月の明細を読み込んでいます…' : ''}
+        </span>
+        {visibleMonth !== currentMonthStart ? (
+          <button
+            type="button"
+            onClick={() => changeMonth(dateOnlyToLocalDate(currentMonthStart))}
+            className="font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            今月へ戻る
+          </button>
+        ) : null}
       </div>
+      {monthError ? (
+        <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
+          {monthError}
+        </p>
+      ) : null}
 
       <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
@@ -182,7 +266,10 @@ export function SpendingCalendar({
                 key={group.genreId ?? 'uncategorized'}
                 group={group}
                 categories={categories}
-                onSaved={() => router.refresh()}
+                onSaved={() => {
+                  router.refresh();
+                  void loadMonth(visibleMonth, true);
+                }}
               />
             ))}
           </div>
@@ -218,45 +305,31 @@ function spentYenOf(group: GenreGroup): number {
   return group.transactions.filter((t) => t.amountYen < 0).reduce((acc, t) => acc - t.amountYen, 0);
 }
 
-function CalendarDayCell({
-  date,
-  isFuture,
-  isSelected,
-  isToday,
-  spentYen,
-  onSelect,
-}: {
-  date: string;
-  isFuture: boolean;
-  isSelected: boolean;
-  isToday: boolean;
-  spentYen: number;
-  onSelect: () => void;
-}) {
-  const dayNumber = splitDateOnly(date)[2];
+/** 日付ボタン。日付の下にその日の支出額を小さく添える。 */
+function CalendarDayButton({ day, modifiers, ...buttonProps }: DayButtonProps) {
+  const spentByDate = useContext(SpentByDateContext);
+  const dateOnly = localDateToDateOnly(day.date);
+  const spentYen = spentByDate.get(dateOnly) ?? 0;
+  const isSelected = Boolean(modifiers.selected);
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      disabled={isFuture}
-      className="flex flex-col items-center gap-0.5 rounded-lg py-1.5 disabled:opacity-30"
-      style={{
-        background: isSelected ? 'var(--accent-track)' : 'transparent',
-        border: isToday ? '1px solid var(--accent)' : '1px solid transparent',
-      }}
-    >
-      <span
-        className="tabular text-[11px]"
-        style={{ color: isSelected ? 'var(--accent)' : 'var(--ink)' }}
-      >
-        {dayNumber}
-      </span>
-      <span
-        className="tabular text-[9px] leading-none"
-        style={{ color: 'var(--ink-muted)', minHeight: '9px' }}
-      >
-        {spentYen > 0 ? spentYen.toLocaleString('ja-JP') : ''}
+    <button {...buttonProps} type="button">
+      <span className="flex flex-col items-center gap-0.5">
+        <span
+          className="tabular text-[13px]"
+          style={{
+            color: isSelected ? 'var(--accent)' : 'var(--ink)',
+            fontWeight: modifiers.today ? 700 : 500,
+          }}
+        >
+          {splitDateOnly(dateOnly)[2]}
+        </span>
+        <span
+          className="tabular text-[9px] leading-none"
+          style={{ color: 'var(--ink-muted)', minHeight: '9px' }}
+        >
+          {spentYen > 0 ? spentYen.toLocaleString('ja-JP') : ''}
+        </span>
       </span>
     </button>
   );
