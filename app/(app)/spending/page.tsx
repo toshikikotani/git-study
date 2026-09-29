@@ -16,7 +16,8 @@ import { CalendarHeatmap } from './calendar-heatmap';
 import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
-import { GoalSummary } from './goal-summary';
+import { GoalCard } from '../plan/goal-card';
+import { buildGoalCard } from '@/features/goals/card';
 import { InsightsCard } from './insights-card';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
@@ -96,7 +97,7 @@ export default async function SpendingPage() {
           pace={pace}
           forecast={forecast}
           hasIncomeRegistered={hasIncome(ledger.totals.incomeYen)}
-          goal={goal ? <GoalSummary view={goal} today={today} /> : null}
+          goal={goal ? <GoalCard model={buildGoalCard(goal, today)} /> : null}
         />
         <AttentionCard hasGoal={goal !== null} />
         <GenreBreakdown goalRows={goal ? goal.breakdown : null} />

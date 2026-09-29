@@ -144,6 +144,7 @@ export async function loadLedgerTransactions(
       branchName: row.branch_name ?? null,
       reconcileDiffYen: row.reconcile_diff_yen ?? null,
       mustPay: row.must_pay,
+      needsInput: false,
       isTransfer: row.is_transfer,
       reviewStatus: row.review_status,
       status: entryStatus(row.occurred_on, today),

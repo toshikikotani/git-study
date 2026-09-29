@@ -20,6 +20,7 @@ export function ledgerTx(o: Partial<LedgerTransaction> & { id: string }): Ledger
     reviewStatus: 'auto_ok',
     status: 'actual',
     kind: 'normal',
+    needsInput: false,
     splits: [],
     ...o,
   };

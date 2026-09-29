@@ -9,6 +9,7 @@ import type { GoalSnapshot } from '@/domain/goal-impact';
 import { buildGoalReview, type GoalReview } from '@/domain/goal-review';
 import { summarizeLedger, type LedgerEntry } from '@/domain/ledger';
 import { planGuidance, type PlanGuidance } from '@/domain/spending-plan';
+import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import type { DateOnly } from '@/lib/date';
 
 /** 家計簿のジャンル内訳(目標期間の切り替え)で使う1行。 */
@@ -62,6 +63,14 @@ export type GoalView = {
   review: GoalReview | null;
   /** 未分類の実績(目標に未反映)。 */
   uncategorizedYen: number;
+  /** 予定の支出の一覧(日付順)。目標カードで展開して見せる。 */
+  scheduledItems: {
+    id: string;
+    date: DateOnly;
+    label: string;
+    genreName: string | null;
+    amountYen: number;
+  }[];
 };
 
 /**
@@ -73,6 +82,8 @@ export function buildGoalView(input: {
   entries: readonly LedgerEntry[];
   genreNames: ReadonlyMap<string, string>;
   today: DateOnly;
+  /** 予定の一覧(名前・ジャンル)に使う明細。省略すると一覧は空。 */
+  transactions?: readonly LedgerTransaction[];
 }): GoalView {
   const { plan, entries, genreNames, today } = input;
   const range = { from: plan.periodStart, to: plan.periodEnd };
@@ -167,6 +178,24 @@ export function buildGoalView(input: {
         })
       : null,
     uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
+    scheduledItems: (input.transactions ?? [])
+      .filter(
+        (t) =>
+          t.occurredOn > today &&
+          t.occurredOn <= plan.periodEnd &&
+          t.amountYen < 0 &&
+          !t.isTransfer &&
+          t.reviewStatus !== 'ignored' &&
+          !t.needsInput,
+      )
+      .sort((a, b) => a.occurredOn.localeCompare(b.occurredOn))
+      .map((t) => ({
+        id: t.id,
+        date: t.occurredOn,
+        label: t.label,
+        genreName: t.genreName,
+        amountYen: -t.amountYen,
+      })),
   };
 }
 

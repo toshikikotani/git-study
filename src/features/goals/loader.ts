@@ -24,6 +24,7 @@ export async function loadGoalView(
     entries: toLedgerEntries(transactions),
     genreNames: new Map(genres.map((g) => [g.id, g.name])),
     today,
+    transactions,
   });
   return { plan, view };
 }
