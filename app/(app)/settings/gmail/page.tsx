@@ -90,7 +90,7 @@ export default async function GmailSettingsPage() {
         </ul>
       </Card>
 
-      <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
         {settings.gmailEnabled
           ? 'この設定に加えて、環境変数(GMAIL_ADDRESS/GMAIL_APP_PASSWORD/GMAIL_IMPORT_ACCOUNT_ID)の設定が済んでいる必要があります。'
           : '自動取得を有効にするまでは'}
@@ -120,7 +120,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
       <span
-        className="tabular flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+        className="tabular flex size-5 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold"
         style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
       >
         {n}
@@ -133,7 +133,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 function Code({ children }: { children: React.ReactNode }) {
   return (
     <code
-      className="rounded px-1.5 py-0.5 font-mono text-[12px]"
+      className="rounded-lg px-2 py-1 font-mono text-[13px]"
       style={{ background: 'var(--plane)', color: 'var(--ink)' }}
     >
       {children}

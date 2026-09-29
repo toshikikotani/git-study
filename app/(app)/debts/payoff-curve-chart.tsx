@@ -154,7 +154,7 @@ export function PayoffCurveChart({
 
       {hoverMonth !== null && hoverBaseline !== null && hoverProposed !== null ? (
         <div
-          className="mt-1 flex justify-between text-[11px]"
+          className="mt-1 flex justify-between text-[13px]"
           style={{ color: 'var(--ink-secondary)' }}
         >
           <span>{hoverMonth}ヶ月後</span>
@@ -165,7 +165,7 @@ export function PayoffCurveChart({
         </div>
       ) : (
         <div
-          className="mt-1 flex items-center gap-4 text-[11px]"
+          className="mt-1 flex items-center gap-4 text-[13px]"
           style={{ color: 'var(--ink-muted)' }}
         >
           <Legend color="var(--ink-muted)" dashed label="最低返済のみ" />
@@ -174,7 +174,7 @@ export function PayoffCurveChart({
       )}
 
       {truncated ? (
-        <p className="mt-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           最低返済のみの場合は{MAX_CHART_MONTHS}ヶ月以上かかるため、グラフは{MAX_CHART_MONTHS}
           ヶ月目までを表示しています
         </p>
@@ -206,17 +206,17 @@ function MilestoneTable({
 
   return (
     <div className="mt-3 overflow-x-auto">
-      <table className="w-full text-[11px]">
+      <table className="w-full text-[13px]">
         <caption className="sr-only">経過月ごとの残高(最低返済のみ・選択中のプラン)</caption>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--hairline)' }}>
-            <th className="p-1.5 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-2 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
               経過
             </th>
-            <th className="p-1.5 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
               最低返済のみ
             </th>
-            <th className="p-1.5 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
               この金額で返済
             </th>
           </tr>
@@ -224,13 +224,13 @@ function MilestoneTable({
         <tbody>
           {months.map((month) => (
             <tr key={month} style={{ borderBottom: '1px solid var(--hairline)' }}>
-              <td className="p-1.5" style={{ color: 'var(--ink)' }}>
+              <td className="p-2" style={{ color: 'var(--ink)' }}>
                 {month === 0 ? '現在' : `${month}ヶ月後`}
               </td>
-              <td className="tabular p-1.5 text-right" style={{ color: 'var(--ink-secondary)' }}>
+              <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                 {formatYen(balanceAtMonth(baseline, month), { sign: 'never' })}
               </td>
-              <td className="tabular p-1.5 text-right" style={{ color: 'var(--ink-secondary)' }}>
+              <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                 {formatYen(balanceAtMonth(proposed, month), { sign: 'never' })}
               </td>
             </tr>
@@ -256,9 +256,9 @@ function PayoffDot({
 
 function Legend({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-2">
       <span
-        className="inline-block h-0.5 w-4"
+        className="inline-block h-1 w-4"
         style={{
           background: dashed ? 'none' : color,
           borderTop: dashed ? `2px dashed ${color}` : undefined,

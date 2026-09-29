@@ -37,7 +37,7 @@ export default async function GenresPage() {
           <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
             ジャンル管理・分析
           </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             唯一の分類。追加削除・予算はここで、分類はAIが行う
           </p>
         </div>

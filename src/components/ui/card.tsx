@@ -31,7 +31,7 @@ export function Card({
   return (
     <section
       className={`p-5 ${className ?? ''}`}
-      style={{ borderRadius: 'var(--radius-lg)', ...variantStyle[variant] }}
+      style={{ borderRadius: 'var(--radius-card)', ...variantStyle[variant] }}
     >
       {children}
     </section>

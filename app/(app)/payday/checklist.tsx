@@ -48,7 +48,7 @@ export function PaydayAmountForm({ paydayOn }: { paydayOn: DateOnly }) {
           type="submit"
           disabled={pending}
           className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '作成中…' : '振り分ける'}
         </button>
@@ -87,18 +87,18 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
             <form action={toggleTransferRunItemAction.bind(null, item.id, !item.isDone)}>
               <button
                 type="submit"
-                className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left"
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left"
                 style={{
                   background: item.isDone ? 'var(--accent-track)' : 'var(--plane)',
                   border: '1px solid var(--hairline)',
                 }}
               >
                 <span
-                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold"
                   style={{
                     background: item.isDone ? 'var(--accent)' : 'transparent',
                     border: item.isDone ? 'none' : '1px solid var(--hairline)',
-                    color: '#fff',
+                    color: 'var(--on-accent)',
                   }}
                 >
                   {item.isDone ? <MdCheck aria-hidden /> : null}

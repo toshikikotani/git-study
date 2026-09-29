@@ -47,7 +47,7 @@ export default function GoogleSettingsPage() {
             </p>
           </div>
           <span
-            className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            className="shrink-0 rounded-full px-3 py-1 text-[13px] font-semibold"
             style={{
               background: connected ? 'var(--accent-track)' : 'var(--plane)',
               color: connected ? 'var(--accent)' : 'var(--ink-muted)',
@@ -60,7 +60,7 @@ export default function GoogleSettingsPage() {
         <a
           href="/api/auth/google/start"
           className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {connected ? 'Google と再連携する' : 'Google と連携する'}
         </a>
@@ -136,7 +136,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
       <span
-        className="tabular flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+        className="tabular flex size-5 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold"
         style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
       >
         {n}
@@ -149,7 +149,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 function Code({ children }: { children: React.ReactNode }) {
   return (
     <code
-      className="rounded px-1.5 py-0.5 font-mono text-[12px] break-all"
+      className="rounded-lg px-2 py-1 font-mono text-[13px] break-all"
       style={{ background: 'var(--plane)', color: 'var(--ink)' }}
     >
       {children}

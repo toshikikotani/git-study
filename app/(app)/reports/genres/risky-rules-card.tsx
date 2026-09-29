@@ -32,7 +32,7 @@ export function RiskyRulesCard() {
         していて、会話やここからも変更できません。
       </p>
 
-      <ul className="mt-3 space-y-1.5">
+      <ul className="mt-3 space-y-2">
         {DEFAULT_DETECTION_RULES.map((rule) => (
           <li
             key={rule.id}

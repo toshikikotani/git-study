@@ -33,7 +33,7 @@ export function SnapshotSection({ snapshots }: { snapshots: readonly InvestmentS
                   <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                     {snapshot.productName}
                   </p>
-                  <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {formatDateJa(snapshot.asOf)} 時点
                     {snapshot.costBasisYen !== null
                       ? ` ・ 取得額 ${formatYen(snapshot.costBasisYen, { sign: 'never' })}`
@@ -154,15 +154,15 @@ function SnapshotForm({ onDone }: { onDone: () => void }) {
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '保存中…' : '記録する'}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-full px-4 py-2.5 text-sm font-medium"
+          className="rounded-full px-4 py-3 text-sm font-medium"
           style={{ color: 'var(--ink-muted)' }}
         >
           やめる
@@ -188,7 +188,7 @@ function Field({
       </span>
       <div className="mt-1">{children}</div>
       {hint ? (
-        <span className="mt-1 block text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        <span className="mt-1 block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           {hint}
         </span>
       ) : null}

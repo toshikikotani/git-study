@@ -51,7 +51,7 @@ export function PasswordForm() {
         type="submit"
         disabled={pending}
         className="w-full rounded-2xl py-3 text-sm font-medium text-white disabled:opacity-50"
-        style={{ background: 'var(--accent)' }}
+        style={{ background: 'var(--action)' }}
       >
         {pending ? '設定しています…' : 'パスワードを設定'}
       </button>

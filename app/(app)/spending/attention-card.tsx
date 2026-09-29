@@ -72,7 +72,7 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
               </span>
             </div>
             <ul
-              className="tabular mt-1.5 space-y-0.5 text-[13px]"
+              className="tabular mt-2 space-y-1 text-[13px]"
               style={{ color: 'var(--ink-secondary)' }}
             >
               {attention.uncategorized.count > 0 ? (
@@ -189,7 +189,7 @@ function AttentionFixer({
               type="button"
               onClick={onClose}
               className="mt-3 rounded-full px-5 py-2 text-sm font-semibold"
-              style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               閉じる
             </button>
@@ -213,10 +213,7 @@ function AttentionFixer({
               <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
                 {current.tx.label}
                 {current.tx.branchName ? (
-                  <span
-                    className="ml-1.5 text-xs font-normal"
-                    style={{ color: 'var(--ink-muted)' }}
-                  >
+                  <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
                     {current.tx.branchName}
                   </span>
                 ) : null}
@@ -237,14 +234,14 @@ function AttentionFixer({
                 <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                   ジャンルを選んでください
                 </p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {genres.map((g) => (
                     <button
                       key={g.id}
                       type="button"
                       disabled={busy}
                       onClick={() => void pickGenre(g.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      className="rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50"
                       style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                     >
                       {g.name}
@@ -264,7 +261,7 @@ function AttentionFixer({
                     disabled={busy}
                     onClick={() => void acceptDiff()}
                     className="flex-1 rounded-full py-2 text-sm font-semibold disabled:opacity-50"
-                    style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+                    style={{ background: 'var(--action)', color: 'var(--on-action)' }}
                   >
                     この差額でOK
                   </button>

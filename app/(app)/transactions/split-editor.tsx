@@ -7,6 +7,7 @@ import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { GenreBadge } from '@/components/ui/genre-badge';
+import { LedgerAmount } from '@/components/ui/money';
 import { genreBarColor } from '@/domain/genre-style';
 import { predictGenres, type GenreHistoryEntry } from '@/domain/genre-prediction';
 import { MdReceiptLong } from 'react-icons/md';
@@ -375,7 +376,7 @@ export function TransactionRowWithSplit({
   if (removed) return null;
 
   return (
-    <li className="py-0.5" style={display?.scheduled ? { opacity: 0.85 } : undefined}>
+    <li className="py-1" style={display?.scheduled ? { opacity: 0.85 } : undefined}>
       <SwipeableRow
         onSwipeRight={() => setGenreSheetOpen(true)}
         onLongPress={() => setPreviewOpen(true)}
@@ -433,7 +434,7 @@ export function TransactionRowWithSplit({
                 {display?.name ?? transaction.description}
                 {special ? (
                   <span
-                    className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
+                    className="ml-2 rounded-full px-2 py-1 align-middle text-[13px] font-semibold"
                     style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
                   >
                     特別費
@@ -441,7 +442,7 @@ export function TransactionRowWithSplit({
                 ) : null}
                 {risky && methodLabel ? (
                   <span
-                    className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
+                    className="ml-2 rounded-full px-2 py-1 align-middle text-[13px] font-semibold"
                     style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
                   >
                     {methodLabel}
@@ -450,7 +451,7 @@ export function TransactionRowWithSplit({
               </p>
               {/* 2行目:支店名と品目のプレビュー(分割は品目の羅列ではなく比率の細いバー) */}
               {subtitle !== '' ? (
-                <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                <p className="mt-1 truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                   {subtitle}
                 </p>
               ) : null}
@@ -460,7 +461,7 @@ export function TransactionRowWithSplit({
                   aria-label={`ジャンルの内訳:${shares
                     .map((sh) => `${sh.genreName ?? '未分類'} ${Math.round(sh.ratio * 100)}%`)
                     .join('、')}`}
-                  className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full"
+                  className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
                 >
                   {shares.map((sh) => (
                     <span
@@ -475,13 +476,10 @@ export function TransactionRowWithSplit({
               ) : null}
             </div>
 
-            <span
-              className="tabular shrink-0 text-[15px] font-semibold"
-              style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
-            >
-              {isIncome ? '+' : '−'}
-              {formatYen(targetAbsYen)}
-            </span>
+            <LedgerAmount
+              amountYen={isIncome ? targetAbsYen : -targetAbsYen}
+              className="shrink-0 text-[15px] font-semibold"
+            />
           </button>
           {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
           {display?.thumbnailUrl ? (
@@ -511,7 +509,7 @@ export function TransactionRowWithSplit({
         ) : null}
       </SwipeableRow>
       {rowError ? (
-        <p role="status" className="px-4 pb-2 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        <p role="status" className="px-4 pb-2 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           {rowError}
         </p>
       ) : null}
@@ -610,7 +608,7 @@ export function TransactionRowWithSplit({
                 onClick={() => void saveMemo()}
                 disabled={memoSaving}
                 className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--accent)', color: '#fff' }}
+                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {memoSaving ? '保存中…' : '保存'}
               </button>
@@ -709,7 +707,7 @@ export function TransactionRowWithSplit({
                 onClick={() => void saveSimpleEdit()}
                 disabled={saving || !canSaveSimpleEdit}
                 className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--accent)', color: '#fff' }}
+                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {saving ? '保存中…' : '保存'}
               </button>
@@ -791,7 +789,7 @@ export function TransactionRowWithSplit({
                   value={row.note}
                   onChange={(e) => updateRow(index, { note: e.target.value })}
                   placeholder="メモ(任意。何の分だったか)"
-                  className="w-full rounded-xl px-3 py-1.5 text-xs"
+                  className="w-full rounded-xl px-3 py-2 text-xs"
                   style={{
                     background: 'var(--plane)',
                     color: 'var(--ink)',
@@ -824,7 +822,7 @@ export function TransactionRowWithSplit({
                 onClick={() => void save()}
                 disabled={saving || !canSave}
                 className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--accent)', color: '#fff' }}
+                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {saving ? '保存中…' : '保存'}
               </button>
@@ -870,7 +868,7 @@ export function TransactionRowWithSplit({
           <p className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
             {display?.name ?? transaction.description} のジャンル
           </p>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {predictions.map((p) => (
               <li key={p.genreId}>
                 <button
@@ -920,13 +918,13 @@ export function TransactionRowWithSplit({
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             ジャンルを変更
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {categories.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => void changeGenre(c.id)}
-                className="rounded-full px-3 py-1.5 text-xs font-semibold"
+                className="rounded-full px-3 py-2 text-xs font-semibold"
                 style={{
                   background:
                     c.id === (transaction.genreId ?? '') ? 'var(--accent)' : 'var(--accent-track)',
@@ -946,7 +944,7 @@ export function TransactionRowWithSplit({
           <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
             明細のプレビュー
           </h2>
-          <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             外側をタップで閉じる
           </span>
         </div>
@@ -956,21 +954,17 @@ export function TransactionRowWithSplit({
             <p className="text-[15px]" style={{ color: 'var(--ink)' }}>
               {transaction.description}
             </p>
-            <p
-              className="tabular text-[15px] font-semibold"
-              style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
-            >
-              {isIncome ? '+' : '−'}
-              {formatYen(targetAbsYen)}
+            <p className="text-[15px] font-semibold">
+              <LedgerAmount amountYen={isIncome ? targetAbsYen : -targetAbsYen} />
             </p>
           </div>
 
           <div>
-            <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
               分類
             </p>
             {splits.length > 0 ? (
-              <ul className="mt-1 space-y-0.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+              <ul className="mt-1 space-y-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
                 {splits.map((s, i) => (
                   <li key={i} className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate">
@@ -988,7 +982,7 @@ export function TransactionRowWithSplit({
               </p>
             )}
             {subtype ? (
-              <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                 生活費の内訳:{subtype}
               </p>
             ) : null}
@@ -996,7 +990,7 @@ export function TransactionRowWithSplit({
 
           {items.length > 0 ? (
             <div>
-              <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
                 レシートの品目
               </p>
               <ul className="mt-1 space-y-1">
@@ -1021,7 +1015,7 @@ export function TransactionRowWithSplit({
                 ))}
               </ul>
               {splits.length === 0 && itemsStatus === 'mismatched' ? (
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--over)' }}>
+                <p className="mt-1 text-[13px]" style={{ color: 'var(--over)' }}>
                   品目の合計が金額と一致しません
                 </p>
               ) : null}

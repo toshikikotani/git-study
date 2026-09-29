@@ -54,7 +54,7 @@ export function MerchantRankingCard({ ranking }: { ranking: MerchantRanking }) {
           return (
             <li key={merchant.label}>
               <div className="flex items-baseline justify-between gap-2 text-xs">
-                <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="flex min-w-0 items-baseline gap-2">
                   <span className="tabular shrink-0" style={{ color: 'var(--ink-muted)' }}>
                     {index + 1}位
                   </span>

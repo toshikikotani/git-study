@@ -66,7 +66,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
           ジャンル別の内訳
         </h2>
         {goalRows !== null && isCurrentMonth ? (
-          <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-[11px]">
+          <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-[13px]">
             {(
               [
                 ['month', '今月'],
@@ -79,7 +79,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                 role="radio"
                 aria-checked={scope === value}
                 onClick={() => setScope(value)}
-                className="rounded-full px-2.5 py-1 font-semibold"
+                className="rounded-full px-3 py-1 font-semibold"
                 style={{
                   background: scope === value ? 'var(--accent)' : 'var(--plane)',
                   color: scope === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -129,7 +129,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
             ))}
           </div>
 
-          <ul className="mt-2 space-y-0.5">
+          <ul className="mt-2 space-y-1">
             {rows.map((r) => {
               const selected =
                 filter.genreId === (r.genreId === null ? 'none' : r.genreId) &&
@@ -154,7 +154,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
               );
             })}
           </ul>
-          <p className="tabular mt-2 text-right text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="tabular mt-2 text-right text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             合計 {formatYen(total, { sign: 'never' })}
           </p>
         </>

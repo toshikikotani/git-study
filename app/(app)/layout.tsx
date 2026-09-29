@@ -168,7 +168,7 @@ function BottomBar() {
           href="/transactions/receipt"
           prefetch={false}
           role="status"
-          className="label-text px-4 py-1.5 text-xs"
+          className="label-text px-4 py-2 text-xs"
           style={{
             borderRadius: 'var(--radius-full)',
             background: 'var(--glass-tint-strong)',
@@ -199,12 +199,12 @@ function BottomBar() {
       {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
           以前はその他もピルの6項目目だったため1項目が詰まって小さかった
           (本人発案での見直し、上のコメント参照)。 */}
-      <div className="flex w-full max-w-md items-center gap-2">
+      <div className="flex w-full max-w-md items-center">
         <nav className="min-w-0 flex-1">
           <ul
             className="flex items-end gap-1 p-2"
             style={{
-              borderRadius: 'var(--radius-xl)',
+              borderRadius: 'var(--radius-card)',
               background: 'var(--glass-tint)',
               backdropFilter: 'var(--glass-blur)',
               WebkitBackdropFilter: 'var(--glass-blur)',
@@ -222,7 +222,10 @@ function BottomBar() {
                       className="flex w-16 shrink-0 justify-center self-center"
                       aria-label="レシートを撮る"
                     >
-                      <div className="-my-1">{fab}</div>
+                      {/* 撮影ボタン(56pt)はタブバーから少しだけ浮かせる */}
+                      <div style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}>
+                        {fab}
+                      </div>
                     </li>
                   ) : null}
                   <li className="flex-1">
@@ -236,7 +239,7 @@ function BottomBar() {
                         遷移させ、スプリングのイージングで一瞬 1 を超えてから
                         収まることで「弾む」感触を作る(ADR-028)。 */}
                       <span
-                        className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
+                        className="label-text px-2 py-1 text-[13px] whitespace-nowrap"
                         style={{
                           borderRadius: 'var(--radius-full)',
                           transform: isActive ? 'scale(1)' : 'scale(0.9)',
@@ -252,9 +255,12 @@ function BottomBar() {
                 </Fragment>
               );
             })}
+            {/* 「…」はタブバーの右端に統合する(孤立した丸ボタンにしない)。 */}
+            <li className="flex shrink-0 items-center justify-center self-center">
+              <MoreMenu />
+            </li>
           </ul>
         </nav>
-        <MoreMenu />
       </div>
     </div>
   );

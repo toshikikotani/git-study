@@ -36,7 +36,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
         {brief.items.map((item) => (
           <Card key={item.id}>
             <p
-              className="text-[11px] font-medium tracking-[0.08em] uppercase"
+              className="text-[13px] font-medium tracking-[0.08em] uppercase"
               style={{ color: 'var(--ink-muted)' }}
             >
               {BRIEF_ITEM_KIND_LABELS[item.kind]}

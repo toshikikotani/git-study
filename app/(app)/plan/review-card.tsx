@@ -89,7 +89,7 @@ export function ReviewCard({ planId, review }: { planId: string; review: GoalRev
       </table>
 
       <div
-        className="mt-3 space-y-1.5 border-t pt-3 text-xs leading-relaxed"
+        className="mt-3 space-y-2 border-t pt-3 text-xs leading-relaxed"
         style={{ borderColor: 'var(--hairline)' }}
       >
         <p style={{ color: 'var(--ink)' }}>

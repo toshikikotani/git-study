@@ -38,7 +38,7 @@ export function ProjectSection({ summaries }: { summaries: readonly ProjectSumma
                   <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                     {project.name}
                   </p>
-                  <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {project.clientName ?? project.kind ?? '個人開発'}
                   </p>
                 </div>
@@ -48,7 +48,7 @@ export function ProjectSection({ summaries }: { summaries: readonly ProjectSumma
                       ? '—'
                       : `${formatYen(hourlyRateYen, { sign: 'never' })}/時`}
                   </p>
-                  <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                  <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                     合計 {Math.round((totalMinutes / 60) * 10) / 10} 時間
                   </p>
                 </div>
@@ -140,15 +140,15 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '保存中…' : '追加する'}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-full px-4 py-2.5 text-sm font-medium"
+          className="rounded-full px-4 py-3 text-sm font-medium"
           style={{ color: 'var(--ink-muted)' }}
         >
           やめる

@@ -29,7 +29,7 @@ export function PendingReceiptRows() {
   return (
     <ul
       aria-label="読み取り中・入力待ちのレシート"
-      className="divide-y overflow-hidden rounded-2xl"
+      className="divider-list overflow-hidden rounded-2xl"
       style={{
         background: 'var(--surface)',
         boxShadow: 'var(--card-shadow)',
@@ -73,13 +73,13 @@ function CaptureRow({ capture }: { capture: CaptureView }) {
           <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
             入力待ち
             <span
-              className="ml-2 rounded-full px-2 py-0.5 text-[13px] font-semibold"
+              className="ml-2 rounded-full px-2 py-1 text-[13px] font-semibold"
               style={{ background: 'var(--attention-track)', color: 'var(--ink)' }}
             >
               <span aria-hidden>▲ </span>集計に未反映
             </span>
           </p>
-          <p className="mt-0.5 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
             {capture.receiptStatus === 'partial'
               ? '一部だけ読み取れました。残りを入力してください'
               : '読み取れませんでした。画像を見て入力できます'}
@@ -107,10 +107,10 @@ function JobRow({ job }: { job: ReceiptJob }) {
           {job.status === 'reading' ? (
             <>
               <div
-                className="h-3.5 w-1/2 animate-pulse rounded"
+                className="h-4 w-1/2 animate-pulse rounded-lg"
                 style={{ background: 'var(--hairline)' }}
               />
-              <p className="mt-1.5 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
                 読み取り中…
               </p>
             </>
@@ -125,7 +125,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
                       ? '入力待ち'
                       : 'レシート'}
               </p>
-              <p className="mt-0.5 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
                 {job.status === 'ready'
                   ? '確認して保存する'
                   : job.status === 'waiting'

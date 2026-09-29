@@ -99,7 +99,7 @@ export default function ReconcilePage() {
       {/* 口座(M6-2) */}
       <Card>
         <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-[13px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           口座
@@ -157,7 +157,7 @@ export default function ReconcilePage() {
 
       <Card>
         <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-[13px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           メール本文
@@ -199,7 +199,7 @@ export default function ReconcilePage() {
 
       <Card>
         <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-[13px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           金額・期間(読み取り後に修正できます)
@@ -253,7 +253,7 @@ export default function ReconcilePage() {
           onClick={() => void check()}
           disabled={!accountId || announcedTotalYen === '' || checking}
           className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {checking ? '突き合わせています…' : '突き合わせる'}
         </button>

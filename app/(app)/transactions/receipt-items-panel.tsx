@@ -218,13 +218,13 @@ export function ReceiptItemsPanel({
   return (
     <div className="rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
           レシートの品目
         </p>
         <button
           type="button"
           onClick={openDialog}
-          className="text-[11px] font-semibold"
+          className="text-[13px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           {items.length > 0 ? '編集する' : 'レシートを登録する'}
@@ -233,7 +233,7 @@ export function ReceiptItemsPanel({
 
       {items.length > 0 ? (
         <>
-          <ul className="mt-1.5 space-y-1">
+          <ul className="mt-2 space-y-1">
             {items.map((item) => (
               <li
                 key={item.id}
@@ -259,13 +259,13 @@ export function ReceiptItemsPanel({
           {/* 品目の合計が明細額と一致しない(ADR-035)。編集は常にできるが、
               読み取りが不正確だった可能性を控えめに知らせる。 */}
           {itemsStatus === 'mismatched' ? (
-            <p className="mt-1 text-[11px]" style={{ color: 'var(--over)' }}>
+            <p className="mt-1 text-[13px]" style={{ color: 'var(--over)' }}>
               品目の合計が金額と一致しません
             </p>
           ) : null}
         </>
       ) : (
-        <p className="mt-1.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           品目の記録はありません
         </p>
       )}
@@ -273,7 +273,7 @@ export function ReceiptItemsPanel({
       {/* 生活費の小分類(本人発案、ADR-036)。ADR-057によりジャンルに固定の
           code は無くなったため、値があるときは常に添える。 */}
       {subtype ? (
-        <p className="mt-1.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-2 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           生活費の内訳:{subtype}
         </p>
       ) : null}
@@ -283,7 +283,7 @@ export function ReceiptItemsPanel({
           <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
             品目を編集
           </h2>
-          <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             外側をタップで閉じる
           </span>
         </div>
@@ -325,7 +325,7 @@ export function ReceiptItemsPanel({
                 : 'レシートを読み込む'}
           </button>
           {rescanError ? (
-            <p className="text-[11px]" style={{ color: 'var(--over)' }}>
+            <p className="text-[13px]" style={{ color: 'var(--over)' }}>
               {rescanError}
             </p>
           ) : null}
@@ -399,7 +399,7 @@ export function ReceiptItemsPanel({
               onClick={() => void saveEdit()}
               disabled={editSaving || !canSaveEdit}
               className="flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               {editSaving ? '保存中…' : '保存'}
             </button>

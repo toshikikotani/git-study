@@ -27,7 +27,7 @@ const HEAT_ALPHA = [0, 0.12, 0.26, 0.42, 0.62];
  *
  * 目標期間は、週の行の背後に連続した1本の帯で示す。状態の印は注意(▲)と超過(!)の日だけに付ける
  * (余裕の日は何も付けない)。予定のある日には小さなカレンダーのマークを付ける。今日より先の予定の支出は、金額の代わりに「予」で示す(実績には数えない)。
- * 金額は色の濃さだけに頼らず、数字でも添える。
+ * 金額の大きさは背景の塗り(濃さ)だけで表し、日付の数字を主役にする(金額は読み上げのラベルで伝える)。
  */
 export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
   const {
@@ -93,7 +93,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((v) => !v)}
-            className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            className="rounded-full px-3 py-1 text-[13px] font-semibold"
             style={{ background: 'var(--plane)', color: 'var(--accent)' }}
           >
             {expanded ? '週表示' : '月表示'}
@@ -107,7 +107,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
             <span
               key={w}
               role="columnheader"
-              className="text-[10px]"
+              className="text-[13px]"
               style={{ color: 'var(--ink-muted)' }}
             >
               {w}
@@ -157,7 +157,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                     aria-label={label}
                     aria-selected={selected}
                     onClick={() => setFilter({ date: selected ? null : date })}
-                    className="relative z-10 flex h-14 flex-col items-center justify-center rounded-xl"
+                    className="relative z-10 flex h-11 flex-col items-center justify-center rounded-xl"
                     style={{
                       background: `color-mix(in srgb, var(--accent) ${HEAT_ALPHA[level]! * 100}%, transparent)`,
                       outline: selected ? '2px solid var(--accent)' : 'none',
@@ -177,16 +177,11 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                       {expanded && d === 1 ? `${m}/` : ''}
                       {d}
                     </span>
-                    <span
-                      className="tabular text-[9px] leading-none"
-                      style={{ color: 'var(--ink-secondary)', minHeight: 9 }}
-                    >
-                      {spent > 0 ? spent.toLocaleString('ja-JP') : ''}
-                    </span>
+
                     {status ? (
                       <span
                         aria-hidden
-                        className="absolute top-0.5 right-1 text-[9px] leading-none font-bold"
+                        className="absolute top-1 right-1 text-[13px] leading-none font-bold"
                         style={{ color: STATE_COLOR[status] }}
                       >
                         {STATE_ICON[status]}
@@ -197,7 +192,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                         aria-hidden
                         data-scheduled-mark
                         viewBox="0 0 12 12"
-                        className="absolute top-0.5 left-1 size-2.5"
+                        className="absolute top-1 left-1 size-3"
                         fill="none"
                         stroke="var(--ink-secondary)"
                         strokeWidth="1.2"
@@ -215,7 +210,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
       </div>
 
       <div
-        className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]"
+        className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[13px]"
         style={{ color: 'var(--ink-muted)' }}
       >
         <span aria-hidden className="flex items-center gap-1">
@@ -244,7 +239,7 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
         <button
           type="button"
           onClick={() => goToMonth(currentMonthStart)}
-          className="mt-1 text-[11px] font-semibold"
+          className="mt-1 text-[13px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           今月へ戻る

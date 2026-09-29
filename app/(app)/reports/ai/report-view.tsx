@@ -57,16 +57,16 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
       ) : (
         <>
           <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-            <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
               浪費傾向のタイプ
             </p>
             <p className="mt-1 text-base font-semibold" style={{ color: 'var(--accent)' }}>
               {SPENDING_PERSONA_LABELS[report.personaType]}
             </p>
-            <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+            <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
               {SPENDING_PERSONA_DESCRIPTIONS[report.personaType]}
             </p>
-            <p className="mt-1.5 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
               {report.personaReasoning}
             </p>
           </div>
@@ -80,7 +80,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
       <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             負債返済の進捗
           </p>
           <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>
@@ -99,8 +99,8 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
         type="button"
         onClick={() => void run()}
         disabled={pending}
-        className="mt-4 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
         {pending
           ? '作成しています…'

@@ -1,4 +1,4 @@
-import { formatYen } from '@/domain/money';
+import { LedgerAmount } from '@/components/ui/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { StoredTransaction } from '@/features/transactions/store';
@@ -35,7 +35,7 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
           {/* FR-21:増やしてはいけない借入は、一覧の時点で目に入るようにする */}
           {risky && methodLabel ? (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[13px] font-semibold"
               style={{ background: 'var(--over-track)', color: 'var(--over)' }}
             >
               <span aria-hidden>!</span>
@@ -46,13 +46,10 @@ export function TransactionRow({ transaction }: { transaction: StoredTransaction
       </div>
 
       {/* 符号は色の予備。色が落ちても収支が読める */}
-      <span
-        className="tabular shrink-0 text-[15px] font-semibold"
-        style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
-      >
-        {isIncome ? '+' : '−'}
-        {formatYen(Math.abs(transaction.amountYen))}
-      </span>
+      <LedgerAmount
+        amountYen={isIncome ? Math.abs(transaction.amountYen) : -Math.abs(transaction.amountYen)}
+        className="shrink-0 text-[15px] font-semibold"
+      />
     </li>
   );
 }

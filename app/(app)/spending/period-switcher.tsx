@@ -46,7 +46,7 @@ export function PeriodSwitcher() {
           <button
             type="button"
             onClick={() => goToMonth(currentMonthStart)}
-            className="text-[11px] font-semibold"
+            className="text-[13px] font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             今月へ戻る

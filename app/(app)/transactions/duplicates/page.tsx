@@ -26,7 +26,7 @@ export default async function DuplicatesPage() {
           <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
             重複の確認
           </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             同じ金額・近い日付で、別の経路から入った明細
           </p>
         </div>
@@ -37,7 +37,7 @@ export default async function DuplicatesPage() {
 
       <DuplicateList initial={candidates} />
 
-      <p className="px-1 text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+      <p className="px-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         残さなかった方は削除せず、集計の対象から外すだけです(予算・レポート・
         ちりつも・アラートから一斉に消えます)。
       </p>

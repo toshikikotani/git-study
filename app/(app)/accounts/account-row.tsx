@@ -33,7 +33,7 @@ export function AccountRow({ account }: { account: Account }) {
           <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {account.name}
           </h3>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             {account.institutionName ? `${account.institutionName} ・ ` : ''}
             {ACCOUNT_KIND_LABELS[account.kind]} ・ {ACCOUNT_PURPOSE_LABELS[account.purpose]}
           </p>

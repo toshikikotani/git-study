@@ -182,7 +182,7 @@ export default function PastePage() {
           <Link
             href="/spending"
             className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
             明細を見る
           </Link>
@@ -192,7 +192,7 @@ export default function PastePage() {
       {/* 口座(M6-2) */}
       <Card>
         <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-[13px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           口座
@@ -234,7 +234,7 @@ export default function PastePage() {
 
       <Card>
         <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-[13px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           メール本文
@@ -295,7 +295,7 @@ export default function PastePage() {
               onClick={() => void save()}
               disabled={!accountId}
               className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               {preview.length} 件を取り込む
             </button>

@@ -230,7 +230,7 @@ export function ReceiptCamera({
                 partsRef.current = [];
                 setParts([]);
               }}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold"
+              className="rounded-full px-3 py-2 text-xs font-semibold"
               style={{
                 background: mode === m.value ? '#fff' : 'rgba(255,255,255,0.18)',
                 color: mode === m.value ? '#000' : '#fff',

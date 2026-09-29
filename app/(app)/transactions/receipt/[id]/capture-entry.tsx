@@ -451,7 +451,7 @@ export function CaptureEntry({
           onClick={() => void save()}
           disabled={busy !== null}
           className="min-h-12 w-full rounded-2xl text-[17px] font-semibold disabled:opacity-50"
-          style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {busy === 'save' ? '保存しています…' : '保存する'}
         </button>

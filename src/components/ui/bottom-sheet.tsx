@@ -60,7 +60,7 @@ export function BottomSheet({
         <div
           className="max-h-[75dvh] overflow-y-auto p-2"
           style={{
-            borderRadius: 'var(--radius-xl)',
+            borderRadius: 'var(--radius-card)',
             background: 'var(--glass-tint-strong)',
             backdropFilter: 'var(--glass-blur-strong)',
             WebkitBackdropFilter: 'var(--glass-blur-strong)',
@@ -69,7 +69,7 @@ export function BottomSheet({
           }}
         >
           <div className="flex justify-center pt-2 pb-1">
-            <span className="h-1.5 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
+            <span className="h-2 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
           </div>
           {children}
         </div>

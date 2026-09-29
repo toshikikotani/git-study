@@ -42,7 +42,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
           {formatYen(input.totalSpentYen, { sign: 'never' })}
         </p>
       </div>
-      <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
         今月のここまでの1日あたり平均 {formatYen(input.averageDailySpendYen, { sign: 'never' })}
       </p>
 
@@ -61,8 +61,8 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
         type="button"
         onClick={() => void run()}
         disabled={pending}
-        className="mt-4 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
         {pending
           ? '作成しています…'

@@ -67,7 +67,7 @@ export function GenreBudgetRow({
         </span>
         {hasBudget && state !== 'ok' ? (
           <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            className="shrink-0 rounded-full px-2 py-1 text-[13px] font-semibold"
             style={{ background: STATE_TRACK[state], color: STATE_COLOR[state] }}
           >
             <span aria-hidden>{STATE_ICON[state]} </span>
@@ -86,7 +86,7 @@ export function GenreBudgetRow({
       </div>
       <div
         aria-hidden
-        className="relative mt-1.5 h-2 overflow-hidden rounded-full"
+        className="relative mt-2 h-2 overflow-hidden rounded-full"
         style={{ background: STATE_TRACK[state] }}
       >
         <div
@@ -107,7 +107,7 @@ export function GenreBudgetRow({
         ) : null}
         {idealRatio !== null ? (
           <span
-            className="absolute inset-y-0 w-0.5"
+            className="absolute inset-y-0 w-1"
             style={{
               left: `calc(${idealRatio * 100}% - 1px)`,
               background: 'var(--ink)',
@@ -117,7 +117,7 @@ export function GenreBudgetRow({
         ) : null}
       </div>
       {scheduledYen > 0 && hasBudget ? (
-        <p className="tabular mt-1 text-[11px]" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="tabular mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
           予定 {formatYen(scheduledYen, { sign: 'never' })} / 自由に使える残り{' '}
           {formatYen(freeYen, { sign: 'never' })}
         </p>
@@ -127,7 +127,7 @@ export function GenreBudgetRow({
   );
 
   const style = selected
-    ? { background: 'var(--accent-track)', borderRadius: 'var(--radius-md)' }
+    ? { background: 'var(--accent-track)', borderRadius: 'var(--radius-inner)' }
     : undefined;
   return onClick ? (
     <button
@@ -135,7 +135,7 @@ export function GenreBudgetRow({
       onClick={onClick}
       aria-pressed={selected}
       aria-label={`${budgetSpokenLabel(name, spentYen, budgetYen)}${scheduledYen > 0 ? `、予定${formatYen(scheduledYen, { sign: 'never' })}${state === 'reserved' ? 'で確保済み' : ''}` : ''}`}
-      className="block w-full px-2 py-1.5 text-left"
+      className="block w-full px-2 py-2 text-left"
       style={style}
     >
       {body}
@@ -144,7 +144,7 @@ export function GenreBudgetRow({
     <div
       role="group"
       aria-label={`${budgetSpokenLabel(name, spentYen, budgetYen)}${scheduledYen > 0 ? `、予定${formatYen(scheduledYen, { sign: 'never' })}${state === 'reserved' ? 'で確保済み' : ''}` : ''}`}
-      className="px-2 py-1.5"
+      className="px-2 py-2"
       style={style}
     >
       {body}

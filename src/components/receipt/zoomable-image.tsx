@@ -82,7 +82,7 @@ export function ZoomableImage({
           ) : null}
         </div>
       </div>
-      <div className="absolute right-2 bottom-2 flex gap-1.5">
+      <div className="absolute right-2 bottom-2 flex gap-2">
         {[
           { label: '縮小', text: '−', next: () => setScale((s) => clamp(s - 0.5)) },
           { label: '拡大', text: '+', next: () => setScale((s) => clamp(s + 0.5)) },

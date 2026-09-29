@@ -48,7 +48,7 @@ export default async function PlanPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           目標
         </h1>
-        <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
           期間を決めて、ジャンルごとの支出目標を少しずつ改善していく
         </p>
       </header>
@@ -68,7 +68,7 @@ export default async function PlanPage() {
               <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
                 要対応
               </p>
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-2 space-y-2">
                 {guidance.actions.map((action) => (
                   <li
                     key={action}
@@ -93,14 +93,14 @@ export default async function PlanPage() {
           <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
             {view.ended ? '終わった目標' : '今の目標'}
           </p>
-          <p className="mt-0.5 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {formatDateJa(plan.periodStart)} 〜 {formatDateJa(plan.periodEnd)}
             <span className="ml-1 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
               ({planPeriodDays(plan.periodStart, plan.periodEnd)}日間・
               {formatRemainingDays(plan.periodStart, plan.periodEnd, today)})
             </span>
           </p>
-          <ul className="mt-3 space-y-0.5">
+          <ul className="mt-3 space-y-1">
             {view.breakdown
               .filter((r) => r.targetYen !== null)
               .map((r) => (
@@ -136,7 +136,7 @@ export default async function PlanPage() {
               >
                 予算なし({view.noBudget.length}件)
               </summary>
-              <ul className="mt-2 space-y-0.5">
+              <ul className="mt-2 space-y-1">
                 {view.noBudget.map((r) => (
                   <li key={r.genreId ?? 'none'}>
                     <GenreBudgetRow
@@ -149,7 +149,7 @@ export default async function PlanPage() {
                 ))}
               </ul>
               {view.uncategorizedYen > 0 ? (
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                   未分類の {formatYen(view.uncategorizedYen, { sign: 'never' })}{' '}
                   は、ジャンルが決まるまで目標に反映されません。
                 </p>

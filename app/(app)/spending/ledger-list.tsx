@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { formatSignedYen } from '@/domain/budget-state';
+import { Yen } from '@/components/ui/money';
 import { formatYen } from '@/domain/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
@@ -152,7 +152,7 @@ export function LedgerList({
                 range: filter.range?.from === goalRange.from ? null : goalRange,
               })
             }
-            className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+            className="shrink-0 rounded-full px-3 py-2 text-[13px] font-semibold"
             style={{
               background: filter.range?.from === goalRange.from ? 'var(--accent)' : 'var(--plane)',
               color:
@@ -167,7 +167,7 @@ export function LedgerList({
           <button
             type="button"
             onClick={clearFilter}
-            className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+            className="shrink-0 rounded-full px-3 py-2 text-[13px] font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             解除
@@ -275,7 +275,7 @@ export function LedgerList({
               transactions={g.transactions}
             />
           ))}
-          <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {active
               ? `${filtered.length}件 / この月 ${transactions.length}件`
               : `${transactions.length}件`}
@@ -303,13 +303,13 @@ function ChipSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={label}
-      className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+      className="shrink-0 rounded-full px-3 py-2 text-[13px] font-semibold"
       style={{
         background: active ? 'var(--accent-track)' : 'var(--plane)',
         color: active ? 'var(--accent)' : 'var(--ink-secondary)',
         border: '1px solid var(--hairline)',
         // iOS はフォント 16px 未満だと拡大されるが、チップは見た目を優先して小さく保つ。
-        fontSize: 12,
+        fontSize: 13,
       }}
     >
       {options.map(([v, l]) => (
@@ -361,13 +361,15 @@ function DaySection({
       >
         <span className="text-xs font-medium">
           {heading}
-          {sub ? <span className="ml-2 text-[10px] font-normal">{sub}</span> : null}
+          {sub ? <span className="ml-2 text-[13px] font-normal">{sub}</span> : null}
         </span>
         {total !== undefined && total > 0 ? (
-          <span className="tabular text-xs">{formatSignedYen(-total)}</span>
+          <span className="tabular text-xs">
+            <Yen value={total} />
+          </span>
         ) : null}
       </div>
-      <ul className="divide-y" style={{ borderColor: 'var(--hairline)' }}>
+      <ul className="divider-list">
         {transactions.map((t) => (
           <TransactionRowWithSplit
             key={t.id}
@@ -414,16 +416,16 @@ function ListSkeleton() {
           />
           <div className="flex-1 space-y-2">
             <div
-              className="h-3 w-1/2 animate-pulse rounded"
+              className="h-3 w-1/2 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
             <div
-              className="h-2.5 w-1/3 animate-pulse rounded"
+              className="h-3 w-1/3 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
           </div>
           <div
-            className="h-3 w-14 animate-pulse rounded"
+            className="h-3 w-14 animate-pulse rounded-lg"
             style={{ background: 'var(--hairline)' }}
           />
         </div>

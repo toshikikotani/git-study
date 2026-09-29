@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { Yen } from '@/components/ui/money';
 import { formatYen } from '@/domain/money';
 import type { GoalCardModel } from '@/features/goals/card';
 import { formatDateJa } from '@/lib/date';
@@ -32,12 +33,12 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
                 className="tabular text-4xl leading-tight font-semibold"
                 style={{ color: 'var(--ink)' }}
               >
-                {primary.amountYen === null ? '—' : formatYen(primary.amountYen, { sign: 'never' })}
+                {primary.amountYen === null ? '—' : <Yen value={primary.amountYen} />}
               </p>
             </div>
             {model.badge ? (
               <span
-                className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                className="rounded-full px-2 py-1 text-xs font-semibold"
                 style={{
                   background:
                     model.badge.state === 'over'
@@ -62,7 +63,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
         </summary>
 
         <dl
-          className="mt-3 space-y-1.5 border-t pt-3 text-sm"
+          className="mt-3 space-y-2 border-t pt-3 text-sm"
           style={{ borderColor: 'var(--hairline)' }}
         >
           {model.details.map((d) => (
@@ -86,7 +87,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
               {formatYen(model.scheduled.totalYen, { sign: 'never' })} →
             </span>
           </summary>
-          <ul className="mt-2 space-y-1.5">
+          <ul className="mt-2 space-y-2">
             {model.scheduled.items.map((i) => (
               <li key={i.id} className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="min-w-0" style={{ color: 'var(--ink)' }}>
@@ -94,7 +95,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
                     {formatDateJa(i.date)}
                   </span>{' '}
                   {i.label}
-                  <span className="ml-1.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  <span className="ml-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {i.genreName ?? '未分類'}
                   </span>
                 </span>

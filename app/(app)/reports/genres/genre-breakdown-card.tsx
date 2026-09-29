@@ -137,7 +137,7 @@ export function GenreBreakdownCard({
               className="mt-3 space-y-3 border-t pt-3"
               style={{ borderColor: 'var(--hairline)' }}
             >
-              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
                 明細1件ごとに本人が付けた「絶対払わざるを得ないもの」のラベル
                 (ジャンルとは独立)で、今月の支出を分けています。
               </p>
@@ -158,7 +158,7 @@ export function GenreBreakdownCard({
               <div className="flex items-baseline justify-between gap-2 text-xs">
                 <span style={{ color: 'var(--ink)' }}>
                   <span
-                    className="mr-1.5 inline-block size-2 rounded-full align-middle"
+                    className="mr-2 inline-block size-2 rounded-full align-middle"
                     style={{ background: 'var(--accent)' }}
                   />
                   必須({Math.round(mustPayRatio * 100)}%)
@@ -170,7 +170,7 @@ export function GenreBreakdownCard({
               <div className="flex items-baseline justify-between gap-2 text-xs">
                 <span style={{ color: 'var(--ink)' }}>
                   <span
-                    className="mr-1.5 inline-block size-2 rounded-full align-middle"
+                    className="mr-2 inline-block size-2 rounded-full align-middle"
                     style={{ background: 'var(--over-track)' }}
                   />
                   裁量({Math.round((1 - mustPayRatio) * 100)}%)
@@ -189,8 +189,8 @@ export function GenreBreakdownCard({
           type="button"
           onClick={() => void run('month')}
           disabled={running}
-          className="mt-4 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {running && progressScope === 'month'
             ? `分類しています…(${progressCount ?? 0}件済み)`
@@ -203,7 +203,7 @@ export function GenreBreakdownCard({
           type="button"
           onClick={() => void run('all')}
           disabled={running}
-          className="mt-2 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
+          className="mt-2 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
         >
           {running && progressScope === 'all'

@@ -214,7 +214,7 @@ export function PlanBuilder({
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           改善の強さ(課題のあるジャンルを、今回どこまで削るか)
         </p>
-        <div className="mt-1.5 flex gap-2">
+        <div className="mt-2 flex gap-2">
           {PLAN_STEP_OPTIONS.map((option) => (
             <button
               key={option}
@@ -224,7 +224,7 @@ export function PlanBuilder({
                 setStep(option);
                 setSuggestion(null);
               }}
-              className="flex-1 rounded-full py-1.5 text-xs font-semibold"
+              className="flex-1 rounded-full py-2 text-xs font-semibold"
               style={{
                 background: step === option ? 'var(--accent)' : 'var(--accent-track)',
                 color: step === option ? 'var(--on-accent)' : 'var(--accent)',
@@ -258,7 +258,7 @@ export function PlanBuilder({
               </span>
               {suggestion.evidence.provisional ? (
                 <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  className="rounded-full px-2 py-1 text-[13px] font-semibold"
                   style={{ background: 'var(--attention-track)', color: 'var(--state-caution)' }}
                 >
                   暫定

@@ -40,7 +40,7 @@ export default async function ReportsPage() {
           <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
             支出レポート
           </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             収支・カテゴリ別支出・店舗別支出・資産推移・用途別残高
           </p>
         </div>

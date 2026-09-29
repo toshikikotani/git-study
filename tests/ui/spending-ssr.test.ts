@@ -168,8 +168,9 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     expect(html).toContain('阪神大阪梅田駅店');
   });
 
-  it('行のマイナスはハイフンではなく U+2212、VoiceOver 向けの読み上げがある', () => {
-    expect(html).toContain('−3,000円');
+  it('支出の行に「−」は付かず、「円」は小さく組まれ、VoiceOver 向けの読み上げがある', () => {
+    expect(html).not.toContain('−3,000');
+    expect(html).toContain('3,000<span class="yen-unit">円</span>');
     expect(html).toMatch(/aria-label="ココカラファイン、[^"]*支出3,000円/);
   });
 });

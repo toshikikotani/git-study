@@ -171,7 +171,7 @@ export function NewTransactionForm({
           <Link
             href="/spending"
             className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
             明細を見る
           </Link>
@@ -181,7 +181,7 @@ export function NewTransactionForm({
       {/* 口座(M6-2) */}
       <Card>
         <label
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-[13px] font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           口座
@@ -229,7 +229,7 @@ export function NewTransactionForm({
             className="flex-1 rounded-xl py-2 text-sm font-semibold"
             style={{
               background: !isIncome ? 'var(--accent)' : 'var(--plane)',
-              color: !isIncome ? '#fff' : 'var(--ink-secondary)',
+              color: !isIncome ? 'var(--on-accent)' : 'var(--ink-secondary)',
             }}
           >
             支出
@@ -328,7 +328,7 @@ export function NewTransactionForm({
 
         {!isIncome ? (
           <label className="mt-3 block">
-            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
               目標の扱い
               {occurredOn > todayJst()
                 ? '(今日より先の日付は「予定」として、使った額には入りません)'
@@ -355,7 +355,7 @@ export function NewTransactionForm({
           onClick={() => void save()}
           disabled={saving || !canSave}
           className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {saving ? '登録中…' : '登録する'}
         </button>

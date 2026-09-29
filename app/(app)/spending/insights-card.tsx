@@ -133,8 +133,8 @@ export function InsightsCard({
           type="button"
           onClick={() => void run()}
           disabled={pending}
-          className="mt-4 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+          className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '診断しています…' : `今月の${undiagnosedCount}件をAIで診断する`}
         </button>
@@ -186,10 +186,10 @@ function DiagnosisItemList({
 
   return (
     <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-      <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
         {heading}
       </p>
-      <ul className="mt-2 space-y-2.5">
+      <ul className="mt-2 space-y-3">
         {items.map((item) => (
           <li key={item.id}>
             <div className="flex items-baseline justify-between gap-3">
@@ -200,7 +200,7 @@ function DiagnosisItemList({
                 {formatYen(item.amountYen)}
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+            <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
               {formatDateJa(item.occurredOn)} ・ {item.reasoning}
             </p>
           </li>
