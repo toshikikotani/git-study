@@ -137,9 +137,11 @@ describe('未来日の特別費で目標の見込みが破綻しない(受け入
         },
       ],
     });
-    // 1日目 2,500円 × 8日 = 20,000円。256,336円のような破綻した値にならない。
-    expect(guidance.projectedYen).toBe(20000);
-    expect(guidance.projectedYen).toBeLessThan(21000 + 1);
+    // 1日目は線形の外挿(2,500円 × 8日)をしない。256,336円のような破綻した見込みは出ず、
+    // 理想ペース(21,000円 ÷ 8日 = 2,625円)との差だけを見せる。
+    expect(guidance.showProjection).toBe(false);
+    expect(guidance.projectedYen).toBeNull();
+    expect(guidance.paceDiffYen).toBe(-125);
   });
 });
 

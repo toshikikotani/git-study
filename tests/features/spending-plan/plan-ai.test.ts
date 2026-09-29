@@ -22,12 +22,25 @@ function genre(overrides: Partial<PlanGenreContext>): PlanGenreContext {
     wasteShare: null,
     trendRatio: 1.3,
     previous: null,
+    medianDailyYen: 800,
     ...overrides,
   };
 }
 
 function context(genres: PlanGenreContext[]): PlanContext {
-  return { periodDays: 30, lookbackDays: 60, genres, uncategorizedYen: 0 };
+  return {
+    periodDays: 30,
+    lookbackDays: 60,
+    genres,
+    uncategorizedYen: 0,
+    evidence: {
+      recordedDays: 40,
+      from: '2026-08-01',
+      to: '2026-09-29',
+      medianDailyYen: 1200,
+      provisional: false,
+    },
+  };
 }
 
 describe('mergeSuggestions', () => {

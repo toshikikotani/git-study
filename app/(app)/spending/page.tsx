@@ -1,6 +1,7 @@
 import { paceComparison, canShowForecast, hasIncome } from '@/domain/summary-rules';
 import { loadAccumulationView } from '@/features/accumulation/store';
 import { listAccounts } from '@/features/accounts/store';
+import { loadGoalView } from '@/features/goals/loader';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
@@ -15,6 +16,7 @@ import { CalendarHeatmap } from './calendar-heatmap';
 import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
+import { GoalSummary } from './goal-summary';
 import { InsightsCard } from './insights-card';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
@@ -40,7 +42,7 @@ import { SummaryCard } from './summary-card';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [ledger, genres, accounts, duplicates, diagnosis, pile, subscriptions] =
+  const [ledger, genres, accounts, duplicates, diagnosis, pile, subscriptions, loadedGoal] =
     await withMinDuration(
       Promise.all([
         loadMonthlyLedger(),
@@ -50,6 +52,7 @@ export default async function SpendingPage() {
         loadSpendingDiagnosisView(),
         loadAccumulationView(),
         loadDetectedSubscriptions(),
+        loadGoalView(),
       ]),
     );
   const ids = ledger.transactions.map((t) => t.id);
@@ -60,6 +63,8 @@ export default async function SpendingPage() {
   const transactions = toDrilldownTransactions(ledger.transactions, items, subtypes);
 
   const today = ledger.period.to;
+  // 目標期間中だけ、サマリー・内訳・カレンダー・リストを目標と連動させる。
+  const goal = loadedGoal !== null && loadedGoal.view.active ? loadedGoal.view : null;
   const pace = paceComparison({
     today,
     firstRecordedOn: ledger.record.firstRecordedOn,
@@ -91,12 +96,14 @@ export default async function SpendingPage() {
           pace={pace}
           forecast={forecast}
           hasIncomeRegistered={hasIncome(ledger.totals.incomeYen)}
-          goal={null}
+          goal={goal ? <GoalSummary view={goal} today={today} /> : null}
         />
-        <AttentionCard hasGoal={false} />
-        <GenreBreakdown goalRows={null} />
-        <CalendarHeatmap goal={null} />
-        <LedgerList goalRange={null} duplicateCount={duplicates.length} />
+        <AttentionCard hasGoal={goal !== null} />
+        <GenreBreakdown goalRows={goal ? goal.breakdown : null} />
+        <CalendarHeatmap
+          goal={goal ? { range: goal.range, dailyAllowanceYen: goal.dailyAllowanceYen } : null}
+        />
+        <LedgerList goalRange={goal ? goal.range : null} duplicateCount={duplicates.length} />
         <CurrentMonthOnly>
           <InsightsCard
             view={diagnosis}

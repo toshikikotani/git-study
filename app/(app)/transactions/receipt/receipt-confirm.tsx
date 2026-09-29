@@ -1,8 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
+import { STATE_COLOR, STATE_ICON, STATE_LABEL, STATE_TRACK } from '@/domain/budget-state';
+import {
+  goalImpact,
+  goalToastMessage,
+  needsKindChoice,
+  type GoalSnapshot,
+  type ImpactDelta,
+} from '@/domain/goal-impact';
 import { formatYen } from '@/domain/money';
 import {
   applyFix,
@@ -36,6 +44,8 @@ export type ReceiptConfirmSave = {
   corrections: { itemName: string; genreId: string }[];
   storeName: string;
   imageBase64: string | null;
+  /** 保存後のトースト用:目標への影響のひと言(目標が無ければ null)。 */
+  goalMessage: string | null;
 };
 
 function underline(low: boolean): React.CSSProperties {
@@ -70,7 +80,7 @@ export function ReceiptConfirm({
   accountId,
   saving,
   savedLabel,
-  goalImpact,
+  goal,
   onSave,
   onDiscard,
 }: {
@@ -81,13 +91,8 @@ export function ReceiptConfirm({
   saving: boolean;
   /** 保存済みなら表示する文言(保存ボタンの代わり)。 */
   savedLabel: string | null;
-  /** 目標があるときの「保存前 → 保存後の残り予算」表示(呼び出し側が組み立てる)。 */
-  goalImpact?: (input: {
-    parsed: ParsedReceiptTransaction;
-    genreByLineId: ReadonlyMap<string, string | null>;
-    parentGenreId: string | null;
-    kind: 'normal' | 'special';
-  }) => ReactNode;
+  /** 今の目標と実績(目標があるとき)。保存前 → 保存後の残り予算を出す。 */
+  goal: { snapshot: GoalSnapshot; today: string } | null;
   onSave: (input: ReceiptConfirmSave) => void;
   onDiscard: () => void;
 }) {
@@ -100,6 +105,8 @@ export function ReceiptConfirm({
     job.parentGenreIds[index] ?? null,
   );
   const [kind, setKind] = useState<'normal' | 'special'>('normal');
+  // 未来日・高額のとき、含める/特別費のどちらかを本人が選ぶまで保存できない。
+  const [kindChosen, setKindChosen] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<number>(0);
@@ -164,7 +171,38 @@ export function ReceiptConfirm({
   const groups = draft ? linesByTaxRate(draft) : [];
   const status = reconcile?.status ?? null;
 
+  // 目標への影響:この支払いがジャンルごとに動かす額(品目のジャンル、無ければ明細のジャンル)。
+  const deltas = useMemo<ImpactDelta[]>(() => {
+    const out: ImpactDelta[] = [];
+    if (current.items.length === 0) {
+      out.push({ genreId: parentGenreId, amountYen: Math.abs(current.amountYen) });
+    } else {
+      for (const item of current.items) {
+        const g =
+          (item.lineId !== undefined ? genreByLineId.get(item.lineId) : null) ?? parentGenreId;
+        out.push({ genreId: g, amountYen: Math.abs(item.amountYen) });
+      }
+    }
+    return out;
+  }, [current.items, current.amountYen, genreByLineId, parentGenreId]);
+  const impact = useMemo(
+    () =>
+      goal === null
+        ? null
+        : goalImpact(goal.snapshot, { occurredOn, today: goal.today, kind, deltas }),
+    [goal, occurredOn, kind, deltas],
+  );
+  const choice = useMemo(
+    () =>
+      goal === null
+        ? { needed: false, reason: null }
+        : needsKindChoice(goal.snapshot, { occurredOn, today: goal.today, deltas }),
+    [goal, occurredOn, deltas],
+  );
+  const mustChoose = choice.needed && !kindChosen;
+
   const save = () => {
+    if (mustChoose) return;
     if (draft === null && current.items.length === 0 && current.amountYen === 0) return;
     const plan = buildReceiptSavePlan({
       parsed: current,
@@ -182,7 +220,21 @@ export function ReceiptConfirm({
           ? [{ itemName: l.name, genreId: now }]
           : [];
       });
-    onSave({ plan, corrections, storeName: store, imageBase64: job.imageBase64 });
+    onSave({
+      plan,
+      corrections,
+      storeName: store,
+      imageBase64: job.imageBase64,
+      goalMessage:
+        goal !== null && impact !== null
+          ? goalToastMessage({
+              label: `${store} ${formatYen(paidYen, { sign: 'never' })}`,
+              impact,
+              goal: goal.snapshot,
+              today: goal.today,
+            })
+          : null,
+    });
   };
 
   const field = 'w-full rounded-lg px-2 py-1.5 text-sm';
@@ -452,7 +504,10 @@ export function ReceiptConfirm({
             </span>
             <select
               value={kind}
-              onChange={(e) => setKind(e.target.value as 'normal' | 'special')}
+              onChange={(e) => {
+                setKind(e.target.value as 'normal' | 'special');
+                setKindChosen(true);
+              }}
               className={field}
               style={fieldStyle}
             >
@@ -462,7 +517,53 @@ export function ReceiptConfirm({
           </label>
         </div>
 
-        {goalImpact?.({ parsed: current, genreByLineId, parentGenreId, kind })}
+        {choice.needed ? (
+          <div
+            role="group"
+            aria-label="目標の扱い"
+            className="rounded-xl p-3"
+            style={{
+              background: 'var(--attention-track)',
+              border: '1px solid var(--state-caution)',
+            }}
+          >
+            <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+              {choice.reason === 'scheduled'
+                ? '今日より先の日付です。'
+                : 'このジャンルの予算の半分以上になる支払いです。'}
+              目標の扱いを選んでください
+            </p>
+            <div className="mt-2 flex gap-2">
+              {(
+                [
+                  ['normal', '目標の予算に含める'],
+                  ['special', '特別費として別枠'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={kindChosen && kind === value}
+                  onClick={() => {
+                    setKind(value);
+                    setKindChosen(true);
+                  }}
+                  className="flex-1 rounded-full px-3 py-2 text-xs font-semibold"
+                  style={{
+                    background: kindChosen && kind === value ? 'var(--accent)' : 'var(--surface)',
+                    color:
+                      kindChosen && kind === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
+                    border: '1px solid var(--hairline)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {impact !== null && goal !== null ? <GoalImpactView impact={impact} /> : null}
       </div>
 
       {/* 照合バー(下部に固定):品目合計 + 税 − 値引き − ポイント = 支払額 */}
@@ -494,7 +595,9 @@ export function ReceiptConfirm({
             <button
               type="button"
               onClick={save}
-              disabled={saving || !accountId || (draft !== null && draft.paidYen <= 0)}
+              disabled={
+                saving || !accountId || mustChoose || (draft !== null && draft.paidYen <= 0)
+              }
               className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
             >
@@ -719,6 +822,79 @@ function ReconcileBar({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const IMPACT_REASON: Record<string, string> = {
+  special: '特別費として別枠にするので、目標のペースには含めません。',
+  scheduled: '今日より先の予定なので、目標のペースには含めません。',
+  outside_period: '目標の期間の外なので、目標には含めません。',
+  no_target: '目標のあるジャンルではないので、目標には含めません。',
+};
+
+/** 保存前 → 保存後の残り予算を、影響のあるジャンルごとにミニバーで見せる。 */
+function GoalImpactView({ impact }: { impact: ReturnType<typeof goalImpact> }) {
+  if (impact.rows.length === 0 && impact.counts) return null;
+  return (
+    <div
+      className="rounded-xl p-3"
+      style={{ background: 'var(--plane)' }}
+      role="group"
+      aria-label="目標への影響"
+    >
+      <p className="text-[11px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
+        目標への影響(保存前 → 保存後の残り予算)
+      </p>
+      {!impact.counts && impact.reason !== 'included' ? (
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          {IMPACT_REASON[impact.reason]}
+        </p>
+      ) : null}
+      <ul className="mt-2 space-y-2.5">
+        {impact.rows.map((r) => {
+          const before = Math.min(Math.max(r.beforeSpentYen / r.targetYen, 0), 1);
+          const after = Math.min(Math.max(r.afterSpentYen / r.targetYen, 0), 1);
+          return (
+            <li
+              key={r.genreId}
+              aria-label={`${r.genreName}、残り${formatYen(r.beforeRemainingYen)}から${formatYen(r.afterRemainingYen)}へ、${STATE_LABEL[r.state]}`}
+            >
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span style={{ color: 'var(--ink)' }}>{r.genreName}</span>
+                <span className="tabular" style={{ color: 'var(--ink-secondary)' }}>
+                  {formatYen(r.beforeRemainingYen)} → {formatYen(r.afterRemainingYen)}
+                  <span className="ml-1.5 font-semibold" style={{ color: STATE_COLOR[r.state] }}>
+                    <span aria-hidden>{STATE_ICON[r.state]} </span>
+                    {STATE_LABEL[r.state]}
+                  </span>
+                </span>
+              </div>
+              <div
+                aria-hidden
+                className="relative mt-1 h-2 overflow-hidden rounded-full"
+                style={{ background: STATE_TRACK[r.state] }}
+              >
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ width: `${after * 100}%`, background: STATE_COLOR[r.state] }}
+                />
+                <span
+                  className="absolute inset-y-0 w-0.5"
+                  style={{
+                    left: `calc(${before * 100}% - 1px)`,
+                    background: 'var(--ink)',
+                    opacity: 0.6,
+                  }}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-1.5 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+        縦線=保存前の使用額、色のバー=保存後
+      </p>
     </div>
   );
 }

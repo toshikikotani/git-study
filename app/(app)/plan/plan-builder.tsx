@@ -6,8 +6,16 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { formatYen } from '@/domain/money';
+import {
+  DEFAULT_PLAN_PRESET,
+  PLAN_PRESET_LABELS,
+  PLAN_PRESET_ORDER,
+  planPreset,
+  type PlanPresetId,
+} from '@/domain/plan-presets';
+import type { PlanEvidence } from '@/domain/plan-evidence';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
-import { addDays, addMonths, formatDateJa, nthDayOfMonth, type DateOnly } from '@/lib/date';
+import { formatDateJa, type DateOnly } from '@/lib/date';
 import { savePlanAction, suggestPlanAction } from './actions';
 import { AllocationEditor } from './allocation-editor';
 import { RangeCalendar } from './range-calendar';
@@ -32,26 +40,29 @@ type Suggestion = {
   warnings: string[];
   usedAi: boolean;
   uncategorizedYen: number;
+  evidence: PlanEvidence;
+  /** 記録がないジャンル(予算0円として並べず、折りたたむ)。 */
+  noRecord: string[];
 };
-
-function lastDayOfMonth(date: DateOnly, offsetMonths: number): DateOnly {
-  return addDays(addMonths(nthDayOfMonth(date, 1), offsetMonths + 1), -1);
-}
 
 /**
  * 期間を選び、AIに目標案を作ってもらい、本人が直して保存する(本人発案、ADR-058)。
  * 「徐々に改善」のため、改善の強さ(1回で削る幅の上限)を選べる。
  */
-export function PlanBuilder({ today }: { today: DateOnly }) {
+export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number }) {
   const router = useRouter();
-  const [start, setStart] = useState<DateOnly | null>(today);
-  const [end, setEnd] = useState<DateOnly | null>(lastDayOfMonth(today, 0));
+  // 初期選択は「1週間」。短い期間から始めて、結果を見て次の目標へ進める。
+  const initial = planPreset(DEFAULT_PLAN_PRESET, today, payday);
+  const [preset, setPreset] = useState<PlanPresetId | null>(DEFAULT_PLAN_PRESET);
+  const [start, setStart] = useState<DateOnly | null>(initial.start);
+  const [end, setEnd] = useState<DateOnly | null>(initial.end);
   const [step, setStep] = useState<(typeof PLAN_STEP_OPTIONS)[number]>(10);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [busy, setBusy] = useState<'suggest' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const setRange = (range: { start: DateOnly | null; end: DateOnly | null }) => {
+    setPreset(null);
     setStart(range.start);
     setEnd(range.end);
     setSuggestion(null);
@@ -68,6 +79,7 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
       return;
     }
     setSuggestion({
+      // 記録がないジャンルは、予算0円として並べず「予算なし」に折りたたむ。
       items: result.items
         .filter((item) => item.baselineYen > 0)
         .map((item) => ({
@@ -75,8 +87,10 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
           genreName: item.genreName,
           baselineYen: item.baselineYen,
           aiSuggestedYen: item.suggestedYen,
-          reason: item.reason,
+          reason: `${item.reason}(1日あたりの中央値 ${formatYen(result.medianByGenre[item.genreId] ?? 0, { sign: 'never' })})`,
         })),
+      noRecord: result.items.filter((item) => item.baselineYen <= 0).map((item) => item.genreName),
+      evidence: result.evidence,
       summary: result.summary,
       warnings: result.warnings,
       usedAi: result.usedAi,
@@ -120,19 +134,24 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
         提案は目安なので、あとから自由に直せます。
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {[
-          { label: '今月末まで', end: lastDayOfMonth(today, 0) },
-          { label: '来月末まで', end: lastDayOfMonth(today, 1) },
-        ].map((chip) => (
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="期間のプリセット">
+        {PLAN_PRESET_ORDER.map((id) => (
           <button
-            key={chip.label}
+            key={id}
             type="button"
-            onClick={() => setRange({ start: today, end: chip.end })}
+            aria-pressed={preset === id}
+            onClick={() => {
+              const range = planPreset(id, today, payday);
+              setRange({ start: range.start, end: range.end });
+              setPreset(id);
+            }}
             className="rounded-full px-3 py-1 text-xs font-semibold"
-            style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+            style={{
+              background: preset === id ? 'var(--accent)' : 'var(--accent-track)',
+              color: preset === id ? 'var(--on-accent)' : 'var(--accent)',
+            }}
           >
-            {chip.label}
+            {PLAN_PRESET_LABELS[id]}
           </button>
         ))}
       </div>
@@ -166,7 +185,7 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
               className="flex-1 rounded-full py-1.5 text-xs font-semibold"
               style={{
                 background: step === option ? 'var(--accent)' : 'var(--accent-track)',
-                color: step === option ? '#fff' : 'var(--accent)',
+                color: step === option ? 'var(--on-accent)' : 'var(--accent)',
               }}
             >
               {STEP_LABELS[option]}({option}%)
@@ -186,6 +205,38 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
 
       {suggestion !== null ? (
         <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
+          {/* 根拠(記録日数・対象期間・中央値)。記録が14日未満なら「暫定」 */}
+          <div
+            className="rounded-xl p-3 text-xs leading-relaxed"
+            style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+          >
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold" style={{ color: 'var(--ink)' }}>
+                提案の根拠
+              </span>
+              {suggestion.evidence.provisional ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ background: 'var(--attention-track)', color: 'var(--state-caution)' }}
+                >
+                  暫定
+                </span>
+              ) : null}
+            </p>
+            <p className="tabular mt-1">
+              家計簿の記録 {suggestion.evidence.recordedDays}日分
+              {suggestion.evidence.from
+                ? `(${formatDateJa(suggestion.evidence.from)} 〜 ${formatDateJa(suggestion.evidence.to)})`
+                : ''}
+              ・ 1日あたりの支出の中央値{' '}
+              {formatYen(suggestion.evidence.medianDailyYen, { sign: 'never' })}
+            </p>
+            {suggestion.evidence.provisional ? (
+              <p className="mt-1" style={{ color: 'var(--ink-muted)' }}>
+                記録が14日に満たないため、暫定の目安です。記録がそろったら作り直せます。
+              </p>
+            ) : null}
+          </div>
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
             {suggestion.summary}
           </p>
@@ -207,6 +258,15 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
               </Link>
               すると、より正確な案になります。
             </p>
+          ) : null}
+
+          {suggestion.noRecord.length > 0 ? (
+            <details className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              <summary className="cursor-pointer font-semibold">
+                予算なし({suggestion.noRecord.length}件・記録がないジャンル)
+              </summary>
+              <p className="mt-1 leading-relaxed">{suggestion.noRecord.join('、')}</p>
+            </details>
           ) : null}
 
           <AllocationEditor

@@ -236,3 +236,107 @@ describe('planGuidance', () => {
     expect(g.expectedByTodayYen).toBe(30000); // 60000 × 15/30
   });
 });
+
+describe('planGuidance(目標との連携の規則)', () => {
+  const period = { periodStart: '2026-09-29', periodEnd: '2026-10-05' }; // 7日間
+
+  it('予算0円のジャンルに「順調です」「1日0円まで」を出さない(受け入れ基準6)', () => {
+    const g = planGuidance({
+      ...period,
+      today: '2026-10-02',
+      items: [
+        { genreId: 'g1', genreName: '外食', targetYen: 7000, spentYen: 1000 },
+        { genreId: 'g0', genreName: '酒', targetYen: 0, spentYen: 0 },
+        { genreId: 'g00', genreName: '旅行', targetYen: 0, spentYen: 3000 },
+      ],
+    });
+    for (const id of ['g0', 'g00']) {
+      const x = g.genres.find((y) => y.genreId === id)!;
+      expect(x.status).toBe('no_budget');
+      expect(x.message).toBe('');
+      expect(x.dailyAllowanceYen).toBeNull();
+    }
+    const all = [g.headline, ...g.actions, ...g.genres.map((y) => y.message)].join('\n');
+    expect(all).not.toContain('1日0円');
+    expect(all).not.toMatch(/酒|旅行/);
+  });
+
+  it('予算なしのジャンルは、目標の合計にも実績の合計にも入れない', () => {
+    const g = planGuidance({
+      ...period,
+      today: '2026-10-02',
+      items: [
+        { genreId: 'g1', genreName: '外食', targetYen: 7000, spentYen: 1000 },
+        { genreId: 'g00', genreName: '旅行', targetYen: 0, spentYen: 3000 },
+      ],
+    });
+    expect(g.targetYen).toBe(7000);
+    expect(g.spentYen).toBe(1000);
+  });
+
+  it('経過3日未満は線形の見込みを出さず、理想ペースとの差(今日時点で±○円)を見せる', () => {
+    // 1日目(9/29): 7日間・目標7,000円 → 理想 1,000円。実績 2,500円
+    const g = planGuidance({
+      ...period,
+      today: '2026-09-29',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 7000, spentYen: 2500 }],
+    });
+    expect(g.showProjection).toBe(false);
+    expect(g.projectedYen).toBeNull();
+    expect(g.genres[0]!.projectedYen).toBeNull();
+    expect(g.paceDiffYen).toBe(1500);
+    expect(g.headline).toContain('理想ペースとの差');
+    expect(g.headline).toContain('+1,500円');
+    expect(g.headline).not.toContain('見込み');
+  });
+
+  it('3日目からは線形の見込みを出す', () => {
+    const g = planGuidance({
+      ...period,
+      today: '2026-10-01',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 7000, spentYen: 3000 }],
+    });
+    expect(g.showProjection).toBe(true);
+    expect(g.projectedYen).toBe(7000);
+  });
+
+  it('今日使える額 = 今日より前の実績で残りを割った1日の目安 − 今日すでに使った分', () => {
+    // 10/1(3日目): 目標7,000円、ここまで 3,000円(うち今日 800円)。残り5日(今日を含む)
+    // 今日より前の実績 2,200円 → (7,000 − 2,200) ÷ 5 = 960円/日 → 今日の残り 160円
+    const g = planGuidance({
+      ...period,
+      today: '2026-10-01',
+      items: [
+        { genreId: 'g1', genreName: '外食', targetYen: 7000, spentYen: 3000, todaySpentYen: 800 },
+      ],
+    });
+    expect(g.remainingDays).toBe(5);
+    expect(g.todayAllowanceYen).toBe(160);
+  });
+
+  it('特別費・予定は別の値として持つ(ペースの実績には入らない)', () => {
+    const g = planGuidance({
+      ...period,
+      today: '2026-09-29',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 7000, spentYen: 1000 }],
+      specialYen: 26540,
+      scheduledYen: 26540,
+    });
+    expect(g.spentYen).toBe(1000);
+    expect(g.specialYen).toBe(26540);
+    expect(g.scheduledYen).toBe(26540);
+  });
+
+  it('行動指針は要対応ジャンルの上位2件だけ', () => {
+    const g = planGuidance({
+      ...period,
+      today: '2026-10-03',
+      items: [
+        { genreId: 'a', genreName: 'A', targetYen: 1000, spentYen: 2000 },
+        { genreId: 'b', genreName: 'B', targetYen: 1000, spentYen: 3000 },
+        { genreId: 'c', genreName: 'C', targetYen: 1000, spentYen: 4000 },
+      ],
+    });
+    expect(g.actions).toHaveLength(2);
+  });
+});

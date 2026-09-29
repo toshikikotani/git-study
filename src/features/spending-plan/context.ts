@@ -6,6 +6,12 @@
 
 import { baselineForPeriod, planPeriodDays, type PlanGenreFacts } from '@/domain/spending-plan';
 import { isCountable } from '@/domain/budget';
+import {
+  buildPlanEvidence,
+  dailySeries,
+  medianOf,
+  type PlanEvidence,
+} from '@/domain/plan-evidence';
 import { entryStatus } from '@/domain/ledger';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import { toLedgerEntries } from '@/features/spending/views';
@@ -44,6 +50,8 @@ export type PlanGenreContext = PlanGenreFacts & {
   wasteShare: number | null;
   /** 直近(30日)と、それ以前の1日平均の比。判定できなければ null。 */
   trendRatio: number | null;
+  /** 1日あたりの支出の中央値(記録の無い日は0円で数える)。 */
+  medianDailyYen: number;
 };
 
 export type PlanContext = {
@@ -52,6 +60,8 @@ export type PlanContext = {
   genres: PlanGenreContext[];
   /** 未分類の支出(先に分類しないと目標に含められない)。 */
   uncategorizedYen: number;
+  /** 提案の根拠(記録日数・対象期間・中央値)。記録が14日未満なら暫定。 */
+  evidence: PlanEvidence;
 };
 
 export async function loadPlanContext(
@@ -100,10 +110,18 @@ export async function loadPlanContext(
     prior: number;
   };
   const accByGenre = new Map<string, Acc>();
+  const totalByDay = new Map<string, number>();
+  const genreDay = new Map<string, Map<string, number>>();
   let uncategorizedYen = 0;
   for (const r of countable) {
     const genreId = r.categoryId;
     const yen = -r.amountYen;
+    totalByDay.set(r.occurredOn, (totalByDay.get(r.occurredOn) ?? 0) + yen);
+    if (genreId !== null) {
+      const days = genreDay.get(genreId) ?? new Map<string, number>();
+      days.set(r.occurredOn, (days.get(r.occurredOn) ?? 0) + yen);
+      genreDay.set(genreId, days);
+    }
     if (genreId === null) {
       uncategorizedYen += yen;
       continue;
@@ -153,10 +171,19 @@ export async function loadPlanContext(
       wasteShare,
       trendRatio,
       previous: previousByGenre.get(g.id) ?? null,
+      medianDailyYen:
+        earliest === null
+          ? 0
+          : medianOf(dailySeries(genreDay.get(g.id) ?? new Map(), earliest, today)),
     };
   });
 
-  return { periodDays, lookbackDays, genres: contexts, uncategorizedYen };
+  const evidence = buildPlanEvidence({
+    recordedDates: countable.map((r) => r.occurredOn),
+    totalByDay,
+    today,
+  });
+  return { periodDays, lookbackDays, genres: contexts, uncategorizedYen, evidence };
 }
 
 /** 浪費と診断された明細のid(診断が無い・テーブル未適用なら空)。 */

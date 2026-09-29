@@ -10,6 +10,8 @@ import {
   undoReceiptSaveAction,
 } from '../actions';
 import { ensureDefaultAccountAction } from '../../accounts/actions';
+import { loadGoalSnapshotAction } from '../../plan/actions';
+import type { GoalSnapshot } from '@/domain/goal-impact';
 import { formatYen } from '@/domain/money';
 import {
   enqueueReceiptFiles,
@@ -45,9 +47,14 @@ export default function ReceiptPage() {
   const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  // 目標があるとき、保存前の影響と保存後のひと言に使う。
+  const [goal, setGoal] = useState<{ snapshot: GoalSnapshot; today: string } | null>(null);
 
   useEffect(() => {
     void fetchGenreOptions().then(setGenres);
+    void loadGoalSnapshotAction().then((r) =>
+      setGoal(r.snapshot ? { snapshot: r.snapshot, today: r.today } : null),
+    );
   }, []);
 
   useEffect(() => {
@@ -127,7 +134,8 @@ export default function ReceiptPage() {
       message:
         outcome.imported === 0
           ? `${label} は既に登録済みのため追加しませんでした`
-          : `${label} を保存しました${warnings.length > 0 ? `(${warnings[0]})` : ''}`,
+          : (input.goalMessage ??
+            `${label} を保存しました${warnings.length > 0 ? `(${warnings[0]})` : ''}`),
       ids: outcome.insertedIds,
       undoing: false,
       error: null,
@@ -336,6 +344,7 @@ export default function ReceiptPage() {
                 accountId={accountId}
                 saving={savingKey === `${job.id}:${index}`}
                 savedLabel={saved.get(`${job.id}:${index}`) ?? null}
+                goal={goal}
                 onSave={(input) => void save(job, index, input)}
                 onDiscard={() => removeReceiptJob(job.id)}
               />
