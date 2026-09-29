@@ -71,7 +71,7 @@ export function SpendingCalendar({
 }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(period.to);
-  // 日付を押すと開くメニュー(その日の明細を見る/家計簿を手で登録する)。
+  // 日付を押すと、その日の明細の上に開くメニュー(家計簿を手で登録する)。
   const [menuOpen, setMenuOpen] = useState(false);
 
   const transactionsByDate = useMemo(() => {
@@ -137,53 +137,39 @@ export function SpendingCalendar({
         )}
       </div>
 
-      {menuOpen ? (
-        <div
-          role="menu"
-          aria-label={`${formatDateJa(selectedDate)}のメニュー`}
-          className="mt-3 overflow-hidden rounded-xl"
-          style={{ background: 'var(--surface-raised)', border: '1px solid var(--hairline)' }}
-        >
-          <p
-            className="px-3 pt-2 pb-1 text-[11px] font-semibold"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            {formatDateJa(selectedDate)}
-          </p>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setMenuOpen(false);
-              document
-                .getElementById('calendar-day-detail')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }}
-            className="block w-full px-3 py-2.5 text-left text-sm"
-            style={{ color: 'var(--ink)' }}
-          >
-            この日の明細を見る
-          </button>
-          <Link
-            href={`/transactions/new?date=${selectedDate}`}
-            role="menuitem"
-            prefetch={false}
-            className="block border-t px-3 py-2.5 text-sm font-semibold"
-            style={{ color: 'var(--accent)', borderColor: 'var(--hairline)' }}
-          >
-            家計簿を手で登録する
-          </Link>
-        </div>
-      ) : null}
-
-      <div
-        id="calendar-day-detail"
-        className="mt-4 border-t pt-3"
-        style={{ borderColor: 'var(--hairline)' }}
-      >
+      <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           {formatDateJa(selectedDate)}
         </p>
+
+        {/* 日付を押すと、その日の明細のすぐ上にメニューを出す(本人発案)。 */}
+        {menuOpen ? (
+          <div
+            role="menu"
+            aria-label={`${formatDateJa(selectedDate)}のメニュー`}
+            className="mt-2 overflow-hidden rounded-xl"
+            style={{ background: 'var(--surface-raised)', border: '1px solid var(--hairline)' }}
+          >
+            <Link
+              href={`/transactions/new?date=${selectedDate}`}
+              role="menuitem"
+              prefetch={false}
+              className="block px-3 py-2.5 text-sm font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              家計簿を手で登録する
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+              className="block w-full border-t px-3 py-2.5 text-left text-sm"
+              style={{ color: 'var(--ink-muted)', borderColor: 'var(--hairline)' }}
+            >
+              閉じる
+            </button>
+          </div>
+        ) : null}
 
         {selectedByCategory.length === 0 ? (
           <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
