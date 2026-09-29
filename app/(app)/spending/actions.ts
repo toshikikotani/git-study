@@ -13,8 +13,15 @@ import {
   listUndiagnosedTransactions,
   saveDiagnoses,
 } from '@/features/diagnosis/store';
+import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
+import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
+import { listCalendarTransactions } from '@/features/spending/store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { addMonths, nthDayOfMonth, parseDateOnlyOr, todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
+import { toDrilldownTransactions } from './drilldown';
+import type { DrilldownTransaction } from './category-breakdown-chart';
 
 export type DiagnoseSpendingActionResult = {
   diagnosedCount: number;
@@ -70,4 +77,42 @@ export async function diagnoseSpendingAction(): Promise<DiagnoseSpendingActionRe
 
   revalidatePath('/spending');
   return { diagnosedCount: outcome.results.length, warnings: outcome.warnings, error: null };
+}
+
+/** カレンダーが移動できる範囲(今日から前後何か月まで)。 */
+const CALENDAR_MONTHS_BACK = 120;
+const CALENDAR_MONTHS_FORWARD = 24;
+
+export type CalendarMonthResult =
+  { error: null; transactions: DrilldownTransaction[] } | { error: string };
+
+/**
+ * カレンダーで過去・未来の月へ移ったときに、その月の明細を返す。
+ * 月は 'YYYY-MM-DD' の任意の日を受け、その月の1日に直す(形式不正は今月)。
+ */
+export async function loadCalendarMonthAction(month: string): Promise<CalendarMonthResult> {
+  try {
+    const today = todayJst();
+    const monthStart = nthDayOfMonth(parseDateOnlyOr(month, today), 1);
+    const earliest = addMonths(nthDayOfMonth(today, 1), -CALENDAR_MONTHS_BACK);
+    const latest = addMonths(nthDayOfMonth(today, 1), CALENDAR_MONTHS_FORWARD);
+    if (monthStart < earliest || monthStart > latest) {
+      return { error: 'この月のカレンダーは表示できません' };
+    }
+
+    const ledgerTransactions = await listCalendarTransactions(monthStart);
+    const ids = ledgerTransactions.map((t) => t.id);
+    const [items, subtypes] = await Promise.all([
+      listReceiptItemsForTransactionIds(ids),
+      listExpenseSubtypesForTransactionIds(ids),
+    ]);
+    return {
+      error: null,
+      transactions: toDrilldownTransactions(ledgerTransactions, items, subtypes),
+    };
+  } catch (error) {
+    return {
+      error: error instanceof AppError ? error.message : 'この月の明細を読み込めませんでした。',
+    };
+  }
 }

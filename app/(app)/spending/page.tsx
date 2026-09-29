@@ -15,6 +15,7 @@ import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { SpendingCalendar } from './calendar';
 import { CategoryBreakdownChart, type DrilldownTransaction } from './category-breakdown-chart';
+import { toDrilldownTransactions } from './drilldown';
 import { DiagnosisCard } from './diagnosis-card';
 import { ReorderableCards, type SpendingCardKey } from './reorderable-cards';
 import {
@@ -130,23 +131,15 @@ export default async function SpendingPage({
   // ADR-044)の両方から使う、明細1件分の共通の形。ここで1回だけ作り、
   // 両画面で共有する(ADR-033、同じ考慮を複数箇所で作らない)。
   const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
-  const drilldownTransactions: DrilldownTransaction[] = ledger.transactions.map((t) => {
-    const drilldown: DrilldownTransaction = {
-      id: t.id,
-      occurredOn: t.occurredOn,
-      label: t.label,
-      genreId: t.genreId,
-      genreName: t.genreName,
-      amountYen: t.amountYen,
-      accountId: t.accountId,
-      paymentMethod: t.paymentMethod,
-      items: itemsByTransactionId.get(t.id) ?? [],
-      expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
-    };
-    const key = t.genreId ?? 'uncategorized';
+  const drilldownTransactions = toDrilldownTransactions(
+    ledger.transactions,
+    itemsByTransactionId,
+    expenseSubtypeByTransactionId,
+  );
+  for (const drilldown of drilldownTransactions) {
+    const key = drilldown.genreId ?? 'uncategorized';
     transactionsByCategory[key] = [...(transactionsByCategory[key] ?? []), drilldown];
-    return drilldown;
-  });
+  }
 
   return (
     <div className="rise space-y-3">
