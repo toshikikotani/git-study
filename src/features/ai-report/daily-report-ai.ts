@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { parseStructured } from '@/lib/anthropic';
 
 /** レポート生成に使うモデル(ADR-032)。日付サフィックスは付けない。 */
-export const DAILY_REPORT_MODEL = 'claude-sonnet-5';
+export const DAILY_REPORT_MODEL = 'claude-sonnet-5-5';
 
 const MAX_OUTPUT_TOKENS = 1536;
 

@@ -13,7 +13,7 @@ import { SPENDING_PERSONA_TYPES, type SpendingPersonaType } from '@/domain/perso
 import { parseStructured } from '@/lib/anthropic';
 
 /** レポート生成に使うモデル(ADR-031)。日付サフィックスは付けない。 */
-export const MONTHLY_REPORT_MODEL = 'claude-sonnet-5';
+export const MONTHLY_REPORT_MODEL = 'claude-sonnet-5-5';
 
 const MAX_OUTPUT_TOKENS = 2048;
 
