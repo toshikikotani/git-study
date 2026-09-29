@@ -8,6 +8,7 @@ import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { LedgerAmount } from '@/components/ui/money';
+import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { genreBarColor } from '@/domain/genre-style';
 import { predictGenres, type GenreHistoryEntry } from '@/domain/genre-prediction';
 import { MdReceiptLong } from 'react-icons/md';
@@ -155,6 +156,7 @@ export function TransactionRowWithSplit({
   /** 生活費の小分類(AIの自由記述、ADR-036)。 */
   expenseSubtype?: string | null;
 }) {
+  const overrides = useGenreOverrides();
   const [open, setOpen] = useState(false);
   // 既に分割済みの明細は分割フォームから開く。それ以外(大半の明細)は
   // 単一カテゴリの変更から開く——分割はあくまで例外的な操作。
@@ -625,7 +627,10 @@ export function TransactionRowWithSplit({
                       key={sh.genreId ?? 'none'}
                       style={{
                         width: `${sh.ratio * 100}%`,
-                        background: genreBarColor(sh.genreName),
+                        background: genreBarColor(
+                          sh.genreName,
+                          sh.genreName ? overrides[sh.genreName] : null,
+                        ),
                       }}
                     />
                   ))}

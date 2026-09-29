@@ -7,7 +7,7 @@ const SCOPE = [
   ...walk('app/(app)/spending'),
   ...walk('app/(app)/plan'),
   ...walk('app/(app)/transactions'),
-  'app/(app)/layout.tsx',
+  'app/(app)/app-shell.tsx',
   ...walk('src/components/ui'),
   ...walk('src/components/receipt'),
 ].filter((f) => !f.includes('transactions/import') && !f.includes('transactions/paste'));

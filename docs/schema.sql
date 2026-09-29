@@ -459,8 +459,13 @@ create table public.genres (
   -- ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。
   show_on_home boolean     not null default false,
 
+  -- 見た目(利用者が選ぶ。null は名前からの既定。domain/genre-style.ts)
+  icon_key     text,
+  color_index  smallint,
+
   created_at   timestamptz not null default now(),
 
+  constraint ck_genres_color_index check (color_index is null or color_index between 1 and 10),
   constraint ck_genres_name_not_blank check (btrim(name) <> ''),
   constraint ck_genres_budget check (budget_yen is null or budget_yen >= 0)
 );

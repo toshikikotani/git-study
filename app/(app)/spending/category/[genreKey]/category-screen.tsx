@@ -21,6 +21,7 @@ import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
 import { CategoryChart } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
+import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
 import { RuleSheet } from './rule-sheet';
@@ -64,6 +65,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   });
   const counts = useMoveCounts();
   const [movePicker, setMovePicker] = useState<CategoryLine | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
   const [showPrevious, setShowPrevious] = useState(true);
@@ -278,15 +280,28 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         totalYen={totalYen}
         onBack={() => router.back()}
         menu={
-          <button
-            type="button"
-            onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-            aria-pressed={selectMode}
-            className="min-h-11 rounded-full px-4 text-sm font-semibold"
-            style={{ color: 'var(--ink)' }}
-          >
-            {selectMode ? '完了' : '選択'}
-          </button>
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              aria-pressed={selectMode}
+              className="min-h-11 rounded-full px-4 text-sm font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              {selectMode ? '完了' : '選択'}
+            </button>
+            {currentGenreId !== null ? (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                aria-label={`${data.genreName}の設定`}
+                className="min-h-11 rounded-full px-3 text-sm font-semibold"
+                style={{ color: 'var(--ink)' }}
+              >
+                設定
+              </button>
+            ) : null}
+          </div>
         }
       />
 
@@ -522,6 +537,15 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
           </div>
         </div>
       </BottomSheet>
+
+      {currentGenreId !== null ? (
+        <CategorySettings
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          data={data}
+          genreId={currentGenreId}
+        />
+      ) : null}
 
       <RuleSheet
         suggestion={rule?.suggestion ?? null}

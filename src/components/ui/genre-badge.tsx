@@ -1,3 +1,5 @@
+'use client';
+
 import type { IconType } from 'react-icons';
 import {
   MdBookmark,
@@ -26,9 +28,15 @@ import {
   MdCheckroom,
 } from 'react-icons/md';
 
-import { genreColorVar, genreStyle, type GenreIconKey } from '@/domain/genre-style';
+import {
+  genreColorVar,
+  genreStyle,
+  type GenreIconKey,
+  type GenreStyleOverride,
+} from '@/domain/genre-style';
+import { useGenreOverride } from './genre-style-context';
 
-const ICONS: Record<GenreIconKey, IconType> = {
+export const ICONS: Record<GenreIconKey, IconType> = {
   grocery: MdLocalGroceryStore,
   restaurant: MdRestaurant,
   cafe: MdCoffee,
@@ -54,14 +62,32 @@ const ICONS: Record<GenreIconKey, IconType> = {
   uncategorized: MdHelpOutline,
 };
 
-export function GenreIcon({ name, size = 16 }: { name: string | null; size?: number }) {
-  const Icon = ICONS[genreStyle(name).icon] ?? MdBookmark;
+export function GenreIcon({
+  name,
+  size = 16,
+  override,
+}: {
+  name: string | null;
+  size?: number;
+  override?: GenreStyleOverride | null | undefined;
+}) {
+  const fromContext = useGenreOverride(name);
+  const Icon = ICONS[genreStyle(name, override ?? fromContext).icon] ?? MdBookmark;
   return <Icon aria-hidden size={size} />;
 }
 
 /** ジャンルのアイコンを色つきの丸に載せたバッジ(名前は隣に別途出す)。 */
-export function GenreBadge({ name, size = 32 }: { name: string | null; size?: number }) {
-  const color = genreColorVar(name);
+export function GenreBadge({
+  name,
+  size = 32,
+  override,
+}: {
+  name: string | null;
+  size?: number;
+  override?: GenreStyleOverride | null | undefined;
+}) {
+  const fromContext = useGenreOverride(name);
+  const color = genreColorVar(name, override ?? fromContext);
   return (
     <span
       aria-hidden
@@ -73,7 +99,7 @@ export function GenreBadge({ name, size = 32 }: { name: string | null; size?: nu
         background: `color-mix(in srgb, ${color} 16%, transparent)`,
       }}
     >
-      <GenreIcon name={name} size={Math.round(size * 0.55)} />
+      <GenreIcon name={name} size={Math.round(size * 0.55)} override={override ?? fromContext} />
     </span>
   );
 }

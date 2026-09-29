@@ -215,6 +215,15 @@ alter table public.transactions drop constraint if exists ck_transactions_kind;
 alter table public.transactions
   add constraint ck_transactions_kind check (kind in ('normal', 'special', 'refund'));
 
+-- 6. genres にアイコン・色の列を足す(カテゴリ設定)
+-- -----------------------------------------------------------------------------
+alter table public.genres add column if not exists icon_key text;
+alter table public.genres add column if not exists color_index smallint;
+
+alter table public.genres drop constraint if exists ck_genres_color_index;
+alter table public.genres
+  add constraint ck_genres_color_index check (color_index is null or color_index between 1 and 10);
+
 commit;
 
 -- =============================================================================
@@ -254,4 +263,12 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'receipt_captures'
-  ) then 'ok' else 'NG: テーブルが無い' end;
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'genres.icon_key / color_index',
+  case when (
+    select count(*) from information_schema.columns
+    where table_schema = 'public' and table_name = 'genres'
+      and column_name in ('icon_key', 'color_index')
+  ) = 2 then 'ok' else 'NG: 列が無い' end;

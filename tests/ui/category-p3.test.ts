@@ -105,6 +105,7 @@ describe('P3 サマリー(画面)', () => {
                 scheduledYen: 5000,
                 reserved: false,
               },
+              plan: null,
             },
           },
         }),

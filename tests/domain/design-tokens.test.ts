@@ -46,7 +46,7 @@ describe('デザイントークン', () => {
   it('ステータスバーの下のぼかし(safe-area)と、リストの下端の余白がレイアウトに含まれる', () => {
     expect(css).toContain('.status-blur');
     expect(css).toContain('env(safe-area-inset-top');
-    const layout = readFileSync(new URL('../../app/(app)/layout.tsx', import.meta.url), 'utf8');
+    const layout = readFileSync(new URL('../../app/(app)/app-shell.tsx', import.meta.url), 'utf8');
     expect(layout).toContain('status-blur');
     expect(layout).toMatch(/pb-\[calc\(9rem\+env\(safe-area-inset-bottom\)\)\]/);
   });

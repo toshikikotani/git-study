@@ -34,6 +34,8 @@ import {
   updateRuleGenre,
 } from '@/features/genre/memory-store';
 import { recordCorrection } from '@/features/genre/memory-store';
+import { updateGenreBudget } from '@/features/genre/store';
+import { renameGenre, saveGenreStyle } from '@/features/genre/style-store';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { describeUserError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -535,5 +537,47 @@ export async function updateRuleGenreAction(
     return { error: describeUserError(e, 'ルールを変更できませんでした。') };
   }
   revalidatePath('/spending');
+  return { error: null };
+}
+
+/** P8: カテゴリ名を変える(同名は不可)。 */
+export async function renameCategoryAction(
+  genreId: string,
+  name: string,
+): Promise<{ error: string | null }> {
+  try {
+    await renameGenre(genreId, name);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** P8: アイコンと色を変える(色は、コントラストを満たす候補だけ)。 */
+export async function saveCategoryStyleAction(
+  genreId: string,
+  style: { icon: string; colorIndex: number },
+): Promise<{ error: string | null }> {
+  try {
+    await saveGenreStyle(genreId, style);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** P8: 目標が無いときの月の目安(ジャンルの予算)を変える。空は「なし」。 */
+export async function updateCategoryBudgetAction(
+  genreId: string,
+  budgetYen: number | null,
+): Promise<{ error: string | null }> {
+  try {
+    await updateGenreBudget(genreId, budgetYen);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
   return { error: null };
 }

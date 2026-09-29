@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { genreBarColor } from '@/domain/genre-style';
 import {
   AUDIO_NOTE_MS,
@@ -54,7 +55,11 @@ export function CategoryChart({
   const [tip, setTip] = useState<number | null>(null);
   const [audioNote, setAudioNote] = useState<string | null>(null);
   const n = series.buckets.length;
-  const color = genreBarColor(genreName === '未分類' ? null : genreName);
+  const overrides = useGenreOverrides();
+  const color = genreBarColor(
+    genreName === '未分類' ? null : genreName,
+    genreName === '未分類' ? null : overrides[genreName],
+  );
 
   // なぞり操作(長押し・なぞる・タップ)の状態機械。DOM に触れない(lib/chart-gesture.ts)。
   const [gesture] = useState(() => new ChartGesture());

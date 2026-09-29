@@ -1649,7 +1649,9 @@ export type Database = {
       genres: {
         Row: {
           budget_yen: number | null;
+          color_index: number | null;
           created_at: string;
+          icon_key: string | null;
           id: string;
           name: string;
           show_on_home: boolean;
@@ -1658,7 +1660,9 @@ export type Database = {
         };
         Insert: {
           budget_yen?: number | null;
+          color_index?: number | null;
           created_at?: string;
+          icon_key?: string | null;
           id?: string;
           name: string;
           show_on_home?: boolean;
@@ -1667,7 +1671,9 @@ export type Database = {
         };
         Update: {
           budget_yen?: number | null;
+          color_index?: number | null;
           created_at?: string;
+          icon_key?: string | null;
           id?: string;
           name?: string;
           show_on_home?: boolean;

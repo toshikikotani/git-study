@@ -34,6 +34,7 @@ PENDING=(
   20260930000200_receipt_memory.sql
   20260930000300_receipt_captures.sql
   20260930000400_transaction_kind_refund.sql
+  20260930000500_genre_style.sql
 )
 
 WORK="$(mktemp -d)"

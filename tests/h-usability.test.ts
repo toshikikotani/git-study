@@ -62,7 +62,7 @@ describe('H 家計簿タブ・概要/明細(受け入れ基準10)', () => {
     const page = readFileSync('app/(app)/spending/page.tsx', 'utf8');
     expect(page).toContain('<ViewSwitch />');
     expect(readFileSync('app/(app)/spending/ledger-list.tsx', 'utf8')).toContain('id="ledger"');
-    expect(readFileSync('app/(app)/layout.tsx', 'utf8')).toContain(
+    expect(readFileSync('app/(app)/app-shell.tsx', 'utf8')).toContain(
       'tabTapAction(pathname, item.href)',
     );
   });

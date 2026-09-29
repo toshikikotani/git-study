@@ -5,6 +5,7 @@ import { useJustSaved } from '@/lib/just-saved';
 import { useState } from 'react';
 
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
+import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { genreBarColor } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
 import type { GoalBreakdownRow } from '@/features/goals/view';
@@ -20,6 +21,7 @@ import { useSpendingMonth } from './spending-month-provider';
  * 行(実績バー + 今日時点の理想ラインの目印 + 状態色)で見せる。
  */
 export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownRow[] | null }) {
+  const overrides = useGenreOverrides();
   const { genreBreakdown, filter, isCurrentMonth, loading, visibleMonth } = useSpendingMonth();
   const [scope, setScope] = useState<'month' | 'goal'>('month');
   const justSaved = useJustSaved().length > 0;
@@ -124,7 +126,10 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                 key={r.key}
                 style={{
                   width: `${(r.spentYen / Math.max(total, 1)) * 100}%`,
-                  background: genreBarColor(r.genreId === null ? null : r.name),
+                  background: genreBarColor(
+                    r.genreId === null ? null : r.name,
+                    r.genreId === null ? null : overrides[r.name],
+                  ),
                 }}
               />
             ))}

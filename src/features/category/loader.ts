@@ -46,6 +46,19 @@ export type CategoryDetailData = {
     dailyAllowanceYen: number | null;
     active: boolean;
     row: GoalBreakdownRow | null;
+    /** 進行中の目標の配分(カテゴリ設定から「配分・総額を調整する」を開くため)。 */
+    plan: null | {
+      id: string;
+      periodStart: string;
+      periodEnd: string;
+      rows: {
+        genreId: string;
+        genreName: string;
+        baselineYen: number | null;
+        note: string | null;
+        yen: number;
+      }[];
+    };
   };
 };
 
@@ -113,6 +126,21 @@ export async function loadCategoryDetail(input: {
             dailyAllowanceYen: view.dailyAllowanceYen,
             active: view.active,
             row: view.breakdown.find((r) => r.genreId === genreId) ?? null,
+            plan:
+              view.active && goalLoaded
+                ? {
+                    id: goalLoaded.plan.id,
+                    periodStart: goalLoaded.plan.periodStart,
+                    periodEnd: goalLoaded.plan.periodEnd,
+                    rows: goalLoaded.plan.items.map((item) => ({
+                      genreId: item.genreId,
+                      genreName: item.genreName,
+                      baselineYen: null,
+                      note: item.reason,
+                      yen: item.targetYen,
+                    })),
+                  }
+                : null,
           },
   };
 }
