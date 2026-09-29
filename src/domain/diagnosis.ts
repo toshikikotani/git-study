@@ -101,3 +101,35 @@ export function wasteRatioOf(entry: MonthlyDiagnosisSummary): number | null {
   const totalYen = entry.wasteYen + entry.necessaryYen;
   return totalYen > 0 ? entry.wasteYen / totalYen : null;
 }
+
+export type DiagnosisBreakdown = {
+  /** 見直し候補(AI が「浪費」と判断した支出)。 */
+  reviewYen: number;
+  /** 必要経費。 */
+  necessaryYen: number;
+  /** まだ診断していない支出。 */
+  undiagnosedYen: number;
+  /** 使った額の合計 = 見直し候補 + 必要経費 + 未診断額。 */
+  totalYen: number;
+};
+
+/**
+ * 診断の内訳を、使った額の合計(集計関数の値)に必ず一致させる。
+ * 未診断額は「合計 − 診断済み」で求めるので、見直し候補 + 必要経費 + 未診断額 = 合計
+ * が常に成り立つ(診断済みの方が大きい不整合なデータでも、合計を超えて表示しない)。
+ */
+export function diagnosisBreakdown(input: {
+  totalSpentYen: number;
+  wasteYen: number;
+  necessaryYen: number;
+}): DiagnosisBreakdown {
+  const total = Math.max(input.totalSpentYen, 0);
+  const reviewYen = Math.min(input.wasteYen, total);
+  const necessaryYen = Math.min(input.necessaryYen, total - reviewYen);
+  return {
+    reviewYen,
+    necessaryYen,
+    undiagnosedYen: total - reviewYen - necessaryYen,
+    totalYen: total,
+  };
+}

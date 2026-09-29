@@ -12,6 +12,8 @@ import { monthRange, summarizeLedger } from '@/domain/ledger';
 import { projectedMonthTotalYen } from '@/domain/spending';
 import { addMonths, daysBetween, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
+import { countRecordedDays } from '@/domain/summary-rules';
+import { createClient } from '@/lib/supabase/server';
 import { loadLedgerTransactions } from './entries';
 import { attachThumbnails } from './thumbnails';
 import { buildLedgerViews, toLedgerEntries } from './views';
@@ -61,7 +63,13 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   ).spentYen;
   const { summary } = views;
 
+  const firstRecordedOn = await loadFirstRecordedOn(today);
+  const recordedDaysThisMonth = countRecordedDays(
+    [...summary.byDay.keys()].filter((d) => d >= thisMonth.from),
+  );
+
   return {
+    record: { firstRecordedOn, recordedDaysThisMonth },
     period: { from: thisMonth.from, to: today },
     totals: views.totals,
     totalSpentYen: summary.spentYen,
@@ -123,4 +131,17 @@ export async function loadCalendarMonth(
     genreBreakdown: views.genreBreakdown,
     totals: views.totals,
   };
+}
+
+/** 最初の記録の日(今日まで)。1件も無ければ null。 */
+async function loadFirstRecordedOn(today: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('occurred_on')
+    .lte('occurred_on', today)
+    .order('occurred_on', { ascending: true })
+    .limit(1);
+  if (error || data.length === 0) return null;
+  return data[0]!.occurred_on;
 }

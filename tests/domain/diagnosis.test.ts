@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  diagnosisBreakdown,
   summarizeDiagnoses,
   summarizeDiagnosesByMonth,
   wasteRatioOf,
@@ -88,5 +89,24 @@ describe('wasteRatioOf', () => {
 
   it('合計が0円なら null(診断していない月と区別する)', () => {
     expect(wasteRatioOf({ monthKey: '2026-08', wasteYen: 0, necessaryYen: 0 })).toBeNull();
+  });
+});
+
+describe('diagnosisBreakdown', () => {
+  it('見直し候補 + 必要経費 + 未診断額 = 合計', () => {
+    const b = diagnosisBreakdown({ totalSpentYen: 31542, wasteYen: 5000, necessaryYen: 20000 });
+    expect(b).toEqual({
+      reviewYen: 5000,
+      necessaryYen: 20000,
+      undiagnosedYen: 6542,
+      totalYen: 31542,
+    });
+    expect(b.reviewYen + b.necessaryYen + b.undiagnosedYen).toBe(b.totalYen);
+  });
+
+  it('診断済みが合計より大きい不整合でも、合計を超えない', () => {
+    const b = diagnosisBreakdown({ totalSpentYen: 1000, wasteYen: 800, necessaryYen: 900 });
+    expect(b.reviewYen + b.necessaryYen + b.undiagnosedYen).toBe(1000);
+    expect(b.undiagnosedYen).toBe(0);
   });
 });

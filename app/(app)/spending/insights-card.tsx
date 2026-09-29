@@ -1,8 +1,12 @@
 'use client';
 
 /**
- * AI家計診断のカード(ADR-030)。押されたときだけ AI を呼ぶ。
- * 浪費・必要経費どちらも理由付きで全件出す(上位N件に絞らない)。
+ * 気づき(AI家計診断とちりつもを小さくまとめたカード)。
+ *
+ * AI家計診断(ADR-030)は押されたときだけ AI を呼ぶ。「浪費」は「見直し候補」と
+ * 表記し、見直し候補 + 必要経費 + 未診断額 = 使った額の合計 になるよう、未診断額も
+ * 明示する(domain/diagnosis.ts の diagnosisBreakdown。合計は家計簿の集計と同じ値)。
+ * 見直し候補・必要経費どちらも理由付きで全件出す(上位N件に絞らない)。
  *
  * ── 内訳は開くまで畳んでおく(本人からのUX指摘「パンパンパンパン、
  *    詳細見たかったら詳細見るみたいな感じがいい」)──────────────────
@@ -13,14 +17,25 @@
 
 import { useState } from 'react';
 
-import { wasteRatioOf } from '@/domain/diagnosis';
+import Link from 'next/link';
+
+import { diagnosisBreakdown, wasteRatioOf } from '@/domain/diagnosis';
 import { formatYen } from '@/domain/money';
 import type { DiagnosedItem, SpendingDiagnosisView } from '@/features/diagnosis/store';
 import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
 import { formatDateJa } from '@/lib/date';
 import { diagnoseSpendingAction } from './actions';
 
-export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
+export function InsightsCard({
+  view,
+  totalSpentYen,
+  pile,
+}: {
+  view: SpendingDiagnosisView;
+  /** 今月使った額(集計関数の値)。診断の内訳の合計にそろえる。 */
+  totalSpentYen: number;
+  pile: { thresholdYen: number; smallSpendTotalYen: number };
+}) {
   const [current, setCurrent] = useState(view.currentMonth);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +43,11 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const { summary, wasteItems, necessaryItems, undiagnosedCount } = current;
+  const breakdown = diagnosisBreakdown({
+    totalSpentYen,
+    wasteYen: summary.wasteYen,
+    necessaryYen: summary.necessaryYen,
+  });
   const wasteRatioPoints = view.trend.rows.map((row) => ({
     monthKey: row.monthKey,
     ratio: wasteRatioOf(row),
@@ -52,23 +72,24 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
 
   return (
     <div
+      aria-label="気づき"
       className="rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          AI家計診断
+          気づき ・ AI家計診断
         </p>
         {summary.wasteRatio !== null ? (
           <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            浪費 {Math.round(summary.wasteRatio * 100)}%
+            見直し候補 {Math.round(summary.wasteRatio * 100)}%
           </p>
         ) : null}
       </div>
 
       {summary.wasteRatio === null ? (
         <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          投資家目線で、今の支出が浪費か必要経費かをAIが判断します。
+          投資家目線で、今の支出が見直し候補か必要経費かをAIが判断します。
         </p>
       ) : (
         <>
@@ -78,8 +99,10 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
             className="mt-2 flex w-full items-center justify-between gap-3 text-left"
           >
             <span className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              浪費 {formatYen(summary.wasteYen, { sign: 'never' })} ・ 必要経費{' '}
-              {formatYen(summary.necessaryYen, { sign: 'never' })}
+              見直し候補 {formatYen(breakdown.reviewYen, { sign: 'never' })} ・ 必要経費{' '}
+              {formatYen(breakdown.necessaryYen, { sign: 'never' })} ・ 未診断{' '}
+              {formatYen(breakdown.undiagnosedYen, { sign: 'never' })} = 合計{' '}
+              {formatYen(breakdown.totalYen, { sign: 'never' })}
             </span>
             <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--accent)' }}>
               {detailsOpen ? '閉じる' : '詳しく見る'}
@@ -89,9 +112,9 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
           {detailsOpen ? (
             <>
               <DiagnosisItemList
-                heading="浪費と判断した内訳"
+                heading="見直し候補と判断した内訳"
                 items={wasteItems}
-                amountColor="var(--over)"
+                amountColor="var(--ink)"
               />
               <DiagnosisItemList
                 heading="必要経費と判断した内訳"
@@ -111,7 +134,7 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
           onClick={() => void run()}
           disabled={pending}
           className="mt-4 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
         >
           {pending ? '診断しています…' : `今月の${undiagnosedCount}件をAIで診断する`}
         </button>
@@ -126,10 +149,25 @@ export function DiagnosisCard({ view }: { view: SpendingDiagnosisView }) {
       ) : null}
 
       {error ? (
-        <p className="mt-2 text-xs" style={{ color: 'var(--over)' }}>
+        <p role="alert" className="mt-2 text-xs" style={{ color: 'var(--over)' }}>
           {error}
         </p>
       ) : null}
+
+      {/* ちりつも(小口支出の積み重ね)は補助。要約1行だけ見せて詳細へ */}
+      <Link
+        href="/spending/pile"
+        className="mt-3 flex items-center justify-between gap-3 border-t pt-3"
+        style={{ borderColor: 'var(--hairline)' }}
+      >
+        <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          ちりつも:1回{formatYen(pile.thresholdYen, { sign: 'never' })}未満の小口支出、今月は{' '}
+          <span className="tabular">{formatYen(pile.smallSpendTotalYen, { sign: 'never' })}</span>
+        </p>
+        <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+          詳しく →
+        </span>
+      </Link>
     </div>
   );
 }

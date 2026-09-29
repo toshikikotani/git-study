@@ -104,7 +104,16 @@ export type MonthlyPace = {
   differenceYen: number;
 };
 
+/** 記録の量(前月比較・月末予測を出してよいかの判断材料)。 */
+export type LedgerRecordInfo = {
+  /** 最初の記録の日。記録が1件も無ければ null。 */
+  firstRecordedOn: string | null;
+  /** 今月、取引(実績の支出)のある日の数。 */
+  recordedDaysThisMonth: number;
+};
+
 export type MonthlyLedgerView = {
+  record: LedgerRecordInfo;
   period: { from: string; to: string };
   totals: MonthTotals;
   totalSpentYen: number;
