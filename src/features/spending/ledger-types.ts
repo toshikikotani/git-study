@@ -24,6 +24,9 @@ export type LedgerTransaction = {
   paymentMethod: PaymentMethod;
 };
 
+/** 1か月の支出・収入の合計(どちらも正の数)。 */
+export type MonthTotals = { spentYen: number; incomeYen: number };
+
 export type GenreBreakdownRow = {
   genreId: string | null;
   /** null は未分類(genreId が無い明細)。 */
