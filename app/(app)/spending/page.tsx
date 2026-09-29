@@ -14,10 +14,11 @@ import {
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { SpendingCalendar } from './calendar';
-import { CategoryBreakdownChart, type DrilldownTransaction } from './category-breakdown-chart';
+import { MonthLinkedCategoryBreakdown } from './category-breakdown-chart';
 import { toDrilldownTransactions } from './drilldown';
 import { DiagnosisCard } from './diagnosis-card';
 import { ReorderableCards, type SpendingCardKey } from './reorderable-cards';
+import { SpendingMonthProvider } from './spending-month-provider';
 import {
   TransactionListSection,
   type TransactionListSearchParams,
@@ -130,16 +131,11 @@ export default async function SpendingPage({
   // ジャンル別内訳(CategoryBreakdownChart)とカレンダー(SpendingCalendar、
   // ADR-044)の両方から使う、明細1件分の共通の形。ここで1回だけ作り、
   // 両画面で共有する(ADR-033、同じ考慮を複数箇所で作らない)。
-  const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
   const drilldownTransactions = toDrilldownTransactions(
     ledger.transactions,
     itemsByTransactionId,
     expenseSubtypeByTransactionId,
   );
-  for (const drilldown of drilldownTransactions) {
-    const key = drilldown.genreId ?? 'uncategorized';
-    transactionsByCategory[key] = [...(transactionsByCategory[key] ?? []), drilldown];
-  }
 
   return (
     <div className="rise space-y-3">
@@ -152,30 +148,27 @@ export default async function SpendingPage({
         </p>
       </header>
 
-      <ReorderableCards
-        defaultOrder={DEFAULT_CARD_ORDER}
-        cards={{
-          summary: <SummaryCard ledger={ledger} netYen={netYen} />,
-          calendar: (
-            <SpendingCalendar
-              transactions={drilldownTransactions}
-              period={ledger.period}
-              categories={categories}
-            />
-          ),
-          forecast: <ForecastCard forecast={ledger.forecast} />,
-          diagnosis: <DiagnosisCard view={diagnosis} />,
-          categoryBreakdown: (
-            <CategoryBreakdownChart
-              rows={ledger.genreBreakdown}
-              transactionsByCategory={transactionsByCategory}
-              categories={categories}
-            />
-          ),
-          pile: <PileTeaserCard view={pile} />,
-          transactionList: <TransactionListSection searchParams={params} />,
-        }}
-      />
+      {/* カレンダーと「ジャンル別の内訳」は同じ月を見せる(本人発案)。表示中の月は
+          SpendingMonthProvider が持ち、両方のカードがそれを読む。 */}
+      <SpendingMonthProvider
+        today={ledger.period.to}
+        currentMonthStart={ledger.period.from}
+        currentTransactions={drilldownTransactions}
+        currentGenreBreakdown={ledger.genreBreakdown}
+      >
+        <ReorderableCards
+          defaultOrder={DEFAULT_CARD_ORDER}
+          cards={{
+            summary: <SummaryCard ledger={ledger} netYen={netYen} />,
+            calendar: <SpendingCalendar categories={categories} />,
+            forecast: <ForecastCard forecast={ledger.forecast} />,
+            diagnosis: <DiagnosisCard view={diagnosis} />,
+            categoryBreakdown: <MonthLinkedCategoryBreakdown categories={categories} />,
+            pile: <PileTeaserCard view={pile} />,
+            transactionList: <TransactionListSection searchParams={params} />,
+          }}
+        />
+      </SpendingMonthProvider>
     </div>
   );
 }

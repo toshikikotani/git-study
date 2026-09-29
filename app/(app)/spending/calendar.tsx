@@ -17,7 +17,7 @@ import {
   nthDayOfMonth,
   splitDateOnly,
 } from '@/lib/date';
-import { loadCalendarMonthAction } from './actions';
+import { useSpendingMonth } from './spending-month-provider';
 import { updateTransactionAction } from '../transactions/actions';
 import { ReceiptItemsPanel } from '../transactions/receipt-items-panel';
 import type { DrilldownTransaction } from './category-breakdown-chart';
@@ -95,35 +95,23 @@ const CALENDAR_CLASS_NAMES = {
   hidden: 'invisible',
 } as const;
 
-export function SpendingCalendar({
-  transactions,
-  period,
-  categories,
-}: {
-  transactions: readonly DrilldownTransaction[];
-  period: { from: string; to: string };
-  categories: readonly GenreOption[];
-}) {
+export function SpendingCalendar({ categories }: { categories: readonly GenreOption[] }) {
   const router = useRouter();
-  const today = period.to;
-  const currentMonthStart = period.from;
+  // 表示中の月と、その月の明細は「ジャンル別の内訳」と共有する(SpendingMonthProvider)。
+  const {
+    visibleMonth,
+    currentMonthStart,
+    today,
+    isCurrentMonth,
+    transactions: visibleTransactions,
+    loading: loadingMonth,
+    error: monthError,
+    goToMonth,
+    reloadVisibleMonth,
+  } = useSpendingMonth();
   const [selectedDate, setSelectedDate] = useState(today);
-  // 表示中の月の1日。過去・未来の月へ移動できる(本人発案)。
-  const [visibleMonth, setVisibleMonth] = useState(currentMonthStart);
-  // 今月以外の月の明細(月の1日 → 明細)。今月は常に page.tsx が渡す最新の値を使う。
-  const [otherMonths, setOtherMonths] = useState<ReadonlyMap<string, DrilldownTransaction[]>>(
-    new Map(),
-  );
-  const [loadingMonth, setLoadingMonth] = useState(false);
-  const [monthError, setMonthError] = useState<string | null>(null);
   // 日付を押すと、その日の明細の上に開くメニュー(家計簿を手で登録する)。
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const visibleTransactions = useMemo(
-    () =>
-      visibleMonth === currentMonthStart ? transactions : (otherMonths.get(visibleMonth) ?? []),
-    [visibleMonth, currentMonthStart, transactions, otherMonths],
-  );
 
   const transactionsByDate = useMemo(() => {
     const map = new Map<string, DrilldownTransaction[]>();
@@ -149,27 +137,12 @@ export function SpendingCalendar({
     [transactionsByDate, selectedDate],
   );
 
-  /** 月を移ったら、その月の明細を取りに行く(今月はページが持っている)。 */
-  const loadMonth = async (monthStart: string, force = false) => {
-    if (monthStart === currentMonthStart || (!force && otherMonths.has(monthStart))) return;
-    setLoadingMonth(true);
-    setMonthError(null);
-    const result = await loadCalendarMonthAction(monthStart);
-    setLoadingMonth(false);
-    if (result.error !== null) {
-      setMonthError(result.error);
-      return;
-    }
-    setOtherMonths((prev) => new Map(prev).set(monthStart, result.transactions));
-  };
-
   const changeMonth = (month: Date) => {
     const monthStart = nthDayOfMonth(localDateToDateOnly(month), 1);
-    setVisibleMonth(monthStart);
     // 移動先では、今月なら今日、それ以外は1日を選んでおく。
     setSelectedDate(monthStart === currentMonthStart ? today : monthStart);
     setMenuOpen(false);
-    void loadMonth(monthStart);
+    goToMonth(monthStart);
   };
 
   const selectDate = (date: string) => {
@@ -204,7 +177,7 @@ export function SpendingCalendar({
         <span style={{ color: 'var(--ink-muted)' }}>
           {loadingMonth ? 'この月の明細を読み込んでいます…' : ''}
         </span>
-        {visibleMonth !== currentMonthStart ? (
+        {!isCurrentMonth ? (
           <button
             type="button"
             onClick={() => changeMonth(dateOnlyToLocalDate(currentMonthStart))}
@@ -268,7 +241,7 @@ export function SpendingCalendar({
                 categories={categories}
                 onSaved={() => {
                   router.refresh();
-                  void loadMonth(visibleMonth, true);
+                  reloadVisibleMonth();
                 }}
               />
             ))}
