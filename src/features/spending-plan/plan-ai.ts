@@ -22,7 +22,14 @@ import { parseStructured } from '@/lib/anthropic';
 import type { PlanContext, PlanGenreContext } from './context';
 
 /** 提案に使うモデル。日付サフィックスは付けない。 */
-export const SPENDING_PLAN_MODEL = 'claude-sonnet-5';
+export const SPENDING_PLAN_MODEL = 'claude-sonnet-5-5';
+
+/**
+ * 配分の微調整に使うモデル。出力は数字の表と短い説明だけで、合計の一致は
+ * applyRefinement()(rebalanceToTotal)が機械的にそろえるため、速さを優先して
+ * Haiku にした(Sonnet 5 は既定で高強度に考えるため遅く、出力上限で切れていた)。
+ */
+export const SPENDING_PLAN_REFINE_MODEL = 'claude-haiku-4-5';
 
 // 返答そのもの(22ジャンルぶんの金額と理由)は数百トークンだが、モデルの思考にも
 // 出力枠が使われて 4096 では途中で切れた(本番で確認)。使った分だけの課金なので広く取る。
@@ -171,6 +178,8 @@ export async function suggestPlanTargets(
     client: client ?? new Anthropic({ apiKey }),
     model: SPENDING_PLAN_MODEL,
     maxTokens: MAX_OUTPUT_TOKENS,
+    disableThinking: true,
+    effort: 'low',
     system: buildSystemPrompt(stepPercent),
     messages: [{ role: 'user', content: buildUserContent(context, stepPercent) }],
     schema: buildSchema(context.genres.map((g) => g.genreName) as [string, ...string[]]),
@@ -264,7 +273,7 @@ export async function refinePlanAllocation(
   );
   const result = await parseStructured({
     client: client ?? new Anthropic({ apiKey }),
-    model: SPENDING_PLAN_MODEL,
+    model: SPENDING_PLAN_REFINE_MODEL,
     maxTokens: MAX_OUTPUT_TOKENS,
     system: [
       'あなたは家計改善を手伝う、現実的で無理を勧めないアドバイザーです。',

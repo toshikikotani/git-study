@@ -15,7 +15,7 @@ import { parseStructured } from '@/lib/anthropic';
 import type { DateOnly } from '@/lib/date';
 
 /** 診断に使うモデル(ADR-030)。日付サフィックスは付けない。 */
-export const SPENDING_DIAGNOSIS_MODEL = 'claude-sonnet-5';
+export const SPENDING_DIAGNOSIS_MODEL = 'claude-sonnet-5-5';
 
 /** 1回のリクエストに含める明細数の上限。理由は診断1件ごとに文章を書かせる
  * ため、件数が増えると出力が長くなり max_tokens に達しやすくなるため
