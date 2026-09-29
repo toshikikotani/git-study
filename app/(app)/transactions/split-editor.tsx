@@ -20,6 +20,7 @@ import {
   duplicateTransactionAction,
   recordGenreCorrectionAction,
   replaceSplitsAction,
+  setTransactionKindAction,
   updateTransactionAction,
   updateTransactionMemoAction,
 } from './actions';
@@ -181,6 +182,7 @@ export function TransactionRowWithSplit({
   const [genreSheetOpen, setGenreSheetOpen] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  const [special, setSpecial] = useState(display?.special ?? false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -317,6 +319,17 @@ export function TransactionRowWithSplit({
     });
   }
 
+  async function toggleSpecial(): Promise<void> {
+    setRowError(null);
+    const next = !special;
+    const result = await setTransactionKindAction(transaction.id, next ? 'special' : 'normal');
+    if (result.error) {
+      setRowError(result.error);
+      return;
+    }
+    setSpecial(next);
+  }
+
   async function remove(): Promise<void> {
     setRowError(null);
     const result = await deleteTransactionAction(transaction.id);
@@ -380,7 +393,7 @@ export function TransactionRowWithSplit({
             {/* 1行目:正規化した店名 */}
             <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
               {display?.name ?? transaction.description}
-              {display?.special ? (
+              {special ? (
                 <span
                   className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
                   style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
@@ -476,6 +489,18 @@ export function TransactionRowWithSplit({
         {/* 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付
           とは独立した操作なので、別の開閉状態を持つ(このファイル冒頭の
           コメント参照)。 */}
+        {open ? (
+          <button
+            type="button"
+            onClick={() => void toggleSpecial()}
+            aria-pressed={special}
+            className="mt-3 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            {special ? '特別費を通常の支出に戻す' : '特別費にする(目標のペースから除く)'}
+          </button>
+        ) : null}
+
         {open && !memoFormOpen ? (
           <div className="mt-3 flex items-start justify-between gap-2">
             {memo ? (
