@@ -468,6 +468,13 @@ function planPlanTargets(input: unknown, ctx: PlanContext): PlannedChange {
     items.push({ genreId: planItem.genreId, targetYen });
     parts.push(`${planItem.genreName}: ${yen(planItem.targetYen)}→${yen(targetYen)}`);
   }
+  const changed = new Map(items.map((i) => [i.genreId, i.targetYen]));
+  const totalBefore = ctx.latestPlan.items.reduce((sum, i) => sum + i.targetYen, 0);
+  const totalAfter = ctx.latestPlan.items.reduce(
+    (sum, i) => sum + (changed.get(i.genreId) ?? i.targetYen),
+    0,
+  );
+  parts.push(`合計: ${yen(totalBefore)}→${yen(totalAfter)}`);
   return {
     change: {
       tool: 'update_plan_targets',

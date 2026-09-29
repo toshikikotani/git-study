@@ -266,6 +266,7 @@ describe('planToolCall: 支出目標の調整', () => {
       CTX,
     );
     expect(change.detail).toContain('食料品: 30,000円→27,000円');
+    expect(change.detail).toContain('合計: 40,000円→35,000円');
     expect(operation).toEqual({
       op: 'update_plan_targets',
       planId: 'plan1',
