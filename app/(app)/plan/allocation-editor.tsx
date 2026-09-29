@@ -185,7 +185,7 @@ export function AllocationEditor({
           <span style={{ color: 'var(--ink-muted)' }}>円</span>
         </label>
       </div>
-      <p className="text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         総額を書き換えて確定すると、全ジャンルの配分が比率で自動的に増減します。
       </p>
 
@@ -235,7 +235,7 @@ export function AllocationEditor({
               >
                 {row.genreName}
                 {pinned.has(row.genreId) ? (
-                  <span className="ml-1 text-[10px] font-normal" style={{ color: 'var(--accent)' }}>
+                  <span className="ml-1 text-xs font-normal" style={{ color: 'var(--accent)' }}>
                     固定
                   </span>
                 ) : null}
@@ -245,7 +245,7 @@ export function AllocationEditor({
                   type="button"
                   aria-label={`${row.genreName}を${STEP_YEN}円減らす`}
                   onClick={() => setYen(row.genreId, (parsed[i] ?? 0) - STEP_YEN, true)}
-                  className="size-8 rounded-full text-base font-semibold"
+                  className="min-h-11 size-8 rounded-full text-base font-semibold"
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
                   −
@@ -272,7 +272,7 @@ export function AllocationEditor({
                   type="button"
                   aria-label={`${row.genreName}を${STEP_YEN}円増やす`}
                   onClick={() => setYen(row.genreId, (parsed[i] ?? 0) + STEP_YEN, true)}
-                  className="size-8 rounded-full text-base font-semibold"
+                  className="min-h-11 size-8 rounded-full text-base font-semibold"
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
                   ＋
@@ -280,10 +280,7 @@ export function AllocationEditor({
               </span>
             </div>
             {row.baselineYen !== null || row.note ? (
-              <p
-                className="mt-0.5 text-[11px] leading-relaxed"
-                style={{ color: 'var(--ink-muted)' }}
-              >
+              <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
                 {row.baselineYen !== null
                   ? `実績ペース ${formatYen(row.baselineYen, { sign: 'never' })}`
                   : ''}
@@ -313,7 +310,7 @@ export function AllocationEditor({
           maxLength={200}
           rows={2}
           placeholder="例:外食を減らして、その分を日用品に回したい(空欄なら見直し案を出します)"
-          className="mt-1.5 w-full rounded-lg px-2 py-1.5 text-xs"
+          className="mt-2 w-full rounded-lg px-2 py-2 text-xs"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',

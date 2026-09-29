@@ -40,7 +40,7 @@ type ButtonAsLink = CommonProps & {
 };
 
 const VARIANT_STYLE: Record<Variant, React.CSSProperties> = {
-  filled: { background: 'var(--accent)', color: 'var(--on-accent)' },
+  filled: { background: 'var(--action)', color: 'var(--on-action)' },
   tonal: { background: 'var(--accent-track)', color: 'var(--accent)' },
   outlined: {
     background: 'transparent',
@@ -61,7 +61,7 @@ const VARIANT_STYLE: Record<Variant, React.CSSProperties> = {
 export function Button(props: ButtonAsButton | ButtonAsLink) {
   const { children, variant = 'filled', className, disabled } = props;
 
-  const sharedClassName = `label-text active:scale-[0.96] inline-flex items-center justify-center gap-1.5 px-6 py-2.5 ${
+  const sharedClassName = `label-text active:scale-[0.96] inline-flex items-center justify-center gap-2 px-6 py-3 ${
     disabled ? 'pointer-events-none opacity-40' : ''
   } ${className ?? ''}`;
   const sharedStyle: React.CSSProperties = {
@@ -72,7 +72,11 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
 
   if (props.href !== undefined) {
     return (
-      <Link href={props.href as Route} className={sharedClassName} style={sharedStyle}>
+      <Link
+        href={props.href as Route}
+        className={`min-h-11 inline-flex items-center ${sharedClassName}`}
+        style={sharedStyle}
+      >
         {children}
       </Link>
     );
@@ -83,7 +87,7 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
       type={props.type ?? 'button'}
       onClick={props.onClick}
       disabled={disabled}
-      className={sharedClassName}
+      className={`min-h-11 ${sharedClassName}`}
       style={sharedStyle}
     >
       {children}

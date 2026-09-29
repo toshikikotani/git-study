@@ -41,7 +41,7 @@ export default async function SpendingPilePage() {
         <div>
           <Link
             href="/spending"
-            className="text-[11px] font-medium"
+            className="min-h-11 inline-flex items-center text-xs font-medium"
             style={{ color: 'var(--ink-muted)' }}
           >
             ← 家計簿
@@ -49,11 +49,15 @@ export default async function SpendingPilePage() {
           <h1 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
             ちりつも
           </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             {formatDateJa(view.period.from)} 〜 {formatDateJa(view.period.to)}
           </p>
         </div>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link
+          href="/spending"
+          className="min-h-11 inline-flex items-center text-xs"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           明細
         </Link>
       </header>
@@ -166,7 +170,7 @@ function SmallSpendPile({ view }: { view: AccumulationView }) {
             </div>
 
             <div
-              className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full"
+              className="mt-2 h-2 w-full overflow-hidden rounded-full"
               style={{ background: 'var(--over-track)' }}
               title={`${group.label} ${group.count}回 ${formatYen(group.totalYen, {
                 sign: 'never',
@@ -181,7 +185,7 @@ function SmallSpendPile({ view }: { view: AccumulationView }) {
               />
             </div>
 
-            <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
               {group.count}回 / 1回あたり {formatYen(group.averageYen, { sign: 'never' })}
             </p>
           </li>

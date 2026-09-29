@@ -34,6 +34,37 @@
   --font-sans:
     var(--font-inter), var(--font-jp), system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
     sans-serif;
+
+  /* 文字の段階は5つだけ(34 大見出し / 40 金額の主役 / 17 見出し(太字)/ 15 本文 / 13 補足)。
+     Tailwind の text-* もこの5つのどれかに寄せる。 */
+  --text-xs: calc(13 / 17 * 1rem);
+  --text-xs--line-height: 18px;
+  --text-sm: calc(15 / 17 * 1rem);
+  --text-sm--line-height: 22px;
+  --text-base: 1rem;
+  --text-base--line-height: 24px;
+  --text-lg: 1rem;
+  --text-lg--line-height: 24px;
+  --text-xl: 2rem;
+  --text-xl--line-height: 40px;
+  --text-2xl: 2rem;
+  --text-2xl--line-height: 40px;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 40px;
+  --text-4xl: calc(40 / 17 * 1rem);
+  --text-4xl--line-height: 48px;
+
+  /* 角丸は カード16 / 内側の要素12 / チップは完全な丸 の3つだけ。 */
+  --spacing: 4px;
+
+  --radius-xs: 12px;
+  --radius-sm: 12px;
+  --radius-md: 12px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 16px;
+  --radius-4xl: 16px;
 }
 
 :root {
@@ -42,24 +73,24 @@
   /* 面(青みを含んだ階調) */
   --plane: #eef1f6;
   --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --hairline: rgba(10, 16, 32, 0.08);
+  --surface-raised: #f4f6fa;
+  --hairline: rgba(10, 16, 32, 0.06);
 
   /* 文字 */
   --ink: #0a1020;
   --ink-secondary: #4a5568;
-  --ink-muted: #78849b;
+  --ink-muted: #5b667a;
 
   /* 役割の色 */
-  --accent: #2a78d6; /* 返済・残り */
-  --accent-track: #dceafc; /* 空のトラック(同一ランプの明るい段) */
+  --accent: #0a1020; /* 選択中・リンクの文字(青ではない。青は --action だけ) */
+  --accent-track: rgba(10, 16, 32, 0.07); /* 帯・トラック(中立) */
   --income: #0f8f60; /* 収入 */
   --income-track: #d9f2e6;
   --over: #e34948; /* 超過・支出 */
   --over-track: #f9dfdf;
   --attention: #b8860b; /* 閾値到達。点で使い、必ず文字を伴う */
 
-  --hero-glow: rgba(42, 120, 214, 0.09);
+  --hero-glow: rgba(10, 16, 32, 0.03);
   --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
 
   /* ジャンルの色(10色)。赤・青・黄・灰は状態色に予約してあるので使わない。
@@ -78,8 +109,8 @@
 
   /* 状態色:余裕=青、注意=黄、超過=赤、予算なし=グレー。赤は超過とエラーにだけ使う。
      色だけに頼らず、必ずアイコン・ラベルを併用する(domain/budget-state.ts)。 */
-  --state-ok: #2a78d6;
-  --state-ok-track: #dceafc;
+  --state-ok: #4a5568;
+  --state-ok-track: #e6e9ef;
   --state-caution: #b8860b;
   --state-caution-track: #f8edc6;
   --attention-track: #f8edc6;
@@ -93,25 +124,26 @@
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --plane: #070b14;
-    --surface: #0d1424;
-    --surface-raised: #131c31;
-    --hairline: rgba(255, 255, 255, 0.07);
+    --plane: #0b0f17;
+    --surface: #121826;
+    --surface-raised: #1a2233;
+    --hairline: rgba(255, 255, 255, 0.06);
 
     /* 純白は目が疲れる。少し落とす */
     --ink: rgba(255, 255, 255, 0.93);
-    --ink-secondary: #9aa6bf;
-    --ink-muted: #6b7791;
+    --ink-secondary: #a3adbd;
+    --ink-muted: #97a1b4;
 
-    --accent: #3987e5;
-    --accent-track: #16294a;
+    --accent: #f2f5fa;
+    --on-accent: #0b1b3a;
+    --accent-track: rgba(255, 255, 255, 0.08);
     --income: #199e70;
     --income-track: #163829;
     --over: #e66767;
     --over-track: #3d2027;
     --attention: #fab219;
 
-    --hero-glow: rgba(57, 135, 229, 0.2);
+    --hero-glow: rgba(255, 255, 255, 0.04);
     --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 
     --genre-1: #3ec48a;
@@ -126,8 +158,8 @@
     --genre-10: #e88a6a;
     --genre-none: #6b7791;
 
-    --state-ok: #3987e5;
-    --state-ok-track: #16294a;
+    --state-ok: #a3adbd;
+    --state-ok-track: #232b3d;
     --state-caution: #fab219;
     --state-caution-track: #3a3013;
     --attention-track: #3a3013;
@@ -141,24 +173,25 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --plane: #070b14;
-  --surface: #0d1424;
-  --surface-raised: #131c31;
-  --hairline: rgba(255, 255, 255, 0.07);
+  --plane: #0b0f17;
+  --surface: #121826;
+  --surface-raised: #1a2233;
+  --hairline: rgba(255, 255, 255, 0.06);
 
   --ink: rgba(255, 255, 255, 0.93);
-  --ink-secondary: #9aa6bf;
-  --ink-muted: #6b7791;
+  --ink-secondary: #a3adbd;
+  --ink-muted: #97a1b4;
 
-  --accent: #3987e5;
-  --accent-track: #16294a;
+  --accent: #f2f5fa;
+  --on-accent: #0b1b3a;
+  --accent-track: rgba(255, 255, 255, 0.08);
   --income: #199e70;
   --income-track: #163829;
   --over: #e66767;
   --over-track: #3d2027;
   --attention: #fab219;
 
-  --hero-glow: rgba(57, 135, 229, 0.2);
+  --hero-glow: rgba(255, 255, 255, 0.04);
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 
   --genre-1: #3ec48a;
@@ -173,8 +206,8 @@
   --genre-10: #e88a6a;
   --genre-none: #6b7791;
 
-  --state-ok: #3987e5;
-  --state-ok-track: #16294a;
+  --state-ok: #a3adbd;
+  --state-ok-track: #232b3d;
   --state-caution: #fab219;
   --state-caution-track: #3a3013;
   --attention-track: #3a3013;
@@ -214,13 +247,80 @@
      (Apple の secondarySystemBackground に相当する中間階調)。 */
   --surface-fill: color-mix(in srgb, var(--surface-raised) 94%, var(--ink) 6%);
 
-  /* Shape。Apple の continuous corner(スーパー楕円)は CSS の border-radius
-     では厳密には再現できないが、値の刻みは HIG の目安(10/14/20/28px)に寄せた。 */
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  /* Shape(トークン)。カード16 / 内側12 / チップは完全な丸。 */
+  --radius-card: 16px;
+  --radius-inner: 12px;
   --radius-full: 999px;
+
+  /* モーション(src/lib/motion.ts と同じ値。tests/motion.test.ts が食い違いを検出する)。
+     標準の遷移=スプリング(応答0.35秒・減衰0.85)、小さな状態変化=250ms ease-out、
+     金額の変化=数字が桁ごとに回転(400ms)、一覧の行の出入り=高さと透明度を同時に(250ms)。 */
+  --motion-spring-duration: 453ms;
+  --motion-spring: linear(
+    0,
+    0.051,
+    0.167,
+    0.308,
+    0.45,
+    0.579,
+    0.688,
+    0.778,
+    0.847,
+    0.899,
+    0.938,
+    0.964,
+    0.982,
+    0.994,
+    1.001,
+    1.004,
+    1.006,
+    1.006,
+    1.006,
+    1.005,
+    1.004,
+    1.003,
+    1.003,
+    1
+  );
+  --motion-small: 250ms;
+  --motion-number: 400ms;
+  --motion-row: 250ms;
+  --motion-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* 青は主要な操作(撮影・保存・AIで目標案を作る)だけに使う。ほかの色の役割は上の
+     --accent(中立の選択色)・--state-*(状態)・--income(収入)。 */
+  --action: #2b6cd4;
+  --on-action: #ffffff;
+
+  /* 余白は4の倍数。画面の左右は16。 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --gutter: 16px;
+
+  /* 文字の段階(上の @theme と同じ5つ)。 */
+  --font-title: 2rem;
+  --font-amount: calc(40 / 17 * 1rem);
+  --font-heading: 1rem;
+  --font-body: calc(15 / 17 * 1rem);
+  --font-caption: calc(13 / 17 * 1rem);
+
+  /* 金額の「円」は数字の0.7倍で、少し細く。 */
+  --yen-unit-scale: 0.7;
+  --yen-unit-weight: 400;
+
+  /* 区切り線:アイコンの右端から、白6%の細い線。 */
+  --divider: color-mix(in srgb, var(--ink) 6%, transparent);
+  --row-icon-inset: 56px;
+
+  /* 操作系。タップ領域は44pt以上、撮影ボタンは56pt。 */
+  --tap-min: 44px;
+  --fab-size: 56px;
+  --fab-lift: 12px;
 
   /* Motion。standard は色・不透明度などの単純な状態変化に、spring は
      押下フィードバックやタブの切り替えなど「弾む」動きが要る箇所に使う
@@ -274,7 +374,22 @@
   --glass-shadow-float: 0 14px 38px rgba(0, 0, 0, 0.55);
 }
 
+/* Dynamic Type(文字サイズの設定)。iOS/iPadOS の Safari では、システムの文字サイズを
+   -apple-system-body で受け取り、rem で書いた文字の段階(13/15/17/34/40 = 17px 基準の比)が
+   一緒に拡大縮小する。余白・タップ領域は px(--spacing: 4px)のままで、文字が大きくなったら
+   min-h と折り返しで広がる。長い名前は折り返して、はみ出さない。 */
+html {
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+}
+@supports (font: -apple-system-body) {
+  html {
+    font: -apple-system-body;
+  }
+}
+
 body {
+  overflow-wrap: anywhere;
   background: var(--plane);
   color: var(--ink);
   /* 金額は等幅数字(縦に並べたとき桁がそろう)。 */
@@ -300,8 +415,8 @@ body {
    本文の既存サイズ指定(Tailwind の text-*)はそのまま。Button・Fab・Chip・
    ナビのラベルなど、強調した短いラベルに使う。 */
 .label-text {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-body);
+  line-height: 22px;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -313,7 +428,7 @@ body {
 input,
 select,
 textarea {
-  font-size: 16px;
+  font-size: var(--font-heading);
 }
 
 /* iOS Safari は button 内のテキストもデフォルトでは選択対象になる。
@@ -417,5 +532,182 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .ptr-spin {
     animation: none;
+  }
+}
+
+/* 未分類を確定したときの行のアニメーション(300ms以内)。 */
+@keyframes row-flash {
+  0% {
+    background: color-mix(in srgb, var(--ink) 14%, transparent);
+    transform: scale(0.985);
+  }
+  100% {
+    background: transparent;
+    transform: scale(1);
+  }
+}
+.row-flash {
+  animation: row-flash 280ms var(--ease-standard) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-flash {
+    animation: none;
+  }
+}
+
+/* レシート保存の直後:追加された行が滑り込み、内訳のバーが伸びる(300ms以内)。 */
+@keyframes row-insert {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    background: transparent;
+  }
+}
+@keyframes bar-grow {
+  0% {
+    transform: scaleX(0.72);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+.row-insert {
+  animation: row-insert 260ms var(--ease-standard) both;
+}
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 300ms var(--ease-standard) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-insert,
+  .bar-grow {
+    animation: none;
+  }
+}
+
+/* 金額の「円」。数字の0.7倍で少し細くする(components/ui/money.tsx)。 */
+.yen-unit {
+  font-size: calc(1em * var(--yen-unit-scale));
+  font-weight: var(--yen-unit-weight);
+  margin-left: 0.08em;
+}
+
+/* 一覧の区切り線。アイコンの右端から始まり、白6%の細い線。 */
+.divider-list > li {
+  position: relative;
+}
+.divider-list > li + li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--row-icon-inset);
+  height: 1px;
+  background: var(--divider);
+}
+
+/* ── モーションの部品(P1) ─────────────────────────────────── */
+/* 読み込みの骨格は 150ms 経つまで出さない(速く読めたときにちらつかせない)。 */
+@keyframes skeleton-in {
+  to {
+    opacity: 1;
+  }
+}
+.skeleton-delayed {
+  opacity: 0;
+  animation: skeleton-in 0s linear 150ms forwards;
+}
+
+@keyframes motion-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.motion-fade-in {
+  animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
+}
+
+/* 金額の数字が桁ごとに回転する(components/ui/rolling-number.tsx)。 */
+@keyframes digit-roll {
+  from {
+    transform: translateY(calc(var(--digit-from) * -1em));
+  }
+  to {
+    transform: translateY(calc(var(--digit-to) * -1em));
+  }
+}
+.digit-roll {
+  animation-name: digit-roll;
+  animation-timing-function: var(--motion-ease-out);
+  animation-fill-mode: both;
+}
+
+/* 一覧の行が消える/入る:高さと透明度を同時に変える(250ms)。
+   使い方: <div class="row-shell" data-state="removed"><div class="row-shell-inner">…</div></div> */
+.row-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--motion-row) var(--motion-ease-out),
+    opacity var(--motion-row) var(--motion-ease-out);
+}
+.row-shell[data-state='removed'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.row-shell-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* グラフの棒:単位を切り替えると、位置・幅・高さがスプリングで変形する。 */
+.chart-bar {
+  transition:
+    left var(--motion-spring-duration) var(--motion-spring),
+    width var(--motion-spring-duration) var(--motion-spring),
+    height var(--motion-spring-duration) var(--motion-spring),
+    bottom var(--motion-spring-duration) var(--motion-spring),
+    opacity var(--motion-small) var(--motion-ease-out);
+}
+
+/* 共有要素の遷移(行のアイコン・名前・金額 → 詳細のヘッダー)。スプリングで動く。 */
+::view-transition-group(.morph) {
+  animation-duration: var(--motion-spring-duration);
+  animation-timing-function: var(--motion-spring);
+}
+
+/* 「視差効果を減らす」:動きはすべてクロスフェードに置き換える(位置・大きさは動かさない)。 */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .pop-in,
+  .row-flash,
+  .row-insert,
+  .bar-grow,
+  .digit-roll {
+    animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
+  }
+  .row-shell {
+    transition: opacity var(--motion-small) linear;
+  }
+  .chart-bar {
+    transition: opacity var(--motion-small) linear;
+  }
+  ::view-transition-group(*) {
+    animation-duration: 0s;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: var(--motion-small);
+    animation-timing-function: linear;
   }
 }

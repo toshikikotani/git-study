@@ -63,7 +63,7 @@ export function CategoryTrendChart({ trend }: { trend: CategorySpendingTrend }) 
                     >
                       {index === peakIndex && spentYen > 0 ? (
                         <span
-                          className="tabular absolute inset-x-0 -top-4 text-center text-[9px]"
+                          className="tabular absolute inset-x-0 -top-4 text-center text-xs"
                           style={{ color: 'var(--ink-muted)' }}
                           aria-hidden
                         >
@@ -79,11 +79,11 @@ export function CategoryTrendChart({ trend }: { trend: CategorySpendingTrend }) 
                 })}
               </div>
 
-              <div className="mt-1.5 flex gap-[2px]">
+              <div className="mt-2 flex gap-[2px]">
                 {monthKeys.map((monthKey) => (
                   <span
                     key={monthKey}
-                    className="tabular flex-1 text-center text-[10px]"
+                    className="tabular flex-1 text-center text-xs"
                     style={{ color: 'var(--ink-muted)' }}
                   >
                     {formatMonthJa(monthKey)}
@@ -113,13 +113,13 @@ function SpendingTable({ trend }: { trend: CategorySpendingTrend }) {
         <caption className="sr-only">カテゴリ別・月別支出額の表</caption>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--hairline)' }}>
-            <th className="p-2.5 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-3 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
               カテゴリ
             </th>
             {monthKeys.map((monthKey) => (
               <th
                 key={monthKey}
-                className="p-2.5 text-right font-medium"
+                className="p-3 text-right font-medium"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 {formatMonthJa(monthKey)}
@@ -130,13 +130,13 @@ function SpendingTable({ trend }: { trend: CategorySpendingTrend }) {
         <tbody>
           {categories.map((category) => (
             <tr key={category.id} style={{ borderBottom: '1px solid var(--hairline)' }}>
-              <td className="p-2.5" style={{ color: 'var(--ink)' }}>
+              <td className="p-3" style={{ color: 'var(--ink)' }}>
                 {category.name}
               </td>
               {monthKeys.map((monthKey) => (
                 <td
                   key={monthKey}
-                  className="tabular p-2.5 text-right"
+                  className="tabular p-3 text-right"
                   style={{ color: 'var(--ink-secondary)' }}
                 >
                   {formatYen(rowsByCategoryAndMonth.get(`${category.id}:${monthKey}`) ?? 0)}

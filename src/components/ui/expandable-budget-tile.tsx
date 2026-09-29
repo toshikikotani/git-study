@@ -35,7 +35,7 @@ export function ExpandableBudgetTile({
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="block w-full text-left"
+        className="min-h-11 block w-full text-left"
       >
         <StatTile {...tile} hint={{ text: expanded ? '閉じる' : '内訳を見る', expanded }} />
       </button>

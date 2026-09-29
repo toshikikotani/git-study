@@ -8,7 +8,7 @@ export default function DuplicatesLoading() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           重複の確認
         </h1>
-        <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
           同じ金額・近い日付で、別の経路から入った明細
         </p>
       </header>

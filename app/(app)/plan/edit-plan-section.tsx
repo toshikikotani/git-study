@@ -27,7 +27,7 @@ export function EditPlanSection({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="text-xs font-semibold"
+        className="min-h-11 text-xs font-semibold"
         style={{ color: 'var(--accent)' }}
       >
         {open ? '配分の調整を閉じる' : '配分・総額を調整する'}

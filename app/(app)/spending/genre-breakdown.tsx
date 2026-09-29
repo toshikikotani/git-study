@@ -1,9 +1,12 @@
 'use client';
 
+import { categoryHref } from '@/lib/category-nav';
+import { useJustSaved } from '@/lib/just-saved';
 import { useState } from 'react';
 
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
-import { genreColorVar } from '@/domain/genre-style';
+import { useGenreOverrides } from '@/components/ui/genre-style-context';
+import { genreBarColor } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
 import type { GoalBreakdownRow } from '@/features/goals/view';
 import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
@@ -18,8 +21,10 @@ import { useSpendingMonth } from './spending-month-provider';
  * 行(実績バー + 今日時点の理想ラインの目印 + 状態色)で見せる。
  */
 export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownRow[] | null }) {
-  const { genreBreakdown, filter, setFilter, isCurrentMonth, loading } = useSpendingMonth();
+  const overrides = useGenreOverrides();
+  const { genreBreakdown, filter, isCurrentMonth, loading, visibleMonth } = useSpendingMonth();
   const [scope, setScope] = useState<'month' | 'goal'>('month');
+  const justSaved = useJustSaved().length > 0;
   const useGoal = scope === 'goal' && goalRows !== null && isCurrentMonth;
 
   const rows: {
@@ -29,6 +34,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
     spentYen: number;
     budgetYen: number | null;
     idealYen: number | null;
+    scheduledYen: number;
   }[] = useGoal
     ? goalRows!.map((r) => ({
         key: r.genreId ?? 'none',
@@ -37,6 +43,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
         spentYen: r.spentYen,
         budgetYen: r.targetYen,
         idealYen: r.idealYen,
+        scheduledYen: r.scheduledYen,
       }))
     : genreBreakdown.map((r: GenreBreakdownRow) => ({
         key: r.genreId ?? 'none',
@@ -45,6 +52,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
         spentYen: r.spentYen,
         budgetYen: r.budgetYen,
         idealYen: null,
+        scheduledYen: 0,
       }));
 
   const total = rows.reduce((a, r) => a + r.spentYen, 0);
@@ -61,7 +69,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
           ジャンル別の内訳
         </h2>
         {goalRows !== null && isCurrentMonth ? (
-          <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-[11px]">
+          <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-xs">
             {(
               [
                 ['month', '今月'],
@@ -74,7 +82,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                 role="radio"
                 aria-checked={scope === value}
                 onClick={() => setScope(value)}
-                className="rounded-full px-2.5 py-1 font-semibold"
+                className="min-h-11 rounded-full px-3 py-1 font-semibold"
                 style={{
                   background: scope === value ? 'var(--accent)' : 'var(--plane)',
                   color: scope === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -110,7 +118,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
             aria-label={`内訳:${rows
               .map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`)
               .join('、')}`}
-            className="mt-3 flex h-3 w-full overflow-hidden rounded-full"
+            className={`mt-3 flex h-3 w-full overflow-hidden rounded-full ${justSaved ? 'bar-grow' : ''}`}
             style={{ background: 'var(--state-none-track)' }}
           >
             {rows.map((r) => (
@@ -118,13 +126,16 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                 key={r.key}
                 style={{
                   width: `${(r.spentYen / Math.max(total, 1)) * 100}%`,
-                  background: genreColorVar(r.genreId === null ? null : r.name),
+                  background: genreBarColor(
+                    r.genreId === null ? null : r.name,
+                    r.genreId === null ? null : overrides[r.name],
+                  ),
                 }}
               />
             ))}
           </div>
 
-          <ul className="mt-2 space-y-0.5">
+          <ul className="mt-2 space-y-1">
             {rows.map((r) => {
               const selected =
                 filter.genreId === (r.genreId === null ? 'none' : r.genreId) &&
@@ -136,19 +147,17 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                     spentYen={r.spentYen}
                     budgetYen={r.budgetYen}
                     idealYen={r.idealYen}
+                    scheduledYen={r.scheduledYen}
                     maxYen={maxYen}
                     selected={selected}
-                    onClick={() =>
-                      setFilter({
-                        genreId: selected ? null : r.genreId === null ? 'none' : r.genreId,
-                      })
-                    }
+                    href={categoryHref(r.key, visibleMonth)}
+                    sharedKey={r.key}
                   />
                 </li>
               );
             })}
           </ul>
-          <p className="tabular mt-2 text-right text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="tabular mt-2 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
             合計 {formatYen(total, { sign: 'never' })}
           </p>
         </>

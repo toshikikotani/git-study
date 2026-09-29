@@ -6,6 +6,7 @@ import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
+import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
@@ -16,10 +17,12 @@ import { CalendarHeatmap } from './calendar-heatmap';
 import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
-import { GoalSummary } from './goal-summary';
+import { GoalCard } from '../plan/goal-card';
+import { buildGoalCard } from '@/features/goals/card';
 import { InsightsCard } from './insights-card';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
+import { ViewSwitch } from './view-switch';
 import { SpendingMonthProvider } from './spending-month-provider';
 import { SubscriptionsCard } from './subscriptions-card';
 import { SummaryCard } from './summary-card';
@@ -42,19 +45,30 @@ import { SummaryCard } from './summary-card';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [ledger, genres, accounts, duplicates, diagnosis, pile, subscriptions, loadedGoal] =
-    await withMinDuration(
-      Promise.all([
-        loadMonthlyLedger(),
-        listGenres(),
-        listAccounts(),
-        listDuplicateCandidates(),
-        loadSpendingDiagnosisView(),
-        loadAccumulationView(),
-        loadDetectedSubscriptions(),
-        loadGoalView(),
-      ]),
-    );
+  const [
+    ledger,
+    genres,
+    accounts,
+    duplicates,
+    diagnosis,
+    pile,
+    subscriptions,
+    loadedGoal,
+    captures,
+  ] = await withMinDuration(
+    Promise.all([
+      loadMonthlyLedger(),
+      listGenres(),
+      listAccounts(),
+      listDuplicateCandidates(),
+      loadSpendingDiagnosisView(),
+      loadAccumulationView(),
+      loadDetectedSubscriptions(),
+      loadGoalView(),
+      // 読み取れなかったレシート(入力待ち)。取れなくても家計簿は開く。
+      listOpenCaptures().catch(() => []),
+    ]),
+  );
   const ids = ledger.transactions.map((t) => t.id);
   const [items, subtypes] = await Promise.all([
     listReceiptItemsForTransactionIds(ids),
@@ -90,13 +104,19 @@ export default async function SpendingPage() {
         currentTotals={ledger.totals}
         genres={genres}
         accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+        captures={captures}
       >
         <PeriodSwitcher />
+        <ViewSwitch />
         <SummaryCard
           pace={pace}
           forecast={forecast}
           hasIncomeRegistered={hasIncome(ledger.totals.incomeYen)}
-          goal={goal ? <GoalSummary view={goal} today={today} /> : null}
+          goal={
+            goal ? (
+              <GoalCard model={buildGoalCard(goal, today, { pendingCount: captures.length })} />
+            ) : null
+          }
         />
         <AttentionCard hasGoal={goal !== null} />
         <GenreBreakdown goalRows={goal ? goal.breakdown : null} />

@@ -32,6 +32,55 @@ import { createClient } from '@/lib/supabase/server';
 import { describeUserError } from '@/lib/errors';
 
 /**
+ * 変更前の値(Undo 用)。変更する前に読んで、変更の結果と一緒に返す。
+ * 元に戻すときは restoreRowFieldsAction にそのまま渡す。
+ */
+export type RowFields = {
+  id: string;
+  genre_id: string | null;
+  classified_by: 'unclassified' | 'rule' | 'ai' | 'manual';
+  review_status: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
+  reviewed_at: string | null;
+  amount_yen: number;
+  occurred_on: string;
+  note: string | null;
+  kind: string | null;
+  reconcile_diff_yen: number | null;
+};
+
+/** 削除した明細の丸ごとの控え(Undo で同じ id のまま戻す)。 */
+export type DeletedSnapshot = {
+  row: Record<string, unknown>;
+  splits: Record<string, unknown>[];
+  items: Record<string, unknown>[];
+  subtypes: Record<string, unknown>[];
+};
+
+async function readRowFields(ids: readonly string[]): Promise<RowFields[]> {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('transactions')
+    .select('*')
+    .in('id', [...ids]);
+  return (data ?? []).map((r) => {
+    const row = r as unknown as Record<string, unknown>;
+    return {
+      id: r.id,
+      genre_id: r.genre_id,
+      classified_by: r.classified_by,
+      review_status: r.review_status,
+      reviewed_at: r.reviewed_at,
+      amount_yen: r.amount_yen,
+      occurred_on: r.occurred_on,
+      note: r.note,
+      kind: (row.kind as string | undefined) ?? null,
+      reconcile_diff_yen: (row.reconcile_diff_yen as number | null | undefined) ?? null,
+    };
+  });
+}
+
+/**
  * レシート商品行から作った分割(本人発案)。呼び出し側(receipt/page.tsx)は
  * 分割したい行の StoredTransaction に一意な sourceRef を振っておき、ここで
  * 保存後の実 id と対応付けて transaction_splits を作る。
@@ -165,8 +214,10 @@ export async function updateTransactionAction(
   id: string,
   genreId: string,
   patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean },
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; previous?: RowFields[] }> {
+  let previous: RowFields[] = [];
   try {
+    previous = await readRowFields([id]);
     let storePatch: { amountYen: number; occurredOn: string } | undefined;
     if (patch) {
       const amountAbsYen = assertYen(patch.amountAbsYen, '金額');
@@ -184,7 +235,7 @@ export async function updateTransactionAction(
     return { error: describeUserError(error, '更新に失敗しました。') };
   }
   revalidatePath('/spending');
-  return { error: null };
+  return { error: null, previous };
 }
 
 /**
@@ -194,14 +245,16 @@ export async function updateTransactionAction(
 export async function updateTransactionMemoAction(
   id: string,
   memo: string,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; previous?: RowFields[] }> {
+  let previous: RowFields[] = [];
   try {
+    previous = await readRowFields([id]);
     await updateTransactionMemo(id, memo);
   } catch (error) {
     return { error: describeUserError(error, 'メモの保存に失敗しました。') };
   }
   revalidatePath('/spending');
-  return { error: null };
+  return { error: null, previous };
 }
 
 /** 明細の複数カテゴリ分割を保存する(本人発案)。空配列を渡すと分割を解除する。 */
@@ -333,16 +386,89 @@ export async function undoReceiptSaveAction(
   return { error: null };
 }
 
-/** 明細を削除する(分割・品目は明細と一緒に消える)。 */
-export async function deleteTransactionAction(id: string): Promise<{ error: string | null }> {
+/**
+ * 明細を削除する(分割・品目は明細と一緒に消える)。消す前に丸ごと控えを取って返し、
+ * restoreDeletedTransactionAction で同じ id のまま戻せる(Undo)。
+ */
+export async function deleteTransactionAction(
+  id: string,
+): Promise<{ error: string | null; snapshot?: DeletedSnapshot }> {
+  let snapshot: DeletedSnapshot | undefined;
   try {
     const supabase = await createClient();
+    const [{ data: row }, { data: splits }, { data: items }, { data: subtypes }] =
+      await Promise.all([
+        supabase.from('transactions').select('*').eq('id', id).maybeSingle(),
+        supabase.from('transaction_splits').select('*').eq('transaction_id', id),
+        supabase.from('receipt_items').select('*').eq('transaction_id', id),
+        supabase.from('transaction_expense_subtypes').select('*').eq('transaction_id', id),
+      ]);
+    if (row) {
+      snapshot = {
+        row: row as unknown as Record<string, unknown>,
+        splits: (splits ?? []) as unknown as Record<string, unknown>[],
+        items: (items ?? []) as unknown as Record<string, unknown>[],
+        subtypes: (subtypes ?? []) as unknown as Record<string, unknown>[],
+      };
+    }
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) return { error: '削除できませんでした。' };
   } catch (error) {
     return { error: describeUserError(error, '削除できませんでした。') };
   }
   revalidatePath('/spending');
+  return { error: null, ...(snapshot ? { snapshot } : {}) };
+}
+
+/** 削除の Undo。控えから、明細・分割・品目・小分類を同じ id で作り直す。 */
+export async function restoreDeletedTransactionAction(
+  snapshot: DeletedSnapshot,
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('transactions').insert(snapshot.row as never);
+    if (error) return { error: '元に戻せませんでした。' };
+    const children: [string, Record<string, unknown>[]][] = [
+      ['transaction_splits', snapshot.splits],
+      ['receipt_items', snapshot.items],
+      ['transaction_expense_subtypes', snapshot.subtypes],
+    ];
+    for (const [table, rows] of children) {
+      if (rows.length === 0) continue;
+      const { error: childError } = await supabase
+        .from(table as 'receipt_items')
+        .insert(rows as never);
+      if (childError) return { error: '元に戻せませんでした(品目・分割の一部)。' };
+    }
+  } catch (error) {
+    return { error: describeUserError(error, '元に戻せませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/** 変更の Undo。変更前の値(RowFields)を書き戻す。 */
+export async function restoreRowFieldsAction(
+  rows: readonly RowFields[],
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    for (const { id, kind, reconcile_diff_yen, ...fields } of rows) {
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          ...fields,
+          ...(kind !== null ? { kind } : {}),
+          reconcile_diff_yen,
+        } as never)
+        .eq('id', id);
+      if (error) return { error: '元に戻せませんでした。' };
+    }
+  } catch (error) {
+    return { error: describeUserError(error, '元に戻せませんでした。') };
+  }
+  revalidatePath('/spending');
+  revalidatePath('/plan');
   return { error: null };
 }
 
@@ -350,7 +476,10 @@ export async function deleteTransactionAction(id: string): Promise<{ error: stri
  * 明細を複製する。同じ日・同じ金額・同じ摘要は重複排除の一意制約に当たるため、
  * 摘要に「(複製)」を付けて作る(あとから編集する前提)。分割・品目は複製しない。
  */
-export async function duplicateTransactionAction(id: string): Promise<{ error: string | null }> {
+export async function duplicateTransactionAction(
+  id: string,
+): Promise<{ error: string | null; createdId?: string }> {
+  let createdId: string | undefined;
   try {
     const supabase = await createClient();
     const { data: row, error } = await supabase
@@ -386,6 +515,7 @@ export async function duplicateTransactionAction(id: string): Promise<{ error: s
       .single();
     if (insertError || !created)
       return { error: '複製できませんでした。すでに複製済みかもしれません。' };
+    createdId = created.id;
 
     // 分割・品目も複製する(失敗しても複製した明細自体は残す)。
     const [{ data: splits }, { data: items }] = await Promise.all([
@@ -412,15 +542,17 @@ export async function duplicateTransactionAction(id: string): Promise<{ error: s
     return { error: describeUserError(error, '複製できませんでした。') };
   }
   revalidatePath('/spending');
-  return { error: null };
+  return { error: null, ...(createdId ? { createdId } : {}) };
 }
 
 /** 金額不一致の確認を済ませる(差額を認めて、要確認から外す)。 */
 export async function resolveReconcileAction(
   ids: readonly string[],
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; previous?: RowFields[] }> {
   if (ids.length === 0) return { error: null };
+  let previous: RowFields[] = [];
   try {
+    previous = await readRowFields(ids);
     const supabase = await createClient();
     const { error } = await supabase
       .from('transactions')
@@ -431,15 +563,17 @@ export async function resolveReconcileAction(
     return { error: describeUserError(error, '更新できませんでした。') };
   }
   revalidatePath('/spending');
-  return { error: null };
+  return { error: null, previous };
 }
 
 /** 明細を特別費(目標のペース計算から除く)にする/通常に戻す。列が本番に無い間はエラーを返す。 */
 export async function setTransactionKindAction(
   id: string,
   kind: 'normal' | 'special',
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; previous?: RowFields[] }> {
+  let previous: RowFields[] = [];
   try {
+    previous = await readRowFields([id]);
     const supabase = await createClient();
     const { error } = await supabase.from('transactions').update({ kind }).eq('id', id);
     if (error)
@@ -449,5 +583,5 @@ export async function setTransactionKindAction(
   }
   revalidatePath('/spending');
   revalidatePath('/plan');
-  return { error: null };
+  return { error: null, previous };
 }

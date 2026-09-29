@@ -66,7 +66,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
-                className="text-[11px] font-medium tracking-[0.1em] uppercase"
+                className="text-xs font-medium tracking-[0.1em] uppercase"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 完済まで
@@ -74,7 +74,7 @@ export default async function HomePage() {
               {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
               {payoff.isEstimated ? (
                 <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  className="rounded-full px-2 py-1 text-xs font-medium"
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
                   推定
@@ -84,23 +84,23 @@ export default async function HomePage() {
             <StreakBadge streak={streak} />
           </div>
 
-          <p className="mt-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             最終更新 {updatedAt}
           </p>
 
           {payoff.daysRemaining === null ? (
             <p
-              className="mt-2 text-[56px] leading-none font-semibold tracking-[-0.03em]"
+              className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em]"
               style={{ color: 'var(--income)' }}
             >
               完済済み
             </p>
           ) : (
             <>
-              <p className="mt-1.5 flex items-baseline gap-2">
+              <p className="mt-2 flex items-baseline gap-2">
                 <CountUp
                   value={payoff.daysRemaining}
-                  className="text-[80px] leading-[0.88] font-semibold tracking-[-0.05em]"
+                  className="text-4xl leading-[0.88] font-semibold tracking-[-0.05em]"
                   style={{ color: 'var(--ink)' }}
                 />
                 <span className="text-xl font-medium" style={{ color: 'var(--ink-secondary)' }}>
@@ -111,7 +111,7 @@ export default async function HomePage() {
               <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
                 <span style={{ color: 'var(--ink-secondary)' }}>
                   残り
-                  <span className="tabular ml-0.5 font-semibold" style={{ color: 'var(--ink)' }}>
+                  <span className="tabular ml-1 font-semibold" style={{ color: 'var(--ink)' }}>
                     {formatYen(payoff.remainingYen)}
                   </span>
                 </span>
@@ -126,7 +126,7 @@ export default async function HomePage() {
                   減った分を出すことが、返済アプリの正のフィードバックそのもの。 */}
               {payoff.reducedThisMonthYen > 0 ? (
                 <p
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                  className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
                   <span aria-hidden>↓</span>
@@ -253,7 +253,7 @@ function StreakBadge({ streak }: { streak: CheckinStreak }) {
 
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
       style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
     >
       {badge.kind === 'active' ? (

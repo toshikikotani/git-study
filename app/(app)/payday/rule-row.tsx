@@ -63,7 +63,7 @@ export function RuleRow({
             <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               {rule.name}
             </h3>
-            <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
               {describeAmount(rule)}
               {toAccountName ? ` ・ ${toAccountName}へ` : ''}
               {categoryName ? ` ・ ${categoryName}` : ''}

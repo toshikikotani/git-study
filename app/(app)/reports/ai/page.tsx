@@ -32,7 +32,7 @@ export default async function AiReportPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           AIレポート
         </h1>
-        <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
           {monthlyView.input.monthKey} の傾向・気づき・アドバイス
         </p>
       </header>
@@ -51,7 +51,7 @@ export default async function AiReportPage() {
           <h2 className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
             ジャンル別の内訳
           </h2>
-          <ul className="mt-2 space-y-0.5">
+          <ul className="mt-2 space-y-1">
             {ledger.genreBreakdown.map((r) => (
               <li key={r.genreId ?? 'none'}>
                 <GenreBudgetRow

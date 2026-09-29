@@ -45,7 +45,7 @@ export function GenreManageCard({ genres }: { genres: readonly Genre[] }) {
 
       {open ? (
         <div className="mt-3 space-y-3">
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {genres.map((genre) => (
               <GenreListItem key={genre.id} genre={genre} />
             ))}
@@ -102,7 +102,7 @@ function GenreListItem({ genre }: { genre: Genre }) {
 
   return (
     <li>
-      <div className="space-y-1.5 rounded-xl px-3 py-2" style={{ background: 'var(--plane)' }}>
+      <div className="space-y-2 rounded-xl px-3 py-2" style={{ background: 'var(--plane)' }}>
         <div className="flex items-center justify-between gap-3">
           <span className="truncate text-sm" style={{ color: 'var(--ink)' }}>
             {genre.name}
@@ -121,7 +121,7 @@ function GenreListItem({ genre }: { genre: Genre }) {
         <div className="flex items-center gap-3">
           {/* 本人発案「ユーザーが設定するのはカテゴリのそれぞれの値段設定」。
               空欄は無制限(budget_yen=null)。 */}
-          <label className="flex min-w-0 flex-1 items-center gap-1.5 text-xs">
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-xs">
             <span className="shrink-0" style={{ color: 'var(--ink-muted)' }}>
               予算
             </span>
@@ -146,7 +146,7 @@ function GenreListItem({ genre }: { genre: Genre }) {
           </label>
 
           <label
-            className="flex shrink-0 items-center gap-1 text-[11px]"
+            className="flex shrink-0 items-center gap-1 text-xs"
             style={{ color: 'var(--ink-muted)' }}
           >
             <input
@@ -189,13 +189,13 @@ function NewGenreForm() {
           type="submit"
           disabled={pending}
           className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '追加中…' : '追加'}
         </button>
       </div>
       {state.error ? (
-        <p className="mt-1.5 text-xs" style={{ color: 'var(--over)' }}>
+        <p className="mt-2 text-xs" style={{ color: 'var(--over)' }}>
           {state.error}
         </p>
       ) : null}

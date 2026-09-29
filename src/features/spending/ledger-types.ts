@@ -42,6 +42,8 @@ export type LedgerTransaction = {
   status: EntryStatus;
   /** 特別費('special')は目標のペース計算から除く。 */
   kind: EntryKind;
+  /** 読み取りに失敗したレシートの「入力待ち」。実績・目標・予測の集計に含めない。 */
+  needsInput: boolean;
   /**
    * 分割(レシートの品目・ジャンル按分)の子。空なら分割なし。子のジャンルが
    * 未設定のものは親のジャンルを引き継いだ値が入る(「未分類」の子を作らない)。

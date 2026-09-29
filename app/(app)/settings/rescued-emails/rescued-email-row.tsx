@@ -33,7 +33,7 @@ export function RescuedEmailRow({ email }: { email: RescuedEmail }) {
           <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
             {email.subject ?? '(件名なし)'}
           </p>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             {SOURCE_LABEL[email.source]} ・{' '}
             {email.extractedCount > 0 ? `AIが${email.extractedCount}件読み取り` : 'AIも読み取れず'}
           </p>

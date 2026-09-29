@@ -144,17 +144,12 @@ export function MoreMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="その他の機能"
-        className="flex size-11 shrink-0 items-center justify-center"
+        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"
         style={{
           borderRadius: 'var(--radius-full)',
-          background: open ? 'var(--accent-track)' : 'var(--glass-tint)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          border: '1px solid var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
-          color: open ? 'var(--accent)' : 'var(--ink-muted)',
-          transform: open ? 'scale(1.05)' : 'scale(1)',
-          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+          background: open ? 'var(--accent-track)' : 'transparent',
+          color: open ? 'var(--accent)' : 'var(--ink-secondary)',
+          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)`,
         }}
       >
         <MdMoreHoriz aria-hidden size={22} />
@@ -162,10 +157,10 @@ export function MoreMenu() {
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
-          <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             その他の機能
           </h2>
-          <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             外側をタップで閉じる
           </span>
         </div>
@@ -174,14 +169,14 @@ export function MoreMenu() {
           {GROUPS.map((group) => (
             <section key={group.title}>
               <h3
-                className="px-2 pb-1.5 text-[11px] font-medium tracking-[0.06em] uppercase"
+                className="px-2 pb-2 text-xs font-medium tracking-[0.06em] uppercase"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 {group.title}
               </h3>
               <div
                 className="overflow-hidden"
-                style={{ borderRadius: 'var(--radius-md)', background: 'var(--surface)' }}
+                style={{ borderRadius: 'var(--radius-inner)', background: 'var(--surface)' }}
               >
                 {/* prefetch={false}:app/(app)/layout.tsx のナビと同じ理由
                     (本人からの不具合報告「読み込み中に画面全体にローディング
@@ -193,21 +188,18 @@ export function MoreMenu() {
                     prefetch={false}
                     role="menuitem"
                     onClick={() => setOpen(false)}
-                    className="flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
+                    className="min-h-11 flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
                     style={{
                       borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
                     }}
                   >
                     <span>
-                      <span
-                        className="block text-[14px] font-medium"
-                        style={{ color: 'var(--ink)' }}
-                      >
+                      <span className="block text-sm font-medium" style={{ color: 'var(--ink)' }}>
                         {item.label}
                       </span>
                       {'dek' in item ? (
                         <span
-                          className="mt-0.5 block text-[11.5px]"
+                          className="mt-1 block text-[11.5px]"
                           style={{ color: 'var(--ink-muted)' }}
                         >
                           {item.dek}

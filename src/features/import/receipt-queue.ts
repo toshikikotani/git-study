@@ -14,10 +14,23 @@
 
 import { useSyncExternalStore } from 'react';
 
+import { judgeReadResult, needsManualInput, type ReceiptStatus } from '@/domain/receipt-capture';
 import type { ParsedReceiptTransaction } from '@/features/import/receipt-ai';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
+import {
+  deleteWaitingFile,
+  loadWaitingFiles,
+  saveWaitingFile,
+} from '@/features/import/offline-store';
 
-export type ReceiptJobStatus = 'reading' | 'ready' | 'error';
+/**
+ * reading    : 読み取り中
+ * ready      : 読み取れた(確認して保存する)
+ * waiting    : 読み取り待ち(圏外など。失敗ではない。オンラインに戻ると自動で読み取る)
+ * needs_input: 読み取れなかった/一部だけ読めた。画像は入力待ちとして残してあり、手で入力する
+ * error      : 入力待ちも作れなかった(画像を保存できないなど。撮り直してもらう)
+ */
+export type ReceiptJobStatus = 'reading' | 'ready' | 'waiting' | 'needs_input' | 'error';
 
 export type JobClassification = {
   key: string;
@@ -37,6 +50,9 @@ export type ReceiptJob = {
   classifications: JobClassification[];
   parentGenreIds: Record<number, string>;
   error: string | null;
+  /** needs_input のとき、入力待ちの id(手入力の画面へ進む)。 */
+  captureId: string | null;
+  receiptStatus: ReceiptStatus | null;
 };
 
 export type QueueAction =
@@ -51,6 +67,9 @@ export type QueueAction =
       parentGenreIds: Record<number, string>;
     }
   | { type: 'fail'; id: string; error: string }
+  | { type: 'waiting'; id: string }
+  | { type: 'retry'; id: string }
+  | { type: 'captured'; id: string; captureId: string; receiptStatus: ReceiptStatus }
   | { type: 'remove'; id: string };
 
 export function queueReducer(state: readonly ReceiptJob[], action: QueueAction): ReceiptJob[] {
@@ -80,6 +99,22 @@ export function queueReducer(state: readonly ReceiptJob[], action: QueueAction):
       return state.map((j) =>
         j.id === action.id ? { ...j, status: 'error', error: action.error } : j,
       );
+    case 'waiting':
+      return state.map((j) => (j.id === action.id ? { ...j, status: 'waiting', error: null } : j));
+    case 'retry':
+      return state.map((j) => (j.id === action.id ? { ...j, status: 'reading', error: null } : j));
+    case 'captured':
+      return state.map((j) =>
+        j.id === action.id
+          ? {
+              ...j,
+              status: 'needs_input',
+              captureId: action.captureId,
+              receiptStatus: action.receiptStatus,
+              error: null,
+            }
+          : j,
+      );
     case 'remove':
       return state.filter((j) => j.id !== action.id);
   }
@@ -97,6 +132,8 @@ export function newJob(id: string, previewUrl: string, now: number): ReceiptJob 
     classifications: [],
     parentGenreIds: {},
     error: null,
+    captureId: null,
+    receiptStatus: null,
   };
 }
 
@@ -123,6 +160,11 @@ export function useReceiptJobs(): readonly ReceiptJob[] {
   );
 }
 
+/** いまのキューの中身(テスト・画面外からの参照用)。 */
+export function getReceiptJobs(): readonly ReceiptJob[] {
+  return state;
+}
+
 export function removeReceiptJob(id: string): void {
   const job = state.find((j) => j.id === id);
   if (job) URL.revokeObjectURL(job.previewUrl);
@@ -145,33 +187,94 @@ function pump(): void {
   }
 }
 
+/**
+ * 入力待ちを作る処理(Server Action)。features は app に依存しないので、画面側(layout)が
+ * 起動時に渡す。未設定のときは入力待ちを作れず、従来どおり「読み取れませんでした」になる。
+ */
+export type CaptureCreator = (input: {
+  imageBase64: string;
+  transactions: readonly ParsedReceiptTransaction[];
+  warnings: readonly string[];
+}) => Promise<
+  { error: null; receiptStatus: ReceiptStatus; captureId: string | null } | { error: string }
+>;
+let createCapture: CaptureCreator | null = null;
+export function configureReceiptQueue(options: { createCapture: CaptureCreator }): void {
+  createCapture = options.createCapture;
+}
+
+/** 読み取り待ち(オフライン)のジョブの元ファイル。オンラインに戻ったら再処理する。 */
+const files = new Map<string, File>();
+
 async function process(job: ReceiptJob, file: File): Promise<void> {
+  files.set(job.id, file);
   try {
     const imageBase64 = await resizeToJpegBase64(file);
-    const response = await fetch('/api/import/receipt', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg' }),
-    });
-    if (!response.ok) {
-      dispatch({ type: 'fail', id: job.id, error: '読み取りに失敗しました。' });
+
+    // 圏外なら失敗にせず「読み取り待ち」にする(画像は端末に残し、戻ったら自動で読む)。
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      await park(job.id, file);
       return;
     }
-    const result = (await response.json()) as {
+
+    let response: Response;
+    try {
+      response = await fetch('/api/import/receipt', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg' }),
+      });
+    } catch {
+      // 通信できない(圏外・サーバーに届かない)。読み取りに失敗したのではなく、まだ読めていない。
+      await park(job.id, file);
+      return;
+    }
+
+    let result: {
       transactions: ParsedReceiptTransaction[];
       warnings: string[];
       classifications?: JobClassification[];
       parentGenreIds?: Record<number, string>;
-    };
-    dispatch({
-      type: 'ready',
-      id: job.id,
-      imageBase64,
-      parsed: result.transactions,
-      warnings: result.warnings,
-      classifications: result.classifications ?? [],
-      parentGenreIds: result.parentGenreIds ?? {},
-    });
+    } = { transactions: [], warnings: ['読み取りに失敗しました。'] };
+    if (response.ok) result = await response.json();
+
+    // 全部読めていれば確認画面へ。読めなかった/一部だけなら、画像を残して入力待ちにする。
+    if (!needsManualInput(judgeReadResult(result.transactions).receiptStatus)) {
+      dispatch({
+        type: 'ready',
+        id: job.id,
+        imageBase64,
+        parsed: result.transactions,
+        warnings: result.warnings,
+        classifications: result.classifications ?? [],
+        parentGenreIds: result.parentGenreIds ?? {},
+      });
+      await unpark(job.id);
+      return;
+    }
+
+    const captured = createCapture
+      ? await createCapture({
+          imageBase64,
+          transactions: result.transactions,
+          warnings: result.warnings,
+        })
+      : ({ error: result.warnings[0] ?? '読み取れませんでした。' } as const);
+    if (captured.error === null && captured.captureId !== null) {
+      dispatch({
+        type: 'captured',
+        id: job.id,
+        captureId: captured.captureId,
+        receiptStatus: captured.receiptStatus,
+      });
+      await unpark(job.id);
+    } else {
+      dispatch({
+        type: 'fail',
+        id: job.id,
+        error: captured.error ?? '読み取りに失敗しました。',
+      });
+    }
   } catch (e) {
     dispatch({
       type: 'fail',
@@ -179,6 +282,55 @@ async function process(job: ReceiptJob, file: File): Promise<void> {
       error: e instanceof Error ? e.message : '読み取りに失敗しました。',
     });
   }
+}
+
+/** 読み取り待ちにして、元の画像を端末へ置く(ページを閉じても失わない)。 */
+async function park(id: string, file: File): Promise<void> {
+  dispatch({ type: 'waiting', id });
+  await saveWaitingFile({ id, blob: file, createdAt: Date.now() });
+  ensureOnlineListener();
+}
+
+async function unpark(id: string): Promise<void> {
+  files.delete(id);
+  await deleteWaitingFile(id);
+}
+
+/** 読み取り待ちのジョブを、もう一度読み取りに回す。 */
+export function retryWaitingJobs(): void {
+  for (const job of state) {
+    const file = files.get(job.id);
+    if (job.status !== 'waiting' || file === undefined) continue;
+    dispatch({ type: 'retry', id: job.id });
+    waiting.push(() => process(job, file));
+  }
+  pump();
+}
+
+let onlineListenerAttached = false;
+function ensureOnlineListener(): void {
+  if (onlineListenerAttached || typeof window === 'undefined') return;
+  onlineListenerAttached = true;
+  window.addEventListener('online', () => retryWaitingJobs());
+}
+
+let restored = false;
+/** 前回オフラインで撮ったまま残っているレシートを「読み取り待ち」として戻す(1回だけ)。 */
+export async function restoreWaitingReceipts(): Promise<void> {
+  if (restored || typeof window === 'undefined') return;
+  restored = true;
+  const saved = await loadWaitingFiles();
+  for (const entry of saved) {
+    if (state.some((j) => j.id === entry.id)) continue;
+    const file = new File([entry.blob], `${entry.id}.jpg`, { type: entry.blob.type });
+    files.set(entry.id, file);
+    dispatch({
+      type: 'add',
+      job: { ...newJob(entry.id, URL.createObjectURL(file), entry.createdAt), status: 'waiting' },
+    });
+  }
+  ensureOnlineListener();
+  if (navigator.onLine) retryWaitingJobs();
 }
 
 /** 撮った/選んだ画像をキューへ入れ、すぐ戻る(読み取りは裏で進む)。 */

@@ -9,6 +9,7 @@ import type { GoalSnapshot } from '@/domain/goal-impact';
 import { buildGoalReview, type GoalReview } from '@/domain/goal-review';
 import { summarizeLedger, type LedgerEntry } from '@/domain/ledger';
 import { planGuidance, type PlanGuidance } from '@/domain/spending-plan';
+import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import type { DateOnly } from '@/lib/date';
 
 /** 家計簿のジャンル内訳(目標期間の切り替え)で使う1行。 */
@@ -18,8 +19,12 @@ export type GoalBreakdownRow = {
   spentYen: number;
   /** 目標額。目標に無いジャンルは null(予算なし)。 */
   targetYen: number | null;
-  /** 今日時点の理想ライン(目標を期間で均等に使った額)。 */
+  /** 今日時点の理想ライン((目標 − 予定)を期間で均等に使った額)。 */
   idealYen: number | null;
+  /** このジャンルの予定の支出(今日より先)。 */
+  scheduledYen: number;
+  /** 予定で目標のほぼ全額が確保済みか。 */
+  reserved: boolean;
 };
 
 /**
@@ -58,6 +63,14 @@ export type GoalView = {
   review: GoalReview | null;
   /** 未分類の実績(目標に未反映)。 */
   uncategorizedYen: number;
+  /** 予定の支出の一覧(日付順)。目標カードで展開して見せる。 */
+  scheduledItems: {
+    id: string;
+    date: DateOnly;
+    label: string;
+    genreName: string | null;
+    amountYen: number;
+  }[];
 };
 
 /**
@@ -69,6 +82,8 @@ export function buildGoalView(input: {
   entries: readonly LedgerEntry[];
   genreNames: ReadonlyMap<string, string>;
   today: DateOnly;
+  /** 予定の一覧(名前・ジャンル)に使う明細。省略すると一覧は空。 */
+  transactions?: readonly LedgerTransaction[];
 }): GoalView {
   const { plan, entries, genreNames, today } = input;
   const range = { from: plan.periodStart, to: plan.periodEnd };
@@ -85,9 +100,12 @@ export function buildGoalView(input: {
       targetYen: item.targetYen,
       spentYen: summary.byGenrePace.get(item.genreId) ?? 0,
       todaySpentYen: todaySummary.byGenrePace.get(item.genreId) ?? 0,
+      scheduledYen: summary.scheduledByGenre.get(item.genreId) ?? 0,
     })),
     specialYen: summary.specialYen,
     scheduledYen: summary.scheduledYen,
+    uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
+    uncategorizedTodayYen: todaySummary.byGenrePace.get(null) ?? 0,
   });
 
   const planned = new Set(plan.items.filter((i) => i.targetYen > 0).map((i) => i.genreId));
@@ -99,6 +117,8 @@ export function buildGoalView(input: {
       spentYen: g.spentYen,
       targetYen: g.targetYen,
       idealYen: g.idealYen,
+      scheduledYen: g.scheduledYen,
+      reserved: g.status === 'reserved',
     }));
   const noBudget: GoalView['noBudget'] = [];
   for (const [genreId, spentYen] of summary.byGenrePace) {
@@ -118,6 +138,8 @@ export function buildGoalView(input: {
       spentYen: row.spentYen,
       targetYen: null,
       idealYen: null,
+      scheduledYen: 0,
+      reserved: false,
     });
   }
 
@@ -134,6 +156,7 @@ export function buildGoalView(input: {
     guidance,
     snapshot: {
       range,
+      scheduledYen: guidance.scheduledYen,
       genres: plan.items.map((i) => ({
         genreId: i.genreId,
         genreName: i.genreName,
@@ -143,7 +166,9 @@ export function buildGoalView(input: {
     },
     breakdown,
     noBudget,
-    dailyAllowanceYen: targetTotal > 0 ? Math.floor(targetTotal / days) : null,
+    // カレンダーの点の基準:予定を除いた予算を期間の日数で割った1日の目安。
+    dailyAllowanceYen:
+      targetTotal > 0 ? Math.floor(Math.max(targetTotal - guidance.scheduledYen, 0) / days) : null,
     review: ended
       ? buildGoalReview({
           items: plan.items,
@@ -153,6 +178,24 @@ export function buildGoalView(input: {
         })
       : null,
     uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
+    scheduledItems: (input.transactions ?? [])
+      .filter(
+        (t) =>
+          t.occurredOn > today &&
+          t.occurredOn <= plan.periodEnd &&
+          t.amountYen < 0 &&
+          !t.isTransfer &&
+          t.reviewStatus !== 'ignored' &&
+          !t.needsInput,
+      )
+      .sort((a, b) => a.occurredOn.localeCompare(b.occurredOn))
+      .map((t) => ({
+        id: t.id,
+        date: t.occurredOn,
+        label: t.label,
+        genreName: t.genreName,
+        amountYen: -t.amountYen,
+      })),
   };
 }
 

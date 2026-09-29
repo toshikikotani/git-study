@@ -52,7 +52,7 @@ export function PurposeBalanceCard({ balances }: { balances: readonly PurposeBal
           return (
             <li key={balance.purpose}>
               <div className="flex items-baseline justify-between gap-2 text-xs">
-                <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="flex min-w-0 items-baseline gap-2">
                   <span className="truncate font-medium" style={{ color: 'var(--ink)' }}>
                     {label}
                   </span>

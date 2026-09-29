@@ -22,6 +22,8 @@ import type { GenreBreakdownRow, LedgerTransaction, MonthTotals } from './ledger
 /** 明細(親)を集計の入力(分割の子へ展開済み)にする。全画面が同じ展開を使う。 */
 export function toLedgerEntries(transactions: readonly LedgerTransaction[]): LedgerEntry[] {
   return transactions.flatMap((t): LedgerEntry[] => {
+    // 入力待ちのレシートは集計に含めない(通常は明細に入らないが、混ざっても数えない)。
+    if (t.needsInput) return [];
     const base = {
       id: t.id,
       occurredOn: t.occurredOn,
@@ -135,6 +137,8 @@ export type LedgerFilter = {
   /** 目標期間に絞る。 */
   range: LedgerRange | null;
   search: string;
+  /** 入力待ちのレシートだけを見る(明細は出さない)。 */
+  pendingOnly: boolean;
 };
 
 export const EMPTY_FILTER: LedgerFilter = {
@@ -143,6 +147,7 @@ export const EMPTY_FILTER: LedgerFilter = {
   accountId: null,
   range: null,
   search: '',
+  pendingOnly: false,
 };
 
 export function isFilterActive(f: LedgerFilter): boolean {
@@ -151,7 +156,16 @@ export function isFilterActive(f: LedgerFilter): boolean {
     f.date !== null ||
     f.accountId !== null ||
     f.range !== null ||
+    f.pendingOnly ||
     f.search.trim() !== ''
+  );
+}
+
+/** 「フィルター(n)」の n。検索の文字は数えない(検索欄に見えているため)。 */
+export function activeFilterCount(f: LedgerFilter): number {
+  return (
+    [f.genreId, f.date, f.accountId, f.range].filter((v) => v !== null).length +
+    (f.pendingOnly ? 1 : 0)
   );
 }
 
@@ -167,6 +181,8 @@ export function filterLedger<T extends LedgerTransaction & { items?: readonly { 
   filter: LedgerFilter,
 ): T[] {
   const q = filter.search.normalize('NFKC').toLowerCase().trim();
+  // 入力待ちだけを見るときは、明細(実績・予定)は出さない。
+  if (filter.pendingOnly) return [];
   return transactions.filter((t) => {
     if (filter.date !== null && t.occurredOn !== filter.date) return false;
     if (

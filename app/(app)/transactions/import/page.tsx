@@ -182,7 +182,7 @@ export default function ImportPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           CSV を取り込む
         </h1>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/spending" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           やめる
         </Link>
       </header>
@@ -406,7 +406,7 @@ export default function ImportPage() {
             onClick={() => void save()}
             disabled={preview.length === 0 || saving}
             className="mt-5 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
             {saving ? '取り込み中…' : `${preview.length} 件を取り込む`}
           </button>
@@ -445,7 +445,7 @@ function SavedResult({ imported, duplicates }: { imported: number; duplicates: n
         <Link
           href="/spending"
           className="mt-5 block w-full rounded-full py-3 text-center text-sm font-semibold"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           明細を見る
         </Link>
@@ -458,7 +458,7 @@ function Step({ n, title }: { n: number; title: string }) {
   return (
     <div className="flex items-center gap-2">
       <span
-        className="tabular flex size-5 items-center justify-center rounded-full text-[11px] font-semibold"
+        className="tabular flex size-5 items-center justify-center rounded-full text-xs font-semibold"
         style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
       >
         {n}
@@ -487,8 +487,8 @@ function Count({ label, value, tone }: { label: string; value: number; tone: 'ac
   const color = tone === 'over' && value > 0 ? 'var(--over)' : 'var(--accent)';
   const bg = tone === 'over' && value > 0 ? 'var(--over-track)' : 'var(--accent-track)';
   return (
-    <div className="flex-1 rounded-2xl px-3 py-2.5" style={{ background: bg }}>
-      <p className="text-[11px]" style={{ color: 'var(--ink-secondary)' }}>
+    <div className="flex-1 rounded-2xl px-3 py-3" style={{ background: bg }}>
+      <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </p>
       <p className="tabular text-lg font-semibold" style={{ color }}>

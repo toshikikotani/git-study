@@ -1,5 +1,7 @@
 'use client';
 
+import { markJustSaved } from '@/lib/just-saved';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -16,6 +18,7 @@ import { formatYen } from '@/domain/money';
 import {
   enqueueReceiptFiles,
   removeReceiptJob,
+  retryWaitingJobs,
   useReceiptJobs,
   type ReceiptJob,
 } from '@/features/import/receipt-queue';
@@ -128,6 +131,7 @@ export default function ReceiptPage() {
       ),
     );
 
+    markJustSaved(outcome.insertedIds);
     const label = `${input.storeName} ${formatYen(-plan.transaction.amountYen)}`;
     setSaved((prev) => new Map(prev).set(key, label));
     setToast({
@@ -159,7 +163,14 @@ export default function ReceiptPage() {
   };
 
   const reading = jobs.filter((j) => j.status === 'reading');
-  const pending = useMemo(() => jobs.filter((j) => j.status !== 'reading'), [jobs]);
+  const pending = useMemo(
+    () => jobs.filter((j) => j.status === 'ready' || j.status === 'error'),
+    [jobs],
+  );
+  const parked = useMemo(
+    () => jobs.filter((j) => j.status === 'waiting' || j.status === 'needs_input'),
+    [jobs],
+  );
 
   return (
     <div className="rise space-y-4">
@@ -167,14 +178,18 @@ export default function ReceiptPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           レシートを確認
         </h1>
-        <Link href="/spending" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link
+          href="/spending"
+          className="min-h-11 inline-flex items-center text-xs"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           家計簿へ戻る
         </Link>
       </header>
 
       {accounts !== null && accounts.length > 1 ? (
         <label className="block">
-          <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             口座
           </span>
           <select
@@ -198,7 +213,10 @@ export default function ReceiptPage() {
       {accounts !== null && accounts.length === 0 ? (
         <p className="text-xs" style={{ color: 'var(--over)' }}>
           口座を用意できませんでした。時間をおいてから開き直してください。
-          <Link href="/accounts" className="ml-1 font-semibold underline">
+          <Link
+            href="/accounts"
+            className="min-h-11 inline-flex items-center ml-1 font-semibold underline"
+          >
             口座を登録する
           </Link>
         </p>
@@ -211,11 +229,11 @@ export default function ReceiptPage() {
       >
         <div className="flex justify-center gap-3">
           <label
-            className="label-text cursor-pointer px-6 py-2.5"
+            className="min-h-11 label-text cursor-pointer px-6 py-3"
             style={{
               borderRadius: 'var(--radius-full)',
-              background: 'var(--accent)',
-              color: 'var(--on-accent)',
+              background: 'var(--action)',
+              color: 'var(--on-action)',
             }}
           >
             <input
@@ -232,7 +250,7 @@ export default function ReceiptPage() {
             撮る
           </label>
           <label
-            className="label-text cursor-pointer px-6 py-2.5"
+            className="min-h-11 label-text cursor-pointer px-6 py-3"
             style={{
               borderRadius: 'var(--radius-full)',
               border: '1px solid var(--hairline)',
@@ -285,11 +303,11 @@ export default function ReceiptPage() {
           <img src={job.previewUrl} alt="" className="size-14 rounded-lg object-cover" />
           <div className="min-w-0 flex-1 space-y-2">
             <div
-              className="h-3 w-2/3 animate-pulse rounded"
+              className="h-3 w-2/3 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
             <div
-              className="h-3 w-1/3 animate-pulse rounded"
+              className="h-3 w-1/3 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
           </div>
@@ -297,6 +315,10 @@ export default function ReceiptPage() {
             読み取り中…
           </span>
         </div>
+      ))}
+
+      {parked.map((job) => (
+        <ParkedJobCard key={job.id} job={job} />
       ))}
 
       {pending.map((job) =>
@@ -320,7 +342,7 @@ export default function ReceiptPage() {
             <button
               type="button"
               onClick={() => removeReceiptJob(job.id)}
-              className="text-xs font-semibold"
+              className="min-h-11 text-xs font-semibold"
               style={{ color: 'var(--accent)' }}
             >
               閉じる
@@ -370,17 +392,80 @@ export default function ReceiptPage() {
                 type="button"
                 onClick={() => void undo()}
                 disabled={toast.undoing}
-                className="font-semibold underline disabled:opacity-50"
+                className="min-h-11 font-semibold underline disabled:opacity-50"
               >
                 元に戻す
               </button>
             ) : null}
-            <button type="button" aria-label="閉じる" onClick={() => setToast(null)}>
+            <button
+              className="min-h-11"
+              type="button"
+              aria-label="閉じる"
+              onClick={() => setToast(null)}
+            >
               ×
             </button>
           </span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * 読み取り待ち(圏外)と入力待ち(読み取れなかった)のカード。どちらも画像は残してあり、
+ * 「失敗」とは呼ばない。入力待ちは手入力の画面へ、読み取り待ちは戻れば自動で読み取る。
+ */
+function ParkedJobCard({ job }: { job: ReceiptJob }) {
+  return (
+    <div
+      className="flex items-center gap-3 rounded-2xl p-3"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={job.previewUrl} alt="" className="size-14 rounded-lg object-cover" />
+      <div className="min-w-0 flex-1">
+        {job.status === 'waiting' ? (
+          <>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+              読み取り待ち
+            </p>
+            <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+              オンラインに戻ると自動で読み取ります。画像は端末に残してあります。
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+              入力待ち
+            </p>
+            <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+              {job.receiptStatus === 'partial'
+                ? '一部だけ読み取れました。残りを入力してください。'
+                : '読み取れませんでした。画像を見ながら入力できます。'}
+            </p>
+          </>
+        )}
+      </div>
+      {job.status === 'waiting' ? (
+        <button
+          type="button"
+          onClick={() => retryWaitingJobs()}
+          className="min-h-11 shrink-0 px-2 text-xs font-semibold"
+          style={{ color: 'var(--ink)' }}
+        >
+          今すぐ読み取る →
+        </button>
+      ) : (
+        <Link
+          href={`/transactions/receipt/${job.captureId}` as Route}
+          prefetch={false}
+          className="flex min-h-11 shrink-0 items-center px-2 text-xs font-semibold"
+          style={{ color: 'var(--ink)' }}
+        >
+          入力する →
+        </Link>
+      )}
     </div>
   );
 }

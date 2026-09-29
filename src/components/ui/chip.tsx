@@ -20,8 +20,8 @@ export function Chip({
 
   return (
     <span
-      className="label-text inline-flex items-center gap-1 px-3 py-1 text-[12px]"
-      style={{ borderRadius: 'var(--radius-sm)', ...style[tone] }}
+      className="label-text inline-flex items-center gap-1 px-3 py-1 text-xs"
+      style={{ borderRadius: 'var(--radius-full)', ...style[tone] }}
     >
       {children}
     </span>

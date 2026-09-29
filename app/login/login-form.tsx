@@ -32,7 +32,7 @@ export function LoginForm() {
         ログイン
       </h1>
 
-      <div className="mt-5 flex gap-1.5">
+      <div className="mt-5 flex gap-2">
         <TabButton active={tab === 'password'} onClick={() => setTab('password')}>
           パスワード
         </TabButton>
@@ -109,7 +109,7 @@ function PasswordForm() {
         type="submit"
         disabled={status === 'sending'}
         className="w-full rounded-2xl py-3 text-sm font-medium text-white disabled:opacity-50"
-        style={{ background: 'var(--accent)' }}
+        style={{ background: 'var(--action)' }}
       >
         {status === 'sending' ? 'ログインしています…' : 'ログイン'}
       </button>
@@ -239,10 +239,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full px-3 py-1.5 text-xs font-medium"
+      className="rounded-full px-3 py-2 text-xs font-medium"
       style={
         active
-          ? { background: 'var(--accent)', color: '#fff' }
+          ? { background: 'var(--accent)', color: 'var(--on-accent)' }
           : { background: 'var(--plane)', color: 'var(--ink-secondary)' }
       }
     >

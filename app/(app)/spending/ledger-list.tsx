@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { formatSignedYen } from '@/domain/budget-state';
+import { Yen } from '@/components/ui/money';
 import { formatYen } from '@/domain/money';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
@@ -14,9 +14,12 @@ import {
   isFilterActive,
   splitShares,
 } from '@/features/spending/views';
-import { addDays, formatDateJa, weekdayOf } from '@/lib/date';
+import { useJustSaved } from '@/lib/just-saved';
+import { formatDateJa, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
+import { ActiveFilterChips, FilterSheet } from './filter-sheet';
+import { LedgerMenu } from './ledger-menu';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -45,13 +48,11 @@ export function LedgerList({
     today,
     filter,
     setFilter,
-    clearFilter,
-    genres,
-    accounts,
     loading,
     error,
     isCurrentMonth,
     reloadVisibleMonth,
+    captures,
   } = useSpendingMonth();
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
@@ -62,129 +63,33 @@ export function LedgerList({
   );
   const active = isFilterActive(filter);
 
-  const periodValue =
-    filter.date !== null
-      ? `date:${filter.date}`
-      : filter.range !== null && (goalRange === null || filter.range.from !== goalRange.from)
-        ? 'week'
-        : '';
-
   return (
-    <section aria-label="明細" className="space-y-3">
+    <section id="ledger" aria-label="明細" className="scroll-mt-16 space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           明細
         </h2>
-        <div className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
-          <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-            口座
-          </Link>
-          <Link
-            href="/transactions/reconcile"
-            className="text-[13px]"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            突き合わせ
-          </Link>
-          <Link
-            href="/transactions/import"
-            className="text-[13px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            取り込む
-          </Link>
-        </div>
+        <LedgerMenu />
       </div>
 
-      {/* 検索 + 横スクロールのフィルターチップ(1行) */}
-      <input
-        type="search"
-        value={filter.search}
-        onChange={(e) => setFilter({ search: e.target.value })}
-        placeholder="店名・品目・メモを検索"
-        aria-label="明細を検索"
-        className="w-full rounded-xl px-3 py-2 text-sm"
-        style={{
-          background: 'var(--plane)',
-          color: 'var(--ink)',
-          border: '1px solid var(--hairline)',
-        }}
-      />
-      <div
-        role="group"
-        aria-label="明細の絞り込み"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        <ChipSelect
-          label="口座で絞り込む"
-          value={filter.accountId ?? ''}
-          onChange={(v) => setFilter({ accountId: v || null })}
-          options={[
-            ['', 'すべての口座'],
-            ...accounts.map((a) => [a.id, a.name] as [string, string]),
-          ]}
-        />
-        <ChipSelect
-          label="ジャンルで絞り込む"
-          value={filter.genreId ?? ''}
-          onChange={(v) => setFilter({ genreId: v || null })}
-          options={[
-            ['', 'すべてのジャンル'],
-            ['none', '未分類'],
-            ...genres.map((g) => [g.id, g.name] as [string, string]),
-          ]}
-        />
-        <ChipSelect
-          label="期間で絞り込む"
-          value={periodValue}
-          onChange={(v) => {
-            if (v === '') setFilter({ date: null, range: null });
-            else if (v === 'week')
-              setFilter({ date: null, range: { from: addDays(today, -6), to: today } });
-            else if (v === 'today') setFilter({ date: today, range: null });
+      {/* 検索 + フィルター(ボトムシート)。選んでいる条件は下のチップで見せる */}
+      <div className="flex items-center gap-2">
+        <input
+          type="search"
+          value={filter.search}
+          onChange={(e) => setFilter({ search: e.target.value })}
+          placeholder="店名・品目・メモを検索"
+          aria-label="明細を検索"
+          className="min-h-11 min-w-0 flex-1 rounded-xl px-3 text-sm"
+          style={{
+            background: 'var(--surface-raised)',
+            color: 'var(--ink)',
+            border: '1px solid var(--hairline)',
           }}
-          options={[
-            ['', '月全体'],
-            ['today', '今日'],
-            ['week', '直近7日'],
-            ...(filter.date !== null && filter.date !== today
-              ? ([[`date:${filter.date}`, formatDateJa(filter.date)]] as [string, string][])
-              : []),
-          ]}
         />
-        {goalRange !== null ? (
-          <button
-            type="button"
-            aria-pressed={filter.range?.from === goalRange.from}
-            onClick={() =>
-              setFilter({
-                date: null,
-                range: filter.range?.from === goalRange.from ? null : goalRange,
-              })
-            }
-            className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold"
-            style={{
-              background: filter.range?.from === goalRange.from ? 'var(--accent)' : 'var(--plane)',
-              color:
-                filter.range?.from === goalRange.from ? 'var(--on-accent)' : 'var(--ink-secondary)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            目標期間
-          </button>
-        ) : null}
-        {active ? (
-          <button
-            type="button"
-            onClick={clearFilter}
-            className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            解除
-          </button>
-        ) : null}
+        <FilterSheet goalRange={goalRange} />
       </div>
+      <ActiveFilterChips goalRange={goalRange} />
 
       <PendingReceiptRows />
 
@@ -208,7 +113,7 @@ export function LedgerList({
       {duplicateCount > 0 ? (
         <Link
           href="/transactions/duplicates"
-          className="flex items-center justify-between gap-3 rounded-2xl p-4"
+          className="min-h-11 flex items-center justify-between gap-3 rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -228,12 +133,18 @@ export function LedgerList({
           <button
             type="button"
             onClick={reloadVisibleMonth}
-            className="mt-2 text-sm font-semibold"
+            className="min-h-11 mt-2 text-sm font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             もう一度読み込む
           </button>
         </div>
+      ) : filter.pendingOnly ? (
+        captures.length === 0 ? (
+          <p className="px-1 py-6 text-center text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            入力待ちのレシートはありません。
+          </p>
+        ) : null
       ) : loading && !isCurrentMonth ? (
         <ListSkeleton />
       ) : transactions.length === 0 ? (
@@ -246,7 +157,7 @@ export function LedgerList({
           <button
             type="button"
             onClick={() => setFilter(EMPTY_FILTER)}
-            className="mt-2 text-sm font-semibold"
+            className="min-h-11 mt-2 text-sm font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             絞り込みを解除
@@ -270,7 +181,7 @@ export function LedgerList({
               transactions={g.transactions}
             />
           ))}
-          <p className="px-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             {active
               ? `${filtered.length}件 / この月 ${transactions.length}件`
               : `${transactions.length}件`}
@@ -278,41 +189,6 @@ export function LedgerList({
         </>
       )}
     </section>
-  );
-}
-
-function ChipSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: [string, string][];
-}) {
-  const active = value !== '';
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={label}
-      className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold"
-      style={{
-        background: active ? 'var(--accent-track)' : 'var(--plane)',
-        color: active ? 'var(--accent)' : 'var(--ink-secondary)',
-        border: '1px solid var(--hairline)',
-        // iOS はフォント 16px 未満だと拡大されるが、チップは見た目を優先して小さく保つ。
-        fontSize: 12,
-      }}
-    >
-      {options.map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -328,7 +204,16 @@ function DaySection({
   total?: number;
   transactions: DrilldownTransaction[];
 }) {
-  const { genres } = useSpendingMonth();
+  const { genres, transactions: monthTransactions } = useSpendingMonth();
+  const justSavedIds = useJustSaved();
+  // 未分類の予測に使う、この月の「店 → ジャンル」の履歴。
+  const history = useMemo(
+    () =>
+      monthTransactions
+        .filter((t) => t.genreId !== null && t.amountYen < 0)
+        .map((t) => ({ storeName: t.label, genreId: t.genreId! })),
+    [monthTransactions],
+  );
   return (
     <section
       aria-label={heading}
@@ -347,13 +232,15 @@ function DaySection({
       >
         <span className="text-xs font-medium">
           {heading}
-          {sub ? <span className="ml-2 text-[10px] font-normal">{sub}</span> : null}
+          {sub ? <span className="ml-2 text-xs font-normal">{sub}</span> : null}
         </span>
         {total !== undefined && total > 0 ? (
-          <span className="tabular text-xs">{formatSignedYen(-total)}</span>
+          <span className="tabular text-xs">
+            <Yen value={total} />
+          </span>
         ) : null}
       </div>
-      <ul className="divide-y" style={{ borderColor: 'var(--hairline)' }}>
+      <ul className="divider-list">
         {transactions.map((t) => (
           <TransactionRowWithSplit
             key={t.id}
@@ -366,6 +253,8 @@ function DaySection({
               amountYen: s.amountYen,
               note: s.note,
             }))}
+            genreHistory={history}
+            justSaved={justSavedIds.includes(t.id)}
             receiptItems={t.items}
             expenseSubtype={t.expenseSubtype}
             display={{
@@ -398,16 +287,16 @@ function ListSkeleton() {
           />
           <div className="flex-1 space-y-2">
             <div
-              className="h-3 w-1/2 animate-pulse rounded"
+              className="h-3 w-1/2 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
             <div
-              className="h-2.5 w-1/3 animate-pulse rounded"
+              className="h-3 w-1/3 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
           </div>
           <div
-            className="h-3 w-14 animate-pulse rounded"
+            className="h-3 w-14 animate-pulse rounded-lg"
             style={{ background: 'var(--hairline)' }}
           />
         </div>
@@ -423,7 +312,7 @@ function EmptyState() {
         className="rounded-3xl p-6"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
-        <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           この月の明細はまだありません。
           <br />
           レシートを撮るか、銀行・カードの CSV を取り込むと、自動で分類されます。

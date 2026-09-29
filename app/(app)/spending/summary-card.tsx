@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { formatSignedYen } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
+import { Yen } from '@/components/ui/money';
 import type { PaceComparison } from '@/domain/summary-rules';
 import { splitDateOnly } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
@@ -55,7 +56,7 @@ export function SummaryCard({
         <div className="w-full shrink-0 snap-center">{goal}</div>
         <div className="w-full shrink-0 snap-center">{monthPane}</div>
       </div>
-      <p className="text-center text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-center text-xs" style={{ color: 'var(--ink-muted)' }}>
         ← 目標期間 ・ 月 →(スワイプで切り替え)
       </p>
     </div>
@@ -99,7 +100,7 @@ function MonthPane({
           className="tabular mt-1 text-4xl leading-none font-semibold tracking-tight"
           style={{ color: waiting ? 'var(--ink-muted)' : 'var(--ink)' }}
         >
-          {waiting ? '—' : formatYen(totals.spentYen, { sign: 'never' })}
+          {waiting ? '—' : <Yen value={totals.spentYen} />}
         </p>
       )}
       {waiting && error !== null ? (
@@ -109,7 +110,7 @@ function MonthPane({
       ) : null}
 
       {!waiting && (totals.specialYen > 0 || totals.scheduledYen > 0) ? (
-        <p className="tabular mt-2 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="tabular mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
           {totals.specialYen > 0 ? `うち特別費 ${formatYen(totals.specialYen)}` : ''}
           {totals.specialYen > 0 && totals.scheduledYen > 0 ? ' ・ ' : ''}
           {totals.scheduledYen > 0 ? `このほか予定 ${formatYen(totals.scheduledYen)}` : ''}
@@ -124,7 +125,7 @@ function MonthPane({
           {incomeRegistered ? (
             <>
               <div>
-                <dt className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                <dt className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                   収入
                 </dt>
                 <dd className="tabular text-sm font-semibold" style={{ color: 'var(--income)' }}>
@@ -132,7 +133,7 @@ function MonthPane({
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                <dt className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                   差額
                 </dt>
                 <dd className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -145,12 +146,12 @@ function MonthPane({
               <Link
                 href="/transactions/new?type=income"
                 prefetch={false}
-                className="text-sm font-semibold"
+                className="min-h-11 inline-flex items-center text-sm font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
                 収入を登録 →
               </Link>
-              <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                 登録すると、収入との差額が見られます
               </p>
             </div>

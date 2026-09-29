@@ -1,10 +1,20 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import type { CaptureView } from '@/features/receipt-captures/types';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import type { GenreOption } from '@/features/genre/store';
 import type { GenreBreakdownRow, MonthTotals } from '@/features/spending/ledger-types';
 import { EMPTY_FILTER, type LedgerFilter } from '@/features/spending/views';
+import { VIEW_STATE_KEY, parseViewState, serializeViewState } from '@/lib/scroll';
 import { loadCalendarMonthAction } from './actions';
 import type { DrilldownTransaction } from './drilldown';
 
@@ -38,6 +48,8 @@ type SpendingMonth = MonthData & {
   error: string | null;
   genres: readonly GenreOption[];
   accounts: readonly { id: string; name: string }[];
+  /** 入力待ちのレシート(読み取れなかったもの)。集計・目標には入らない。 */
+  captures: readonly CaptureView[];
   /** 月を切り替える(今月以外は明細と内訳を取りに行く)。 */
   goToMonth: (monthStart: string) => void;
   /** 表示中の月を取り直す(明細の編集後、今月以外のキャッシュを最新にする)。 */
@@ -74,6 +86,8 @@ export function SpendingMonthProvider({
   currentTotals,
   genres,
   accounts,
+  captures = [],
+  initialFilter,
   children,
 }: {
   today: string;
@@ -83,13 +97,79 @@ export function SpendingMonthProvider({
   currentTotals: MonthTotals;
   genres: readonly GenreOption[];
   accounts: readonly { id: string; name: string }[];
+  /** 入力待ちのレシート(読み取れなかったもの)。 */
+  captures?: readonly CaptureView[];
+  /** 絞り込みの初期値(テスト用)。 */
+  initialFilter?: Partial<LedgerFilter>;
   children: ReactNode;
 }) {
   const [visibleMonth, setVisibleMonth] = useState(currentMonthStart);
   const [otherMonths, setOtherMonths] = useState<ReadonlyMap<string, MonthData>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilterState] = useState<LedgerFilter>(EMPTY_FILTER);
+  const [filter, setFilterState] = useState<LedgerFilter>({
+    ...EMPTY_FILTER,
+    ...initialFilter,
+  });
+
+  // 家計簿を離れて戻ったとき(レシートの入力・目標画面などから)、絞り込みとスクロール位置を復元する。
+  useEffect(() => {
+    if (initialFilter !== undefined) return;
+    try {
+      const saved = parseViewState(window.sessionStorage.getItem(VIEW_STATE_KEY), Date.now());
+      if (saved === null) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 外部(sessionStorage)からの一度きりの復元
+      setFilterState(saved.filter);
+      window.requestAnimationFrame(() => window.scrollTo(0, saved.scrollY));
+    } catch {
+      // 復元できなくても通常どおり開く
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // アプリのバッジ(ホーム画面のアイコン)に、入力待ちのレシートの件数を出す(対応する環境だけ)。
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (n: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (captures.length > 0) void nav.setAppBadge?.(captures.length)?.catch(() => {});
+    else void nav.clearAppBadge?.()?.catch(() => {});
+  }, [captures.length]);
+
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+  useEffect(() => {
+    let timer: number | undefined;
+    const save = () => {
+      try {
+        window.sessionStorage.setItem(
+          VIEW_STATE_KEY,
+          serializeViewState({
+            filter: filterRef.current,
+            scrollY: window.scrollY,
+            savedAt: Date.now(),
+          }),
+        );
+      } catch {
+        // 保存できなくても復元されないだけ
+      }
+    };
+    const onScroll = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(save, 150);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pagehide', save);
+      window.clearTimeout(timer);
+      save();
+    };
+  }, []);
 
   const load = async (monthStart: string, force: boolean) => {
     if (monthStart === currentMonthStart || (!force && otherMonths.has(monthStart))) return;
@@ -144,6 +224,7 @@ export function SpendingMonthProvider({
     error,
     genres,
     accounts,
+    captures,
     goToMonth: (monthStart) => {
       setVisibleMonth(monthStart);
       // 月が変わったら、日付・ジャンルの絞り込みは外す(別の月の日付は無意味)。

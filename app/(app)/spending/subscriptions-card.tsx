@@ -28,12 +28,12 @@ export function SubscriptionsCard({ subscriptions }: { subscriptions: DetectedSu
         </p>
       </div>
 
-      <dl className="mt-3 space-y-1.5">
+      <dl className="mt-3 space-y-2">
         {subscriptions.map((s) => (
           <div key={s.key} className="flex items-baseline justify-between gap-3 text-xs">
             <dt style={{ color: 'var(--ink-secondary)' }}>
               {s.label}
-              <span className="ml-1.5" style={{ color: 'var(--ink-muted)' }}>
+              <span className="ml-2" style={{ color: 'var(--ink-muted)' }}>
                 前回 {formatDateJa(s.lastOccurredOn)}・{s.occurrenceCount}回目
               </span>
             </dt>

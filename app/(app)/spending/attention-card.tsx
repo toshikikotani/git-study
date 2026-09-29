@@ -1,15 +1,20 @@
 'use client';
 
+import type { Route } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { buildAttention } from '@/features/spending/views';
+import { categoryHref } from '@/lib/category-nav';
+import { pushUndo } from '@/lib/undo';
 import { formatDateJa } from '@/lib/date';
 import {
   recordGenreCorrectionAction,
   resolveReconcileAction,
+  restoreRowFieldsAction,
   updateTransactionAction,
 } from '../transactions/actions';
 import type { DrilldownTransaction } from './drilldown';
@@ -23,7 +28,7 @@ import { useSpendingMonth } from './spending-month-provider';
  * 目標のジャンル別の実績に入らないため)。
  */
 export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
-  const { transactions, today, isCurrentMonth, reloadVisibleMonth } = useSpendingMonth();
+  const { transactions, today, reloadVisibleMonth, captures, visibleMonth } = useSpendingMonth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -42,47 +47,86 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
     return items;
   }, [attention, transactions]);
 
-  if (!isCurrentMonth && queue.length === 0) return null;
-  if (queue.length === 0) return null;
+  if (queue.length === 0 && captures.length === 0) return null;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="block w-full rounded-2xl p-4 text-left"
+      <div
+        className="w-full rounded-2xl p-4"
         style={{
           background: 'var(--attention-track)',
           boxShadow: 'var(--card-shadow)',
           border: '1px solid var(--state-caution)',
         }}
-        aria-label={`要確認 ${queue.length}件。タップして順番に直す`}
       >
-        <div className="flex items-baseline justify-between gap-3">
+        {queue.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="block min-h-11 w-full text-left"
+            aria-label={`要確認 ${queue.length}件。タップして順番に直す`}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                <span aria-hidden>▲ </span>要確認
+              </p>
+              <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                順番に直す →
+              </span>
+            </div>
+            <ul
+              className="tabular mt-2 space-y-1 text-xs"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              {attention.uncategorized.count > 0 ? (
+                <li>
+                  未分類 {attention.uncategorized.count}件・{formatYen(attention.uncategorized.yen)}
+                  {hasGoal ? '(目標に未反映)' : ''}
+                </li>
+              ) : null}
+              {attention.mismatch.count > 0 ? (
+                <li>
+                  金額不一致 {attention.mismatch.count}件・差額 {formatYen(attention.mismatch.yen)}
+                </li>
+              ) : null}
+            </ul>
+          </button>
+        ) : (
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             <span aria-hidden>▲ </span>要確認
           </p>
-          <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-            順番に直す →
-          </span>
-        </div>
-        <ul
-          className="tabular mt-1.5 space-y-0.5 text-xs"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
-          {attention.uncategorized.count > 0 ? (
-            <li>
-              未分類 {attention.uncategorized.count}件・{formatYen(attention.uncategorized.yen)}
-              {hasGoal ? '(目標に未反映)' : ''}
-            </li>
-          ) : null}
-          {attention.mismatch.count > 0 ? (
-            <li>
-              金額不一致 {attention.mismatch.count}件・差額 {formatYen(attention.mismatch.yen)}
-            </li>
-          ) : null}
-        </ul>
-      </button>
+        )}
+        {attention.uncategorized.count > 0 ? (
+          <Link
+            href={categoryHref('none', visibleMonth) as Route}
+            prefetch={false}
+            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            <span>未分類の明細を一覧で分類する</span>
+            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
+              開く →
+            </span>
+          </Link>
+        ) : null}
+        {captures.length > 0 ? (
+          <Link
+            href={`/transactions/receipt/${captures[0]!.id}` as Route}
+            prefetch={false}
+            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            <span className="tabular">
+              入力待ち {captures.length}件{'(集計に入っていません'}
+              {hasGoal ? '・目標に未反映' : ''}
+              {')'}
+            </span>
+            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
+              入力する →
+            </span>
+          </Link>
+        ) : null}
+      </div>
 
       <AttentionFixer
         open={open}
@@ -133,7 +177,21 @@ function AttentionFixer({
       itemName: current.tx.label,
       genreId,
     });
-    markHandled(`${current.reason}:${current.tx.id}`);
+    const key = `${current.reason}:${current.tx.id}`;
+    markHandled(key);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo(`${current.tx.label} のジャンルを変更しました`, async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setHandled((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        return null;
+      });
+    }
   }
 
   async function acceptDiff(): Promise<void> {
@@ -146,7 +204,21 @@ function AttentionFixer({
       setError(result.error);
       return;
     }
-    markHandled(`${current.reason}:${current.tx.id}`);
+    const key = `${current.reason}:${current.tx.id}`;
+    markHandled(key);
+    if (result.previous) {
+      const previous = result.previous;
+      pushUndo(`${current.tx.label} の差額を認めました`, async () => {
+        const r = await restoreRowFieldsAction(previous);
+        if (r.error) return r.error;
+        setHandled((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        return null;
+      });
+    }
   }
 
   return (
@@ -160,8 +232,8 @@ function AttentionFixer({
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 rounded-full px-5 py-2 text-sm font-semibold"
-              style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+              className="min-h-11 mt-3 rounded-full px-5 py-2 text-sm font-semibold"
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               閉じる
             </button>
@@ -175,7 +247,7 @@ function AttentionFixer({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-xs"
+                className="min-h-11 text-xs"
                 style={{ color: 'var(--ink-muted)' }}
               >
                 あとで
@@ -185,10 +257,7 @@ function AttentionFixer({
               <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
                 {current.tx.label}
                 {current.tx.branchName ? (
-                  <span
-                    className="ml-1.5 text-xs font-normal"
-                    style={{ color: 'var(--ink-muted)' }}
-                  >
+                  <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
                     {current.tx.branchName}
                   </span>
                 ) : null}
@@ -209,14 +278,14 @@ function AttentionFixer({
                 <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                   ジャンルを選んでください
                 </p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {genres.map((g) => (
                     <button
                       key={g.id}
                       type="button"
                       disabled={busy}
                       onClick={() => void pickGenre(g.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50"
                       style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                     >
                       {g.name}
@@ -235,15 +304,15 @@ function AttentionFixer({
                     type="button"
                     disabled={busy}
                     onClick={() => void acceptDiff()}
-                    className="flex-1 rounded-full py-2 text-sm font-semibold disabled:opacity-50"
-                    style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+                    className="min-h-11 flex-1 rounded-full py-2 text-sm font-semibold disabled:opacity-50"
+                    style={{ background: 'var(--action)', color: 'var(--on-action)' }}
                   >
                     この差額でOK
                   </button>
                   <button
                     type="button"
                     onClick={() => markHandled(`${current.reason}:${current.tx.id}`)}
-                    className="rounded-full px-4 py-2 text-sm"
+                    className="min-h-11 rounded-full px-4 py-2 text-sm"
                     style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
                   >
                     スキップ

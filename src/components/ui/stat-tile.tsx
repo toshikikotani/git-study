@@ -41,14 +41,14 @@ export function StatTile({
     <div
       className="p-5"
       style={{
-        borderRadius: 'var(--radius-lg)',
+        borderRadius: 'var(--radius-card)',
         background: 'var(--surface)',
         boxShadow: 'var(--shadow-1)',
       }}
     >
       <div className="flex items-center justify-between gap-2">
         <span
-          className="text-[11px] font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-medium tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           {label}
@@ -57,21 +57,19 @@ export function StatTile({
       </div>
 
       {/* 金額を主役にする。FR-64 の肯定形は保ったまま、数字だけを大きく組む */}
-      <p className="mt-2.5 leading-tight" style={{ color: 'var(--ink)' }}>
+      <p className="mt-3 leading-tight" style={{ color: 'var(--ink)' }}>
         {valueParts ? (
           <>
             <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
               {valueParts.prefix}
             </span>
-            <span className="text-[30px] font-semibold tracking-[-0.03em]">
-              {valueParts.amount}
-            </span>
-            <span className="ml-0.5 text-base" style={{ color: 'var(--ink-secondary)' }}>
+            <span className="text-3xl font-semibold tracking-[-0.03em]">{valueParts.amount}</span>
+            <span className="ml-1 text-base" style={{ color: 'var(--ink-secondary)' }}>
               {valueParts.suffix}
             </span>
           </>
         ) : (
-          <span className="text-[26px] font-semibold tracking-[-0.02em]">{value}</span>
+          <span className="text-3xl font-semibold tracking-[-0.02em]">{value}</span>
         )}
       </p>
 
@@ -82,14 +80,14 @@ export function StatTile({
       ) : null}
 
       {sub ? (
-        <p className="tabular mt-2.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+        <p className="tabular mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
           {sub}
         </p>
       ) : null}
 
       {hint ? (
         <p
-          className="mt-2.5 flex items-center gap-1 text-[11px] font-medium"
+          className="mt-3 flex items-center gap-1 text-xs font-medium"
           style={{ color: 'var(--ink-muted)' }}
         >
           {hint.text}
@@ -119,8 +117,8 @@ function ToneBadge({ tone, text }: { tone: BudgetTone; text: string }) {
   }[tone];
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium">
-      <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
+    <span className="inline-flex items-center gap-2 text-xs font-medium">
+      <span className="size-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
       <span style={{ color: tone === 'normal' ? 'var(--ink-muted)' : 'var(--ink-secondary)' }}>
         {text}
       </span>

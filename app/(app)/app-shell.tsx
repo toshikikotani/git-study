@@ -1,0 +1,370 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { MdCameraAlt } from 'react-icons/md';
+
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { createLongPress } from '@/lib/long-press';
+import { UndoToastHost } from '@/components/ui/undo-toast';
+import { Fab } from '@/components/ui/fab';
+import { MoreMenu } from '@/components/ui/more-menu';
+import { PullToRefresh } from '@/components/ui/pull-to-refresh';
+import { useIsClient } from '@/components/ui/use-is-client';
+import { ReceiptCamera } from '@/components/receipt/receipt-camera';
+import {
+  configureReceiptQueue,
+  countReading,
+  enqueueReceiptFiles,
+  restoreWaitingReceipts,
+  useReceiptJobs,
+} from '@/features/import/receipt-queue';
+import { scrollToTop, tabTapAction } from '@/lib/scroll';
+import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
+
+// 読み取れなかったレシートを「入力待ち」にする処理を、キューへ渡す(features は app に依存しない)。
+configureReceiptQueue({ createCapture: createCaptureFromReadAction });
+
+/**
+ * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
+ * わかりづらい」への対応。/transactions の見出しに小さい文字リンクを並べる
+ * だけでは、ホーム・明細・給料日と並ぶタブほどの発見性が無かった。
+ * 家計簿(/spending)をタブに追加し、レシート撮影は毎回の記録行動そのもの
+ * (設計原則2:記録の手間を最小化)なので、どの画面からでも1タップで開ける
+ * 専用ボタンとして常設する(タブの隣に置くと埋もれるため別枠にした)。
+ *
+ * ── 主タブは4つまで(本人発案) ─────────────────────────────
+ * 別アプリ(pairs)のスクリーンショットを見せて「メニューが少し大きくて
+ * タップしにくい、pairsみたいにメニュー4つまで」と要望。以前はホーム/
+ * 家計簿/明細/負債/給料日の5タブ+その他で計6項目が1本のピルに詰まって
+ * いたため、確認の上、ホーム・家計簿・明細・給料日の4つに絞った(負債は
+ * その他メニューへ)。「その他」自体もタブの6つ目から、ピルの隣に独立した
+ * 丸ボタンへ切り出した(src/components/ui/more-menu.tsx)——タブ数を
+ * 増やさずに済み、それぞれの押しやすい大きさを保てる。負債・口座・ルール・
+ * 投資・副業・転職準備・レポート・朝配信・AI相談・設定群など、タブから
+ * 辿り着けない画面はすべてこの丸ボタンから開くドロップアップメニュー
+ * (MoreMenu)に集約する。
+ *
+ * ── 「明細」タブをさらに廃止(ADR-057) ─────────────────────────
+ * 本人発案「明細と家計簿については統合する。二つのタブの使い分けが
+ * わからん」への対応。明細一覧を家計簿(/spending)へ統合したため、
+ * ホーム・家計簿・給料日の3つになった(4枠使い切る必要は無い)。
+ *
+ * ボトムナビは Apple の Liquid Glass 風(ADR-028、ADR-027の Material
+ * Navigation Bar から置き換え)——本人が実際に触っている別アプリの
+ * スクリーンショット(半透明にぼかした帯+選択時に水のように弾むピル)を
+ * 見せて要望されたため、それに直接寄せた。バーの背景は半透明+ぼかし
+ * (backdrop-filter)にし、アクティブ項目の背後のピルは色の変化と
+ * わずかな拡大を「行き過ぎてから収まる」スプリングのイージングで
+ * 動かして弾む感触を作る(ripple のような Material の水紋ではなく、
+ * Apple のタップ時に「軽く縮んでバネで戻る」感触に合わせた)。
+ * レシート撮影ボタンは正式な Fab コンポーネントに置き換えた。
+ *
+ * `<main>` を PullToRefresh(ADR-029)で包み、全画面に「引っ張って更新」を
+ * 効かせる。一回読み込んだ画面はそのまま表示を保持し(next.config.ts の
+ * staleTimes)、明示的に下へ引っ張ったときだけ最新化する。
+ *
+ * ── なぜナビの Link に prefetch={false} を付けたか(本人からの不具合報告) ──
+ * 「読み込み中に画面全体にローディング表示されない」——初めて開く画面でも
+ * 発生。原因はこのボトムナビ自体:5画面すべてで常にマウントされ続け、
+ * リンクが常にビューポート内にあるため、Next.js の自動プリフェッチが
+ * ほぼ即座に効いてしまう。ADR-029 で staleTimes.dynamic を伸ばした結果、
+ * この自動プリフェッチが「その場限りのシェルだけ」ではなく実際のページ
+ * 内容まで先読みして温めてしまい、本人が実際にタップする頃には内容が
+ * 揃っていて loading.tsx の表示ごとスキップされてしまっていた。
+ * `prefetch={false}` でこの先読みを止め、タップした瞬間に初めてサーバーへ
+ * 取りに行く(=毎回 loading.tsx が挟まる)ようにした。一度実際に開いた
+ * 画面がキャッシュされたまま保持される挙動(ADR-029 の本題)自体は
+ * staleTimes 側の設定でそのまま効き続ける——prefetch を止めても、
+ * 実際に navigate した後の Router Cache 保持には影響しない。
+ *
+ * ── なぜボトムナビ全体を Portal で描画するのか(本人からの不具合報告) ──
+ * 「明細とかで height が膨らんできた時に下のメニューが固定じゃなくて
+ * 付いてくる、結果的に下のコンテンツが選択できない」。このバー自体は
+ * `position: fixed` だが、`<main>`(以前は `PullToRefresh` の直下)と
+ * 同じ `<div className="mx-auto ... flex-col">` の中に描画されていた。
+ * `more-menu.tsx` で見つかった不具合(一部のブラウザでは祖先の
+ * `backdrop-filter` が子孫の `position: fixed` の基準(containing block)
+ * になり、固定されるはずの要素がその祖先の矩形に閉じ込められる)と同種の
+ * 問題が起きうる構造で、ページの中身が伸びるほど祖先の高さも伸び、
+ * 「固定のはずのバーがページの高さに比例して下へ流れていく」ように見える。
+ * `more-menu.tsx` のオーバーレイと同じ対処——`createPortal` で
+ * `document.body` 直下に描画し、祖先に何が来ても影響されない土台にした。
+ */
+const NAV = [
+  { href: '/', label: 'ホーム' },
+  { href: '/spending', label: '家計簿' },
+  { href: '/plan', label: '目標' },
+  { href: '/payday', label: '給料日' },
+] as const;
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const isClient = useIsClient();
+
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
+      {/* ステータスバーの下のぼかし(safe-area 対応) */}
+      <div aria-hidden className="status-blur" />
+      <PullToRefresh>
+        <main className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(9rem+env(safe-area-inset-bottom))]">
+          {children}
+        </main>
+      </PullToRefresh>
+
+      <UndoToastHost />
+
+      {/* document.body 直下に描画する(上のコメント参照)。ハイドレーション
+          前(document が無い、または起動が遅く isClient がまだ true に
+          なっていない間)は、この場に直接描画しておく——本人からの不具合
+          報告「起動が遅い。どんなけ読み込んでてもカメラアイコンはすぐ
+          表示して」への対応。カメラの `<label><input type=file>` は
+          JS 無しでも機能するネイティブ要素のため、ハイドレーション未完了
+          でも即座にレシート撮影を開始できる(祖先の backdrop-filter 問題は
+          root layout に対象となるスタイルが無いため、この一瞬だけ
+          ポータル無しで描画しても実害が無い)。 */}
+      {isClient ? createPortal(<BottomBar />, document.body) : <BottomBar />}
+    </div>
+  );
+}
+
+function BottomBar() {
+  const pathname = usePathname();
+  const isClient = useIsClient();
+  const jobs = useReceiptJobs();
+  // 前回オフラインで撮ったまま残っているレシートを「読み取り待ち」として戻す(1回だけ)。
+  useEffect(() => {
+    void restoreWaitingReceipts();
+  }, []);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'single' | 'continuous'>('single');
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const longPress = useMemo(() => createLongPress({ onLongPress: () => setFabMenuOpen(true) }), []);
+  const reading = countReading(jobs);
+  const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
+  const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
+  const needInput = jobs.filter((j) => j.status === 'needs_input').length;
+  // ホーム画面のショートカット(/spending?capture=1)から開いたら、撮影をすぐ開く。
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('capture') !== '1') return;
+    url.searchParams.delete('capture');
+    window.history.replaceState(null, '', url.pathname + url.search);
+    if (typeof navigator.mediaDevices?.getUserMedia === 'function') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL(外部)からの一度きりの起動
+      setCameraOpen(true);
+    }
+  }, []);
+  // ハイドレーション前は、JS 無しでも動くネイティブの入力(撮る/選ぶ)を出しておく。
+  const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
+
+  const fab = canStream ? (
+    <Fab
+      label="レシートを撮る"
+      onPress={() => {
+        setCameraMode('single');
+        setCameraOpen(true);
+      }}
+    >
+      <MdCameraAlt aria-hidden size={26} />
+    </Fab>
+  ) : (
+    <Fab label="レシートを撮る" onFiles={(files) => enqueueReceiptFiles(files)}>
+      <MdCameraAlt aria-hidden size={26} />
+    </Fab>
+  );
+
+  return (
+    // 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07)
+    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
+          (本人発案)。アイコンだけにして、余計な文字を足さない。
+          絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
+          差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
+          ナビゲーション chrome にだけ使う方針)。
+          撮影は receipt-queue.ts のキューへ入れて裏で読み取る(待たせない)。
+          カメラが使える環境では自動撮影のカメラ(ReceiptCamera)を開き、
+          使えない環境や JS の起動前は、ネイティブの撮る/選ぶ(input type=file)に
+          なる。「撮る/選ぶを選択できるようにする」経緯は fab.tsx 参照。 */}
+      {/* 撮影は読み取りを待たない:撮ったらキューへ入れてすぐ戻る(receipt-queue.ts)。
+          読み取り中・確認待ちの件数は、ここのピルから確認画面へ進める。 */}
+      {reading + waiting + offlineWaiting + needInput > 0 ? (
+        <Link
+          href="/transactions/receipt"
+          prefetch={false}
+          role="status"
+          className="min-h-11 inline-flex items-center label-text px-4 py-2 text-xs"
+          style={{
+            borderRadius: 'var(--radius-full)',
+            background: 'var(--glass-tint-strong)',
+            backdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--ink)',
+          }}
+        >
+          {[
+            reading > 0 ? `読み取り中 ${reading}件` : '',
+            offlineWaiting > 0 ? `読み取り待ち ${offlineWaiting}件` : '',
+            waiting > 0 ? `確認待ち ${waiting}件` : '',
+            needInput > 0 ? `入力待ち ${needInput}件` : '',
+          ]
+            .filter((t) => t !== '')
+            .join(' ・ ')}
+          <span aria-hidden> →</span>
+        </Link>
+      ) : null}
+
+      {cameraOpen ? (
+        <ReceiptCamera
+          initialMode={cameraMode}
+          onCapture={(files) => enqueueReceiptFiles(files)}
+          onClose={() => setCameraOpen(false)}
+        />
+      ) : null}
+
+      {/* 撮影ボタンの長押し:手入力 / 写真から選ぶ / 連続撮影 */}
+      <BottomSheet open={fabMenuOpen} onClose={() => setFabMenuOpen(false)} role="menu">
+        <ul className="px-2 pb-2">
+          <li>
+            <Link
+              href="/transactions/new"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              手入力
+            </Link>
+          </li>
+          <li>
+            <label
+              role="menuitem"
+              className="flex min-h-11 cursor-pointer items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              写真から選ぶ
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  enqueueReceiptFiles(Array.from(e.target.files ?? []));
+                  e.target.value = '';
+                  setFabMenuOpen(false);
+                }}
+              />
+            </label>
+          </li>
+          {canStream ? (
+            <li>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFabMenuOpen(false);
+                  setCameraMode('continuous');
+                  setCameraOpen(true);
+                }}
+                className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold"
+                style={{ color: 'var(--ink)' }}
+              >
+                連続撮影
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      </BottomSheet>
+
+      {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
+          以前はその他もピルの6項目目だったため1項目が詰まって小さかった
+          (本人発案での見直し、上のコメント参照)。 */}
+      <div className="flex w-full max-w-md items-center">
+        <nav className="min-w-0 flex-1">
+          <ul
+            className="flex items-end gap-1 p-2"
+            style={{
+              borderRadius: 'var(--radius-card)',
+              background: 'var(--glass-tint)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
+            }}
+          >
+            {NAV.map((item, index) => {
+              const isActive = pathname === item.href;
+              return (
+                <Fragment key={item.href}>
+                  {/* 撮影ボタンはタブバーの中央に組み込む(本文に被らない)。 */}
+                  {index === 2 ? (
+                    <li
+                      className="flex w-16 shrink-0 justify-center self-center"
+                      aria-label="レシートを撮る"
+                    >
+                      {/* 撮影ボタン(56pt)はタブバーから少しだけ浮かせる */}
+                      <div
+                        style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}
+                        onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
+                        onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
+                        onPointerUp={longPress.end}
+                        onPointerCancel={longPress.end}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClickCapture={(e) => {
+                          // 長押しが成立したあとのクリックは、撮影を始めずに打ち消す。
+                          if (longPress.consumeClick()) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
+                      >
+                        {fab}
+                      </div>
+                    </li>
+                  ) : null}
+                  <li className="flex-1">
+                    <Link
+                      href={item.href}
+                      prefetch={false}
+                      aria-current={isActive ? 'page' : undefined}
+                      onClick={(e) => {
+                        // 開いているタブをもう一度タップしたら、一番上へ戻る。
+                        if (tabTapAction(pathname, item.href) === 'scroll-top') {
+                          e.preventDefault();
+                          scrollToTop();
+                        }
+                      }}
+                      className="min-h-11 flex flex-col items-center gap-1 py-2"
+                    >
+                      {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
+                        遷移させ、スプリングのイージングで一瞬 1 を超えてから
+                        収まることで「弾む」感触を作る(ADR-028)。 */}
+                      <span
+                        className="label-text px-2 py-1 text-xs whitespace-nowrap"
+                        style={{
+                          borderRadius: 'var(--radius-full)',
+                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+                          background: isActive ? 'var(--accent-track)' : 'transparent',
+                          color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    </Link>
+                  </li>
+                </Fragment>
+              );
+            })}
+            {/* 「…」はタブバーの右端に統合する(孤立した丸ボタンにしない)。 */}
+            <li className="flex shrink-0 items-center justify-center self-center">
+              <MoreMenu />
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  );
+}

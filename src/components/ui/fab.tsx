@@ -54,9 +54,9 @@ type FabAsButton = CommonProps & {
 
 const SHARED_STYLE: React.CSSProperties = {
   borderRadius: 'var(--radius-full)',
-  background: 'var(--accent)',
-  color: 'var(--on-accent)',
-  boxShadow: `0 10px 24px color-mix(in srgb, var(--accent) 35%, transparent), var(--shadow-1)`,
+  background: 'var(--action)',
+  color: 'var(--on-action)',
+  boxShadow: `0 10px 24px color-mix(in srgb, var(--action) 35%, transparent), var(--shadow-1)`,
   transition: 'transform var(--duration-medium) var(--ease-spring)',
 };
 

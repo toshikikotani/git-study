@@ -11,6 +11,8 @@
  *   - 今日より未来の日付は自動で scheduled(予定)。実績には含めず、別に持つ
  *   - kind='special'(特別費)は「使った額」には入るが、目標のペース計算
  *     (paceSpentYen)には入れない
+ *   - kind='refund'(返品・返金)は金額が正だが収入ではなく、そのジャンル・その日の
+ *     使った額から差し引く(使った額・ジャンル別・日別・ペースのすべてで純額になる)
  *   - 金額は整数の円だけ。小数が来たら例外にする(浮動小数点を混ぜない)
  *   - 分割した明細は子(splits)へ展開して数える。子のジャンルが未設定なら
  *     親のジャンルを引き継ぐ
@@ -21,7 +23,7 @@ import { assertYen } from '@/domain/money';
 import { addDays, type DateOnly } from '@/lib/date';
 
 export type EntryStatus = 'actual' | 'scheduled';
-export type EntryKind = 'normal' | 'special';
+export type EntryKind = 'normal' | 'special' | 'refund';
 
 /** 集計の入力1行。明細1件、または分割の子1件。 */
 export type LedgerEntry = BudgetTransaction & {
@@ -83,6 +85,8 @@ export type LedgerSummary = {
   byDay: ReadonlyMap<DateOnly, number>;
   /** 日別の予定の支出。 */
   scheduledByDay: ReadonlyMap<DateOnly, number>;
+  /** ジャンル別の予定の支出(特別費を含む)。キー null は未分類。 */
+  scheduledByGenre: ReadonlyMap<string | null, number>;
   /** 未分類の使った額(byGenre の null と同じ値)。 */
   uncategorizedYen: number;
 };
@@ -108,6 +112,7 @@ export function summarizeLedger(
   const byGenrePace = new Map<string | null, number>();
   const byDay = new Map<DateOnly, number>();
   const scheduledByDay = new Map<DateOnly, number>();
+  const scheduledByGenre = new Map<string | null, number>();
 
   for (const e of entries) {
     if (e.occurredOn < range.from || e.occurredOn > range.to) continue;
@@ -119,11 +124,20 @@ export function summarizeLedger(
       if (yen > 0) {
         scheduledYen += yen;
         add(scheduledByDay, e.occurredOn, yen);
+        add(scheduledByGenre, e.categoryId, yen);
       }
       continue;
     }
 
     if (e.amountYen > 0) {
+      if (e.kind === 'refund') {
+        // 返品・返金:収入ではなく、同じジャンル・同じ日の使った額から差し引く。
+        spentYen -= e.amountYen;
+        add(byGenre, e.categoryId, -e.amountYen);
+        add(byDay, e.occurredOn, -e.amountYen);
+        add(byGenrePace, e.categoryId, -e.amountYen);
+        continue;
+      }
       incomeYen += e.amountYen;
       continue;
     }
@@ -148,6 +162,7 @@ export function summarizeLedger(
     byGenrePace,
     byDay,
     scheduledByDay,
+    scheduledByGenre,
     uncategorizedYen: byGenre.get(null) ?? 0,
   };
 }

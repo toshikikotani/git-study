@@ -15,6 +15,7 @@ import {
 } from '@/domain/plan-presets';
 import type { PlanEvidence } from '@/domain/plan-evidence';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
+import { findOverlap, overlapMessage, reservationStart } from '@/domain/plan-periods';
 import { formatDateJa, type DateOnly } from '@/lib/date';
 import { savePlanAction, suggestPlanAction } from './actions';
 import { AllocationEditor } from './allocation-editor';
@@ -49,10 +50,25 @@ type Suggestion = {
  * 期間を選び、AIに目標案を作ってもらい、本人が直して保存する(本人発案、ADR-058)。
  * 「徐々に改善」のため、改善の強さ(1回で削る幅の上限)を選べる。
  */
-export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number }) {
+export function PlanBuilder({
+  today,
+  payday,
+  ranges,
+  activeEnd,
+}: {
+  today: DateOnly;
+  payday: number;
+  /** すでにある目標の期間。重なる期間は作れない。 */
+  ranges: readonly { id: string; periodStart: DateOnly; periodEnd: DateOnly }[];
+  /** 進行中の目標の終了日。あれば「次の目標を予約」として折りたたみ、開始日を翌日にする。 */
+  activeEnd: DateOnly | null;
+}) {
   const router = useRouter();
+  const reserving = activeEnd !== null;
+  // 予約のときは、進行中の目標の終了日の翌日から。
+  const baseDate = reserving ? reservationStart(activeEnd) : today;
   // 初期選択は「1週間」。短い期間から始めて、結果を見て次の目標へ進める。
-  const initial = planPreset(DEFAULT_PLAN_PRESET, today, payday);
+  const initial = planPreset(DEFAULT_PLAN_PRESET, baseDate, payday);
   const [preset, setPreset] = useState<PlanPresetId | null>(DEFAULT_PLAN_PRESET);
   const [start, setStart] = useState<DateOnly | null>(initial.start);
   const [end, setEnd] = useState<DateOnly | null>(initial.end);
@@ -60,6 +76,9 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [busy, setBusy] = useState<'suggest' | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const conflict = start !== null && end !== null ? findOverlap(ranges, { start, end }) : null;
+  const overlapError = conflict === null ? null : overlapMessage(conflict);
 
   const setRange = (range: { start: DateOnly | null; end: DateOnly | null }) => {
     setPreset(null);
@@ -69,7 +88,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
   };
 
   const suggest = async () => {
-    if (start === null || end === null) return;
+    if (start === null || end === null || overlapError !== null) return;
     setBusy('suggest');
     setError(null);
     const result = await suggestPlanAction(start, end, step);
@@ -102,6 +121,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
     items: { genreId: string; targetYen: number }[],
   ): Promise<{ error: string | null }> => {
     if (start === null || end === null || suggestion === null) return { error: null };
+    if (overlapError !== null) return { error: overlapError };
     const byId = new Map(suggestion.items.map((item) => [item.genreId, item]));
     const result = await savePlanAction({
       periodStart: start,
@@ -122,13 +142,22 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
   };
 
   return (
-    <div
+    <details
+      open={!reserving}
       className="rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        新しい目標を立てる
-      </h2>
+      <summary
+        className="min-h-11 cursor-pointer list-none text-sm font-semibold"
+        style={{ color: 'var(--ink)' }}
+      >
+        {reserving ? '次の目標を予約' : '新しい目標を立てる'}
+        {reserving ? (
+          <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+            進行中の目標の次の期間から →
+          </span>
+        ) : null}
+      </summary>
       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         カレンダーで期間を選ぶと、AIが過去の支出と課題から、ジャンルごとの目標を提案します。
         提案は目安なので、あとから自由に直せます。
@@ -141,11 +170,11 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
             type="button"
             aria-pressed={preset === id}
             onClick={() => {
-              const range = planPreset(id, today, payday);
+              const range = planPreset(id, baseDate, payday);
               setRange({ start: range.start, end: range.end });
               setPreset(id);
             }}
-            className="rounded-full px-3 py-1 text-xs font-semibold"
+            className="min-h-11 rounded-full px-3 py-1 text-xs font-semibold"
             style={{
               background: preset === id ? 'var(--accent)' : 'var(--accent-track)',
               color: preset === id ? 'var(--on-accent)' : 'var(--accent)',
@@ -157,8 +186,21 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
       </div>
 
       <div className="mt-3">
-        <RangeCalendar start={start} end={end} today={today} onChange={setRange} />
+        <RangeCalendar
+          start={start}
+          end={end}
+          today={baseDate}
+          blocked={ranges.map((r) => ({ from: r.periodStart, to: r.periodEnd }))}
+          onChange={setRange}
+        />
       </div>
+
+      {overlapError !== null ? (
+        <p role="alert" className="mt-2 text-sm" style={{ color: 'var(--ink)' }}>
+          <span aria-hidden>▲ </span>
+          {overlapError}
+        </p>
+      ) : null}
 
       <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
         {start === null
@@ -172,7 +214,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           改善の強さ(課題のあるジャンルを、今回どこまで削るか)
         </p>
-        <div className="mt-1.5 flex gap-2">
+        <div className="mt-2 flex gap-2">
           {PLAN_STEP_OPTIONS.map((option) => (
             <button
               key={option}
@@ -182,7 +224,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
                 setStep(option);
                 setSuggestion(null);
               }}
-              className="flex-1 rounded-full py-1.5 text-xs font-semibold"
+              className="min-h-11 flex-1 rounded-full py-2 text-xs font-semibold"
               style={{
                 background: step === option ? 'var(--accent)' : 'var(--accent-track)',
                 color: step === option ? 'var(--on-accent)' : 'var(--accent)',
@@ -197,7 +239,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
       <Button
         variant="filled"
         className="mt-4 w-full"
-        disabled={start === null || end === null || busy !== null}
+        disabled={start === null || end === null || busy !== null || overlapError !== null}
         onClick={() => void suggest()}
       >
         {busy === 'suggest' ? '目標案を作っています…' : 'AIに目標案を作ってもらう'}
@@ -216,7 +258,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
               </span>
               {suggestion.evidence.provisional ? (
                 <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  className="rounded-full px-2 py-1 text-xs font-semibold"
                   style={{ background: 'var(--attention-track)', color: 'var(--state-caution)' }}
                 >
                   暫定
@@ -251,7 +293,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
               あり、目標に含まれていません。先に
               <Link
                 href="/reports/genres"
-                className="font-semibold"
+                className="min-h-11 inline-flex items-center font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
                 ジャンル分類
@@ -262,7 +304,7 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
 
           {suggestion.noRecord.length > 0 ? (
             <details className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              <summary className="cursor-pointer font-semibold">
+              <summary className="min-h-11 cursor-pointer font-semibold">
                 予算なし({suggestion.noRecord.length}件・記録がないジャンル)
               </summary>
               <p className="mt-1 leading-relaxed">{suggestion.noRecord.join('、')}</p>
@@ -291,6 +333,6 @@ export function PlanBuilder({ today, payday }: { today: DateOnly; payday: number
           {error}
         </p>
       ) : null}
-    </div>
+    </details>
   );
 }

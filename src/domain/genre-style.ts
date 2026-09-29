@@ -73,11 +73,78 @@ function hash(name: string): number {
   return h;
 }
 
-/** ジャンル名から色とアイコンを決める。null は未分類。 */
-export function genreStyle(name: string | null): GenreStyle {
+/** 利用者が選んだ見た目(genres.icon_key / color_index)。未設定の項目は名前からの既定。 */
+export type GenreStyleOverride = { icon?: GenreIconKey | null; colorIndex?: number | null };
+
+/** 選べるアイコン(未分類は選べない)。 */
+export const SELECTABLE_ICONS: readonly GenreIconKey[] = [
+  'grocery',
+  'restaurant',
+  'cafe',
+  'bar',
+  'goods',
+  'fashion',
+  'beauty',
+  'health',
+  'home',
+  'utility',
+  'phone',
+  'transport',
+  'hobby',
+  'book',
+  'subscription',
+  'gift',
+  'kids',
+  'pet',
+  'appliance',
+  'travel',
+  'money',
+  'other',
+];
+
+export const ICON_LABELS: Record<GenreIconKey, string> = {
+  grocery: '食料品',
+  restaurant: '外食',
+  cafe: 'カフェ',
+  bar: 'お酒',
+  goods: '日用品',
+  fashion: '衣服',
+  beauty: '美容',
+  health: '医療',
+  home: '住まい',
+  utility: '光熱',
+  phone: '通信',
+  transport: '交通',
+  hobby: '趣味',
+  book: '本',
+  subscription: '会費',
+  gift: '贈り物',
+  kids: 'こども',
+  pet: 'ペット',
+  appliance: '家電',
+  travel: '旅行',
+  money: 'お金',
+  other: 'その他',
+  uncategorized: '未分類',
+};
+
+/** ジャンル名から色とアイコンを決める。null は未分類。`override` は利用者が選んだ見た目。 */
+export function genreStyle(name: string | null, override?: GenreStyleOverride | null): GenreStyle {
   if (name === null || name === '' || name === '未分類') {
     return { colorIndex: null, icon: 'uncategorized' };
   }
+  const base = defaultGenreStyle(name);
+  if (!override) return base;
+  const colorIndex =
+    override.colorIndex != null &&
+    override.colorIndex >= 1 &&
+    override.colorIndex <= GENRE_COLOR_COUNT
+      ? override.colorIndex
+      : base.colorIndex;
+  return { colorIndex, icon: override.icon ?? base.icon };
+}
+
+function defaultGenreStyle(name: string): GenreStyle {
   const fixed = FIXED[name];
   if (fixed) return fixed;
   if (/収入|給与|給料|賞与/.test(name)) return { colorIndex: 1, icon: 'money' };
@@ -85,7 +152,81 @@ export function genreStyle(name: string | null): GenreStyle {
 }
 
 /** CSS の色。未分類は灰。 */
-export function genreColorVar(name: string | null): string {
-  const { colorIndex } = genreStyle(name);
+export function genreColorVar(name: string | null, override?: GenreStyleOverride | null): string {
+  const { colorIndex } = genreStyle(name, override);
   return colorIndex === null ? 'var(--genre-none)' : `var(--genre-${colorIndex})`;
+}
+
+/**
+ * 色の候補(app/globals.css の --genre-N の写し。テストで CSS と一致を確かめる)。
+ * 背景 `surface` に対して、アイコンなどの図形に求められる 3:1(WCAG 1.4.11)を
+ * 明るい・暗いの両方で満たす色だけを、設定の候補に出す。
+ */
+export const GENRE_COLOR_HEX = {
+  light: [
+    '#1f8f5f',
+    '#c26a1b',
+    '#8a5a3c',
+    '#8e4fc4',
+    '#0f8f9c',
+    '#c2478f',
+    '#6b8f1f',
+    '#3d7f6b',
+    '#7a5ca8',
+    '#b5583a',
+  ],
+  dark: [
+    '#3ec48a',
+    '#f0994a',
+    '#c99672',
+    '#b985ee',
+    '#3cc0cf',
+    '#ee73b8',
+    '#a3c94a',
+    '#62b9a0',
+    '#a68bd6',
+    '#e88a6a',
+  ],
+  surface: { light: '#ffffff', dark: '#121826' },
+} as const;
+
+export const MIN_GRAPHIC_CONTRAST = 3;
+
+function channel(v: number): number {
+  const c = v / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+export function contrastRatio(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    return (
+      0.2126 * channel((n >> 16) & 255) +
+      0.7152 * channel((n >> 8) & 255) +
+      0.0722 * channel(n & 255)
+    );
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** 設定で選べる色の番号(1〜10)。明るい・暗いの両方でコントラストを満たすものだけ。 */
+export function selectableColorIndexes(): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < GENRE_COLOR_COUNT; i += 1) {
+    const ok =
+      contrastRatio(GENRE_COLOR_HEX.light[i]!, GENRE_COLOR_HEX.surface.light) >=
+        MIN_GRAPHIC_CONTRAST &&
+      contrastRatio(GENRE_COLOR_HEX.dark[i]!, GENRE_COLOR_HEX.surface.dark) >= MIN_GRAPHIC_CONTRAST;
+    if (ok) out.push(i + 1);
+  }
+  return out;
+}
+
+/**
+ * バー(比率・内訳)用の色。ジャンルの色を少し落ち着かせる(灰に寄せる)。
+ * アイコンや文字の色は今の彩度のまま、面積の大きいバーだけを静かにする。
+ */
+export function genreBarColor(name: string | null, override?: GenreStyleOverride | null): string {
+  return `color-mix(in srgb, ${genreColorVar(name, override)} 62%, var(--ink-muted))`;
 }

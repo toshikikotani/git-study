@@ -82,7 +82,7 @@ export function ZoomableImage({
           ) : null}
         </div>
       </div>
-      <div className="absolute right-2 bottom-2 flex gap-1.5">
+      <div className="absolute right-2 bottom-2 flex gap-2">
         {[
           { label: '縮小', text: '−', next: () => setScale((s) => clamp(s - 0.5)) },
           { label: '拡大', text: '+', next: () => setScale((s) => clamp(s + 0.5)) },
@@ -92,7 +92,7 @@ export function ZoomableImage({
             type="button"
             aria-label={`画像を${b.label}`}
             onClick={b.next}
-            className="flex size-9 items-center justify-center rounded-full text-lg font-semibold"
+            className="min-h-11 flex size-9 items-center justify-center rounded-full text-lg font-semibold"
             style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
           >
             {b.text}

@@ -25,12 +25,12 @@ export function Placeholder({
       >
         <div className="flex items-center gap-2">
           <span
-            className="size-1.5 rounded-full"
+            className="size-2 rounded-full"
             style={{ background: 'var(--ink-muted)' }}
             aria-hidden
           />
           <span
-            className="text-[11px] font-medium tracking-[0.08em] uppercase"
+            className="text-xs font-medium tracking-[0.08em] uppercase"
             style={{ color: 'var(--ink-muted)' }}
           >
             未実装

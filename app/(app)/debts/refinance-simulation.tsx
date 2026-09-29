@@ -94,7 +94,7 @@ export function RefinanceSimulation({
                 <p className="tabular mt-1 font-semibold" style={{ color: 'var(--ink)' }}>
                   {result.original.months}ヶ月
                 </p>
-                <p className="tabular mt-0.5" style={{ color: 'var(--ink-secondary)' }}>
+                <p className="tabular mt-1" style={{ color: 'var(--ink-secondary)' }}>
                   利息 {formatYen(result.original.totalInterestYen, { sign: 'never' })}
                 </p>
               </div>
@@ -103,7 +103,7 @@ export function RefinanceSimulation({
                 <p className="tabular mt-1 font-semibold" style={{ color: 'var(--ink)' }}>
                   {result.refinanced.months}ヶ月
                 </p>
-                <p className="tabular mt-0.5" style={{ color: 'var(--ink-secondary)' }}>
+                <p className="tabular mt-1" style={{ color: 'var(--ink-secondary)' }}>
                   利息 {formatYen(result.refinanced.totalInterestYen, { sign: 'never' })}
                 </p>
               </div>
@@ -149,7 +149,7 @@ export function RefinanceSimulation({
                 type="submit"
                 disabled={pending}
                 className="shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-40"
-                style={{ background: 'var(--accent)', color: '#fff' }}
+                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
               >
                 {pending ? '保存中…' : '保存する'}
               </button>
@@ -175,7 +175,7 @@ export function RefinanceSimulation({
                 <p className="font-medium" style={{ color: 'var(--ink)' }}>
                   {scenario.name}
                 </p>
-                <p className="tabular mt-0.5" style={{ color: 'var(--ink-muted)' }}>
+                <p className="tabular mt-1" style={{ color: 'var(--ink-muted)' }}>
                   {formatAnnualRate(scenario.overrideAnnualRate ?? 0)} ・ {scenario.monthsToPayoff}
                   ヶ月 ・ 利息 {formatYen(scenario.totalInterestYen ?? 0, { sign: 'never' })} ・
                   完済見込み {scenario.payoffOn ? formatDateJa(scenario.payoffOn) : '-'}

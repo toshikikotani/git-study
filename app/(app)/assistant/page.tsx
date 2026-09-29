@@ -181,11 +181,11 @@ export default function AssistantChatPage() {
           <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
             AIに相談
           </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             意見を話すと、必要な設定をまとめて変更案にします
           </p>
         </div>
-        <Link href="/advisor" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/advisor" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           目標
         </Link>
       </header>
@@ -203,13 +203,13 @@ export default function AssistantChatPage() {
                 秘匿情報、リボ払い等の検知には触れません。
               </p>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => void send(s)}
-                  className="block w-full rounded-2xl px-4 py-3 text-left text-[13px]"
+                  className="block w-full rounded-2xl px-4 py-3 text-left text-xs"
                   style={{
                     background: 'var(--surface)',
                     color: 'var(--ink-secondary)',
@@ -238,13 +238,13 @@ export default function AssistantChatPage() {
         {sending ? (
           <div className="pop-in flex justify-start">
             <div
-              className="flex items-center gap-1.5 rounded-2xl rounded-bl-md px-4 py-3"
+              className="flex items-center gap-2 rounded-2xl rounded-bl-md px-4 py-3"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="typing-dot h-1.5 w-1.5 rounded-full"
+                  className="typing-dot h-2 w-2 rounded-full"
                   style={{ background: 'var(--ink-muted)', animationDelay: `${i * 0.15}s` }}
                 />
               ))}
@@ -277,7 +277,7 @@ export default function AssistantChatPage() {
           }}
           rows={1}
           placeholder="例:食費をもう少し抑えたい"
-          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl px-4 py-2.5 text-sm outline-none"
+          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl px-4 py-3 text-sm outline-none"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',
@@ -288,7 +288,7 @@ export default function AssistantChatPage() {
           type="submit"
           disabled={sending || input.trim() === ''}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white disabled:opacity-40"
-          style={{ background: 'var(--accent)' }}
+          style={{ background: 'var(--action)' }}
           aria-label="送信"
         >
           →
@@ -318,12 +318,12 @@ function Bubble({
     <div className={`pop-in flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className="max-w-[92%] space-y-2">
         <div
-          className={`px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap ${
+          className={`px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
             isUser ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md'
           }`}
           style={
             isUser
-              ? { background: 'var(--accent)', color: '#fff' }
+              ? { background: 'var(--accent)', color: 'var(--on-accent)' }
               : {
                   background: 'var(--surface)',
                   color: 'var(--ink)',
@@ -382,10 +382,10 @@ function QuestionCard({
       className="space-y-2 rounded-2xl p-3"
       style={{ background: 'var(--plane)', opacity: disabled ? 0.6 : 1 }}
     >
-      <p className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
         {question.question}
       </p>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {question.options.map((option) => {
           const isPicked = picked.includes(option.label);
           return (
@@ -401,11 +401,11 @@ function QuestionCard({
                 outline: isPicked ? '2px solid var(--accent)' : 'none',
               }}
             >
-              <span className="block text-[13px] font-medium" style={{ color: 'var(--ink)' }}>
+              <span className="block text-xs font-medium" style={{ color: 'var(--ink)' }}>
                 {option.label}
               </span>
               {option.description ? (
-                <span className="block text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                <span className="block text-xs" style={{ color: 'var(--ink-muted)' }}>
                   {option.description}
                 </span>
               ) : null}
@@ -418,8 +418,8 @@ function QuestionCard({
           type="button"
           disabled={disabled || picked.length === 0}
           onClick={() => onAnswer(picked)}
-          className="w-full rounded-xl py-2 text-[13px] font-semibold text-white disabled:opacity-40"
-          style={{ background: 'var(--accent)' }}
+          className="w-full rounded-xl py-2 text-xs font-semibold text-white disabled:opacity-40"
+          style={{ background: 'var(--action)' }}
         >
           この内容で決める
         </button>
@@ -448,9 +448,9 @@ function ProposalCard({
       <ul className="space-y-1 rounded-2xl px-3 py-2" style={{ background: 'var(--plane)' }}>
         {results.map((r, i) =>
           r.ok ? (
-            <li key={i} className="flex items-baseline gap-2 text-[12px]">
+            <li key={i} className="flex items-baseline gap-2 text-xs">
               <span
-                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold"
                 style={changeBadgeStyle(r.change.kind)}
               >
                 {changeLabel(r.change.kind)}
@@ -461,7 +461,7 @@ function ProposalCard({
               </span>
             </li>
           ) : (
-            <li key={i} className="text-[12px]" style={{ color: 'var(--over)' }}>
+            <li key={i} className="text-xs" style={{ color: 'var(--over)' }}>
               {r.target} — {r.error}
             </li>
           ),
@@ -475,10 +475,10 @@ function ProposalCard({
       className="space-y-2 rounded-2xl p-3"
       style={{ background: 'var(--plane)', opacity: status === 'cancelled' ? 0.5 : 1 }}
     >
-      <p className="text-[12px] font-semibold" style={{ color: 'var(--ink)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
         変更案({changes.length}件)— 反映したいものにチェック
       </p>
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {changes.map((c, i) => (
           <li key={i}>
             <label
@@ -490,9 +490,9 @@ function ProposalCard({
                 checked={selected[i] ?? false}
                 disabled={locked}
                 onChange={() => onToggle(i)}
-                className="mt-0.5"
+                className="mt-1"
               />
-              <span className="min-w-0 text-[12px]" style={{ color: 'var(--ink-secondary)' }}>
+              <span className="min-w-0 text-xs" style={{ color: 'var(--ink-secondary)' }}>
                 <span className="font-semibold" style={{ color: 'var(--ink)' }}>
                   {c.target}
                 </span>
@@ -510,8 +510,8 @@ function ProposalCard({
             type="button"
             disabled={locked || selectedCount === 0}
             onClick={onApply}
-            className="flex-1 rounded-xl py-2 text-[13px] font-semibold text-white disabled:opacity-40"
-            style={{ background: 'var(--accent)' }}
+            className="flex-1 rounded-xl py-2 text-xs font-semibold text-white disabled:opacity-40"
+            style={{ background: 'var(--action)' }}
           >
             {status === 'applying' ? '反映しています…' : `${selectedCount}件をまとめて反映`}
           </button>
@@ -519,7 +519,7 @@ function ProposalCard({
             type="button"
             disabled={locked}
             onClick={onCancel}
-            className="rounded-xl px-4 py-2 text-[13px] disabled:opacity-40"
+            className="rounded-xl px-4 py-2 text-xs disabled:opacity-40"
             style={{ background: 'var(--surface)', color: 'var(--ink-secondary)' }}
           >
             やめる
