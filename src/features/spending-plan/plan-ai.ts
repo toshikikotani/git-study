@@ -24,7 +24,9 @@ import type { PlanContext, PlanGenreContext } from './context';
 /** 提案に使うモデル。日付サフィックスは付けない。 */
 export const SPENDING_PLAN_MODEL = 'claude-sonnet-5';
 
-const MAX_OUTPUT_TOKENS = 4096;
+// 返答そのもの(22ジャンルぶんの金額と理由)は数百トークンだが、モデルの思考にも
+// 出力枠が使われて 4096 では途中で切れた(本番で確認)。使った分だけの課金なので広く取る。
+const MAX_OUTPUT_TOKENS = 16000;
 
 export type PlanSuggestionItem = {
   genreId: string;
