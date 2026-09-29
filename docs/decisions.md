@@ -1581,7 +1581,7 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 **決定・実装**
 
 1. **`parseStructured`に`disableThinking`・`effort`を追加**(`lib/anthropic.ts`、ADR-033の共通部分)。指定しなければ従来どおり何も送らない——Haiku 4.5 は`effort`非対応で、渡すと400になるため、モデルごとの違いを呼び出し側の明示に任せる。
-2. **支出目標の提案**(`suggestPlanTargets`)は`disableThinking: true`+`effort: 'low'`。判断は「課題のあるジャンルを少し削る」程度で、削る幅の上限・必須の保護・実績を超えない、は`clampAiTarget`が機械的に守る(ADR-058)ため、深く考えさせても得るものが小さい。
+2. **支出目標の提案**(`suggestPlanTargets`)は`disableThinking: true`+`effort: 'low'`。モデルは本人の指示で Sonnet 5.5(`claude-sonnet-5-5`)に上げた(目標タブのAIだけ。他のSonnet 5の呼び出しは据え置き)。APIキー側でこのIDが使えない場合は API エラーとして扱われ、決め打ち(`fallbackTarget`)の案に切り替わる。判断は「課題のあるジャンルを少し削る」程度で、削る幅の上限・必須の保護・実績を超えない、は`clampAiTarget`が機械的に守る(ADR-058)ため、深く考えさせても得るものが小さい。
 3. **配分の微調整**(`refinePlanAllocation`)は**Haiku 4.5**に変更。出力は数字の表と1〜2文の説明で、合計を総額にそろえるのは`applyRefinement()`(`rebalanceToTotal`)が行い、AIの足し算を信用しない設計(ADR-058)のため、モデルの強さより速さの方が効く。
 4. **AIの窓口の会話**(ADR-059、`app/api/assistant/chat/route.ts`)は`output_config.effort: 'low'`。変更案づくりの途中で考えすぎて遅くなる・上限で切れるのを避ける(変更は承認カードで人が確認するため、深い推論に頼らない)。
 

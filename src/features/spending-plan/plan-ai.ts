@@ -22,7 +22,7 @@ import { parseStructured } from '@/lib/anthropic';
 import type { PlanContext, PlanGenreContext } from './context';
 
 /** 提案に使うモデル。日付サフィックスは付けない。 */
-export const SPENDING_PLAN_MODEL = 'claude-sonnet-5';
+export const SPENDING_PLAN_MODEL = 'claude-sonnet-5-5';
 
 /**
  * 配分の微調整に使うモデル。出力は数字の表と短い説明だけで、合計の一致は
