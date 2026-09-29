@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Meter } from '@/components/ui/meter';
 import { formatYen } from '@/domain/money';
@@ -9,8 +9,9 @@ import type { GenreOption } from '@/features/genre/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { GenreBreakdownRow } from '@/features/spending/store';
-import { formatDateJa } from '@/lib/date';
+import { formatDateJa, splitDateOnly } from '@/lib/date';
 import { ReceiptItemsPanel } from '../transactions/receipt-items-panel';
+import { useSpendingMonth } from './spending-month-provider';
 
 /**
  * ジャンル別内訳から辿れる当月の明細1件分(本人発案、ADR-040/ADR-057)。
@@ -59,13 +60,19 @@ export function CategoryBreakdownChart({
   rows,
   transactionsByCategory,
   categories,
+  monthLabel = null,
+  emptyMessage = null,
 }: {
   rows: readonly GenreBreakdownRow[];
-  /** ジャンルID(未分類は 'uncategorized')ごとの当月の明細。 */
+  /** ジャンルID(未分類は 'uncategorized')ごとの、その月の明細。 */
   transactionsByCategory: Readonly<Record<string, readonly DrilldownTransaction[]>>;
   categories: readonly GenreOption[];
+  /** 今月以外を見せているとき、見出しに添える月(例「2026年8月」)。 */
+  monthLabel?: string | null;
+  /** 支出が無いときに出す言葉。null ならカードごと出さない(従来の動き)。 */
+  emptyMessage?: string | null;
 }) {
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && emptyMessage === null) return null;
 
   const totalYen = rows.reduce((acc, row) => acc + row.spentYen, 0);
   const maxSpentYen = Math.max(...rows.map((row) => row.spentYen), 1);
@@ -77,7 +84,7 @@ export function CategoryBreakdownChart({
     >
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          ジャンル別の内訳
+          ジャンル別の内訳{monthLabel ? `(${monthLabel})` : ''}
         </p>
         {rows.some((row) => row.genreId === null) ? (
           <Link
@@ -89,6 +96,12 @@ export function CategoryBreakdownChart({
           </Link>
         ) : null}
       </div>
+
+      {rows.length === 0 ? (
+        <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          {emptyMessage}
+        </p>
+      ) : null}
 
       <ul className="mt-3 space-y-3.5">
         {rows.map((row) => (
@@ -103,6 +116,47 @@ export function CategoryBreakdownChart({
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * カレンダーで表示中の月の「ジャンル別の内訳」(本人発案「カレンダーに連動して
+ * 切り替えたらその月のものを表示させて」)。今月に支出が無いあいだは従来どおり
+ * カードごと出さず、別の月へ移ったときは読み込み中・支出が無いことを伝える
+ * (カードが消えると、押した結果が分からないため)。
+ */
+export function MonthLinkedCategoryBreakdown({
+  categories,
+}: {
+  categories: readonly GenreOption[];
+}) {
+  const { genreBreakdown, transactions, isCurrentMonth, visibleMonth, loading, error } =
+    useSpendingMonth();
+
+  const [year, month] = splitDateOnly(visibleMonth);
+  const transactionsByCategory = useMemo(() => {
+    const map: Record<string, DrilldownTransaction[]> = {};
+    for (const t of transactions) {
+      const key = t.genreId ?? 'uncategorized';
+      (map[key] ??= []).push(t);
+    }
+    return map;
+  }, [transactions]);
+
+  return (
+    <CategoryBreakdownChart
+      rows={genreBreakdown}
+      transactionsByCategory={transactionsByCategory}
+      categories={categories}
+      monthLabel={isCurrentMonth ? null : `${year}年${month}月`}
+      emptyMessage={
+        isCurrentMonth
+          ? null
+          : loading
+            ? 'この月の内訳を読み込んでいます…'
+            : (error ?? 'この月の支出はありません')
+      }
+    />
   );
 }
 

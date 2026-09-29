@@ -15,7 +15,8 @@ import {
 } from '@/features/diagnosis/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
-import { listCalendarTransactions } from '@/features/spending/store';
+import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
+import { loadCalendarMonth } from '@/features/spending/store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { addMonths, nthDayOfMonth, parseDateOnlyOr, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
@@ -84,10 +85,15 @@ const CALENDAR_MONTHS_BACK = 120;
 const CALENDAR_MONTHS_FORWARD = 24;
 
 export type CalendarMonthResult =
-  { error: null; transactions: DrilldownTransaction[] } | { error: string };
+  | {
+      error: null;
+      transactions: DrilldownTransaction[];
+      genreBreakdown: GenreBreakdownRow[];
+    }
+  | { error: string };
 
 /**
- * カレンダーで過去・未来の月へ移ったときに、その月の明細を返す。
+ * カレンダーで過去・未来の月へ移ったときに、その月の明細とジャンル別の内訳を返す。
  * 月は 'YYYY-MM-DD' の任意の日を受け、その月の1日に直す(形式不正は今月)。
  */
 export async function loadCalendarMonthAction(month: string): Promise<CalendarMonthResult> {
@@ -100,15 +106,16 @@ export async function loadCalendarMonthAction(month: string): Promise<CalendarMo
       return { error: 'この月のカレンダーは表示できません' };
     }
 
-    const ledgerTransactions = await listCalendarTransactions(monthStart);
-    const ids = ledgerTransactions.map((t) => t.id);
+    const { transactions, genreBreakdown } = await loadCalendarMonth(monthStart);
+    const ids = transactions.map((t) => t.id);
     const [items, subtypes] = await Promise.all([
       listReceiptItemsForTransactionIds(ids),
       listExpenseSubtypesForTransactionIds(ids),
     ]);
     return {
       error: null,
-      transactions: toDrilldownTransactions(ledgerTransactions, items, subtypes),
+      transactions: toDrilldownTransactions(transactions, items, subtypes),
+      genreBreakdown,
     };
   } catch (error) {
     return {

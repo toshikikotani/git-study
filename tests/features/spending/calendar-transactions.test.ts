@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { listCalendarTransactions } from '@/features/spending/store';
+import { loadCalendarMonth } from '@/features/spending/store';
 
 /**
- * カレンダーが過去・未来の月へ移ったときに読む明細(listCalendarTransactions)。
+ * カレンダーが過去・未来の月へ移ったときに読む明細(loadCalendarMonth)。
  * Supabase には触れず、月の範囲の指定・収支の対象外の除外・品目から決めた
  * 代表ジャンルの反映だけを検証する。
  */
@@ -66,14 +66,16 @@ vi.mock('@/lib/supabase/server', () => ({
     from: (table: string) => {
       if (table === 'genres') {
         return {
-          select: () =>
-            Promise.resolve({
-              data: [
-                { id: 'g1', name: '外食' },
-                { id: 'g2', name: '食料品' },
-              ],
-              error: null,
-            }),
+          select: () => ({
+            order: () =>
+              Promise.resolve({
+                data: [
+                  { id: 'g1', name: '外食', budget_yen: 1000 },
+                  { id: 'g2', name: '食料品', budget_yen: null },
+                ],
+                error: null,
+              }),
+          }),
         };
       }
       return {
@@ -98,26 +100,41 @@ vi.mock('@/features/genre/item-genres', () => ({
   resolveItemGenres: async () => new Map([['t3', 'g2']]),
 }));
 
-describe('listCalendarTransactions', () => {
+describe('loadCalendarMonth', () => {
   it('指定した月の1日から翌月1日の手前までを読む', async () => {
-    await listCalendarTransactions('2026-10-01');
+    await loadCalendarMonth('2026-10-01');
     expect(calls).toEqual({ gte: '2026-10-01', lt: '2026-11-01' });
   });
 
   it('年をまたぐ月末でも翌月の1日までを読む', async () => {
-    await listCalendarTransactions('2026-12-01');
+    await loadCalendarMonth('2026-12-01');
     expect(calls.lt).toBe('2027-01-01');
   });
 
   it('振替・対象外は除き、店名が無ければ摘要を使う', async () => {
-    const result = await listCalendarTransactions('2026-10-01');
+    const { transactions: result } = await loadCalendarMonth('2026-10-01');
     expect(result.map((t) => t.id)).toEqual(['t1', 't3']);
     expect(result.map((t) => t.label)).toEqual(['一蘭', 'コンビニ']);
   });
 
   it('明細本体のジャンルが空でも、品目から決めた代表ジャンルを使う', async () => {
-    const result = await listCalendarTransactions('2026-10-01');
+    const { transactions: result } = await loadCalendarMonth('2026-10-01');
     expect(result.find((t) => t.id === 't1')).toMatchObject({ genreId: 'g1', genreName: '外食' });
     expect(result.find((t) => t.id === 't3')).toMatchObject({ genreId: 'g2', genreName: '食料品' });
+  });
+
+  it('ジャンル別の内訳もその月のものを、金額の大きい順・予算つきで返す', async () => {
+    const { genreBreakdown } = await loadCalendarMonth('2026-10-01');
+    expect(genreBreakdown.map((r) => [r.genreName, r.spentYen, r.budgetYen])).toEqual([
+      ['外食', 900, 1000],
+      ['食料品', 300, null],
+    ]);
+    // 予算の9割を使っているジャンルは attention、予算が無ければ normal
+    expect(genreBreakdown.map((r) => r.tone)).toEqual(['attention', 'normal']);
+  });
+
+  it('振替・対象外は内訳に含めない', async () => {
+    const { genreBreakdown } = await loadCalendarMonth('2026-10-01');
+    expect(genreBreakdown.reduce((acc, r) => acc + r.spentYen, 0)).toBe(1200);
   });
 });
