@@ -11,7 +11,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
-import { clampAiTarget, fallbackTarget } from '@/domain/spending-plan';
+import {
+  PLAN_ROUNDING_YEN,
+  clampAiTarget,
+  fallbackTarget,
+  rebalanceToTotal,
+} from '@/domain/spending-plan';
 import { formatYen } from '@/domain/money';
 import { parseStructured } from '@/lib/anthropic';
 import type { PlanContext, PlanGenreContext } from './context';
@@ -178,5 +183,119 @@ export async function suggestPlanTargets(
     summary: result.value.summary.trim(),
     warnings: [],
     usedAi: true,
+  };
+}
+
+export type RefineItem = {
+  genreId: string;
+  genreName: string;
+  /** いまの目標額(本人が直している途中の値)。 */
+  currentYen: number;
+  /** 過去実績から出した、この期間の目安額。 */
+  baselineYen: number;
+  mustPayShare: number;
+};
+
+export type RefineResult =
+  { ok: true; amounts: Map<string, number>; summary: string } | { ok: false; message: string };
+
+const MAX_INSTRUCTION_CHARS = 200;
+
+function buildRefineSchema(genreNames: [string, ...string[]]) {
+  return z.object({
+    summary: z.string().describe('どう配分を動かしたかの説明。1〜2文。'),
+    targets: z
+      .array(z.object({ genre_name: z.enum(genreNames), target_yen: z.number() }))
+      .describe('渡されたジャンルすべてについて1件ずつ返す。'),
+  });
+}
+
+/**
+ * AIの返答(または無し)から、総額に一致する配分を組み立てる。AIの行が無い
+ * ジャンルは現状の額のまま、100円単位に丸め、最後に rebalanceToTotal で
+ * 合計を総額にそろえる(AIの足し算を信用しない)。
+ */
+export function applyRefinement(
+  items: readonly RefineItem[],
+  totalYen: number,
+  aiRows: readonly { genre_name: string; target_yen: number }[],
+): Map<string, number> {
+  const byName = new Map<string, number>();
+  for (const row of aiRows)
+    if (!byName.has(row.genre_name)) byName.set(row.genre_name, row.target_yen);
+
+  const proposed = items.map((item) => {
+    const yen = byName.get(item.genreName);
+    return yen === undefined || !Number.isFinite(yen)
+      ? item.currentYen
+      : Math.max(Math.round(yen / PLAN_ROUNDING_YEN) * PLAN_ROUNDING_YEN, 0);
+  });
+  const balanced = rebalanceToTotal(proposed, totalYen, proposed);
+  return new Map(items.map((item, i) => [item.genreId, balanced[i]!]));
+}
+
+/**
+ * 目標の総額は固定のまま、ジャンルごとの配分を本人の指示に沿って微調整する
+ * (本人発案、ADR-058)。指示が無ければ、実績と必須ラベルを踏まえた見直し案を出す。
+ */
+export async function refinePlanAllocation(
+  apiKey: string | null,
+  input: {
+    periodDays: number;
+    totalYen: number;
+    items: readonly RefineItem[];
+    instruction: string;
+  },
+  client?: Anthropic,
+): Promise<RefineResult> {
+  if (apiKey === null) {
+    return { ok: false, message: 'AIのAPIキーが設定されていません。手動で調整できます。' };
+  }
+  if (input.items.length === 0) return { ok: false, message: '調整するジャンルがありません。' };
+
+  const instruction = input.instruction.trim().slice(0, MAX_INSTRUCTION_CHARS);
+  const lines = input.items.map(
+    (item) =>
+      `ジャンル=${item.genreName} いまの目標=${item.currentYen}円 期間の目安額(実績ペース)=${item.baselineYen}円 必須ラベルの割合=${Math.round(
+        item.mustPayShare * 100,
+      )}%`,
+  );
+  const result = await parseStructured({
+    client: client ?? new Anthropic({ apiKey }),
+    model: SPENDING_PLAN_MODEL,
+    maxTokens: MAX_OUTPUT_TOKENS,
+    system: [
+      'あなたは家計改善を手伝う、現実的で無理を勧めないアドバイザーです。',
+      '支出目標の総額は固定です。総額を変えずに、ジャンルごとの配分だけを本人の指示に沿って',
+      '微調整します。',
+      '',
+      '守ること:',
+      `- 全ジャンルの目標額の合計を、必ず総額(${input.totalYen}円)にそろえる。`,
+      '- 指示に書かれたジャンルは指示どおりに動かし、その分を他のジャンルへ回す(または他から回す)。',
+      '  回す先・元は、実績の大きさと、必須ラベルの割合が低い(=調整の余地がある)ジャンルを優先する。',
+      '- 必須ラベルの割合が高いジャンルは、実績ペースを大きく下回る額にしない。',
+      '- 指示が無い場合は、実績と必須ラベルを踏まえて、無理のある配分を1〜2か所だけ見直す。',
+      '- 目標額は100円単位にする。',
+      '- 渡されたジャンルすべてに1件ずつ返す。',
+    ].join('\n'),
+    messages: [
+      {
+        role: 'user',
+        content: [
+          `期間は${input.periodDays}日間、総額は${input.totalYen}円で固定です。`,
+          `本人の指示: ${instruction === '' ? '(なし。見直し案をお願いします)' : instruction}`,
+          ...lines,
+        ].join('\n'),
+      },
+    ],
+    schema: buildRefineSchema(input.items.map((i) => i.genreName) as [string, ...string[]]),
+    hints: { truncated: 'ジャンル数が多いため、もう一度お試しください。' },
+  });
+  if (!result.ok) return { ok: false, message: result.message };
+
+  return {
+    ok: true,
+    amounts: applyRefinement(input.items, input.totalYen, result.value.targets),
+    summary: result.value.summary.trim(),
   };
 }

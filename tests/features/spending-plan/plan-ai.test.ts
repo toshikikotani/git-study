@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PlanContext, PlanGenreContext } from '@/features/spending-plan/context';
-import { mergeSuggestions, suggestPlanTargets } from '@/features/spending-plan/plan-ai';
+import {
+  applyRefinement,
+  mergeSuggestions,
+  refinePlanAllocation,
+  suggestPlanTargets,
+  type RefineItem,
+} from '@/features/spending-plan/plan-ai';
 
 function genre(overrides: Partial<PlanGenreContext>): PlanGenreContext {
   return {
@@ -66,5 +72,40 @@ describe('suggestPlanTargets', () => {
     expect(result.usedAi).toBe(false);
     expect(result.items[0]?.suggestedYen).toBe(27000);
     expect(result.warnings[0]).toContain('APIキー');
+  });
+});
+
+describe('applyRefinement', () => {
+  const items: RefineItem[] = [
+    { genreId: 'g1', genreName: '外食', currentYen: 30000, baselineYen: 30000, mustPayShare: 0 },
+    { genreId: 'g2', genreName: '旅行', currentYen: 10000, baselineYen: 10000, mustPayShare: 0 },
+  ];
+  const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+
+  it('AIの答えの合計がずれていても、総額にそろえる', () => {
+    const result = applyRefinement(items, 40000, [
+      { genre_name: '外食', target_yen: 20000 },
+      { genre_name: '旅行', target_yen: 15000 },
+    ]);
+    expect(sum(result)).toBe(40000);
+    expect(result.get('g1')! < 30000).toBe(true);
+  });
+
+  it('答えの無いジャンルは現状の額から始め、負にならない', () => {
+    const result = applyRefinement(items, 40000, [{ genre_name: '外食', target_yen: -5000 }]);
+    expect(sum(result)).toBe(40000);
+    expect([...result.values()].every((x) => x >= 0)).toBe(true);
+  });
+});
+
+describe('refinePlanAllocation', () => {
+  it('APIキーが無ければ手動を案内して失敗を返す', async () => {
+    const result = await refinePlanAllocation(null, {
+      periodDays: 30,
+      totalYen: 40000,
+      items: [],
+      instruction: '外食を減らしたい',
+    });
+    expect(result).toMatchObject({ ok: false });
   });
 });

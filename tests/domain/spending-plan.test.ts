@@ -5,7 +5,9 @@ import {
   clampAiTarget,
   fallbackTarget,
   nextPlanRange,
+  planGuidance,
   planPeriodDays,
+  rebalanceToTotal,
   planProgress,
 } from '@/domain/spending-plan';
 
@@ -106,5 +108,131 @@ describe('nextPlanRange', () => {
       start: '2026-10-25',
       end: null,
     });
+  });
+});
+
+describe('rebalanceToTotal', () => {
+  const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+
+  it('差額を現在の金額の比率で配り、合計を総額にそろえる', () => {
+    const result = rebalanceToTotal([20000, 10000], 36000);
+    expect(sum(result)).toBe(36000);
+    expect(result).toEqual([24000, 12000]);
+  });
+
+  it('減らす場合も比率で引く', () => {
+    expect(rebalanceToTotal([20000, 10000], 24000)).toEqual([16000, 8000]);
+  });
+
+  it('すでに総額と同じなら変えない', () => {
+    expect(rebalanceToTotal([1000, 2000], 3000)).toEqual([1000, 2000]);
+  });
+
+  it('重みを渡せば、その比率で配る', () => {
+    expect(rebalanceToTotal([0, 0], 10000, [3, 1])).toEqual([7500, 2500]);
+  });
+
+  it('100円未満の端数は重みが最大のジャンルに載せる', () => {
+    const result = rebalanceToTotal([10000, 10000], 20050, [1, 2]);
+    expect(sum(result)).toBe(20050);
+    expect(result[1]! - 10000).toBeGreaterThan(result[0]! - 10000);
+  });
+
+  it('減らしても0円未満にせず、足りない分は他のジャンルから引く', () => {
+    const result = rebalanceToTotal([1000, 50000], 30000, [100, 1]);
+    expect(sum(result)).toBe(30000);
+    expect(result.every((x) => x >= 0)).toBe(true);
+  });
+
+  it('すべて0円なら均等に配る', () => {
+    expect(rebalanceToTotal([0, 0, 0], 3000)).toEqual([1000, 1000, 1000]);
+  });
+
+  it('どんな入力でも合計は総額に一致し、負にならない', () => {
+    const cases: [number[], number][] = [
+      [[33300, 12300, 4500, 0], 41000],
+      [[100, 100, 100], 50],
+      [[99999, 1], 0],
+      [[5000, 5000, 5000], 123456],
+      [[1, 2, 3], 700],
+    ];
+    for (const [amounts, total] of cases) {
+      const result = rebalanceToTotal(amounts, total);
+      expect(sum(result)).toBe(total);
+      expect(result.every((x) => x >= 0)).toBe(true);
+    }
+  });
+});
+
+describe('rebalanceToTotal(ランダム入力)', () => {
+  it('300通りの入力すべてで、合計が総額に一致し負にならない', () => {
+    let seed = 12345;
+    const next = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed;
+    };
+    for (let n = 0; n < 300; n++) {
+      const count = 1 + (next() % 8);
+      const amounts = Array.from({ length: count }, () => (next() % 3 === 0 ? 0 : next() % 90000));
+      const total = next() % 200000;
+      const result = rebalanceToTotal(amounts, total);
+      expect(result.reduce((a, b) => a + b, 0)).toBe(total);
+      expect(result.every((x) => Number.isInteger(x) && x >= 0)).toBe(true);
+    }
+  });
+});
+
+describe('planGuidance', () => {
+  const base = { periodStart: '2026-10-01', periodEnd: '2026-10-30' };
+  const items = [
+    { genreId: 'g1', genreName: '外食', targetYen: 30000, spentYen: 20000 },
+    { genreId: 'g2', genreName: '食料品', targetYen: 30000, spentYen: 6000 },
+  ];
+
+  it('始まる前は開始までの日数と目標額を示す', () => {
+    const g = planGuidance({ ...base, today: '2026-09-28', items });
+    expect(g.status).toBe('not_started');
+    expect(g.headline).toContain('3日後に始まります');
+    expect(g.elapsedDays).toBe(0);
+  });
+
+  it('ペースが速いジャンルは期間末の超過見込みと1日の使える額を出す', () => {
+    // 10日経過(10/10): 外食は2000円/日 → 期間末60000円見込み(目標30000円)
+    const g = planGuidance({ ...base, today: '2026-10-10', items });
+    const dining = g.genres.find((x) => x.genreId === 'g1')!;
+    expect(dining.status).toBe('over_pace');
+    expect(dining.projectedYen).toBe(60000);
+    expect(dining.projectedOverYen).toBe(30000);
+    expect(dining.dailyAllowanceYen).toBe(500); // 残り10000円 ÷ 残り20日
+    expect(dining.message).toContain('30,000円超える見込み');
+    expect(g.actions[0]).toContain('外食');
+  });
+
+  it('順調なジャンルは行動指針に出さない', () => {
+    const g = planGuidance({ ...base, today: '2026-10-10', items });
+    expect(g.genres.find((x) => x.genreId === 'g2')!.status).toBe('on_track');
+    expect(g.actions.some((a) => a.startsWith('食料品'))).toBe(false);
+  });
+
+  it('目標を超えたら over、残りの使える額は0円', () => {
+    const g = planGuidance({
+      ...base,
+      today: '2026-10-20',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 10000, spentYen: 12000 }],
+    });
+    expect(g.genres[0]).toMatchObject({ status: 'over', dailyAllowanceYen: 0 });
+    expect(g.genres[0]!.message).toContain('2,000円超えています');
+  });
+
+  it('期間が終わったら結果だけを示す', () => {
+    const g = planGuidance({ ...base, today: '2026-11-05', items });
+    expect(g.status).toBe('ended');
+    expect(g.dailyAllowanceYen).toBeNull();
+    expect(g.remainingDays).toBe(0);
+  });
+
+  it('全体の目安と実績を比べる', () => {
+    const g = planGuidance({ ...base, today: '2026-10-15', items });
+    expect(g.expectedByTodayYen).toBe(30000); // 60000 × 15/30
   });
 });
