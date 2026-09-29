@@ -11,6 +11,7 @@ import {
   monthStartJst,
   mostRecentClosingOnOrBefore,
   nthDayOfMonth,
+  parseDateOnlyOr,
   paydayCycleFor,
   splitDateOnly,
   todayJst,
@@ -186,5 +187,18 @@ describe('mostRecentClosingOnOrBefore(FR-18, M6-4)', () => {
 
   it('締め日当日は当日を返す', () => {
     expect(mostRecentClosingOnOrBefore('2026-09-10', 10)).toBe('2026-09-10');
+  });
+});
+
+describe('parseDateOnlyOr', () => {
+  it('正しい日付はそのまま返す', () => {
+    expect(parseDateOnlyOr('2026-09-20', '2026-01-01')).toBe('2026-09-20');
+  });
+
+  it('形式が正しくない・存在しない日付・文字列でない値は fallback', () => {
+    expect(parseDateOnlyOr('2026/09/20', '2026-01-01')).toBe('2026-01-01');
+    expect(parseDateOnlyOr('2026-02-31', '2026-01-01')).toBe('2026-01-01');
+    expect(parseDateOnlyOr(undefined, '2026-01-01')).toBe('2026-01-01');
+    expect(parseDateOnlyOr(['2026-09-20'], '2026-01-01')).toBe('2026-01-01');
   });
 });

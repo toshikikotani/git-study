@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -70,6 +71,8 @@ export function SpendingCalendar({
 }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(period.to);
+  // 日付を押すと、その日の明細の上に開くメニュー(家計簿を手で登録する)。
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const transactionsByDate = useMemo(() => {
     const map = new Map<string, DrilldownTransaction[]>();
@@ -124,7 +127,11 @@ export function SpendingCalendar({
               isSelected={date === selectedDate}
               isToday={date === period.to}
               spentYen={spentByDate.get(date) ?? 0}
-              onSelect={() => setSelectedDate(date)}
+              onSelect={() => {
+                // 選択中の日をもう一度押すとメニューを閉じる。
+                setMenuOpen(date !== selectedDate || !menuOpen);
+                setSelectedDate(date);
+              }}
             />
           ),
         )}
@@ -134,6 +141,35 @@ export function SpendingCalendar({
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           {formatDateJa(selectedDate)}
         </p>
+
+        {/* 日付を押すと、その日の明細のすぐ上にメニューを出す(本人発案)。 */}
+        {menuOpen ? (
+          <div
+            role="menu"
+            aria-label={`${formatDateJa(selectedDate)}のメニュー`}
+            className="mt-2 overflow-hidden rounded-xl"
+            style={{ background: 'var(--surface-raised)', border: '1px solid var(--hairline)' }}
+          >
+            <Link
+              href={`/transactions/new?date=${selectedDate}`}
+              role="menuitem"
+              prefetch={false}
+              className="block px-3 py-2.5 text-sm font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              家計簿を手で登録する
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+              className="block w-full border-t px-3 py-2.5 text-left text-sm"
+              style={{ color: 'var(--ink-muted)', borderColor: 'var(--hairline)' }}
+            >
+              閉じる
+            </button>
+          </div>
+        ) : null}
 
         {selectedByCategory.length === 0 ? (
           <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
