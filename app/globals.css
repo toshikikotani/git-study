@@ -612,6 +612,17 @@ button {
 }
 
 /* ── モーションの部品(P1) ─────────────────────────────────── */
+/* 読み込みの骨格は 150ms 経つまで出さない(速く読めたときにちらつかせない)。 */
+@keyframes skeleton-in {
+  to {
+    opacity: 1;
+  }
+}
+.skeleton-delayed {
+  opacity: 0;
+  animation: skeleton-in 0s linear 150ms forwards;
+}
+
 @keyframes motion-fade {
   from {
     opacity: 0;

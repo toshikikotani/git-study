@@ -18,6 +18,7 @@ import { genreIdOfKey } from '@/features/category/model';
 import { formatMonthJa } from '@/lib/date';
 import { prefersReducedMotion } from '@/lib/motion';
 import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
+import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
@@ -66,6 +67,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const counts = useMoveCounts();
   const [movePicker, setMovePicker] = useState<CategoryLine | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const online = useOnline();
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
   const [showPrevious, setShowPrevious] = useState(true);
@@ -272,6 +274,23 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
 
   return (
     <div className="space-y-4">
+      <p className="sr-only">
+        {categoryVoiceOverLabel({
+          genreName: data.genreName,
+          monthKey: data.monthKey,
+          totalYen,
+          count: summary.count,
+        })}
+      </p>
+      {online ? null : (
+        <p
+          role="status"
+          className="rounded-xl px-3 py-2 text-sm"
+          style={{ background: 'var(--surface-raised)', color: 'var(--ink-secondary)' }}
+        >
+          オフラインです。最後に読み込んだ内容を表示しています。変更は通信できるようになってから行えます。
+        </p>
+      )}
       <CategoryHeader
         genreKey={data.genreKey}
         genreName={data.genreName}
