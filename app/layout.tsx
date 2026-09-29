@@ -55,6 +55,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   // 主な閲覧はスマートフォン(NFR-07)
   maximumScale: 5,
+  // ノッチ・ホームバーの領域まで描画し、safe-area は CSS(env())で避ける。
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

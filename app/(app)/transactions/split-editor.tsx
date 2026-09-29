@@ -696,7 +696,7 @@ export function TransactionRowWithSplit({
                     type="button"
                     onClick={() => removeRow(index)}
                     className="shrink-0 px-2 text-xs"
-                    style={{ color: 'var(--over)' }}
+                    style={{ color: 'var(--ink-muted)' }}
                   >
                     削除
                   </button>

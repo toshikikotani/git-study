@@ -14,6 +14,9 @@ export const MAX_YEN = 1_000_000_000_000; // 1兆円
 
 export class MoneyError extends AppError {}
 
+/** 金額のマイナス記号(U+2212)。 */
+export const MINUS = '\u2212';
+
 /** 整数の円であることを検査する。計算結果を DB へ渡す直前に必ず通す。 */
 export function assertYen(value: number, label = '金額'): number {
   if (!Number.isFinite(value)) {
@@ -35,7 +38,8 @@ export function assertYen(value: number, label = '金額'): number {
 export function formatYen(value: number, options?: { sign?: 'auto' | 'never' }): string {
   assertYen(value, '表示金額');
   const shown = options?.sign === 'never' ? Math.abs(value) : value;
-  return `${shown.toLocaleString('ja-JP')}円`;
+  // マイナスは U+2212(−)。ハイフン(-)は数字と並ぶと短く、金額の符号として読みにくい。
+  return `${shown.toLocaleString('ja-JP').replace('-', MINUS)}円`;
 }
 
 /**

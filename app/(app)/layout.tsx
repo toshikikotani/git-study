@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
@@ -91,8 +91,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
+      {/* ステータスバーの下のぼかし(safe-area 対応) */}
+      <div aria-hidden className="status-blur" />
       <PullToRefresh>
-        <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
+        <main className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(9rem+env(safe-area-inset-bottom))]">
+          {children}
+        </main>
       </PullToRefresh>
 
       {/* document.body 直下に描画する(上のコメント参照)。ハイドレーション
@@ -119,9 +123,19 @@ function BottomBar() {
   // ハイドレーション前は、JS 無しでも動くネイティブの入力(撮る/選ぶ)を出しておく。
   const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
 
+  const fab = canStream ? (
+    <Fab label="レシートを撮る" onPress={() => setCameraOpen(true)}>
+      <MdCameraAlt aria-hidden size={26} />
+    </Fab>
+  ) : (
+    <Fab label="レシートを撮る" onFiles={(files) => enqueueReceiptFiles(files)}>
+      <MdCameraAlt aria-hidden size={26} />
+    </Fab>
+  );
+
   return (
     // 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07)
-    <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
           (本人発案)。アイコンだけにして、余計な文字を足さない。
           絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
@@ -154,15 +168,6 @@ function BottomBar() {
         </Link>
       ) : null}
 
-      {canStream ? (
-        <Fab label="レシートを撮る" onPress={() => setCameraOpen(true)}>
-          <MdCameraAlt aria-hidden size={26} />
-        </Fab>
-      ) : (
-        <Fab label="レシートを撮る" onFiles={(files) => enqueueReceiptFiles(files)}>
-          <MdCameraAlt aria-hidden size={26} />
-        </Fab>
-      )}
       {cameraOpen ? (
         <ReceiptCamera
           onCapture={(files) => enqueueReceiptFiles(files)}
@@ -186,33 +191,44 @@ function BottomBar() {
               boxShadow: 'var(--glass-shadow)',
             }}
           >
-            {NAV.map((item) => {
+            {NAV.map((item, index) => {
               const isActive = pathname === item.href;
               return (
-                <li key={item.href} className="flex-1">
-                  <Link
-                    href={item.href}
-                    prefetch={false}
-                    aria-current={isActive ? 'page' : undefined}
-                    className="flex flex-col items-center gap-1 py-2"
-                  >
-                    {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
+                <Fragment key={item.href}>
+                  {/* 撮影ボタンはタブバーの中央に組み込む(本文に被らない)。 */}
+                  {index === 2 ? (
+                    <li
+                      className="flex w-16 shrink-0 justify-center self-center"
+                      aria-label="レシートを撮る"
+                    >
+                      <div className="-my-1">{fab}</div>
+                    </li>
+                  ) : null}
+                  <li className="flex-1">
+                    <Link
+                      href={item.href}
+                      prefetch={false}
+                      aria-current={isActive ? 'page' : undefined}
+                      className="flex flex-col items-center gap-1 py-2"
+                    >
+                      {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
                         遷移させ、スプリングのイージングで一瞬 1 を超えてから
                         収まることで「弾む」感触を作る(ADR-028)。 */}
-                    <span
-                      className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
-                      style={{
-                        borderRadius: 'var(--radius-full)',
-                        transform: isActive ? 'scale(1)' : 'scale(0.9)',
-                        transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
-                        background: isActive ? 'var(--accent-track)' : 'transparent',
-                        color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
-                      }}
-                    >
-                      {item.label}
-                    </span>
-                  </Link>
-                </li>
+                      <span
+                        className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
+                        style={{
+                          borderRadius: 'var(--radius-full)',
+                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+                          background: isActive ? 'var(--accent-track)' : 'transparent',
+                          color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    </Link>
+                  </li>
+                </Fragment>
               );
             })}
           </ul>

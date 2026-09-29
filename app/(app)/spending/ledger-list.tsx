@@ -49,7 +49,9 @@ export function LedgerList({
     genres,
     accounts,
     loading,
+    error,
     isCurrentMonth,
+    reloadVisibleMonth,
   } = useSpendingMonth();
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
@@ -218,7 +220,21 @@ export function LedgerList({
         </Link>
       ) : null}
 
-      {loading && !isCurrentMonth ? (
+      {error !== null && !isCurrentMonth ? (
+        <div role="alert" className="px-1 py-6 text-center">
+          <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={reloadVisibleMonth}
+            className="mt-2 text-sm font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            もう一度読み込む
+          </button>
+        </div>
+      ) : loading && !isCurrentMonth ? (
         <ListSkeleton />
       ) : transactions.length === 0 ? (
         <EmptyState />

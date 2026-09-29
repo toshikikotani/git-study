@@ -35,7 +35,8 @@ describe('assertYen', () => {
 describe('formatYen', () => {
   it('桁区切りと円を付ける', () => {
     expect(formatYen(1234567)).toBe('1,234,567円');
-    expect(formatYen(-3500)).toBe('-3,500円');
+    expect(formatYen(-3500)).toBe('\u22123,500円');
+    expect(formatYen(-3500)).not.toContain('-');
   });
 
   it('sign: never で符号を落とす(支出額を正で見せたいとき)', () => {

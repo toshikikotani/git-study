@@ -277,6 +277,23 @@
 body {
   background: var(--plane);
   color: var(--ink);
+  /* 金額は等幅数字(縦に並べたとき桁がそろう)。 */
+  font-variant-numeric: tabular-nums;
+  /* 固定要素の余白(ステータスバー・ホームバー)の基準。 */
+  --sticky-top: env(safe-area-inset-top, 0px);
+}
+
+/* ステータスバーの下のぼかし。ノッチ・ダイナミックアイランドの背後を本文が透けて
+   見えないよう、safe-area の高さだけ半透明+ぼかしの帯を敷く(layout.tsx)。 */
+.status-blur {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 30;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--glass-tint-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  pointer-events: none;
 }
 
 /* ── ラベル用の文字組み ─────────────────────────────────────
