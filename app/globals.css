@@ -252,6 +252,41 @@
   --radius-inner: 12px;
   --radius-full: 999px;
 
+  /* モーション(src/lib/motion.ts と同じ値。tests/motion.test.ts が食い違いを検出する)。
+     標準の遷移=スプリング(応答0.35秒・減衰0.85)、小さな状態変化=250ms ease-out、
+     金額の変化=数字が桁ごとに回転(400ms)、一覧の行の出入り=高さと透明度を同時に(250ms)。 */
+  --motion-spring-duration: 453ms;
+  --motion-spring: linear(
+    0,
+    0.051,
+    0.167,
+    0.308,
+    0.45,
+    0.579,
+    0.688,
+    0.778,
+    0.847,
+    0.899,
+    0.938,
+    0.964,
+    0.982,
+    0.994,
+    1.001,
+    1.004,
+    1.006,
+    1.006,
+    1.006,
+    1.005,
+    1.004,
+    1.003,
+    1.003,
+    1
+  );
+  --motion-small: 250ms;
+  --motion-number: 400ms;
+  --motion-row: 250ms;
+  --motion-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
   /* 青は主要な操作(撮影・保存・AIで目標案を作る)だけに使う。ほかの色の役割は上の
      --accent(中立の選択色)・--state-*(状態)・--income(収入)。 */
   --action: #2b6cd4;
@@ -574,4 +609,81 @@ button {
   left: var(--row-icon-inset);
   height: 1px;
   background: var(--divider);
+}
+
+/* ── モーションの部品(P1) ─────────────────────────────────── */
+@keyframes motion-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.motion-fade-in {
+  animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
+}
+
+/* 金額の数字が桁ごとに回転する(components/ui/rolling-number.tsx)。 */
+@keyframes digit-roll {
+  from {
+    transform: translateY(calc(var(--digit-from) * -1em));
+  }
+  to {
+    transform: translateY(calc(var(--digit-to) * -1em));
+  }
+}
+.digit-roll {
+  animation-name: digit-roll;
+  animation-timing-function: var(--motion-ease-out);
+  animation-fill-mode: both;
+}
+
+/* 一覧の行が消える/入る:高さと透明度を同時に変える(250ms)。
+   使い方: <div class="row-shell" data-state="removed"><div class="row-shell-inner">…</div></div> */
+.row-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--motion-row) var(--motion-ease-out),
+    opacity var(--motion-row) var(--motion-ease-out);
+}
+.row-shell[data-state='removed'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.row-shell-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 共有要素の遷移(行のアイコン・名前・金額 → 詳細のヘッダー)。スプリングで動く。 */
+::view-transition-group(.morph) {
+  animation-duration: var(--motion-spring-duration);
+  animation-timing-function: var(--motion-spring);
+}
+
+/* 「視差効果を減らす」:動きはすべてクロスフェードに置き換える(位置・大きさは動かさない)。 */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .pop-in,
+  .row-flash,
+  .row-insert,
+  .bar-grow,
+  .digit-roll {
+    animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
+  }
+  .row-shell {
+    transition: opacity var(--motion-small) linear;
+  }
+  ::view-transition-group(*) {
+    animation-duration: 0s;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: var(--motion-small);
+    animation-timing-function: linear;
+  }
 }

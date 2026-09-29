@@ -19,6 +19,7 @@ import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
+import { hapticFor } from '@/lib/haptics';
 import { pushUndo } from '@/lib/undo';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import {
@@ -396,7 +397,7 @@ export function TransactionRowWithSplit({
     // 確定の手応え:行のアニメーションとハプティクス。
     setFlash(true);
     window.setTimeout(() => setFlash(false), 300);
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(12);
+    hapticFor('genreConfirm');
     // 直したジャンルは、次の分類から効くよう履歴へ反映する。
     void recordGenreCorrectionAction({
       storeName: display?.name ?? transaction.description,
@@ -434,6 +435,7 @@ export function TransactionRowWithSplit({
     }
     setRemoved(true);
     setMenuOpen(false);
+    hapticFor('deleteConfirm');
     const snapshot = result.snapshot;
     if (snapshot) {
       pushUndo('削除しました', async () => {

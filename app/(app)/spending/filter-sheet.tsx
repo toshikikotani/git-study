@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { hapticFor } from '@/lib/haptics';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { activeFilterCount, isFilterActive } from '@/features/spending/views';
 import { addDays, formatDateJa, splitDateOnly } from '@/lib/date';
@@ -167,7 +168,10 @@ function Choice({
     <button
       type="button"
       aria-pressed={on}
-      onClick={onClick}
+      onClick={() => {
+        hapticFor('filterChange');
+        onClick();
+      }}
       className="min-h-11 rounded-full px-4 text-sm font-semibold"
       style={{
         background: on ? 'var(--accent)' : 'transparent',

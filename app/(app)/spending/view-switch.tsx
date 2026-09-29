@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { hapticFor } from '@/lib/haptics';
 import { scrollToLedger, scrollToTop, LEDGER_ANCHOR } from '@/lib/scroll';
 
 /**
@@ -48,6 +49,7 @@ export function ViewSwitch() {
           aria-selected={view === value}
           onClick={() => {
             setView(value);
+            hapticFor('tabChange');
             if (value === 'ledger') scrollToLedger();
             else scrollToTop();
           }}

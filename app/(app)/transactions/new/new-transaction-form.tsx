@@ -10,6 +10,7 @@ import {
   type ManualEntryValues,
 } from '@/domain/receipt-capture';
 import { todayJst } from '@/lib/date';
+import { hapticFor } from '@/lib/haptics';
 import { pushUndo } from '@/lib/undo';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
@@ -110,6 +111,7 @@ export function NewTransactionForm({
       setSaveError(outcome.error);
       return;
     }
+    hapticFor('save');
     setSaved(outcome);
     if (outcome.insertedIds.length > 0) {
       const ids = outcome.insertedIds;

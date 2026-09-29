@@ -1792,6 +1792,20 @@ ADR-061 の続き。仮定とフォールバックをセクションごとに記
 - **Dynamic Type**: 文字の段階(13/15/17/34/40)を 17px 基準の rem にし、`html { font: -apple-system-body }`(対応ブラウザのみ)で iOS の文字サイズ設定に追従させる。余白は `--spacing: 4px` の px のまま。長い名前は `overflow-wrap: anywhere`。仮定: 最大サイズでの見た目は実機で確認できていない。折り返しと min-h で広がる作りにしただけ。
 - **未実装**: 画面のスクリーンショット差分テストは H の範囲では作っていない(P9 で扱う)。
 
+
+## ADR-063 カテゴリ詳細画面(P1〜P9)
+
+前提:仕上げの続きとして、家計簿のジャンル(カテゴリ)の詳細画面をプレミアム品質で作る。集計は既存の統一集計関数(domain/ledger.ts の summarizeLedger)だけを使い、この画面独自の足し算をしない。
+
+### P1 モーションとハプティクスの基盤
+
+- **モーショントークン**(`src/lib/motion.ts` と `app/globals.css` の `--motion-*`。`tests/motion.test.ts` が両者の一致を検査): 標準の遷移=スプリング(応答0.35秒・減衰0.85 → 減衰振動の解析解から作った CSS `linear()` イージング、収束 453ms)、小さな状態変化=250ms ease-out、金額の変化=400ms、行の出入り=250ms。
+- **金額の回転表示**(`RollingNumber`): 旧値と新値を桁ごとに比べ(`digitColumns`)、変わった桁だけ0〜9の帯を縦に回す。読み上げは最終の金額のみ(途中の桁は aria-hidden)。
+- **行の出入り**: `.row-shell`(grid の `0fr↔1fr` で高さ、同時に opacity。250ms)。
+- **視差効果を減らす**: 動きのクラス(rise・pop-in・row-flash・row-insert・bar-grow・digit-roll)は `motion-fade`(250msのクロスフェード)に置換、行の出入りは高さを動かさず opacity のみ、共有要素の遷移は位置の移動を 0s にして old/new のクロスフェードだけにする。
+- **ハプティクス**(`src/lib/haptics.ts`): 操作 → 触覚の対応表 `HAPTIC_FOR_ACTION`(選択=タブ切替・グラフのなぞり・フィルター、軽い衝撃=カテゴリ移動・保存・ジャンル確定、成功=一括操作の完了・ルール保存、警告=削除の確定)。実装は Vibration API。フォールバック: iOS の Safari には Vibration API が無いので、`<input type="checkbox" switch>` のラベルを押す方法(iOS 18 以降で触覚が出る)を試す。どちらも無い環境では何も起きない(動きと文言で意味が伝わる)。画面のコードは `navigator.vibrate` を直接呼ばない(テストで検査)。
+- **共有要素**(`SharedElement`): React の `ViewTransition`(Next の App Router が使う canary にだけある)を、ある環境だけで使う薄いラッパー。無い環境では子をそのまま出す。名前は行とヘッダーで同じ(`category-icon-*` / `category-title-*` / `category-amount-*`)。
+
 <!-- LEDGER-ADR-END -->
 
 ---

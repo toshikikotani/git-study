@@ -20,6 +20,7 @@ import {
 } from '@/domain/receipt-capture';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import type { CaptureView } from '@/features/receipt-captures/types';
+import { hapticFor } from '@/lib/haptics';
 import { markJustSaved } from '@/lib/just-saved';
 import { checkReceiptDuplicatesAction, undoReceiptSaveAction } from '../../actions';
 import {
@@ -213,6 +214,7 @@ export function CaptureEntry({
       setMessage(result.error);
       return;
     }
+    hapticFor('save');
     markJustSaved(result.insertedIds);
     try {
       window.localStorage.removeItem(localKey(capture.id));
