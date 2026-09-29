@@ -1,5 +1,6 @@
 'use client';
 
+import { markJustSaved } from '@/lib/just-saved';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -128,6 +129,7 @@ export default function ReceiptPage() {
       ),
     );
 
+    markJustSaved(outcome.insertedIds);
     const label = `${input.storeName} ${formatYen(-plan.transaction.amountYen)}`;
     setSaved((prev) => new Map(prev).set(key, label));
     setToast({

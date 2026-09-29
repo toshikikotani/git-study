@@ -7,7 +7,7 @@ import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { GenreBadge } from '@/components/ui/genre-badge';
-import { genreColorVar } from '@/domain/genre-style';
+import { genreBarColor } from '@/domain/genre-style';
 import { predictGenres, type GenreHistoryEntry } from '@/domain/genre-prediction';
 import { MdReceiptLong } from 'react-icons/md';
 import { ReceiptImageViewer } from '@/components/receipt/receipt-image-viewer';
@@ -133,8 +133,11 @@ export function TransactionRowWithSplit({
   expenseSubtype = null,
   display,
   genreHistory = [],
+  justSaved = false,
 }: {
   transaction: EditableTransaction;
+  /** レシート保存の直後に追加された行(挿入の動きを付ける)。 */
+  justSaved?: boolean;
   display?: RowDisplay;
   /** 未分類の予測に使う、過去の「店 → ジャンル」。 */
   genreHistory?: readonly GenreHistoryEntry[];
@@ -397,7 +400,9 @@ export function TransactionRowWithSplit({
           </>
         }
       >
-        <div className={`flex items-center pr-2 ${flash ? 'row-flash' : ''}`}>
+        <div
+          className={`flex items-center pr-2 ${flash ? 'row-flash' : ''} ${justSaved ? 'row-insert' : ''}`}
+        >
           <button
             type="button"
             aria-expanded={open}
@@ -462,7 +467,7 @@ export function TransactionRowWithSplit({
                       key={sh.genreId ?? 'none'}
                       style={{
                         width: `${sh.ratio * 100}%`,
-                        background: genreColorVar(sh.genreName),
+                        background: genreBarColor(sh.genreName),
                       }}
                     />
                   ))}

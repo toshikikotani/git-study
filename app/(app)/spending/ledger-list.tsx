@@ -14,6 +14,7 @@ import {
   isFilterActive,
   splitShares,
 } from '@/features/spending/views';
+import { useJustSaved } from '@/lib/just-saved';
 import { addDays, formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
@@ -333,6 +334,7 @@ function DaySection({
   transactions: DrilldownTransaction[];
 }) {
   const { genres, transactions: monthTransactions } = useSpendingMonth();
+  const justSavedIds = useJustSaved();
   // 未分類の予測に使う、この月の「店 → ジャンル」の履歴。
   const history = useMemo(
     () =>
@@ -379,6 +381,7 @@ function DaySection({
               note: s.note,
             }))}
             genreHistory={history}
+            justSaved={justSavedIds.includes(t.id)}
             receiptItems={t.items}
             expenseSubtype={t.expenseSubtype}
             display={{

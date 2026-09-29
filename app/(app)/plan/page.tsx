@@ -164,7 +164,6 @@ export default async function PlanPage() {
                 yen: item.targetYen,
               }))}
             />
-            <DeletePlanButton planId={plan.id} />
           </div>
         </section>
       ) : null}
@@ -175,6 +174,12 @@ export default async function PlanPage() {
         ranges={ranges}
         activeEnd={view?.active ? view.range.to : null}
       />
+
+      {plan ? (
+        <div className="border-t pt-4 text-center" style={{ borderColor: 'var(--hairline)' }}>
+          <DeletePlanButton planId={plan.id} />
+        </div>
+      ) : null}
     </div>
   );
 }

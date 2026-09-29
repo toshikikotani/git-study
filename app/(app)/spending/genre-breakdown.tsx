@@ -1,9 +1,10 @@
 'use client';
 
+import { useJustSaved } from '@/lib/just-saved';
 import { useState } from 'react';
 
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
-import { genreColorVar } from '@/domain/genre-style';
+import { genreBarColor } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
 import type { GoalBreakdownRow } from '@/features/goals/view';
 import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
@@ -20,6 +21,7 @@ import { useSpendingMonth } from './spending-month-provider';
 export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownRow[] | null }) {
   const { genreBreakdown, filter, setFilter, isCurrentMonth, loading } = useSpendingMonth();
   const [scope, setScope] = useState<'month' | 'goal'>('month');
+  const justSaved = useJustSaved().length > 0;
   const useGoal = scope === 'goal' && goalRows !== null && isCurrentMonth;
 
   const rows: {
@@ -113,7 +115,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
             aria-label={`内訳:${rows
               .map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`)
               .join('、')}`}
-            className="mt-3 flex h-3 w-full overflow-hidden rounded-full"
+            className={`mt-3 flex h-3 w-full overflow-hidden rounded-full ${justSaved ? 'bar-grow' : ''}`}
             style={{ background: 'var(--state-none-track)' }}
           >
             {rows.map((r) => (
@@ -121,7 +123,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                 key={r.key}
                 style={{
                   width: `${(r.spentYen / Math.max(total, 1)) * 100}%`,
-                  background: genreColorVar(r.genreId === null ? null : r.name),
+                  background: genreBarColor(r.genreId === null ? null : r.name),
                 }}
               />
             ))}

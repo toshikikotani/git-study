@@ -439,3 +439,38 @@ button {
     animation: none;
   }
 }
+
+/* レシート保存の直後:追加された行が滑り込み、内訳のバーが伸びる(300ms以内)。 */
+@keyframes row-insert {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    background: transparent;
+  }
+}
+@keyframes bar-grow {
+  0% {
+    transform: scaleX(0.72);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+.row-insert {
+  animation: row-insert 260ms var(--ease-standard) both;
+}
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 300ms var(--ease-standard) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-insert,
+  .bar-grow {
+    animation: none;
+  }
+}

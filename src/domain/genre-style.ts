@@ -89,3 +89,11 @@ export function genreColorVar(name: string | null): string {
   const { colorIndex } = genreStyle(name);
   return colorIndex === null ? 'var(--genre-none)' : `var(--genre-${colorIndex})`;
 }
+
+/**
+ * バー(比率・内訳)用の色。ジャンルの色を少し落ち着かせる(灰に寄せる)。
+ * アイコンや文字の色は今の彩度のまま、面積の大きいバーだけを静かにする。
+ */
+export function genreBarColor(name: string | null): string {
+  return `color-mix(in srgb, ${genreColorVar(name)} 62%, var(--ink-muted))`;
+}
