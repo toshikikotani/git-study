@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
@@ -11,7 +11,17 @@ import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
-import { countReading, enqueueReceiptFiles, useReceiptJobs } from '@/features/import/receipt-queue';
+import {
+  configureReceiptQueue,
+  countReading,
+  enqueueReceiptFiles,
+  restoreWaitingReceipts,
+  useReceiptJobs,
+} from '@/features/import/receipt-queue';
+import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
+
+// 読み取れなかったレシートを「入力待ち」にする処理を、キューへ渡す(features は app に依存しない)。
+configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
@@ -117,9 +127,15 @@ function BottomBar() {
   const pathname = usePathname();
   const isClient = useIsClient();
   const jobs = useReceiptJobs();
+  // 前回オフラインで撮ったまま残っているレシートを「読み取り待ち」として戻す(1回だけ)。
+  useEffect(() => {
+    void restoreWaitingReceipts();
+  }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
   const reading = countReading(jobs);
-  const waiting = jobs.filter((j) => j.status !== 'reading').length;
+  const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
+  const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
+  const needInput = jobs.filter((j) => j.status === 'needs_input').length;
   // ハイドレーション前は、JS 無しでも動くネイティブの入力(撮る/選ぶ)を出しておく。
   const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
 
@@ -147,7 +163,7 @@ function BottomBar() {
           なる。「撮る/選ぶを選択できるようにする」経緯は fab.tsx 参照。 */}
       {/* 撮影は読み取りを待たない:撮ったらキューへ入れてすぐ戻る(receipt-queue.ts)。
           読み取り中・確認待ちの件数は、ここのピルから確認画面へ進める。 */}
-      {reading + waiting > 0 ? (
+      {reading + waiting + offlineWaiting + needInput > 0 ? (
         <Link
           href="/transactions/receipt"
           prefetch={false}
@@ -161,9 +177,14 @@ function BottomBar() {
             color: 'var(--ink)',
           }}
         >
-          {reading > 0 ? `読み取り中 ${reading}件` : ''}
-          {reading > 0 && waiting > 0 ? ' ・ ' : ''}
-          {waiting > 0 ? `確認待ち ${waiting}件` : ''}
+          {[
+            reading > 0 ? `読み取り中 ${reading}件` : '',
+            offlineWaiting > 0 ? `読み取り待ち ${offlineWaiting}件` : '',
+            waiting > 0 ? `確認待ち ${waiting}件` : '',
+            needInput > 0 ? `入力待ち ${needInput}件` : '',
+          ]
+            .filter((t) => t !== '')
+            .join(' ・ ')}
           <span aria-hidden> →</span>
         </Link>
       ) : null}

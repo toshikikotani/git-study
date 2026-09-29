@@ -1659,6 +1659,52 @@ create unique index ux_genre_memory_key
   on public.genre_memory (user_id, store_key, item_key);
 create index ix_genre_memory_user on public.genre_memory (user_id);
 
+-- -----------------------------------------------------------------------------
+-- 3.33 receipt_captures — 読み取りに失敗したレシートの「入力待ち」(F7)
+--   撮影した画像とAIの生の読み取り結果を残し、手で入力して明細にするまでの記録。
+--   transactions とは別に持つので、入力が終わるまで集計・目標には入らない。
+--   元の画像は破棄しても消さない(status='discarded' にするだけ。Undo できる)。
+-- -----------------------------------------------------------------------------
+create table public.receipt_captures (
+  id                uuid        primary key default gen_random_uuid(),
+  user_id           uuid        not null references auth.users(id) on delete cascade,
+
+  -- needs_input: 手で入力する必要がある(明細・要確認に「入力待ち」と出る)
+  -- resolved   : 明細として保存済み(transaction_id が入る)
+  -- discarded  : 破棄した(Undo できるよう行は消さず、画像も残す)
+  status            text        not null default 'needs_input',
+  -- 読み取りの結果: parsed(全部読めた)/ partial(一部だけ)/ failed(読めない)/ manual(最初から手入力)
+  receipt_status    text        not null default 'failed',
+
+  -- 元の画像は消さない。補正(切り抜き・回転・明るさ)した画像は別のパスで持つ。
+  image_path        text        not null,
+  edited_image_path text,
+
+  -- AI の生の読み取り結果(warnings・部分的に読めた値)。再読み取りの比較に使う。
+  ocr_raw           jsonb,
+  -- 読み取れた項目({amountYen, occurredOn, storeName, ...})と読めなかった項目の名前。
+  read_fields       jsonb       not null default '{}'::jsonb,
+  unread_fields     text[]      not null default '{}',
+  -- 入力途中の内容(下書き)。離れても消えない。
+  draft             jsonb,
+  draft_updated_at  timestamptz,
+
+  transaction_id    uuid        references public.transactions(id) on delete set null,
+  captured_on       date        not null default (now() at time zone 'Asia/Tokyo')::date,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  resolved_at       timestamptz,
+  discarded_at      timestamptz,
+
+  constraint ck_receipt_captures_status
+    check (status in ('needs_input', 'resolved', 'discarded')),
+  constraint ck_receipt_captures_receipt_status
+    check (receipt_status in ('parsed', 'partial', 'failed', 'manual'))
+);
+
+create index ix_receipt_captures_user_status
+  on public.receipt_captures (user_id, status, created_at desc);
+
 
 
 
@@ -2002,7 +2048,7 @@ begin
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
     'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
-    'genre_memory'
+    'genre_memory','receipt_captures'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

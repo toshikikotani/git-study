@@ -1,6 +1,7 @@
 'use client';
 
 import { markJustSaved } from '@/lib/just-saved';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -17,6 +18,7 @@ import { formatYen } from '@/domain/money';
 import {
   enqueueReceiptFiles,
   removeReceiptJob,
+  retryWaitingJobs,
   useReceiptJobs,
   type ReceiptJob,
 } from '@/features/import/receipt-queue';
@@ -161,7 +163,14 @@ export default function ReceiptPage() {
   };
 
   const reading = jobs.filter((j) => j.status === 'reading');
-  const pending = useMemo(() => jobs.filter((j) => j.status !== 'reading'), [jobs]);
+  const pending = useMemo(
+    () => jobs.filter((j) => j.status === 'ready' || j.status === 'error'),
+    [jobs],
+  );
+  const parked = useMemo(
+    () => jobs.filter((j) => j.status === 'waiting' || j.status === 'needs_input'),
+    [jobs],
+  );
 
   return (
     <div className="rise space-y-4">
@@ -301,6 +310,10 @@ export default function ReceiptPage() {
         </div>
       ))}
 
+      {parked.map((job) => (
+        <ParkedJobCard key={job.id} job={job} />
+      ))}
+
       {pending.map((job) =>
         job.status === 'error' ? (
           <div
@@ -383,6 +396,64 @@ export default function ReceiptPage() {
           </span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * 読み取り待ち(圏外)と入力待ち(読み取れなかった)のカード。どちらも画像は残してあり、
+ * 「失敗」とは呼ばない。入力待ちは手入力の画面へ、読み取り待ちは戻れば自動で読み取る。
+ */
+function ParkedJobCard({ job }: { job: ReceiptJob }) {
+  return (
+    <div
+      className="flex items-center gap-3 rounded-2xl p-3"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={job.previewUrl} alt="" className="size-14 rounded-lg object-cover" />
+      <div className="min-w-0 flex-1">
+        {job.status === 'waiting' ? (
+          <>
+            <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+              読み取り待ち
+            </p>
+            <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              オンラインに戻ると自動で読み取ります。画像は端末に残してあります。
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+              入力待ち
+            </p>
+            <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              {job.receiptStatus === 'partial'
+                ? '一部だけ読み取れました。残りを入力してください。'
+                : '読み取れませんでした。画像を見ながら入力できます。'}
+            </p>
+          </>
+        )}
+      </div>
+      {job.status === 'waiting' ? (
+        <button
+          type="button"
+          onClick={() => retryWaitingJobs()}
+          className="min-h-11 shrink-0 px-2 text-[13px] font-semibold"
+          style={{ color: 'var(--ink)' }}
+        >
+          今すぐ読み取る →
+        </button>
+      ) : (
+        <Link
+          href={`/transactions/receipt/${job.captureId}` as Route}
+          prefetch={false}
+          className="flex min-h-11 shrink-0 items-center px-2 text-[13px] font-semibold"
+          style={{ color: 'var(--ink)' }}
+        >
+          入力する →
+        </Link>
+      )}
     </div>
   );
 }

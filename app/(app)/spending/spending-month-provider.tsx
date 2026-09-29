@@ -1,5 +1,6 @@
 'use client';
 
+import type { CaptureView } from '@/features/receipt-captures/types';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import type { GenreOption } from '@/features/genre/store';
@@ -38,6 +39,8 @@ type SpendingMonth = MonthData & {
   error: string | null;
   genres: readonly GenreOption[];
   accounts: readonly { id: string; name: string }[];
+  /** 入力待ちのレシート(読み取れなかったもの)。集計・目標には入らない。 */
+  captures: readonly CaptureView[];
   /** 月を切り替える(今月以外は明細と内訳を取りに行く)。 */
   goToMonth: (monthStart: string) => void;
   /** 表示中の月を取り直す(明細の編集後、今月以外のキャッシュを最新にする)。 */
@@ -74,6 +77,7 @@ export function SpendingMonthProvider({
   currentTotals,
   genres,
   accounts,
+  captures = [],
   initialFilter,
   children,
 }: {
@@ -84,6 +88,8 @@ export function SpendingMonthProvider({
   currentTotals: MonthTotals;
   genres: readonly GenreOption[];
   accounts: readonly { id: string; name: string }[];
+  /** 入力待ちのレシート(読み取れなかったもの)。 */
+  captures?: readonly CaptureView[];
   /** 絞り込みの初期値(テスト用)。 */
   initialFilter?: Partial<LedgerFilter>;
   children: ReactNode;
@@ -150,6 +156,7 @@ export function SpendingMonthProvider({
     error,
     genres,
     accounts,
+    captures,
     goToMonth: (monthStart) => {
       setVisibleMonth(monthStart);
       // 月が変わったら、日付・ジャンルの絞り込みは外す(別の月の日付は無意味)。

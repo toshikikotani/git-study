@@ -157,6 +157,58 @@ create policy "own_rows" on public.genre_memory
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 4. receipt_captures — 読み取りに失敗したレシートの「入力待ち」(F7)
+-- -----------------------------------------------------------------------------
+create table if not exists public.receipt_captures (
+  id                uuid        primary key default gen_random_uuid(),
+  user_id           uuid        not null references auth.users(id) on delete cascade,
+
+  -- needs_input: 手で入力する必要がある(明細・要確認に「入力待ち」と出る)
+  -- resolved   : 明細として保存済み(transaction_id が入る)
+  -- discarded  : 破棄した(Undo できるよう行は消さず、画像も残す)
+  status            text        not null default 'needs_input',
+  -- 読み取りの結果: parsed(全部読めた)/ partial(一部だけ)/ failed(読めない)/ manual(最初から手入力)
+  receipt_status    text        not null default 'failed',
+
+  -- 元の画像は消さない。補正(切り抜き・回転・明るさ)した画像は別のパスで持つ。
+  image_path        text        not null,
+  edited_image_path text,
+
+  -- AI の生の読み取り結果(warnings・部分的に読めた値)。再読み取りの比較に使う。
+  ocr_raw           jsonb,
+  -- 読み取れた項目({amountYen, occurredOn, storeName, ...})と読めなかった項目の名前。
+  read_fields       jsonb       not null default '{}'::jsonb,
+  unread_fields     text[]      not null default '{}',
+  -- 入力途中の内容(下書き)。離れても消えない。
+  draft             jsonb,
+  draft_updated_at  timestamptz,
+
+  transaction_id    uuid        references public.transactions(id) on delete set null,
+  captured_on       date        not null default (now() at time zone 'Asia/Tokyo')::date,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  resolved_at       timestamptz,
+  discarded_at      timestamptz,
+
+  constraint ck_receipt_captures_status
+    check (status in ('needs_input', 'resolved', 'discarded')),
+  constraint ck_receipt_captures_receipt_status
+    check (receipt_status in ('parsed', 'partial', 'failed', 'manual'))
+);
+
+create index if not exists ix_receipt_captures_user_status
+  on public.receipt_captures (user_id, status, created_at desc);
+
+alter table public.receipt_captures enable row level security;
+alter table public.receipt_captures force row level security;
+
+drop policy if exists "own_rows" on public.receipt_captures;
+create policy "own_rows" on public.receipt_captures
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -189,4 +241,11 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'genre_memory'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'receipt_captures',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'receipt_captures'
   ) then 'ok' else 'NG: テーブルが無い' end;

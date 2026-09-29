@@ -1,5 +1,7 @@
 'use client';
 
+import type { Route } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -23,7 +25,7 @@ import { useSpendingMonth } from './spending-month-provider';
  * 目標のジャンル別の実績に入らないため)。
  */
 export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
-  const { transactions, today, isCurrentMonth, reloadVisibleMonth } = useSpendingMonth();
+  const { transactions, today, reloadVisibleMonth, captures } = useSpendingMonth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -42,47 +44,73 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
     return items;
   }, [attention, transactions]);
 
-  if (!isCurrentMonth && queue.length === 0) return null;
-  if (queue.length === 0) return null;
+  if (queue.length === 0 && captures.length === 0) return null;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="block w-full rounded-2xl p-4 text-left"
+      <div
+        className="w-full rounded-2xl p-4"
         style={{
           background: 'var(--attention-track)',
           boxShadow: 'var(--card-shadow)',
           border: '1px solid var(--state-caution)',
         }}
-        aria-label={`要確認 ${queue.length}件。タップして順番に直す`}
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+        {queue.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="block min-h-11 w-full text-left"
+            aria-label={`要確認 ${queue.length}件。タップして順番に直す`}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+                <span aria-hidden>▲ </span>要確認
+              </p>
+              <span className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+                順番に直す →
+              </span>
+            </div>
+            <ul
+              className="tabular mt-1.5 space-y-0.5 text-[13px]"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              {attention.uncategorized.count > 0 ? (
+                <li>
+                  未分類 {attention.uncategorized.count}件・{formatYen(attention.uncategorized.yen)}
+                  {hasGoal ? '(目標に未反映)' : ''}
+                </li>
+              ) : null}
+              {attention.mismatch.count > 0 ? (
+                <li>
+                  金額不一致 {attention.mismatch.count}件・差額 {formatYen(attention.mismatch.yen)}
+                </li>
+              ) : null}
+            </ul>
+          </button>
+        ) : (
+          <p className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
             <span aria-hidden>▲ </span>要確認
           </p>
-          <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-            順番に直す →
-          </span>
-        </div>
-        <ul
-          className="tabular mt-1.5 space-y-0.5 text-xs"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
-          {attention.uncategorized.count > 0 ? (
-            <li>
-              未分類 {attention.uncategorized.count}件・{formatYen(attention.uncategorized.yen)}
-              {hasGoal ? '(目標に未反映)' : ''}
-            </li>
-          ) : null}
-          {attention.mismatch.count > 0 ? (
-            <li>
-              金額不一致 {attention.mismatch.count}件・差額 {formatYen(attention.mismatch.yen)}
-            </li>
-          ) : null}
-        </ul>
-      </button>
+        )}
+        {captures.length > 0 ? (
+          <Link
+            href={`/transactions/receipt/${captures[0]!.id}` as Route}
+            prefetch={false}
+            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-[13px]"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            <span className="tabular">
+              入力待ち {captures.length}件{'(集計に入っていません'}
+              {hasGoal ? '・目標に未反映' : ''}
+              {')'}
+            </span>
+            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
+              入力する →
+            </span>
+          </Link>
+        ) : null}
+      </div>
 
       <AttentionFixer
         open={open}

@@ -1578,6 +1578,74 @@ export type Database = {
         };
         Relationships: [];
       };
+      receipt_captures: {
+        Row: {
+          captured_on: string;
+          created_at: string;
+          discarded_at: string | null;
+          draft: Json | null;
+          draft_updated_at: string | null;
+          edited_image_path: string | null;
+          id: string;
+          image_path: string;
+          ocr_raw: Json | null;
+          read_fields: Json;
+          receipt_status: string;
+          resolved_at: string | null;
+          status: string;
+          transaction_id: string | null;
+          unread_fields: string[];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          captured_on?: string;
+          created_at?: string;
+          discarded_at?: string | null;
+          draft?: Json | null;
+          draft_updated_at?: string | null;
+          edited_image_path?: string | null;
+          id?: string;
+          image_path: string;
+          ocr_raw?: Json | null;
+          read_fields?: Json;
+          receipt_status?: string;
+          resolved_at?: string | null;
+          status?: string;
+          transaction_id?: string | null;
+          unread_fields?: string[];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          captured_on?: string;
+          created_at?: string;
+          discarded_at?: string | null;
+          draft?: Json | null;
+          draft_updated_at?: string | null;
+          edited_image_path?: string | null;
+          id?: string;
+          image_path?: string;
+          ocr_raw?: Json | null;
+          read_fields?: Json;
+          receipt_status?: string;
+          resolved_at?: string | null;
+          status?: string;
+          transaction_id?: string | null;
+          unread_fields?: string[];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'receipt_captures_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       genres: {
         Row: {
           budget_yen: number | null;

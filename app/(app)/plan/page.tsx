@@ -2,6 +2,7 @@ import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { formatYen } from '@/domain/money';
 import { formatRemainingDays } from '@/domain/period';
 import { planPeriodDays } from '@/domain/spending-plan';
+import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { buildGoalCard } from '@/features/goals/card';
 import { loadGoalView } from '@/features/goals/loader';
 import { listPlanRanges } from '@/features/spending-plan/store';
@@ -29,8 +30,13 @@ export const maxDuration = 60;
 
 export default async function PlanPage() {
   const today = todayJst();
-  const [loaded, settings, ranges] = await withMinDuration(
-    Promise.all([loadGoalView(), getAppSettings(), listPlanRanges()]),
+  const [loaded, settings, ranges, captures] = await withMinDuration(
+    Promise.all([
+      loadGoalView(),
+      getAppSettings(),
+      listPlanRanges(),
+      listOpenCaptures().catch(() => []),
+    ]),
   );
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
@@ -51,7 +57,7 @@ export default async function PlanPage() {
 
       {view !== null && guidance !== null && !view.ended ? (
         <>
-          <GoalCard model={buildGoalCard(view, today)} />
+          <GoalCard model={buildGoalCard(view, today, { pendingCount: captures.length })} />
           {/* 要対応のジャンル(上位2件)だけ。下の一覧に同じ一言を繰り返さない */}
           {guidance.actions.length > 0 ? (
             <section
