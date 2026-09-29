@@ -47,7 +47,11 @@ export function NewTransactionForm({
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
   const [values, setValues] = useState<ManualEntryValues>(() => emptyManualValues(initialDate));
-  const [isIncome, setIsIncome] = useState(initialIncome);
+  // 支出 / 収入 / 返金(返品・返金は、収入ではなく、そのジャンルの支出から差し引く)。
+  const [mode, setMode] = useState<'expense' | 'income' | 'refund'>(
+    initialIncome ? 'income' : 'expense',
+  );
+  const isIncome = mode === 'income';
   // 特別費(目標のペース計算から外す)。未来日の予定の支払い(発表会など)にも使う。
   const [kind, setKind] = useState<'normal' | 'special'>('normal');
   const [saving, setSaving] = useState(false);
@@ -71,7 +75,11 @@ export function NewTransactionForm({
     setSaving(true);
     setSaveError(null);
 
-    const amountYen = (isIncome ? 1 : -1) * (values.amountYen ?? 0);
+    if (mode === 'refund' && values.genreId === null) {
+      setSaveError('返金は、どのジャンルの支出から差し引くかを選んでください。');
+      return;
+    }
+    const amountYen = (mode === 'expense' ? -1 : 1) * (values.amountYen ?? 0);
     const store = values.storeName.trim() === '' ? '手入力' : values.storeName.trim();
     const genre = genreOptions.find((g) => g.id === values.genreId);
     const preview: StoredTransaction = {
@@ -88,7 +96,7 @@ export function NewTransactionForm({
       confidence: null,
       reviewStatus: 'auto_ok',
       mustPay: false,
-      kind: isIncome ? 'normal' : kind,
+      kind: mode === 'refund' ? 'refund' : isIncome ? 'normal' : kind,
       source: 'manual',
       fingerprint: fingerprintOf({
         occurredOn: values.occurredOn,
@@ -141,32 +149,34 @@ export function NewTransactionForm({
         </Link>
       </header>
 
-      <div className="flex gap-2" role="group" aria-label="支出か収入か">
-        <button
-          type="button"
-          aria-pressed={!isIncome}
-          onClick={() => setIsIncome(false)}
-          className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
-          style={{
-            background: !isIncome ? 'var(--accent)' : 'var(--surface-raised)',
-            color: !isIncome ? 'var(--on-accent)' : 'var(--ink-secondary)',
-          }}
-        >
-          支出
-        </button>
-        <button
-          type="button"
-          aria-pressed={isIncome}
-          onClick={() => setIsIncome(true)}
-          className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
-          style={{
-            background: isIncome ? 'var(--accent)' : 'var(--surface-raised)',
-            color: isIncome ? 'var(--on-accent)' : 'var(--ink-secondary)',
-          }}
-        >
-          収入
-        </button>
+      <div className="flex gap-2" role="group" aria-label="支出・収入・返金">
+        {(
+          [
+            ['expense', '支出'],
+            ['income', '収入'],
+            ['refund', '返金'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={mode === value}
+            onClick={() => setMode(value)}
+            className="min-h-11 flex-1 rounded-xl text-sm font-semibold"
+            style={{
+              background: mode === value ? 'var(--accent)' : 'var(--surface-raised)',
+              color: mode === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+      {mode === 'refund' ? (
+        <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          返品・返金は、選んだジャンルの使った額から差し引かれます(収入にはなりません)。
+        </p>
+      ) : null}
 
       {accounts !== null && accounts.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -211,7 +221,7 @@ export function NewTransactionForm({
         showErrors={showErrors}
       />
 
-      {!isIncome ? (
+      {mode === 'expense' ? (
         <label className="block">
           <span className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             目標の扱い

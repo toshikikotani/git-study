@@ -27,12 +27,12 @@ export function CategoryTransactionRow({
   onOpen: (line: CategoryLine) => void;
   selected?: boolean;
   selectMode?: boolean;
-  rowRef?: (el: HTMLElement | null) => void;
+  rowRef?: (el: HTMLDivElement | null) => void;
 }) {
   const subtitle = [line.branchName, itemsPreview(line)].filter((x) => x && x !== '').join(' ・ ');
   const spoken = `${line.label}、${line.refund ? '返品・返金' : '支出'}${Math.abs(line.amountYen).toLocaleString('ja-JP')}円${line.receiptTotalYen !== null ? `、レシート全体${line.receiptTotalYen.toLocaleString('ja-JP')}円のうち` : ''}${line.status === 'scheduled' ? '、予定' : ''}`;
   return (
-    <li
+    <div
       ref={rowRef}
       data-row-id={line.txId}
       style={line.status === 'scheduled' ? { opacity: 0.85 } : undefined}
@@ -94,6 +94,6 @@ export function CategoryTransactionRow({
         ) : null}
         <LedgerAmount amountYen={line.amountYen} className="shrink-0 text-sm font-semibold" />
       </button>
-    </li>
+    </div>
   );
 }

@@ -9,12 +9,14 @@ import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/se
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
 import { formatMonthJa } from '@/lib/date';
+import { prefersReducedMotion } from '@/lib/motion';
 import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
 import { CategoryChart } from './category-chart';
 import { CategoryHeader } from './category-header';
+import { CategoryTabs, type CategoryTab } from './category-tabs';
+import { LineDetailSheet } from './line-detail-sheet';
 import { InsightsSection } from './insights-section';
 import { SummarySection } from './summary-section';
-import { CategoryTransactionRow } from './transaction-row';
 
 /**
  * カテゴリ詳細の画面(クライアント側)。読み込んだ明細をここで持ち、編集・移動は
@@ -38,6 +40,8 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
   const [showPrevious, setShowPrevious] = useState(true);
+  const [tab, setTab] = useState<CategoryTab>('tx');
+  const [openLine, setOpenLine] = useState<CategoryLine | null>(null);
 
   // 選んだ月の行と、履歴を含む全部の行(前月の比較・単価の推移に使う)。
   const lines = useMemo(
@@ -96,8 +100,20 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
     [historyLines, unit, data.monthStart, data.range.to, data.today, data.goal],
   );
 
+  /** 絞り込んだ取引を見せる:取引のタブへ切り替え、一覧の先頭までスクロールする。 */
+  const showTransactions = (next: LineFocus) => {
+    setFocus(next);
+    setTab('tx');
+    window.requestAnimationFrame(() =>
+      document.getElementById('category-tabs')?.scrollIntoView({
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        block: 'start',
+      }),
+    );
+  };
+
   const focusInsight = (insight: Insight) =>
-    setFocus({ ids: new Set(insight.evidenceTxIds), label: insight.focusLabel });
+    showTransactions({ ids: new Set(insight.evidenceTxIds), label: insight.focusLabel });
 
   const pickBucket = (b: Bucket) => {
     if (unit === 'month') {
@@ -106,7 +122,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
       return;
     }
     const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-    setFocus({
+    showTransactions({
       range: { from: b.from, to: b.to },
       label: unit === 'day' ? md(b.from) : `${md(b.from)}〜${md(b.to)}`,
     });
@@ -175,31 +191,22 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
       />
 
-      {focus ? (
-        <section aria-label="根拠の取引" className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setFocus(null)}
-            aria-label={`${focus.label}の絞り込みを解除`}
-            className="tabular min-h-11 inline-flex items-center gap-2 rounded-full px-4 text-xs font-semibold"
-            style={{
-              background: 'var(--surface-raised)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            {focus.label}で絞り込み中<span aria-hidden>×</span>
-          </button>
-          <ul
-            className="divider-list overflow-hidden rounded-2xl"
-            style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-          >
-            {shown.map((l) => (
-              <CategoryTransactionRow key={l.txId} line={l} onOpen={() => {}} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <CategoryTabs
+        genreKey={data.genreKey}
+        lines={lines}
+        historyLines={historyLines}
+        tab={tab}
+        onTab={setTab}
+        focusedLines={focus ? shown : null}
+        focusLabel={focus?.label ?? null}
+        onClearFocus={() => setFocus(null)}
+        onOpenLine={setOpenLine}
+        onFocusStore={(store) =>
+          showTransactions({ ids: new Set(store.txIds), label: store.label })
+        }
+      />
+
+      <LineDetailSheet line={openLine} onClose={() => setOpenLine(null)} />
     </div>
   );
 }
