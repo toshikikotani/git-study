@@ -7,52 +7,35 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages';
 import { NextResponse } from 'next/server';
 
-import { resolveGenreByName } from '@/features/genre/chat-tools';
-import { listGenres, type GenreOption } from '@/features/genre/store';
-import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
-import { replaceReceiptItems, type ReceiptItemInput } from '@/features/receipts/items-store';
-import { parseAppSettingsPatch } from '@/features/settings/chat-tools';
-import { getAppSettings, updateAppSettings, type AppSettings } from '@/features/settings/store';
-import { resolveTransactionById } from '@/features/transactions/chat-tools';
+import { loadPlanContext } from '@/features/assistant/apply';
+import { buildAssistantSystemPrompt } from '@/features/assistant/chat-tools';
+import { buildAdvisorContextText } from '@/features/advisor/context';
 import {
-  listTransactions,
-  updateTransaction,
-  updateTransactionMemo,
-} from '@/features/transactions/store';
-import type { StoredTransaction } from '@/features/transactions/types';
-import {
-  buildAssistantSystemPrompt,
-  RECENT_TRANSACTIONS_LIMIT,
-  type AssistantChange,
-} from '@/features/assistant/chat-tools';
+  isWriteToolName,
+  MAX_CHANGES_PER_PROPOSAL,
+  parseAskUser,
+  planToolCall,
+  type AskUserQuestion,
+  type PlanContext,
+  type ProposedChange,
+} from '@/features/assistant/plan';
 import { apiKeyMissingMessage, describeAnthropicError } from '@/lib/anthropic';
 import { ChatToolError, parseChatMessages } from '@/lib/chat-tools';
 import { readAnthropicApiKey } from '@/lib/env';
 import { describeUserError } from '@/lib/errors';
 
 /**
- * 「AIに変更を頼む」(本人発案、ADR-054)。
+ * AIの窓口(本人発案、ADR-054 → ADR-059 で唯一の窓口に統合)。
  *
- * 「ルールをAIに相談する」(ADR-024、app/api/rules/chat/route.ts、廃止)を
- * 汎用化したもの。本人が話した内容から、本人設定・明細・レシート品目・
- * 生活費の小分類のいずれかを実際に変更する。アーキテクチャ(tool-use の
- * ループ、レート制限、会話を保存しないステートレス設計)は旧実装から
- * そのまま引き継ぐ。各ドメインの純粋な部分は
- * features/{genre,settings,transactions}/chat-tools.ts に、
- * それらを束ねてシステムプロンプトを作る部分は features/assistant/chat-tools.ts に
- * 分離してある。
+ * 本人の意見から、複数の設定をまとめて変える「変更案」を作る。モデルの
+ * ツール呼び出しはここでは実行せず、検証(features/assistant/plan.ts)を通した
+ * 変更案として返すだけ——実際の反映は、本人がチャット内の確認カードで承認した
+ * あとに app/api/assistant/apply/route.ts が行う。
  *
- * ── 何をさせないか(ADR-010 を会話にも適用する) ───────────────
- * FR-21(リボ・キャッシング・分割払い)の検知は固定のロジック
- * (features/classification/rules.ts の DEFAULT_DETECTION_RULES)であり、
- * ADR-057によりパターンルール(classification_rules)自体が廃止されたため、
- * 会話から変更できるツール自体がもう存在しない(create_rule/update_rule/
- * delete_rule は廃止した)。
- *
- * ── 設定の変更はシークレットに触れない(ADR-014) ─────────────
- * update_settings が触れるのは `AppSettings`(業務パラメータ)の列だけ。
- * シークレット(env変数名の参照値)を保持する列はこのテーブルに存在せず、
- * `AppSettingsPatch` 自体がそれ以外を受け付けない型になっている。
+ * ── ask_user(選択肢を出すツール) ─────────────────────────────
+ * 方針が複数ある・値が分からないときは、文章で聞き返す代わりにモデルが
+ * ask_user を呼ぶ。ここでは実行せず、選択肢をそのまま画面へ返す(画面が
+ * チップとして描画し、選ばれた文言が次の発言としてこのAPIへ戻ってくる)。
  *
  * ── 会話は保存しない ────────────────────────────────────────
  * 旧実装と同じ理由(新しいテーブルを増やさない、本番へ新規マイグレーションを
@@ -61,8 +44,12 @@ import { describeUserError } from '@/lib/errors';
 
 export const runtime = 'nodejs';
 
-const MODEL = 'claude-haiku-4-5';
-const MAX_OUTPUT_TOKENS = 1024;
+/**
+ * 複数の設定を組み合わせる判断が要るため、旧 /assistant の Haiku ではなく、
+ * 旧 /advisor(目標設定・買う前相談)と同じ Sonnet を使う(会話の質を優先)。
+ */
+const MODEL = 'claude-sonnet-5';
+const MAX_OUTPUT_TOKENS = 2048;
 /** 1回の相談で許す tool 呼び出しの往復上限。青天井の課金を防ぐ。 */
 const MAX_TOOL_ROUNDS = 4;
 /** 認証が入るまでの歯止め(email/receipt の各 route と同じ考え方)。 */
@@ -82,13 +69,11 @@ function takeAiCallSlot(): boolean {
   return true;
 }
 
-export type { AssistantChange };
-
 const TOOLS: Tool[] = [
   {
     name: 'update_settings',
     description:
-      '本人設定を変更する。渡した項目だけを変更する(渡さなかった項目はそのまま)。少なくとも1項目は指定すること。',
+      '本人設定の変更案を作る。渡した項目だけを変更する(渡さなかった項目はそのまま)。少なくとも1項目は指定すること。',
     input_schema: {
       type: 'object',
       properties: {
@@ -102,7 +87,6 @@ const TOOLS: Tool[] = [
           type: 'number',
           description: '返済目標額に対する投資額の比率(0〜1)',
         },
-        is_high_risk_unlocked: { type: 'boolean', description: '高リスク投資枠を解禁するか' },
         high_risk_allocation_ratio: {
           type: 'number',
           description: '投資総額のうち高リスク枠に回す比率(0〜1)',
@@ -117,7 +101,7 @@ const TOOLS: Tool[] = [
   {
     name: 'update_transaction',
     description:
-      '既存の明細のジャンル・金額・日付・メモのいずれかを変更する。少なくとも1項目は指定すること。' +
+      '既存の明細のジャンル・金額・日付・メモのいずれかを変更する案を作る。少なくとも1項目は指定すること。' +
       '金額は支出なら負、収入なら正の整数円で指定する。',
     input_schema: {
       type: 'object',
@@ -134,7 +118,7 @@ const TOOLS: Tool[] = [
   {
     name: 'update_receipt_items',
     description:
-      '明細(レシート)の品目一覧を丸ごと置き換える。空配列を渡すと品目を無くす。' +
+      '明細(レシート)の品目一覧を丸ごと置き換える案を作る。空配列を渡すと品目を無くす。' +
       '合計が明細の金額と一致する必要はない。',
     input_schema: {
       type: 'object',
@@ -159,7 +143,7 @@ const TOOLS: Tool[] = [
   {
     name: 'set_expense_subtype',
     description:
-      '生活費明細の小分類を設定する(例:食費・日用品など、決まったカテゴリではない自由記述)。',
+      '生活費明細の小分類を設定する案を作る(例:食費・日用品など、決まったカテゴリではない自由記述)。',
     input_schema: {
       type: 'object',
       properties: {
@@ -169,7 +153,129 @@ const TOOLS: Tool[] = [
       required: ['transaction_id', 'subtype'],
     },
   },
+  {
+    name: 'update_genre_budget',
+    description:
+      'ジャンルの月次予算を変更する案を作る。無制限に戻すときは budget_yen に null を渡す。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        genre_name: { type: 'string', description: '現在のジャンル一覧にある名前' },
+        budget_yen: { type: ['number', 'null'], description: '月次予算(円)。null で無制限' },
+      },
+      required: ['genre_name', 'budget_yen'],
+    },
+  },
+  {
+    name: 'set_genre_show_on_home',
+    description: 'ジャンルの残額をホーム画面に出すかどうかを変更する案を作る。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        genre_name: { type: 'string' },
+        show_on_home: { type: 'boolean' },
+      },
+      required: ['genre_name', 'show_on_home'],
+    },
+  },
+  {
+    name: 'create_genre',
+    description:
+      '新しいジャンルを追加する案を作る。既存のジャンルで足りるときは作らない。' +
+      '追加したジャンルを使う別の変更は、承認後の次のやり取りで頼むこと(同じ変更案には入れない)。',
+    input_schema: {
+      type: 'object',
+      properties: { name: { type: 'string', description: '1〜30文字' } },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'create_goal',
+    description:
+      '新しい目標を追加する案を作る。タイトルが決まり、できれば金額・期限も固まってから使う。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: '目標の短いタイトル(例:旅行費用を貯める)' },
+        target_amount_yen: { type: ['number', 'null'], description: '目標金額(円)。無ければ null' },
+        target_date: {
+          type: ['string', 'null'],
+          description: 'YYYY-MM-DD形式の期限。無ければ null',
+        },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'update_goal_progress',
+    description: '進行中の目標の現在の進捗額を変更する案を作る。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        goal_id: { type: 'string', description: '進行中の目標一覧の id' },
+        current_amount_yen: { type: 'number' },
+      },
+      required: ['goal_id', 'current_amount_yen'],
+    },
+  },
+  {
+    name: 'update_plan_targets',
+    description:
+      '直近に立てた支出目標のジャンルごとの目標額を調整する案を作る(合計を変える・配分を直すなど)。' +
+      '直近の目標に含まれるジャンルだけ指定できる。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              genre_name: { type: 'string' },
+              target_yen: { type: 'number', description: '目標額(円)' },
+            },
+            required: ['genre_name', 'target_yen'],
+          },
+        },
+      },
+      required: ['items'],
+    },
+  },
+  {
+    name: 'ask_user',
+    description:
+      '本人に選択肢を出して選んでもらう。方針が複数あって本人の好みで決まるとき、値が分からないときに、' +
+      '文章で聞き返す代わりに使う。選択肢は2〜4個。「その他」は入れない(自由入力は常にできる)。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        question: { type: 'string', description: '本人への質問文(1文)' },
+        options: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: {
+                type: 'string',
+                description: '選択肢の短い名前(選ばれるとそのまま発言になる)',
+              },
+              description: { type: 'string', description: 'その選択肢を選ぶと何が起きるか' },
+            },
+            required: ['label', 'description'],
+          },
+        },
+        multi_select: { type: 'boolean', description: '複数選べるようにするか。既定 false' },
+      },
+      required: ['question', 'options'],
+    },
+  },
 ];
+
+export type AssistantReply = {
+  reply: string;
+  proposal: { changes: ProposedChange[] } | null;
+  question: AskUserQuestion | null;
+};
 
 export async function POST(request: Request): Promise<NextResponse> {
   let payload: { messages?: unknown };
@@ -190,33 +296,33 @@ export async function POST(request: Request): Promise<NextResponse> {
   const apiKey = readAnthropicApiKey();
   if (apiKey === null) {
     return NextResponse.json({
-      reply: apiKeyMissingMessage('AIに変更を頼む機能'),
-      changes: [],
-    });
+      reply: apiKeyMissingMessage('AIの窓口'),
+      proposal: null,
+      question: null,
+    } satisfies AssistantReply);
   }
   if (!takeAiCallSlot()) {
     return NextResponse.json({
       reply: 'AIの呼び出しが混み合っています。時間をおいて試してください。',
-      changes: [],
-    });
+      proposal: null,
+      question: null,
+    } satisfies AssistantReply);
   }
 
-  let genres: GenreOption[];
-  let currentSettings: AppSettings;
-  let recentTransactions: StoredTransaction[];
+  let planContext: PlanContext;
+  let situationText: string;
   try {
-    let transactions: StoredTransaction[];
-    [genres, currentSettings, transactions] = await Promise.all([
-      listGenres(),
-      getAppSettings(),
-      listTransactions(),
+    [planContext, situationText] = await Promise.all([
+      loadPlanContext(),
+      // 買う前相談の根拠になる正確な数字。取得に失敗しても変更案づくりは続ける。
+      buildAdvisorContextText().catch(() => ''),
     ]);
-    recentTransactions = transactions.slice(0, RECENT_TRANSACTIONS_LIMIT);
   } catch (error) {
     return NextResponse.json({
       reply: describeUserError(error, '読み込みに失敗しました。'),
-      changes: [],
-    });
+      proposal: null,
+      question: null,
+    } satisfies AssistantReply);
   }
 
   const client = new Anthropic({ apiKey });
@@ -224,8 +330,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     role: m.role,
     content: m.content,
   }));
+  const system = buildAssistantSystemPrompt({
+    genres: planContext.genres,
+    settings: planContext.settings,
+    recentTransactions: planContext.transactions,
+    goals: planContext.goals,
+    latestPlan: planContext.latestPlan,
+    situationText,
+  });
 
-  const changes: AssistantChange[] = [];
+  const proposed: ProposedChange[] = [];
+  let question: AskUserQuestion | null = null;
   let finalText = '';
 
   try {
@@ -233,11 +348,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       const response = await client.messages.create({
         model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
-        system: buildAssistantSystemPrompt({
-          genres,
-          settings: currentSettings,
-          recentTransactions,
-        }),
+        system,
         tools: TOOLS,
         messages: anthropicMessages,
       });
@@ -258,7 +369,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const toolResults: ToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const outcome = await executeTool(toolUse, genres, recentTransactions, changes);
+        const outcome = handleToolUse(toolUse, planContext, proposed);
+        if (outcome.question !== null) question = outcome.question;
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolUse.id,
@@ -266,160 +378,67 @@ export async function POST(request: Request): Promise<NextResponse> {
           is_error: outcome.isError,
         });
       }
+      if (question !== null) break;
       anthropicMessages.push({ role: 'user', content: toolResults });
     }
   } catch (error) {
-    return NextResponse.json({ reply: describeAnthropicError(error), changes });
+    return NextResponse.json({
+      reply: describeAnthropicError(error),
+      proposal: proposed.length > 0 ? { changes: proposed } : null,
+      question: null,
+    } satisfies AssistantReply);
   }
 
+  const fallback =
+    question !== null
+      ? '選んでください。'
+      : proposed.length > 0
+        ? '変更案を作りました。内容を確認して反映してください。'
+        : '完了しました。';
   return NextResponse.json({
-    reply: finalText !== '' ? finalText : '完了しました。',
-    changes,
-  });
+    reply: finalText !== '' ? finalText : fallback,
+    proposal: proposed.length > 0 ? { changes: proposed } : null,
+    question,
+  } satisfies AssistantReply);
 }
 
-type ToolOutcome = { message: string; isError: boolean };
+type ToolOutcome = { message: string; isError: boolean; question: AskUserQuestion | null };
 
-async function executeTool(
+function handleToolUse(
   toolUse: ToolUseBlock,
-  genres: readonly GenreOption[],
-  transactions: readonly StoredTransaction[],
-  changes: AssistantChange[],
-): Promise<ToolOutcome> {
+  planContext: PlanContext,
+  proposed: ProposedChange[],
+): ToolOutcome {
   try {
-    switch (toolUse.name) {
-      case 'update_settings':
-        return await runUpdateSettings(toolUse.input, changes);
-      case 'update_transaction':
-        return await runUpdateTransaction(toolUse.input, genres, transactions, changes);
-      case 'update_receipt_items':
-        return await runUpdateReceiptItems(toolUse.input, genres, transactions, changes);
-      case 'set_expense_subtype':
-        return await runSetExpenseSubtype(toolUse.input, transactions, changes);
-      default:
-        return { message: `未知のツールです: ${toolUse.name}`, isError: true };
+    if (toolUse.name === 'ask_user') {
+      const question = parseAskUser(toolUse.input);
+      return { message: '選択肢を本人に表示しました。', isError: false, question };
     }
+    if (!isWriteToolName(toolUse.name)) {
+      return { message: `未知のツールです: ${toolUse.name}`, isError: true, question: null };
+    }
+    if (proposed.length >= MAX_CHANGES_PER_PROPOSAL) {
+      return {
+        message: `1回の変更案は${MAX_CHANGES_PER_PROPOSAL}件までです。残りは承認後に改めて提案してください。`,
+        isError: true,
+        question: null,
+      };
+    }
+    const { change } = planToolCall(toolUse.name, toolUse.input, planContext);
+    proposed.push(change);
+    return {
+      message: `変更案として受け付けました(${change.target}: ${change.detail})。本人が承認するまで反映されません。`,
+      isError: false,
+      question: null,
+    };
   } catch (error) {
-    return { message: describeUserError(error, '実行に失敗しました。'), isError: true };
-  }
-}
-
-async function runUpdateSettings(input: unknown, changes: AssistantChange[]): Promise<ToolOutcome> {
-  const { patch, descriptions } = parseAppSettingsPatch(input);
-  await updateAppSettings(patch);
-  const detail = descriptions.join(' / ');
-  changes.push({ kind: 'updated', target: '設定', detail });
-  return { message: `設定を変更しました(${detail})。`, isError: false };
-}
-
-async function runUpdateTransaction(
-  input: unknown,
-  genres: readonly GenreOption[],
-  transactions: readonly StoredTransaction[],
-  changes: AssistantChange[],
-): Promise<ToolOutcome> {
-  const args = input as Record<string, unknown>;
-  const current = resolveTransactionById(args.transaction_id, transactions);
-
-  let genreId = current.genreId;
-  let genreName = current.genreName;
-  if (args.genre_name !== undefined) {
-    const genre = resolveGenreByName(args.genre_name, genres);
-    genreId = genre.id;
-    genreName = genre.name;
-  }
-
-  const hasAmountOrDate = args.amount_yen !== undefined || args.occurred_on !== undefined;
-  const changingGenreOrAmountOrDate = args.genre_name !== undefined || hasAmountOrDate;
-  const hasMemo = typeof args.memo === 'string';
-
-  if (!changingGenreOrAmountOrDate && !hasMemo) {
-    return { message: '変更する項目がありません。', isError: true };
-  }
-
-  if (changingGenreOrAmountOrDate) {
-    if (genreId === null) {
-      throw new ChatToolError(
-        'この明細にはまだジャンルが無いため、genre_name も併せて指定してください。',
-      );
+    if (error instanceof ChatToolError) {
+      return { message: error.message, isError: true, question: null };
     }
-    const amountYen =
-      typeof args.amount_yen === 'number' ? Math.trunc(args.amount_yen) : current.amountYen;
-    const occurredOn = typeof args.occurred_on === 'string' ? args.occurred_on : current.occurredOn;
-    await updateTransaction(
-      current.id,
-      genreId,
-      hasAmountOrDate ? { amountYen, occurredOn } : undefined,
-    );
+    return {
+      message: describeUserError(error, '変更案を作れませんでした。'),
+      isError: true,
+      question: null,
+    };
   }
-  if (hasMemo) {
-    await updateTransactionMemo(current.id, args.memo as string);
-  }
-
-  const detailParts: string[] = [];
-  if (args.genre_name !== undefined) detailParts.push(`ジャンル: ${genreName}`);
-  if (typeof args.amount_yen === 'number')
-    detailParts.push(`金額: ${Math.trunc(args.amount_yen)}円`);
-  if (typeof args.occurred_on === 'string') detailParts.push(`日付: ${args.occurred_on}`);
-  if (hasMemo) detailParts.push(`メモ: ${args.memo}`);
-
-  changes.push({ kind: 'updated', target: current.description, detail: detailParts.join(' / ') });
-  return { message: `明細「${current.description}」を変更しました。`, isError: false };
-}
-
-async function runUpdateReceiptItems(
-  input: unknown,
-  genres: readonly GenreOption[],
-  transactions: readonly StoredTransaction[],
-  changes: AssistantChange[],
-): Promise<ToolOutcome> {
-  const args = input as Record<string, unknown>;
-  const current = resolveTransactionById(args.transaction_id, transactions);
-  const rawItems = Array.isArray(args.items) ? args.items : null;
-  if (rawItems === null) {
-    throw new ChatToolError('items は配列で指定してください。');
-  }
-
-  const items: ReceiptItemInput[] = rawItems.map((raw) => {
-    const item = (raw ?? {}) as Record<string, unknown>;
-    const name = typeof item.name === 'string' ? item.name.trim() : '';
-    const amountYen = typeof item.amount_yen === 'number' ? Math.trunc(item.amount_yen) : NaN;
-    if (name === '' || !Number.isFinite(amountYen) || amountYen === 0) {
-      throw new ChatToolError('品目には name と 0 以外の amount_yen が必要です。');
-    }
-    const genreId =
-      item.genre_name !== undefined ? resolveGenreByName(item.genre_name, genres).id : null;
-    return { name, amountYen, genreId };
-  });
-
-  await replaceReceiptItems(current.id, items);
-  const detail = items.length > 0 ? `品目${items.length}件を登録` : '品目を削除';
-  changes.push({ kind: 'updated', target: current.description, detail });
-  return {
-    message: `明細「${current.description}」の${detail}しました。`,
-    isError: false,
-  };
-}
-
-async function runSetExpenseSubtype(
-  input: unknown,
-  transactions: readonly StoredTransaction[],
-  changes: AssistantChange[],
-): Promise<ToolOutcome> {
-  const args = input as Record<string, unknown>;
-  const current = resolveTransactionById(args.transaction_id, transactions);
-  const subtype = typeof args.subtype === 'string' ? args.subtype.trim() : '';
-  if (subtype === '') {
-    throw new ChatToolError('subtype が空です。');
-  }
-  await setExpenseSubtype(current.id, subtype);
-  changes.push({
-    kind: 'updated',
-    target: current.description,
-    detail: `生活費の小分類: ${subtype}`,
-  });
-  return {
-    message: `明細「${current.description}」の小分類を「${subtype}」にしました。`,
-    isError: false,
-  };
 }
