@@ -7,6 +7,7 @@
  * 書き込みは握り潰さずエラーにする。
  */
 
+import { findOverlap, overlapMessage, pickCurrentPlan } from '@/domain/plan-periods';
 import { planPeriodDays } from '@/domain/spending-plan';
 import { summarizeLedger } from '@/domain/ledger';
 import { loadLedgerTransactions } from '@/features/spending/entries';
@@ -49,13 +50,46 @@ export type SpendingPlanInput = {
   }[];
 };
 
+/** すべての目標の期間(新しく作った順)。予約と重なりの確認に使う。 */
+export async function listPlanRanges(): Promise<
+  { id: string; periodStart: DateOnly; periodEnd: DateOnly; createdAt: string }[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('spending_plans')
+    .select('id, period_start, period_end, created_at')
+    .order('created_at', { ascending: false });
+  if (error) {
+    if (isMissingTableError(error)) return [];
+    throw new SpendingPlanStoreError(`目標を取得できませんでした: ${error.message}`);
+  }
+  return data.map((r) => ({
+    id: r.id,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    createdAt: r.created_at,
+  }));
+}
+
+/** 今日の時点の「今の目標」(進行中 > 直近に終わったもの > 近い予約)。無ければ null。 */
+export async function getCurrentPlan(today: DateOnly): Promise<SpendingPlan | null> {
+  const ranges = await listPlanRanges();
+  const current = pickCurrentPlan(ranges, today);
+  return current === null ? null : loadPlan(current.id);
+}
+
 /** 直近に立てた目標(新しい順の先頭)。無ければ null。 */
 export async function getLatestPlan(): Promise<SpendingPlan | null> {
+  const ranges = await listPlanRanges();
+  return ranges[0] === undefined ? null : loadPlan(ranges[0].id);
+}
+
+async function loadPlan(planId: string): Promise<SpendingPlan | null> {
   const supabase = await createClient();
   const { data: plans, error } = await supabase
     .from('spending_plans')
     .select('id, period_start, period_end, step_percent, created_at')
-    .order('created_at', { ascending: false })
+    .eq('id', planId)
     .limit(1);
   if (error) {
     if (isMissingTableError(error)) return null;
@@ -121,6 +155,12 @@ function assertPlanInput(input: SpendingPlanInput): void {
 /** 目標を新しく保存する(直近の目標として扱われる。過去の目標は残す)。 */
 export async function savePlan(input: SpendingPlanInput): Promise<void> {
   assertPlanInput(input);
+  // 期間が重なる目標は作れない(予約は、進行中の目標の終了日の翌日以降)。
+  const conflict = findOverlap(await listPlanRanges(), {
+    start: input.periodStart,
+    end: input.periodEnd,
+  });
+  if (conflict !== null) throw new SpendingPlanStoreError(overlapMessage(conflict));
 
   const supabase = await createClient();
   const { data: auth, error: authError } = await supabase.auth.getUser();

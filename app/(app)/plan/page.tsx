@@ -4,6 +4,7 @@ import { formatRemainingDays } from '@/domain/period';
 import { planPeriodDays } from '@/domain/spending-plan';
 import { buildGoalCard } from '@/features/goals/card';
 import { loadGoalView } from '@/features/goals/loader';
+import { listPlanRanges } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
 import { formatDateJa, todayJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
@@ -28,7 +29,9 @@ export const maxDuration = 60;
 
 export default async function PlanPage() {
   const today = todayJst();
-  const [loaded, settings] = await withMinDuration(Promise.all([loadGoalView(), getAppSettings()]));
+  const [loaded, settings, ranges] = await withMinDuration(
+    Promise.all([loadGoalView(), getAppSettings(), listPlanRanges()]),
+  );
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
   const guidance = view?.guidance ?? null;
@@ -166,7 +169,12 @@ export default async function PlanPage() {
         </section>
       ) : null}
 
-      <PlanBuilder today={today} payday={settings.payday} />
+      <PlanBuilder
+        today={today}
+        payday={settings.payday}
+        ranges={ranges}
+        activeEnd={view?.active ? view.range.to : null}
+      />
     </div>
   );
 }
