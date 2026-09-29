@@ -406,3 +406,21 @@ export async function resolveReconcileAction(
   revalidatePath('/spending');
   return { error: null };
 }
+
+/** 明細を特別費(目標のペース計算から除く)にする/通常に戻す。列が本番に無い間はエラーを返す。 */
+export async function setTransactionKindAction(
+  id: string,
+  kind: 'normal' | 'special',
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('transactions').update({ kind }).eq('id', id);
+    if (error)
+      return { error: '変更できませんでした(マイグレーションの適用が必要かもしれません)。' };
+  } catch (error) {
+    return { error: describeUserError(error, '変更できませんでした。') };
+  }
+  revalidatePath('/spending');
+  revalidatePath('/plan');
+  return { error: null };
+}
