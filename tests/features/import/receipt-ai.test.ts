@@ -500,3 +500,90 @@ describe('itemsReconcileWithTotal — カテゴリ分割の対象になるか(AD
     expect(itemsReconcileWithTotal(items, -500)).toBe(false);
   });
 });
+
+describe('buildFromAiRows(receipt) — 税率・値引き・ポイントの照合(受け入れ基準4)', () => {
+  const item = (
+    name: string,
+    amount_yen: number,
+    tax_rate: number,
+    extra: { is_discount?: boolean; y_ratio?: number } = {},
+  ) => ({
+    name,
+    amount_yen,
+    product_type: '',
+    tax_rate,
+    is_discount: extra.is_discount ?? false,
+    confidence: 0.9,
+    y_ratio: extra.y_ratio ?? 0.3,
+  });
+
+  const mixed = {
+    occurred_on: '2026-09-20',
+    // 内税表示:食品(8%) 648×2、日用品(10%) 1,100、8%の値引き 100 → 2,296、ポイント 300 使用
+    amount_yen: 1996,
+    store_name: 'ココカラファイン阪神大阪梅田駅店',
+    payment_method_text: '現金',
+    items: [
+      item('食パン', 648, 8),
+      item('牛乳', 648, 8),
+      item('洗剤', 1100, 10),
+      item('値引', 100, 8, { is_discount: true }),
+    ],
+    expense_subtype: '',
+    price_basis: 'tax_included' as const,
+    tax_8_yen: 0,
+    tax_10_yen: 0,
+    points_used_yen: 300,
+    coupon_yen: 0,
+    store_confidence: 0.95,
+    date_confidence: 0.9,
+    total_confidence: 0.98,
+  };
+
+  it('8%/10%混在・値引き・ポイント払いでも照合が一致し、品目の合計は支払額になる', () => {
+    const t = buildFromAiRows([mixed]).transactions[0]!;
+    expect(t.reconcile?.status).toBe('ok');
+    expect(t.amountYen).toBe(-1996);
+    expect(t.items).toHaveLength(3); // 値引き行は品目にしない
+    expect(t.items.reduce((a, i) => a + i.amountYen, 0)).toBe(-1996);
+    expect(t.items.every((i) => i.amountYen < 0)).toBe(true);
+    expect(itemsReconcileWithTotal(t.items, t.amountYen)).toBe(true);
+  });
+
+  it('店名は正規化し、支店名を分ける。品目には税率と画像上の位置を残す', () => {
+    const t = buildFromAiRows([mixed]).transactions[0]!;
+    expect(t.storeName).toBe('ココカラファイン');
+    expect(t.branchName).toBe('阪神大阪梅田駅店');
+    expect(t.items[0]).toMatchObject({ taxRate: 8, yRatio: 0.3, lineId: 'l0' });
+    expect(t.fieldConfidence).toEqual({ store: 0.95, date: 0.9, total: 0.98 });
+  });
+
+  it('外税レシート(印字された税額つき)でも一致する', () => {
+    const t = buildFromAiRows([
+      {
+        ...mixed,
+        price_basis: 'tax_excluded',
+        items: [item('食パン', 1000, 8), item('洗剤', 500, 10)],
+        tax_8_yen: 80,
+        tax_10_yen: 50,
+        points_used_yen: 0,
+        amount_yen: 1630,
+      },
+    ]).transactions[0]!;
+    expect(t.reconcile?.status).toBe('ok');
+    expect(t.items.reduce((a, i) => a + i.amountYen, 0)).toBe(-1630);
+  });
+
+  it('読み取りが食い違っていれば不一致として残す(それでも品目の合計は支払額)', () => {
+    const t = buildFromAiRows([{ ...mixed, amount_yen: 1500 }]).transactions[0]!;
+    expect(t.reconcile?.status).toBe('mismatch');
+    expect(t.reconcile?.diffYen).toBe(-496);
+    expect(t.items.reduce((a, i) => a + i.amountYen, 0)).toBe(-1500);
+  });
+
+  it('品目が読み取れなければ照合しない(不一致ではなく内訳なし)', () => {
+    const t = buildFromAiRows([{ ...mixed, items: [] }]).transactions[0]!;
+    expect(t.reconcile).toBeUndefined();
+    expect(t.items).toEqual([]);
+  });
+});

@@ -2,14 +2,20 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import type { GenreOption } from '@/features/genre/store';
 import type { GenreBreakdownRow, MonthTotals } from '@/features/spending/ledger-types';
+import { EMPTY_FILTER, type LedgerFilter } from '@/features/spending/views';
 import { loadCalendarMonthAction } from './actions';
-import type { DrilldownTransaction } from './category-breakdown-chart';
+import type { DrilldownTransaction } from './drilldown';
 
 /**
- * 家計簿で表示中の月(本人発案「ジャンル別の内訳も、カレンダーに連動して切り替え
- * たらその月のものを表示させて」)。カレンダーと「ジャンル別の内訳」は別のカード
- * だが、同じ月を見せる必要があるため、月と、その月の明細・内訳をここで持つ。
+ * 家計簿で表示中の月と、明細の絞り込みの状態。
+ *
+ * 期間の切り替え(‹ 9月 ›)・サマリー・ジャンル内訳・カレンダー・明細リストは
+ * すべて同じ月を見せる。表示中の月と、その月の明細・内訳・合計をここで持つ
+ * (どれも domain/ledger.ts の集計関数から作った値で、画面ごとに足し直さない)。
+ * 絞り込み(ジャンル・日付・口座・目標期間・検索)も1つの状態で、内訳やカレンダーで
+ * タップすると明細リストがその条件に絞られる。
  *
  * 今月はページ(Server Component)が渡す最新の値をそのまま使う(保存後に
  * router.refresh() で更新される)。今月以外は月を移ったときに Server Action で
@@ -30,10 +36,24 @@ type SpendingMonth = MonthData & {
   isCurrentMonth: boolean;
   loading: boolean;
   error: string | null;
+  genres: readonly GenreOption[];
+  accounts: readonly { id: string; name: string }[];
   /** 月を切り替える(今月以外は明細と内訳を取りに行く)。 */
   goToMonth: (monthStart: string) => void;
   /** 表示中の月を取り直す(明細の編集後、今月以外のキャッシュを最新にする)。 */
   reloadVisibleMonth: () => void;
+  filter: LedgerFilter;
+  setFilter: (patch: Partial<LedgerFilter>) => void;
+  clearFilter: () => void;
+};
+
+const EMPTY_TOTALS: MonthTotals = {
+  spentYen: 0,
+  incomeYen: 0,
+  specialYen: 0,
+  scheduledYen: 0,
+  daySpend: {},
+  scheduledDaySpend: {},
 };
 
 const SpendingMonthContext = createContext<SpendingMonth | null>(null);
@@ -52,6 +72,8 @@ export function SpendingMonthProvider({
   currentTransactions,
   currentGenreBreakdown,
   currentTotals,
+  genres,
+  accounts,
   children,
 }: {
   today: string;
@@ -59,12 +81,15 @@ export function SpendingMonthProvider({
   currentTransactions: readonly DrilldownTransaction[];
   currentGenreBreakdown: readonly GenreBreakdownRow[];
   currentTotals: MonthTotals;
+  genres: readonly GenreOption[];
+  accounts: readonly { id: string; name: string }[];
   children: ReactNode;
 }) {
   const [visibleMonth, setVisibleMonth] = useState(currentMonthStart);
   const [otherMonths, setOtherMonths] = useState<ReadonlyMap<string, MonthData>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilterState] = useState<LedgerFilter>(EMPTY_FILTER);
 
   const load = async (monthStart: string, force: boolean) => {
     if (monthStart === currentMonthStart || (!force && otherMonths.has(monthStart))) return;
@@ -97,7 +122,7 @@ export function SpendingMonthProvider({
         : (otherMonths.get(visibleMonth) ?? {
             transactions: [],
             genreBreakdown: [],
-            totals: { spentYen: 0, incomeYen: 0 },
+            totals: EMPTY_TOTALS,
           }),
     [
       isCurrentMonth,
@@ -117,11 +142,18 @@ export function SpendingMonthProvider({
     isCurrentMonth,
     loading,
     error,
+    genres,
+    accounts,
     goToMonth: (monthStart) => {
       setVisibleMonth(monthStart);
+      // 月が変わったら、日付・ジャンルの絞り込みは外す(別の月の日付は無意味)。
+      setFilterState((f) => ({ ...f, date: null, genreId: null }));
       void load(monthStart, false);
     },
     reloadVisibleMonth: () => void load(visibleMonth, true),
+    filter,
+    setFilter: (patch) => setFilterState((f) => ({ ...f, ...patch })),
+    clearFilter: () => setFilterState(EMPTY_FILTER),
   };
 
   return <SpendingMonthContext.Provider value={value}>{children}</SpendingMonthContext.Provider>;

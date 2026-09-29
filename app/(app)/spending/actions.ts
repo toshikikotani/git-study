@@ -21,8 +21,7 @@ import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { addMonths, nthDayOfMonth, parseDateOnlyOr, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
-import { toDrilldownTransactions } from './drilldown';
-import type { DrilldownTransaction } from './category-breakdown-chart';
+import { toDrilldownTransactions, type DrilldownTransaction } from './drilldown';
 
 export type DiagnoseSpendingActionResult = {
   diagnosedCount: number;

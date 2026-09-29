@@ -690,6 +690,16 @@ create table public.transactions (
   -- (ジャンルとは独立した軸。ADR-057)。裁量的な支出と分けてグラフ表示する。
   must_pay          boolean            not null default false,
 
+  -- 実績/予定(今日より未来は予定として実績の集計から外す)と、通常/特別費
+  -- (特別費は目標のペース計算から除く)。domain/ledger.ts 参照。
+  status            text               not null default 'actual',
+  kind              text               not null default 'normal',
+
+  -- 店名を正規化して分けた支店名(merchant_name は店名のみ)と、レシートの照合で
+  -- 解消していない差額(0/null なら一致)。要確認カードの「金額不一致」に使う。
+  branch_name        text,
+  reconcile_diff_yen integer,
+
   note              text,
   created_at        timestamptz        not null default now(),
   updated_at        timestamptz        not null default now(),
@@ -711,7 +721,9 @@ create table public.transactions (
   constraint ck_transactions_not_self_counter
     check (counter_transaction_id is null or counter_transaction_id <> id),
   constraint ck_transactions_posted_after_occurred
-    check (posted_on is null or posted_on >= occurred_on)
+    check (posted_on is null or posted_on >= occurred_on),
+  constraint ck_transactions_status check (status in ('actual', 'scheduled')),
+  constraint ck_transactions_kind   check (kind in ('normal', 'special'))
 );
 
 -- 重複排除:同一ファイルを別名で取り込んでも同じ明細は入らない
@@ -1624,6 +1636,29 @@ create unique index ux_spending_plan_items_plan_genre
   on public.spending_plan_items (plan_id, genre_id);
 create index ix_spending_plan_items_user on public.spending_plan_items (user_id);
 
+-- 3.32 genre_memory — 分類パイプラインの記憶(個人の履歴・利用者のルール)
+--   分類は 利用者のルール → 個人の履歴(店×品目)→ 品目辞書 → AI の順に当てる。
+--   前半 2 段の元データがここ。store_key='' は「どの店でも」。pinned=true が
+--   利用者のルール。利用者が直した内容は即座にここへ反映する。
+-- -----------------------------------------------------------------------------
+create table public.genre_memory (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  store_key  text        not null default '',
+  item_key   text        not null,
+  genre_id   uuid        not null references public.genres(id) on delete cascade,
+  pinned     boolean     not null default false,
+  hits       integer     not null default 1,
+  updated_at timestamptz not null default now(),
+
+  constraint ck_genre_memory_item_not_blank check (btrim(item_key) <> ''),
+  constraint ck_genre_memory_hits check (hits >= 1)
+);
+
+create unique index ux_genre_memory_key
+  on public.genre_memory (user_id, store_key, item_key);
+create index ix_genre_memory_user on public.genre_memory (user_id);
+
 
 
 
@@ -1966,7 +2001,8 @@ begin
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
-    'transaction_expense_subtypes','genres','spending_plans','spending_plan_items'
+    'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
+    'genre_memory'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

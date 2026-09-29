@@ -7,12 +7,16 @@
 
 import { revalidatePath } from 'next/cache';
 
+import type { PlanEvidence } from '@/domain/plan-evidence';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
 import { refinePlanAllocation } from '@/features/spending-plan/plan-ai';
 import { deletePlan, savePlan, updatePlanTargets } from '@/features/spending-plan/store';
-import { assertDateOnly } from '@/lib/date';
+import type { GoalSnapshot } from '@/domain/goal-impact';
+import { nextPlanTargets } from '@/domain/goal-review';
+import { loadGoalView } from '@/features/goals/loader';
+import { addDays, assertDateOnly, todayJst } from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
 
@@ -27,6 +31,9 @@ export type SuggestPlanResult =
       usedAi: boolean;
       lookbackDays: number;
       uncategorizedYen: number;
+      evidence: PlanEvidence;
+      /** ジャンルごとの1日あたりの中央値(根拠の表示用)。 */
+      medianByGenre: Record<string, number>;
     }
   | { error: string };
 
@@ -61,6 +68,8 @@ export async function suggestPlanAction(
       usedAi: suggestion.usedAi,
       lookbackDays: context.lookbackDays,
       uncategorizedYen: context.uncategorizedYen,
+      evidence: context.evidence,
+      medianByGenre: Object.fromEntries(context.genres.map((g) => [g.genreId, g.medianDailyYen])),
     };
   } catch (error) {
     return { error: describeUserError(error) };
@@ -167,4 +176,56 @@ export async function updatePlanAllocationAction(
   }
   revalidatePath('/plan');
   return { error: null };
+}
+
+/**
+ * 「この結果で次の目標を作る」。終わった目標の実績を反映した次の目標を、同じ長さで
+ * 終了日の翌日から始まる期間として保存する(超えたジャンルは中間へ、大きく下回った
+ * ジャンルは実績に合わせ、他は継続。domain/goal-review.ts の nextPlanTargets)。
+ * 保存後は、目標画面で配分を直せる。
+ */
+export async function createNextPlanAction(planId: string): Promise<{ error: string | null }> {
+  try {
+    const loaded = await loadGoalView();
+    if (loaded === null || loaded.plan.id !== planId || loaded.view.review === null) {
+      return { error: '振り返りができる目標が見つかりません。' };
+    }
+    const { plan, view } = loaded;
+    const days = planPeriodDays(plan.periodStart, plan.periodEnd);
+    const start = addDays(plan.periodEnd, 1);
+    const next = nextPlanTargets(view.review!);
+    await savePlan({
+      periodStart: start,
+      periodEnd: addDays(start, days - 1),
+      stepPercent: plan.stepPercent,
+      items: plan.items
+        .filter((i) => i.targetYen > 0)
+        .map((i) => ({
+          genreId: i.genreId,
+          targetYen: next.get(i.genreId) ?? i.targetYen,
+          aiSuggestedYen: null,
+          reason: '前回の結果を反映した次の目標',
+        })),
+    });
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/plan');
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/** レシートの確認画面が、保存前の影響(残り予算の変化)を出すための今の目標と実績。 */
+export async function loadGoalSnapshotAction(): Promise<{
+  snapshot: GoalSnapshot | null;
+  today: string;
+}> {
+  const today = todayJst();
+  try {
+    const loaded = await loadGoalView();
+    if (loaded === null || !loaded.view.active) return { snapshot: null, today };
+    return { snapshot: loaded.view.snapshot, today };
+  } catch {
+    return { snapshot: null, today };
+  }
 }

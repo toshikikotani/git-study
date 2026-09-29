@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { Fragment, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
@@ -9,7 +10,8 @@ import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
-import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files';
+import { ReceiptCamera } from '@/components/receipt/receipt-camera';
+import { countReading, enqueueReceiptFiles, useReceiptJobs } from '@/features/import/receipt-queue';
 
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
@@ -89,8 +91,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
+      {/* ステータスバーの下のぼかし(safe-area 対応) */}
+      <div aria-hidden className="status-blur" />
       <PullToRefresh>
-        <main className="flex-1 px-4 pt-6 pb-40">{children}</main>
+        <main className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(9rem+env(safe-area-inset-bottom))]">
+          {children}
+        </main>
       </PullToRefresh>
 
       {/* document.body 直下に描画する(上のコメント参照)。ハイドレーション
@@ -109,30 +115,65 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function BottomBar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const isClient = useIsClient();
+  const jobs = useReceiptJobs();
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const reading = countReading(jobs);
+  const waiting = jobs.filter((j) => j.status !== 'reading').length;
+  // ハイドレーション前は、JS 無しでも動くネイティブの入力(撮る/選ぶ)を出しておく。
+  const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
+
+  const fab = canStream ? (
+    <Fab label="レシートを撮る" onPress={() => setCameraOpen(true)}>
+      <MdCameraAlt aria-hidden size={26} />
+    </Fab>
+  ) : (
+    <Fab label="レシートを撮る" onFiles={(files) => enqueueReceiptFiles(files)}>
+      <MdCameraAlt aria-hidden size={26} />
+    </Fab>
+  );
 
   return (
     // 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07)
-    <div className="fixed inset-x-0 bottom-0 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {/* 記録の主な入り口だとひと目でわかるよう、タブとは別に中央に置く
           (本人発案)。アイコンだけにして、余計な文字を足さない。
           絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
           差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
           ナビゲーション chrome にだけ使う方針)。
-          href での画面遷移ではなく onFiles(input type=file)にし、
-          撮影後は pending-receipt-files.ts 経由でファイルを
-          /transactions/receipt へ渡し、そちらの画面が続きの抽出・分類・
-          保存を行う。「押した瞬間にカメラアプリを開く」(以前の方針)から
-          「撮る/選ぶを選択できるようにする」へ変更した経緯は fab.tsx 参照。 */}
-      <Fab
-        label="レシートを撮る"
-        onFiles={(files) => {
-          setPendingReceiptFiles(files);
-          router.push('/transactions/receipt');
-        }}
-      >
-        <MdCameraAlt aria-hidden size={26} />
-      </Fab>
+          撮影は receipt-queue.ts のキューへ入れて裏で読み取る(待たせない)。
+          カメラが使える環境では自動撮影のカメラ(ReceiptCamera)を開き、
+          使えない環境や JS の起動前は、ネイティブの撮る/選ぶ(input type=file)に
+          なる。「撮る/選ぶを選択できるようにする」経緯は fab.tsx 参照。 */}
+      {/* 撮影は読み取りを待たない:撮ったらキューへ入れてすぐ戻る(receipt-queue.ts)。
+          読み取り中・確認待ちの件数は、ここのピルから確認画面へ進める。 */}
+      {reading + waiting > 0 ? (
+        <Link
+          href="/transactions/receipt"
+          prefetch={false}
+          role="status"
+          className="label-text px-4 py-1.5 text-xs"
+          style={{
+            borderRadius: 'var(--radius-full)',
+            background: 'var(--glass-tint-strong)',
+            backdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--ink)',
+          }}
+        >
+          {reading > 0 ? `読み取り中 ${reading}件` : ''}
+          {reading > 0 && waiting > 0 ? ' ・ ' : ''}
+          {waiting > 0 ? `確認待ち ${waiting}件` : ''}
+          <span aria-hidden> →</span>
+        </Link>
+      ) : null}
+
+      {cameraOpen ? (
+        <ReceiptCamera
+          onCapture={(files) => enqueueReceiptFiles(files)}
+          onClose={() => setCameraOpen(false)}
+        />
+      ) : null}
 
       {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
           以前はその他もピルの6項目目だったため1項目が詰まって小さかった
@@ -150,33 +191,44 @@ function BottomBar() {
               boxShadow: 'var(--glass-shadow)',
             }}
           >
-            {NAV.map((item) => {
+            {NAV.map((item, index) => {
               const isActive = pathname === item.href;
               return (
-                <li key={item.href} className="flex-1">
-                  <Link
-                    href={item.href}
-                    prefetch={false}
-                    aria-current={isActive ? 'page' : undefined}
-                    className="flex flex-col items-center gap-1 py-2"
-                  >
-                    {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
+                <Fragment key={item.href}>
+                  {/* 撮影ボタンはタブバーの中央に組み込む(本文に被らない)。 */}
+                  {index === 2 ? (
+                    <li
+                      className="flex w-16 shrink-0 justify-center self-center"
+                      aria-label="レシートを撮る"
+                    >
+                      <div className="-my-1">{fab}</div>
+                    </li>
+                  ) : null}
+                  <li className="flex-1">
+                    <Link
+                      href={item.href}
+                      prefetch={false}
+                      aria-current={isActive ? 'page' : undefined}
+                      className="flex flex-col items-center gap-1 py-2"
+                    >
+                      {/* アクティブ項目は背後にピルを敷く。scale を 0.9→1 で
                         遷移させ、スプリングのイージングで一瞬 1 を超えてから
                         収まることで「弾む」感触を作る(ADR-028)。 */}
-                    <span
-                      className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
-                      style={{
-                        borderRadius: 'var(--radius-full)',
-                        transform: isActive ? 'scale(1)' : 'scale(0.9)',
-                        transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
-                        background: isActive ? 'var(--accent-track)' : 'transparent',
-                        color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
-                      }}
-                    >
-                      {item.label}
-                    </span>
-                  </Link>
-                </li>
+                      <span
+                        className="label-text px-2 py-0.5 text-[11px] whitespace-nowrap"
+                        style={{
+                          borderRadius: 'var(--radius-full)',
+                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-medium) var(--ease-spring)`,
+                          background: isActive ? 'var(--accent-track)' : 'transparent',
+                          color: isActive ? 'var(--accent)' : 'var(--ink-muted)',
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    </Link>
+                  </li>
+                </Fragment>
               );
             })}
           </ul>

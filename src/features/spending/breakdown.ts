@@ -2,10 +2,14 @@
  * 1か月分のジャンル別の内訳(家計簿の「ジャンル別の内訳」)を組み立てる。
  * DB にもネットワークにも触れない。今月(loadMonthlyLedger)とカレンダーで
  * 移動した過去・未来の月(loadCalendarMonth)が同じ結果になるよう、両方がここを使う。
+ *
+ * 数字は domain/ledger.ts の summarizeLedger() の byGenre をそのまま並べる
+ * だけで、ここで足し算し直さない(ヘッダーの合計と必ず一致させるため)。
  */
 
-import { budgetTone, isCountable, type BudgetTransaction } from '@/domain/budget';
-import { summarizeMonthlySpendByCategory, type SpendingTransaction } from '@/domain/spending';
+import { budgetTone } from '@/domain/budget';
+import { monthRange, summarizeLedger, type LedgerEntry, type LedgerSummary } from '@/domain/ledger';
+import type { DateOnly } from '@/lib/date';
 import type { GenreBreakdownRow } from './ledger-types';
 
 export const UNCATEGORIZED_LABEL = '未分類';
@@ -26,53 +30,45 @@ function toneFor(genreId: string, budgetYen: number | null, spentYen: number) {
   });
 }
 
-/**
- * monthKey('YYYY-MM')の内訳。金額の大きい順。予算は月次の値(genres.budget_yen)を
- * どの月にも同じように当てる。支出の無いジャンルは出さず、未分類の支出があれば
- * 「未分類」を1行足す。
- */
-export function buildGenreBreakdown(
+/** 集計済みの LedgerSummary から内訳を作る。金額の大きい順。 */
+export function breakdownFromSummary(
   genres: readonly { id: string; name: string; budget_yen: number | null }[],
-  transactions: readonly SpendingTransaction[],
-  monthKey: string,
+  summary: LedgerSummary,
 ): GenreBreakdownRow[] {
-  const budgetById = new Map(genres.map((g) => [g.id, g.budget_yen]));
-  const genreRows = summarizeMonthlySpendByCategory(
-    genres.map((g) => ({ id: g.id, name: g.name })),
-    transactions,
-    [monthKey],
-  );
-
-  const uncategorizedYen = transactions
-    .filter(
-      (tx: BudgetTransaction & { occurredOn: string }) =>
-        tx.occurredOn.startsWith(monthKey) &&
-        isCountable(tx) &&
-        tx.categoryId === null &&
-        tx.amountYen < 0,
-    )
-    .reduce((acc, tx) => acc - tx.amountYen, 0);
-
-  const breakdown: GenreBreakdownRow[] = genreRows
-    .filter((row) => row.spentYen > 0)
-    .map((row) => {
-      const budgetYen = budgetById.get(row.categoryId) ?? null;
-      return {
-        genreId: row.categoryId,
-        genreName: row.categoryName,
-        spentYen: row.spentYen,
-        budgetYen,
-        tone: toneFor(row.categoryId, budgetYen, row.spentYen),
-      };
+  const breakdown: GenreBreakdownRow[] = [];
+  for (const g of genres) {
+    const spentYen = summary.byGenre.get(g.id) ?? 0;
+    if (spentYen <= 0) continue;
+    breakdown.push({
+      genreId: g.id,
+      genreName: g.name,
+      spentYen,
+      budgetYen: g.budget_yen,
+      tone: toneFor(g.id, g.budget_yen, spentYen),
     });
-  if (uncategorizedYen > 0) {
+  }
+  if (summary.uncategorizedYen > 0) {
     breakdown.push({
       genreId: null,
       genreName: UNCATEGORIZED_LABEL,
-      spentYen: uncategorizedYen,
+      spentYen: summary.uncategorizedYen,
       budgetYen: null,
       tone: 'normal',
     });
   }
   return breakdown.sort((a, b) => b.spentYen - a.spentYen);
+}
+
+/**
+ * monthKey('YYYY-MM')の内訳。金額の大きい順。予算は月次の値(genres.budget_yen)を
+ * どの月にも同じように当てる。支出の無いジャンルは出さず、未分類の支出があれば
+ * 「未分類」を1行足す。予定(today より未来)は含めない。
+ */
+export function buildGenreBreakdown(
+  genres: readonly { id: string; name: string; budget_yen: number | null }[],
+  entries: readonly LedgerEntry[],
+  monthKey: string,
+  today: DateOnly,
+): GenreBreakdownRow[] {
+  return breakdownFromSummary(genres, summarizeLedger(entries, monthRange(monthKey), today));
 }

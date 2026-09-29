@@ -13,6 +13,9 @@ import {
   type MonthlyDiagnosisSummary,
   type SpendingVerdict,
 } from '@/domain/diagnosis';
+import { summarizeLedger } from '@/domain/ledger';
+import { loadLedgerTransactions } from '@/features/spending/entries';
+import { toLedgerEntries } from '@/features/spending/views';
 import { monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
@@ -108,13 +111,15 @@ export async function listUndiagnosedTransactions(
   }
   const genreById = new Map(genres.map((g) => [g.id, g]));
 
-  // 診断の根拠に「そのジャンルを今月どれだけ使っているか」を添える。
-  const monthSpentByGenre = new Map<string, number>();
-  for (const r of countable) {
-    const genreId = effectiveGenreId(r);
-    if (genreId === null) continue;
-    monthSpentByGenre.set(genreId, (monthSpentByGenre.get(genreId) ?? 0) - r.amount_yen);
-  }
+  // 診断の根拠に「そのジャンルを今月どれだけ使っているか」を添える。数字は
+  // 家計簿と同じ集計(domain/ledger.ts の summarizeLedger)から取る。
+  const ledger = await loadLedgerTransactions({ from: monthStart, to: today }, today);
+  const monthSummary = summarizeLedger(
+    toLedgerEntries(ledger.transactions),
+    { from: monthStart, to: today },
+    today,
+  );
+  const monthSpentByGenre = monthSummary.byGenre;
 
   const { data: items, error: itemsError } = await supabase
     .from('receipt_items')

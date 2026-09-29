@@ -23,7 +23,12 @@ import {
   type TransactionSource,
 } from '@/features/transactions/store';
 import { replaceSplits } from '@/features/transactions/splits-store';
+import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
+import { normalizeStoreName } from '@/domain/store-name';
+import { recordCorrection } from '@/features/genre/memory-store';
+import { fingerprintOf } from '@/features/transactions/types';
 import { assertDateOnly } from '@/lib/date';
+import { createClient } from '@/lib/supabase/server';
 import { describeUserError } from '@/lib/errors';
 
 /**
@@ -80,6 +85,8 @@ export async function saveImportBatchAction(
   duplicates: number;
   error: string | null;
   splitWarnings: string[];
+  /** 今回新しく作られた明細の id(保存直後の「元に戻す」に使う)。 */
+  insertedIds: string[];
 }> {
   let result;
   try {
@@ -87,7 +94,7 @@ export async function saveImportBatchAction(
   } catch (error) {
     const message =
       error instanceof TransactionStoreError ? error.message : '取り込みに失敗しました。';
-    return { imported: 0, duplicates: 0, error: message, splitWarnings: [] };
+    return { imported: 0, duplicates: 0, error: message, splitWarnings: [], insertedIds: [] };
   }
   revalidatePath('/spending');
 
@@ -139,6 +146,7 @@ export async function saveImportBatchAction(
     duplicates: result.duplicateCount,
     error: null,
     splitWarnings,
+    insertedIds: result.insertedTransactions.map((t) => t.id),
   };
 }
 
@@ -240,6 +248,160 @@ export async function setExpenseSubtypeAction(
     await setExpenseSubtype(transactionId, subtype);
   } catch (error) {
     return { error: describeUserError(error, '生活費の小分類の保存に失敗しました。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/**
+ * 保存前の重複警告(同じ店・同じ日・近い金額の取引が既にあるか)。
+ * 警告だけで、保存は止めない(同じ店で同じ日に2回買うこともあるため、判断は本人)。
+ */
+export async function checkReceiptDuplicatesAction(
+  probes: readonly { key: string; storeName: string; occurredOn: string; amountYen: number }[],
+): Promise<{
+  duplicates: Record<string, { id: string; occurredOn: string; amountYen: number }[]>;
+}> {
+  const result: Record<string, { id: string; occurredOn: string; amountYen: number }[]> = {};
+  try {
+    const dates = [...new Set(probes.map((p) => assertDateOnly(p.occurredOn)))];
+    if (dates.length === 0) return { duplicates: result };
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, occurred_on, description, merchant_name, amount_yen, review_status')
+      .in('occurred_on', dates)
+      .neq('review_status', 'ignored');
+    if (error) return { duplicates: result };
+    const existing = data.map((r) => ({
+      id: r.id,
+      storeName: r.merchant_name ?? normalizeStoreName(r.description).name,
+      occurredOn: r.occurred_on,
+      amountYen: r.amount_yen,
+    }));
+    for (const probe of probes) {
+      const hits = findReceiptDuplicates(probe, existing);
+      if (hits.length > 0) {
+        result[probe.key] = hits.map((h) => ({
+          id: h.id,
+          occurredOn: h.occurredOn,
+          amountYen: h.amountYen,
+        }));
+      }
+    }
+  } catch {
+    // 警告は補助。失敗しても保存を妨げない。
+  }
+  return { duplicates: result };
+}
+
+/** 利用者が直した品目のジャンルを、分類の履歴へ即座に反映する(pin=true でルール化)。 */
+export async function recordGenreCorrectionAction(input: {
+  storeName: string;
+  itemName: string;
+  genreId: string;
+  pin?: boolean;
+  anyStore?: boolean;
+}): Promise<{ error: string | null }> {
+  try {
+    await recordCorrection(input);
+    return { error: null };
+  } catch (error) {
+    return { error: describeUserError(error, '分類の履歴を保存できませんでした。') };
+  }
+}
+
+/**
+ * 保存直後の「元に戻す」。今の保存で作った明細を消す(分割・品目は明細の削除で
+ * 一緒に消える)。id は本人の行にだけ効く(RLS)。
+ */
+export async function undoReceiptSaveAction(
+  ids: readonly string[],
+): Promise<{ error: string | null }> {
+  if (ids.length === 0) return { error: null };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .in('id', [...ids]);
+    if (error) return { error: '元に戻せませんでした。明細から削除してください。' };
+  } catch (error) {
+    return { error: describeUserError(error, '元に戻せませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/** 明細を削除する(分割・品目は明細と一緒に消える)。 */
+export async function deleteTransactionAction(id: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (error) return { error: '削除できませんでした。' };
+  } catch (error) {
+    return { error: describeUserError(error, '削除できませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/**
+ * 明細を複製する。同じ日・同じ金額・同じ摘要は重複排除の一意制約に当たるため、
+ * 摘要に「(複製)」を付けて作る(あとから編集する前提)。分割・品目は複製しない。
+ */
+export async function duplicateTransactionAction(id: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { data: row, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error || !row) return { error: '複製できませんでした。' };
+    const description = `${row.description}(複製)`;
+    const { error: insertError } = await supabase.from('transactions').insert({
+      user_id: row.user_id,
+      account_id: row.account_id,
+      occurred_on: row.occurred_on,
+      amount_yen: row.amount_yen,
+      description,
+      merchant_name: row.merchant_name,
+      payment_method: row.payment_method,
+      genre_id: row.genre_id,
+      classified_by: row.classified_by,
+      confidence: row.confidence,
+      review_status: 'auto_ok',
+      must_pay: row.must_pay,
+      source: 'manual',
+      fingerprint: fingerprintOf({
+        occurredOn: row.occurred_on,
+        amountYen: row.amount_yen,
+        description,
+      }),
+    });
+    if (insertError) return { error: '複製できませんでした。すでに複製済みかもしれません。' };
+  } catch (error) {
+    return { error: describeUserError(error, '複製できませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/** 金額不一致の確認を済ませる(差額を認めて、要確認から外す)。 */
+export async function resolveReconcileAction(
+  ids: readonly string[],
+): Promise<{ error: string | null }> {
+  if (ids.length === 0) return { error: null };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('transactions')
+      .update({ reconcile_diff_yen: null })
+      .in('id', [...ids]);
+    if (error) return { error: '更新できませんでした。' };
+  } catch (error) {
+    return { error: describeUserError(error, '更新できませんでした。') };
   }
   revalidatePath('/spending');
   return { error: null };

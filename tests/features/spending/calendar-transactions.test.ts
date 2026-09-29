@@ -8,7 +8,7 @@ import { loadCalendarMonth } from '@/features/spending/store';
  * 代表ジャンルの反映だけを検証する。
  */
 
-const calls: { gte?: string; lt?: string } = {};
+const calls: { gte?: string; lte?: string } = {};
 
 const rows = [
   {
@@ -61,36 +61,39 @@ const rows = [
   },
 ];
 
+/** from().select().gte().lte().order() のような呼び出しの連なりを受け、最後に結果を返す。 */
+function chain(result: { data: unknown; error: null }, onCall?: (m: string, a: unknown[]) => void) {
+  const proxy: unknown = new Proxy(() => undefined, {
+    get: (_t, prop) => {
+      if (prop === 'then') {
+        return (resolve: (v: unknown) => void) => resolve(result);
+      }
+      return (...args: unknown[]) => {
+        onCall?.(String(prop), args);
+        return proxy;
+      };
+    },
+  });
+  return proxy;
+}
+
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     from: (table: string) => {
       if (table === 'genres') {
-        return {
-          select: () => ({
-            order: () =>
-              Promise.resolve({
-                data: [
-                  { id: 'g1', name: '外食', budget_yen: 1000 },
-                  { id: 'g2', name: '食料品', budget_yen: null },
-                ],
-                error: null,
-              }),
-          }),
-        };
+        return chain({
+          data: [
+            { id: 'g1', name: '外食', budget_yen: 1000 },
+            { id: 'g2', name: '食料品', budget_yen: null },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: () => ({
-          gte: (_column: string, value: string) => {
-            calls.gte = value;
-            return {
-              lt: (_c: string, upper: string) => {
-                calls.lt = upper;
-                return { order: () => Promise.resolve({ data: rows, error: null }) };
-              },
-            };
-          },
-        }),
-      };
+      if (table === 'transaction_splits') return chain({ data: [], error: null });
+      return chain({ data: rows, error: null }, (method, args) => {
+        if (method === 'gte') calls.gte = args[1] as string;
+        if (method === 'lte') calls.lte = args[1] as string;
+      });
     },
   }),
 }));
@@ -100,31 +103,34 @@ vi.mock('@/features/genre/item-genres', () => ({
   resolveItemGenres: async () => new Map([['t3', 'g2']]),
 }));
 
+// 基準日(JST 2026-11-15)。10月の明細はすべて過去の実績になる。
+const NOW = new Date('2026-11-15T03:00:00Z');
+
 describe('loadCalendarMonth', () => {
-  it('指定した月の1日から翌月1日の手前までを読む', async () => {
-    await loadCalendarMonth('2026-10-01');
-    expect(calls).toEqual({ gte: '2026-10-01', lt: '2026-11-01' });
+  it('指定した月の1日から月末までを読む', async () => {
+    await loadCalendarMonth('2026-10-01', NOW);
+    expect(calls).toEqual({ gte: '2026-10-01', lte: '2026-10-31' });
   });
 
-  it('年をまたぐ月末でも翌月の1日までを読む', async () => {
-    await loadCalendarMonth('2026-12-01');
-    expect(calls.lt).toBe('2027-01-01');
+  it('12月でも月末(12/31)までを読む', async () => {
+    await loadCalendarMonth('2026-12-01', NOW);
+    expect(calls.lte).toBe('2026-12-31');
   });
 
   it('振替・対象外は除き、店名が無ければ摘要を使う', async () => {
-    const { transactions: result } = await loadCalendarMonth('2026-10-01');
+    const { transactions: result } = await loadCalendarMonth('2026-10-01', NOW);
     expect(result.map((t) => t.id)).toEqual(['t1', 't3']);
     expect(result.map((t) => t.label)).toEqual(['一蘭', 'コンビニ']);
   });
 
   it('明細本体のジャンルが空でも、品目から決めた代表ジャンルを使う', async () => {
-    const { transactions: result } = await loadCalendarMonth('2026-10-01');
+    const { transactions: result } = await loadCalendarMonth('2026-10-01', NOW);
     expect(result.find((t) => t.id === 't1')).toMatchObject({ genreId: 'g1', genreName: '外食' });
     expect(result.find((t) => t.id === 't3')).toMatchObject({ genreId: 'g2', genreName: '食料品' });
   });
 
   it('ジャンル別の内訳もその月のものを、金額の大きい順・予算つきで返す', async () => {
-    const { genreBreakdown } = await loadCalendarMonth('2026-10-01');
+    const { genreBreakdown } = await loadCalendarMonth('2026-10-01', NOW);
     expect(genreBreakdown.map((r) => [r.genreName, r.spentYen, r.budgetYen])).toEqual([
       ['外食', 900, 1000],
       ['食料品', 300, null],
@@ -134,12 +140,22 @@ describe('loadCalendarMonth', () => {
   });
 
   it('振替・対象外は内訳に含めない', async () => {
-    const { genreBreakdown } = await loadCalendarMonth('2026-10-01');
+    const { genreBreakdown } = await loadCalendarMonth('2026-10-01', NOW);
     expect(genreBreakdown.reduce((acc, r) => acc + r.spentYen, 0)).toBe(1200);
   });
 
   it('その月の支出・収入の合計を返す(振替・対象外は含めない)', async () => {
-    const { totals } = await loadCalendarMonth('2026-10-01');
-    expect(totals).toEqual({ spentYen: 1200, incomeYen: 0 });
+    const { totals } = await loadCalendarMonth('2026-10-01', NOW);
+    expect(totals).toMatchObject({ spentYen: 1200, incomeYen: 0, scheduledYen: 0 });
+  });
+
+  it('基準日より未来の明細は実績に入れず、予定(scheduledYen)に分ける', async () => {
+    const { totals, genreBreakdown } = await loadCalendarMonth(
+      '2026-10-01',
+      new Date('2026-10-18T03:00:00Z'),
+    );
+    // 10/19 の振替を除くと、10/20 の一蘭(900円)は未来 = 予定。10/18 のコンビニ(300円)だけが実績。
+    expect(totals).toMatchObject({ spentYen: 300, scheduledYen: 900 });
+    expect(genreBreakdown.map((r) => [r.genreName, r.spentYen])).toEqual([['食料品', 300]]);
   });
 });

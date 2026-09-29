@@ -49,6 +49,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
+import { normalizeStoreName } from '@/domain/store-name';
+import {
+  allocateToPayment,
+  reconcileReceipt,
+  type ReceiptDraft,
+  type ReceiptLine,
+  type ReconcileResult,
+  type TaxRate,
+} from '@/domain/receipt-reconcile';
 import { parseStructured } from '@/lib/anthropic';
 import type { DateOnly } from '@/lib/date';
 import { readPaymentMethod, type PaymentMethod } from './adapters';
@@ -76,7 +85,17 @@ export type ParsedReceiptItem = {
   amountYen: number;
   /** 商品の種類のAIによる自由記述(例:飲料・調味料、ADR-036)。判断できなければ null。 */
   productType: string | null;
+  /** 下書き(draft)の品目 id。確認画面で品目と対応付ける。 */
+  lineId?: string;
+  /** 税率(8/10、0=非課税・不明、null=読み取れず)。 */
+  taxRate?: TaxRate | null;
+  /** 読み取りの確からしさ(0〜1)。 */
+  confidence?: number;
+  /** レシート画像上の縦位置(0〜1)。 */
+  yRatio?: number | null;
 };
+
+export type ReceiptFieldConfidence = { store: number; date: number; total: number };
 
 export type ParsedReceiptTransaction = {
   occurredOn: DateOnly;
@@ -97,6 +116,15 @@ export type ParsedReceiptTransaction = {
    * ではカテゴリ分類そのものを行わない)。
    */
   expenseSubtype: string | null;
+  /** 正規化した店名(支店名を除く)。 */
+  storeName?: string;
+  /** 支店名。 */
+  branchName?: string | null;
+  /** 税・値引き・ポイントを含む読み取り結果(編集して再照合できる)。 */
+  draft?: ReceiptDraft;
+  /** 照合結果(draft から計算した値。画面は draft から再計算する)。 */
+  reconcile?: ReconcileResult | undefined;
+  fieldConfidence?: ReceiptFieldConfidence;
 };
 
 export type ReceiptParseResult = {
@@ -124,10 +152,8 @@ const itemSchema = z.object({
   amount_yen: z
     .number()
     .describe(
-      'その商品の金額(値引き後の実際の請求額)。消費税を含めた税込の金額を返す。' +
-        'レシート上の商品行が税抜表示になっている場合は、その商品にかかる消費税を' +
-        '含めた税込額に直して返す(商品ごとの税込額の合計が、支払合計の金額と' +
-        '一致するように)。円単位の整数。',
+      'レシートに印字された、その行の金額(円の整数、絶対値)。税込・税抜どちらの表示でも' +
+        '印字のまま返し、税の按分や値引きの適用はしない。値引き行は値引き額の絶対値。',
     ),
   product_type: z
     .string()
@@ -135,6 +161,19 @@ const itemSchema = z.object({
       'その商品の種類を一言で(例:飲料、調味料、菓子、日用品、書籍)。固定の選択肢は無い。' +
         '自由に判断してよい。何の商品か判断できなければ空文字。',
     ),
+  tax_rate: z
+    .number()
+    .describe(
+      'その行の消費税率(8 か 10)。「軽」「※」「*」の印や税率別の区分から判断する。' +
+        '判断できなければ 0。',
+    ),
+  is_discount: z
+    .boolean()
+    .describe(
+      '値引き・割引・クーポン値引きの行なら true(その場合 amount_yen は値引き額の絶対値)。',
+    ),
+  confidence: z.number().describe('この行を正しく読み取れた自信(0〜1)。かすれ・不鮮明なら低く。'),
+  y_ratio: z.number().describe('この行の画像上の縦位置。画像の上端が 0、下端が 1。'),
 });
 
 const rowSchema = z.object({
@@ -166,6 +205,16 @@ const rowSchema = z.object({
       'レシートに印字された商品行。小計・合計・お預り・お釣り・消費税・ポイントの行は' +
         '含めない。内訳が印字されていない、商品が1点しかない、または振込明細の場合は空配列。',
     ),
+  price_basis: z
+    .enum(['tax_included', 'tax_excluded'])
+    .describe('商品行の金額が税込表示(内税)か税抜表示(外税)か。'),
+  tax_8_yen: z.number().describe('レシートに印字された 8% 対象の消費税額。無ければ 0。'),
+  tax_10_yen: z.number().describe('レシートに印字された 10% 対象の消費税額。無ければ 0。'),
+  points_used_yen: z.number().describe('ポイント払い(ポイント利用)の額。無ければ 0。'),
+  coupon_yen: z.number().describe('クーポン・商品券・割引券による支払い側の減額。無ければ 0。'),
+  store_confidence: z.number().describe('店名の読み取りの自信(0〜1)。'),
+  date_confidence: z.number().describe('日付の読み取りの自信(0〜1)。'),
+  total_confidence: z.number().describe('支払額の読み取りの自信(0〜1)。'),
   expense_subtype: z
     .string()
     .describe(
@@ -187,7 +236,24 @@ const extractionSchema = z.object({
     .describe('読み取れた明細。1枚に複数の取引が写っていれば複数。無ければ空配列。'),
 });
 
-type ExtractionRow = z.infer<typeof rowSchema>;
+type ExtractionRowFull = z.infer<typeof rowSchema>;
+type NewRowFields = Pick<
+  ExtractionRowFull,
+  | 'price_basis'
+  | 'tax_8_yen'
+  | 'tax_10_yen'
+  | 'points_used_yen'
+  | 'coupon_yen'
+  | 'store_confidence'
+  | 'date_confidence'
+  | 'total_confidence'
+>;
+type ItemInput = { name: string; amount_yen: number; product_type: string } & Partial<
+  Pick<ExtractionRowFull['items'][number], 'tax_rate' | 'is_discount' | 'confidence' | 'y_ratio'>
+>;
+/** 税・値引き・ポイントの項目は省略可(項目が無い従来の形も受ける)。 */
+export type ExtractionRow = Omit<ExtractionRowFull, 'items' | keyof NewRowFields> &
+  Partial<NewRowFields> & { items: ItemInput[] };
 
 const SYSTEM_PROMPT = [
   'あなたはレシート・領収書、または銀行アプリの振込/送金完了画面の画像から、',
@@ -205,11 +271,17 @@ const SYSTEM_PROMPT = [
   '- payment_method_text はレシートに書かれていた支払方法の文字列をそのまま写す。',
   '  「クレジット」を「credit card」に直すようなことはしない。振込の場合は空文字にする。',
   '- items には商品行を1行ずつ書き写す。小計・合計・お預り・お釣り・消費税・',
-  '  ポイント付与/使用の行は商品ではないので含めない。内訳が印字されていない、',
-  '  商品が1点しかない、または振込明細の場合は items を空配列にしてよい。',
-  '  商品ごとの金額は消費税を含めた税込額で返す。レシートの商品行が税抜表示で、',
-  '  消費税が別の行にまとめて書かれている場合は、その消費税を商品に按分して',
-  '  税込額に直す(商品ごとの税込額を合計すると、支払合計の金額と一致するように)。',
+  '  ポイント付与の行は商品ではないので含めない。値引き・割引の行は is_discount=true の',
+  '  行として含める(額は絶対値)。内訳が印字されていない、商品が1点しかない、',
+  '  または振込明細の場合は items を空配列にしてよい。',
+  '  商品行の金額は印字のまま返す。税込・税抜の別は price_basis で、税率(8/10)は',
+  '  各行の tax_rate で、印字された税額は tax_8_yen / tax_10_yen で返す。',
+  '  税の按分や値引きの適用は自分で行わない(こちらで照合する)。',
+  '- ポイント払い(ポイント利用)は points_used_yen、クーポン・商品券による',
+  '  支払い側の減額は coupon_yen に入れる。amount_yen は、それらを差し引いた',
+  '  実際の支払額(カード・現金で払った額)。',
+  '- 各行の confidence(0〜1)と y_ratio(画像上の縦位置、上端0〜下端1)、',
+  '  store_confidence / date_confidence / total_confidence も返す。',
   '- 1枚に複数のレシート・振込明細が写っていれば、すべて返す。',
   '- レシート・領収書でも振込/送金の完了画面でもない画像(無関係な写真、',
   '  読み取れないほど不鮮明な画像など)は is_recognized を false にして',
@@ -303,16 +375,42 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
 
     const description = row.store_name.trim();
     const label = description === '' ? '(店名不明)' : description;
+    const store = normalizeStoreName(description);
 
-    transactions.push({
+    const base: ParsedReceiptTransaction = {
       occurredOn,
       // レシートは支出(ADR-008)。符号はモデルに委ねない。
       amountYen: -amount,
       description: label,
       // ここが FR-21 の砦。判定するのはモデルではなく正規表現(ADR-010)。
       paymentMethod: readPaymentMethod(row.payment_method_text),
-      items: reconcileItemsWithAmount(buildItems(row.items), -amount, row.items.length),
+      items: [],
       expenseSubtype: toNullableLabel(row.expense_subtype),
+      storeName: store.name === '' ? label : store.name,
+      branchName: store.branch,
+    };
+
+    if (row.price_basis === undefined) {
+      // 税・値引きの項目が無い従来の形:商品行は税込として、差が小さければ補正する。
+      transactions.push({
+        ...base,
+        items: reconcileItemsWithAmount(buildItems(row.items), -amount, row.items.length),
+      });
+      continue;
+    }
+
+    const draft = draftFromRow(row, amount);
+    const productTypes = new Map(
+      row.items.map((it, j) => [`l${j}`, toNullableLabel(it.product_type)] as const),
+    );
+    transactions.push({
+      ...base,
+      ...withDraft(base, draft, productTypes),
+      fieldConfidence: {
+        store: clamp01(row.store_confidence, 0.8),
+        date: clamp01(row.date_confidence, 0.8),
+        total: clamp01(row.total_confidence, 0.8),
+      },
     });
   }
 
@@ -389,6 +487,79 @@ function buildItems(
       amountYen: it.amountYen,
       productType: it.productType,
     }));
+}
+
+function clamp01(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, 0), 1);
+}
+
+/** 税・値引き・ポイントを含む下書きを組み立てる(印字のまま。按分は照合側)。 */
+function draftFromRow(row: ExtractionRow, paidYen: number): ReceiptDraft {
+  const lines: ReceiptLine[] = [];
+  row.items.forEach((it, j) => {
+    const amountYen = Math.abs(Math.round(it.amount_yen));
+    if (!Number.isFinite(amountYen) || amountYen === 0) return;
+    const name = it.name.trim();
+    lines.push({
+      id: `l${j}`,
+      name: name === '' ? '(品名不明)' : name,
+      amountYen,
+      kind: it.is_discount ? 'discount' : 'item',
+      taxRate: it.tax_rate === 8 || it.tax_rate === 10 ? it.tax_rate : null,
+      genreId: null,
+      confidence: clamp01(it.confidence, 0.8),
+      yRatio: it.y_ratio === undefined ? null : clamp01(it.y_ratio, 0),
+      // 商品種別は品目側の情報として別に持つ(下の productTypes)。
+    });
+  });
+  const printed: { 8?: number; 10?: number } = {};
+  if ((row.tax_8_yen ?? 0) > 0) printed[8] = Math.round(row.tax_8_yen!);
+  if ((row.tax_10_yen ?? 0) > 0) printed[10] = Math.round(row.tax_10_yen!);
+  return {
+    priceBasis: row.price_basis ?? 'tax_included',
+    lines,
+    printedTaxYen: printed,
+    taxRounding: 'floor',
+    pointsYen: Math.max(Math.round(row.points_used_yen ?? 0), 0),
+    couponYen: Math.max(Math.round(row.coupon_yen ?? 0), 0),
+    roundingAdjustYen: 0,
+    paidYen,
+  };
+}
+
+/**
+ * 下書きから、明細の品目(支払額へ按分済み・支出は負)と照合結果を作る。
+ * 画面で下書きを直したときも同じ関数で作り直す(サーバーとクライアントで同じ結果)。
+ */
+export function withDraft(
+  t: Pick<ParsedReceiptTransaction, 'items'>,
+  draft: ReceiptDraft,
+  productTypeByLineId: ReadonlyMap<string, string | null> = new Map(),
+): Pick<ParsedReceiptTransaction, 'items' | 'draft' | 'reconcile' | 'amountYen'> {
+  const allocated = new Map(allocateToPayment(draft).map((a) => [a.id, a.amountYen]));
+  const items: ParsedReceiptItem[] = draft.lines
+    .filter((l) => l.kind === 'item' && (allocated.get(l.id) ?? 0) > 0)
+    .map((l) => ({
+      description: l.name,
+      amountYen: -(allocated.get(l.id) ?? 0),
+      productType:
+        productTypeByLineId.get(l.id) ??
+        t.items.find((i) => i.lineId === l.id)?.productType ??
+        null,
+      lineId: l.id,
+      taxRate: l.taxRate,
+      confidence: l.confidence,
+      yRatio: l.yRatio,
+    }));
+  const hasItems = draft.lines.some((l) => l.kind === 'item');
+  return {
+    amountYen: -draft.paidYen,
+    items,
+    draft,
+    // 品目が無い(内訳の印字が無い)レシートは照合しない(不一致ではなく「内訳なし」)。
+    reconcile: hasItems ? reconcileReceipt(draft) : undefined,
+  };
 }
 
 /** 自由記述のAI判断(product_type/expense_subtype、ADR-036)。空文字は null にする。 */

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { todayJst } from '@/lib/date';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { fetchGenreOptions } from '@/features/transactions/genres-client';
 // `./store` ではなく `./types` から読む(T-7/P10-4)。`store.ts` は
@@ -43,13 +44,22 @@ import { saveImportBatchAction } from '../actions';
  * 登録直後は口座・日付・カテゴリを残し、金額・摘要だけ空にして次の1件を
  * すぐ入力できるようにした。
  */
-export function NewTransactionForm({ initialDate }: { initialDate: string }) {
+export function NewTransactionForm({
+  initialDate,
+  initialIncome = false,
+}: {
+  initialDate: string;
+  /** 「収入を登録」から開いたときは収入から始める。 */
+  initialIncome?: boolean;
+}) {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountId, setAccountId] = useState('');
   const [genreOptions, setGenreOptions] = useState<{ id: string; name: string }[]>([]);
 
   const [occurredOn, setOccurredOn] = useState(initialDate);
-  const [isIncome, setIsIncome] = useState(false);
+  const [isIncome, setIsIncome] = useState(initialIncome);
+  // 特別費(目標のペース計算から外す)。未来日の予定の支払い(発表会など)にも使う。
+  const [kind, setKind] = useState<'normal' | 'special'>('normal');
   const [amountYenInput, setAmountYenInput] = useState('');
   const [description, setDescription] = useState('');
   const [genreId, setGenreId] = useState('');
@@ -99,6 +109,7 @@ export function NewTransactionForm({ initialDate }: { initialDate: string }) {
       confidence: null,
       reviewStatus: 'auto_ok',
       mustPay: false,
+      kind: isIncome ? 'normal' : kind,
       source: 'manual',
       fingerprint: fingerprintOf({
         occurredOn,
@@ -296,6 +307,30 @@ export function NewTransactionForm({ initialDate }: { initialDate: string }) {
             </option>
           ))}
         </select>
+
+        {!isIncome ? (
+          <label className="mt-3 block">
+            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              目標の扱い
+              {occurredOn > todayJst()
+                ? '(今日より先の日付は「予定」として、使った額には入りません)'
+                : ''}
+            </span>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as 'normal' | 'special')}
+              className="mt-1 w-full rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            >
+              <option value="normal">目標の予算に含める</option>
+              <option value="special">特別費として別枠</option>
+            </select>
+          </label>
+        ) : null}
 
         <button
           type="button"

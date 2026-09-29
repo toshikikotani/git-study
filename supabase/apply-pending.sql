@@ -84,6 +84,79 @@ create policy "own_rows" on public.spending_plan_items
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 2. transactions.status / kind — 実績/予定・通常/特別費、分割の子のジャンル補完
+-- -----------------------------------------------------------------------------
+alter table public.transactions
+  add column if not exists status text not null default 'actual',
+  add column if not exists kind   text not null default 'normal';
+
+do $$
+begin
+  alter table public.transactions
+    add constraint ck_transactions_status check (status in ('actual', 'scheduled'));
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.transactions
+    add constraint ck_transactions_kind check (kind in ('normal', 'special'));
+exception when duplicate_object then null;
+end $$;
+
+update public.transactions
+  set status = 'scheduled'
+  where occurred_on > (now() at time zone 'Asia/Tokyo')::date
+    and status <> 'scheduled';
+
+update public.transaction_splits s
+  set genre_id = t.genre_id
+  from public.transactions t
+  where s.transaction_id = t.id
+    and s.genre_id is null
+    and t.genre_id is not null;
+
+update public.receipt_items i
+  set genre_id = t.genre_id
+  from public.transactions t
+  where i.transaction_id = t.id
+    and i.genre_id is null
+    and t.genre_id is not null;
+
+-- 3. genre_memory / transactions.branch_name・reconcile_diff_yen — レシートの分類の記憶
+-- -----------------------------------------------------------------------------
+alter table public.transactions
+  add column if not exists branch_name        text,
+  add column if not exists reconcile_diff_yen integer;
+
+create table if not exists public.genre_memory (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  store_key  text        not null default '',
+  item_key   text        not null,
+  genre_id   uuid        not null references public.genres(id) on delete cascade,
+  pinned     boolean     not null default false,
+  hits       integer     not null default 1,
+  updated_at timestamptz not null default now(),
+
+  constraint ck_genre_memory_item_not_blank check (btrim(item_key) <> ''),
+  constraint ck_genre_memory_hits check (hits >= 1)
+);
+
+create unique index if not exists ux_genre_memory_key
+  on public.genre_memory (user_id, store_key, item_key);
+create index if not exists ix_genre_memory_user on public.genre_memory (user_id);
+
+alter table public.genre_memory enable row level security;
+alter table public.genre_memory force row level security;
+
+drop policy if exists "own_rows" on public.genre_memory;
+create policy "own_rows" on public.genre_memory
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -101,4 +174,19 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'spending_plan_items'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'transactions.status / kind',
+  case when (
+    select count(*) from information_schema.columns
+    where table_schema = 'public' and table_name = 'transactions'
+      and column_name in ('status', 'kind')
+  ) = 2 then 'ok' else 'NG: 列が無い' end
+union all
+select
+  'genre_memory',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'genre_memory'
   ) then 'ok' else 'NG: テーブルが無い' end;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildGenreBreakdown } from '@/features/spending/breakdown';
 
+const TODAY = '2026-12-31';
 const genres = [
   { id: 'g1', name: '外食', budget_yen: 10000 },
   { id: 'g2', name: '食料品', budget_yen: null },
@@ -18,6 +19,8 @@ function tx(
   }>,
 ) {
   return {
+    id: 'x',
+    kind: 'normal' as const,
     categoryId: 'g1',
     amountYen: -1000,
     occurredOn: '2026-08-10',
@@ -38,6 +41,7 @@ describe('buildGenreBreakdown', () => {
         tx({ categoryId: 'g1', amountYen: -99999, occurredOn: '2026-07-31' }),
       ],
       '2026-08',
+      TODAY,
     );
     expect(result.map((r) => [r.genreName, r.spentYen])).toEqual([
       ['食料品', 3000],
@@ -46,7 +50,7 @@ describe('buildGenreBreakdown', () => {
   });
 
   it('支出の無いジャンルは出さない', () => {
-    const result = buildGenreBreakdown(genres, [tx({ categoryId: 'g1' })], '2026-08');
+    const result = buildGenreBreakdown(genres, [tx({ categoryId: 'g1' })], '2026-08', TODAY);
     expect(result.map((r) => r.genreName)).toEqual(['外食']);
   });
 
@@ -58,6 +62,7 @@ describe('buildGenreBreakdown', () => {
         tx({ categoryId: null, amountYen: -800, occurredOn: '2026-09-01' }),
       ],
       '2026-08',
+      TODAY,
     );
     expect(result).toEqual([
       { genreId: null, genreName: '未分類', spentYen: 700, budgetYen: null, tone: 'normal' },
@@ -69,6 +74,7 @@ describe('buildGenreBreakdown', () => {
       genres,
       [tx({ amountYen: 5000 }), tx({ isTransfer: true }), tx({ reviewStatus: 'ignored' })],
       '2026-08',
+      TODAY,
     );
     expect(result).toEqual([]);
   });
@@ -78,6 +84,7 @@ describe('buildGenreBreakdown', () => {
       genres,
       [tx({ categoryId: 'g1', amountYen: -12000 }), tx({ categoryId: 'g3', amountYen: -3600 })],
       '2026-08',
+      TODAY,
     );
     expect(result.map((r) => [r.genreName, r.tone])).toEqual([
       ['外食', 'over'],

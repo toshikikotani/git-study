@@ -9,8 +9,13 @@ import { NewTransactionForm } from './new-transaction-form';
 export default async function NewTransactionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string | string[] }>;
+  searchParams: Promise<{ date?: string | string[]; type?: string | string[] }>;
 }) {
-  const { date } = await searchParams;
-  return <NewTransactionForm initialDate={parseDateOnlyOr(date, todayJst())} />;
+  const { date, type } = await searchParams;
+  return (
+    <NewTransactionForm
+      initialDate={parseDateOnlyOr(date, todayJst())}
+      initialIncome={type === 'income'}
+    />
+  );
 }

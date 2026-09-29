@@ -2,27 +2,21 @@
  * 家計簿(/spending)のデータアクセス(本人発案:「普通の家計簿」への作り直し)。
  *
  * 元は「ちりつも」(小口支出の山)しか無く、収支の全体像・ジャンル別の内訳・
- * 今月の明細・予測が無かった。判断(集計)は既存の純粋関数
- * (domain/spending.ts・domain/accumulation.ts・domain/budget.ts)に任せ、
- * ここでは「DB から何を読むか」だけを担う。ジャンル(genres)に統廃合の概念は
- * 無い(categories.merged_into_id の廃止、ADR-057)ため、旧来の統廃合解決は
- * 不要になった。月次のスナップショットは保存しない(features/reports/store.ts
- * と同じ考え方。毎回 transactions を集計し直す)。
+ * 今月の明細・予測が無かった。明細は entries.ts が読み、集計は domain/ledger.ts
+ * の summarizeLedger()(views.ts 経由)が唯一の窓口。ここでは「どの期間を読み、
+ * どの画面向けに組み立てるか」だけを持つ。月次のスナップショットは保存しない
+ * (features/reports/store.ts と同じ考え方。毎回 transactions を集計し直す)。
  */
 
-import { compareToPreviousMonthPace, type AccumulationTransaction } from '@/domain/accumulation';
-import { isCountable, type BudgetTransaction } from '@/domain/budget';
-import {
-  projectedMonthTotalYen,
-  summarizeMonthlyIncomeExpense,
-  type SpendingTransaction,
-} from '@/domain/spending';
-import { resolveItemGenres } from '@/features/genre/item-genres';
-import type { PaymentMethod } from '@/features/import/adapters';
-import { addMonths, daysBetween, monthStartJst, nthDayOfMonth, todayJst } from '@/lib/date';
+import { monthRange, summarizeLedger } from '@/domain/ledger';
+import { projectedMonthTotalYen } from '@/domain/spending';
+import { addMonths, daysBetween, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
+import { countRecordedDays } from '@/domain/summary-rules';
 import { createClient } from '@/lib/supabase/server';
-import { buildGenreBreakdown } from './breakdown';
+import { loadLedgerTransactions } from './entries';
+import { attachThumbnails } from './thumbnails';
+import { buildLedgerViews, toLedgerEntries } from './views';
 import type {
   GenreBreakdownRow,
   LedgerTransaction,
@@ -42,167 +36,112 @@ export class SpendingStoreError extends AppError {}
 
 export async function loadMonthlyLedger(now: Date = new Date()): Promise<MonthlyLedgerView> {
   const today = todayJst(now);
-  const thisMonthStart = monthStartJst(0, now);
-  const nextMonthStart = monthStartJst(1, now);
-  // 先月同日比(domain/accumulation.ts の compareToPreviousMonthPace)のため、
-  // 先月の月初まで遡って読む。
-  const rangeStart = nthDayOfMonth(addMonths(today, -1), 1);
+  const monthKey = today.slice(0, 7);
+  const thisMonth = monthRange(monthKey);
+  // 先月同日比のため、先月の月初まで遡って読む。未来日(予定)も今月末まで読む。
+  const lastMonthStart = nthDayOfMonth(addMonths(today, -1), 1);
 
-  const supabase = await createClient();
+  const loaded = await loadLedgerTransactions({ from: lastMonthStart, to: thisMonth.to }, today);
+  const { genres, transactions } = loaded;
 
-  const { data: genres, error: genresError } = await supabase
-    .from('genres')
-    .select('id, name, budget_yen')
-    .order('sort_order', { ascending: true });
-  if (genresError) {
-    throw new SpendingStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
-  }
+  const views = buildLedgerViews({ genres, transactions, range: thisMonth, today });
+  const entries = toLedgerEntries(transactions);
 
-  const { data: rows, error: txError } = await supabase
-    .from('transactions')
-    .select(
-      'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method',
-    )
-    .gte('occurred_on', rangeStart)
-    .lte('occurred_on', today)
-    .order('occurred_on', { ascending: false });
-  if (txError) throw new SpendingStoreError(`明細を取得できませんでした: ${txError.message}`);
-
-  const itemGenreByTransactionId = await resolveItemGenres(rows);
-
-  const nameById = new Map(genres.map((g) => [g.id, g.name]));
-
-  const mapped: (BudgetTransaction & {
-    id: string;
-    occurredOn: string;
-    label: string;
-    accountId: string;
-    paymentMethod: PaymentMethod;
-  })[] = rows.map((row) => ({
-    id: row.id,
-    categoryId: row.genre_id ?? itemGenreByTransactionId.get(row.id) ?? null,
-    amountYen: row.amount_yen,
-    isTransfer: row.is_transfer,
-    reviewStatus: row.review_status,
-    occurredOn: row.occurred_on,
-    label: row.merchant_name ?? row.description,
-    accountId: row.account_id,
-    paymentMethod: row.payment_method,
-  }));
-
-  const thisMonth = mapped.filter((tx) => tx.occurredOn >= thisMonthStart);
-  const monthKey = thisMonthStart.slice(0, 7);
-
-  const spendingTx: SpendingTransaction[] = mapped;
-  const [incomeExpense] = summarizeMonthlyIncomeExpense(spendingTx, [monthKey]);
-  const genreBreakdown = buildGenreBreakdown(genres, thisMonth, monthKey);
-
-  const countableThisMonth = thisMonth.filter((tx) => isCountable(tx));
-  const transactions: LedgerTransaction[] = countableThisMonth.map((tx) => ({
-    id: tx.id,
-    occurredOn: tx.occurredOn,
-    label: tx.label,
-    genreId: tx.categoryId,
-    genreName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
-    amountYen: tx.amountYen,
-    accountId: tx.accountId,
-    paymentMethod: tx.paymentMethod,
-  }));
-
-  const elapsedDays = daysBetween(thisMonthStart, today) + 1;
-  const totalDaysInMonth = daysBetween(thisMonthStart, nextMonthStart);
+  const elapsedDays = daysBetween(thisMonth.from, today) + 1;
+  const totalDaysInMonth = daysBetween(thisMonth.from, thisMonth.to) + 1;
   const budgetedGenres = genres.filter((g) => g.budget_yen !== null);
   const totalBudgetYen =
     budgetedGenres.length === 0
       ? null
       : budgetedGenres.reduce((acc, g) => acc + (g.budget_yen ?? 0), 0);
 
-  const accumulationTx: AccumulationTransaction[] = mapped;
+  const lastMonthSameDay = addMonths(today, -1);
+  const lastMonthSameDayYen = summarizeLedger(
+    entries,
+    { from: lastMonthStart, to: lastMonthSameDay },
+    today,
+  ).spentYen;
+  const { summary } = views;
+
+  const firstRecordedOn = await loadFirstRecordedOn(today);
+  const recordedDaysThisMonth = countRecordedDays(
+    [...summary.byDay.keys()].filter((d) => d >= thisMonth.from),
+  );
 
   return {
-    period: { from: thisMonthStart, to: today },
-    totalSpentYen: incomeExpense!.expenseYen,
-    totalIncomeYen: incomeExpense!.incomeYen,
-    genreBreakdown,
-    transactions,
+    record: { firstRecordedOn, recordedDaysThisMonth },
+    period: { from: thisMonth.from, to: today },
+    totals: views.totals,
+    totalSpentYen: summary.spentYen,
+    totalIncomeYen: summary.incomeYen,
+    genreBreakdown: views.genreBreakdown,
+    transactions: await attachThumbnails(
+      transactions.filter(
+        (t) => t.occurredOn >= thisMonth.from && t.occurredOn <= thisMonth.to && isListed(t),
+      ),
+      loaded.batchIdByTransactionId,
+    ),
     forecast: {
       elapsedDays,
       totalDaysInMonth,
-      projectedTotalYen: projectedMonthTotalYen(
-        incomeExpense!.expenseYen,
-        elapsedDays,
-        totalDaysInMonth,
-      ),
+      // 特別費は今後も同じ額で続くわけではないため、ペースの外挿から外して後から足す。
+      projectedTotalYen:
+        projectedMonthTotalYen(summary.paceSpentYen, elapsedDays, totalDaysInMonth) +
+        summary.specialYen,
       totalBudgetYen,
     },
-    pace: compareToPreviousMonthPace(accumulationTx, today),
+    pace: {
+      dayOfMonth: elapsedDays,
+      thisMonthToDateYen: summary.spentYen,
+      lastMonthSameDayYen,
+      differenceYen: summary.spentYen - lastMonthSameDayYen,
+    },
   };
+}
+
+/** 一覧に出す明細(振替・対象外は出さない)。 */
+function isListed(t: LedgerTransaction): boolean {
+  return !t.isTransfer && t.reviewStatus !== 'ignored';
 }
 
 /**
  * カレンダー(家計簿トップ)で移動した月の、明細とジャンル別の内訳。
- * 明細は loadMonthlyLedger と同じ見え方(収支の対象になるものだけ・品目から決めた
- * 代表ジャンル込み・収入も含む)で新しい日付が先頭。内訳は今月と同じ
- * buildGenreBreakdown で組み立てるため、過去・未来の月も今月と同じ見た目になる。
+ * 今月と同じ buildLedgerViews で組み立てるため、過去・未来の月も今月と同じ
+ * 見え方・同じ集計になる(収支の対象になるものだけ・品目から決めた代表ジャンル
+ * 込み・収入も含む、新しい日付が先頭)。
  */
-export async function loadCalendarMonth(monthStart: string): Promise<{
+export async function loadCalendarMonth(
+  monthStart: string,
+  now: Date = new Date(),
+): Promise<{
   transactions: LedgerTransaction[];
   genreBreakdown: GenreBreakdownRow[];
   totals: MonthTotals;
 }> {
-  const supabase = await createClient();
-  const nextMonthStart = addMonths(monthStart, 1);
-
-  const [{ data: genres, error: genresError }, { data: rows, error: txError }] = await Promise.all([
-    supabase.from('genres').select('id, name, budget_yen').order('sort_order'),
-    supabase
-      .from('transactions')
-      .select(
-        'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method',
-      )
-      .gte('occurred_on', monthStart)
-      .lt('occurred_on', nextMonthStart)
-      .order('occurred_on', { ascending: false }),
-  ]);
-  if (genresError) {
-    throw new SpendingStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
-  }
-  if (txError) throw new SpendingStoreError(`明細を取得できませんでした: ${txError.message}`);
-
-  const nameById = new Map(genres.map((g) => [g.id, g.name]));
-  const inherited = await resolveItemGenres(rows);
-
-  const mapped = rows.map((row) => ({
-    id: row.id,
-    categoryId: row.genre_id ?? inherited.get(row.id) ?? null,
-    amountYen: row.amount_yen,
-    isTransfer: row.is_transfer,
-    reviewStatus: row.review_status,
-    occurredOn: row.occurred_on,
-    label: row.merchant_name ?? row.description,
-    accountId: row.account_id,
-    paymentMethod: row.payment_method,
-  }));
-
-  const transactions: LedgerTransaction[] = mapped
-    .filter((tx) => isCountable(tx))
-    .map((tx) => ({
-      id: tx.id,
-      occurredOn: tx.occurredOn,
-      label: tx.label,
-      genreId: tx.categoryId,
-      genreName: tx.categoryId === null ? null : (nameById.get(tx.categoryId) ?? null),
-      amountYen: tx.amountYen,
-      accountId: tx.accountId,
-      paymentMethod: tx.paymentMethod,
-    }));
-
-  const monthKey = monthStart.slice(0, 7);
-  const [incomeExpense] = summarizeMonthlyIncomeExpense(mapped, [monthKey]);
-
+  const today = todayJst(now);
+  const range = monthRange(monthStart.slice(0, 7));
+  const loaded = await loadLedgerTransactions(range, today);
+  const { genres, transactions } = loaded;
+  const views = buildLedgerViews({ genres, transactions, range, today });
   return {
-    transactions,
-    genreBreakdown: buildGenreBreakdown(genres, mapped, monthKey),
-    totals: { spentYen: incomeExpense!.expenseYen, incomeYen: incomeExpense!.incomeYen },
+    transactions: await attachThumbnails(
+      transactions.filter(isListed),
+      loaded.batchIdByTransactionId,
+    ),
+    genreBreakdown: views.genreBreakdown,
+    totals: views.totals,
   };
+}
+
+/** 最初の記録の日(今日まで)。1件も無ければ null。 */
+async function loadFirstRecordedOn(today: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('occurred_on')
+    .lte('occurred_on', today)
+    .order('occurred_on', { ascending: true })
+    .limit(1);
+  if (error || data.length === 0) return null;
+  return data[0]!.occurred_on;
 }
