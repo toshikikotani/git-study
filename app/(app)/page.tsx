@@ -233,7 +233,7 @@ export default async function HomePage() {
         <Button href="/reports" variant="outlined" className="flex-1">
           支出レポート
         </Button>
-        <Button href="/advisor" variant="outlined" className="flex-1">
+        <Button href="/assistant" variant="outlined" className="flex-1">
           AI相談
         </Button>
       </div>
