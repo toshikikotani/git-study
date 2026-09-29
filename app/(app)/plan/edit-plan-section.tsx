@@ -30,7 +30,7 @@ export function EditPlanSection({
         className="text-xs font-semibold"
         style={{ color: 'var(--accent)' }}
       >
-        {open ? '配分の調整を閉じる' : '配分を調整する(総額は固定)'}
+        {open ? '配分の調整を閉じる' : '配分・総額を調整する'}
       </button>
       {open ? (
         <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
