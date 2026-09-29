@@ -29,7 +29,9 @@ function parseYen(input: string): number | null {
  * ジャンルごとの目標額の配分を直す(本人発案「目標の金額は固定の上、カテゴリごとの
  * 金額を調整したい。AIと相談して微調整、手動でも」、ADR-058)。
  *
- * 総額は固定で、ジャンルの合計がぴったり総額になるまで保存できない。
+ * 総額は書き換えられ(確定するとジャンルの配分も比率で増減)、「固定する」ときは
+ * ジャンルの合計がぴったり総額になるまで保存できない。固定しないときは、ジャンルの
+ * 合計がそのまま総額になる。
  * 手で直した額(ピン留め)は動かさず、残りのジャンルで「未配分」を自動で埋められる。
  * AIには、指示に沿った配分の見直しを相談できる(合計は必ず総額にそろえて返る)。
  */
@@ -46,7 +48,12 @@ export function AllocationEditor({
   saveLabel: string;
   onSave: (items: { genreId: string; targetYen: number }[]) => Promise<{ error: string | null }>;
 }) {
-  const [totalInput, setTotalInput] = useState(String(rows.reduce((acc, r) => acc + r.yen, 0)));
+  const [lockTotal, setLockTotal] = useState(true);
+  const [committedTotal, setCommittedTotal] = useState(
+    String(rows.reduce((acc, r) => acc + r.yen, 0)),
+  );
+  // 総額を書き換えている最中の文字列(確定するまで配分は動かさない)。
+  const [totalDraft, setTotalDraft] = useState<string | null>(null);
   const [inputs, setInputs] = useState<Record<string, string>>(
     Object.fromEntries(rows.map((r) => [r.genreId, String(r.yen)])),
   );
@@ -58,10 +65,13 @@ export function AllocationEditor({
 
   const parsed = rows.map((r) => parseYen(inputs[r.genreId] ?? ''));
   const allValid = parsed.every((yen) => yen !== null);
-  const total = parseYen(totalInput);
   const allocated = parsed.reduce<number>((acc, yen) => acc + (yen ?? 0), 0);
+  // 固定のときは確定した総額、固定しないときはジャンルの合計が総額。
+  const total = lockTotal ? parseYen(committedTotal) : allocated;
+  const shownTotal = totalDraft ?? (lockTotal ? committedTotal : String(allocated));
   const unallocated = total === null ? null : total - allocated;
   const balanced = allValid && unallocated === 0;
+  const canSave = lockTotal ? balanced : allValid && allocated > 0;
 
   const setYen = (genreId: string, yen: number, pin: boolean) => {
     setInputs((prev) => ({ ...prev, [genreId]: String(Math.max(yen, 0)) }));
@@ -69,13 +79,42 @@ export function AllocationEditor({
     setAiSummary(null);
   };
 
-  /** 手で決めたジャンル(ピン留め)は動かさず、残りのジャンルで総額にそろえる。 */
-  const autoBalance = () => {
-    if (total === null || !allValid) return;
+  /**
+   * 差額をジャンルに配る。respectPins のときは手で決めたジャンル(固定)を動かさず、
+   * 残りのジャンルの比率で配る(全部固定なら全体の比率)。総額の書き換えでは全ジャンルを
+   * 現在の比率で増減する。
+   */
+  const rebalanceInputs = (nextTotal: number, respectPins: boolean) => {
+    if (!allValid) return;
     const amounts = parsed as number[];
-    const weights = rows.map((r, i) => (pinned.has(r.genreId) ? 0 : amounts[i]!));
-    const next = rebalanceToTotal(amounts, total, weights);
+    const hasFree = rows.some((r) => !pinned.has(r.genreId));
+    const weights = rows.map((r, i) =>
+      respectPins && hasFree && pinned.has(r.genreId) ? 0 : amounts[i]!,
+    );
+    const next = rebalanceToTotal(amounts, nextTotal, weights);
     setInputs(Object.fromEntries(rows.map((r, i) => [r.genreId, String(next[i])])));
+  };
+
+  const autoBalance = () => {
+    if (total === null) return;
+    rebalanceInputs(total, true);
+  };
+
+  /** 総額の書き換えを確定する。ジャンルの配分も新しい総額に合わせて増減する。 */
+  const commitTotal = () => {
+    if (totalDraft === null) return;
+    const next = parseYen(totalDraft);
+    setTotalDraft(null);
+    if (next === null) return;
+    setCommittedTotal(String(next));
+    rebalanceInputs(next, false);
+    setAiSummary(null);
+  };
+
+  const toggleLock = () => {
+    if (!lockTotal) setCommittedTotal(String(allocated));
+    setLockTotal((v) => !v);
+    setTotalDraft(null);
   };
 
   const consultAi = async () => {
@@ -103,7 +142,7 @@ export function AllocationEditor({
   };
 
   const save = async () => {
-    if (!balanced) return;
+    if (!canSave) return;
     setBusy('save');
     setError(null);
     const result = await onSave(
@@ -115,46 +154,75 @@ export function AllocationEditor({
 
   return (
     <div className="space-y-3">
-      <label className="flex items-center justify-between gap-3 text-sm">
+      <div className="flex items-center justify-between gap-3 text-sm">
         <span className="font-medium" style={{ color: 'var(--ink)' }}>
-          総額(固定)
+          総額
         </span>
-        <span className="flex items-center gap-1">
+        <label className="flex items-center gap-1">
           <input
             type="text"
             inputMode="numeric"
-            value={totalInput}
-            onChange={(e) => {
-              setTotalInput(e.target.value);
-              setAiSummary(null);
+            value={shownTotal}
+            onFocus={() => setTotalDraft(shownTotal)}
+            onChange={(e) => setTotalDraft(e.target.value)}
+            onBlur={commitTotal}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
             }}
             aria-label="目標の総額(円)"
-            aria-invalid={total === null}
+            aria-invalid={totalDraft !== null && parseYen(totalDraft) === null}
             className="tabular w-28 rounded-lg px-2 py-1 text-right font-semibold"
             style={{
               background: 'var(--surface-raised)',
               color: 'var(--ink)',
-              border: `1px solid ${total === null ? 'var(--over)' : 'var(--hairline)'}`,
+              border: `1px solid ${
+                totalDraft !== null && parseYen(totalDraft) === null
+                  ? 'var(--over)'
+                  : 'var(--hairline)'
+              }`,
             }}
           />
           <span style={{ color: 'var(--ink-muted)' }}>円</span>
+        </label>
+      </div>
+      <p className="text-[11px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        総額を書き換えて確定すると、全ジャンルの配分が比率で自動的に増減します。
+      </p>
+
+      <label className="flex items-center justify-between gap-3 text-xs">
+        <span style={{ color: 'var(--ink-secondary)' }}>
+          {lockTotal
+            ? '総額を固定する(ジャンルを動かしても総額は変わらない)'
+            : '総額を固定しない(ジャンルを動かすと総額が増減する)'}
         </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={lockTotal}
+          onChange={toggleLock}
+          aria-label="総額を固定する"
+          className="size-5 shrink-0"
+        />
       </label>
 
       <p
         className="text-xs"
         role="status"
-        style={{ color: balanced ? 'var(--income)' : 'var(--over)' }}
+        style={{
+          color: lockTotal ? (balanced ? 'var(--income)' : 'var(--over)') : 'var(--ink-muted)',
+        }}
       >
-        {unallocated === null
-          ? '総額を数字で入力してください'
-          : !allValid
-            ? '金額を0円以上の整数で入力してください'
-            : unallocated === 0
-              ? '配分が総額とぴったり合っています'
-              : unallocated > 0
-                ? `あと${formatYen(unallocated, { sign: 'never' })}が未配分です`
-                : `${formatYen(-unallocated, { sign: 'never' })}配りすぎです`}
+        {!allValid
+          ? '金額を0円以上の整数で入力してください'
+          : !lockTotal
+            ? `ジャンルの合計 ${formatYen(allocated, { sign: 'never' })} がそのまま総額になります`
+            : unallocated === null
+              ? '総額を数字で入力してください'
+              : unallocated === 0
+                ? '配分が総額とぴったり合っています'
+                : unallocated > 0
+                  ? `あと${formatYen(unallocated, { sign: 'never' })}が未配分です`
+                  : `${formatYen(-unallocated, { sign: 'never' })}配りすぎです`}
       </p>
 
       <ul className="space-y-3">
@@ -227,7 +295,7 @@ export function AllocationEditor({
         ))}
       </ul>
 
-      {!balanced && unallocated !== null && allValid ? (
+      {lockTotal && !balanced && unallocated !== null && allValid ? (
         <Button variant="tonal" className="w-full" onClick={autoBalance}>
           {pinned.size > 0
             ? '自分で決めた額はそのまま、残りで総額に合わせる'
@@ -270,7 +338,7 @@ export function AllocationEditor({
       <Button
         variant="filled"
         className="w-full"
-        disabled={!balanced || busy !== null}
+        disabled={!canSave || busy !== null}
         onClick={() => void save()}
       >
         {busy === 'save' ? '保存しています…' : saveLabel}
