@@ -21,7 +21,7 @@ import type { LedgerSplit, LedgerTransaction } from './ledger-types';
 export class LedgerLoadError extends Error {}
 
 const BASE_COLUMNS =
-  'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method, must_pay';
+  'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method, must_pay, note, import_batch_id';
 const SPLIT_ID_CHUNK = 50;
 
 export type LedgerGenre = { id: string; name: string; budget_yen: number | null };
@@ -29,8 +29,8 @@ export type LedgerGenre = { id: string; name: string; budget_yen: number | null 
 /** 分割の合計が明細の金額と合わないデータは、集計がずれるため分割として扱わない。 */
 function usableSplits(
   amountYen: number,
-  splits: readonly { genreId: string | null; amountYen: number }[] | undefined,
-): readonly { genreId: string | null; amountYen: number }[] {
+  splits: readonly { genreId: string | null; amountYen: number; note: string | null }[] | undefined,
+): readonly { genreId: string | null; amountYen: number; note: string | null }[] {
   if (!splits || splits.length === 0) return [];
   const sum = splits.reduce((acc, s) => acc + s.amountYen, 0);
   return sum === amountYen ? splits : [];
@@ -48,6 +48,8 @@ type RawRow = {
   account_id: string;
   payment_method: PaymentMethod;
   must_pay: boolean;
+  note: string | null;
+  import_batch_id: string | null;
   kind?: string | null;
   branch_name?: string | null;
   reconcile_diff_yen?: number | null;
@@ -57,7 +59,12 @@ type RawRow = {
 export async function loadLedgerTransactions(
   range: { from: DateOnly; to: DateOnly },
   today: DateOnly,
-): Promise<{ genres: LedgerGenre[]; transactions: LedgerTransaction[] }> {
+): Promise<{
+  genres: LedgerGenre[];
+  transactions: LedgerTransaction[];
+  /** 取り込み単位(レシート画像の引き当て用)。 */
+  batchIdByTransactionId: Map<string, string>;
+}> {
   const supabase = await createClient();
 
   const query = (columns: string) =>
@@ -90,7 +97,10 @@ export async function loadLedgerTransactions(
   const genres = genresResult.data;
   const nameById = new Map(genres.map((g) => [g.id, g.name]));
 
-  const splitsById = new Map<string, { genreId: string | null; amountYen: number }[]>();
+  const splitsById = new Map<
+    string,
+    { genreId: string | null; amountYen: number; note: string | null }[]
+  >();
   for (let i = 0; i < txRows.length; i += SPLIT_ID_CHUNK) {
     const chunk = await listSplitsForTransactionIds(
       supabase,
@@ -106,19 +116,26 @@ export async function loadLedgerTransactions(
 
   const transactions = txRows.map((row): LedgerTransaction => {
     const genreId = row.genre_id ?? itemGenre.get(row.id) ?? null;
-    const splits: LedgerSplit[] = usableSplits(row.amount_yen, splitsById.get(row.id)).map((s) => {
-      // 子のジャンルが未設定なら親を引き継ぐ(「(未分類)」の子を作らない)。
-      const childGenreId = s.genreId ?? genreId;
-      return {
-        genreId: childGenreId,
-        genreName: childGenreId === null ? null : (nameById.get(childGenreId) ?? null),
-        amountYen: s.amountYen,
-      };
-    });
+    const splits: LedgerSplit[] = usableSplits(row.amount_yen, splitsById.get(row.id)).map(
+      (s, i) => {
+        // 子のジャンルが未設定なら親を引き継ぐ(「(未分類)」の子を作らない)。
+        const childGenreId = s.genreId ?? genreId;
+        return {
+          id: `${row.id}:${i}`,
+          note: s.note,
+          genreId: childGenreId,
+          genreName: childGenreId === null ? null : (nameById.get(childGenreId) ?? null),
+          amountYen: s.amountYen,
+        };
+      },
+    );
     return {
       id: row.id,
       occurredOn: row.occurred_on,
       label: row.merchant_name ?? row.description,
+      description: row.description,
+      memo: row.note,
+      thumbnailUrl: null,
       genreId,
       genreName: genreId === null ? null : (nameById.get(genreId) ?? null),
       amountYen: row.amount_yen,
@@ -135,5 +152,9 @@ export async function loadLedgerTransactions(
     };
   });
 
-  return { genres, transactions };
+  const batchIdByTransactionId = new Map<string, string>();
+  for (const row of txRows) {
+    if (row.import_batch_id) batchIdByTransactionId.set(row.id, row.import_batch_id);
+  }
+  return { genres, transactions, batchIdByTransactionId };
 }

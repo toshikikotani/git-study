@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * 明細行の左フリック・長押し(本人発案「左フリックで編集とか長押ししたら
+ * 明細行のスワイプ・長押し(本人発案「左フリックで編集とか長押ししたら
  * レシートの内容を見れるとか、直感的な操作を増やしたい」)。
  *
  * pull-to-refresh.tsx と同じ理由で、`preventDefault()` が効くネイティブの
@@ -27,31 +27,48 @@ import { useEffect, useRef, useState } from 'react';
  * `dragPxRef` に持たせ、見た目の再描画にだけ `dragPx` state を使う。
  */
 const SWIPE_THRESHOLD = 56;
-const MAX_REVEAL = 72;
+const ACTIONS_WIDTH = 144;
+const MAX_RIGHT = 88;
 const LONG_PRESS_MS = 500;
 const MOVE_SLOP = 10;
 
 type Mode = 'unknown' | 'swipe' | 'longpress' | 'scroll';
 
+/**
+ * 明細行のスワイプ(本人発案の直感操作を、家計簿の明細リスト用に組み直した)。
+ *   - 右へスワイプ → ジャンル変更(onSwipeRight)。しきい値を超えたら呼ぶ。
+ *   - 左へスワイプ → 裏の操作(actions:削除・複製など)が現れ、開いたまま止まる。
+ *     行のほかの場所を触るか、操作を選ぶと閉じる。
+ *   - 長押し → その場のプレビュー(onLongPress)
+ * タップは中身の button に任せる(ここでは処理しない)。
+ */
 export function SwipeableRow({
-  /** 閾値を超えて左フリックした時に呼ぶ(例:カテゴリ編集を直接開く)。 */
-  onSwipeLeft,
-  /** ほぼ動かさずに長押しした時に呼ぶ(例:内容をその場でプレビュー)。 */
+  onSwipeRight,
   onLongPress,
+  actions,
+  rightLabel = 'ジャンル',
   children,
 }: {
-  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
   onLongPress?: () => void;
+  /** 左スワイプで現れる操作(ボタンの並び)。幅は 144px。 */
+  actions?: React.ReactNode;
+  rightLabel?: string;
   children: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dragPx, setDragPx] = useState(0);
+  // 見た目の位置(px。左が負、右が正)。
+  const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
-  const dragPxRef = useRef(0);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const offsetRef = useRef(0);
+  const revealedRef = useRef(false);
+  const startRef = useRef<{ x: number; y: number; base: number } | null>(null);
   const modeRef = useRef<Mode>('unknown');
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
+
+  const hasActions = actions !== undefined;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -63,15 +80,25 @@ export function SwipeableRow({
         longPressTimerRef.current = null;
       }
     };
-    const resetDrag = () => {
-      dragPxRef.current = 0;
-      setDragPx(0);
+    const move = (px: number) => {
+      offsetRef.current = px;
+      setOffset(px);
+    };
+    const setOpen = (open: boolean) => {
+      revealedRef.current = open;
+      setRevealed(open);
+      setAnimating(true);
+      move(open ? -ACTIONS_WIDTH : 0);
     };
 
     const onTouchStart = (e: TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
-      startRef.current = { x: touch.clientX, y: touch.clientY };
+      startRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        base: revealedRef.current ? -ACTIONS_WIDTH : 0,
+      };
       modeRef.current = 'unknown';
       longPressFiredRef.current = false;
       setAnimating(false);
@@ -92,29 +119,37 @@ export function SwipeableRow({
 
       if (modeRef.current === 'unknown') {
         if (Math.abs(dx) < MOVE_SLOP && Math.abs(dy) < MOVE_SLOP) return;
-        // ここまで動いたら長押しの候補では無くなる(スワイプか、縦スクロール)。
         clearLongPressTimer();
-        modeRef.current = dx < 0 && Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
+        modeRef.current = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
       }
       if (modeRef.current !== 'swipe') return;
 
-      // ページの横方向のバウンス等を止め、フリックの動きだけにする。
       e.preventDefault();
-      const next = Math.min(Math.max(-dx, 0), MAX_REVEAL);
-      dragPxRef.current = next;
-      setDragPx(next);
+      const min = hasActions ? -ACTIONS_WIDTH : 0;
+      const max = onSwipeRight ? MAX_RIGHT : 0;
+      move(Math.min(Math.max(start.base + dx, min), max));
     };
 
     const onTouchEnd = (e: TouchEvent) => {
       clearLongPressTimer();
-      if (longPressFiredRef.current) {
-        // 長押し直後の合成 click(=タップして行が開く)を止める。
-        e.preventDefault();
-      }
+      if (longPressFiredRef.current) e.preventDefault();
       if (modeRef.current === 'swipe') {
-        setAnimating(true);
-        if (dragPxRef.current >= SWIPE_THRESHOLD) onSwipeLeft?.();
-        resetDrag();
+        const px = offsetRef.current;
+        if (px >= SWIPE_THRESHOLD) {
+          setAnimating(true);
+          move(0);
+          revealedRef.current = false;
+          setRevealed(false);
+          onSwipeRight?.();
+        } else if (hasActions && px <= -SWIPE_THRESHOLD) {
+          setOpen(true);
+        } else {
+          setOpen(false);
+        }
+      } else if (modeRef.current === 'unknown' && revealedRef.current) {
+        // 開いている間のタップは、行を開かずに閉じるだけ。
+        e.preventDefault();
+        setOpen(false);
       }
       startRef.current = null;
       modeRef.current = 'unknown';
@@ -122,8 +157,7 @@ export function SwipeableRow({
 
     const onTouchCancel = () => {
       clearLongPressTimer();
-      setAnimating(true);
-      resetDrag();
+      setOpen(revealedRef.current);
       startRef.current = null;
       modeRef.current = 'unknown';
     };
@@ -139,23 +173,48 @@ export function SwipeableRow({
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchCancel);
     };
-  }, [onSwipeLeft, onLongPress]);
+  }, [onSwipeRight, onLongPress, hasActions]);
+
+  const close = () => {
+    revealedRef.current = false;
+    offsetRef.current = 0;
+    setRevealed(false);
+    setAnimating(true);
+    setOffset(0);
+  };
 
   return (
     <div ref={containerRef} className="relative overflow-hidden" style={{ touchAction: 'pan-y' }}>
-      {/* 左フリックで裏から見える「編集」の合図。実際に画面遷移するのは
-          onSwipeLeft 側(呼び出し元がカテゴリ編集を直接開く)。 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4"
-        style={{ width: MAX_REVEAL, opacity: dragPx / MAX_REVEAL, color: 'var(--accent)' }}
-      >
-        <span className="text-xs font-semibold">編集</span>
-      </div>
+      {onSwipeRight ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4"
+          style={{
+            width: MAX_RIGHT,
+            opacity: Math.min(Math.max(offset, 0) / MAX_RIGHT, 1),
+            color: 'var(--accent)',
+          }}
+        >
+          <span className="text-xs font-semibold">{rightLabel}</span>
+        </div>
+      ) : null}
+      {hasActions ? (
+        <div
+          className="absolute inset-y-0 right-0 flex items-stretch"
+          style={{
+            width: ACTIONS_WIDTH,
+            visibility: offset < 0 || revealed ? 'visible' : 'hidden',
+          }}
+          onClick={close}
+        >
+          {actions}
+        </div>
+      ) : null}
       <div
         style={{
-          transform: `translateX(${-dragPx}px)`,
+          transform: `translateX(${offset}px)`,
           transition: animating ? 'transform var(--duration-medium) var(--ease-spring)' : 'none',
+          background: 'var(--surface)',
         }}
       >
         {children}

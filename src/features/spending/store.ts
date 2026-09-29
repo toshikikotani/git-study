@@ -13,6 +13,7 @@ import { projectedMonthTotalYen } from '@/domain/spending';
 import { addMonths, daysBetween, nthDayOfMonth, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { loadLedgerTransactions } from './entries';
+import { attachThumbnails } from './thumbnails';
 import { buildLedgerViews, toLedgerEntries } from './views';
 import type {
   GenreBreakdownRow,
@@ -38,10 +39,8 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   // 先月同日比のため、先月の月初まで遡って読む。未来日(予定)も今月末まで読む。
   const lastMonthStart = nthDayOfMonth(addMonths(today, -1), 1);
 
-  const { genres, transactions } = await loadLedgerTransactions(
-    { from: lastMonthStart, to: thisMonth.to },
-    today,
-  );
+  const loaded = await loadLedgerTransactions({ from: lastMonthStart, to: thisMonth.to }, today);
+  const { genres, transactions } = loaded;
 
   const views = buildLedgerViews({ genres, transactions, range: thisMonth, today });
   const entries = toLedgerEntries(transactions);
@@ -68,8 +67,11 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
     totalSpentYen: summary.spentYen,
     totalIncomeYen: summary.incomeYen,
     genreBreakdown: views.genreBreakdown,
-    transactions: transactions.filter(
-      (t) => t.occurredOn >= thisMonth.from && t.occurredOn <= thisMonth.to && isListed(t),
+    transactions: await attachThumbnails(
+      transactions.filter(
+        (t) => t.occurredOn >= thisMonth.from && t.occurredOn <= thisMonth.to && isListed(t),
+      ),
+      loaded.batchIdByTransactionId,
     ),
     forecast: {
       elapsedDays,
@@ -110,10 +112,14 @@ export async function loadCalendarMonth(
 }> {
   const today = todayJst(now);
   const range = monthRange(monthStart.slice(0, 7));
-  const { genres, transactions } = await loadLedgerTransactions(range, today);
+  const loaded = await loadLedgerTransactions(range, today);
+  const { genres, transactions } = loaded;
   const views = buildLedgerViews({ genres, transactions, range, today });
   return {
-    transactions: transactions.filter(isListed),
+    transactions: await attachThumbnails(
+      transactions.filter(isListed),
+      loaded.batchIdByTransactionId,
+    ),
     genreBreakdown: views.genreBreakdown,
     totals: views.totals,
   };

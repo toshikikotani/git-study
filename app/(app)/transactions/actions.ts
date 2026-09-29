@@ -26,6 +26,7 @@ import { replaceSplits } from '@/features/transactions/splits-store';
 import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
 import { normalizeStoreName } from '@/domain/store-name';
 import { recordCorrection } from '@/features/genre/memory-store';
+import { fingerprintOf } from '@/features/transactions/types';
 import { assertDateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import { describeUserError } from '@/lib/errors';
@@ -327,6 +328,80 @@ export async function undoReceiptSaveAction(
     if (error) return { error: '元に戻せませんでした。明細から削除してください。' };
   } catch (error) {
     return { error: describeUserError(error, '元に戻せませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/** 明細を削除する(分割・品目は明細と一緒に消える)。 */
+export async function deleteTransactionAction(id: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (error) return { error: '削除できませんでした。' };
+  } catch (error) {
+    return { error: describeUserError(error, '削除できませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/**
+ * 明細を複製する。同じ日・同じ金額・同じ摘要は重複排除の一意制約に当たるため、
+ * 摘要に「(複製)」を付けて作る(あとから編集する前提)。分割・品目は複製しない。
+ */
+export async function duplicateTransactionAction(id: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { data: row, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error || !row) return { error: '複製できませんでした。' };
+    const description = `${row.description}(複製)`;
+    const { error: insertError } = await supabase.from('transactions').insert({
+      user_id: row.user_id,
+      account_id: row.account_id,
+      occurred_on: row.occurred_on,
+      amount_yen: row.amount_yen,
+      description,
+      merchant_name: row.merchant_name,
+      payment_method: row.payment_method,
+      genre_id: row.genre_id,
+      classified_by: row.classified_by,
+      confidence: row.confidence,
+      review_status: 'auto_ok',
+      must_pay: row.must_pay,
+      source: 'manual',
+      fingerprint: fingerprintOf({
+        occurredOn: row.occurred_on,
+        amountYen: row.amount_yen,
+        description,
+      }),
+    });
+    if (insertError) return { error: '複製できませんでした。すでに複製済みかもしれません。' };
+  } catch (error) {
+    return { error: describeUserError(error, '複製できませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/** 金額不一致の確認を済ませる(差額を認めて、要確認から外す)。 */
+export async function resolveReconcileAction(
+  ids: readonly string[],
+): Promise<{ error: string | null }> {
+  if (ids.length === 0) return { error: null };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('transactions')
+      .update({ reconcile_diff_yen: null })
+      .in('id', [...ids]);
+    if (error) return { error: '更新できませんでした。' };
+  } catch (error) {
+    return { error: describeUserError(error, '更新できませんでした。') };
   }
   revalidatePath('/spending');
   return { error: null };

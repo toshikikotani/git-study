@@ -14,8 +14,14 @@ import type { PaymentMethod } from '@/features/import/adapters';
 export type LedgerTransaction = {
   id: string;
   occurredOn: string;
-  /** 店名(無ければ摘要)。 */
+  /** 店名(正規化済み。無ければ摘要)。 */
   label: string;
+  /** 摘要(取り込んだままの表記)。 */
+  description: string;
+  /** 自由記述のメモ。 */
+  memo: string | null;
+  /** レシート画像の縮小表示用の署名付きURL(無ければ null)。 */
+  thumbnailUrl: string | null;
   genreId: string | null;
   genreName: string | null;
   /** 支出が負、収入が正(ADR-008)。 */
@@ -44,6 +50,9 @@ export type LedgerTransaction = {
 };
 
 export type LedgerSplit = {
+  /** 表示・編集用の一時的な識別子。 */
+  id: string;
+  note: string | null;
   genreId: string | null;
   genreName: string | null;
   amountYen: number;

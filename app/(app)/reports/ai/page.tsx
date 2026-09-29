@@ -1,12 +1,6 @@
-import {
-  CategoryBreakdownChart,
-  type DrilldownTransaction,
-} from '../../spending/category-breakdown-chart';
+import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { DailyReportCard } from './daily-report-view';
 import { loadDailyAiReportView, loadMonthlyAiReportView } from '@/features/ai-report/store';
-import { listGenres } from '@/features/genre/store';
-import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
-import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { MonthlyReportCard } from './report-view';
@@ -20,10 +14,8 @@ import { MonthlyReportCard } from './report-view';
  * 浪費傾向のタイプ判定(persona)は月次レポートだけが持つ(ADR-032:1日分の
  * データでは判定のノイズが大きいため)。
  *
- * カテゴリ別の内訳は /spending と同じ CategoryBreakdownChart をそのまま
- * 再利用する(見た目・判断ロジックを二重に持たない)。押すとレシートの
- * 詳細まで見える深掘り(ADR-040)も /spending と同じ挙動にする——同じ
- * 部品を使いながらここだけ深掘りできない、という差を作らないため。
+ * ジャンル別の内訳は /spending と同じ集計・同じ行の部品(GenreBudgetRow)を使う
+ * (見た目・判断ロジックを二重に持たない)。絞り込みは /spending 側で行う。
  */
 export const dynamic = 'force-dynamic';
 
@@ -32,30 +24,7 @@ export default async function AiReportPage() {
     Promise.all([loadDailyAiReportView(), loadMonthlyAiReportView(), loadMonthlyLedger()]),
   );
 
-  const transactionIds = ledger.transactions.map((t) => t.id);
-  const [categories, itemsByTransactionId, expenseSubtypeByTransactionId] = await Promise.all([
-    listGenres(),
-    listReceiptItemsForTransactionIds(transactionIds),
-    listExpenseSubtypesForTransactionIds(transactionIds),
-  ]);
-  const transactionsByCategory: Record<string, DrilldownTransaction[]> = {};
-  for (const t of ledger.transactions) {
-    const key = t.genreId ?? 'uncategorized';
-    const list = transactionsByCategory[key] ?? [];
-    list.push({
-      id: t.id,
-      occurredOn: t.occurredOn,
-      label: t.label,
-      genreId: t.genreId,
-      genreName: t.genreName,
-      amountYen: t.amountYen,
-      accountId: t.accountId,
-      paymentMethod: t.paymentMethod,
-      items: itemsByTransactionId.get(t.id) ?? [],
-      expenseSubtype: expenseSubtypeByTransactionId.get(t.id) ?? null,
-    });
-    transactionsByCategory[key] = list;
-  }
+  const maxYen = Math.max(...ledger.genreBreakdown.map((r) => r.spentYen), 1);
 
   return (
     <div className="rise space-y-3">
@@ -72,11 +41,30 @@ export default async function AiReportPage() {
 
       <MonthlyReportCard view={monthlyView} />
 
-      <CategoryBreakdownChart
-        rows={ledger.genreBreakdown}
-        transactionsByCategory={transactionsByCategory}
-        categories={categories}
-      />
+      {/* ジャンル別の内訳(家計簿と同じ集計・同じ行の部品) */}
+      {ledger.genreBreakdown.length > 0 ? (
+        <section
+          aria-label="ジャンル別の内訳"
+          className="rounded-2xl p-4"
+          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        >
+          <h2 className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+            ジャンル別の内訳
+          </h2>
+          <ul className="mt-2 space-y-0.5">
+            {ledger.genreBreakdown.map((r) => (
+              <li key={r.genreId ?? 'none'}>
+                <GenreBudgetRow
+                  name={r.genreName}
+                  spentYen={r.spentYen}
+                  budgetYen={r.budgetYen}
+                  maxYen={maxYen}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

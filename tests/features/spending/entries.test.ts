@@ -34,6 +34,8 @@ function row(o: Record<string, unknown>) {
     account_id: 'a',
     payment_method: 'one_time',
     must_pay: false,
+    note: null,
+    import_batch_id: null,
     kind: 'normal',
     ...o,
   };
@@ -63,9 +65,9 @@ describe('loadLedgerTransactions', () => {
       { from: '2026-09-01', to: '2026-09-30' },
       '2026-09-29',
     );
-    expect(transactions[0]!.splits).toEqual([
-      { genreId: 'drug', genreName: '日用品', amountYen: -1200 },
-      { genreId: 'cafe', genreName: 'カフェ・飲料', amountYen: -1800 },
+    expect(transactions[0]!.splits.map((s) => [s.genreId, s.genreName, s.amountYen])).toEqual([
+      ['drug', '日用品', -1200],
+      ['cafe', 'カフェ・飲料', -1800],
     ]);
   });
 

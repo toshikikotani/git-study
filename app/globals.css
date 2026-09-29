@@ -61,6 +61,32 @@
 
   --hero-glow: rgba(42, 120, 214, 0.09);
   --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
+
+  /* ジャンルの色(10色)。赤・青・黄・灰は状態色に予約してあるので使わない。
+     色だけで区別させず、アイコンと名前を必ず併記する(domain/genre-style.ts)。 */
+  --genre-1: #1f8f5f;
+  --genre-2: #c26a1b;
+  --genre-3: #8a5a3c;
+  --genre-4: #8e4fc4;
+  --genre-5: #0f8f9c;
+  --genre-6: #c2478f;
+  --genre-7: #6b8f1f;
+  --genre-8: #3d7f6b;
+  --genre-9: #7a5ca8;
+  --genre-10: #b5583a;
+  --genre-none: #78849b;
+
+  /* 状態色:余裕=青、注意=黄、超過=赤、予算なし=グレー。赤は超過とエラーにだけ使う。
+     色だけに頼らず、必ずアイコン・ラベルを併用する(domain/budget-state.ts)。 */
+  --state-ok: #2a78d6;
+  --state-ok-track: #dceafc;
+  --state-caution: #b8860b;
+  --state-caution-track: #f8edc6;
+  --attention-track: #f8edc6;
+  --state-over: #e34948;
+  --state-over-track: #f9dfdf;
+  --state-none: #78849b;
+  --state-none-track: #e6e9ef;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -87,6 +113,28 @@
 
     --hero-glow: rgba(57, 135, 229, 0.2);
     --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+    --genre-1: #3ec48a;
+    --genre-2: #f0994a;
+    --genre-3: #c99672;
+    --genre-4: #b985ee;
+    --genre-5: #3cc0cf;
+    --genre-6: #ee73b8;
+    --genre-7: #a3c94a;
+    --genre-8: #62b9a0;
+    --genre-9: #a68bd6;
+    --genre-10: #e88a6a;
+    --genre-none: #6b7791;
+
+    --state-ok: #3987e5;
+    --state-ok-track: #16294a;
+    --state-caution: #fab219;
+    --state-caution-track: #3a3013;
+    --attention-track: #3a3013;
+    --state-over: #e66767;
+    --state-over-track: #3d2027;
+    --state-none: #6b7791;
+    --state-none-track: #232b3d;
   }
 }
 
@@ -112,6 +160,28 @@
 
   --hero-glow: rgba(57, 135, 229, 0.2);
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --genre-1: #3ec48a;
+  --genre-2: #f0994a;
+  --genre-3: #c99672;
+  --genre-4: #b985ee;
+  --genre-5: #3cc0cf;
+  --genre-6: #ee73b8;
+  --genre-7: #a3c94a;
+  --genre-8: #62b9a0;
+  --genre-9: #a68bd6;
+  --genre-10: #e88a6a;
+  --genre-none: #6b7791;
+
+  --state-ok: #3987e5;
+  --state-ok-track: #16294a;
+  --state-caution: #fab219;
+  --state-caution-track: #3a3013;
+  --attention-track: #3a3013;
+  --state-over: #e66767;
+  --state-over-track: #3d2027;
+  --state-none: #6b7791;
+  --state-none-track: #232b3d;
 }
 
 /* =============================================================================

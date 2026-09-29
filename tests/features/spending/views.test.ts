@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { summarizeLedger } from '@/domain/ledger';
 import { formatRemainingDays, remainingDays } from '@/domain/period';
 import { planGuidance } from '@/domain/spending-plan';
-import type { LedgerTransaction } from '@/features/spending/ledger-types';
+import { ledgerSplit, ledgerTx } from '../../helpers/ledger';
 import { buildLedgerViews, toLedgerEntries } from '@/features/spending/views';
 
 /**
@@ -20,28 +20,9 @@ const genres = [
   { id: 'event', name: '発表会', budget_yen: null },
 ];
 
-function tx(o: Partial<LedgerTransaction> & { id: string }): LedgerTransaction {
-  return {
-    occurredOn: '2026-09-10',
-    label: o.id,
-    genreId: 'dining',
-    genreName: '外食',
-    amountYen: -1000,
-    accountId: 'a',
-    paymentMethod: 'one_time',
-    branchName: null,
-    reconcileDiffYen: null,
-    mustPay: false,
-    isTransfer: false,
-    reviewStatus: 'auto_ok',
-    status: 'actual',
-    kind: 'normal',
-    splits: [],
-    ...o,
-  };
-}
+const tx = ledgerTx;
 
-const transactions: LedgerTransaction[] = [
+const transactions: ReturnType<typeof ledgerTx>[] = [
   tx({ id: 'a', occurredOn: '2026-09-02', amountYen: -7900 }),
   tx({ id: 'b', occurredOn: '2026-09-15', amountYen: -4379 }),
   tx({ id: 'c', occurredOn: '2026-09-15', genreId: 'food', genreName: '食料品', amountYen: -6000 }),
@@ -54,8 +35,8 @@ const transactions: LedgerTransaction[] = [
     genreName: '日用品',
     amountYen: -3000,
     splits: [
-      { genreId: 'drug', genreName: '日用品', amountYen: -1200 },
-      { genreId: 'cafe', genreName: 'カフェ・飲料', amountYen: -1800 },
+      ledgerSplit({ genreId: 'drug', genreName: '日用品', amountYen: -1200 }),
+      ledgerSplit({ genreId: 'cafe', genreName: 'カフェ・飲料', amountYen: -1800 }),
     ],
   }),
   tx({ id: 'e', occurredOn: '2026-09-25', genreId: null, genreName: null, amountYen: -663 }),

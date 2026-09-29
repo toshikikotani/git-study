@@ -146,14 +146,18 @@ export async function listSplitsForDisplay(
 export async function listSplitsForTransactionIds(
   client: SupabaseClient<Database>,
   transactionIds: readonly string[],
-): Promise<Map<string, { genreId: string | null; amountYen: number }[]>> {
-  const map = new Map<string, { genreId: string | null; amountYen: number }[]>();
+): Promise<Map<string, { genreId: string | null; amountYen: number; note: string | null }[]>> {
+  const map = new Map<
+    string,
+    { genreId: string | null; amountYen: number; note: string | null }[]
+  >();
   if (transactionIds.length === 0) return map;
 
   const { data, error } = await client
     .from('transaction_splits')
-    .select('transaction_id, genre_id, amount_yen')
-    .in('transaction_id', transactionIds);
+    .select('transaction_id, genre_id, amount_yen, note')
+    .in('transaction_id', transactionIds)
+    .order('created_at', { ascending: true });
   if (error) {
     if (isMissingTableError(error)) return map;
     throw new TransactionSplitStoreError(`分割を取得できませんでした: ${error.message}`);
@@ -161,7 +165,7 @@ export async function listSplitsForTransactionIds(
 
   for (const row of data) {
     const list = map.get(row.transaction_id) ?? [];
-    list.push({ genreId: row.genre_id, amountYen: row.amount_yen });
+    list.push({ genreId: row.genre_id, amountYen: row.amount_yen, note: row.note });
     map.set(row.transaction_id, list);
   }
   return map;
