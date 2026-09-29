@@ -71,8 +71,12 @@ const GROUPS = [
   {
     title: '相談する',
     items: [
-      { href: '/advisor', label: 'AI相談', dek: '目標設定・買う前相談' },
-      { href: '/assistant', label: 'AIに変更を頼む', dek: '設定・明細・ルールを会話で変更' },
+      {
+        href: '/assistant',
+        label: 'AIに相談',
+        dek: '意見を話すと、設定・予算・目標をまとめて変更案に',
+      },
+      { href: '/advisor', label: '目標', dek: '進行中の目標と進捗' },
     ],
   },
   {

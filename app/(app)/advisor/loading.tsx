@@ -6,7 +6,7 @@ export default function AdvisorLoading() {
     <div className="space-y-4">
       <header className="flex items-baseline justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          AI相談
+          目標
         </h1>
       </header>
       <Skeleton className="h-24" />
