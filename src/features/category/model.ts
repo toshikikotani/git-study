@@ -184,12 +184,19 @@ export type ItemAggregate = {
  * 品目ごとの集計(実績のみ)。品目の記録が無い/足りないぶんは「品目の記録なし」1行にまとめ、
  * 取引・店の見方と合計が一致するようにする。
  */
-export function aggregateItems(lines: readonly CategoryLine[], genreKey: string): ItemAggregate[] {
+/** 品目ごとの出現(実績のみ)。品目の名前は表記ゆれをまとめたキーで束ねる。 */
+export function collectItemOccurrences(
+  lines: readonly CategoryLine[],
+  genreKey: string,
+): {
+  byKey: Map<string, { key: string; name: string; occurrences: ItemOccurrence[] }>;
+  remainder: number;
+  remainderCount: number;
+} {
   const genreId = genreIdOfKey(genreKey);
-  const byKey = new Map<string, ItemAggregate>();
+  const byKey = new Map<string, { key: string; name: string; occurrences: ItemOccurrence[] }>();
   let remainder = 0;
   let remainderCount = 0;
-
   for (const l of lines) {
     if (l.status !== 'actual') continue;
     const portion = -l.amountYen; // 支出は正、返金は負
@@ -202,26 +209,15 @@ export function aggregateItems(lines: readonly CategoryLine[], genreKey: string)
       counted += unit;
       const key = itemKeyOf(item.name);
       if (key === '') continue;
-      const agg =
-        byKey.get(key) ??
-        ({
-          key,
-          name: item.name,
-          count: 0,
-          totalYen: 0,
-          averageYen: 0,
-          occurrences: [],
-        } as ItemAggregate);
-      agg.count += 1;
-      agg.totalYen += unit;
-      agg.occurrences.push({
+      const entry = byKey.get(key) ?? { key, name: item.name, occurrences: [] };
+      entry.occurrences.push({
         txId: l.txId,
         occurredOn: l.occurredOn,
         storeKey: comparableKey(l.label),
         storeLabel: l.label,
         unitYen: unit,
       });
-      byKey.set(key, agg);
+      byKey.set(key, entry);
     }
     const rest = portion - counted;
     if (rest !== 0) {
@@ -229,11 +225,26 @@ export function aggregateItems(lines: readonly CategoryLine[], genreKey: string)
       remainderCount += 1;
     }
   }
+  return { byKey, remainder, remainderCount };
+}
 
-  const rows = [...byKey.values()].map((a) => ({
-    ...a,
-    averageYen: a.count === 0 ? 0 : Math.round(a.totalYen / a.count),
-  }));
+/**
+ * 品目ごとの集計(実績のみ)。品目の記録が無い/足りないぶんは「品目の記録なし」1行にまとめ、
+ * 取引・店の見方と合計が一致するようにする。
+ */
+export function aggregateItems(lines: readonly CategoryLine[], genreKey: string): ItemAggregate[] {
+  const { byKey, remainder, remainderCount } = collectItemOccurrences(lines, genreKey);
+  const rows: ItemAggregate[] = [...byKey.values()].map((e) => {
+    const totalYen = e.occurrences.reduce((a, o) => a + o.unitYen, 0);
+    return {
+      key: e.key,
+      name: e.name,
+      count: e.occurrences.length,
+      totalYen,
+      averageYen: Math.round(totalYen / e.occurrences.length),
+      occurrences: e.occurrences,
+    };
+  });
   if (remainderCount > 0) {
     rows.push({
       key: NO_ITEM_KEY,
