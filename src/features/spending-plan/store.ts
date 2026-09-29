@@ -161,6 +161,35 @@ export async function savePlan(input: SpendingPlanInput): Promise<void> {
   }
 }
 
+/**
+ * 保存済みの目標のジャンルごとの金額だけを直す(配分の微調整)。期間・提案額・
+ * 理由は変えない。計画に無いジャンルは触らない。
+ */
+export async function updatePlanTargets(
+  planId: string,
+  items: readonly { genreId: string; targetYen: number }[],
+): Promise<void> {
+  for (const item of items) {
+    if (!Number.isInteger(item.targetYen) || item.targetYen < 0) {
+      throw new SpendingPlanStoreError('目標額は0円以上の整数で入力してください');
+    }
+  }
+  const supabase = await createClient();
+  const results = await Promise.all(
+    items.map((item) =>
+      supabase
+        .from('spending_plan_items')
+        .update({ target_yen: item.targetYen })
+        .eq('plan_id', planId)
+        .eq('genre_id', item.genreId),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    throw new SpendingPlanStoreError(`目標を更新できませんでした: ${failed.error.message}`);
+  }
+}
+
 export async function deletePlan(id: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from('spending_plans').delete().eq('id', id);

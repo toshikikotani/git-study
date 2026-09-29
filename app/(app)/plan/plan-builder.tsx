@@ -9,6 +9,7 @@ import { formatYen } from '@/domain/money';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { addDays, addMonths, formatDateJa, nthDayOfMonth, type DateOnly } from '@/lib/date';
 import { savePlanAction, suggestPlanAction } from './actions';
+import { AllocationEditor } from './allocation-editor';
 import { RangeCalendar } from './range-calendar';
 
 const STEP_LABELS: Record<(typeof PLAN_STEP_OPTIONS)[number], string> = {
@@ -23,7 +24,6 @@ type EditableItem = {
   baselineYen: number;
   aiSuggestedYen: number;
   reason: string;
-  targetInput: string;
 };
 
 type Suggestion = {
@@ -48,7 +48,7 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
   const [end, setEnd] = useState<DateOnly | null>(lastDayOfMonth(today, 0));
   const [step, setStep] = useState<(typeof PLAN_STEP_OPTIONS)[number]>(10);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
-  const [busy, setBusy] = useState<'suggest' | 'save' | null>(null);
+  const [busy, setBusy] = useState<'suggest' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const setRange = (range: { start: DateOnly | null; end: DateOnly | null }) => {
@@ -76,7 +76,6 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
           baselineYen: item.baselineYen,
           aiSuggestedYen: item.suggestedYen,
           reason: item.reason,
-          targetInput: String(item.suggestedYen),
         })),
       summary: result.summary,
       warnings: result.warnings,
@@ -85,50 +84,27 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
     });
   };
 
-  const updateTarget = (genreId: string, value: string) => {
-    setSuggestion((prev) =>
-      prev === null
-        ? prev
-        : {
-            ...prev,
-            items: prev.items.map((item) =>
-              item.genreId === genreId ? { ...item, targetInput: value } : item,
-            ),
-          },
-    );
-  };
-
-  const parsed = suggestion?.items.map((item) => {
-    const trimmed = item.targetInput.trim();
-    const yen = trimmed === '' ? NaN : Number(trimmed);
-    return Number.isInteger(yen) && yen >= 0 ? yen : null;
-  });
-  const allValid = parsed !== undefined && parsed.every((yen) => yen !== null);
-  const totalTargetYen = (parsed ?? []).reduce<number>((acc, yen) => acc + (yen ?? 0), 0);
-  const totalBaselineYen = (suggestion?.items ?? []).reduce((acc, i) => acc + i.baselineYen, 0);
-
-  const save = async () => {
-    if (start === null || end === null || suggestion === null || !allValid) return;
-    setBusy('save');
-    setError(null);
+  const save = async (
+    items: { genreId: string; targetYen: number }[],
+  ): Promise<{ error: string | null }> => {
+    if (start === null || end === null || suggestion === null) return { error: null };
+    const byId = new Map(suggestion.items.map((item) => [item.genreId, item]));
     const result = await savePlanAction({
       periodStart: start,
       periodEnd: end,
       stepPercent: step,
-      items: suggestion.items.map((item, i) => ({
+      items: items.map((item) => ({
         genreId: item.genreId,
-        targetYen: parsed![i]!,
-        aiSuggestedYen: item.aiSuggestedYen,
-        reason: item.reason,
+        targetYen: item.targetYen,
+        aiSuggestedYen: byId.get(item.genreId)?.aiSuggestedYen ?? null,
+        reason: byId.get(item.genreId)?.reason ?? null,
       })),
     });
-    setBusy(null);
-    if (result.error !== null) {
-      setError(result.error);
-      return;
+    if (result.error === null) {
+      setSuggestion(null);
+      router.refresh();
     }
-    setSuggestion(null);
-    router.refresh();
+    return result;
   };
 
   return (
@@ -233,64 +209,20 @@ export function PlanBuilder({ today }: { today: DateOnly }) {
             </p>
           ) : null}
 
-          <ul className="space-y-3">
-            {suggestion.items.map((item, i) => (
-              <li key={item.genreId}>
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className="min-w-0 truncate text-sm font-medium"
-                    style={{ color: 'var(--ink)' }}
-                  >
-                    {item.genreName}
-                  </span>
-                  <label className="flex shrink-0 items-center gap-1 text-sm">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={item.targetInput}
-                      onChange={(e) => updateTarget(item.genreId, e.target.value)}
-                      aria-label={`${item.genreName}の目標額(円)`}
-                      aria-invalid={parsed?.[i] === null}
-                      className="tabular w-24 rounded-lg px-2 py-1 text-right"
-                      style={{
-                        background: 'var(--surface-raised)',
-                        color: 'var(--ink)',
-                        border: `1px solid ${parsed?.[i] === null ? 'var(--over)' : 'var(--hairline)'}`,
-                      }}
-                    />
-                    <span style={{ color: 'var(--ink-muted)' }}>円</span>
-                  </label>
-                </div>
-                <p
-                  className="mt-0.5 text-[11px] leading-relaxed"
-                  style={{ color: 'var(--ink-muted)' }}
-                >
-                  実績ペース {formatYen(item.baselineYen, { sign: 'never' })} ・ {item.reason}
-                </p>
-              </li>
-            ))}
-          </ul>
-
-          <div
-            className="flex items-baseline justify-between border-t pt-3 text-sm"
-            style={{ borderColor: 'var(--hairline)' }}
-          >
-            <span style={{ color: 'var(--ink-muted)' }}>
-              合計(実績ペース {formatYen(totalBaselineYen, { sign: 'never' })})
-            </span>
-            <span className="tabular font-semibold" style={{ color: 'var(--ink)' }}>
-              {formatYen(totalTargetYen, { sign: 'never' })}
-            </span>
-          </div>
-
-          <Button
-            variant="filled"
-            className="w-full"
-            disabled={!allValid || busy !== null}
-            onClick={() => void save()}
-          >
-            {busy === 'save' ? '保存しています…' : 'この目標で保存する'}
-          </Button>
+          <AllocationEditor
+            key={`${start}-${end}-${step}-${suggestion.summary}`}
+            periodStart={start!}
+            periodEnd={end!}
+            rows={suggestion.items.map((item) => ({
+              genreId: item.genreId,
+              genreName: item.genreName,
+              baselineYen: item.baselineYen,
+              note: item.reason,
+              yen: item.aiSuggestedYen,
+            }))}
+            saveLabel="この目標で保存する"
+            onSave={save}
+          />
         </div>
       ) : null}
 

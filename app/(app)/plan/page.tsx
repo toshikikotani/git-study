@@ -1,10 +1,16 @@
 import { Meter } from '@/components/ui/meter';
 import { formatYen } from '@/domain/money';
-import { planPeriodDays, planProgress } from '@/domain/spending-plan';
+import {
+  planGuidance,
+  planPeriodDays,
+  planProgress,
+  type GuidanceStatus,
+} from '@/domain/spending-plan';
 import { getLatestPlan, loadGenreSpend } from '@/features/spending-plan/store';
 import { addDays, daysBetween, formatDateJa, todayJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { DeletePlanButton } from './delete-plan-button';
+import { EditPlanSection } from './edit-plan-section';
 import { PlanBuilder } from './plan-builder';
 
 /**
@@ -30,6 +36,22 @@ export default async function PlanPage() {
     ]),
   );
 
+  const guidance =
+    plan !== null && latestSpend !== null
+      ? planGuidance({
+          periodStart: plan.periodStart,
+          periodEnd: plan.periodEnd,
+          today,
+          items: plan.items.map((item) => ({
+            genreId: item.genreId,
+            genreName: item.genreName,
+            targetYen: item.targetYen,
+            spentYen: latestSpend.byGenre.get(item.genreId) ?? 0,
+          })),
+        })
+      : null;
+  const messageByGenre = new Map(guidance?.genres.map((g) => [g.genreId, g.message]));
+
   return (
     <div className="rise space-y-3">
       <header>
@@ -40,6 +62,44 @@ export default async function PlanPage() {
           期間を決めて、ジャンルごとの支出目標を少しずつ改善していく
         </p>
       </header>
+
+      {guidance !== null ? (
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+              行動指針
+            </p>
+            <span
+              className="text-xs font-semibold"
+              style={{ color: STATUS_COLOR[guidance.status] }}
+            >
+              {STATUS_LABEL[guidance.status]}
+            </span>
+          </div>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+            {guidance.headline}
+          </p>
+          {guidance.actions.length > 0 ? (
+            <ul
+              className="mt-3 space-y-1.5 border-t pt-3"
+              style={{ borderColor: 'var(--hairline)' }}
+            >
+              {guidance.actions.map((action) => (
+                <li
+                  key={action}
+                  className="text-xs leading-relaxed"
+                  style={{ color: 'var(--ink-secondary)' }}
+                >
+                  ・{action}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {plan !== null && latestSpend !== null ? (
         <div
@@ -84,18 +144,30 @@ export default async function PlanPage() {
                       label={`${item.genreName}の目標の消化`}
                     />
                   </div>
-                  <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                    {progress.remainingYen >= 0
-                      ? `あと${formatYen(progress.remainingYen, { sign: 'never' })}`
-                      : `${formatYen(-progress.remainingYen, { sign: 'never' })}超過`}
-                    {item.reason ? ` ・ ${item.reason}` : ''}
+                  <p
+                    className="mt-1 text-[11px] leading-relaxed"
+                    style={{ color: 'var(--ink-muted)' }}
+                  >
+                    {messageByGenre.get(item.genreId)}
                   </p>
                 </li>
               );
             })}
           </ul>
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+            <EditPlanSection
+              planId={plan.id}
+              periodStart={plan.periodStart}
+              periodEnd={plan.periodEnd}
+              rows={plan.items.map((item) => ({
+                genreId: item.genreId,
+                genreName: item.genreName,
+                baselineYen: null,
+                note: item.reason,
+                yen: item.targetYen,
+              }))}
+            />
             <DeletePlanButton planId={plan.id} />
           </div>
         </div>
@@ -105,6 +177,24 @@ export default async function PlanPage() {
     </div>
   );
 }
+
+const STATUS_LABEL: Record<GuidanceStatus, string> = {
+  not_started: 'これから',
+  on_track: '順調',
+  watch: 'もう少しで目標',
+  over_pace: 'ペースが速め',
+  over: '目標を超えています',
+  ended: '達成',
+};
+
+const STATUS_COLOR: Record<GuidanceStatus, string> = {
+  not_started: 'var(--ink-muted)',
+  on_track: 'var(--income)',
+  watch: 'var(--accent)',
+  over_pace: 'var(--over)',
+  over: 'var(--over)',
+  ended: 'var(--income)',
+};
 
 function periodStatus(start: string, end: string, today: string): string {
   if (today < start) return `${daysBetween(today, start)}日後に開始`;

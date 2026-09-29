@@ -10,7 +10,8 @@ import { revalidatePath } from 'next/cache';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
-import { deletePlan, savePlan } from '@/features/spending-plan/store';
+import { refinePlanAllocation } from '@/features/spending-plan/plan-ai';
+import { deletePlan, savePlan, updatePlanTargets } from '@/features/spending-plan/store';
 import { assertDateOnly } from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
@@ -89,6 +90,78 @@ export async function savePlanAction(input: {
 export async function deletePlanAction(id: string): Promise<{ error: string | null }> {
   try {
     await deletePlan(id);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/plan');
+  return { error: null };
+}
+
+export type RefinePlanResult =
+  | { error: null; items: { genreId: string; targetYen: number }[]; summary: string }
+  | { error: string };
+
+/**
+ * 総額は固定のまま、ジャンルごとの配分をAIと相談して微調整する。実績・必須ラベルは
+ * クライアントの値を信用せず、サーバーで期間から集め直す。
+ */
+export async function refinePlanAction(input: {
+  periodStart: string;
+  periodEnd: string;
+  totalYen: number;
+  items: { genreId: string; targetYen: number }[];
+  instruction: string;
+}): Promise<RefinePlanResult> {
+  try {
+    const start = assertDateOnly(input.periodStart);
+    const end = assertDateOnly(input.periodEnd);
+    if (end < start) return { error: '終了日は開始日以降を選んでください' };
+    if (!Number.isInteger(input.totalYen) || input.totalYen < 0) {
+      return { error: '総額は0円以上の整数で入力してください' };
+    }
+
+    const context = await loadPlanContext(start, end);
+    const byId = new Map(context.genres.map((g) => [g.genreId, g]));
+    const items = input.items.flatMap((item) => {
+      const genre = byId.get(item.genreId);
+      if (genre === undefined || !Number.isInteger(item.targetYen) || item.targetYen < 0) return [];
+      return [
+        {
+          genreId: genre.genreId,
+          genreName: genre.genreName,
+          currentYen: item.targetYen,
+          baselineYen: genre.baselineYen,
+          mustPayShare: genre.mustPayShare,
+        },
+      ];
+    });
+
+    const result = await refinePlanAllocation(readAnthropicApiKey(), {
+      periodDays: context.periodDays,
+      totalYen: input.totalYen,
+      items,
+      instruction: input.instruction,
+    });
+    if (!result.ok) return { error: result.message };
+    return {
+      error: null,
+      items: items.map((item) => ({
+        genreId: item.genreId,
+        targetYen: result.amounts.get(item.genreId) ?? item.currentYen,
+      })),
+      summary: result.summary,
+    };
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+}
+
+export async function updatePlanAllocationAction(
+  planId: string,
+  items: { genreId: string; targetYen: number }[],
+): Promise<{ error: string | null }> {
+  try {
+    await updatePlanTargets(planId, items);
   } catch (error) {
     return { error: describeUserError(error) };
   }
