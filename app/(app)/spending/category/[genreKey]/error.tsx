@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { MdErrorOutline } from 'react-icons/md';
 
 import { Button } from '@/components/ui/button';
+import { ErrorDetail } from '@/components/ui/error-detail';
 import { useOnline } from '@/features/category/a11y';
 
 /** カテゴリ詳細の読み込み失敗。オフラインなら、その理由を言う。この画面だけやり直せる。 */
@@ -35,6 +36,7 @@ export default function CategoryError({
             : '通信できるようになったら、もう一度お試しください。'}
         </p>
       </div>
+      <ErrorDetail error={error} />
       <div className="flex gap-2">
         <Button onClick={reset} variant="filled">
           もう一度試す
