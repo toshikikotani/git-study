@@ -189,3 +189,19 @@ export function isValidDayOfMonth(value: number): boolean {
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0');
 }
+
+/**
+ * URL などの外から来た値を日付として読む。形式が正しくない・存在しない日付・文字列でない
+ * 値は fallback にする(URL は本人が書き換えられるため信用しない)。
+ */
+export function parseDateOnlyOr(value: unknown, fallback: DateOnly): DateOnly {
+  if (typeof value !== 'string' || !DATE_ONLY_PATTERN.test(value)) return fallback;
+  // 形式が合っていても 2026-02-31 のような存在しない日付があるため、暦として確かめる。
+  const [year, month, day] = value.split('-').map(Number) as [number, number, number];
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const exists =
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day;
+  return exists ? value : fallback;
+}
