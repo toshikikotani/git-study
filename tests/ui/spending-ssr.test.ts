@@ -81,6 +81,20 @@ const txs = [
     expenseSubtype: null,
   },
 ];
+txs.push({
+  ...ledgerTx({
+    id: 'r',
+    occurredOn: '2026-09-27',
+    label: 'ドトールコーヒー',
+    branchName: '梅田店',
+    genreId: 'cafe',
+    genreName: 'カフェ・飲料',
+    amountYen: -500,
+    thumbnailUrl: 'https://example.test/r.jpg',
+  }),
+  items: [],
+  expenseSubtype: null,
+});
 const views = buildLedgerViews({
   genres: genres.map((g) => ({ ...g, budget_yen: g.id === 'dining' ? 8000 : null })),
   transactions: txs,
@@ -157,6 +171,46 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
   it('行のマイナスはハイフンではなく U+2212、VoiceOver 向けの読み上げがある', () => {
     expect(html).toContain('−3,000円');
     expect(html).toMatch(/aria-label="ココカラファイン、[^"]*支出3,000円/);
+  });
+});
+
+describe('F4 明細の行', () => {
+  const html = visible(
+    renderToString(
+      h(SpendingMonthProvider, {
+        today: '2026-09-29',
+        currentMonthStart: '2026-09-01',
+        currentTransactions: txs,
+        currentGenreBreakdown: views.genreBreakdown,
+        currentTotals: views.totals,
+        genres,
+        accounts: [{ id: 'a', name: '現金' }],
+        children: h(LedgerList, { goalRange: null, duplicateCount: 0 }),
+      }),
+    ),
+  );
+
+  it('未分類の行は、「?」やグレーのバーではなく、行の中の「ジャンルを選ぶ」チップ(受け入れ基準5)', () => {
+    expect(html).toContain('ジャンルを選ぶ');
+    // 未分類は1件だけ → チップも1つ
+    expect(html.match(/ジャンルを選ぶ/g)).toHaveLength(1);
+    expect(html).not.toContain('未分類</span>'); // 「未分類」ラベルのバッジを出さない
+  });
+
+  it('1行目は正規化した店名、2行目に支店名(受け入れ基準6)。店名は切れない(truncate しない)', () => {
+    expect(html).toMatch(/ドトールコーヒー[\s\S]{0,400}梅田店/);
+    const nameLine = html.match(/<p class="([^"]*)"[^>]*>ドトールコーヒー/);
+    expect(nameLine?.[1]).not.toContain('truncate');
+  });
+
+  it('レシート画像はサムネイルではなく小さなレシートアイコン(タップでフルスクリーン)', () => {
+    expect(html).toContain('レシート画像を見る');
+    expect(html).not.toContain('<img');
+  });
+
+  it('見出し右側の「口座・突き合わせ・取り込む」は1つの「…」メニューにまとまっている', () => {
+    expect(html).toContain('明細のメニュー');
+    expect(html).not.toContain('突き合わせ');
   });
 });
 

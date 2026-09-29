@@ -61,7 +61,9 @@ export function NewTransactionForm({
   // 特別費(目標のペース計算から外す)。未来日の予定の支払い(発表会など)にも使う。
   const [kind, setKind] = useState<'normal' | 'special'>('normal');
   const [amountYenInput, setAmountYenInput] = useState('');
+  // 店名とメモは別の入力欄(既存の「A・B」「A/B」形式のデータは変換せずそのまま表示する)。
   const [description, setDescription] = useState('');
+  const [memo, setMemo] = useState('');
   const [genreId, setGenreId] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -100,7 +102,7 @@ export function NewTransactionForm({
       accountId,
       occurredOn,
       description: trimmedDescription,
-      merchantName: null,
+      merchantName: trimmedDescription,
       amountYen,
       paymentMethod: 'one_time',
       genreId: genreId || null,
@@ -118,7 +120,7 @@ export function NewTransactionForm({
       }),
       batchId: null,
       sourceRef: null,
-      memo: null,
+      memo: memo.trim() === '' ? null : memo.trim(),
     };
 
     const outcome = await saveImportBatchAction([preview], {
@@ -135,6 +137,7 @@ export function NewTransactionForm({
     setSaved(outcome);
     setAmountYenInput('');
     setDescription('');
+    setMemo('');
   }
 
   return (
@@ -281,7 +284,22 @@ export function NewTransactionForm({
             setDescription(e.target.value);
             setSaved(null);
           }}
-          placeholder="摘要・店名"
+          placeholder="店名"
+          aria-label="店名"
+          className="mt-3 w-full rounded-xl px-3 py-2 text-sm"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink)',
+            border: '1px solid var(--hairline)',
+          }}
+        />
+
+        <input
+          type="text"
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="メモ(任意)"
+          aria-label="メモ"
           className="mt-3 w-full rounded-xl px-3 py-2 text-sm"
           style={{
             background: 'var(--plane)',

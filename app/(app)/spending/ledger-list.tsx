@@ -17,6 +17,7 @@ import {
 import { addDays, formatDateJa, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
+import { LedgerMenu } from './ledger-menu';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -75,25 +76,7 @@ export function LedgerList({
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           明細
         </h2>
-        <div className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
-          <Link href="/accounts" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-            口座
-          </Link>
-          <Link
-            href="/transactions/reconcile"
-            className="text-[13px]"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            突き合わせ
-          </Link>
-          <Link
-            href="/transactions/import"
-            className="text-[13px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            取り込む
-          </Link>
-        </div>
+        <LedgerMenu />
       </div>
 
       {/* 検索 + 横スクロールのフィルターチップ(1行) */}
@@ -328,7 +311,15 @@ function DaySection({
   total?: number;
   transactions: DrilldownTransaction[];
 }) {
-  const { genres } = useSpendingMonth();
+  const { genres, transactions: monthTransactions } = useSpendingMonth();
+  // 未分類の予測に使う、この月の「店 → ジャンル」の履歴。
+  const history = useMemo(
+    () =>
+      monthTransactions
+        .filter((t) => t.genreId !== null && t.amountYen < 0)
+        .map((t) => ({ storeName: t.label, genreId: t.genreId! })),
+    [monthTransactions],
+  );
   return (
     <section
       aria-label={heading}
@@ -366,6 +357,7 @@ function DaySection({
               amountYen: s.amountYen,
               note: s.note,
             }))}
+            genreHistory={history}
             receiptItems={t.items}
             expenseSubtype={t.expenseSubtype}
             display={{

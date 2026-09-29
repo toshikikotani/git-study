@@ -419,3 +419,23 @@ button {
     animation: none;
   }
 }
+
+/* 未分類を確定したときの行のアニメーション(300ms以内)。 */
+@keyframes row-flash {
+  0% {
+    background: color-mix(in srgb, var(--ink) 14%, transparent);
+    transform: scale(0.985);
+  }
+  100% {
+    background: transparent;
+    transform: scale(1);
+  }
+}
+.row-flash {
+  animation: row-flash 280ms var(--ease-standard) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-flash {
+    animation: none;
+  }
+}

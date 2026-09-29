@@ -8,6 +8,9 @@ import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { genreColorVar } from '@/domain/genre-style';
+import { predictGenres, type GenreHistoryEntry } from '@/domain/genre-prediction';
+import { MdReceiptLong } from 'react-icons/md';
+import { ReceiptImageViewer } from '@/components/receipt/receipt-image-viewer';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import type { GenreShare } from '@/features/spending/views';
 import type { GenreOption } from '@/features/genre/store';
@@ -129,9 +132,12 @@ export function TransactionRowWithSplit({
   receiptItems = [],
   expenseSubtype = null,
   display,
+  genreHistory = [],
 }: {
   transaction: EditableTransaction;
   display?: RowDisplay;
+  /** 未分類の予測に使う、過去の「店 → ジャンル」。 */
+  genreHistory?: readonly GenreHistoryEntry[];
   categories: readonly GenreOption[];
   initialSplits: readonly TransactionSplit[];
   /** レシートの商品行(ADR-034)。ジャンル分割の有無に関わらず、常に見せる。 */
@@ -183,6 +189,10 @@ export function TransactionRowWithSplit({
   const [rowError, setRowError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
   const [special, setSpecial] = useState(display?.special ?? false);
+  // 未分類のインライン分類(予測上位3件のシート)と、確定時のアニメーション。
+  const [pickOpen, setPickOpen] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -290,6 +300,15 @@ export function TransactionRowWithSplit({
   }
 
   const itemNames = items.map((it) => it.name);
+  const uncategorized = !transaction.genreId && !isIncome && splits.length === 0;
+  const predictions = uncategorized
+    ? predictGenres({
+        storeName: display?.name ?? transaction.description,
+        itemNames,
+        genres: categories,
+        history: genreHistory,
+      })
+    : [];
   const shares = display?.shares ?? [];
   const subtitle = [
     display?.branch ?? null,
@@ -311,6 +330,10 @@ export function TransactionRowWithSplit({
       return;
     }
     setGenreId(newGenreId);
+    // 確定の手応え:行のアニメーションとハプティクス。
+    setFlash(true);
+    window.setTimeout(() => setFlash(false), 300);
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(12);
     // 直したジャンルは、次の分類から効くよう履歴へ反映する。
     void recordGenreCorrectionAction({
       storeName: display?.name ?? transaction.description,
@@ -374,83 +397,113 @@ export function TransactionRowWithSplit({
           </>
         }
       >
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => {
-            // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
-            setOpen((v) => {
-              const next = !v;
-              if (!next) setCategoryFormOpen(false);
-              return next;
-            });
-          }}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left"
-          aria-label={rowAriaLabel}
-        >
-          <GenreBadge name={transaction.genreName} />
-          <div className="min-w-0 flex-1">
-            {/* 1行目:正規化した店名 */}
-            <p className="truncate text-[15px]" style={{ color: 'var(--ink)' }}>
-              {display?.name ?? transaction.description}
-              {special ? (
-                <span
-                  className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
-                  style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
-                >
-                  特別費
-                </span>
-              ) : null}
-              {risky && methodLabel ? (
-                <span
-                  className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
-                  style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
-                >
-                  {methodLabel}
-                </span>
-              ) : null}
-            </p>
-            {/* 2行目:支店名と品目のプレビュー(分割は品目の羅列ではなく比率の細いバー) */}
-            {subtitle !== '' ? (
-              <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                {subtitle}
-              </p>
-            ) : null}
-            {shares.length > 0 ? (
-              <div
-                role="img"
-                aria-label={`ジャンルの内訳:${shares
-                  .map((sh) => `${sh.genreName ?? '未分類'} ${Math.round(sh.ratio * 100)}%`)
-                  .join('、')}`}
-                className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full"
-              >
-                {shares.map((sh) => (
-                  <span
-                    key={sh.genreId ?? 'none'}
-                    style={{ width: `${sh.ratio * 100}%`, background: genreColorVar(sh.genreName) }}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          {display?.thumbnailUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={display.thumbnailUrl}
-              alt=""
-              loading="lazy"
-              className="size-9 shrink-0 rounded-md object-cover"
-            />
-          ) : null}
-          <span
-            className="tabular shrink-0 text-[15px] font-semibold"
-            style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
+        <div className={`flex items-center pr-2 ${flash ? 'row-flash' : ''}`}>
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => {
+              // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
+              setOpen((v) => {
+                const next = !v;
+                if (!next) setCategoryFormOpen(false);
+                return next;
+              });
+            }}
+            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+            aria-label={rowAriaLabel}
           >
-            {isIncome ? '+' : '−'}
-            {formatYen(targetAbsYen)}
-          </span>
-        </button>
+            {uncategorized ? (
+              // 未分類は「?」やグレーではなく、点線の空の丸。ジャンルは行の中のチップで選ぶ。
+              <span
+                aria-hidden
+                className="size-8 shrink-0 rounded-full border border-dashed"
+                style={{ borderColor: 'var(--ink-muted)' }}
+              />
+            ) : (
+              <GenreBadge name={transaction.genreName} />
+            )}
+            <div className="min-w-0 flex-1">
+              {/* 1行目:正規化した店名(切れないように折り返す) */}
+              <p className="text-[15px] leading-snug break-words" style={{ color: 'var(--ink)' }}>
+                {display?.name ?? transaction.description}
+                {special ? (
+                  <span
+                    className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
+                    style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
+                  >
+                    特別費
+                  </span>
+                ) : null}
+                {risky && methodLabel ? (
+                  <span
+                    className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold"
+                    style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
+                  >
+                    {methodLabel}
+                  </span>
+                ) : null}
+              </p>
+              {/* 2行目:支店名と品目のプレビュー(分割は品目の羅列ではなく比率の細いバー) */}
+              {subtitle !== '' ? (
+                <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                  {subtitle}
+                </p>
+              ) : null}
+              {shares.length > 0 ? (
+                <div
+                  role="img"
+                  aria-label={`ジャンルの内訳:${shares
+                    .map((sh) => `${sh.genreName ?? '未分類'} ${Math.round(sh.ratio * 100)}%`)
+                    .join('、')}`}
+                  className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full"
+                >
+                  {shares.map((sh) => (
+                    <span
+                      key={sh.genreId ?? 'none'}
+                      style={{
+                        width: `${sh.ratio * 100}%`,
+                        background: genreColorVar(sh.genreName),
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <span
+              className="tabular shrink-0 text-[15px] font-semibold"
+              style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
+            >
+              {isIncome ? '+' : '−'}
+              {formatYen(targetAbsYen)}
+            </span>
+          </button>
+          {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
+          {display?.thumbnailUrl ? (
+            <button
+              type="button"
+              aria-label="レシート画像を見る"
+              onClick={() => setViewerOpen(true)}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full"
+              style={{ color: 'var(--ink-muted)' }}
+            >
+              <MdReceiptLong aria-hidden size={20} />
+            </button>
+          ) : null}
+        </div>
+        {/* 未分類:行の中の「ジャンルを選ぶ」チップ。タップ → 予測上位3件 → 1タップで確定 */}
+        {uncategorized ? (
+          <div className="pr-4 pb-3 pl-[60px]">
+            <button
+              type="button"
+              onClick={() => setPickOpen(true)}
+              className="min-h-11 rounded-full border px-4 text-sm font-semibold"
+              style={{ borderColor: 'var(--ink-muted)', color: 'var(--ink)' }}
+            >
+              ジャンルを選ぶ
+            </button>
+          </div>
+        ) : null}
       </SwipeableRow>
       {rowError ? (
         <p role="status" className="px-4 pb-2 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
@@ -806,6 +859,56 @@ export function TransactionRowWithSplit({
         {/* 長押しのその場プレビュー(本人発案、ADR-042)。編集の入口は一切
           出さない——閲覧専用。行を開かなくても、その場で内容を確認できる。 */}
       </div>
+
+      <BottomSheet open={pickOpen} onClose={() => setPickOpen(false)} role="dialog">
+        <div className="space-y-2 px-2 pb-2">
+          <p className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+            {display?.name ?? transaction.description} のジャンル
+          </p>
+          <ul className="space-y-1.5">
+            {predictions.map((p) => (
+              <li key={p.genreId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickOpen(false);
+                    void changeGenre(p.genreId);
+                  }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left"
+                  style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+                >
+                  <GenreBadge name={p.genreName} size={28} />
+                  <span className="flex-1 text-[15px] font-semibold">{p.genreName}</span>
+                  <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                    {p.reason === 'history'
+                      ? 'いつもの'
+                      : p.reason === 'dictionary'
+                        ? '品目から'
+                        : p.reason === 'store_type'
+                          ? '店の種類から'
+                          : 'よく使う'}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              setPickOpen(false);
+              setGenreSheetOpen(true);
+            }}
+            className="min-h-11 text-sm font-semibold"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            ほかのジャンルから選ぶ →
+          </button>
+        </div>
+      </BottomSheet>
+
+      {viewerOpen && display?.thumbnailUrl ? (
+        <ReceiptImageViewer src={display.thumbnailUrl} onClose={() => setViewerOpen(false)} />
+      ) : null}
 
       <BottomSheet open={genreSheetOpen} onClose={() => setGenreSheetOpen(false)} role="dialog">
         <div className="space-y-2 px-2 pb-2">

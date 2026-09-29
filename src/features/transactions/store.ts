@@ -225,6 +225,7 @@ export async function importTransactionsAsAdmin(
     import_batch_id: batch.id,
     fingerprint: t.fingerprint,
     source_ref: t.sourceRef,
+    note: t.memo ?? null,
   }));
   const insertRows = (values: readonly Record<string, unknown>[]) =>
     supabase

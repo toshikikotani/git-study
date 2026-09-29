@@ -3,7 +3,14 @@
  * 期間全体を(週ごとの)連続した帯で見せる。
  */
 
-import { addDays, addMonths, daysBetween, nthDayOfMonth, weekdayOf, type DateOnly } from '@/lib/date';
+import {
+  addDays,
+  addMonths,
+  daysBetween,
+  nthDayOfMonth,
+  weekdayOf,
+  type DateOnly,
+} from '@/lib/date';
 
 /** 表示する月(各月の1日)。期間が無ければ今月と翌月。extra で後ろへ足せる。 */
 export function monthsToShow(
