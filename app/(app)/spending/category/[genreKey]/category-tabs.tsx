@@ -55,6 +55,10 @@ export function CategoryTabs({
   onClearFocus,
   onOpenLine,
   onFocusStore,
+  quickDestination,
+  onQuickMove,
+  onMoveMenu,
+  ghostLines,
 }: {
   genreKey: string;
   /** 選んだ月の行(実績・予定)。 */
@@ -69,6 +73,12 @@ export function CategoryTabs({
   onClearFocus: () => void;
   onOpenLine: (line: CategoryLine) => void;
   onFocusStore: (store: StoreAggregate) => void;
+  /** 右スワイプの移動先(最もよく使う移動先)。 */
+  quickDestination: { id: string; name: string } | null;
+  onQuickMove: (line: CategoryLine) => void;
+  onMoveMenu: (line: CategoryLine) => void;
+  /** 別のカテゴリへ移って消えていく途中の行(250ms の間だけ一覧に残す)。 */
+  ghostLines: readonly CategoryLine[];
 }) {
   const [sort, setSort] = useState<LineSort>('newest');
   const [query, setQuery] = useState('');
@@ -81,7 +91,16 @@ export function CategoryTabs({
     () => searchLines(focusedLines ?? lines, query),
     [focusedLines, lines, query],
   );
-  const rows = useMemo(() => flattenRows(txLines, sort), [txLines, sort]);
+  const ghostIds = useMemo(() => new Set(ghostLines.map((g) => g.txId)), [ghostLines]);
+  // 消えていく途中の行も一覧には残す(合計・件数には数えない)。
+  const rows = useMemo(
+    () =>
+      flattenRows(
+        [...txLines, ...ghostLines.filter((g) => !txLines.some((l) => l.txId === g.txId))],
+        sort,
+      ),
+    [txLines, ghostLines, sort],
+  );
 
   const [firstVisible, setFirstVisible] = useState(0);
   const sticky = sort === 'newest' ? stickyHeaderFor(rows, firstVisible) : null;
@@ -220,7 +239,14 @@ export function CategoryTabs({
                   r.kind === 'header' ? (
                     <DayHeader row={r} />
                   ) : (
-                    <CategoryTransactionRow line={r.line} onOpen={onOpenLine} />
+                    <CategoryTransactionRow
+                      line={r.line}
+                      onOpen={onOpenLine}
+                      quickDestination={quickDestination}
+                      onQuickMove={onQuickMove}
+                      onMoveMenu={onMoveMenu}
+                      leaving={ghostIds.has(r.line.txId)}
+                    />
                   )
                 }
               />

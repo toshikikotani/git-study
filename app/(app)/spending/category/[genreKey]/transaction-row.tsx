@@ -1,6 +1,7 @@
 'use client';
 
 import { LedgerAmount } from '@/components/ui/money';
+import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { MdReceiptLong } from 'react-icons/md';
 import type { CategoryLine } from '@/features/category/model';
 
@@ -22,16 +23,27 @@ export function CategoryTransactionRow({
   selected = false,
   selectMode = false,
   rowRef,
+  quickDestination = null,
+  onQuickMove,
+  onMoveMenu,
+  leaving = false,
 }: {
   line: CategoryLine;
   onOpen: (line: CategoryLine) => void;
   selected?: boolean;
   selectMode?: boolean;
   rowRef?: (el: HTMLDivElement | null) => void;
+  /** 右スワイプの移動先(最もよく使う移動先)。行に表示する。 */
+  quickDestination?: { id: string; name: string } | null;
+  onQuickMove?: (line: CategoryLine) => void;
+  /** 左スワイプの「カテゴリを移す」。 */
+  onMoveMenu?: (line: CategoryLine) => void;
+  /** 別のカテゴリへ移って一覧から消えていく途中(高さと透明度を同時に変える、250ms)。 */
+  leaving?: boolean;
 }) {
   const subtitle = [line.branchName, itemsPreview(line)].filter((x) => x && x !== '').join(' ・ ');
-  const spoken = `${line.label}、${line.refund ? '返品・返金' : '支出'}${Math.abs(line.amountYen).toLocaleString('ja-JP')}円${line.receiptTotalYen !== null ? `、レシート全体${line.receiptTotalYen.toLocaleString('ja-JP')}円のうち` : ''}${line.status === 'scheduled' ? '、予定' : ''}`;
-  return (
+  const spoken = `${line.label}、${line.refund ? '返品・返金' : '支出'}${Math.abs(line.amountYen).toLocaleString('ja-JP')}円${line.receiptTotalYen !== null ? `、レシート全体${line.receiptTotalYen.toLocaleString('ja-JP')}円のうち` : ''}${line.status === 'scheduled' ? '、予定' : ''}${quickDestination ? `。右にスワイプで${quickDestination.name}へ移動` : ''}`;
+  const inner = (
     <div
       ref={rowRef}
       data-row-id={line.txId}
@@ -94,6 +106,34 @@ export function CategoryTransactionRow({
         ) : null}
         <LedgerAmount amountYen={line.amountYen} className="shrink-0 text-sm font-semibold" />
       </button>
+    </div>
+  );
+
+  const swipeable = !selectMode && !leaving && line.status === 'actual' && onMoveMenu !== undefined;
+  return (
+    <div className="row-shell" data-state={leaving ? 'removed' : 'shown'}>
+      <div className="row-shell-inner">
+        {swipeable ? (
+          <SwipeableRow
+            {...(quickDestination && onQuickMove ? { onSwipeRight: () => onQuickMove(line) } : {})}
+            rightLabel={quickDestination ? `→ ${quickDestination.name}` : ''}
+            actions={
+              <button
+                type="button"
+                onClick={() => onMoveMenu(line)}
+                className="min-h-11 flex-1 text-xs font-semibold"
+                style={{ background: 'var(--accent-track)', color: 'var(--ink)' }}
+              >
+                カテゴリを移す
+              </button>
+            }
+          >
+            {inner}
+          </SwipeableRow>
+        ) : (
+          inner
+        )}
+      </div>
     </div>
   );
 }

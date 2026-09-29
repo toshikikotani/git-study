@@ -8,13 +8,18 @@ import { buildCategorySummary, buildInsights, type Insight } from '@/features/ca
 import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/series';
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { pickQuickDestination, useMoveCounts } from '@/features/category/destinations';
+import { genreIdOfKey } from '@/features/category/model';
 import { formatMonthJa } from '@/lib/date';
 import { prefersReducedMotion } from '@/lib/motion';
 import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
 import { CategoryChart } from './category-chart';
 import { CategoryHeader } from './category-header';
+import { CategoryPicker } from './category-picker';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
-import { LineDetailSheet } from './line-detail-sheet';
+import { EditSheet } from './edit-sheet';
+import { useCategoryEdits } from './use-category-edits';
 import { InsightsSection } from './insights-section';
 import { SummarySection } from './summary-section';
 
@@ -36,7 +41,14 @@ export type LineFocus = {
 
 function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const router = useRouter();
-  const [transactions] = useState(data.transactions);
+  const { transactions, ghosts, banner, dismissBanner, moveLines, moveOneItem, saveEdit } =
+    useCategoryEdits({
+      initial: data.transactions,
+      genreKey: data.genreKey,
+      genres: data.genres,
+    });
+  const counts = useMoveCounts();
+  const [movePicker, setMovePicker] = useState<CategoryLine | null>(null);
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
   const [showPrevious, setShowPrevious] = useState(true);
@@ -98,6 +110,12 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
             : null,
       }),
     [historyLines, unit, data.monthStart, data.range.to, data.today, data.goal],
+  );
+
+  const currentGenreId = genreIdOfKey(data.genreKey);
+  const quickDestination = useMemo(
+    () => pickQuickDestination({ counts, genres: data.genres, currentGenreId }),
+    [counts, data.genres, currentGenreId],
   );
 
   /** 絞り込んだ取引を見せる:取引のタブへ切り替え、一覧の先頭までスクロールする。 */
@@ -201,12 +219,74 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         focusLabel={focus?.label ?? null}
         onClearFocus={() => setFocus(null)}
         onOpenLine={setOpenLine}
+        quickDestination={quickDestination}
+        onQuickMove={(line) => quickDestination && void moveLines([line], quickDestination.id)}
+        onMoveMenu={setMovePicker}
+        ghostLines={ghosts}
         onFocusStore={(store) =>
           showTransactions({ ids: new Set(store.txIds), label: store.label })
         }
       />
 
-      <LineDetailSheet line={openLine} onClose={() => setOpenLine(null)} />
+      {banner ? (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-2xl p-4 text-sm"
+          style={{ background: 'var(--attention-track)', border: '1px solid var(--state-caution)' }}
+        >
+          <span style={{ color: 'var(--ink)' }}>
+            <span aria-hidden>▲ </span>
+            {banner}
+          </span>
+          <button
+            type="button"
+            onClick={dismissBanner}
+            aria-label="閉じる"
+            className="min-h-11 min-w-11"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
+      <EditSheet
+        line={openLine}
+        genres={data.genres}
+        suggestedGenreId={quickDestination?.id ?? null}
+        onClose={() => setOpenLine(null)}
+        onSave={(line, patch) => {
+          setOpenLine(null);
+          void saveEdit(line, patch);
+        }}
+        onMove={(line, to) => {
+          setOpenLine(null);
+          void moveLines([line], to);
+        }}
+        onMoveItem={(line, itemId, to) => {
+          setOpenLine(null);
+          void moveOneItem(line, itemId, to);
+        }}
+      />
+
+      {/* 左スワイプの「カテゴリを移す」:格子から1タップ */}
+      <BottomSheet open={movePicker !== null} onClose={() => setMovePicker(null)} role="dialog">
+        <div className="space-y-2 px-3 pb-3">
+          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            {movePicker?.label} のカテゴリを移す
+          </p>
+          <CategoryPicker
+            genres={data.genres}
+            currentId={currentGenreId}
+            suggestedId={quickDestination?.id ?? null}
+            includeUncategorized
+            onPick={(to) => {
+              const line = movePicker;
+              setMovePicker(null);
+              if (line) void moveLines([line], to);
+            }}
+          />
+        </div>
+      </BottomSheet>
     </div>
   );
 }
