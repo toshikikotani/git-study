@@ -1,6 +1,10 @@
 'use client';
 
+import Link from 'next/link';
+import type { Route } from 'next';
+
 import { GenreBadge } from '@/components/ui/genre-badge';
+import { SharedElement, sharedName } from '@/components/ui/shared-element';
 import {
   STATE_COLOR,
   STATE_ICON,
@@ -29,6 +33,8 @@ export function GenreBudgetRow({
   maxYen,
   selected = false,
   onClick,
+  href,
+  sharedKey,
   children,
 }: {
   name: string;
@@ -42,6 +48,10 @@ export function GenreBudgetRow({
   maxYen: number;
   selected?: boolean;
   onClick?: () => void;
+  /** カテゴリ詳細へ遷移する。行のアイコン・名前・金額が、詳細のヘッダーへ共有要素として動く。 */
+  href?: string;
+  /** 共有要素の名前に使うカテゴリのキー(未分類は 'none')。href とセットで渡す。 */
+  sharedKey?: string;
   /** 行の下に足す補足(目標画面の一言など)。 */
   children?: React.ReactNode;
 }) {
@@ -61,9 +71,15 @@ export function GenreBudgetRow({
   const body = (
     <>
       <div className="flex items-center gap-3">
-        <GenreBadge name={name === '未分類' ? null : name} size={28} />
-        <span className="min-w-0 flex-1 truncate text-sm" style={{ color: 'var(--ink)' }}>
-          {name}
+        {shared(
+          sharedKey && sharedName.icon(sharedKey),
+          <GenreBadge name={name === '未分類' ? null : name} size={28} />,
+        )}
+        <span className="min-w-0 flex-1 text-sm" style={{ color: 'var(--ink)' }}>
+          {shared(
+            sharedKey && sharedName.title(sharedKey),
+            <span className="block truncate">{name}</span>,
+          )}
         </span>
         {hasBudget && state !== 'ok' ? (
           <span
@@ -75,7 +91,10 @@ export function GenreBudgetRow({
           </span>
         ) : null}
         <span className="tabular shrink-0 text-sm" style={{ color: 'var(--ink)' }}>
-          {formatYen(spentYen, { sign: 'never' })}
+          {shared(
+            sharedKey && sharedName.amount(sharedKey),
+            <span>{formatYen(spentYen, { sign: 'never' })}</span>,
+          )}
           {hasBudget ? (
             <span style={{ color: 'var(--ink-muted)' }}>
               {' / '}
@@ -129,6 +148,19 @@ export function GenreBudgetRow({
   const style = selected
     ? { background: 'var(--accent-track)', borderRadius: 'var(--radius-inner)' }
     : undefined;
+  const spoken = `${budgetSpokenLabel(name, spentYen, budgetYen)}${scheduledYen > 0 ? `、予定${formatYen(scheduledYen, { sign: 'never' })}${state === 'reserved' ? 'で確保済み' : ''}` : ''}`;
+  if (href !== undefined) {
+    return (
+      <Link
+        href={href as Route}
+        aria-label={`${spoken}。タップして詳細を開く`}
+        className="min-h-11 block w-full px-2 py-2 text-left"
+        style={style}
+      >
+        {body}
+      </Link>
+    );
+  }
   return onClick ? (
     <button
       type="button"
@@ -150,4 +182,12 @@ export function GenreBudgetRow({
       {body}
     </div>
   );
+}
+
+/** 共有要素(key があるときだけ ViewTransition で包む)。 */
+function shared(
+  name: string | undefined | '' | false | null,
+  node: React.ReactNode,
+): React.ReactNode {
+  return name ? <SharedElement name={name}>{node}</SharedElement> : node;
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { categoryHref } from '@/lib/category-nav';
 import { useJustSaved } from '@/lib/just-saved';
 import { useState } from 'react';
 
@@ -19,7 +20,7 @@ import { useSpendingMonth } from './spending-month-provider';
  * 行(実績バー + 今日時点の理想ラインの目印 + 状態色)で見せる。
  */
 export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownRow[] | null }) {
-  const { genreBreakdown, filter, setFilter, isCurrentMonth, loading } = useSpendingMonth();
+  const { genreBreakdown, filter, isCurrentMonth, loading, visibleMonth } = useSpendingMonth();
   const [scope, setScope] = useState<'month' | 'goal'>('month');
   const justSaved = useJustSaved().length > 0;
   const useGoal = scope === 'goal' && goalRows !== null && isCurrentMonth;
@@ -144,11 +145,8 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                     scheduledYen={r.scheduledYen}
                     maxYen={maxYen}
                     selected={selected}
-                    onClick={() =>
-                      setFilter({
-                        genreId: selected ? null : r.genreId === null ? 'none' : r.genreId,
-                      })
-                    }
+                    href={categoryHref(r.key, visibleMonth)}
+                    sharedKey={r.key}
                   />
                 </li>
               );

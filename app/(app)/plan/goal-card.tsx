@@ -113,7 +113,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
 
       {model.uncategorized ? (
         <Link
-          href="/reports/genres"
+          href="/spending/category/none"
           className="min-h-11 mt-3 flex items-baseline justify-between gap-3 border-t pt-3 text-sm"
           style={{ borderColor: 'var(--hairline)' }}
         >

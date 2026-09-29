@@ -145,7 +145,7 @@ describe('F2 目標カード(受け入れ基準2)', () => {
       h(GoalCard, { model: buildGoalCard(view(base), '2026-09-29') }),
     ).replace(/<!-- -->/g, '');
     expect(html).toContain('未分類 300円(目標に未反映)');
-    expect(html).toContain('href="/reports/genres"');
+    expect(html).toContain('href="/spending/category/none"');
   });
 
   it('ソースに、同じ数値を並べる旧レイアウト(headline と今日使える額の併記)が残っていない', () => {

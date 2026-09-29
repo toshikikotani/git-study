@@ -7,6 +7,7 @@ import { buildGoalCard } from '@/features/goals/card';
 import { loadGoalView } from '@/features/goals/loader';
 import { listPlanRanges } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
+import { categoryHref } from '@/lib/category-nav';
 import { formatDateJa, todayJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GoalCard } from './goal-card';
@@ -111,6 +112,8 @@ export default async function PlanPage() {
                     budgetYen={r.targetYen}
                     idealYen={view.ended ? null : r.idealYen}
                     scheduledYen={r.scheduledYen}
+                    href={categoryHref(r.genreId ?? 'none', today)}
+                    sharedKey={r.genreId ?? 'none'}
                     maxYen={Math.max(...view.breakdown.map((x) => x.spentYen), 1)}
                   />
                 </li>
@@ -143,6 +146,8 @@ export default async function PlanPage() {
                       name={r.genreName}
                       spentYen={r.spentYen}
                       budgetYen={null}
+                      href={categoryHref(r.genreId ?? 'none', today)}
+                      sharedKey={r.genreId ?? 'none'}
                       maxYen={Math.max(...view.noBudget.map((x) => x.spentYen), 1)}
                     />
                   </li>

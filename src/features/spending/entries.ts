@@ -148,7 +148,9 @@ export async function loadLedgerTransactions(
       isTransfer: row.is_transfer,
       reviewStatus: row.review_status,
       status: entryStatus(row.occurred_on, today),
-      kind: (row.kind === 'special' ? 'special' : 'normal') satisfies EntryKind,
+      kind: (row.kind === 'special' || row.kind === 'refund'
+        ? row.kind
+        : 'normal') satisfies EntryKind,
       splits,
     };
   });

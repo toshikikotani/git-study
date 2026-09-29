@@ -22,6 +22,8 @@ import type { GenreBreakdownRow, LedgerTransaction, MonthTotals } from './ledger
 /** 明細(親)を集計の入力(分割の子へ展開済み)にする。全画面が同じ展開を使う。 */
 export function toLedgerEntries(transactions: readonly LedgerTransaction[]): LedgerEntry[] {
   return transactions.flatMap((t): LedgerEntry[] => {
+    // 入力待ちのレシートは集計に含めない(通常は明細に入らないが、混ざっても数えない)。
+    if (t.needsInput) return [];
     const base = {
       id: t.id,
       occurredOn: t.occurredOn,

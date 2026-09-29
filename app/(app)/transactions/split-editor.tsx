@@ -491,7 +491,7 @@ export function TransactionRowWithSplit({
       const prevItems = items;
       const payload = parsed.items.map((i) => ({
         name: i.description,
-        amountYen: Math.abs(i.amountYen),
+        amountYen: (transaction.amountYen < 0 ? -1 : 1) * Math.abs(i.amountYen),
         genreId: transaction.genreId,
         productType: i.productType,
       }));

@@ -691,7 +691,8 @@ create table public.transactions (
   must_pay          boolean            not null default false,
 
   -- 実績/予定(今日より未来は予定として実績の集計から外す)と、通常/特別費
-  -- (特別費は目標のペース計算から除く)。domain/ledger.ts 参照。
+  -- (特別費は目標のペース計算から除く)。返品・返金('refund')は金額が正で、そのジャンルの
+  -- 支出から差し引く。domain/ledger.ts 参照。
   status            text               not null default 'actual',
   kind              text               not null default 'normal',
 
@@ -723,7 +724,7 @@ create table public.transactions (
   constraint ck_transactions_posted_after_occurred
     check (posted_on is null or posted_on >= occurred_on),
   constraint ck_transactions_status check (status in ('actual', 'scheduled')),
-  constraint ck_transactions_kind   check (kind in ('normal', 'special'))
+  constraint ck_transactions_kind   check (kind in ('normal', 'special', 'refund'))
 );
 
 -- 重複排除:同一ファイルを別名で取り込んでも同じ明細は入らない

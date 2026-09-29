@@ -209,6 +209,12 @@ create policy "own_rows" on public.receipt_captures
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 5. transactions.kind に 'refund'(返品・返金)を足す
+-- -----------------------------------------------------------------------------
+alter table public.transactions drop constraint if exists ck_transactions_kind;
+alter table public.transactions
+  add constraint ck_transactions_kind check (kind in ('normal', 'special', 'refund'));
+
 commit;
 
 -- =============================================================================

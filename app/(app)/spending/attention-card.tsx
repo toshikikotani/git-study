@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { buildAttention } from '@/features/spending/views';
+import { categoryHref } from '@/lib/category-nav';
 import { pushUndo } from '@/lib/undo';
 import { formatDateJa } from '@/lib/date';
 import {
@@ -27,7 +28,7 @@ import { useSpendingMonth } from './spending-month-provider';
  * 目標のジャンル別の実績に入らないため)。
  */
 export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
-  const { transactions, today, reloadVisibleMonth, captures } = useSpendingMonth();
+  const { transactions, today, reloadVisibleMonth, captures, visibleMonth } = useSpendingMonth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -95,6 +96,19 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
             <span aria-hidden>▲ </span>要確認
           </p>
         )}
+        {attention.uncategorized.count > 0 ? (
+          <Link
+            href={categoryHref('none', visibleMonth) as Route}
+            prefetch={false}
+            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            <span>未分類の明細を一覧で分類する</span>
+            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
+              開く →
+            </span>
+          </Link>
+        ) : null}
         {captures.length > 0 ? (
           <Link
             href={`/transactions/receipt/${captures[0]!.id}` as Route}
