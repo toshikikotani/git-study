@@ -48,7 +48,7 @@ export const runtime = 'nodejs';
  * 複数の設定を組み合わせる判断が要るため、旧 /assistant の Haiku ではなく、
  * 旧 /advisor(目標設定・買う前相談)と同じ Sonnet を使う(会話の質を優先)。
  */
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const MAX_OUTPUT_TOKENS = 2048;
 /** 1回の相談で許す tool 呼び出しの往復上限。青天井の課金を防ぐ。 */
 const MAX_TOOL_ROUNDS = 4;
