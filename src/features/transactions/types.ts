@@ -36,6 +36,10 @@ export type StoredTransaction = {
   mustPay: boolean;
   /** 通常/特別費。省略は通常。特別費は目標のペース計算から除く(domain/ledger.ts)。 */
   kind?: 'normal' | 'special';
+  /** 支店名(店名を正規化して分けたもの。merchantName は店名のみ)。 */
+  branchName?: string | null;
+  /** レシートの照合で解消していない差額(0/null なら一致)。 */
+  reconcileDiffYen?: number | null;
   source: TransactionSource;
   /** 重複排除キー。DB のトリガ(md5)が自動設定するため、ここの値は上書きされる。 */
   fingerprint: string;

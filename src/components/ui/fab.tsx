@@ -36,11 +36,20 @@ type CommonProps = {
 type FabAsLink = CommonProps & {
   href: Route | string;
   onFiles?: undefined;
+  onPress?: undefined;
 };
 
 type FabAsCapture = CommonProps & {
   href?: undefined;
   onFiles: (files: readonly File[]) => void;
+  onPress?: undefined;
+};
+
+/** 押すと自前の画面(自動撮影のカメラ)を開く。ハイドレーション後に使う。 */
+type FabAsButton = CommonProps & {
+  href?: undefined;
+  onFiles?: undefined;
+  onPress: () => void;
 };
 
 const SHARED_STYLE: React.CSSProperties = {
@@ -51,8 +60,22 @@ const SHARED_STYLE: React.CSSProperties = {
   transition: 'transform var(--duration-medium) var(--ease-spring)',
 };
 
-export function Fab(props: FabAsLink | FabAsCapture) {
+export function Fab(props: FabAsLink | FabAsCapture | FabAsButton) {
   const { label, children } = props;
+
+  if (props.onPress !== undefined) {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        onClick={props.onPress}
+        className="active:scale-[0.92] flex size-14 shrink-0 items-center justify-center"
+        style={SHARED_STYLE}
+      >
+        {children}
+      </button>
+    );
+  }
 
   if (props.href !== undefined) {
     return (
@@ -80,7 +103,7 @@ export function Fab(props: FabAsLink | FabAsCapture) {
         className="sr-only"
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
-          if (files.length > 0) props.onFiles(files);
+          if (files.length > 0) props.onFiles?.(files);
           e.target.value = '';
         }}
       />

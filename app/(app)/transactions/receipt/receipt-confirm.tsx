@@ -1,0 +1,724 @@
+'use client';
+
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+
+import { ZoomableImage } from '@/components/receipt/zoomable-image';
+import { formatYen } from '@/domain/money';
+import {
+  applyFix,
+  linesByTaxRate,
+  reconcileReceipt,
+  type PriceBasis,
+  type ReceiptDraft,
+  type ReceiptLine,
+  type ReconcileSuggestion,
+  type TaxRate,
+} from '@/domain/receipt-reconcile';
+import { withDraft, type ParsedReceiptTransaction } from '@/features/import/receipt-ai';
+import type { JobClassification, ReceiptJob } from '@/features/import/receipt-queue';
+import { buildReceiptSavePlan, type ReceiptSavePlan } from '@/features/import/receipt-save';
+import type { GenreOption } from '@/features/transactions/genres-client';
+import { checkReceiptDuplicatesAction } from '../actions';
+
+/** これ未満の確からしさの項目には、黄色の下線を引く。 */
+const LOW_CONFIDENCE = 0.7;
+
+const RATE_LABEL: Record<string, string> = {
+  '8': '軽減税率 8%',
+  '10': '標準税率 10%',
+  '0': '非課税・不明',
+  null: '税率不明',
+};
+
+export type ReceiptConfirmSave = {
+  plan: ReceiptSavePlan;
+  /** 保存前に本人が直したジャンル(履歴へ反映する)。 */
+  corrections: { itemName: string; genreId: string }[];
+  storeName: string;
+  imageBase64: string | null;
+};
+
+function underline(low: boolean): React.CSSProperties {
+  return low
+    ? {
+        textDecoration: 'underline',
+        textDecorationColor: 'var(--attention)',
+        textDecorationThickness: '2px',
+        textUnderlineOffset: '4px',
+      }
+    : {};
+}
+
+function initialGenres(
+  job: ReceiptJob,
+  index: number,
+  parsed: ParsedReceiptTransaction,
+): Map<string, string | null> {
+  const byKey = new Map<string, JobClassification>(job.classifications.map((c) => [c.key, c]));
+  const map = new Map<string, string | null>();
+  parsed.items.forEach((item, j) => {
+    if (item.lineId !== undefined)
+      map.set(item.lineId, byKey.get(`${index}:${j}`)?.genreId ?? null);
+  });
+  return map;
+}
+
+export function ReceiptConfirm({
+  job,
+  index,
+  genres,
+  accountId,
+  saving,
+  savedLabel,
+  goalImpact,
+  onSave,
+  onDiscard,
+}: {
+  job: ReceiptJob;
+  index: number;
+  genres: readonly GenreOption[];
+  accountId: string;
+  saving: boolean;
+  /** 保存済みなら表示する文言(保存ボタンの代わり)。 */
+  savedLabel: string | null;
+  /** 目標があるときの「保存前 → 保存後の残り予算」表示(呼び出し側が組み立てる)。 */
+  goalImpact?: (input: {
+    parsed: ParsedReceiptTransaction;
+    genreByLineId: ReadonlyMap<string, string | null>;
+    parentGenreId: string | null;
+    kind: 'normal' | 'special';
+  }) => ReactNode;
+  onSave: (input: ReceiptConfirmSave) => void;
+  onDiscard: () => void;
+}) {
+  const original = job.parsed[index]!;
+  const [draft, setDraft] = useState<ReceiptDraft | null>(original.draft ?? null);
+  const [store, setStore] = useState(original.storeName ?? original.description);
+  const [occurredOn, setOccurredOn] = useState(original.occurredOn);
+  const [genreByLineId, setGenreByLineId] = useState(() => initialGenres(job, index, original));
+  const [parentGenreId, setParentGenreId] = useState<string | null>(
+    job.parentGenreIds[index] ?? null,
+  );
+  const [kind, setKind] = useState<'normal' | 'special'>('normal');
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [duplicates, setDuplicates] = useState<number>(0);
+
+  const initialGenreMap = useMemo(
+    () => initialGenres(job, index, original),
+    [job, index, original],
+  );
+  const genreName = useMemo(() => new Map(genres.map((g) => [g.id, g.name])), [genres]);
+
+  // 品目の按分・照合は、下書きから毎回同じ関数で作り直す(サーバーと同じ結果)。
+  const current = useMemo<ParsedReceiptTransaction>(() => {
+    if (draft === null) return { ...original, storeName: store, occurredOn };
+    const productTypes = new Map(original.items.map((i) => [i.lineId ?? '', i.productType]));
+    return {
+      ...original,
+      storeName: store,
+      occurredOn,
+      ...withDraft(original, draft, productTypes),
+    };
+  }, [original, draft, store, occurredOn]);
+  const reconcile = useMemo(
+    () =>
+      draft !== null && draft.lines.some((l) => l.kind === 'item') ? reconcileReceipt(draft) : null,
+    [draft],
+  );
+
+  // 重複の警告(同じ店・同じ日・近い金額)。日付・店・金額を直したら取り直す。
+  const paidYen = draft?.paidYen ?? Math.abs(original.amountYen);
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void checkReceiptDuplicatesAction([
+        { key: 'r', storeName: store, occurredOn, amountYen: -paidYen },
+      ]).then((r) => {
+        if (!cancelled) setDuplicates(r.duplicates.r?.length ?? 0);
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [store, occurredOn, paidYen]);
+
+  const update = (fn: (d: ReceiptDraft) => ReceiptDraft) =>
+    setDraft((d) => (d === null ? d : fn(d)));
+  const updateLine = (id: string, patch: Partial<ReceiptLine>) =>
+    update((d) => ({ ...d, lines: d.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
+
+  const selectedLine = draft?.lines.find((l) => selected.size === 1 && selected.has(l.id)) ?? null;
+  const lowStore = (original.fieldConfidence?.store ?? 1) < LOW_CONFIDENCE;
+  const lowDate = (original.fieldConfidence?.date ?? 1) < LOW_CONFIDENCE;
+  const lowTotal = (original.fieldConfidence?.total ?? 1) < LOW_CONFIDENCE;
+
+  const setGenreFor = (ids: Iterable<string>, genreId: string | null) =>
+    setGenreByLineId((prev) => {
+      const next = new Map(prev);
+      for (const id of ids) next.set(id, genreId);
+      return next;
+    });
+
+  const groups = draft ? linesByTaxRate(draft) : [];
+  const status = reconcile?.status ?? null;
+
+  const save = () => {
+    if (draft === null && current.items.length === 0 && current.amountYen === 0) return;
+    const plan = buildReceiptSavePlan({
+      parsed: current,
+      accountId,
+      parentGenreId,
+      genreByLineId,
+      kind,
+      sourceRef: crypto.randomUUID(),
+    });
+    const corrections = (draft?.lines ?? [])
+      .filter((l) => l.kind === 'item')
+      .flatMap((l) => {
+        const now = genreByLineId.get(l.id) ?? null;
+        return now !== null && now !== (initialGenreMap.get(l.id) ?? null)
+          ? [{ itemName: l.name, genreId: now }]
+          : [];
+      });
+    onSave({ plan, corrections, storeName: store, imageBase64: job.imageBase64 });
+  };
+
+  const field = 'w-full rounded-lg px-2 py-1.5 text-sm';
+  const fieldStyle = {
+    background: 'var(--plane)',
+    color: 'var(--ink)',
+    border: '1px solid var(--hairline)',
+  };
+
+  return (
+    <section
+      aria-label={`${store}のレシート`}
+      className="overflow-hidden rounded-2xl"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      {/* 上半分:画像(ズーム可)。品目をタップすると該当行をハイライトする。 */}
+      <ZoomableImage
+        src={job.previewUrl}
+        alt="撮影したレシート"
+        highlightRatio={selectedLine?.yRatio ?? null}
+        className="h-[38vh] min-h-56"
+      />
+
+      {/* 下半分:読み取り結果 */}
+      <div className="space-y-4 p-4 pb-2">
+        <div className="grid grid-cols-2 gap-2">
+          <label className="col-span-2 block">
+            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              店名{original.branchName ? `(${original.branchName})` : ''}
+            </span>
+            <input
+              value={store}
+              onChange={(e) => setStore(e.target.value)}
+              className={field}
+              style={{ ...fieldStyle, ...underline(lowStore) }}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              日付
+            </span>
+            <input
+              type="date"
+              value={occurredOn}
+              onChange={(e) => setOccurredOn(e.target.value)}
+              className={field}
+              style={{ ...fieldStyle, ...underline(lowDate) }}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              支払額(円)
+            </span>
+            <input
+              inputMode="numeric"
+              value={String(paidYen)}
+              onChange={(e) => {
+                const yen = Number(e.target.value.replace(/[^0-9]/g, '') || '0');
+                if (draft !== null) update((d) => ({ ...d, paidYen: yen }));
+              }}
+              disabled={draft === null}
+              className={`${field} tabular`}
+              style={{ ...fieldStyle, ...underline(lowTotal) }}
+            />
+          </label>
+        </div>
+
+        {duplicates > 0 ? (
+          <p
+            role="alert"
+            className="rounded-xl px-3 py-2 text-xs leading-relaxed"
+            style={{
+              background: 'var(--attention-track, var(--plane))',
+              color: 'var(--ink)',
+              border: '1px solid var(--attention)',
+            }}
+          >
+            ⚠ 同じ店・同じ日・近い金額の記録が {duplicates}{' '}
+            件あります。二重登録でないか確認してください。
+          </p>
+        ) : null}
+
+        {draft !== null ? (
+          <>
+            <div role="radiogroup" aria-label="価格の表示" className="flex gap-1 text-xs">
+              {(
+                [
+                  ['tax_included', '内税(税込表示)'],
+                  ['tax_excluded', '外税(税抜表示)'],
+                ] as [PriceBasis, string][]
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.priceBasis === value}
+                  onClick={() => update((d) => ({ ...d, priceBasis: value }))}
+                  className="rounded-full px-3 py-1.5 font-semibold"
+                  style={{
+                    background: draft.priceBasis === value ? 'var(--accent)' : 'var(--plane)',
+                    color: draft.priceBasis === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* 品目は税率でグループ化。タップで選択(複数可)→ 下のチップで一括変更 */}
+            {groups.map((g) => {
+              const total = g.lines
+                .filter((l) => l.kind === 'item')
+                .reduce((a, l) => a + l.amountYen, 0);
+              return (
+                <div key={String(g.rate)}>
+                  <div
+                    className="flex items-baseline justify-between text-[11px]"
+                    style={{ color: 'var(--ink-muted)' }}
+                  >
+                    <span className="font-semibold">{RATE_LABEL[String(g.rate)]}</span>
+                    <span className="tabular">{formatYen(total)}</span>
+                  </div>
+                  <ul className="mt-1 space-y-1">
+                    {g.lines.map((l) => (
+                      <LineRow
+                        key={l.id}
+                        line={l}
+                        genreLabel={
+                          l.kind === 'discount'
+                            ? null
+                            : (genreName.get(genreByLineId.get(l.id) ?? '') ?? '未分類')
+                        }
+                        selected={selected.has(l.id)}
+                        editing={editing === l.id}
+                        onToggle={() =>
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(l.id)) next.delete(l.id);
+                            else next.add(l.id);
+                            return next;
+                          })
+                        }
+                        onEdit={() => setEditing(editing === l.id ? null : l.id)}
+                        onChange={(patch) => updateLine(l.id, patch)}
+                        onRemove={() => {
+                          update((d) => ({ ...d, lines: d.lines.filter((x) => x.id !== l.id) }));
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            next.delete(l.id);
+                            return next;
+                          });
+                        }}
+                        fieldStyle={fieldStyle}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+
+            <div className="grid grid-cols-2 gap-2">
+              <NumberField
+                label="ポイント払い(円)"
+                value={draft.pointsYen}
+                onChange={(v) => update((d) => ({ ...d, pointsYen: v }))}
+                style={fieldStyle}
+              />
+              <NumberField
+                label="クーポン(円)"
+                value={draft.couponYen}
+                onChange={(v) => update((d) => ({ ...d, couponYen: v }))}
+                style={fieldStyle}
+              />
+            </div>
+
+            {/* ジャンル:選んだ品目を、チップで一括変更 */}
+            <div>
+              <p className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                {selected.size > 0
+                  ? `${selected.size}件を選択中 ─ ジャンルをタップで一括変更`
+                  : '品目をタップして選ぶと、ジャンルを一括で変えられます'}
+              </p>
+              <div
+                className="mt-1.5 flex gap-1.5 overflow-x-auto pb-1"
+                role="group"
+                aria-label="ジャンル"
+              >
+                {genres.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    disabled={selected.size === 0}
+                    onClick={() => setGenreFor(selected, g.id)}
+                    className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                    style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+                {selected.size > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelected(new Set())}
+                    className="shrink-0 rounded-full px-3 py-1.5 text-xs"
+                    style={{ color: 'var(--ink-muted)' }}
+                  >
+                    選択を解除
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                update((d) => ({
+                  ...d,
+                  lines: [
+                    ...d.lines,
+                    {
+                      id: `manual-${d.lines.length}-${Date.now()}`,
+                      name: '品目',
+                      amountYen: 0,
+                      kind: 'item',
+                      taxRate: null,
+                      genreId: null,
+                      confidence: 1,
+                      yRatio: null,
+                    },
+                  ],
+                }))
+              }
+              className="text-xs font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              ＋ 品目を追加
+            </button>
+          </>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            品目は読み取れませんでした。金額と店名だけで保存できます。
+          </p>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              明細のジャンル
+            </span>
+            <select
+              value={parentGenreId ?? ''}
+              onChange={(e) => setParentGenreId(e.target.value || null)}
+              className={field}
+              style={fieldStyle}
+            >
+              <option value="">未分類</option>
+              {genres.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+              目標の扱い
+            </span>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as 'normal' | 'special')}
+              className={field}
+              style={fieldStyle}
+            >
+              <option value="normal">目標の予算に含める</option>
+              <option value="special">特別費として別枠</option>
+            </select>
+          </label>
+        </div>
+
+        {goalImpact?.({ parsed: current, genreByLineId, parentGenreId, kind })}
+      </div>
+
+      {/* 照合バー(下部に固定):品目合計 + 税 − 値引き − ポイント = 支払額 */}
+      <div
+        className="sticky bottom-0 space-y-2 border-t p-3"
+        style={{ background: 'var(--surface-raised)', borderColor: 'var(--hairline)' }}
+      >
+        {reconcile !== null ? (
+          <ReconcileBar result={reconcile} onFix={(fix) => update((d) => applyFix(d, fix))} />
+        ) : null}
+        {savedLabel !== null ? (
+          <p
+            role="status"
+            className="text-center text-sm font-semibold"
+            style={{ color: 'var(--income)' }}
+          >
+            ✓ {savedLabel}
+          </p>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onDiscard}
+              className="rounded-full px-4 py-2.5 text-sm"
+              style={{ color: 'var(--ink-muted)', border: '1px solid var(--hairline)' }}
+            >
+              破棄
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || !accountId || (draft !== null && draft.paidYen <= 0)}
+              className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+            >
+              {saving
+                ? '保存しています…'
+                : status === 'mismatch'
+                  ? '差額を残して保存(要確認に入ります)'
+                  : '保存する'}
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LineRow({
+  line,
+  genreLabel,
+  selected,
+  editing,
+  onToggle,
+  onEdit,
+  onChange,
+  onRemove,
+  fieldStyle,
+}: {
+  line: ReceiptLine;
+  genreLabel: string | null;
+  selected: boolean;
+  editing: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onChange: (patch: Partial<ReceiptLine>) => void;
+  onRemove: () => void;
+  fieldStyle: React.CSSProperties;
+}) {
+  const low = line.confidence < LOW_CONFIDENCE;
+  const isDiscount = line.kind === 'discount';
+  return (
+    <li
+      className="rounded-xl"
+      style={{
+        background: selected ? 'var(--accent-track)' : 'var(--plane)',
+        border: `1px solid ${selected ? 'var(--accent)' : 'transparent'}`,
+      }}
+    >
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          aria-pressed={selected}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-baseline justify-between gap-2 text-left"
+        >
+          <span
+            className="min-w-0 truncate text-[13px]"
+            style={{ color: 'var(--ink)', ...underline(low) }}
+          >
+            {isDiscount ? '値引き ' : ''}
+            {line.name}
+            {genreLabel !== null ? (
+              <span className="ml-1.5 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                {genreLabel}
+              </span>
+            ) : null}
+          </span>
+          <span
+            className="tabular shrink-0 text-[13px] font-semibold"
+            style={{ color: 'var(--ink)' }}
+          >
+            {isDiscount ? '−' : ''}
+            {formatYen(line.amountYen)}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`${line.name}を編集`}
+          aria-expanded={editing}
+          className="shrink-0 text-[11px] font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          編集
+        </button>
+      </div>
+      {editing ? (
+        <div className="grid grid-cols-6 gap-1.5 px-3 pb-3">
+          <input
+            aria-label="品名"
+            value={line.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+            className="col-span-6 rounded-lg px-2 py-1.5 text-sm"
+            style={fieldStyle}
+          />
+          <input
+            aria-label="金額"
+            inputMode="numeric"
+            value={String(line.amountYen)}
+            onChange={(e) =>
+              onChange({ amountYen: Number(e.target.value.replace(/[^0-9]/g, '') || '0') })
+            }
+            className="tabular col-span-2 rounded-lg px-2 py-1.5 text-sm"
+            style={fieldStyle}
+          />
+          <select
+            aria-label="税率"
+            value={line.taxRate === null ? '' : String(line.taxRate)}
+            onChange={(e) =>
+              onChange({
+                taxRate: e.target.value === '' ? null : (Number(e.target.value) as TaxRate),
+              })
+            }
+            className="col-span-2 rounded-lg px-1 py-1.5 text-sm"
+            style={fieldStyle}
+          >
+            <option value="">税率不明</option>
+            <option value="8">8%</option>
+            <option value="10">10%</option>
+            <option value="0">非課税</option>
+          </select>
+          <select
+            aria-label="種類"
+            value={line.kind}
+            onChange={(e) => onChange({ kind: e.target.value as ReceiptLine['kind'] })}
+            className="col-span-2 rounded-lg px-1 py-1.5 text-sm"
+            style={fieldStyle}
+          >
+            <option value="item">品目</option>
+            <option value="discount">値引き</option>
+          </select>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="col-span-6 text-left text-xs"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            この行を削除
+          </button>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  onChange,
+  style,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  style: React.CSSProperties;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        {label}
+      </span>
+      <input
+        inputMode="numeric"
+        value={String(value)}
+        onChange={(e) => onChange(Number(e.target.value.replace(/[^0-9]/g, '') || '0'))}
+        className="tabular w-full rounded-lg px-2 py-1.5 text-sm"
+        style={style}
+      />
+    </label>
+  );
+}
+
+const FIX_LABEL: Record<ReconcileSuggestion['type'], string> = {
+  adjust_rounding: '端数として調整',
+  add_discount: '値引き行を追加',
+  check_missing_line: '行の読み落とし分を追加',
+};
+
+/** 照合バー:品目合計 + 税 − 値引き − ポイント = 支払額。不一致なら差額と修正候補。 */
+function ReconcileBar({
+  result,
+  onFix,
+}: {
+  result: ReturnType<typeof reconcileReceipt>;
+  onFix: (fix: ReconcileSuggestion) => void;
+}) {
+  const ok = result.status === 'ok';
+  const discounts = result.discountYen + result.pointsYen + result.couponYen;
+  return (
+    <div role="status" aria-live="polite">
+      <p className="tabular text-[11px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        品目 {formatYen(result.itemsYen)} + 税 {formatYen(result.taxYen)} − 値引き・ポイント{' '}
+        {formatYen(discounts)} = {formatYen(result.expectedPaidYen)}
+        <span style={{ color: 'var(--ink-muted)' }}> / 支払 {formatYen(result.paidYen)}</span>
+      </p>
+      {ok ? (
+        <p className="text-xs font-semibold" style={{ color: 'var(--income)' }}>
+          ✓ 一致しています
+          {result.absorbedYen !== 0 ? `(${formatYen(result.absorbedYen)}は端数として調整)` : ''}
+        </p>
+      ) : (
+        <div>
+          <p className="text-xs font-semibold" style={{ color: 'var(--attention)' }}>
+            ⚠ 差額 {result.diffYen > 0 ? '+' : '−'}
+            {formatYen(Math.abs(result.diffYen))}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {result.suggestions.map((s) => (
+              <button
+                key={s.type}
+                type="button"
+                onClick={() => onFix(s)}
+                className="rounded-full px-3 py-1 text-[11px] font-semibold"
+                style={{
+                  background: s.recommended ? 'var(--accent)' : 'var(--plane)',
+                  color: s.recommended ? 'var(--on-accent)' : 'var(--ink-secondary)',
+                }}
+              >
+                {FIX_LABEL[s.type]}
+                {s.recommended ? '(おすすめ)' : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -244,6 +244,8 @@ export async function importTransactionsAsAdmin(
       ...row,
       status: entryStatus(row.occurred_on, today),
       kind: transactions[i]!.kind ?? 'normal',
+      branch_name: transactions[i]!.branchName ?? null,
+      reconcile_diff_yen: transactions[i]!.reconcileDiffYen ?? null,
     })),
   );
   if (insertError && isMissingColumnError(insertError)) {

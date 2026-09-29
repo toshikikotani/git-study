@@ -31,6 +31,7 @@ PG_SANDBOX_DB="apply_pending_scratch"
 PENDING=(
   20260929000200_spending_plans.sql
   20260930000100_transaction_status_kind.sql
+  20260930000200_receipt_memory.sql
 )
 
 WORK="$(mktemp -d)"

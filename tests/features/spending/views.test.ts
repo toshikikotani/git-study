@@ -29,6 +29,8 @@ function tx(o: Partial<LedgerTransaction> & { id: string }): LedgerTransaction {
     amountYen: -1000,
     accountId: 'a',
     paymentMethod: 'one_time',
+    branchName: null,
+    reconcileDiffYen: null,
     mustPay: false,
     isTransfer: false,
     reviewStatus: 'auto_ok',

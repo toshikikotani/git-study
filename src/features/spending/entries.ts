@@ -49,6 +49,8 @@ type RawRow = {
   payment_method: PaymentMethod;
   must_pay: boolean;
   kind?: string | null;
+  branch_name?: string | null;
+  reconcile_diff_yen?: number | null;
 };
 
 /** 範囲 [from, to](両端を含む)の明細を、未来日(予定)も含めて読む。 */
@@ -68,7 +70,7 @@ export async function loadLedgerTransactions(
 
   const [genresResult, withKind] = await Promise.all([
     supabase.from('genres').select('id, name, budget_yen').order('sort_order'),
-    query(`${BASE_COLUMNS}, kind`),
+    query(`${BASE_COLUMNS}, kind, branch_name, reconcile_diff_yen`),
   ]);
   if (genresResult.error) {
     throw new LedgerLoadError(`ジャンルを取得できませんでした: ${genresResult.error.message}`);
@@ -122,6 +124,8 @@ export async function loadLedgerTransactions(
       amountYen: row.amount_yen,
       accountId: row.account_id,
       paymentMethod: row.payment_method,
+      branchName: row.branch_name ?? null,
+      reconcileDiffYen: row.reconcile_diff_yen ?? null,
       mustPay: row.must_pay,
       isTransfer: row.is_transfer,
       reviewStatus: row.review_status,

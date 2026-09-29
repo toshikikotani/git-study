@@ -123,6 +123,40 @@ update public.receipt_items i
     and i.genre_id is null
     and t.genre_id is not null;
 
+-- 3. genre_memory / transactions.branch_name・reconcile_diff_yen — レシートの分類の記憶
+-- -----------------------------------------------------------------------------
+alter table public.transactions
+  add column if not exists branch_name        text,
+  add column if not exists reconcile_diff_yen integer;
+
+create table if not exists public.genre_memory (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  store_key  text        not null default '',
+  item_key   text        not null,
+  genre_id   uuid        not null references public.genres(id) on delete cascade,
+  pinned     boolean     not null default false,
+  hits       integer     not null default 1,
+  updated_at timestamptz not null default now(),
+
+  constraint ck_genre_memory_item_not_blank check (btrim(item_key) <> ''),
+  constraint ck_genre_memory_hits check (hits >= 1)
+);
+
+create unique index if not exists ux_genre_memory_key
+  on public.genre_memory (user_id, store_key, item_key);
+create index if not exists ix_genre_memory_user on public.genre_memory (user_id);
+
+alter table public.genre_memory enable row level security;
+alter table public.genre_memory force row level security;
+
+drop policy if exists "own_rows" on public.genre_memory;
+create policy "own_rows" on public.genre_memory
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -148,4 +182,11 @@ select
     select count(*) from information_schema.columns
     where table_schema = 'public' and table_name = 'transactions'
       and column_name in ('status', 'kind')
-  ) = 2 then 'ok' else 'NG: 列が無い' end;
+  ) = 2 then 'ok' else 'NG: 列が無い' end
+union all
+select
+  'genre_memory',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'genre_memory'
+  ) then 'ok' else 'NG: テーブルが無い' end;

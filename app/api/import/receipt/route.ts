@@ -7,9 +7,10 @@ import {
 } from '@/features/import/receipt-ai';
 import { listGenres } from '@/features/genre/store';
 import {
-  classifyReceiptTransactions,
-  type ReceiptClassification,
+  classifyReceiptPipeline,
+  type PipelineClassification,
 } from '@/features/genre/receipt-classify';
+import { loadClassificationMemory } from '@/features/genre/memory-store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { readAnthropicApiKey } from '@/lib/env';
 
@@ -106,20 +107,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     mediaType: payload.mediaType,
   });
 
-  // レシート登録時のジャンル分類(本人発案)。失敗しても読み取り結果は返す
-  // (分類は保存前に本人が選び直せる補助のため、読み取りを巻き込まない)。
-  let classifications: ReceiptClassification[] = [];
+  // ジャンル分類:利用者のルール → 個人の履歴 → 品目辞書 → AI(決まらなかったものだけ)。
+  // 失敗しても読み取り結果は返す(分類は保存前に本人が選び直せる補助のため)。
+  let classifications: PipelineClassification[] = [];
+  let parentGenreIds: Record<number, string> = {};
   const warnings = [...result.warnings];
   if (result.transactions.length > 0) {
     try {
-      const genres = await listGenres();
-      const outcome = await classifyReceiptTransactions(apiKey, result.transactions, genres);
+      const [genres, memory] = await Promise.all([listGenres(), loadClassificationMemory()]);
+      const outcome = await classifyReceiptPipeline(apiKey, result.transactions, genres, memory);
       classifications = outcome.classifications;
+      parentGenreIds = Object.fromEntries(outcome.parentGenreIds);
       warnings.push(...outcome.warnings);
     } catch {
       warnings.push('ジャンルを自動で付けられませんでした。「編集する」から選べます。');
     }
   }
 
-  return NextResponse.json({ transactions: result.transactions, warnings, classifications });
+  return NextResponse.json({
+    transactions: result.transactions,
+    warnings,
+    classifications,
+    parentGenreIds,
+  });
 }

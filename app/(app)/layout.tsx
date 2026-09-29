@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
@@ -9,7 +10,8 @@ import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
-import { setPendingReceiptFiles } from '@/features/import/pending-receipt-files';
+import { ReceiptCamera } from '@/components/receipt/receipt-camera';
+import { countReading, enqueueReceiptFiles, useReceiptJobs } from '@/features/import/receipt-queue';
 
 /**
  * 本人発案:「家計簿(ちりつも)に飛ぶ動線が難しい」「レシートの取り込み口が
@@ -109,7 +111,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function BottomBar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const isClient = useIsClient();
+  const jobs = useReceiptJobs();
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const reading = countReading(jobs);
+  const waiting = jobs.filter((j) => j.status !== 'reading').length;
+  // ハイドレーション前は、JS 無しでも動くネイティブの入力(撮る/選ぶ)を出しておく。
+  const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
 
   return (
     // 片手で届く位置に浮かせる。主な閲覧はスマートフォン(NFR-07)
@@ -119,20 +127,48 @@ function BottomBar() {
           絵文字は本人の指摘で撤廃し、react-icons(Material Icons)に
           差し替えた。FAB 自体は塗り潰しの円のまま(ADR-028、ガラス素材は
           ナビゲーション chrome にだけ使う方針)。
-          href での画面遷移ではなく onFiles(input type=file)にし、
-          撮影後は pending-receipt-files.ts 経由でファイルを
-          /transactions/receipt へ渡し、そちらの画面が続きの抽出・分類・
-          保存を行う。「押した瞬間にカメラアプリを開く」(以前の方針)から
-          「撮る/選ぶを選択できるようにする」へ変更した経緯は fab.tsx 参照。 */}
-      <Fab
-        label="レシートを撮る"
-        onFiles={(files) => {
-          setPendingReceiptFiles(files);
-          router.push('/transactions/receipt');
-        }}
-      >
-        <MdCameraAlt aria-hidden size={26} />
-      </Fab>
+          撮影は receipt-queue.ts のキューへ入れて裏で読み取る(待たせない)。
+          カメラが使える環境では自動撮影のカメラ(ReceiptCamera)を開き、
+          使えない環境や JS の起動前は、ネイティブの撮る/選ぶ(input type=file)に
+          なる。「撮る/選ぶを選択できるようにする」経緯は fab.tsx 参照。 */}
+      {/* 撮影は読み取りを待たない:撮ったらキューへ入れてすぐ戻る(receipt-queue.ts)。
+          読み取り中・確認待ちの件数は、ここのピルから確認画面へ進める。 */}
+      {reading + waiting > 0 ? (
+        <Link
+          href="/transactions/receipt"
+          prefetch={false}
+          role="status"
+          className="label-text px-4 py-1.5 text-xs"
+          style={{
+            borderRadius: 'var(--radius-full)',
+            background: 'var(--glass-tint-strong)',
+            backdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--ink)',
+          }}
+        >
+          {reading > 0 ? `読み取り中 ${reading}件` : ''}
+          {reading > 0 && waiting > 0 ? ' ・ ' : ''}
+          {waiting > 0 ? `確認待ち ${waiting}件` : ''}
+          <span aria-hidden> →</span>
+        </Link>
+      ) : null}
+
+      {canStream ? (
+        <Fab label="レシートを撮る" onPress={() => setCameraOpen(true)}>
+          <MdCameraAlt aria-hidden size={26} />
+        </Fab>
+      ) : (
+        <Fab label="レシートを撮る" onFiles={(files) => enqueueReceiptFiles(files)}>
+          <MdCameraAlt aria-hidden size={26} />
+        </Fab>
+      )}
+      {cameraOpen ? (
+        <ReceiptCamera
+          onCapture={(files) => enqueueReceiptFiles(files)}
+          onClose={() => setCameraOpen(false)}
+        />
+      ) : null}
 
       {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
           以前はその他もピルの6項目目だったため1項目が詰まって小さかった

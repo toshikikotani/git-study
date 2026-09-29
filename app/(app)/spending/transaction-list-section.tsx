@@ -21,6 +21,7 @@ import {
   type StoredTransaction,
 } from '@/features/transactions/store';
 import { formatDateJa } from '@/lib/date';
+import { PendingReceiptRows } from './pending-receipt-rows';
 import { TransactionFilters, type TransactionFilterState } from '../transactions/filters';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 
@@ -116,6 +117,8 @@ export async function TransactionListSection({
         months={months}
         current={filter}
       />
+
+      <PendingReceiptRows />
 
       <PaydayPeriodCard summary={periodSummary} />
 

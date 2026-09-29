@@ -1283,6 +1283,8 @@ export type Database = {
           must_pay: boolean;
           status: string;
           kind: string;
+          branch_name: string | null;
+          reconcile_diff_yen: number | null;
           merchant_name: string | null;
           note: string | null;
           occurred_on: string;
@@ -1313,6 +1315,8 @@ export type Database = {
           must_pay?: boolean;
           status?: string;
           kind?: string;
+          branch_name?: string | null;
+          reconcile_diff_yen?: number | null;
           merchant_name?: string | null;
           note?: string | null;
           occurred_on: string;
@@ -1343,6 +1347,8 @@ export type Database = {
           must_pay?: boolean;
           status?: string;
           kind?: string;
+          branch_name?: string | null;
+          reconcile_diff_yen?: number | null;
           merchant_name?: string | null;
           note?: string | null;
           occurred_on?: string;
@@ -1538,6 +1544,39 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      genre_memory: {
+        Row: {
+          genre_id: string;
+          hits: number;
+          id: string;
+          item_key: string;
+          pinned: boolean;
+          store_key: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          genre_id: string;
+          hits?: number;
+          id?: string;
+          item_key: string;
+          pinned?: boolean;
+          store_key?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          genre_id?: string;
+          hits?: number;
+          id?: string;
+          item_key?: string;
+          pinned?: boolean;
+          store_key?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       genres: {
         Row: {

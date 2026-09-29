@@ -23,6 +23,10 @@ export type LedgerTransaction = {
   /** ジャンル別内訳からレシートの再登録ができるように持ち回る(ADR-040)。 */
   accountId: string;
   paymentMethod: PaymentMethod;
+  /** 支店名(店名は label)。 */
+  branchName: string | null;
+  /** レシートの照合で解消していない差額(0/null なら一致)。 */
+  reconcileDiffYen: number | null;
   /** 「絶対払わざるを得ないもの」のラベル(ジャンルとは独立した軸)。 */
   mustPay: boolean;
   /** 振替・対象外の判定に使う(集計は domain/ledger.ts が行う)。 */

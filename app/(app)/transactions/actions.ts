@@ -23,7 +23,11 @@ import {
   type TransactionSource,
 } from '@/features/transactions/store';
 import { replaceSplits } from '@/features/transactions/splits-store';
+import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
+import { normalizeStoreName } from '@/domain/store-name';
+import { recordCorrection } from '@/features/genre/memory-store';
 import { assertDateOnly } from '@/lib/date';
+import { createClient } from '@/lib/supabase/server';
 import { describeUserError } from '@/lib/errors';
 
 /**
@@ -80,6 +84,8 @@ export async function saveImportBatchAction(
   duplicates: number;
   error: string | null;
   splitWarnings: string[];
+  /** 今回新しく作られた明細の id(保存直後の「元に戻す」に使う)。 */
+  insertedIds: string[];
 }> {
   let result;
   try {
@@ -87,7 +93,7 @@ export async function saveImportBatchAction(
   } catch (error) {
     const message =
       error instanceof TransactionStoreError ? error.message : '取り込みに失敗しました。';
-    return { imported: 0, duplicates: 0, error: message, splitWarnings: [] };
+    return { imported: 0, duplicates: 0, error: message, splitWarnings: [], insertedIds: [] };
   }
   revalidatePath('/spending');
 
@@ -139,6 +145,7 @@ export async function saveImportBatchAction(
     duplicates: result.duplicateCount,
     error: null,
     splitWarnings,
+    insertedIds: result.insertedTransactions.map((t) => t.id),
   };
 }
 
@@ -240,6 +247,86 @@ export async function setExpenseSubtypeAction(
     await setExpenseSubtype(transactionId, subtype);
   } catch (error) {
     return { error: describeUserError(error, '生活費の小分類の保存に失敗しました。') };
+  }
+  revalidatePath('/spending');
+  return { error: null };
+}
+
+/**
+ * 保存前の重複警告(同じ店・同じ日・近い金額の取引が既にあるか)。
+ * 警告だけで、保存は止めない(同じ店で同じ日に2回買うこともあるため、判断は本人)。
+ */
+export async function checkReceiptDuplicatesAction(
+  probes: readonly { key: string; storeName: string; occurredOn: string; amountYen: number }[],
+): Promise<{
+  duplicates: Record<string, { id: string; occurredOn: string; amountYen: number }[]>;
+}> {
+  const result: Record<string, { id: string; occurredOn: string; amountYen: number }[]> = {};
+  try {
+    const dates = [...new Set(probes.map((p) => assertDateOnly(p.occurredOn)))];
+    if (dates.length === 0) return { duplicates: result };
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, occurred_on, description, merchant_name, amount_yen, review_status')
+      .in('occurred_on', dates)
+      .neq('review_status', 'ignored');
+    if (error) return { duplicates: result };
+    const existing = data.map((r) => ({
+      id: r.id,
+      storeName: r.merchant_name ?? normalizeStoreName(r.description).name,
+      occurredOn: r.occurred_on,
+      amountYen: r.amount_yen,
+    }));
+    for (const probe of probes) {
+      const hits = findReceiptDuplicates(probe, existing);
+      if (hits.length > 0) {
+        result[probe.key] = hits.map((h) => ({
+          id: h.id,
+          occurredOn: h.occurredOn,
+          amountYen: h.amountYen,
+        }));
+      }
+    }
+  } catch {
+    // 警告は補助。失敗しても保存を妨げない。
+  }
+  return { duplicates: result };
+}
+
+/** 利用者が直した品目のジャンルを、分類の履歴へ即座に反映する(pin=true でルール化)。 */
+export async function recordGenreCorrectionAction(input: {
+  storeName: string;
+  itemName: string;
+  genreId: string;
+  pin?: boolean;
+  anyStore?: boolean;
+}): Promise<{ error: string | null }> {
+  try {
+    await recordCorrection(input);
+    return { error: null };
+  } catch (error) {
+    return { error: describeUserError(error, '分類の履歴を保存できませんでした。') };
+  }
+}
+
+/**
+ * 保存直後の「元に戻す」。今の保存で作った明細を消す(分割・品目は明細の削除で
+ * 一緒に消える)。id は本人の行にだけ効く(RLS)。
+ */
+export async function undoReceiptSaveAction(
+  ids: readonly string[],
+): Promise<{ error: string | null }> {
+  if (ids.length === 0) return { error: null };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .in('id', [...ids]);
+    if (error) return { error: '元に戻せませんでした。明細から削除してください。' };
+  } catch (error) {
+    return { error: describeUserError(error, '元に戻せませんでした。') };
   }
   revalidatePath('/spending');
   return { error: null };
