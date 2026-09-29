@@ -12,6 +12,8 @@ import { remainingDays } from '@/domain/period';
 
 export type GoalSnapshot = {
   range: { from: DateOnly; to: DateOnly };
+  /** 期間内の予定の支出の合計。明日からの1日の目安は、これを予算から差し引いて出す。 */
+  scheduledYen?: number;
   genres: readonly {
     genreId: string;
     genreName: string;
@@ -148,7 +150,10 @@ export function goalToastMessage(input: {
       (a, g) => a + (g.targetYen > 0 ? (afterByGenre.get(g.genreId) ?? g.spentYen) : 0),
       0,
     );
-    const perDay = Math.max(Math.floor((targetYen - spentYen) / daysAfterToday), 0);
+    const perDay = Math.max(
+      Math.floor((targetYen - (goal.scheduledYen ?? 0) - spentYen) / daysAfterToday),
+      0,
+    );
     return `${saved}${over.genreName}が目安を${overYen}超えました。明日からは1日${formatYen(perDay, { sign: 'never' })}が目安です。`;
   }
   const first = impact.rows[0];

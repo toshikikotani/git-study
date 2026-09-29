@@ -33,6 +33,7 @@ const STATUS_LABEL: Record<GuidanceStatus, string> = {
   over: '目標を超えています',
   ended: '達成',
   no_budget: '予算なし',
+  reserved: '予定で確保済み',
 };
 
 const STATUS_COLOR: Record<GuidanceStatus, string> = {
@@ -43,6 +44,7 @@ const STATUS_COLOR: Record<GuidanceStatus, string> = {
   over: STATE_COLOR.over,
   ended: 'var(--state-ok)',
   no_budget: 'var(--state-none)',
+  reserved: 'var(--state-none)',
 };
 
 export default async function PlanPage() {
@@ -140,6 +142,7 @@ export default async function PlanPage() {
                     spentYen={r.spentYen}
                     budgetYen={r.targetYen}
                     idealYen={view.ended ? null : r.idealYen}
+                    scheduledYen={r.scheduledYen}
                     maxYen={Math.max(...view.breakdown.map((x) => x.spentYen), 1)}
                   />
                 </li>

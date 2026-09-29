@@ -25,6 +25,7 @@ export function GenreBudgetRow({
   spentYen,
   budgetYen,
   idealYen = null,
+  scheduledYen = 0,
   maxYen,
   selected = false,
   onClick,
@@ -35,6 +36,8 @@ export function GenreBudgetRow({
   budgetYen: number | null;
   /** 今日時点の理想ライン(予算を期間で均等に使った額)。 */
   idealYen?: number | null;
+  /** このジャンルの予定の支出(今日より先)。予算から差し引いて見せる。 */
+  scheduledYen?: number;
   /** 予算なしのバーの基準(一覧の最大額)。 */
   maxYen: number;
   selected?: boolean;
@@ -42,8 +45,13 @@ export function GenreBudgetRow({
   /** 行の下に足す補足(目標画面の一言など)。 */
   children?: React.ReactNode;
 }) {
-  const state = budgetState({ spentYen, budgetYen, idealYen });
+  const state = budgetState({ spentYen, budgetYen, idealYen, scheduledYen });
   const hasBudget = state !== 'none';
+  const freeYen = hasBudget ? Math.max(budgetYen! - scheduledYen - spentYen, 0) : 0;
+  const scheduledRatio = hasBudget
+    ? Math.min(scheduledYen / budgetYen!, 1 - Math.min(spentYen / budgetYen!, 1))
+    : 0;
+  // 余裕のときは状態を出さない(注意・超過・予定で確保済みのときだけ)。
   const ratio = hasBudget
     ? Math.min(spentYen / budgetYen!, 1)
     : Math.min(spentYen / Math.max(maxYen, 1), 1);
@@ -57,7 +65,7 @@ export function GenreBudgetRow({
         <span className="min-w-0 flex-1 truncate text-sm" style={{ color: 'var(--ink)' }}>
           {name}
         </span>
-        {hasBudget ? (
+        {hasBudget && state !== 'ok' ? (
           <span
             className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
             style={{ background: STATE_TRACK[state], color: STATE_COLOR[state] }}
@@ -85,6 +93,18 @@ export function GenreBudgetRow({
           className="h-full rounded-full"
           style={{ width: `${ratio * 100}%`, background: STATE_COLOR[state] }}
         />
+        {scheduledRatio > 0 ? (
+          <div
+            className="absolute inset-y-0"
+            style={{
+              left: `${ratio * 100}%`,
+              width: `${scheduledRatio * 100}%`,
+              background:
+                'repeating-linear-gradient(45deg, var(--ink-muted) 0 3px, transparent 3px 6px)',
+              opacity: 0.55,
+            }}
+          />
+        ) : null}
         {idealRatio !== null ? (
           <span
             className="absolute inset-y-0 w-0.5"
@@ -96,6 +116,12 @@ export function GenreBudgetRow({
           />
         ) : null}
       </div>
+      {scheduledYen > 0 && hasBudget ? (
+        <p className="tabular mt-1 text-[11px]" style={{ color: 'var(--ink-secondary)' }}>
+          予定 {formatYen(scheduledYen, { sign: 'never' })} / 自由に使える残り{' '}
+          {formatYen(freeYen, { sign: 'never' })}
+        </p>
+      ) : null}
       {children}
     </>
   );
@@ -108,7 +134,7 @@ export function GenreBudgetRow({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      aria-label={budgetSpokenLabel(name, spentYen, budgetYen)}
+      aria-label={`${budgetSpokenLabel(name, spentYen, budgetYen)}${scheduledYen > 0 ? `、予定${formatYen(scheduledYen, { sign: 'never' })}${state === 'reserved' ? 'で確保済み' : ''}` : ''}`}
       className="block w-full px-2 py-1.5 text-left"
       style={style}
     >
@@ -117,7 +143,7 @@ export function GenreBudgetRow({
   ) : (
     <div
       role="group"
-      aria-label={budgetSpokenLabel(name, spentYen, budgetYen)}
+      aria-label={`${budgetSpokenLabel(name, spentYen, budgetYen)}${scheduledYen > 0 ? `、予定${formatYen(scheduledYen, { sign: 'never' })}${state === 'reserved' ? 'で確保済み' : ''}` : ''}`}
       className="px-2 py-1.5"
       style={style}
     >

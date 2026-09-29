@@ -83,6 +83,8 @@ export type LedgerSummary = {
   byDay: ReadonlyMap<DateOnly, number>;
   /** 日別の予定の支出。 */
   scheduledByDay: ReadonlyMap<DateOnly, number>;
+  /** ジャンル別の予定の支出(特別費を含む)。キー null は未分類。 */
+  scheduledByGenre: ReadonlyMap<string | null, number>;
   /** 未分類の使った額(byGenre の null と同じ値)。 */
   uncategorizedYen: number;
 };
@@ -108,6 +110,7 @@ export function summarizeLedger(
   const byGenrePace = new Map<string | null, number>();
   const byDay = new Map<DateOnly, number>();
   const scheduledByDay = new Map<DateOnly, number>();
+  const scheduledByGenre = new Map<string | null, number>();
 
   for (const e of entries) {
     if (e.occurredOn < range.from || e.occurredOn > range.to) continue;
@@ -119,6 +122,7 @@ export function summarizeLedger(
       if (yen > 0) {
         scheduledYen += yen;
         add(scheduledByDay, e.occurredOn, yen);
+        add(scheduledByGenre, e.categoryId, yen);
       }
       continue;
     }
@@ -148,6 +152,7 @@ export function summarizeLedger(
     byGenrePace,
     byDay,
     scheduledByDay,
+    scheduledByGenre,
     uncategorizedYen: byGenre.get(null) ?? 0,
   };
 }

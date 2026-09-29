@@ -285,8 +285,8 @@ describe('planGuidance(目標との連携の規則)', () => {
     expect(g.projectedYen).toBeNull();
     expect(g.genres[0]!.projectedYen).toBeNull();
     expect(g.paceDiffYen).toBe(1500);
-    expect(g.headline).toContain('理想ペースとの差');
-    expect(g.headline).toContain('+1,500円');
+    expect(g.headline).toContain('理想より1,500円多い');
+    expect(g.headline).not.toMatch(/[+\u2212]\d/);
     expect(g.headline).not.toContain('見込み');
   });
 

@@ -29,6 +29,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
     spentYen: number;
     budgetYen: number | null;
     idealYen: number | null;
+    scheduledYen: number;
   }[] = useGoal
     ? goalRows!.map((r) => ({
         key: r.genreId ?? 'none',
@@ -37,6 +38,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
         spentYen: r.spentYen,
         budgetYen: r.targetYen,
         idealYen: r.idealYen,
+        scheduledYen: r.scheduledYen,
       }))
     : genreBreakdown.map((r: GenreBreakdownRow) => ({
         key: r.genreId ?? 'none',
@@ -45,6 +47,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
         spentYen: r.spentYen,
         budgetYen: r.budgetYen,
         idealYen: null,
+        scheduledYen: 0,
       }));
 
   const total = rows.reduce((a, r) => a + r.spentYen, 0);
@@ -136,6 +139,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
                     spentYen={r.spentYen}
                     budgetYen={r.budgetYen}
                     idealYen={r.idealYen}
+                    scheduledYen={r.scheduledYen}
                     maxYen={maxYen}
                     selected={selected}
                     onClick={() =>

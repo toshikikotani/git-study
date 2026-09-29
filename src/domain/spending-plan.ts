@@ -197,6 +197,9 @@ export function rebalanceToTotal(
 /** 線形の外挿(このペースが続くと…)を出すのに必要な経過日数。これ未満は理想ペースとの差だけを見せる。 */
 export const MIN_DAYS_FOR_PROJECTION = 3;
 
+/** 予定の支出がジャンルの目標のこの割合以上なら、そのジャンルは「予定で確保済み」。 */
+export const RESERVED_RATIO = 0.8;
+
 export type GuidanceStatus =
   | 'not_started'
   | 'on_track'
@@ -205,19 +208,26 @@ export type GuidanceStatus =
   | 'over'
   | 'ended'
   /** 目標が0円・未設定のジャンル。状態も一言も出さない(「順調です」「1日0円まで」を出さない)。 */
-  | 'no_budget';
+  | 'no_budget'
+  /** 予定の支出で、目標のほぼ全額が確保済み。「余裕」とは扱わない。 */
+  | 'reserved';
 
 export type GenreGuidance = {
   genreId: string;
   genreName: string;
   targetYen: number;
   spentYen: number;
+  /** 目標 − 実績(予定は引かない)。 */
   remainingYen: number;
-  /** 今日時点の理想ライン(目標を期間で均等に使った額)。 */
+  /** このジャンルの予定の支出(今日より先)。 */
+  scheduledYen: number;
+  /** 自由に使える残り = 目標 − 予定 − 実績(マイナスは 0 として見せる側で丸める)。 */
+  freeYen: number;
+  /** 今日時点の理想ライン((目標 − 予定)を期間で均等に使った額)。 */
   idealYen: number;
   /** このペースが続いた場合の期間末の支出見込み。経過が短いとき・予算なしは null。 */
   projectedYen: number | null;
-  /** 見込みが目標を超える額(超えなければ0)。 */
+  /** 見込み(+予定)が目標を超える額(超えなければ0)。 */
   projectedOverYen: number;
   /** 残りの日数(今日を含む)で使えるのは1日あたりこの額まで(残りが無い・予算なしは null)。 */
   dailyAllowanceYen: number | null;
@@ -234,25 +244,34 @@ export type PlanGuidance = {
   totalDays: number;
   /** 残り日数(今日を含む、domain/period.ts)。 */
   remainingDays: number;
-  /** 目標のあるジャンルの合計。 */
+  /** 目標のあるジャンルの合計(総予算)。 */
   targetYen: number;
-  /** 目標のあるジャンルの実績の合計(特別費・予定を除く)。 */
+  /** 総額の実績:目標のあるジャンルの実績 + 未分類の実績(特別費・予定を除く)。 */
   spentYen: number;
-  /** 今日時点の理想ライン(目標の合計を期間で均等に使った額)。 */
+  /** 期間内の予定の支出(今日より先)。総予算から差し引く。 */
+  scheduledYen: number;
+  /** 総予算 − 予定 − 実績(マイナスなら予算超過の見込み)。 */
+  freeYen: number;
+  /** 今日時点の理想ライン((総予算 − 予定)を期間で均等に使った額)。 */
   expectedByTodayYen: number;
   /** 理想ペースとの差(実績 − 理想。正なら使いすぎ)。 */
   paceDiffYen: number;
   /** 線形の見込みを出してよいか(経過3日以上)。 */
   showProjection: boolean;
-  /** 1日あたりの目安(今日使える額の元):残り予算 ÷ 残り日数。残り日数が無ければ null。 */
+  /**
+   * 1日の目安 = (総予算 − 予定 − 昨日までの実績)÷ 残り日数(今日を含む)。
+   * 残り日数が無ければ null。
+   */
   dailyAllowanceYen: number | null;
-  /** 今日使える額(今日の目安から、今日すでに使った分を引いた額)。 */
+  /** 今日あと使える額 = 1日の目安 − 今日の実績(下限0)。 */
   todayAllowanceYen: number | null;
+  /** 今日すでに使った額(未分類を含む)。 */
+  todaySpentYen: number;
   projectedYen: number | null;
   /** 特別費(目標のペースに含めない)の実績。 */
   specialYen: number;
-  /** 予定(未来日)の支出。 */
-  scheduledYen: number;
+  /** 未分類の実績(総額に含めるが、ジャンル別には含めない)。 */
+  uncategorizedYen: number;
   headline: string;
   genres: GenreGuidance[];
   /** 要対応のジャンルの一言。上位2件だけ(下の一覧との重複を避ける)。 */
@@ -260,17 +279,22 @@ export type PlanGuidance = {
 };
 
 const yen = (value: number) => `${Math.round(value).toLocaleString('ja-JP')}円`;
-const signedYen = (value: number) => `${value < 0 ? '\u2212' : '+'}${yen(Math.abs(value))}`;
 
 /**
  * 目標に向けて行動できているかの行動指針(本人発案)。AIは使わず、期間・目標・
  * 実績の数字だけから、ペース・期間末の見込み・1日あたりの使える額を出す。
  * 超過は叱らず、数字と次の一手だけを示す。
  *
+ * 計算式(全画面で同じ):
+ *   1日の目安     = (総予算 − 予定支出 − 昨日までの実績)÷ 残り日数(今日を含む)
+ *   今日あと使える額 = 1日の目安 − 今日の実績
+ * 予定の支出(今日より先の日付)は、まだ使っていなくても予算から差し引く。
+ * 未分類の支出は総額の実績に含める(ジャンル別には含めない)。
+ *
  *   - 目標が0円のジャンルは「予算なし」:状態も一言も出さず、合計にも入れない
- *   - 経過が3日未満なら線形の見込みは出さず、理想ペースとの差(今日時点で±○円)を見せる
- *   - 残り日数は今日を含む(domain/period.ts)。「今日使える額」も同じ日数で割る
- *   - 特別費と予定は呼び出し側がペースの実績から外し、specialYen・scheduledYen として別に渡す
+ *   - 予定でジャンルの目標のほぼ全額が確保されていれば「予定で確保済み」(余裕にしない)
+ *   - 経過が3日未満なら線形の見込みは出さず、理想ペースとの差を見せる
+ *   - 特別費の実績はペースの実績から外し、specialYen として別に渡す
  */
 export function planGuidance(input: {
   periodStart: DateOnly;
@@ -281,11 +305,17 @@ export function planGuidance(input: {
     genreName: string;
     targetYen: number;
     spentYen: number;
-    /** 今日すでに使った額(今日使える額の計算用)。 */
+    /** 今日すでに使った額。 */
     todaySpentYen?: number;
+    /** このジャンルの予定の支出。 */
+    scheduledYen?: number;
   }[];
-  specialYen?: number;
+  /** 期間内の予定の支出の合計(ジャンルを問わない)。 */
   scheduledYen?: number;
+  specialYen?: number;
+  /** 未分類の実績と、うち今日の分。 */
+  uncategorizedYen?: number;
+  uncategorizedTodayYen?: number;
 }): PlanGuidance {
   const { periodStart, periodEnd, today } = input;
   const totalDays = planPeriodDays(periodStart, periodEnd);
@@ -298,9 +328,13 @@ export function planGuidance(input: {
 
   const genres: GenreGuidance[] = input.items.map((item) => {
     const hasBudget = item.targetYen > 0;
+    const scheduledYen = item.scheduledYen ?? 0;
     const remainingYen = item.targetYen - item.spentYen;
+    const freeYen = item.targetYen - scheduledYen - item.spentYen;
     const dailyPaceYen = elapsedDays > 0 ? item.spentYen / elapsedDays : 0;
-    const idealYen = Math.round((item.targetYen * elapsedDays) / totalDays);
+    const idealYen = Math.round(
+      (Math.max(item.targetYen - scheduledYen, 0) * elapsedDays) / totalDays,
+    );
     const projectedYen = !hasBudget
       ? null
       : ended
@@ -308,10 +342,11 @@ export function planGuidance(input: {
         : showProjection
           ? Math.round(dailyPaceYen * totalDays)
           : null;
-    const projectedOverYen = projectedYen === null ? 0 : Math.max(projectedYen - item.targetYen, 0);
+    const projectedOverYen =
+      projectedYen === null ? 0 : Math.max(projectedYen + scheduledYen - item.targetYen, 0);
     const dailyAllowanceYen =
       hasBudget && remainingDays > 0 && !ended
-        ? Math.max(Math.floor(remainingYen / remainingDays), 0)
+        ? Math.max(Math.floor(freeYen / remainingDays), 0)
         : null;
 
     let status: GuidanceStatus;
@@ -319,9 +354,12 @@ export function planGuidance(input: {
     else if (!started) status = 'not_started';
     else if (ended) status = item.spentYen > item.targetYen ? 'over' : 'ended';
     else if (remainingYen < 0) status = 'over';
+    else if (freeYen < 0) status = 'over_pace';
+    else if (scheduledYen > 0 && scheduledYen >= item.targetYen * RESERVED_RATIO)
+      status = 'reserved';
     else if (!showProjection) status = item.spentYen > idealYen ? 'watch' : 'on_track';
     else if (projectedOverYen > 0) status = 'over_pace';
-    else if (projectedYen! / item.targetYen >= 0.9) status = 'watch';
+    else if ((projectedYen! + scheduledYen) / item.targetYen >= 0.9) status = 'watch';
     else status = 'on_track';
 
     return {
@@ -330,6 +368,8 @@ export function planGuidance(input: {
       targetYen: item.targetYen,
       spentYen: item.spentYen,
       remainingYen,
+      scheduledYen,
+      freeYen,
       idealYen,
       projectedYen,
       projectedOverYen,
@@ -342,6 +382,8 @@ export function planGuidance(input: {
           : genreMessage(item.genreName, {
               status,
               remainingYen,
+              freeYen,
+              scheduledYen,
               remainingDays,
               dailyAllowanceYen,
               dailyPaceYen: Math.round(dailyPaceYen),
@@ -354,36 +396,37 @@ export function planGuidance(input: {
 
   const budgeted = genres.filter((g) => g.status !== 'no_budget');
   const targetYen = budgeted.reduce((acc, g) => acc + g.targetYen, 0);
-  const spentYen = budgeted.reduce((acc, g) => acc + g.spentYen, 0);
-  const todaySpentYen = input.items
-    .filter((i) => i.targetYen > 0)
-    .reduce((acc, i) => acc + (i.todaySpentYen ?? 0), 0);
-  const remainingYen = targetYen - spentYen;
-  const expectedByTodayYen = Math.round((targetYen * elapsedDays) / totalDays);
+  const uncategorizedYen = input.uncategorizedYen ?? 0;
+  // 総額の実績:目標のあるジャンル + 未分類(ジャンル別の行には未分類を入れない)。
+  const spentYen = budgeted.reduce((acc, g) => acc + g.spentYen, 0) + uncategorizedYen;
+  const todaySpentYen =
+    input.items.filter((i) => i.targetYen > 0).reduce((acc, i) => acc + (i.todaySpentYen ?? 0), 0) +
+    (input.uncategorizedTodayYen ?? 0);
+  const scheduledYen = input.scheduledYen ?? 0;
+  const freeYen = targetYen - scheduledYen - spentYen;
+  const expectedByTodayYen = Math.round(
+    (Math.max(targetYen - scheduledYen, 0) * elapsedDays) / totalDays,
+  );
   const paceDiffYen = spentYen - expectedByTodayYen;
   const projectedYen = showProjection
-    ? budgeted.reduce((acc, g) => acc + (g.projectedYen ?? g.spentYen), 0)
+    ? Math.round((spentYen / elapsedDays) * totalDays) + scheduledYen
     : ended
       ? spentYen
       : null;
-  const dailyAllowanceYen =
-    targetYen > 0 && remainingDays > 0 && !ended
-      ? Math.max(Math.floor(remainingYen / remainingDays), 0)
-      : null;
-  // 今日使える額:今日より前の実績で残りを割った1日の目安から、今日すでに使った分を引く。
+  const canAllow = targetYen > 0 && remainingDays > 0 && !ended && started;
+  const spentBeforeTodayYen = spentYen - todaySpentYen;
+  const dailyAllowanceYen = canAllow
+    ? Math.max(Math.floor((targetYen - scheduledYen - spentBeforeTodayYen) / remainingDays), 0)
+    : null;
   const todayAllowanceYen =
-    targetYen > 0 && remainingDays > 0 && !ended && started
-      ? Math.max(
-          Math.floor((targetYen - (spentYen - todaySpentYen)) / remainingDays) - todaySpentYen,
-          0,
-        )
-      : null;
+    dailyAllowanceYen === null ? null : Math.max(dailyAllowanceYen - todaySpentYen, 0);
 
   let status: GuidanceStatus;
   if (targetYen <= 0) status = 'no_budget';
   else if (!started) status = 'not_started';
   else if (ended) status = spentYen > targetYen ? 'over' : 'ended';
-  else if (remainingYen < 0) status = 'over';
+  else if (targetYen - spentYen < 0) status = 'over';
+  else if (freeYen < 0) status = 'over_pace';
   else if (!showProjection) status = paceDiffYen > 0 ? 'watch' : 'on_track';
   else if (projectedYen! > targetYen) status = 'over_pace';
   else if (projectedYen! / targetYen >= 0.9) status = 'watch';
@@ -391,7 +434,7 @@ export function planGuidance(input: {
 
   const actions = budgeted
     .filter((g) => g.status === 'over' || g.status === 'over_pace')
-    .sort((a, b) => b.projectedOverYen - a.projectedOverYen || a.remainingYen - b.remainingYen)
+    .sort((a, b) => b.projectedOverYen - a.projectedOverYen || a.freeYen - b.freeYen)
     .slice(0, 2)
     .map((g) => g.message);
 
@@ -402,21 +445,24 @@ export function planGuidance(input: {
     remainingDays,
     targetYen,
     spentYen,
+    scheduledYen,
+    freeYen,
     expectedByTodayYen,
     paceDiffYen,
     showProjection,
     dailyAllowanceYen,
     todayAllowanceYen,
+    todaySpentYen,
     projectedYen,
     specialYen: input.specialYen ?? 0,
-    scheduledYen: input.scheduledYen ?? 0,
+    uncategorizedYen,
     headline: headlineMessage({
       status,
       spentYen,
       expectedByTodayYen,
       paceDiffYen,
       showProjection,
-      remainingYen,
+      freeYen,
       remainingDays,
       dailyAllowanceYen,
       projectedYen,
@@ -429,11 +475,19 @@ export function planGuidance(input: {
   };
 }
 
+/** 理想ペースとの差を、符号ではなく言葉で表す。 */
+export function paceDiffWords(paceDiffYen: number): string {
+  if (paceDiffYen === 0) return '理想ペースどおりです';
+  return paceDiffYen < 0 ? `理想より${yen(-paceDiffYen)}少ない` : `理想より${yen(paceDiffYen)}多い`;
+}
+
 function genreMessage(
   name: string,
   x: {
     status: GuidanceStatus;
     remainingYen: number;
+    freeYen: number;
+    scheduledYen: number;
     remainingDays: number;
     dailyAllowanceYen: number | null;
     dailyPaceYen: number;
@@ -453,20 +507,24 @@ function genreMessage(
       return `${name}: まだ始まっていません`;
     case 'ended':
       return `${name}: 目標内で終えました`;
+    case 'reserved':
+      return `${name}: 予定${yen(x.scheduledYen)}で確保済みです。自由に使える残りは${yen(Math.max(x.freeYen, 0))}`;
     case 'over':
       return x.remainingDays > 0
         ? `${name}: 目標を${yen(-x.remainingYen)}超えています。残り${x.remainingDays}日は、これ以上増やさない目安です`
         : `${name}: 目標を${yen(-x.remainingYen)}超えて終えました。次の目標で見直しましょう`;
     case 'over_pace':
-      return `${name}: このペースだと期間末に${yen(x.projectedOverYen)}超える見込みです。${allowance}(今は1日${yen(x.dailyPaceYen)})`;
+      return x.freeYen < 0 && x.projectedOverYen === 0
+        ? `${name}: 予定${yen(x.scheduledYen)}を含めると目標を${yen(-x.freeYen)}超える見込みです`
+        : `${name}: このペースだと期間末に${yen(x.projectedOverYen)}超える見込みです。${allowance}(今は1日${yen(x.dailyPaceYen)})`;
     case 'watch':
       return x.showProjection
         ? `${name}: 目標に近づいています。${allowance}`
-        : `${name}: 理想ペースとの差 ${signedYen(x.paceDiffYen)}(今日時点)。${allowance}`;
+        : `${name}: ${paceDiffWords(x.paceDiffYen)}(今日時点)。${allowance}`;
     case 'on_track':
       return x.showProjection
         ? `${name}: 順調です。${allowance}使えます`
-        : `${name}: 順調です。理想ペースとの差 ${signedYen(x.paceDiffYen)}(今日時点)。${allowance}使えます`;
+        : `${name}: 順調です。${paceDiffWords(x.paceDiffYen)}(今日時点)。${allowance}使えます`;
   }
 }
 
@@ -476,7 +534,7 @@ function headlineMessage(x: {
   expectedByTodayYen: number;
   paceDiffYen: number;
   showProjection: boolean;
-  remainingYen: number;
+  freeYen: number;
   remainingDays: number;
   dailyAllowanceYen: number | null;
   projectedYen: number | null;
@@ -491,23 +549,27 @@ function headlineMessage(x: {
   switch (x.status) {
     case 'no_budget':
       return '目標額が決まっているジャンルがありません';
+    case 'reserved':
+      return '予定で確保済みです';
     case 'not_started':
       return `${daysBetween(x.today, x.periodStart)}日後に始まります。全体で${yen(x.targetYen)}が目標です`;
     case 'ended':
       return `目標内(${yen(x.spentYen)} / ${yen(x.targetYen)})で終えました`;
     case 'over':
       return x.remainingDays > 0
-        ? `全体で目標を${yen(-x.remainingYen)}超えています。残り${x.remainingDays}日は支出を抑えたい状況です`
-        : `全体で目標を${yen(-x.remainingYen)}超えて終えました`;
+        ? `全体で目標を${yen(x.spentYen - x.targetYen)}超えています。残り${x.remainingDays}日は支出を抑えたい状況です`
+        : `全体で目標を${yen(x.spentYen - x.targetYen)}超えて終えました`;
     case 'over_pace':
-      return `今のペースだと期間末に${yen(x.projectedYen ?? 0)}(目標より${yen((x.projectedYen ?? 0) - x.targetYen)}多い)の見込みです。${allowance}`;
+      return x.freeYen < 0
+        ? `予定を含めると、目標より${yen(-x.freeYen)}多くなる見込みです。${allowance}`
+        : `今のペースだと期間末に${yen(x.projectedYen ?? 0)}(目標より${yen((x.projectedYen ?? 0) - x.targetYen)}多い)の見込みです。${allowance}`;
     case 'watch':
       return x.showProjection
         ? `目標に近づいています(見込み${yen(x.projectedYen ?? 0)})。${allowance}`
-        : `理想ペースとの差は ${signedYen(x.paceDiffYen)}(今日時点)。${allowance}`;
+        : `${paceDiffWords(x.paceDiffYen)}(今日時点)。${allowance}`;
     case 'on_track':
       return x.showProjection
         ? `順調です。今日までの目安${yen(x.expectedByTodayYen)}に対して${yen(x.spentYen)}。${allowance}使えます`
-        : `順調です。理想ペースとの差は ${signedYen(x.paceDiffYen)}(今日時点)。${allowance}使えます`;
+        : `順調です。${paceDiffWords(x.paceDiffYen)}(今日時点)。${allowance}使えます`;
   }
 }

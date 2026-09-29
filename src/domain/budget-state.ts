@@ -4,6 +4,7 @@
  *   ok       余裕    青
  *   caution  注意    黄  予算の80%以上を使った、または今日時点の理想ペースを超えている
  *   over     超過    赤  予算を超えた。赤は超過とエラーにだけ使う
+ *   reserved 予定で確保済み  中立(グレー)。予定の支出で予算のほぼ全額が確保されていて、余裕とは扱わない
  *   none     予算なし グレー  予算が未設定・0円。「順調です」「1日0円まで」などは出さない
  *
  * 色だけに頼らず、必ずアイコンとラベルを併用する(STATE_LABEL / STATE_ICON)。
@@ -11,19 +12,26 @@
 
 import { formatYen } from '@/domain/money';
 
-export type BudgetState = 'ok' | 'caution' | 'over' | 'none';
+export type BudgetState = 'ok' | 'caution' | 'over' | 'none' | 'reserved';
 
 export const CAUTION_RATIO = 0.8;
+
+/** 予定の支出が予算のこの割合以上なら「予定で確保済み」(domain/spending-plan.ts と同じ値)。 */
+const RESERVED_RATIO = 0.8;
 
 export function budgetState(input: {
   spentYen: number;
   budgetYen: number | null;
   /** 今日時点の理想ライン(予算を期間で均等に使った場合の額)。無ければ null。 */
   idealYen?: number | null;
+  /** このジャンルの予定の支出(今日より先)。 */
+  scheduledYen?: number;
 }): BudgetState {
   const { spentYen, budgetYen } = input;
   if (budgetYen === null || budgetYen <= 0) return 'none';
-  if (spentYen > budgetYen) return 'over';
+  const scheduledYen = input.scheduledYen ?? 0;
+  if (spentYen > budgetYen || spentYen + scheduledYen > budgetYen) return 'over';
+  if (scheduledYen > 0 && scheduledYen >= budgetYen * RESERVED_RATIO) return 'reserved';
   if (spentYen >= budgetYen * CAUTION_RATIO) return 'caution';
   if (input.idealYen != null && spentYen > input.idealYen) return 'caution';
   return 'ok';
@@ -34,6 +42,7 @@ export const STATE_LABEL: Record<BudgetState, string> = {
   caution: '注意',
   over: '超過',
   none: '予算なし',
+  reserved: '予定で確保済み',
 };
 
 /** 状態を示す記号(色に頼らない併用表示)。 */
@@ -42,6 +51,7 @@ export const STATE_ICON: Record<BudgetState, string> = {
   caution: '▲',
   over: '!',
   none: '–',
+  reserved: '◧',
 };
 
 /** 状態色の CSS 変数(app/globals.css)。 */
@@ -50,6 +60,7 @@ export const STATE_COLOR: Record<BudgetState, string> = {
   caution: 'var(--state-caution)',
   over: 'var(--state-over)',
   none: 'var(--state-none)',
+  reserved: 'var(--state-none)',
 };
 
 export const STATE_TRACK: Record<BudgetState, string> = {
@@ -57,6 +68,7 @@ export const STATE_TRACK: Record<BudgetState, string> = {
   caution: 'var(--state-caution-track)',
   over: 'var(--state-over-track)',
   none: 'var(--state-none-track)',
+  reserved: 'var(--state-none-track)',
 };
 
 /**

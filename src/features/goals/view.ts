@@ -18,8 +18,12 @@ export type GoalBreakdownRow = {
   spentYen: number;
   /** 目標額。目標に無いジャンルは null(予算なし)。 */
   targetYen: number | null;
-  /** 今日時点の理想ライン(目標を期間で均等に使った額)。 */
+  /** 今日時点の理想ライン((目標 − 予定)を期間で均等に使った額)。 */
   idealYen: number | null;
+  /** このジャンルの予定の支出(今日より先)。 */
+  scheduledYen: number;
+  /** 予定で目標のほぼ全額が確保済みか。 */
+  reserved: boolean;
 };
 
 /**
@@ -85,9 +89,12 @@ export function buildGoalView(input: {
       targetYen: item.targetYen,
       spentYen: summary.byGenrePace.get(item.genreId) ?? 0,
       todaySpentYen: todaySummary.byGenrePace.get(item.genreId) ?? 0,
+      scheduledYen: summary.scheduledByGenre.get(item.genreId) ?? 0,
     })),
     specialYen: summary.specialYen,
     scheduledYen: summary.scheduledYen,
+    uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
+    uncategorizedTodayYen: todaySummary.byGenrePace.get(null) ?? 0,
   });
 
   const planned = new Set(plan.items.filter((i) => i.targetYen > 0).map((i) => i.genreId));
@@ -99,6 +106,8 @@ export function buildGoalView(input: {
       spentYen: g.spentYen,
       targetYen: g.targetYen,
       idealYen: g.idealYen,
+      scheduledYen: g.scheduledYen,
+      reserved: g.status === 'reserved',
     }));
   const noBudget: GoalView['noBudget'] = [];
   for (const [genreId, spentYen] of summary.byGenrePace) {
@@ -118,6 +127,8 @@ export function buildGoalView(input: {
       spentYen: row.spentYen,
       targetYen: null,
       idealYen: null,
+      scheduledYen: 0,
+      reserved: false,
     });
   }
 
@@ -134,6 +145,7 @@ export function buildGoalView(input: {
     guidance,
     snapshot: {
       range,
+      scheduledYen: guidance.scheduledYen,
       genres: plan.items.map((i) => ({
         genreId: i.genreId,
         genreName: i.genreName,
@@ -143,7 +155,9 @@ export function buildGoalView(input: {
     },
     breakdown,
     noBudget,
-    dailyAllowanceYen: targetTotal > 0 ? Math.floor(targetTotal / days) : null,
+    // カレンダーの点の基準:予定を除いた予算を期間の日数で割った1日の目安。
+    dailyAllowanceYen:
+      targetTotal > 0 ? Math.floor(Math.max(targetTotal - guidance.scheduledYen, 0) / days) : null,
     review: ended
       ? buildGoalReview({
           items: plan.items,
