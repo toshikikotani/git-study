@@ -1,6 +1,5 @@
 import { MdLocalFireDepartment } from 'react-icons/md';
 
-import { Button } from '@/components/ui/button';
 import { CountUp } from '@/components/ui/count-up';
 import { ExpandableBudgetTile } from '@/components/ui/expandable-budget-tile';
 import { ProgressGauge } from '@/components/ui/meter';
@@ -10,7 +9,7 @@ import { streakBadgeFor } from '@/domain/streak';
 import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
-import { formatDateJa, formatTimeJa } from '@/lib/date';
+import { formatTimeJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
@@ -36,7 +35,9 @@ export default async function HomePage() {
     Promise.all([recordCheckin().catch(() => undefined), loadHomeSummary()]),
   );
   const streak = await getCheckinStreak();
-  const { payoff, tiles } = summary;
+  const { payoff } = summary;
+  // 予算が無い枠は「予算なし」と空のメーターしか出せず、情報が無い。予算を決めた枠だけ出す。
+  const tiles = summary.tiles.filter((tile) => tile.budgetYen !== null);
 
   // タイルを押すとその場で内訳を開く(本人発案:遷移せずに見たい)。
   // タイルは高々数枠(FR-61)なので、ここで内訳もまとめて先読みしておく。
@@ -71,14 +72,16 @@ export default async function HomePage() {
               >
                 完済まで
               </span>
-              {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
+              {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない。
+                  説明文は置かず、押すと負債の入力へ飛ぶ(ADR-061)。 */}
               {payoff.isEstimated ? (
-                <span
+                <a
+                  href="/debts"
                   className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
-                  推定
-                </span>
+                  推定 ›
+                </a>
               ) : null}
             </div>
             <StreakBadge streak={streak} />
@@ -115,11 +118,6 @@ export default async function HomePage() {
                     {formatYen(payoff.remainingYen)}
                   </span>
                 </span>
-                {payoff.payoffOn ? (
-                  <span style={{ color: 'var(--ink-muted)' }}>
-                    {formatDateJa(payoff.payoffOn)} 完済見込み
-                  </span>
-                ) : null}
               </div>
 
               {/* 残高のスナップショットだけでは「進んでいる」ことが伝わらない。
@@ -137,29 +135,8 @@ export default async function HomePage() {
           )}
 
           <div className="mt-5">
-            <ProgressGauge
-              ratio={payoff.progressRatio}
-              label="返済済み"
-              nextMilestone={payoff.nextMilestone}
-            />
+            <ProgressGauge ratio={payoff.progressRatio} label="返済済み" />
           </div>
-
-          {/* リンクを本文に混ぜると行をまたいで割れる。行を分けて動線として立てる。 */}
-          {payoff.isEstimated ? (
-            <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-                残高と金利に推定値が含まれています。正確な値を入れると、この日付が確定します。
-              </p>
-              <a
-                href="/debts"
-                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
-                負債を入力する
-                <span aria-hidden>→</span>
-              </a>
-            </div>
-          ) : null}
         </div>
       </section>
 
@@ -193,8 +170,12 @@ export default async function HomePage() {
                     : `${formatYen(tile.spentYen)} / ${formatYen(tile.budgetYen)}`,
                 ratio: tile.usageRatio,
                 tone,
+                // 割合はメーターと「使った額 / 予算」で既に伝わる。文字のバッジは、
+                // 色だけに頼れない注意・超過のときだけ添える(FR-64)。
                 note:
-                  tile.usageRatio === null ? undefined : `${Math.round(tile.usageRatio * 100)}%`,
+                  tile.usageRatio === null || tone === 'normal'
+                    ? undefined
+                    : `${Math.round(tile.usageRatio * 100)}%`,
               }}
             />
           );
@@ -203,7 +184,7 @@ export default async function HomePage() {
 
       {tiles.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
-          ホームに出す枠が選ばれていません。
+          予算を決めたジャンルが、ここに残額として出ます。
           <a
             href="/reports/genres"
             className="underline decoration-dotted underline-offset-4"
@@ -211,32 +192,9 @@ export default async function HomePage() {
           >
             ジャンルの設定
           </a>
-          で表示したい枠を選んでください。
+          で予算とホーム表示を選んでください。
         </p>
       ) : null}
-
-      {/*
-       * 本人発案(「説明文は遷移先へ。遷移できるものはボタンにし、関連機能の
-       * 近くに置く。機能がいっぱいあるように見せない」)。以前はここに
-       * 6件の文字リンクが横並びだった。副業・転職準備・Google連携は
-       * 「その他」メニュー(P10-1)から辿れるため重複させず削除し、今見ている
-       * 数字(完済・予算タイル)と直接関係の深い2件だけをボタンとして残した。
-       */}
-      <div className="rise" style={{ animationDelay: `${100 + tiles.length * 70}ms` }}>
-        <Button href="/briefs" variant="elevated" className="w-full">
-          朝配信のアーカイブを見る
-          <span aria-hidden>→</span>
-        </Button>
-      </div>
-
-      <div className="rise flex gap-3" style={{ animationDelay: `${170 + tiles.length * 70}ms` }}>
-        <Button href="/reports" variant="outlined" className="flex-1">
-          支出レポート
-        </Button>
-        <Button href="/assistant" variant="outlined" className="flex-1">
-          AI相談
-        </Button>
-      </div>
     </div>
   );
 }
