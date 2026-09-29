@@ -1572,6 +1572,27 @@ Google Calendar のイベントIDは `^[a-v0-9]{5,1024}$`(小文字 base32hex、
 
 **検証**:`npx tsc --noEmit -p .`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(`planToolCall()`の全ツール・上限・削除系の拒否・`parseAskUser()`のテストを含め全通過)/`npx next build` すべて成功。**未検証**:このセッションには実機・本人のログイン手段もAnthropic APIキーも無いため、実際の会話でのツール呼び出し・確認カードの操作・承認後の反映は確認できていない。
 
+## ADR-060:Sonnet 5 の呼び出しでは thinking と effort を明示し、軽い判断の遅さと出力上限での途中切れを避ける
+
+**背景**:本人からの不具合報告「目標のところのaiがクソ遅い」。画面には「AI の出力が長すぎて途中で切れました。ジャンル数が多いため、もう一度お試しください。」と出ていた(`/plan`の「AIに微調整を相談する」)。
+
+**原因**:Sonnet 5 は`thinking`を指定しないと常に適応的に考え、`effort`の既定は`high`。考えた分も`max_tokens`に数えられる。目標タブのAIの出力は数字の表と短い説明だけの小さなもので、ジャンル数の多さが原因ではなく、考える時間で遅くなり、答えを書く前に上限(4096)へ達して切れていた。Sonnet 4.6までは thinking 未指定なら考えなかったため、モデルを上げたときの既定の変化が見落とされていた。
+
+**決定・実装**
+
+1. **`parseStructured`に`disableThinking`・`effort`を追加**(`lib/anthropic.ts`、ADR-033の共通部分)。指定しなければ従来どおり何も送らない——Haiku 4.5 は`effort`非対応で、渡すと400になるため、モデルごとの違いを呼び出し側の明示に任せる。
+2. **支出目標の提案**(`suggestPlanTargets`)は`disableThinking: true`+`effort: 'low'`。判断は「課題のあるジャンルを少し削る」程度で、削る幅の上限・必須の保護・実績を超えない、は`clampAiTarget`が機械的に守る(ADR-058)ため、深く考えさせても得るものが小さい。
+3. **配分の微調整**(`refinePlanAllocation`)は**Haiku 4.5**に変更。出力は数字の表と1〜2文の説明で、合計を総額にそろえるのは`applyRefinement()`(`rebalanceToTotal`)が行い、AIの足し算を信用しない設計(ADR-058)のため、モデルの強さより速さの方が効く。
+4. **AIの窓口の会話**(ADR-059、`app/api/assistant/chat/route.ts`)は`output_config.effort: 'low'`。変更案づくりの途中で考えすぎて遅くなる・上限で切れるのを避ける(変更は承認カードで人が確認するため、深い推論に頼らない)。
+
+**却下した選択肢**
+
+- **`max_tokens`を増やすだけにする**:途中切れは止まるが、遅さが直らず、考える分だけ費用も増える。
+- **全ての Sonnet 5 の呼び出しを一括で thinking 無効にする**:日次・月次レポートと支出診断は文章の質が価値で、thinking を止めると質が変わりうる。本人の報告が無いものは、測れないまま挙動を変えない(TASKS.md P10-76 に残課題として記録)。
+- **微調整もSonnetのまま`effort: 'low'`にする**:速くはなるが、数字を動かすだけの処理には過剰。Haiku の方がさらに速い。
+
+**検証**:`npx tsc --noEmit -p .`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(`parseStructured`が thinking・effort を渡す/渡さないことのテストを含め全通過)/`npx next build`。**未検証**:このセッションにはAnthropic APIキーが無く、実際の応答速度・途中切れが直ったことは計測できていない。
+
 ---
 
 ## 未決のまま残す事項
