@@ -37,7 +37,7 @@ function recencyWeight(date: DateOnly, today: DateOnly): number {
   return Math.pow(0.5, ago / RECENCY_HALF_LIFE_DAYS);
 }
 
-function isPaydayWindow(date: DateOnly, payday: number): boolean {
+export function isPaydayWindow(date: DateOnly, payday: number): boolean {
   const thisMonthPayday = nthDayOfMonth(date, payday);
   const candidates = [thisMonthPayday, nthDayOfMonth(addMonths(date, -1), payday)];
   return candidates.some((p) => {
@@ -120,7 +120,7 @@ function fitCategory(
     categoryId: cat.categoryId,
     categoryName: cat.categoryName,
     countPosterior,
-    amountPosterior: { mu, sigmaSq },
+    amountPosterior: { mu, sigmaSq, kappa: logWeight + AMOUNT_PRIOR_STRENGTH },
     weekdayFactor: weekdaySums.map((s) => shrinkToOne(s, overallRate)),
     paydayFactor: shrinkToOne(paydaySums, overallRate),
     holidayFactor: shrinkToOne(holidaySums, overallRate),

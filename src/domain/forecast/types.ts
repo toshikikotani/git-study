@@ -40,6 +40,10 @@ export type DecomposedSpending = {
     actualYen: number;
     scheduledYen: number;
     excluded: readonly OutlierExclusion[];
+    /** 学習窓内の特別費(kind='special' + 外れ値)の金額一覧(再標本化の母集団、M2)。 */
+    historicalAmounts: readonly number[];
+    /** 学習窓の1日あたりの発生回数(ポアソン分布のλ、M2)。 */
+    occurrencesPerDay: number;
   };
   /** 変動費のカテゴリ×日学習データ。 */
   variable: readonly VariableTrainingData[];
@@ -54,8 +58,12 @@ export type CategoryModelParams = {
   categoryName: string;
   /** ガンマ・ポアソン事後分布(回数)。lambda ~ Gamma(alphaPost, betaPost)(rateパラメータ化)。 */
   countPosterior: { alpha: number; beta: number };
-  /** 対数正規の事後平均・分散(金額)。 */
-  amountPosterior: { mu: number; sigmaSq: number };
+  /**
+   * 対数正規の事後平均・分散(金額)。kappa は mu の確からしさ(相当する観測件数)。
+   * 試行ごとに mu ~ Normal(mu, sigmaSq/kappa) を引き直し、データが少ないほど
+   * 試行間で mu がばらつく(=帯が広がる)ようにする(M3)。
+   */
+  amountPosterior: { mu: number; sigmaSq: number; kappa: number };
   /** 曜日係数(0=日〜6=土)。1.0が「効果なし」。 */
   weekdayFactor: readonly number[];
   paydayFactor: number;

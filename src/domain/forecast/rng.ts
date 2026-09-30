@@ -37,13 +37,22 @@ export function createRng(seed: string): Rng {
   return mulberry32(hashSeed(seed));
 }
 
-/** 標準正規分布(Box-Muller)。 */
+/**
+ * 標準正規分布(Marsaglia の極座標法)。単位円内の点を棄却法で選び、
+ * 三角関数(cos/sin)を使わずに正規分布へ変換する。Box-Muller(毎回 cos を
+ * 呼ぶ)より、モンテカルロで数百万回呼ぶ用途では実測で速い(1万試行規模の
+ * シミュレーションを200ms級に収める必要があるため、M3で採用)。
+ */
 export function sampleStandardNormal(rng: Rng): number {
   let u = 0;
   let v = 0;
-  while (u === 0) u = rng();
-  while (v === 0) v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  let s = 0;
+  do {
+    u = rng() * 2 - 1;
+    v = rng() * 2 - 1;
+    s = u * u + v * v;
+  } while (s >= 1 || s === 0);
+  return u * Math.sqrt((-2 * Math.log(s)) / s);
 }
 
 /**
@@ -106,8 +115,20 @@ export function sampleLognormal(rng: Rng, mu: number, sigma: number): number {
   return Math.exp(mu + sigma * sampleStandardNormal(rng));
 }
 
-/** 配列から重み無しで1件を一様に選ぶ(ブロック・ブートストラップ用)。 */
+/** 配列から重み無しで1件を一様に選ぶ(特別費の再標本化用)。 */
 export function pickOne<T>(rng: Rng, items: readonly T[]): T {
   const idx = Math.min(items.length - 1, Math.floor(rng() * items.length));
   return items[idx]!;
+}
+
+/** 重み付きで1件を選ぶ(ブロック・ブートストラップの直近優先サンプリング用)。 */
+export function pickWeighted<T>(rng: Rng, items: readonly T[], weightOf: (item: T) => number): T {
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0);
+  if (total <= 0) return pickOne(rng, items);
+  let target = rng() * total;
+  for (const item of items) {
+    target -= weightOf(item);
+    if (target <= 0) return item;
+  }
+  return items[items.length - 1]!;
 }

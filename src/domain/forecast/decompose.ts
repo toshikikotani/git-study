@@ -45,10 +45,18 @@ function isCountable(t: ForecastSourceTransaction): boolean {
   );
 }
 
+/** 線形補間の分位点。全部同じ値(実質バラつき無し)なら、その値をそのまま返す
+ *  ——外れ値の閾値が実際の最大値と一致してしまい、上位1%を「超える」ものが
+ *  1件も無くなるはずの状況(タイの多いデータ)を正しく扱うため。 */
 function percentile(sortedAbs: readonly number[], p: number): number {
   if (sortedAbs.length === 0) return Infinity;
-  const idx = Math.min(sortedAbs.length - 1, Math.ceil(p * sortedAbs.length) - 1);
-  return sortedAbs[Math.max(0, idx)]!;
+  if (sortedAbs.length === 1) return sortedAbs[0]!;
+  const idx = p * (sortedAbs.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sortedAbs[lo]!;
+  const frac = idx - lo;
+  return sortedAbs[lo]! + frac * (sortedAbs[hi]! - sortedAbs[lo]!);
 }
 
 export function decomposeSpending(input: {
@@ -72,9 +80,15 @@ export function decomposeSpending(input: {
 
   const countable = input.transactions.filter(isCountable);
 
-  // 実績:今日までの通常支出。
+  // 実績:期間内・今日までの通常支出。
   const actualYen = countable
-    .filter((t) => t.kind === 'normal' && t.status === 'actual' && t.occurredOn <= period.to)
+    .filter(
+      (t) =>
+        t.kind === 'normal' &&
+        t.status === 'actual' &&
+        t.occurredOn >= period.from &&
+        t.occurredOn <= period.to,
+    )
     .reduce((sum, t) => sum + -t.amountYen, 0);
 
   // 確定:残り期間の予定支出(通常のみ。特別扱いの予定は special へ)。
@@ -107,12 +121,24 @@ export function decomposeSpending(input: {
   }
   const fixedKeySet = new Set(fixedItems.map((f) => f.key));
 
-  // 特別:special kind の実績・予定。
+  // 特別:special kind の実績・予定(期間内のみ)。
   const specialActualYen = countable
-    .filter((t) => t.kind === 'special' && t.status === 'actual' && t.occurredOn <= period.to)
+    .filter(
+      (t) =>
+        t.kind === 'special' &&
+        t.status === 'actual' &&
+        t.occurredOn >= period.from &&
+        t.occurredOn <= period.to,
+    )
     .reduce((sum, t) => sum + -t.amountYen, 0);
   const specialScheduledYen = countable
-    .filter((t) => t.kind === 'special' && t.status === 'scheduled' && t.occurredOn <= period.to)
+    .filter(
+      (t) =>
+        t.kind === 'special' &&
+        t.status === 'scheduled' &&
+        t.occurredOn >= period.from &&
+        t.occurredOn <= period.to,
+    )
     .reduce((sum, t) => sum + -t.amountYen, 0);
 
   // 変動費の学習対象:通常・実績・確定済み固定費でないもの。学習窓全体から取る。
@@ -149,7 +175,7 @@ export function decomposeSpending(input: {
 
     for (const t of txs) {
       const amountYen = -t.amountYen;
-      if (amountYen >= threshold) {
+      if (amountYen > threshold) {
         specialExcluded.push({
           categoryId,
           categoryName: name,
@@ -192,6 +218,15 @@ export function decomposeSpending(input: {
     }
   }
 
+  // 特別費の再標本化の母集団:学習窓内の special kind 実績 + 外れ値として除外した候補。
+  const specialFromKind = countable
+    .filter(
+      (t) => t.kind === 'special' && t.status === 'actual' && t.occurredOn >= trainingWindow.from,
+    )
+    .map((t) => -t.amountYen);
+  const specialHistoricalAmounts = [...specialFromKind, ...specialExcluded.map((e) => e.amountYen)];
+  const specialOccurrencesPerDay = dataDays > 0 ? specialHistoricalAmounts.length / dataDays : 0;
+
   return {
     trainingWindow,
     period,
@@ -202,6 +237,8 @@ export function decomposeSpending(input: {
       actualYen: specialActualYen,
       scheduledYen: specialScheduledYen,
       excluded: specialExcluded,
+      historicalAmounts: specialHistoricalAmounts,
+      occurrencesPerDay: specialOccurrencesPerDay,
     },
     variable,
     missingRecordDays,
