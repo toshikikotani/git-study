@@ -11,7 +11,7 @@
 
 begin;
 
-create table public.fixed_cost_confirmations (
+create table if not exists public.fixed_cost_confirmations (
   user_id          uuid        not null references auth.users(id) on delete cascade,
   subscription_key text        not null,
   confirmed_at     timestamptz not null default now(),

@@ -224,6 +224,56 @@ alter table public.genres drop constraint if exists ck_genres_color_index;
 alter table public.genres
   add constraint ck_genres_color_index check (color_index is null or color_index between 1 and 10);
 
+-- 7. app_settings.ai_enabled / ai_cache — AIゲートウェイ基盤(N1)
+-- -----------------------------------------------------------------------------
+alter table public.app_settings add column if not exists ai_enabled boolean not null default true;
+
+create table if not exists public.ai_cache (
+  cache_key      text        primary key,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  feature        text        not null,
+  response_json  jsonb       not null,
+  created_at     timestamptz not null default now(),
+  expires_at     timestamptz not null
+);
+
+create index if not exists ai_cache_user_id_idx on public.ai_cache (user_id);
+create index if not exists ai_cache_expires_at_idx on public.ai_cache (expires_at);
+
+alter table public.ai_cache enable row level security;
+alter table public.ai_cache force row level security;
+
+drop policy if exists "own_rows" on public.ai_cache;
+create policy "own_rows" on public.ai_cache
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+-- 8. genres.quick_entry_order / hidden_in_quick_entry — 手入力のカテゴリ格子(N2)
+-- -----------------------------------------------------------------------------
+alter table public.genres add column if not exists quick_entry_order integer;
+alter table public.genres add column if not exists hidden_in_quick_entry boolean not null default false;
+
+-- 9. fixed_cost_confirmations — 固定費の確認(N4)
+-- -----------------------------------------------------------------------------
+create table if not exists public.fixed_cost_confirmations (
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  subscription_key text        not null,
+  confirmed_at     timestamptz not null default now(),
+  primary key (user_id, subscription_key)
+);
+
+alter table public.fixed_cost_confirmations enable row level security;
+alter table public.fixed_cost_confirmations force row level security;
+
+drop policy if exists "own_rows" on public.fixed_cost_confirmations;
+create policy "own_rows" on public.fixed_cost_confirmations
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -271,4 +321,33 @@ select
     select count(*) from information_schema.columns
     where table_schema = 'public' and table_name = 'genres'
       and column_name in ('icon_key', 'color_index')
-  ) = 2 then 'ok' else 'NG: 列が無い' end;
+  ) = 2 then 'ok' else 'NG: 列が無い' end
+union all
+select
+  'app_settings.ai_enabled',
+  case when exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'app_settings' and column_name = 'ai_enabled'
+  ) then 'ok' else 'NG: 列が無い' end
+union all
+select
+  'ai_cache',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'ai_cache'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'genres.quick_entry_order / hidden_in_quick_entry',
+  case when (
+    select count(*) from information_schema.columns
+    where table_schema = 'public' and table_name = 'genres'
+      and column_name in ('quick_entry_order', 'hidden_in_quick_entry')
+  ) = 2 then 'ok' else 'NG: 列が無い' end
+union all
+select
+  'fixed_cost_confirmations',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'fixed_cost_confirmations'
+  ) then 'ok' else 'NG: テーブルが無い' end;
