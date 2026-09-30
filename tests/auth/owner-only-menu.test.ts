@@ -49,4 +49,16 @@ describe('連携系は、オーナー以外には出さない', () => {
     expect(home).toContain('isCurrentUserOwner');
     expect(home).toMatch(/\{isOwner \? \(/);
   });
+
+  it('レポートの資産推移(残債・投資評価額)、AIレポートの返済の進捗、明細一覧のリボ・キャッシングの案内も、オーナーだけ', async () => {
+    const { readFileSync } = await import('node:fs');
+    const reports = readFileSync('app/(app)/reports/page.tsx', 'utf8');
+    expect(reports).toContain('isCurrentUserOwner');
+    expect(reports).toMatch(/\{isOwner \? <NetWorthChart/);
+    const ai = readFileSync('app/(app)/reports/ai/report-view.tsx', 'utf8');
+    expect(ai).toContain('useIsOwner');
+    expect(ai).toMatch(/\{isOwner \? \(/);
+    const ledger = readFileSync('app/(app)/spending/ledger-list.tsx', 'utf8');
+    expect(ledger).toContain('isOwner && risky.length > 0');
+  });
 });

@@ -19,6 +19,7 @@ import { formatDateJa, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips, FilterSheet } from './filter-sheet';
+import { useIsOwner } from '@/components/ui/owner-context';
 import { LedgerMenu } from './ledger-menu';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
@@ -43,6 +44,8 @@ export function LedgerList({
   goalRange: { from: string; to: string } | null;
   duplicateCount: number;
 }) {
+  // リボ・キャッシング(借入)の案内は、オーナーだけ。
+  const isOwner = useIsOwner();
   const {
     transactions,
     today,
@@ -94,7 +97,7 @@ export function LedgerList({
       <PendingReceiptRows />
 
       {/* リボ・キャッシング(FR-21):増やしてはいけない借入は、一覧の上で数を見せる */}
-      {risky.length > 0 ? (
+      {isOwner && risky.length > 0 ? (
         <div
           role="note"
           className="rounded-2xl p-4"
