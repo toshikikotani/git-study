@@ -4,6 +4,7 @@
  * `transaction_diagnoses` は本番未適用(B-13)。未適用時の扱いは lib/supabase/errors.ts。
  */
 
+import { mapChunks } from '@/lib/chunk';
 import { isCountable } from '@/domain/budget';
 import {
   summarizeDiagnoses,
@@ -82,13 +83,14 @@ export async function listUndiagnosedTransactions(
   );
   if (countable.length === 0) return [];
 
-  const { data: diagnosed, error: diagError } = await supabase
-    .from('transaction_diagnoses')
-    .select('transaction_id')
-    .in(
-      'transaction_id',
-      countable.map((r) => r.id),
-    );
+  // 数百件を超える id は URL に載らないため、分けて問い合わせる。
+  const diagnosedParts = await mapChunks(
+    countable.map((r) => r.id),
+    (ids) =>
+      supabase.from('transaction_diagnoses').select('transaction_id').in('transaction_id', ids),
+  );
+  const diagError = diagnosedParts.find((p) => p.error)?.error ?? null;
+  const diagnosed = diagnosedParts.flatMap((p) => p.data ?? []);
   if (diagError && !isMissingTableError(diagError)) {
     throw new DiagnosisStoreError(`診断状況を取得できませんでした: ${diagError.message}`);
   }
@@ -121,13 +123,13 @@ export async function listUndiagnosedTransactions(
   );
   const monthSpentByGenre = monthSummary.byGenre;
 
-  const { data: items, error: itemsError } = await supabase
-    .from('receipt_items')
-    .select('transaction_id, name')
-    .in(
-      'transaction_id',
-      undiagnosed.map((r) => r.id),
-    );
+  const itemParts = await mapChunks(
+    undiagnosed.map((r) => r.id),
+    (ids) =>
+      supabase.from('receipt_items').select('transaction_id, name').in('transaction_id', ids),
+  );
+  const itemsError = itemParts.find((p) => p.error)?.error ?? null;
+  const items = itemParts.flatMap((p) => p.data ?? []);
   if (itemsError && !isMissingTableError(itemsError)) {
     throw new DiagnosisStoreError(`品目を取得できませんでした: ${itemsError.message}`);
   }
@@ -256,13 +258,16 @@ export async function loadSpendingDiagnosisView(
   };
   if (countable.length === 0) return emptyView;
 
-  const { data: diagnoses, error: diagError } = await supabase
-    .from('transaction_diagnoses')
-    .select('transaction_id, verdict, reasoning')
-    .in(
-      'transaction_id',
-      countable.map((r) => r.id),
-    );
+  const diagnosisParts = await mapChunks(
+    countable.map((r) => r.id),
+    (ids) =>
+      supabase
+        .from('transaction_diagnoses')
+        .select('transaction_id, verdict, reasoning')
+        .in('transaction_id', ids),
+  );
+  const diagError = diagnosisParts.find((p) => p.error)?.error ?? null;
+  const diagnoses = diagnosisParts.flatMap((p) => p.data ?? []);
   if (diagError) {
     if (isMissingTableError(diagError)) {
       return {

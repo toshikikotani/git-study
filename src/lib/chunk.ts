@@ -7,7 +7,7 @@ export const ID_QUERY_CHUNK = 50;
 
 export async function mapChunks<T, R>(
   items: readonly T[],
-  fn: (chunk: T[]) => Promise<R>,
+  fn: (chunk: T[]) => PromiseLike<R>,
   size = ID_QUERY_CHUNK,
   concurrency = 6,
 ): Promise<R[]> {
