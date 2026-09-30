@@ -326,6 +326,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         genreName={data.genreName}
         monthStart={data.monthStart}
         isCurrentMonth={data.isCurrentMonth}
+        todayMonthKey={data.today.slice(0, 7)}
         totalYen={totalYen}
         onBack={() => router.back()}
         menu={
@@ -368,6 +369,8 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
       <SummarySection
         summary={summary}
         goal={data.goal}
+        monthStart={data.monthStart}
+        monthEnd={data.range.to}
         genreName={data.genreName}
         today={data.today}
       />

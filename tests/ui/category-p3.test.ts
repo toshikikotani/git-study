@@ -56,10 +56,9 @@ describe('P3 サマリー(画面)', () => {
   it('合計(主役)・件数・1回あたり・前月同日比(言葉)が出る', () => {
     // 合計 = 1200 + 800 − 300 = 1,700円(返金は差し引く)
     expect(html).toContain('aria-label="1,700円"');
-    expect(html).toContain('>件数<');
-    expect(html).toContain('aria-label="2"'); // 件数(返金は数えない)
-    expect(html).toContain('>1回あたり<');
-    expect(html).toContain('aria-label="850円"'); // 1,700 ÷ 2
+    // 件数(返金は数えない)と1回あたりは、大きな数字にせず1行(「2件 · 1回あたり 850円」)
+    expect(html).toContain('>2件</span> · 1回あたり <span');
+    expect(html).toContain('>850円</span>'); // 1,700 ÷ 2
     expect(html).toMatch(/前月の同じ日までより [\d,]+円 多い/);
   });
 
@@ -83,7 +82,7 @@ describe('P3 サマリー(画面)', () => {
       ),
     );
     expect(noPrev).not.toContain('前月の同じ日まで');
-    expect(noPrev).not.toContain('目標 ');
+    expect(noPrev).not.toContain('目標期間 ');
   });
 
   it('目標期間中は、共通のジャンル行(予算バー・理想ライン・状態)を出す', () => {
@@ -111,7 +110,7 @@ describe('P3 サマリー(画面)', () => {
         }),
       ),
     );
-    expect(withGoal).toContain('目標 ');
+    expect(withGoal).toContain('目標期間 ');
     expect(withGoal).toContain('予定 5,000');
     expect(withGoal).toContain('自由に使える残り');
   });
