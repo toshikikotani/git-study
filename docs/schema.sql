@@ -467,6 +467,12 @@ create table public.genres (
   icon_key     text,
   color_index  smallint,
 
+  -- 手入力のカテゴリ格子(N2)。null のあいだは使用頻度で自動的に並ぶ。値が
+  -- 入ると(長押しで手動並べ替え)その値の昇順を頻度より優先する。
+  quick_entry_order     integer,
+  -- 手入力のカテゴリ格子からだけ隠す(ジャンル自体・他の画面には影響しない)。
+  hidden_in_quick_entry boolean     not null default false,
+
   created_at   timestamptz not null default now(),
 
   constraint ck_genres_color_index check (color_index is null or color_index between 1 and 10),

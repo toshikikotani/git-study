@@ -177,6 +177,23 @@ export function formatTimeJa(now: Date = new Date()): string {
   return jstTimeFormatter.format(now);
 }
 
+const jstHourFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: TIMEZONE,
+  hour: 'numeric',
+  hour12: false,
+});
+
+/**
+ * JST の時(0〜23)。サーバーは UTC で動くため(Vercel)、`new Date().getHours()`
+ * のような素の Date メソッドはサーバー環境のタイムゾーンに依存してしまう
+ * ——「いつもの」予測(N2)の時間帯判定など、JST の時刻そのものが要る場面で使う。
+ */
+export function hourJst(now: Date = new Date()): number {
+  const formatted = jstHourFormatter.format(now);
+  // hour12: false でも en-US ロケールは深夜0時を "24" と表す実装があるため丸める。
+  return Number(formatted) % 24;
+}
+
 /**
  * 「何日」という日にち番号(1〜31)として妥当か。
  * DateOnly ではなく、返済日・締め日のような整数入力の検証に使う

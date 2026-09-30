@@ -112,6 +112,30 @@ export function parseYen(input: string): number {
   return assertYen(sign * value);
 }
 
+export type TaxRoundingMode = 'floor' | 'round' | 'ceil';
+
+/**
+ * 税抜金額を税込に換算する(N2本人要件「税込8%/税込10%ボタン」)。
+ * 端数処理は切り捨て(floor)を既定にする——本人要件どおり、呼び出し側が
+ * 設定で切り上げ・四捨五入に変えられるよう rounding を渡せるようにしてある。
+ */
+export function toTaxIncluded(
+  exclusiveYen: number,
+  ratePercent: 8 | 10,
+  rounding: TaxRoundingMode = 'floor',
+): number {
+  assertYen(exclusiveYen, '税抜金額');
+  const raw = exclusiveYen * (1 + ratePercent / 100);
+  switch (rounding) {
+    case 'floor':
+      return Math.floor(raw);
+    case 'round':
+      return Math.round(raw);
+    case 'ceil':
+      return Math.ceil(raw);
+  }
+}
+
 /**
  * 月あたりの利息。年利は小数(15% → 0.15)で受ける(ADR-008)。
  * 円未満は切り捨て。SQL 側の floor(balance * rate / 12) と一致させる。

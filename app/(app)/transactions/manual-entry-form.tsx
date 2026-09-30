@@ -1,8 +1,11 @@
 'use client';
 
-import { useId } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
+import { CalculatorKeypad } from '@/components/ui/calculator-keypad';
 import { GenreBadge } from '@/components/ui/genre-badge';
+import { QuickEntryGenreManager } from './quick-entry-genre-manager';
+import { createLongPress } from '@/lib/long-press';
 
 import {
   CAPTURE_FIELD_LABEL,
@@ -13,6 +16,9 @@ import {
   type ManualEntryValues,
   type ManualItem,
 } from '@/domain/receipt-capture';
+import { toTaxIncluded, type TaxRoundingMode } from '@/domain/money';
+import { addDays, todayJst } from '@/lib/date';
+import { loadTaxRoundingMode } from '@/lib/tax-rounding-preference';
 
 export type ManualEntryGenre = { id: string; name: string };
 export type ManualEntryAccount = { id: string; name: string };
@@ -36,6 +42,7 @@ export function ManualEntryForm({
   errors = {},
   showErrors = false,
   variant = 'receipt',
+  onQuickEntryGenresChanged,
 }: {
   values: ManualEntryValues;
   /** field は本人が触った項目(再読み取りの上書き防止の印に使う)。 */
@@ -52,9 +59,30 @@ export function ManualEntryForm({
    * quick  : 金額 → ジャンル(アイコンの格子)→ 最近使った店 → 日付 → 口座 → メモ(レシートなしの手入力)
    */
   variant?: 'receipt' | 'quick';
+  /** quick variant のカテゴリ格子を長押しで並べ替え・非表示したあと、呼び出し側に一覧の再取得を促す。 */
+  onQuickEntryGenresChanged?: () => void;
 }) {
   const id = useId();
   const bar = itemsBar(values.items, values.amountYen);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [taxRounding, setTaxRounding] = useState<TaxRoundingMode>('floor');
+  const [genreManagerOpen, setGenreManagerOpen] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage(外部)からの一度きりの読み込み
+    setTaxRounding(loadTaxRoundingMode());
+  }, []);
+  const genreLongPress = useMemo(
+    () => createLongPress({ onLongPress: () => setGenreManagerOpen(true) }),
+    [],
+  );
+
+  function applyTaxRate(rate: 8 | 10): void {
+    if (values.amountYen === null) return;
+    onChange(
+      { ...values, amountYen: toTaxIncluded(values.amountYen, rate, taxRounding) },
+      'amountYen',
+    );
+  }
 
   const fieldTone = (f: CaptureField) =>
     unread.includes(f) ? 'unread' : autofilled.includes(f) ? 'auto' : 'plain';
@@ -92,7 +120,50 @@ export function ManualEntryForm({
           <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
             円
           </span>
+          <button
+            type="button"
+            aria-pressed={calculatorOpen}
+            aria-label="電卓を開く"
+            onClick={() => setCalculatorOpen((v) => !v)}
+            className="min-h-11 min-w-11 shrink-0 rounded-xl text-lg"
+            style={{
+              background: calculatorOpen ? 'var(--accent)' : 'var(--surface-raised)',
+              color: calculatorOpen ? 'var(--on-accent)' : 'var(--ink-secondary)',
+            }}
+          >
+            <span aria-hidden>🖩</span>
+          </button>
         </div>
+
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            disabled={values.amountYen === null}
+            onClick={() => applyTaxRate(8)}
+            className="min-h-11 flex-1 rounded-xl text-xs font-semibold disabled:opacity-40"
+            style={{ background: 'var(--surface-raised)', color: 'var(--ink-secondary)' }}
+          >
+            税込8%
+          </button>
+          <button
+            type="button"
+            disabled={values.amountYen === null}
+            onClick={() => applyTaxRate(10)}
+            className="min-h-11 flex-1 rounded-xl text-xs font-semibold disabled:opacity-40"
+            style={{ background: 'var(--surface-raised)', color: 'var(--ink-secondary)' }}
+          >
+            税込10%
+          </button>
+        </div>
+
+        {calculatorOpen ? (
+          <CalculatorKeypad
+            onConfirm={(amountYen) => {
+              onChange({ ...values, amountYen }, 'amountYen');
+              setCalculatorOpen(false);
+            }}
+          />
+        ) : null}
       </Field>
     ),
     date: (
@@ -102,14 +173,60 @@ export function ManualEntryForm({
         tone={fieldTone('occurredOn')}
         error={showErrors ? errors.occurredOn : undefined}
       >
-        <input
-          id={`${id}-date`}
-          type="date"
-          value={values.occurredOn}
-          onChange={(e) => onChange({ ...values, occurredOn: e.target.value }, 'occurredOn')}
-          className="min-h-11 w-full bg-transparent text-base outline-none"
-          style={{ color: 'var(--ink)' }}
-        />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-label="前の日"
+            onClick={() =>
+              onChange({ ...values, occurredOn: addDays(values.occurredOn, -1) }, 'occurredOn')
+            }
+            className="min-h-11 min-w-11 shrink-0 text-lg"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            ‹
+          </button>
+          <input
+            id={`${id}-date`}
+            type="date"
+            value={values.occurredOn}
+            onChange={(e) => onChange({ ...values, occurredOn: e.target.value }, 'occurredOn')}
+            className="min-h-11 min-w-0 flex-1 bg-transparent text-center text-base outline-none"
+            style={{ color: 'var(--ink)' }}
+          />
+          <button
+            type="button"
+            aria-label="次の日"
+            onClick={() =>
+              onChange({ ...values, occurredOn: addDays(values.occurredOn, 1) }, 'occurredOn')
+            }
+            className="min-h-11 min-w-11 shrink-0 text-lg"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            ›
+          </button>
+        </div>
+        <div className="mt-1 flex gap-2">
+          {(
+            [
+              ['今日', todayJst()],
+              ['昨日', addDays(todayJst(), -1)],
+            ] as const
+          ).map(([label, date]) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={values.occurredOn === date}
+              onClick={() => onChange({ ...values, occurredOn: date }, 'occurredOn')}
+              className="min-h-11 rounded-full px-3 text-xs font-semibold"
+              style={{
+                background: values.occurredOn === date ? 'var(--accent)' : 'var(--plane)',
+                color: values.occurredOn === date ? 'var(--on-accent)' : 'var(--ink-secondary)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </Field>
     ),
     store: (
@@ -179,7 +296,20 @@ export function ManualEntryForm({
     ),
     quickGenre: (
       <Field label="ジャンル" tone="plain">
-        <div role="group" aria-label="ジャンル" className="grid grid-cols-4 gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            長押しで並び替え・非表示
+          </span>
+          <button
+            type="button"
+            onClick={() => setGenreManagerOpen(true)}
+            className="min-h-11 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            編集
+          </button>
+        </div>
+        <div role="group" aria-label="ジャンル" className="mt-1 grid grid-cols-4 gap-2">
           {genres.map((g) => {
             const on = values.genreId === g.id;
             return (
@@ -188,7 +318,15 @@ export function ManualEntryForm({
                 type="button"
                 aria-pressed={on}
                 aria-label={g.name}
-                onClick={() => onChange({ ...values, genreId: on ? null : g.id })}
+                onClick={() => {
+                  if (genreLongPress.consumeClick()) return;
+                  onChange({ ...values, genreId: on ? null : g.id });
+                }}
+                onPointerDown={(e) => genreLongPress.start(e.clientX, e.clientY)}
+                onPointerMove={(e) => genreLongPress.move(e.clientX, e.clientY)}
+                onPointerUp={genreLongPress.end}
+                onPointerCancel={genreLongPress.end}
+                onContextMenu={(e) => e.preventDefault()}
                 className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2"
                 style={{
                   background: on ? 'var(--accent)' : 'var(--surface-raised)',
@@ -201,6 +339,12 @@ export function ManualEntryForm({
             );
           })}
         </div>
+
+        <QuickEntryGenreManager
+          open={genreManagerOpen}
+          onClose={() => setGenreManagerOpen(false)}
+          onChanged={() => onQuickEntryGenresChanged?.()}
+        />
       </Field>
     ),
     account: (

@@ -1969,7 +1969,20 @@ ADR-061 の続き。仮定とフォールバックをセクションごとに記
 
 **検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(1360件全通過、`tests/lib/ai-gateway/` に新規26件)/`npx next build`/`npm run verify:migrations`(`docs/schema.sql` と `supabase/migrations/` が同一スキーマになることを確認)すべて成功。**未検証**:このセッションには本番 Supabase・実際の Anthropic API 呼び出し・本人のログイン手段が無いため、`withAiCache`(実際のDB往復)・`isAiEnabled`(実際の設定読み取り)・`parseStructuredGated` の実際の Anthropic API 相手の挙動は、モック/単体テストの範囲でのみ確認できている。
 
-### N2 以降
+### N2:手入力の高速化
+
+着手前の調査で、`/transactions/new`(`NewTransactionForm`)と共有部品 `ManualEntryForm`(`app/(app)/transactions/manual-entry-form.tsx`、receipt入力(F7)と共通)が既に「支出/収入/返金の上部切り替え」「保存後に口座・日付・ジャンルを残し金額・店名・メモだけ空にする連続入力」「4列のアイコン格子(quick variant)」「最近使った店の候補チップ」を持っていることを確認した。したがって N2 はこれらへの追加分だけを実装した。
+
+1. **電卓キーパッド**:`src/domain/calculator.ts`(純粋な reducer、`pressCalculatorKey()`)+ `src/components/ui/calculator-keypad.tsx`(UI)。関数電卓ではなく、演算子の優先順位を持たない「左から順に計算する」普通の電卓と同じ方式にした(買い物の合計を素早く足す道具として、`1000+500×2`のような式を正しく解釈する必要は無いと判断)。金額欄の🖩ボタンで開閉し、「=」を押すと結果がそのまま金額欄に入る。
+2. **税込8%/10%ボタン**:`src/domain/money.ts` に `toTaxIncluded(exclusiveYen, rate, rounding)` を追加(既存の金額ドメイン関数と同じ場所)。端数処理は切り捨てが既定。**設定の持ち場所を判断した**:本人要件は「設定で変更可能」だが、サーバーに持つほどの重みが無い個人の好み(切り捨て/四捨五入/切り上げの3択のみ)と判断し、`app_settings` へのカラム追加はせず `src/lib/tax-rounding-preference.ts`(localStorage)に留めた。将来「同じ端末以外でも共通の設定にしたい」という要望が来たら `app_settings` へ昇格させる。
+3. **日付 ‹ ›・今日/昨日チップ**:`manual-entry-form.tsx` の日付欄に `addDays()` を使った前後1日ボタンと「今日」「昨日」チップを追加。任意の日付を選ぶ手段として、既存のネイティブ `<input type="date">` はそのまま残した(タップすればOS標準のピッカーが開く)——スペックの「‹ › で1日ずつ」「今日/昨日チップ」を追加する一方、任意の過去日付を選ぶ手段を失わせない判断。
+4. **カテゴリ格子の使用頻度順・長押しで並べ替え/非表示**:`genres.quick_entry_order`(nullなら頻度順、値が入れば長押しで固定した順が頻度より優先)・`genres.hidden_in_quick_entry`(新規カラム、マイグレーション`20260930000800`)。並び替えの純粋なロジックは `src/domain/quick-entry-genres.ts`(`sortQuickEntryGenres()`)、使用頻度は直近90日の明細の genre_id 集計(`fetchQuickEntryGenres()`)。**ドラッグ&ドロップではなくボタン(▲▼)にした**:タッチのドラッグはスクロール領域との競合(意図しないスクロール・誤操作)が起きやすく、このアプリの他の並べ替え操作も一貫してボタン式であるため、操作感を揃える判断をした(長押しでシートを開く入口はスペックどおり維持)。
+5. **「いつもの」予測**:`src/domain/usual-entries.ts`(`suggestUsualEntries()`)。曜日(平日/休日)× 時間帯(朝・昼・夕方・夜)の8区分に丸めて過去の組み合わせ(店・ジャンル・金額)を集計し、一致する区分の件数が3件に満たなければ全期間の頻度上位で埋める——「1分・1曜日ぴったりの一致」を要求するとほぼ毎回0件になるため。時刻はサーバーが UTC で動く(Vercel)ため `src/lib/date.ts` に `hourJst()` を新設し、JSTの時に変換してから区分判定する。**タップの挙動を判断した**:本人要件「タップすると内容が入り、そのまま保存できる」を、フィールドへの反映まで(自動保存はしない)と解釈した——他のAI由来の反映(N1)がすべて本人の確認を経る方針と揃え、誤タップでの即時登録を避けるため。
+6. **既存動線の再確認**:連続入力・支出/収入/返金の切り替えは、着手前から `NewTransactionForm` に既に実装されていたため変更していない。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(1397件全通過、`calculator.test.ts`・`usual-entries.test.ts`・`quick-entry-genres.test.ts`・`money.test.ts`のtoTaxIncluded分・`date.test.ts`のhourJst分を新規追加)/`npx next build`/`npm run verify:migrations`すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、電卓の実際のタップ操作・カテゴリ格子の長押し起動・「いつもの」予測の実データでの見え方は確認できていない。
+
+### N3 以降
 
 以降のセクションの記録はコミットごとに追記する。
 

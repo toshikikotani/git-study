@@ -10,6 +10,7 @@ import {
   monthlyInterest,
   parseAnnualRate,
   parseYen,
+  toTaxIncluded,
 } from '@/domain/money';
 
 describe('assertYen', () => {
@@ -172,5 +173,33 @@ describe('parseAnnualRate(formatAnnualRate の逆変換)', () => {
   it('formatAnnualRate と往復できる', () => {
     const rate = 0.1825;
     expect(parseAnnualRate(formatAnnualRate(rate).replace('%', ''))).toBeCloseTo(rate);
+  });
+});
+
+describe('toTaxIncluded(N2本人要件「税込8%/税込10%ボタン」)', () => {
+  it('8%を税込に換算する(既定は切り捨て)', () => {
+    expect(toTaxIncluded(100, 8)).toBe(108);
+  });
+
+  it('10%を税込に換算する', () => {
+    expect(toTaxIncluded(100, 10)).toBe(110);
+  });
+
+  it('端数は既定で切り捨てる', () => {
+    expect(toTaxIncluded(127, 8)).toBe(137); // 127 * 1.08 = 137.16
+  });
+
+  it('rounding: round を指定すると四捨五入する', () => {
+    expect(toTaxIncluded(127, 8, 'round')).toBe(137); // 137.16 → 137
+    expect(toTaxIncluded(150, 8, 'round')).toBe(162); // 162.0 ちょうど
+    expect(toTaxIncluded(163, 8, 'round')).toBe(176); // 176.04 → 176
+  });
+
+  it('rounding: ceil を指定すると切り上げる', () => {
+    expect(toTaxIncluded(127, 8, 'ceil')).toBe(138); // 137.16 → 138
+  });
+
+  it('0円は0円のまま', () => {
+    expect(toTaxIncluded(0, 10)).toBe(0);
   });
 });

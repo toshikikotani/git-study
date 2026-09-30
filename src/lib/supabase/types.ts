@@ -1681,9 +1681,11 @@ export type Database = {
           budget_yen: number | null;
           color_index: number | null;
           created_at: string;
+          hidden_in_quick_entry: boolean;
           icon_key: string | null;
           id: string;
           name: string;
+          quick_entry_order: number | null;
           show_on_home: boolean;
           sort_order: number;
           user_id: string;
@@ -1692,9 +1694,11 @@ export type Database = {
           budget_yen?: number | null;
           color_index?: number | null;
           created_at?: string;
+          hidden_in_quick_entry?: boolean;
           icon_key?: string | null;
           id?: string;
           name: string;
+          quick_entry_order?: number | null;
           show_on_home?: boolean;
           sort_order?: number;
           user_id: string;
@@ -1703,9 +1707,11 @@ export type Database = {
           budget_yen?: number | null;
           color_index?: number | null;
           created_at?: string;
+          hidden_in_quick_entry?: boolean;
           icon_key?: string | null;
           id?: string;
           name?: string;
+          quick_entry_order?: number | null;
           show_on_home?: boolean;
           sort_order?: number;
           user_id?: string;
