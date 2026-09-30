@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildCategorySummary, buildInsights, type Insight } from '@/features/category/insights';
-import { categoryAllowanceYen, goalOverlaps } from '@/features/category/pace';
+import { buildCumulative, categoryAllowanceYen, goalOverlaps } from '@/features/category/pace';
 import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/series';
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
@@ -20,7 +20,7 @@ import { formatMonthJa } from '@/lib/date';
 import { prefersReducedMotion } from '@/lib/motion';
 import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
 import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
-import { CategoryChart } from './category-chart';
+import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
 import { CategorySettings } from './category-settings';
@@ -71,6 +71,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const online = useOnline();
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
+  const [chartMode, setChartMode] = useState<ChartMode>('cumulative');
   const [showPrevious, setShowPrevious] = useState(true);
   const [tab, setTab] = useState<CategoryTab>('tx');
   const [openLine, setOpenLine] = useState<CategoryLine | null>(null);
@@ -151,6 +152,22 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         dailyAllowanceYen: categoryAllowance,
       }),
     [historyLines, unit, data.monthStart, data.range.to, data.today, categoryAllowance],
+  );
+
+  const cumulative = useMemo(
+    () =>
+      buildCumulative({
+        lines: historyLines,
+        monthStart: data.monthStart,
+        monthEnd: data.range.to,
+        today: data.today,
+        recordStart: series.recordStart,
+        goal:
+          data.goal?.active && data.goal.row && data.goal.row.targetYen !== null
+            ? { range: data.goal.range, budgetYen: data.goal.row.targetYen }
+            : null,
+      }),
+    [historyLines, data.monthStart, data.range.to, data.today, series.recordStart, data.goal],
   );
 
   const currentGenreId = genreIdOfKey(data.genreKey);
@@ -359,6 +376,9 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
 
       <CategoryChart
         series={series}
+        cumulative={cumulative}
+        mode={chartMode}
+        onMode={setChartMode}
         genreName={data.genreName}
         monthLabel={`${data.monthStart.slice(0, 4)}年${formatMonthJa(data.monthKey)}`}
         showPrevious={showPrevious}

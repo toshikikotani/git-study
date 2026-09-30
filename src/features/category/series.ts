@@ -47,6 +47,8 @@ export type Series = {
    * あるときは月の初日)。記録がまったく無いときは月の初日。
    */
   recordStart: DateOnly;
+  /** 記録開始日が月の途中か(「9/21 記録開始」と添えるか)。月の初日から数えるときは false。 */
+  recordStartInMonth: boolean;
   /**
    * 1日平均。「記録開始日 〜 今日(過去の月は月末)」の日数で割る(月の日数では割らない)。
    * 対象の日が無ければ null。
@@ -219,6 +221,7 @@ export function buildSeries(input: {
     unit,
     buckets,
     recordStart,
+    recordStartInMonth: recordStart > monthStart,
     averageYen,
     averageFrom: averageYen === null ? null : recordStart,
     averageLineYen,
