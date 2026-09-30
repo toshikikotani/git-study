@@ -74,12 +74,18 @@ function amountsIn(text: string): number[] {
 }
 
 describe('F2 目標カード(受け入れ基準2)', () => {
-  it('主役は「今日あと○円」1つ。1日の目安・理想ペースとの差は内訳に入る', () => {
+  it('主役は「今日あと○円」1つ。理想ペースとの差は内訳に入る', () => {
     const m = buildGoalCard(view(base), '2026-09-29');
     // 予定 31,540 を引いた 18,460 ÷ 8 = 2,307 / 今日 936円(未分類300含む)
     expect(m.primary).toMatchObject({ label: '今日あと', amountYen: 2307 - 936 });
-    expect(m.details.map((d) => d.key)).toContain('daily');
     expect(m.details.map((d) => d.key)).toContain('pace');
+  });
+
+  it('1日の目安(2,307円)は結果予想(N5)の一言に出るため、内訳からは落ちる(同じ数値を二重に出さない)', () => {
+    const m = buildGoalCard(view(base), '2026-09-29');
+    expect(m.details.map((d) => d.key)).not.toContain('daily');
+    expect(m.forecast?.amountYen).toBe(2307);
+    expect(m.forecast?.text).toContain('2,307円');
   });
 
   it('同じ数値が別の意味で2回出ない(画面に出る金額はすべて別の値)', () => {

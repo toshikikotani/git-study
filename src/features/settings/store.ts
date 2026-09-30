@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
+import { isMissingColumnError } from '@/lib/supabase/errors';
 import type { Database } from '@/lib/supabase/types';
 
 export type RepaymentStrategy = Database['public']['Enums']['repayment_strategy'];
@@ -31,6 +32,8 @@ export type AppSettings = {
   payday: number;
   /** 副業収入のうち返済に回す比率(0〜1)。既定 0.7(FR-42、P3-1)。 */
   sideIncomeRepaymentRatio: number;
+  /** 全AI機能の一括オフ(N1)。false でもアプリの基本機能はすべて使える。既定 true。 */
+  aiEnabled: boolean;
 };
 
 export class SettingsStoreError extends AppError {}
@@ -45,14 +48,31 @@ export async function getAppSettingsAsAdmin(
   client: SupabaseClient<Database>,
   userId: string,
 ): Promise<AppSettings> {
-  const { data, error } = await client
+  let { data, error } = await client
     .from('app_settings')
     .select(
-      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio',
+      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio, ai_enabled',
     )
     .eq('user_id', userId)
     .single();
+
+  // ai_enabled 列が本番に未適用のあいだは、その列を外して再取得する
+  // (ADR-033・isMissingColumnError と同じ扱い。AI既定はオン)。
+  let aiEnabled = data?.ai_enabled ?? true;
+  if (error && isMissingColumnError(error)) {
+    const retry = await client
+      .from('app_settings')
+      .select(
+        'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio',
+      )
+      .eq('user_id', userId)
+      .single();
+    data = retry.data as typeof data;
+    error = retry.error;
+    aiEnabled = true;
+  }
   if (error) throw new SettingsStoreError(`設定を取得できませんでした: ${error.message}`);
+  if (data === null) throw new SettingsStoreError('設定を取得できませんでした');
 
   return {
     monthlyRepaymentTargetYen: data.monthly_repayment_target_yen,
@@ -62,6 +82,7 @@ export async function getAppSettingsAsAdmin(
     highRiskAllocationRatio: data.high_risk_allocation_ratio,
     payday: data.payday,
     sideIncomeRepaymentRatio: data.side_income_repayment_ratio,
+    aiEnabled,
   };
 }
 
@@ -104,6 +125,7 @@ export async function updateAppSettings(patch: AppSettingsPatch): Promise<AppSet
   if (patch.sideIncomeRepaymentRatio !== undefined) {
     row.side_income_repayment_ratio = patch.sideIncomeRepaymentRatio;
   }
+  if (patch.aiEnabled !== undefined) row.ai_enabled = patch.aiEnabled;
 
   const { error } = await supabase.from('app_settings').update(row).eq('user_id', auth.user.id);
   if (error) throw new SettingsStoreError(`設定を更新できませんでした: ${error.message}`);

@@ -12,9 +12,10 @@
 
 import { isCountable } from '@/domain/budget';
 import type { GenredEntry } from '@/domain/genre';
-import { monthStartJst, todayJst } from '@/lib/date';
+import { sortQuickEntryGenres, type QuickEntryGenreInput } from '@/domain/quick-entry-genres';
+import { addDays, monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
-import { isMissingTableError } from '@/lib/supabase/errors';
+import { isMissingColumnError, isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 
 export class GenreStoreError extends AppError {}
@@ -84,6 +85,9 @@ function fromRow(row: {
     showOnHome: row.show_on_home,
   };
 }
+
+/** 使用頻度の集計対象にする期間(直近90日)。それより古い記録は今の傾向を表さない。 */
+const QUICK_ENTRY_FREQUENCY_WINDOW_DAYS = 90;
 
 /** ジャンル一覧(並び順)。1件も無ければ初期値を投入してから返す。 */
 export async function listGenres(): Promise<Genre[]> {
@@ -422,4 +426,110 @@ export async function loadGenreAnalysisView(now: Date = new Date()): Promise<Gen
   }
 
   return { entries, pendingCount };
+}
+
+export type QuickEntryGenre = { id: string; name: string };
+export type QuickEntryGenreSetting = QuickEntryGenre & {
+  hiddenInQuickEntry: boolean;
+};
+
+async function computeQuickEntryInputs(now: Date): Promise<QuickEntryGenreInput[]> {
+  const supabase = await createClient();
+
+  let { data: genres, error } = await supabase
+    .from('genres')
+    .select('id, name, quick_entry_order, hidden_in_quick_entry');
+  // quick_entry_order・hidden_in_quick_entry が本番に未適用のあいだは、
+  // その2列を外して再取得する(ADR-033。並び順は頻度順、非表示は無しとして扱う)。
+  if (error && isMissingColumnError(error)) {
+    const retry = await supabase.from('genres').select('id, name');
+    genres =
+      retry.data?.map((g) => ({ ...g, quick_entry_order: null, hidden_in_quick_entry: false })) ??
+      null;
+    error = retry.error;
+  }
+  if (error) {
+    if (isMissingTableError(error)) return [];
+    throw new GenreStoreError(`ジャンルを取得できませんでした: ${error.message}`);
+  }
+  if (genres === null) return [];
+
+  const since = addDays(todayJst(now), -QUICK_ENTRY_FREQUENCY_WINDOW_DAYS);
+  const { data: recent, error: recentError } = await supabase
+    .from('transactions')
+    .select('genre_id')
+    .not('genre_id', 'is', null)
+    .gte('occurred_on', since)
+    .lte('occurred_on', todayJst(now));
+  if (recentError)
+    throw new GenreStoreError(`使用頻度を集計できませんでした: ${recentError.message}`);
+
+  const usageCountByGenreId = new Map<string, number>();
+  for (const row of recent ?? []) {
+    if (row.genre_id === null) continue;
+    usageCountByGenreId.set(row.genre_id, (usageCountByGenreId.get(row.genre_id) ?? 0) + 1);
+  }
+
+  return genres.map((g) => ({
+    id: g.id,
+    name: g.name,
+    quickEntryOrder: g.quick_entry_order,
+    hiddenInQuickEntry: g.hidden_in_quick_entry,
+    usageCount: usageCountByGenreId.get(g.id) ?? 0,
+  }));
+}
+
+/**
+ * 手入力のカテゴリ格子(N2)に出すジャンル一覧。既定は直近90日の使用頻度順、
+ * 長押しで手動並べ替え済み(quick_entry_order が入っている)のジャンルは
+ * その順を優先する。hidden_in_quick_entry のジャンルは含めない
+ * (domain/quick-entry-genres.ts の sortQuickEntryGenres が実際の並び替えを行う)。
+ */
+export async function fetchQuickEntryGenres(now: Date = new Date()): Promise<QuickEntryGenre[]> {
+  const inputs = await computeQuickEntryInputs(now);
+  return sortQuickEntryGenres(inputs).map((g) => ({ id: g.id, name: g.name }));
+}
+
+/**
+ * 格子の管理シート向け(N2「長押しで手動の並べ替えと非表示」)。非表示中の
+ * ジャンルも含め、現在の並び順のまま全件返す(解除・並べ替えの対象にするため)。
+ */
+export async function fetchQuickEntryGenreSettings(
+  now: Date = new Date(),
+): Promise<QuickEntryGenreSetting[]> {
+  const inputs = await computeQuickEntryInputs(now);
+  const visible = sortQuickEntryGenres(inputs.filter((g) => !g.hiddenInQuickEntry));
+  const hidden = inputs
+    .filter((g) => g.hiddenInQuickEntry)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  return [...visible, ...hidden].map((g) => ({
+    id: g.id,
+    name: g.name,
+    hiddenInQuickEntry: g.hiddenInQuickEntry,
+  }));
+}
+
+/**
+ * 長押しの並べ替え。渡した順に quick_entry_order を振り直す(以後、
+ * これらのジャンルは頻度ではなくこの順で並ぶ)。
+ */
+export async function reorderQuickEntryGenres(orderedIds: readonly string[]): Promise<void> {
+  const supabase = await createClient();
+  for (const [index, id] of orderedIds.entries()) {
+    const { error } = await supabase
+      .from('genres')
+      .update({ quick_entry_order: (index + 1) * 10 })
+      .eq('id', id);
+    if (error) throw new GenreStoreError(`並び順を保存できませんでした: ${error.message}`);
+  }
+}
+
+/** 長押しの「非表示にする/戻す」。ジャンル自体は残り、他の画面には影響しない。 */
+export async function setGenreQuickEntryHidden(id: string, hidden: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('genres')
+    .update({ hidden_in_quick_entry: hidden })
+    .eq('id', id);
+  if (error) throw new GenreStoreError(`表示設定を保存できませんでした: ${error.message}`);
 }

@@ -1,5 +1,8 @@
-import { parseDateOnlyOr, todayJst } from '@/lib/date';
+import { hourJst, parseDateOnlyOr, todayJst, weekdayOf } from '@/lib/date';
 import { recentStoreNames } from '@/features/transactions/recent-stores';
+import { fetchQuickEntryGenres } from '@/features/genre/store';
+import { fetchUsualEntryHistory } from '@/features/transactions/usual-entries';
+import { suggestUsualEntries } from '@/domain/usual-entries';
 import { NewTransactionForm } from './new-transaction-form';
 
 /**
@@ -13,11 +16,26 @@ export default async function NewTransactionPage({
   searchParams: Promise<{ date?: string | string[]; type?: string | string[] }>;
 }) {
   const { date, type } = await searchParams;
+  const now = new Date();
+  const quickEntryGenres = await fetchQuickEntryGenres(now);
+  const genreNameById = Object.fromEntries(quickEntryGenres.map((g) => [g.id, g.name]));
+  const history = await fetchUsualEntryHistory();
+  const usualEntries = suggestUsualEntries(
+    history.map((row) => ({
+      ...row,
+      genreName: row.genreId ? (genreNameById[row.genreId] ?? null) : null,
+    })),
+    { weekday: weekdayOf(todayJst(now)), hour: hourJst(now) },
+    3,
+  );
+
   return (
     <NewTransactionForm
       initialDate={parseDateOnlyOr(date, todayJst())}
       initialIncome={type === 'income'}
       recentStores={await recentStoreNames()}
+      initialQuickEntryGenres={quickEntryGenres}
+      usualEntries={usualEntries}
     />
   );
 }

@@ -296,6 +296,33 @@ function BottomBar() {
               </button>
             </li>
           ) : null}
+          {/* N3:話す・打つ・スクショからの記録。後段(解析・確認カード)は
+              手入力・写真撮影とは別の経路(AIによる下書き作成)のため、
+              専用の確認画面に遷移する。 */}
+          <li>
+            <Link
+              href="/transactions/capture-text"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              話して記録・文字で記録
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/transactions/capture-screenshot"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              スクショから記録
+            </Link>
+          </li>
         </ul>
       </BottomSheet>
 

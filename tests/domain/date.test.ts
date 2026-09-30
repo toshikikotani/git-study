@@ -10,6 +10,7 @@ import {
   dateOnlyToLocalDate,
   localDateToDateOnly,
   formatDateJa,
+  hourJst,
   monthStartJst,
   mostRecentClosingOnOrBefore,
   nthDayOfMonth,
@@ -19,6 +20,23 @@ import {
   todayJst,
   weekdayOf,
 } from '@/lib/date';
+
+describe('hourJst', () => {
+  it('UTCの時刻ではなくJSTの時を返す(サーバーはUTCで動くため)', () => {
+    // 2026-09-07T16:00:00Z は JST 2026-09-08 01:00 → 1時
+    expect(hourJst(new Date('2026-09-07T16:00:00Z'))).toBe(1);
+  });
+
+  it('JSTの正午', () => {
+    // 2026-09-07T03:00:00Z は JST 2026-09-07 12:00
+    expect(hourJst(new Date('2026-09-07T03:00:00Z'))).toBe(12);
+  });
+
+  it('JSTの深夜0時は24ではなく0を返す', () => {
+    // 2026-09-07T15:00:00Z は JST 2026-09-08 00:00
+    expect(hourJst(new Date('2026-09-07T15:00:00Z'))).toBe(0);
+  });
+});
 
 describe('todayJst(ADR-015)', () => {
   it('UTC の日付ではなく JST の日付を返す', () => {

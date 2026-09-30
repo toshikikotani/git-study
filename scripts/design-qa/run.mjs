@@ -222,7 +222,8 @@ const CHECKS = () => {
     // 折り返し:1行の高さに収まっている(ガッターは2行のタグの子要素で見る)
     if (l.hasAttribute('data-may-wrap')) continue; // 文字が大きいときに、折り返してよい置き場
     const lh =
-      parseFloat(getComputedStyle(l).lineHeight) || parseFloat(getComputedStyle(l).fontSize) * 1.4;
+      Number.parseFloat(getComputedStyle(l).lineHeight) ||
+      Number.parseFloat(getComputedStyle(l).fontSize) * 1.4;
     const blocks = l.querySelectorAll(':scope > span.block');
     if (blocks.length > 0) {
       for (const bl of blocks) if (rect(bl).height > lh * 1.6) fail('折り返し', `${name(l)}`);
@@ -403,7 +404,7 @@ const NAV_CHECKS = () => {
       fail('重なり', '取引/品目/店の帯が固定ヘッダーに隠れる');
     if (inter(sb, tb)) fail('重なり', '取引/品目/店の帯がタブバーに隠れる');
     if (
-      Math.abs(sb.top - (parseFloat(getComputedStyle(strip).top) || 0)) > 1.5 &&
+      Math.abs(sb.top - (Number.parseFloat(getComputedStyle(strip).top) || 0)) > 1.5 &&
       section.getBoundingClientRect().bottom > window.innerHeight
     ) {
       fail('固定', `帯が固定されていない(top ${sb.top})`);

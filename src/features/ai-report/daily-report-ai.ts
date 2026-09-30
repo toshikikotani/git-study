@@ -4,12 +4,21 @@
  *
  * 浪費傾向のタイプ判定は持たない——1日分ではその日の偏りで判定がぶれるため、
  * 月次レポート(ADR-031)に一本化している。
+ *
+ * N1(AIゲートウェイ)適用第1号。プロンプトは src/prompts/daily-report.ts
+ * (バージョン付き)、呼び出しは parseStructuredGated(AI一括オフ・1回再試行)、
+ * 結果は withAiCache(同一入力はキャッシュ)、insights/advice の数値は
+ * verifyNumbersAgainstFacts で本文中の数字とだけ突き合わせ、一致しない数値が
+ * 混じっていれば出力ごと破棄する(N1本人要件)。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
-import { parseStructured } from '@/lib/anthropic';
+import { withAiCache } from '@/lib/ai-gateway/cache';
+import { parseStructuredGated } from '@/lib/ai-gateway/gated';
+import { extractNumbers, verifyNumbersAgainstFacts } from '@/lib/ai-gateway/numeric-verification';
+import { DAILY_REPORT_PROMPT } from '@/prompts/daily-report';
 
 /** レポート生成に使うモデル(ADR-032)。日付サフィックスは付けない。 */
 export const DAILY_REPORT_MODEL = 'claude-sonnet-5-5';
@@ -63,20 +72,6 @@ const reportSchema = z.object({
 
 type ReportRow = z.infer<typeof reportSchema>;
 
-const SYSTEM_PROMPT = [
-  'あなたは本人の家計データだけを見て日次レポートを書くファイナンシャルアドバイザーです。',
-  '',
-  '厳守事項:',
-  '- insights・advice はすべて渡された数字だけを根拠にする。渡されていない情報',
-  '  (食事・睡眠・ホルモン・血液検査等)を作り出さない。',
-  '- 医学的な診断、体質の断定、食事・サプリ・栄養に関する助言は一切書かない。本人から',
-  '  「そういう身体的な話は要らない」と明示されている。',
-  '- 1日分のデータだけで性格や浪費傾向のタイプを断定しない(それは月次レポートの役割)。',
-  '- advice はあくまで支出行動(買い物のタイミング・記録の習慣等)に関する一般的な工夫に限る。',
-  '- insights は数字を引用する(円・件数・比率など)。「使いすぎ」のような曖昧な言い方だけで',
-  '  終わらせない。',
-].join('\n');
-
 export interface DailyReportAnalyzer {
   generate(input: DailyReportInput): Promise<GenerateDailyReportOutcome>;
 }
@@ -90,18 +85,40 @@ export class ClaudeDailyReportAnalyzer implements DailyReportAnalyzer {
   }
 
   async generate(input: DailyReportInput): Promise<GenerateDailyReportOutcome> {
-    const result = await parseStructured({
-      client: this.client,
-      model: DAILY_REPORT_MODEL,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserContent(input) }],
-      schema: reportSchema,
-      hints: { truncated: 'もう一度お試しください。' },
-    });
-    if (!result.ok) return { report: null, warnings: [result.message] };
+    return withAiCache(
+      'daily-report',
+      input,
+      async () => {
+        const userContent = buildUserContent(input);
+        const result = await parseStructuredGated({
+          client: this.client,
+          model: DAILY_REPORT_MODEL,
+          maxTokens: MAX_OUTPUT_TOKENS,
+          system: DAILY_REPORT_PROMPT.text,
+          messages: [{ role: 'user', content: userContent }],
+          schema: reportSchema,
+          hints: { truncated: 'もう一度お試しください。' },
+        });
+        if (!result.ok) return { report: null, warnings: [result.message] };
 
-    return buildFromAiOutput(result.value);
+        // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
+        // 台帳に無い数字が1つでも混じっていれば、出力ごと破棄して代替表示にする。
+        const facts = extractNumbers(userContent);
+        const verification = verifyNumbersAgainstFacts(
+          [...result.value.insights, ...result.value.advice],
+          facts,
+        );
+        if (!verification.ok) {
+          return {
+            report: null,
+            warnings: ['AIの出力に台帳と一致しない数字があったため、今回は表示しません。'],
+          };
+        }
+
+        return buildFromAiOutput(result.value);
+      },
+      { shouldCache: (outcome) => outcome.report !== null },
+    );
   }
 }
 

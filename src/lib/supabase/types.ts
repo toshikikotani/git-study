@@ -82,6 +82,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_cache: {
+        Row: {
+          cache_key: string;
+          created_at: string;
+          expires_at: string;
+          feature: string;
+          response_json: Json;
+          user_id: string;
+        };
+        Insert: {
+          cache_key: string;
+          created_at?: string;
+          expires_at: string;
+          feature: string;
+          response_json: Json;
+          user_id: string;
+        };
+        Update: {
+          cache_key?: string;
+          created_at?: string;
+          expires_at?: string;
+          feature?: string;
+          response_json?: Json;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       alerts: {
         Row: {
           acknowledged_at: string | null;
@@ -200,6 +227,7 @@ export type Database = {
       };
       app_settings: {
         Row: {
+          ai_enabled: boolean;
           brief_channel: Database['public']['Enums']['notification_channel'];
           brief_send_at: string;
           classification_confidence_threshold: number;
@@ -230,6 +258,7 @@ export type Database = {
           waste_alert_threshold: number;
         };
         Insert: {
+          ai_enabled?: boolean;
           brief_channel?: Database['public']['Enums']['notification_channel'];
           brief_send_at?: string;
           classification_confidence_threshold?: number;
@@ -260,6 +289,7 @@ export type Database = {
           waste_alert_threshold?: number;
         };
         Update: {
+          ai_enabled?: boolean;
           brief_channel?: Database['public']['Enums']['notification_channel'];
           brief_send_at?: string;
           classification_confidence_threshold?: number;
@@ -1646,14 +1676,34 @@ export type Database = {
           },
         ];
       };
+      fixed_cost_confirmations: {
+        Row: {
+          confirmed_at: string;
+          subscription_key: string;
+          user_id: string;
+        };
+        Insert: {
+          confirmed_at?: string;
+          subscription_key: string;
+          user_id: string;
+        };
+        Update: {
+          confirmed_at?: string;
+          subscription_key?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       genres: {
         Row: {
           budget_yen: number | null;
           color_index: number | null;
           created_at: string;
+          hidden_in_quick_entry: boolean;
           icon_key: string | null;
           id: string;
           name: string;
+          quick_entry_order: number | null;
           show_on_home: boolean;
           sort_order: number;
           user_id: string;
@@ -1662,9 +1712,11 @@ export type Database = {
           budget_yen?: number | null;
           color_index?: number | null;
           created_at?: string;
+          hidden_in_quick_entry?: boolean;
           icon_key?: string | null;
           id?: string;
           name: string;
+          quick_entry_order?: number | null;
           show_on_home?: boolean;
           sort_order?: number;
           user_id: string;
@@ -1673,9 +1725,11 @@ export type Database = {
           budget_yen?: number | null;
           color_index?: number | null;
           created_at?: string;
+          hidden_in_quick_entry?: boolean;
           icon_key?: string | null;
           id?: string;
           name?: string;
+          quick_entry_order?: number | null;
           show_on_home?: boolean;
           sort_order?: number;
           user_id?: string;
