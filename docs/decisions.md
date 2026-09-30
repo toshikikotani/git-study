@@ -1995,7 +1995,25 @@ ADR-061 の続き。仮定とフォールバックをセクションごとに記
 
 **検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(1414件全通過、`natural-text-ai.test.ts`・`screenshot-ai.test.ts`・`genre-hint.test.ts`を新規追加)/`npx next build`すべて成功。**未検証**:このセッションには実際のAnthropic API・本人のログイン手段・実機の音声認識・実際のスクリーンショット画像が無いため、AIの実際の書き起こし精度・音声認識の実際の挙動は確認できていない(N11のAI評価で改めて扱う)。
 
-### N4 以降
+### N4:レポート(月次・年次・固定費検出)
+
+着手前の調査で、`app/(app)/reports/page.tsx` が既に `loadIncomeExpenseTrend()`・`loadCategorySpendingTrend()`・`loadMerchantSpendingRanking()` など複数の集計を並列取得して表示していること、`src/domain/subscriptions.ts` の `detectSubscriptions()`(同一店舗・同一金額の支出が月1回ペースで2回以上)が本人要件の「固定費の自動検出」の候補抽出そのものとして流用できることを確認した。したがって N4 は「概要/明細」の2択だった `ViewSwitch` を3択にする改修と、レポート画面への追加表示に絞った。
+
+1. **表示切り替えの3択化**:`app/(app)/spending/view-switch.tsx` に「レポート」を追加。概要・明細は既存どおりこの画面内のスクロール位置と連動する切り替えボタンのまま、「レポート」だけは別画面(`/reports`)への `<Link>` にした——スクロール連動先の要素が同一画面内に無いため、他の2つと同じ「タップで状態が切り替わるボタン」にはできない。見た目(角丸のタブ列・高さ)だけ揃え、押しても選択状態(`aria-selected`)にはならないようにした(遷移後は `/reports` 自身の見出しが現在地を示す)。
+2. **月合計の3タイル**:`month-summary-row.tsx`(新規)。支出・収入・収支を並べ、`hasIncome()`(既存の `@/domain/summary-rules`)が false のとき収支タイルの代わりに「収入を登録」リンクを2列分の幅で表示する——本人要件「収入が無いときは収支を隠し、収入登録への導線を出す」をそのまま踏襲。
+3. **ジャンル別ドーナツ**:`genre-donut-chart.tsx`(新規)。SVGの `<circle>` を `strokeDasharray`/`strokeDashoffset` で積み上げて描画し、-90度回転させて12時位置から開始する。区切りやリストの行をタップすると選択がトグルし、中央表示が「合計」から「選択したジャンルの金額・割合」に切り替わる。色は `genreColorVar()`(ジャンル詳細・内訳と同じ関数)を使うことで、本人要件「カテゴリの色は全画面で同じ」を満たす。小さい区切りにはラベルを付けず(重なり回避)、下のリストで名前・金額・割合を示す。**実装上の修正**:初稿では `let offset = 0` をジャンル配列の `.map()`内で書き換えて累積オフセットを作っていたが、`react-hooks/immutability`(ESLint)に「レンダー完了後に外側変数を書き換えている」と指摘された。`reduce()` で1つ前の要素の `offset + dash` から次のオフセットを導く形に直し、外側変数の書き換えを無くした。
+4. **固定費/変動費の自動検出**:`fixed_cost_confirmations` テーブル(マイグレーション `20260930000900`・RLS `20260930001000`)を新設し、`detectSubscriptions()` が出す候補のうち本人が「固定費にする」を押したものだけ `subscription_key`(`subscriptionKeyOf()`、店名/摘要+金額を正規化した文字列)で記録する。**未確認の候補は既定で変動費として数える**——誤って固定費扱いにしないための安全側の初期値。`splitFixedVariable()`(`src/domain/subscriptions.ts` に追加)が当月の支出をこの確認済みキー集合で機械的に振り分け、`fixed-cost-store.ts` の `loadFixedVariableSplit()` がDBから当月分を取得して渡す。`fixed-variable-card.tsx` は変動費/固定費のラジオグループ切り替えで一覧を出し、候補には「固定費にする」、確定済みには「解除」ボタンを置く(`confirmFixedCostAction`/`unconfirmFixedCostAction`、いずれも `revalidatePath('/reports')`)。
+5. **年間の収支棒グラフ**:`year-net-bar-chart.tsx`(新規)。既存の `IncomeExpenseChart`(貯蓄率・月平均比較が主眼の折れ線、`income-expense-chart.tsx`)と同じ `IncomeExpenseTrend` データを共有しつつ、別部品として追加した——本人要件「収支はプラスとマイナスで色と向きを変える棒グラフ」は、既存の折れ線グラフの目的(推移・ペースの把握)とは見せ方の意図が異なり、置き換えるとその折れ線グラフの情報が失われるため。ゼロ軸を挟んで正(`var(--income)`)は上向き、負(`var(--over)`)は下向きの棒にし、合計・月平均を数値でも示す。アクセシビリティのため、グラフと同じ内容の `<table>` を併記した(`income-expense-chart.tsx` の既存パターンを踏襲)。
+6. **カテゴリ色の一貫性**:新設した `genre-donut-chart.tsx` を含め、本セクションで追加した表示はすべて既存の `genreColorVar()`/`GenreBadge` を使い、独自の配色を作らなかった。
+
+**却下した選択肢**
+
+- **`IncomeExpenseChart` を `YearNetBarChart` に置き換える**:上記5参照。同じデータソースでも目的が異なるため、両方を残した(ADR-033の「同じ考慮を複数箇所に書かない」はデータ取得側 `loadIncomeExpenseTrend()` の一本化で満たしている)。
+- **固定費の確定をクライアント側(localStorage)のみで持つ**:本人が複数端末で見ることを想定し(既存の `app_settings` 等と同じ扱い)、DBに `fixed_cost_confirmations` として永続化した。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`(`genre-donut-chart.tsx` の `react-hooks/immutability` 指摘を修正、`fixed-variable-card.tsx` の `py-1.5` を `design-tokens.test.ts` に合わせて `py-2` へ修正)/`npx prettier --check .`/`npx vitest run`(1421件全通過)/`npx next build`/`npm run verify:migrations`(`fixed_cost_confirmations` を含めて一致確認)すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、ドーナツグラフのタップ操作・固定費の実データでの検出結果は確認できていない。
+
+### N5 以降
 
 以降のセクションの記録はコミットごとに追記する。
 

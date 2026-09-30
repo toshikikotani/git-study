@@ -1,10 +1,15 @@
 import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
+import { FixedVariableCard } from './fixed-variable-card';
+import { GenreDonutChart } from './genre-donut-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
 import { MerchantRankingCard } from './merchant-ranking-card';
+import { MonthSummaryRow } from './month-summary-row';
 import { NetWorthChart } from './net-worth-chart';
 import { PurposeBalanceCard } from './purpose-balance-card';
+import { YearNetBarChart } from './year-net-bar-chart';
+import { hasIncome } from '@/domain/summary-rules';
 import {
   loadAccountBalanceByPurpose,
   loadCategorySpendingTrend,
@@ -12,6 +17,12 @@ import {
   loadMerchantSpendingRanking,
 } from '@/features/reports/store';
 import { loadNetWorthTrend } from '@/features/net-worth/store';
+import { loadMonthlyLedger } from '@/features/spending/store';
+import {
+  listConfirmedFixedCostKeys,
+  loadFixedVariableSplit,
+} from '@/features/subscriptions/fixed-cost-store';
+import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 
 // 直近6ヶ月の集計は都度 transactions から出す(スナップショットの保存機構が無い)。
@@ -19,19 +30,33 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 export const dynamic = 'force-dynamic';
 
 export default async function ReportsPage() {
-  const [trend, netWorthPoints, incomeExpenseTrend, merchantRanking, purposeBalances] =
-    await withMinDuration(
-      Promise.all([
-        loadCategorySpendingTrend(),
-        // net_worth_snapshots は本番マイグレーション未適用の間、テーブル自体が
-        // 無く失敗する(TASKS.md のブロック事項参照)。本人にとっては「記録が
-        // まだ無い」のと同じなので、レポート画面全体を落とさず空状態にする。
-        loadNetWorthTrend().catch(() => []),
-        loadIncomeExpenseTrend(),
-        loadMerchantSpendingRanking(),
-        loadAccountBalanceByPurpose(),
-      ]),
-    );
+  const [
+    trend,
+    netWorthPoints,
+    incomeExpenseTrend,
+    merchantRanking,
+    purposeBalances,
+    ledger,
+    fixedVariable,
+    subscriptionCandidates,
+    confirmedKeys,
+  ] = await withMinDuration(
+    Promise.all([
+      loadCategorySpendingTrend(),
+      // net_worth_snapshots は本番マイグレーション未適用の間、テーブル自体が
+      // 無く失敗する(TASKS.md のブロック事項参照)。本人にとっては「記録が
+      // まだ無い」のと同じなので、レポート画面全体を落とさず空状態にする。
+      loadNetWorthTrend().catch(() => []),
+      loadIncomeExpenseTrend(),
+      loadMerchantSpendingRanking(),
+      loadAccountBalanceByPurpose(),
+      loadMonthlyLedger(),
+      loadFixedVariableSplit(),
+      loadDetectedSubscriptions(),
+      listConfirmedFixedCostKeys(),
+    ]),
+  );
+  const monthKey = ledger.period.from.slice(0, 7);
 
   return (
     <div className="rise space-y-4">
@@ -49,7 +74,31 @@ export default async function ReportsPage() {
         </Link>
       </header>
 
+      <MonthSummaryRow
+        spentYen={ledger.totalSpentYen}
+        incomeYen={ledger.totalIncomeYen}
+        incomeRegistered={hasIncome(ledger.totalIncomeYen)}
+      />
+
+      <GenreDonutChart
+        rows={ledger.genreBreakdown.map((g) => ({
+          genreId: g.genreId,
+          name: g.genreName,
+          spentYen: g.spentYen,
+        }))}
+        monthKey={monthKey}
+      />
+
+      <FixedVariableCard
+        fixedYen={fixedVariable.fixedYen}
+        variableYen={fixedVariable.variableYen}
+        candidates={subscriptionCandidates}
+        confirmedKeys={[...confirmedKeys]}
+      />
+
       <IncomeExpenseChart trend={incomeExpenseTrend} />
+
+      <YearNetBarChart trend={incomeExpenseTrend} />
 
       {trend.categories.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>

@@ -1737,6 +1737,16 @@ create index ai_cache_user_id_idx on public.ai_cache (user_id);
 create index ai_cache_expires_at_idx on public.ai_cache (expires_at);
 
 
+-- 固定費の確認(N4)。domain/subscriptions.ts の subscriptionKeyOf() と同じ規則の
+-- キー(正規化した店名/摘要 + 金額)。detectSubscriptions() の検知結果と1対1対応。
+create table public.fixed_cost_confirmations (
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  subscription_key text        not null,
+  confirmed_at     timestamptz not null default now(),
+  primary key (user_id, subscription_key)
+);
+
+
 
 
 -- =============================================================================
@@ -2079,7 +2089,7 @@ begin
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
     'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
-    'genre_memory','receipt_captures','ai_cache'
+    'genre_memory','receipt_captures','ai_cache','fixed_cost_confirmations'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

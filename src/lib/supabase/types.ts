@@ -1676,6 +1676,24 @@ export type Database = {
           },
         ];
       };
+      fixed_cost_confirmations: {
+        Row: {
+          confirmed_at: string;
+          subscription_key: string;
+          user_id: string;
+        };
+        Insert: {
+          confirmed_at?: string;
+          subscription_key: string;
+          user_id: string;
+        };
+        Update: {
+          confirmed_at?: string;
+          subscription_key?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       genres: {
         Row: {
           budget_yen: number | null;
