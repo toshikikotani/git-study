@@ -158,3 +158,50 @@ describe('R2 画面の初期表示は「累計」', () => {
     expect(html).toContain('data-actual');
   });
 });
+
+describe('R3 補助線とラベル', () => {
+  const html = renderChart('daily', { allowance: 663 });
+
+  it('目安(破線・濃い)と平均(点線・薄い)は、線の種類と濃さが違う', () => {
+    expect(html).toMatch(
+      /data-line="allowance"[^>]*border-top:1\.5px dashed var\(--ink-secondary\)/,
+    );
+    expect(html).toMatch(/data-line="average"[^>]*border-top:1\.5px dotted color-mix/);
+  });
+
+  it('「目安」「平均」のタグは、描画領域の外(右の余白)に置く', () => {
+    // 描画領域(ref=plot の div)の中にタグの文言が入っていない
+    const plotStart = html.indexOf('relative h-full w-full touch-pan-y');
+    const gutterStart = html.indexOf('pointer-events-none absolute inset-y-0 right-0');
+    expect(gutterStart).toBeGreaterThan(plotStart);
+    const inPlot = html.slice(plotStart, gutterStart);
+    expect(inPlot).not.toContain('>目安<');
+    expect(inPlot).not.toContain('>平均<');
+    const gutter = html.slice(gutterStart);
+    expect(gutter).toContain('>目安<');
+    expect(gutter).toContain('>平均<');
+  });
+
+  it('補助線は2本(半分と上限)+基準線。基準線だけ少し濃く、どれも1pxの細い線。縦の補助線は無い', () => {
+    expect(
+      (html.match(/border-top:1px solid color-mix\(in srgb, var\(--ink\) 10%/g) ?? []).length,
+    ).toBe(2);
+    expect(html).toContain('border-top:1px solid color-mix(in srgb, var(--ink) 22%');
+    expect(html).not.toMatch(/border-left:1px solid color-mix\(in srgb, var\(--ink\) 10%/);
+  });
+
+  it('金額の目盛りは右の余白に短く(1,000 / 2,500 など)', () => {
+    const gutter = html.slice(html.indexOf('pointer-events-none absolute inset-y-0 right-0'));
+    expect(gutter).toMatch(/>1,000</);
+    expect(gutter).toMatch(/>2,000</);
+  });
+
+  it('1日平均には対象期間(9/21〜)を添える', () => {
+    expect(html).toContain('1日平均(9/21〜)');
+  });
+
+  it('吹き出しの置き場はグラフの上部に固定(位置が動かない)。なぞっていないときは空', () => {
+    expect(html).toContain('flex min-h-8 items-center');
+    expect(html).not.toContain('role="status"');
+  });
+});

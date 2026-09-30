@@ -6,6 +6,12 @@ import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { Segmented } from '@/components/ui/segmented';
 import { genreBarColor, genreColorVar } from '@/domain/genre-style';
 import { pickAxisLabels } from '@/features/category/axis';
+import {
+  TAG_HEIGHT,
+  TICK_HEIGHT,
+  layoutGutter,
+  type GutterItem,
+} from '@/features/category/chart-layout';
 import { cumulativeTooltip, idealDeltaLabel, type CumulativeChart } from '@/features/category/pace';
 import {
   AUDIO_NOTE_MS,
@@ -24,7 +30,7 @@ import { ChartGesture } from '@/lib/chart-gesture';
 
 const PLOT_HEIGHT = 176;
 /** 右端の余白(金額の目盛りと、目安・平均のタグ)。描画領域の外側に確保する。 */
-const GUTTER = 52;
+const GUTTER = 56;
 const GAP = 0.18; // 棒の間の隙間(区間の幅に対する割合)
 const BAR_MAX_PX = 12; // 棒の幅の上限
 const BAR_RADIUS = 4; // 棒の上端の角丸
@@ -186,6 +192,36 @@ export function CategoryChart({
 
   const end = cumulative.endIndex !== null ? cumulative.days[cumulative.endIndex]! : null;
 
+  const gutterItems: GutterItem[] = [
+    ...ticks.map((t) => ({
+      key: `tick-${t}`,
+      kind: 'tick' as const,
+      ratio: t / maxYen,
+      height: TICK_HEIGHT,
+    })),
+    ...(!isCum && series.allowanceYen !== null
+      ? [
+          {
+            key: 'allowance',
+            kind: 'tag' as const,
+            ratio: series.allowanceYen / maxYen,
+            height: TAG_HEIGHT,
+          },
+        ]
+      : []),
+    ...(!isCum && series.averageLineYen !== null
+      ? [
+          {
+            key: 'average',
+            kind: 'tag' as const,
+            ratio: series.averageLineYen / maxYen,
+            height: TAG_HEIGHT,
+          },
+        ]
+      : []),
+  ];
+  const placed = layoutGutter(gutterItems, PLOT_HEIGHT);
+
   return (
     <section
       aria-label="グラフ"
@@ -233,6 +269,18 @@ export function CategoryChart({
       )}
 
       <div role="group" aria-label={summary}>
+        {/* なぞっている間の吹き出し。位置は動かさず、グラフの上部に固定する(データと重ならない) */}
+        <div className="flex min-h-8 items-center" style={{ paddingRight: GUTTER }}>
+          {tipText ? (
+            <p
+              role="status"
+              className="tabular rounded-xl px-3 py-1 text-xs font-semibold whitespace-nowrap"
+              style={{ background: 'var(--ink)', color: 'var(--surface)' }}
+            >
+              {tipText}
+            </p>
+          ) : null}
+        </div>
         <div className="relative" style={{ height: PLOT_HEIGHT, paddingRight: GUTTER }}>
           <div
             ref={plot}
@@ -277,10 +325,18 @@ export function CategoryChart({
             ) : (
               <>
                 {series.allowanceYen !== null ? (
-                  <Line ratio={barRatio(series.allowanceYen, maxYen)} />
+                  <Line
+                    kind="allowance"
+                    ratio={barRatio(series.allowanceYen, maxYen)}
+                    dim={tip !== null}
+                  />
                 ) : null}
                 {series.averageLineYen !== null ? (
-                  <Line ratio={barRatio(series.averageLineYen, maxYen)} dashed />
+                  <Line
+                    kind="average"
+                    ratio={barRatio(series.averageLineYen, maxYen)}
+                    dim={tip !== null}
+                  />
                 ) : null}
                 {Array.from({ length: MAX_BARS }, (_, i) => {
                   const b = i < n ? series.buckets[i] : undefined;
@@ -400,39 +456,37 @@ export function CategoryChart({
                 ) : null}
               </>
             ) : null}
-
-            {tipText ? (
-              <div
-                role="status"
-                className="tabular pointer-events-none absolute -top-2 z-10 -translate-y-full rounded-xl px-3 py-2 text-xs font-semibold whitespace-nowrap"
-                style={{
-                  left: `clamp(0px, calc(${x(tip!)}% - 90px), calc(100% - 180px))`,
-                  background: 'var(--ink)',
-                  color: 'var(--surface)',
-                }}
-              >
-                {tipText}
-              </div>
-            ) : null}
           </div>
 
-          {/* 右端の余白:金額の目盛り */}
+          {/* 右端の余白:金額の目盛りと、目安・平均のタグ(描画領域の外に置き、重ならないよう配置) */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-y-0 right-0"
-            style={{ width: GUTTER }}
+            style={{ width: GUTTER, opacity: tip !== null ? 0.6 : 1 }}
           >
-            {ticks.map((t) => (
+            {placed.map((p) => (
               <span
-                key={t}
-                className="tabular absolute right-0 pl-2 text-xs"
+                key={p.key}
+                className="tabular absolute right-0 pl-2 text-right text-xs leading-tight"
                 style={{
-                  bottom: `${(t / maxYen) * 100}%`,
-                  transform: 'translateY(50%)',
-                  color: 'var(--ink-secondary)',
+                  top: p.centerPx,
+                  transform: 'translateY(-50%)',
+                  color: p.kind === 'tag' ? 'var(--ink)' : 'var(--ink-secondary)',
+                  fontWeight: p.kind === 'tag' ? 600 : 400,
                 }}
               >
-                {t.toLocaleString('ja-JP')}
+                {p.kind === 'tag' ? (
+                  <>
+                    <span className="block">{p.key === 'allowance' ? '目安' : '平均'}</span>
+                    <span className="block">
+                      {(p.key === 'allowance'
+                        ? series.allowanceYen
+                        : series.averageLineYen)!.toLocaleString('ja-JP')}
+                    </span>
+                  </>
+                ) : (
+                  Number(p.key.slice(5)).toLocaleString('ja-JP')
+                )}
               </span>
             ))}
           </div>
@@ -460,6 +514,28 @@ export function CategoryChart({
             </span>
           ))}
         </div>
+
+        {/* 平均と目安の中身(対象期間つき)。線のラベルはグラフの右の余白のタグ */}
+        {!isCum && (series.averageYen !== null || series.allowanceYen !== null) ? (
+          <dl className="mt-2 space-y-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            {series.averageYen !== null ? (
+              <div className="flex gap-2">
+                <dt>1日平均({md(series.averageFrom ?? series.recordStart)}〜)</dt>
+                <dd className="tabular font-semibold" style={{ color: 'var(--ink)' }}>
+                  {series.averageYen.toLocaleString('ja-JP')}円
+                </dd>
+              </div>
+            ) : null}
+            {series.allowanceYen !== null && series.unit === 'day' ? (
+              <div className="flex gap-2">
+                <dt>1日の目安(このカテゴリ)</dt>
+                <dd className="tabular font-semibold" style={{ color: 'var(--ink)' }}>
+                  {series.allowanceYen.toLocaleString('ja-JP')}円
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
 
         {/* VoiceOver・キーボード向け:区間ごとのボタン(金額・件数)。見た目は隠す */}
         <ul className="sr-only">
@@ -537,7 +613,9 @@ function CumulativeLayer({
         preserveAspectRatio="none"
         className="pointer-events-none absolute inset-0 size-full overflow-visible"
       >
-        {band ? <polygon points={band} fill={color} fillOpacity={0.14} data-forecast-band /> : null}
+        {band ? (
+          <polygon points={band} fill={color} fillOpacity={dim ? 0.07 : 0.14} data-forecast-band />
+        ) : null}
         {ideal.length > 1 ? (
           <polyline
             data-ideal
@@ -604,15 +682,31 @@ function CumulativeLayer({
   );
 }
 
-/** 目安(実線)・平均(破線)の水平線。ラベルは右の余白に出す(R3)。 */
-function Line({ ratio, dashed = false }: { ratio: number; dashed?: boolean }) {
+/**
+ * 目安(破線・濃い)と平均(点線・薄い)の水平線。線の種類と濃さを変えて見分けられるようにする。
+ * ラベルは右の余白のタグ(描画領域の外)に出すので、データとは重ならない。
+ */
+function Line({
+  kind,
+  ratio,
+  dim,
+}: {
+  kind: 'allowance' | 'average';
+  ratio: number;
+  dim: boolean;
+}) {
+  const allowance = kind === 'allowance';
   return (
     <div
       aria-hidden
+      data-line={kind}
       className="pointer-events-none absolute inset-x-0"
       style={{
         bottom: `${ratio * 100}%`,
-        borderTop: `1px ${dashed ? 'dashed' : 'solid'} ${dashed ? 'color-mix(in srgb, var(--ink) 45%, transparent)' : 'var(--ink-secondary)'}`,
+        borderTop: allowance
+          ? '1.5px dashed var(--ink-secondary)'
+          : '1.5px dotted color-mix(in srgb, var(--ink) 40%, transparent)',
+        opacity: dim ? 0.5 : 1,
       }}
     />
   );

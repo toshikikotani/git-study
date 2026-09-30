@@ -88,10 +88,10 @@ describe('P4 グラフの画面', () => {
     expect((html.match(/min-h-11/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
-  it('1日平均(破線)と、目標期間中は1日の目安の線(実線)。目標が無いときは目安の線が無い', () => {
-    expect(html).toContain('1px dashed');
-    expect(render('day')).not.toContain('1px solid var(--ink-secondary)');
-    expect(html).toContain('1px solid var(--ink-secondary)');
+  it('1日平均(点線)と、目標期間中は1日の目安の線(破線)。目標が無いときは目安の線が無い', () => {
+    expect(html).toContain('data-line="average"');
+    expect(html).toContain('data-line="allowance"');
+    expect(render('day')).not.toContain('data-line="allowance"');
   });
 
   it('予定のある日は、斜線の棒', () => {
