@@ -113,22 +113,28 @@ describe('P2 ヘッダー', () => {
         genreName: '外食',
         monthStart: '2026-09-01',
         isCurrentMonth: true,
+        todayMonthKey: '2026-09',
         totalYen: 12279,
         onBack: () => {},
       }),
     ),
   );
 
-  it('大きな表示:カテゴリ名・期間の切り替え(‹ 9月 ›)・合計金額(読み上げは最終の金額)', () => {
+  it('大きな表示:カテゴリ名 → 合計金額(左揃え・主役)→ 期間「2026年9月 ▾」(読み上げは最終の金額)', () => {
     expect(html).toContain('外食');
     expect(html).toContain('2026年9月');
-    expect(html).toContain('aria-label="前の月"');
-    expect(html).toContain('aria-label="次の月"');
+    expect(html).toContain('▾');
     expect(html).toContain('aria-label="12,279円"');
+    // 金額は期間の切り替えと横に並べない(金額が期間より先=上にある)
+    expect(html.indexOf('aria-label="12,279円"')).toBeLessThan(
+      html.indexOf('aria-haspopup="dialog"'),
+    );
+    expect(html).not.toContain('aria-label="前の月"');
   });
 
-  it('今月は次の月へ進めない。戻るボタン・矢印は44pt', () => {
-    expect(html).toMatch(/aria-label="次の月"[^>]*disabled/);
+  it('期間はタップで選ぶメニュー(押せる大きさ)。戻るボタンも44pt', () => {
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain('期間、2026年9月。タップで期間を選ぶ');
     expect(html).toContain('‹ 家計簿');
     expect((html.match(/min-h-11/g) ?? []).length).toBeGreaterThanOrEqual(3);
   });

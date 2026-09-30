@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
+import { Segmented } from '@/components/ui/segmented';
 import {
   buildItemDetail,
   flattenRows,
@@ -31,6 +32,13 @@ import { CategoryTransactionRow } from './transaction-row';
 import { VirtualList } from './virtual-list';
 
 export type CategoryTab = 'tx' | 'items' | 'stores';
+
+/**
+ * 上部に固定される小さなヘッダーの高さと、その下の取引/品目/店の帯の高さ。
+ * 実際の高さ(文字が大きいほど高い)は、ヘッダー・帯が CSS 変数に書く。読めるまでの既定は 44 / 60。
+ */
+const COMPACT_HEADER = 'var(--compact-header-h, 44px)';
+const TABS_STICKY = 'var(--tabs-strip-h, 60px)';
 
 const TABS: { value: CategoryTab; label: string }[] = [
   { value: 'tx', label: '取引' },
@@ -169,6 +177,23 @@ export function CategoryTabs({
     setDragging(true);
   };
 
+  // 帯の高さ(文字が大きいほど高い)を CSS 変数に書く。日付の見出しは、この下に固定される。
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = strip.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const write = () =>
+      root.style.setProperty('--tabs-strip-h', `${el.getBoundingClientRect().height}px`);
+    write();
+    const ro = new ResizeObserver(write);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty('--tabs-strip-h');
+    };
+  }, []);
+
   const txTotal = actualSpentYen(txLines);
   const itemsTotal = items.reduce((a, i) => a + i.totalYen, 0);
   const storesTotal = stores.reduce((a, s) => a + s.totalYen, 0);
@@ -176,29 +201,27 @@ export function CategoryTabs({
 
   return (
     <section id="category-tabs" aria-label="取引・品目・店" className="scroll-mt-16 space-y-3">
-      <div role="tablist" aria-label="見方の切り替え" className="flex gap-1">
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.value}
-            onClick={() => select(t.value)}
-            className="min-h-11 flex-1 rounded-full text-sm font-semibold"
-            style={{
-              background: tab === t.value ? 'var(--accent)' : 'transparent',
-              color: tab === t.value ? 'var(--on-accent)' : 'var(--ink-secondary)',
-              border: `1px solid ${tab === t.value ? 'transparent' : 'var(--hairline)'}`,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* 取引 / 品目 / 店:スクロールすると、上部に固定されたヘッダーの直下に留まる */}
+      <div
+        ref={strip}
+        className="sticky z-20 -mx-4 px-4 py-1"
+        style={{
+          top: `calc(var(--sticky-top) + ${COMPACT_HEADER})`,
+          background: 'var(--plane)',
+        }}
+      >
+        <Segmented
+          value={tab}
+          options={TABS}
+          onChange={(v) => select(v)}
+          label="見方の切り替え"
+          className="flex w-full [&>button]:flex-1"
+        />
       </div>
 
       {tab === 'tx' ? (
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="search"
               value={query}
@@ -227,7 +250,7 @@ export function CategoryTabs({
                     hapticFor('filterChange');
                     setSort(v);
                   }}
-                  className="min-h-11 rounded-full px-3 text-xs font-semibold"
+                  className="min-h-11 rounded-full px-3 text-xs font-semibold whitespace-nowrap"
                   style={{
                     background: sort === v ? 'var(--accent)' : 'transparent',
                     color: sort === v ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -278,7 +301,10 @@ export function CategoryTabs({
                 <div
                   aria-hidden
                   className="sticky z-10 rounded-t-2xl"
-                  style={{ top: 'calc(var(--sticky-top) + 56px)', background: 'var(--surface)' }}
+                  style={{
+                    top: `calc(var(--sticky-top) + ${COMPACT_HEADER} + ${TABS_STICKY})`,
+                    background: 'var(--surface)',
+                  }}
                 >
                   <DayHeader row={sticky} />
                 </div>

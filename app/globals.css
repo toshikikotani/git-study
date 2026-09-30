@@ -86,9 +86,9 @@
   --accent-track: rgba(10, 16, 32, 0.07); /* 帯・トラック(中立) */
   --income: #0f8f60; /* 収入 */
   --income-track: #d9f2e6;
-  --over: #e34948; /* 超過・支出 */
+  --over: #b82b2b; /* 超過・支出(白・薄い赤の面の上で 4.5:1 以上) */
   --over-track: #f9dfdf;
-  --attention: #b8860b; /* 閾値到達。点で使い、必ず文字を伴う */
+  --attention: #8a6400; /* 閾値到達(白・薄い黄の面の上で 4.5:1 以上)。必ず文字を伴う */
 
   --hero-glow: rgba(10, 16, 32, 0.03);
   --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
@@ -111,10 +111,10 @@
      色だけに頼らず、必ずアイコン・ラベルを併用する(domain/budget-state.ts)。 */
   --state-ok: #4a5568;
   --state-ok-track: #e6e9ef;
-  --state-caution: #b8860b;
+  --state-caution: #8a6400;
   --state-caution-track: #f8edc6;
   --attention-track: #f8edc6;
-  --state-over: #e34948;
+  --state-over: #b82b2b;
   --state-over-track: #f9dfdf;
   --state-none: #78849b;
   --state-none-track: #e6e9ef;
@@ -233,9 +233,8 @@
    アプリを見ても、ガラス素材はタブバー・ツールバー・シート・フローティング
    ボタンなど「コンテンツの上に浮く操作系」にだけ使われ、本文中のボタンや
    カードは不透明な塗りのままになっている(全部を透過にすると逆にコンテンツが
-   読みにくくなるため)。この方針に倣い、ガラス素材(--glass-*)はボトムナビ・
-   その他メニューのシート・Button の elevated variant(カードの上に浮く
-   ボタン)に限定して使い、Card・StatTile・Chip 等の本文要素は不透明な
+   読みにくくなるため)。この方針に倣い、ガラス素材(--glass-*)はナビゲーションの層
+   (タブバー・ナビゲーションバー・浮かぶ操作・シート・メニュー)に限定して使い、Card・StatTile・Chip 等の本文要素は不透明な
    サーフェス+Apple 的な角丸とスプリングの動きだけを採用する。
    ============================================================================= */
 :root {
@@ -396,6 +395,43 @@ body {
   font-variant-numeric: tabular-nums;
   /* 固定要素の余白(ステータスバー・ホームバー)の基準。 */
   --sticky-top: env(safe-area-inset-top, 0px);
+}
+
+/* タブバー:下へスクロールすると縮み(幅と余白)、上へ戻すと元の大きさになる(lib/chrome.ts)。
+   押せる高さ(44pt)は縮めない。視差効果を減らす設定では動かさず切り替える。 */
+.tabbar {
+  max-width: 28rem;
+  transition:
+    max-width var(--motion-medium, 300ms) var(--ease-standard, ease),
+    padding var(--motion-medium, 300ms) var(--ease-standard, ease);
+}
+.tabbar[data-compact='true'] {
+  max-width: 21rem;
+}
+.tabbar[data-compact='true'] .tabbar-pill {
+  padding: 4px;
+}
+.tabbar-pill {
+  transition: padding var(--motion-medium, 300ms) var(--ease-standard, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabbar,
+  .tabbar-pill {
+    transition: none;
+  }
+}
+
+/* 「透明度を下げる」:半透明の素材(ナビゲーションの層)をやめて、不透明の面にする。 */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'] {
+    --glass-tint: var(--surface);
+    --glass-tint-strong: var(--surface);
+    --glass-blur: none;
+    --glass-blur-strong: none;
+    --glass-border: var(--hairline);
+  }
 }
 
 /* ステータスバーの下のぼかし。ノッチ・ダイナミックアイランドの背後を本文が透けて

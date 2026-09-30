@@ -21,6 +21,7 @@
  * 同じ考え方、列版)。
  */
 
+import { mapChunks } from '@/lib/chunk';
 import { assertEditableReceiptItems, ReceiptItemsError } from '@/domain/receipt-items';
 import { AppError } from '@/lib/errors';
 import { isMissingColumnError, isMissingTableError } from '@/lib/supabase/errors';
@@ -124,36 +125,42 @@ export async function listReceiptItemsForTransactionIds(
   if (transactionIds.length === 0) return map;
 
   const supabase = await createClient();
-  let rows: {
+  type Row = {
     id: string;
     transaction_id: string;
     name: string;
     amount_yen: number;
     genre_id: string | null;
     product_type: string | null;
-  }[];
-  const withExtras = await supabase
-    .from('receipt_items')
-    .select('id, transaction_id, name, amount_yen, genre_id, product_type')
-    .in('transaction_id', transactionIds)
-    .order('sort_order', { ascending: true });
-  if (withExtras.error && isMissingColumnError(withExtras.error)) {
-    const withoutExtras = await supabase
+  };
+  // 数百件を超える id は URL に載らないため、分けて問い合わせる。
+  const chunks = await mapChunks(transactionIds, async (ids): Promise<Row[]> => {
+    const withExtras = await supabase
       .from('receipt_items')
-      .select('id, transaction_id, name, amount_yen')
-      .in('transaction_id', transactionIds)
+      .select('id, transaction_id, name, amount_yen, genre_id, product_type')
+      .in('transaction_id', ids)
       .order('sort_order', { ascending: true });
-    if (withoutExtras.error) {
-      if (isMissingTableError(withoutExtras.error)) return map;
-      throw new ReceiptItemStoreError(`品目を取得できませんでした: ${withoutExtras.error.message}`);
+    if (withExtras.error && isMissingColumnError(withExtras.error)) {
+      const withoutExtras = await supabase
+        .from('receipt_items')
+        .select('id, transaction_id, name, amount_yen')
+        .in('transaction_id', ids)
+        .order('sort_order', { ascending: true });
+      if (withoutExtras.error) {
+        if (isMissingTableError(withoutExtras.error)) return [];
+        throw new ReceiptItemStoreError(
+          `品目を取得できませんでした: ${withoutExtras.error.message}`,
+        );
+      }
+      return withoutExtras.data.map((r) => ({ ...r, genre_id: null, product_type: null }));
     }
-    rows = withoutExtras.data.map((r) => ({ ...r, genre_id: null, product_type: null }));
-  } else if (withExtras.error) {
-    if (isMissingTableError(withExtras.error)) return map;
-    throw new ReceiptItemStoreError(`品目を取得できませんでした: ${withExtras.error.message}`);
-  } else {
-    rows = withExtras.data;
-  }
+    if (withExtras.error) {
+      if (isMissingTableError(withExtras.error)) return [];
+      throw new ReceiptItemStoreError(`品目を取得できませんでした: ${withExtras.error.message}`);
+    }
+    return withExtras.data;
+  });
+  const rows: Row[] = chunks.flat();
   if (rows.length === 0) return map;
 
   const { data: genres, error: genresError } = await supabase.from('genres').select('id, name');

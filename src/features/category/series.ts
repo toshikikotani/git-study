@@ -42,12 +42,33 @@ export type Bucket = {
 export type Series = {
   unit: ChartUnit;
   buckets: Bucket[];
-  /** 期間の平均(今日までの区間の実績の平均)。区間が無ければ null。 */
+  /**
+   * 記録開始日。グラフの横軸はここから始まり、これより前の日は描かない(月をまたぐ履歴が
+   * あるときは月の初日)。記録がまったく無いときは月の初日。
+   */
+  recordStart: DateOnly;
+  /** 記録開始日が月の途中か(「9/21 記録開始」と添えるか)。月の初日から数えるときは false。 */
+  recordStartInMonth: boolean;
+  /**
+   * 1日平均。「記録開始日 〜 今日(過去の月は月末)」の日数で割る(月の日数では割らない)。
+   * 対象の日が無ければ null。
+   */
   averageYen: number | null;
-  /** 1日の目安に相当する線(日=1日の目安、週=×7)。無ければ null。 */
+  /** 1日平均の対象期間(「9/21〜」と添える)。 */
+  averageFrom: DateOnly | null;
+  /** 平均の線(日=1日平均、週=×7、月は出さない)。無ければ null。 */
+  averageLineYen: number | null;
+  /** 目標期間中の、このカテゴリの1日の目安に相当する線(日=1日、週=×7)。無ければ null。 */
   allowanceYen: number | null;
-  /** 棒グラフの上端(バー・前期間・平均・目安の最大)。 */
+  /** 前期間のデータがあるか(無いときは「前期間と比べる」を無効にする)。 */
+  hasPrevious: boolean;
+  /**
+   * 縦軸の上限。表示するすべての値(棒・予定・前期間・平均・目安)を含み、切りのよい数に丸める。
+   * どの要素も描画領域からはみ出さない。
+   */
   maxYen: number;
+  /** 横の補助線の位置(金額)。2本(半分と上限)。 */
+  ticks: number[];
   /** 実績の合計(バケットの合計。カテゴリの使った額と一致する)。 */
   totalYen: number;
 };
@@ -130,33 +151,57 @@ export function buildSeries(input: {
         })
       : bucketRanges(unit, prevMonthStart, prevMonthEnd).map((r) => ({ from: r.from, to: r.to }));
 
+  const firstRecord = input.lines.reduce<DateOnly | null>(
+    (min, l) =>
+      l.status === 'actual' && (min === null || l.occurredOn < min) ? l.occurredOn : min,
+    null,
+  );
+  const recordStart: DateOnly =
+    firstRecord !== null && firstRecord > monthStart && firstRecord <= monthEnd
+      ? firstRecord
+      : monthStart;
+  // 週・月の区間も、記録開始日より前の区間は描かない(月表示は履歴の最初の記録から)。
+  const axisStart = unit === 'month' ? (firstRecord ?? monthStart) : recordStart;
+
   const hasPrevData = input.lines.some(
     (l) => l.occurredOn >= prevRanges[0]!.from && l.occurredOn <= prevRanges.at(-1)!.to,
   );
 
-  const buckets: Bucket[] = ranges.map((r, index) => {
-    const cur = sumRange(input.lines, r.from, r.to);
-    const p = prevRanges[index];
-    return {
-      index,
-      from: r.from,
-      to: r.to,
-      label: r.label,
-      actualYen: cur.actualYen,
-      scheduledYen: cur.scheduledYen,
-      count: cur.count,
-      previousYen: p && hasPrevData ? sumRange(input.lines, p.from, p.to).actualYen : null,
-      future: r.from > today,
-      today: r.from <= today && today <= r.to,
-    };
-  });
+  const buckets: Bucket[] = ranges
+    .map((r, originalIndex) => ({ r, originalIndex }))
+    .filter(({ r }) => r.to >= axisStart)
+    .map(({ r, originalIndex }, index) => {
+      const cur = sumRange(input.lines, r.from, r.to);
+      const p = prevRanges[originalIndex];
+      return {
+        index,
+        from: r.from,
+        to: r.to,
+        label: r.label,
+        actualYen: cur.actualYen,
+        scheduledYen: cur.scheduledYen,
+        count: cur.count,
+        previousYen: p && hasPrevData ? sumRange(input.lines, p.from, p.to).actualYen : null,
+        future: r.from > today,
+        today: r.from <= today && today <= r.to,
+      };
+    });
 
-  const elapsed = buckets.filter((b) => !b.future);
   const totalYen = buckets.reduce((a, b) => a + b.actualYen, 0);
+  const avgEnd = today < monthEnd ? today : monthEnd;
+  const averageDays = avgEnd < recordStart ? 0 : daysBetween(recordStart, avgEnd) + 1;
   const averageYen =
-    elapsed.length === 0
+    averageDays === 0
       ? null
-      : Math.round(elapsed.reduce((a, b) => a + b.actualYen, 0) / elapsed.length);
+      : Math.round(sumRange(input.lines, recordStart, avgEnd).actualYen / averageDays);
+  const averageLineYen =
+    averageYen === null || averageYen <= 0
+      ? null
+      : unit === 'day'
+        ? averageYen
+        : unit === 'week'
+          ? averageYen * 7
+          : null;
   const allowanceYen =
     input.dailyAllowanceYen === null || input.dailyAllowanceYen <= 0
       ? null
@@ -165,14 +210,40 @@ export function buildSeries(input: {
         : unit === 'week'
           ? input.dailyAllowanceYen * 7
           : null;
-  const maxYen = Math.max(
-    1,
+  const rawMax = Math.max(
     ...buckets.map((b) => Math.max(b.actualYen, 0) + b.scheduledYen),
     ...buckets.map((b) => b.previousYen ?? 0),
-    averageYen ?? 0,
+    averageLineYen ?? 0,
     allowanceYen ?? 0,
   );
-  return { unit, buckets, averageYen, allowanceYen, maxYen, totalYen };
+  const maxYen = niceCeil(rawMax);
+  return {
+    unit,
+    buckets,
+    recordStart,
+    recordStartInMonth: recordStart > monthStart,
+    averageYen,
+    averageFrom: averageYen === null ? null : recordStart,
+    averageLineYen,
+    allowanceYen,
+    hasPrevious: hasPrevData,
+    maxYen,
+    ticks: [maxYen / 2, maxYen],
+    totalYen,
+  };
+}
+
+/**
+ * 縦軸の上限:値を含む、切りのよい数(1・2・2.5・5 ×10のべき乗)。値が0でも 1,000 は確保する
+ * (目盛りが「0」だけの軸にしない)。
+ */
+export function niceCeil(value: number): number {
+  const v = Math.max(value, 1000);
+  const scale = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const step of [1, 2, 2.5, 5, 10]) {
+    if (step * scale >= v) return step * scale;
+  }
+  return 10 * scale;
 }
 
 /** 棒の高さの割合(0〜1)。 */
@@ -216,7 +287,9 @@ export function summarizeSeries(series: Series, genreName: string, monthLabel: s
         ? `${fmtMd(top.from)}からの週`
         : top.label;
   const avg =
-    series.averageYen === null ? '' : `、平均${series.averageYen.toLocaleString('ja-JP')}円`;
+    series.averageYen === null
+      ? ''
+      : `、1日平均${series.averageYen.toLocaleString('ja-JP')}円(${fmtMd(series.averageFrom ?? series.recordStart)}から)`;
   const sched = series.buckets.reduce((a, b) => a + b.scheduledYen, 0);
   return `${monthLabel}の${genreName}、${unitLabel}。最大は${where}の${top.actualYen.toLocaleString('ja-JP')}円。合計${series.totalYen.toLocaleString('ja-JP')}円${avg}${sched > 0 ? `。予定${sched.toLocaleString('ja-JP')}円` : ''}`;
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildCategorySummary, buildInsights, type Insight } from '@/features/category/insights';
+import { buildCumulative, categoryAllowanceYen, goalOverlaps } from '@/features/category/pace';
 import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/series';
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
@@ -19,7 +20,7 @@ import { formatMonthJa } from '@/lib/date';
 import { prefersReducedMotion } from '@/lib/motion';
 import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
 import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
-import { CategoryChart } from './category-chart';
+import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
 import { CategorySettings } from './category-settings';
@@ -70,6 +71,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
   const online = useOnline();
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
+  const [chartMode, setChartMode] = useState<ChartMode>('cumulative');
   const [showPrevious, setShowPrevious] = useState(true);
   const [tab, setTab] = useState<CategoryTab>('tx');
   const [openLine, setOpenLine] = useState<CategoryLine | null>(null);
@@ -124,6 +126,21 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
     [lines, historyLines, data.genreKey, data.monthStart, data.today, data.isCurrentMonth],
   );
 
+  // 目標期間中の、このカテゴリの1日の目安(全カテゴリ合計の目安ではない)。表示中の期間が
+  // 目標期間と重なるときだけ。
+  const categoryAllowance = useMemo(() => {
+    const g = data.goal;
+    if (!g || !g.active || !g.row || g.row.targetYen === null) return null;
+    if (!goalOverlaps(g.range, data.monthStart, data.range.to)) return null;
+    return categoryAllowanceYen({
+      budgetYen: g.row.targetYen,
+      scheduledYen: g.row.scheduledYen,
+      lines: historyLines,
+      goalRange: g.range,
+      today: data.today,
+    });
+  }, [data.goal, data.monthStart, data.range.to, data.today, historyLines]);
+
   const series = useMemo(
     () =>
       buildSeries({
@@ -132,12 +149,25 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         monthStart: data.monthStart,
         monthEnd: data.range.to,
         today: data.today,
-        dailyAllowanceYen:
-          data.goal?.active && data.goal.row?.targetYen !== null
-            ? data.goal.dailyAllowanceYen
+        dailyAllowanceYen: categoryAllowance,
+      }),
+    [historyLines, unit, data.monthStart, data.range.to, data.today, categoryAllowance],
+  );
+
+  const cumulative = useMemo(
+    () =>
+      buildCumulative({
+        lines: historyLines,
+        monthStart: data.monthStart,
+        monthEnd: data.range.to,
+        today: data.today,
+        recordStart: series.recordStart,
+        goal:
+          data.goal?.active && data.goal.row && data.goal.row.targetYen !== null
+            ? { range: data.goal.range, budgetYen: data.goal.row.targetYen }
             : null,
       }),
-    [historyLines, unit, data.monthStart, data.range.to, data.today, data.goal],
+    [historyLines, data.monthStart, data.range.to, data.today, series.recordStart, data.goal],
   );
 
   const currentGenreId = genreIdOfKey(data.genreKey);
@@ -296,15 +326,16 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         genreName={data.genreName}
         monthStart={data.monthStart}
         isCurrentMonth={data.isCurrentMonth}
+        todayMonthKey={data.today.slice(0, 7)}
         totalYen={totalYen}
         onBack={() => router.back()}
         menu={
-          <div className="flex items-center">
+          <div className="flex flex-wrap items-center">
             <button
               type="button"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
               aria-pressed={selectMode}
-              className="min-h-11 rounded-full px-4 text-sm font-semibold"
+              className="min-h-11 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
               style={{ color: 'var(--ink)' }}
             >
               {selectMode ? '完了' : '選択'}
@@ -314,7 +345,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-label={`${data.genreName}の設定`}
-                className="min-h-11 rounded-full px-3 text-sm font-semibold"
+                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
                 style={{ color: 'var(--ink)' }}
               >
                 設定
@@ -338,6 +369,8 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
       <SummarySection
         summary={summary}
         goal={data.goal}
+        monthStart={data.monthStart}
+        monthEnd={data.range.to}
         genreName={data.genreName}
         today={data.today}
       />
@@ -346,6 +379,9 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
 
       <CategoryChart
         series={series}
+        cumulative={cumulative}
+        mode={chartMode}
+        onMode={setChartMode}
         genreName={data.genreName}
         monthLabel={`${data.monthStart.slice(0, 4)}年${formatMonthJa(data.monthKey)}`}
         showPrevious={showPrevious}

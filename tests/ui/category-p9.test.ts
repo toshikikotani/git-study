@@ -146,7 +146,7 @@ describe('P9 状態の網羅(スナップショット)', () => {
       transactions: [tx({ id: 'a', occurredOn: '2026-09-05', label: 'A', amountYen: -1200 })],
     });
     expect(html).not.toContain('前月の同じ日まで');
-    expect(html).not.toContain('目標 ');
+    expect(html).not.toContain('目標期間 ');
   });
 
   it('未分類の画面(0件)でも壊れず、設定は出さない', () => {

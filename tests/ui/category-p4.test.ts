@@ -14,6 +14,7 @@ vi.mock('next/navigation', () => ({
 import { CategoryChart } from '../../app/(app)/spending/category/[genreKey]/category-chart';
 import { monthRange } from '@/domain/ledger';
 import { buildCategoryLines, type CategoryTx } from '@/features/category/model';
+import { buildCumulative } from '@/features/category/pace';
 import { MAX_BARS, buildSeries, type ChartUnit } from '@/features/category/series';
 import { ledgerTx } from '../helpers/ledger';
 
@@ -37,18 +38,34 @@ const lines = buildCategoryLines(
   { from: '2026-03-01', to: '2026-09-30' },
   TODAY,
 );
-const render = (unit: ChartUnit, allowance: number | null = null, showPrevious = true) =>
-  visible(
+const render = (
+  unit: ChartUnit,
+  allowance: number | null = null,
+  showPrevious = true,
+  mode: 'cumulative' | 'daily' = 'daily',
+) => {
+  const series = buildSeries({
+    lines,
+    unit,
+    monthStart: '2026-09-01',
+    monthEnd: monthRange('2026-09').to,
+    today: TODAY,
+    dailyAllowanceYen: allowance,
+  });
+  return visible(
     renderToString(
       h(CategoryChart, {
-        series: buildSeries({
+        series,
+        cumulative: buildCumulative({
           lines,
-          unit,
           monthStart: '2026-09-01',
           monthEnd: monthRange('2026-09').to,
           today: TODAY,
-          dailyAllowanceYen: allowance,
+          recordStart: series.recordStart,
+          goal: null,
         }),
+        mode,
+        onMode: () => {},
         genreName: '外食',
         monthLabel: '9月',
         showPrevious,
@@ -59,27 +76,26 @@ const render = (unit: ChartUnit, allowance: number | null = null, showPrevious =
       }),
     ),
   );
+};
 
 describe('P4 グラフの画面', () => {
   const html = render('day', 2300);
 
-  it('日 / 週 / 月 の切り替えと、前期間を重ねるスイッチ(どちらも44pt以上)', () => {
+  it('日 / 週 / 月 の切り替えと、前期間と比べるスイッチ(どちらも44pt以上)', () => {
     for (const u of ['日', '週', '月']) expect(html).toContain(`>${u}</button>`);
     expect(html).toContain('role="tablist"');
-    expect(html).toContain('前期間を重ねる');
+    expect(html).toContain('前期間と比べる');
     expect((html.match(/min-h-11/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
-  it('期間の平均(点線)と、目標期間中は1日の目安の線', () => {
-    expect(html).toContain('平均 ');
-    expect(html).toContain('dotted');
-    expect(html).toContain('目安 2,300円');
-    expect(render('day')).not.toContain('目安 ');
+  it('1日平均(点線)と、目標期間中は1日の目安の線(破線)。目標が無いときは目安の線が無い', () => {
+    expect(html).toContain('data-line="average"');
+    expect(html).toContain('data-line="allowance"');
+    expect(render('day')).not.toContain('data-line="allowance"');
   });
 
-  it('予定のある日は、斜線の棒と小さなカレンダーのマーク', () => {
+  it('予定のある日は、斜線の棒', () => {
     expect(html).toContain('repeating-linear-gradient(45deg');
-    expect(html).toContain('data-scheduled-mark');
   });
 
   it('棒は31本ぶんの部品を使い回す(単位を切り替えても本数が変わらず、滑らかに変形する)', () => {
@@ -100,6 +116,9 @@ describe('P4 グラフの画面', () => {
 
   it('VoiceOver:グラフの要約をラベルにし、区間ごとのボタン(金額・件数)がある。音で聞くボタンもある', () => {
     expect(html).toContain('aria-label="9月の外食、日別。最大は9月27日の2,830円');
+    expect(render('day', null, true, 'cumulative')).toContain(
+      'aria-label="9月の外食、累計。4,030円',
+    );
     expect(html).toContain('<button type="button" class="min-h-11">9/27(日) 2,830円 1件</button>');
     expect(html).toContain('音で聞く');
     expect(html).toContain('長押ししてなぞると');

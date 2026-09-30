@@ -3,6 +3,7 @@
  * 合計の検証は domain/transaction-splits.ts の純粋関数が担う。
  */
 
+import { mapChunks } from '@/lib/chunk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
@@ -106,15 +107,19 @@ export async function listSplitsForDisplay(
   if (transactionIds.length === 0) return map;
 
   const supabase = await createClient();
-  const { data: rows, error } = await supabase
-    .from('transaction_splits')
-    .select('id, transaction_id, genre_id, amount_yen, note')
-    .in('transaction_id', transactionIds)
-    .order('created_at', { ascending: true });
-  if (error) {
-    if (isMissingTableError(error)) return map;
-    throw new TransactionSplitStoreError(`分割を取得できませんでした: ${error.message}`);
-  }
+  const parts = await mapChunks(transactionIds, async (ids) => {
+    const { data, error } = await supabase
+      .from('transaction_splits')
+      .select('id, transaction_id, genre_id, amount_yen, note')
+      .in('transaction_id', ids)
+      .order('created_at', { ascending: true });
+    if (error) {
+      if (isMissingTableError(error)) return [];
+      throw new TransactionSplitStoreError(`分割を取得できませんでした: ${error.message}`);
+    }
+    return data;
+  });
+  const rows = parts.flat();
   if (rows.length === 0) return map;
 
   const { data: genres, error: genresError } = await supabase.from('genres').select('id, name');
