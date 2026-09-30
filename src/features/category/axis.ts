@@ -23,6 +23,7 @@ export function pickAxisLabels(
   plotPx = 280,
   firstText?: string,
   max = AXIS_MAX_LABELS,
+  charPx = 7.5,
 ): AxisItem[] {
   const n = labels.length;
   if (n === 0) return [];
@@ -38,7 +39,7 @@ export function pickAxisLabels(
 
   // 左端は左揃え、右端は右揃え、それ以外は中央揃えとして、隣どうしの間が空くまで間引く。
   const span = (it: AxisItem) => {
-    const w = estimateWidth(it.text);
+    const w = estimateWidth(it.text, charPx);
     const x = n === 1 ? plotPx / 2 : ((it.index + 0.5) / n) * plotPx;
     if (it.index === 0) return [0, w] as const;
     if (it.index === n - 1) return [plotPx - w, plotPx] as const;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
@@ -33,9 +33,12 @@ import { VirtualList } from './virtual-list';
 
 export type CategoryTab = 'tx' | 'items' | 'stores';
 
-/** 上部に固定される小さなヘッダーの高さ(44pt)と、その下の取引/品目/店の帯の高さ。 */
-const COMPACT_HEADER_PX = 44;
-const TABS_STICKY_PX = 60;
+/**
+ * 上部に固定される小さなヘッダーの高さと、その下の取引/品目/店の帯の高さ。
+ * 実際の高さ(文字が大きいほど高い)は、ヘッダー・帯が CSS 変数に書く。読めるまでの既定は 44 / 60。
+ */
+const COMPACT_HEADER = 'var(--compact-header-h, 44px)';
+const TABS_STICKY = 'var(--tabs-strip-h, 60px)';
 
 const TABS: { value: CategoryTab; label: string }[] = [
   { value: 'tx', label: '取引' },
@@ -174,6 +177,23 @@ export function CategoryTabs({
     setDragging(true);
   };
 
+  // 帯の高さ(文字が大きいほど高い)を CSS 変数に書く。日付の見出しは、この下に固定される。
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = strip.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const write = () =>
+      root.style.setProperty('--tabs-strip-h', `${el.getBoundingClientRect().height}px`);
+    write();
+    const ro = new ResizeObserver(write);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty('--tabs-strip-h');
+    };
+  }, []);
+
   const txTotal = actualSpentYen(txLines);
   const itemsTotal = items.reduce((a, i) => a + i.totalYen, 0);
   const storesTotal = stores.reduce((a, s) => a + s.totalYen, 0);
@@ -183,9 +203,10 @@ export function CategoryTabs({
     <section id="category-tabs" aria-label="取引・品目・店" className="scroll-mt-16 space-y-3">
       {/* 取引 / 品目 / 店:スクロールすると、上部に固定されたヘッダーの直下に留まる */}
       <div
+        ref={strip}
         className="sticky z-20 -mx-4 px-4 py-1"
         style={{
-          top: `calc(var(--sticky-top) + ${COMPACT_HEADER_PX}px)`,
+          top: `calc(var(--sticky-top) + ${COMPACT_HEADER})`,
           background: 'var(--plane)',
         }}
       >
@@ -200,7 +221,7 @@ export function CategoryTabs({
 
       {tab === 'tx' ? (
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="search"
               value={query}
@@ -229,7 +250,7 @@ export function CategoryTabs({
                     hapticFor('filterChange');
                     setSort(v);
                   }}
-                  className="min-h-11 rounded-full px-3 text-xs font-semibold"
+                  className="min-h-11 rounded-full px-3 text-xs font-semibold whitespace-nowrap"
                   style={{
                     background: sort === v ? 'var(--accent)' : 'transparent',
                     color: sort === v ? 'var(--on-accent)' : 'var(--ink-secondary)',
@@ -281,7 +302,7 @@ export function CategoryTabs({
                   aria-hidden
                   className="sticky z-10 rounded-t-2xl"
                   style={{
-                    top: `calc(var(--sticky-top) + ${COMPACT_HEADER_PX + TABS_STICKY_PX}px)`,
+                    top: `calc(var(--sticky-top) + ${COMPACT_HEADER} + ${TABS_STICKY})`,
                     background: 'var(--surface)',
                   }}
                 >

@@ -74,6 +74,7 @@ export function SummarySection({
           </p>
           <GenreBudgetRow
             name={genreName}
+            hideName
             spentYen={goal!.row!.spentYen}
             budgetYen={goal!.row!.targetYen}
             idealYen={goal!.row!.idealYen}

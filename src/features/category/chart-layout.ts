@@ -86,3 +86,20 @@ export function gutterIsValid(placed: readonly GutterPlacement[], plotPx: number
   }
   return true;
 }
+
+/**
+ * 縦軸・タグの金額の短い表記。1万円未満は「2,500」、以上は「2.5万」「50万」。
+ * 右の余白(5〜6文字ぶん)に収めるため。
+ */
+export function formatAxisYen(yen: number): string {
+  if (yen < 10000) return yen.toLocaleString('ja-JP');
+  const man = yen / 10000;
+  const text = Number.isInteger(man) ? String(man) : String(Math.round(man * 100) / 100);
+  return `${text}万`;
+}
+
+/** 文字の大きさの倍率に合わせた、描画領域の高さ(px)。大きい文字ほど縦にも広げる。 */
+export function plotHeightFor(scale: number, base = 176): number {
+  const s = Math.min(Math.max(scale, 1), 3.2);
+  return Math.round(base * (0.25 + 0.75 * s));
+}

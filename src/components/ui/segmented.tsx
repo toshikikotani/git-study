@@ -22,7 +22,7 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className={`inline-flex gap-1 p-1 ${className ?? ''}`}
+      className={`inline-flex max-w-full gap-1 p-1 ${className ?? ''}`}
       style={{ background: 'var(--surface-raised)', borderRadius: 'var(--radius-inner)' }}
     >
       {options.map((o) => {
@@ -34,7 +34,7 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
-            className="min-h-11 min-w-11 px-4 text-sm font-semibold"
+            className="min-h-11 min-w-11 px-4 text-sm font-semibold whitespace-nowrap"
             style={{
               borderRadius: 'calc(var(--radius-inner) - 4px)',
               background: on ? 'var(--surface)' : 'transparent',

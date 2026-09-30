@@ -330,12 +330,12 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         totalYen={totalYen}
         onBack={() => router.back()}
         menu={
-          <div className="flex items-center">
+          <div className="flex flex-wrap items-center">
             <button
               type="button"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
               aria-pressed={selectMode}
-              className="min-h-11 rounded-full px-4 text-sm font-semibold"
+              className="min-h-11 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
               style={{ color: 'var(--ink)' }}
             >
               {selectMode ? '完了' : '選択'}
@@ -345,7 +345,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-label={`${data.genreName}の設定`}
-                className="min-h-11 rounded-full px-3 text-sm font-semibold"
+                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
                 style={{ color: 'var(--ink)' }}
               >
                 設定

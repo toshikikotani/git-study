@@ -9,7 +9,9 @@ import { pickAxisLabels } from '@/features/category/axis';
 import {
   TAG_HEIGHT,
   TICK_HEIGHT,
+  formatAxisYen,
   layoutGutter,
+  plotHeightFor,
   type GutterItem,
 } from '@/features/category/chart-layout';
 import { cumulativeTooltip, idealDeltaLabel, type CumulativeChart } from '@/features/category/pace';
@@ -25,12 +27,13 @@ import {
   type ChartUnit,
   type Series,
 } from '@/features/category/series';
+import { useFontScale } from '@/lib/font-scale';
 import { hapticFor } from '@/lib/haptics';
+import { DeltaLabel, type DeltaGeometry, type Pt } from './delta-label';
 import { ChartGesture } from '@/lib/chart-gesture';
 
-const PLOT_HEIGHT = 176;
-/** 右端の余白(金額の目盛りと、目安・平均のタグ)。描画領域の外側に確保する。 */
-const GUTTER = 56;
+/** 右端の余白(金額の目盛りと、目安・平均のタグ)。描画領域の外側に確保する。文字の大きさに合わせて広がる(ch)。 */
+const GUTTER_W = 'calc(6ch + 12px)';
 const GAP = 0.18; // 棒の間の隙間(区間の幅に対する割合)
 const BAR_MAX_PX = 12; // 棒の幅の上限
 const BAR_RADIUS = 4; // 棒の上端の角丸
@@ -80,6 +83,11 @@ export function CategoryChart({
   selectedIndex: number | null;
 }) {
   const plot = useRef<HTMLDivElement>(null);
+  const fontScale = useFontScale();
+  const plotPx = plotHeightFor(fontScale);
+  // 文字が大きいとき、点の横には収まらない。グラフの上の固定の置き場に、折り返してよい形で出す。
+  const bigText = fontScale >= 1.5;
+  const [plotW, setPlotW] = useState(280);
   const [tip, setTip] = useState<number | null>(null);
   const [audioNote, setAudioNote] = useState<string | null>(null);
   const isCum = mode === 'cumulative';
@@ -111,6 +119,15 @@ export function CategoryChart({
       },
     });
   }, [gesture, n, series, cumulative, isCum, onPick]);
+
+  // 描画領域の幅(横軸のラベルを間引く目安)。
+  useEffect(() => {
+    const el = plot.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPlotW(el.getBoundingClientRect().width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // なぞっている間は、ページが縦にスクロールしないようにする。
   useEffect(() => {
@@ -183,8 +200,10 @@ export function CategoryChart({
       : undefined;
   const axis = pickAxisLabels(
     axisLabels,
-    280,
+    plotW,
     isCum || series.unit !== 'month' ? startNote : undefined,
+    5,
+    7.5 * fontScale,
   );
 
   const x = (i: number) => ((i + 0.5) / Math.max(n, 1)) * 100;
@@ -192,12 +211,39 @@ export function CategoryChart({
 
   const end = cumulative.endIndex !== null ? cumulative.days[cumulative.endIndex]! : null;
 
+  // 「理想より○円少ない / 多い」を、線・帯と重ならない位置に置くための図形(描画領域に対する%)。
+  let deltaGeometry: DeltaGeometry | null = null;
+  if (isCum && end && end.actualYen !== null) {
+    const e: Pt = [x(end.index), y(end.actualYen)];
+    const fut = cumulative.days.filter((d) => d.forecastHighYen !== null);
+    deltaGeometry = {
+      end: e,
+      lines: [
+        cumulative.days
+          .filter((d) => d.actualYen !== null)
+          .map((d): Pt => [x(d.index), y(d.actualYen!)]),
+        cumulative.days
+          .filter((d) => d.idealYen !== null)
+          .map((d): Pt => [x(d.index), y(d.idealYen!)]),
+        fut.length > 0 ? [e, ...fut.map((d): Pt => [x(d.index), y(d.forecastYen!)])] : [],
+      ],
+      band:
+        fut.length > 0
+          ? [
+              e,
+              ...fut.map((d): Pt => [x(d.index), y(d.forecastHighYen!)]),
+              ...[...fut].reverse().map((d): Pt => [x(d.index), y(d.forecastLowYen!)]),
+            ]
+          : null,
+    };
+  }
+
   const gutterItems: GutterItem[] = [
     ...ticks.map((t) => ({
       key: `tick-${t}`,
       kind: 'tick' as const,
       ratio: t / maxYen,
-      height: TICK_HEIGHT,
+      height: TICK_HEIGHT * fontScale,
     })),
     ...(!isCum && series.allowanceYen !== null
       ? [
@@ -205,7 +251,7 @@ export function CategoryChart({
             key: 'allowance',
             kind: 'tag' as const,
             ratio: series.allowanceYen / maxYen,
-            height: TAG_HEIGHT,
+            height: TAG_HEIGHT * fontScale,
           },
         ]
       : []),
@@ -215,12 +261,12 @@ export function CategoryChart({
             key: 'average',
             kind: 'tag' as const,
             ratio: series.averageLineYen / maxYen,
-            height: TAG_HEIGHT,
+            height: TAG_HEIGHT * fontScale,
           },
         ]
       : []),
   ];
-  const placed = layoutGutter(gutterItems, PLOT_HEIGHT);
+  const placed = layoutGutter(gutterItems, plotPx);
 
   return (
     <section
@@ -245,17 +291,14 @@ export function CategoryChart({
       {isCum ? null : (
         <label
           className="flex min-h-11 items-center gap-2 text-xs"
-          style={{
-            color: 'var(--ink-secondary)',
-            opacity: series.hasPrevious ? 1 : 0.6,
-          }}
+          style={{ color: 'var(--ink-secondary)' }}
         >
           <input
             type="checkbox"
             checked={showPrevious && series.hasPrevious}
             disabled={!series.hasPrevious}
             onChange={(e) => onShowPrevious(e.target.checked)}
-            className="size-5"
+            className="size-5 disabled:opacity-40"
           />
           <span>
             前期間と比べる
@@ -270,10 +313,24 @@ export function CategoryChart({
 
       <div role="group" aria-label={summary}>
         {/* なぞっている間の吹き出し。位置は動かさず、グラフの上部に固定する(データと重ならない) */}
-        <div className="flex min-h-8 items-center" style={{ paddingRight: GUTTER }}>
+        <div className="flex min-h-8 items-center" style={{ paddingRight: GUTTER_W }}>
+          {!tipText && bigText && isCum && cumulative.deltaYen !== null ? (
+            <p
+              data-chart-label="delta"
+              data-may-wrap
+              className="text-xs font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              <span aria-hidden style={{ color: lineColor }}>
+                ●{' '}
+              </span>
+              {idealDeltaLabel(cumulative.deltaYen)}
+            </p>
+          ) : null}
           {tipText ? (
             <p
               role="status"
+              data-chart-label="tooltip"
               className="tabular rounded-xl px-3 py-1 text-xs font-semibold whitespace-nowrap"
               style={{ background: 'var(--ink)', color: 'var(--surface)' }}
             >
@@ -281,7 +338,7 @@ export function CategoryChart({
             </p>
           ) : null}
         </div>
-        <div className="relative" style={{ height: PLOT_HEIGHT, paddingRight: GUTTER }}>
+        <div className="relative text-xs" style={{ height: plotPx, paddingRight: GUTTER_W }}>
           <div
             ref={plot}
             className="relative h-full w-full touch-pan-y select-none"
@@ -439,20 +496,11 @@ export function CategoryChart({
                     boxShadow: '0 0 0 2px var(--surface)',
                   }}
                 />
-                {cumulative.deltaYen !== null ? (
-                  <span
-                    className="tabular pointer-events-none absolute text-xs font-semibold whitespace-nowrap"
-                    style={{
-                      [x(end.index) > 55 ? 'right' : 'left']:
-                        x(end.index) > 55
-                          ? `calc(${100 - x(end.index)}% + 8px)`
-                          : `calc(${x(end.index)}% + 8px)`,
-                      bottom: `calc(${100 - y(end.actualYen)}% + ${y(end.actualYen) < 20 ? -22 : 6}px)`,
-                      color: 'var(--ink)',
-                    }}
-                  >
-                    {idealDeltaLabel(cumulative.deltaYen)}
-                  </span>
+                {cumulative.deltaYen !== null && deltaGeometry && !bigText ? (
+                  <DeltaLabel
+                    text={idealDeltaLabel(cumulative.deltaYen)}
+                    geometry={deltaGeometry}
+                  />
                 ) : null}
               </>
             ) : null}
@@ -462,11 +510,12 @@ export function CategoryChart({
           <div
             aria-hidden
             className="pointer-events-none absolute inset-y-0 right-0"
-            style={{ width: GUTTER, opacity: tip !== null ? 0.6 : 1 }}
+            style={{ width: GUTTER_W, opacity: tip !== null ? 0.6 : 1 }}
           >
             {placed.map((p) => (
               <span
                 key={p.key}
+                data-chart-label="gutter"
                 className="tabular absolute right-0 pl-2 text-right text-xs leading-tight"
                 style={{
                   top: p.centerPx,
@@ -479,13 +528,13 @@ export function CategoryChart({
                   <>
                     <span className="block">{p.key === 'allowance' ? '目安' : '平均'}</span>
                     <span className="block">
-                      {(p.key === 'allowance'
-                        ? series.allowanceYen
-                        : series.averageLineYen)!.toLocaleString('ja-JP')}
+                      {formatAxisYen(
+                        (p.key === 'allowance' ? series.allowanceYen : series.averageLineYen)!,
+                      )}
                     </span>
                   </>
                 ) : (
-                  Number(p.key.slice(5)).toLocaleString('ja-JP')
+                  formatAxisYen(Number(p.key.slice(5)))
                 )}
               </span>
             ))}
@@ -496,11 +545,12 @@ export function CategoryChart({
         <div
           aria-hidden
           className="tabular relative mt-1 h-4 text-xs"
-          style={{ color: 'var(--ink-secondary)', marginRight: GUTTER }}
+          style={{ color: 'var(--ink-secondary)', marginRight: GUTTER_W }}
         >
           {axis.map((a) => (
             <span
               key={a.index}
+              data-chart-label="axis"
               className="absolute whitespace-nowrap"
               style={
                 a.index === 0
@@ -550,7 +600,7 @@ export function CategoryChart({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {isCum
             ? '実線=実際の累計、点線=理想ペース。長押しでなぞれます'
             : '長押ししてなぞると、日ごとの金額が見られます'}
@@ -558,7 +608,7 @@ export function CategoryChart({
         <button
           type="button"
           onClick={playAudio}
-          className="min-h-11 rounded-full px-3 text-xs font-semibold"
+          className="min-h-11 shrink-0 rounded-full px-3 text-xs font-semibold whitespace-nowrap"
           style={{ color: 'var(--ink-secondary)' }}
         >
           音で聞く

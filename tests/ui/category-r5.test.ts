@@ -86,7 +86,7 @@ describe('R5 「取引 / 品目 / 店」はヘッダーの直下に固定され�
     expect(i).toBeGreaterThan(0);
     const before = html.slice(Math.max(0, i - 400), i);
     expect(before).toContain('sticky z-20');
-    expect(before).toContain('top:calc(var(--sticky-top) + 44px)');
+    expect(before).toContain('top:calc(var(--sticky-top) + var(--compact-header-h, 44px))');
     expect(before).toContain('background:var(--plane)');
   });
 });

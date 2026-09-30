@@ -13,6 +13,7 @@
  * 警告に留める、receipt/page.tsx 参照)。
  */
 
+import { mapChunks } from '@/lib/chunk';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -58,14 +59,18 @@ export async function listExpenseSubtypesForTransactionIds(
   if (transactionIds.length === 0) return map;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('transaction_expense_subtypes')
-    .select('transaction_id, subtype')
-    .in('transaction_id', transactionIds);
-  if (error) {
-    if (isMissingTableError(error)) return map;
-    throw new ExpenseSubtypeStoreError(`生活費の小分類を取得できませんでした: ${error.message}`);
-  }
+  const parts = await mapChunks(transactionIds, async (ids) => {
+    const { data, error } = await supabase
+      .from('transaction_expense_subtypes')
+      .select('transaction_id, subtype')
+      .in('transaction_id', ids);
+    if (error) {
+      if (isMissingTableError(error)) return [];
+      throw new ExpenseSubtypeStoreError(`生活費の小分類を取得できませんでした: ${error.message}`);
+    }
+    return data;
+  });
+  const data = parts.flat();
 
   for (const row of data) {
     map.set(row.transaction_id, row.subtype);

@@ -35,6 +35,7 @@ export function GenreBudgetRow({
   onClick,
   href,
   sharedKey,
+  hideName = false,
   children,
 }: {
   name: string;
@@ -52,6 +53,8 @@ export function GenreBudgetRow({
   href?: string;
   /** 共有要素の名前に使うカテゴリのキー(未分類は 'none')。href とセットで渡す。 */
   sharedKey?: string;
+  /** 名前を見た目では出さない(名前が画面の見出しにあるとき)。読み上げには残す。 */
+  hideName?: boolean;
   /** 行の下に足す補足(目標画面の一言など)。 */
   children?: React.ReactNode;
 }) {
@@ -70,17 +73,21 @@ export function GenreBudgetRow({
 
   const body = (
     <>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {shared(
           sharedKey && sharedName.icon(sharedKey),
           <GenreBadge name={name === '未分類' ? null : name} size={28} />,
         )}
-        <span className="min-w-0 flex-1 text-sm" style={{ color: 'var(--ink)' }}>
+        <span
+          className={`min-w-0 flex-1 text-sm ${hideName ? 'sr-only' : ''}`}
+          style={{ color: 'var(--ink)' }}
+        >
           {shared(
             sharedKey && sharedName.title(sharedKey),
             <span className="block truncate">{name}</span>,
           )}
         </span>
+        {hideName ? <span aria-hidden className="flex-1" /> : null}
         {hasBudget && state !== 'ok' ? (
           <span
             className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold"
@@ -90,7 +97,7 @@ export function GenreBudgetRow({
             {STATE_LABEL[state]}
           </span>
         ) : null}
-        <span className="tabular shrink-0 text-sm" style={{ color: 'var(--ink)' }}>
+        <span className="tabular min-w-0 text-sm" style={{ color: 'var(--ink)' }}>
           {shared(
             sharedKey && sharedName.amount(sharedKey),
             <span>{formatYen(spentYen, { sign: 'never' })}</span>,

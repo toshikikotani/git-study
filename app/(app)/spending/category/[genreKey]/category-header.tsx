@@ -46,6 +46,7 @@ export function CategoryHeader({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const sentinel = useRef<HTMLDivElement>(null);
+  const compactBar = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,6 +54,22 @@ export function CategoryHeader({
   const monthLabel = `${monthStart.slice(0, 4)}年${formatMonthJa(monthKey)}`;
   const prev = addMonths(monthStart, -1).slice(0, 7);
   const next = addMonths(monthStart, 1).slice(0, 7);
+
+  // 縮んだヘッダーの高さ(文字が大きいほど高い)を、下に固定する「取引/品目/店」の帯の位置に使う。
+  useEffect(() => {
+    const el = compactBar.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const write = () =>
+      root.style.setProperty('--compact-header-h', `${el.getBoundingClientRect().height}px`);
+    write();
+    const ro = new ResizeObserver(write);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty('--compact-header-h');
+    };
+  }, []);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -85,7 +102,10 @@ export function CategoryHeader({
           transitionDuration: 'var(--motion-small)',
         }}
       >
-        <div className="mx-auto flex min-h-11 w-full max-w-2xl items-center gap-3 px-4">
+        <div
+          ref={compactBar}
+          className="mx-auto flex min-h-11 w-full max-w-2xl items-center gap-3 px-4"
+        >
           <GenreBadge name={genreKey === 'none' ? null : genreName} size={24} />
           <span className="min-w-0 flex-1 truncate text-base font-semibold">{genreName}</span>
           <RollingNumber value={totalYen} className="text-base font-semibold" />
@@ -110,11 +130,11 @@ export function CategoryHeader({
           swipe.current = null;
         }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between">
           <button
             type="button"
             onClick={onBack}
-            className="min-h-11 inline-flex items-center pr-3 text-sm font-semibold"
+            className="min-h-11 inline-flex items-center pr-3 text-sm font-semibold whitespace-nowrap"
             style={{ color: 'var(--ink-secondary)' }}
           >
             ‹ 家計簿
@@ -134,7 +154,10 @@ export function CategoryHeader({
         </div>
 
         {/* 合計金額が主役。期間の切り替えとは横に並べず、金額を左揃えで大きく置く */}
-        <p className="mt-3 text-4xl leading-none font-semibold">
+        <p
+          className="mt-3 leading-none font-semibold"
+          style={{ fontSize: 'min(var(--text-4xl), 10vw)' }}
+        >
           <SharedElement name={sharedName.amount(genreKey)}>
             <span>
               <RollingNumber value={totalYen} />
@@ -148,7 +171,7 @@ export function CategoryHeader({
           aria-expanded={menuOpen}
           aria-label={`期間、${monthLabel}。タップで期間を選ぶ`}
           onClick={() => setMenuOpen(true)}
-          className="tabular mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold"
+          className="tabular mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold whitespace-nowrap"
           style={{ color: 'var(--ink-secondary)', opacity: pending ? 0.5 : 1 }}
         >
           <span aria-live="polite">{monthLabel}</span>
