@@ -14,7 +14,7 @@
 import { RECEIPT_ABSORB_YEN, taxIncludedIn, type TaxRate } from '@/domain/receipt-reconcile';
 import { normalizeStoreName } from '@/domain/store-name';
 import type { ParsedReceiptTransaction } from '@/features/import/receipt-ai';
-import { assertDateOnly, type DateOnly } from '@/lib/date';
+import { addMonths, assertDateOnly, type DateOnly } from '@/lib/date';
 
 export type ReceiptStatus = 'parsed' | 'partial' | 'failed' | 'manual';
 export type CaptureStatus = 'needs_input' | 'resolved' | 'discarded';
@@ -164,10 +164,9 @@ export function validateManualEntry(values: ManualEntryValues, today: DateOnly):
   return errors;
 }
 
-/** 1年より先の日付は入力ミスとみなす。 */
+/** 1年より先の日付は入力ミスとみなす。'YYYY-MM-DD' は辞書順で日付順になる(年は4桁)。 */
 function addYearGuard(today: DateOnly): DateOnly {
-  const [y, m, d] = today.split('-');
-  return `${Number(y) + 1}-${m}-${d}` as DateOnly;
+  return addMonths(today, 12);
 }
 
 // ---- 品目と照合バー ------------------------------------------------------------
