@@ -83,9 +83,9 @@ const GROUPS = [
   {
     title: 'この先に向けて',
     items: [
-      { href: '/investments', label: '投資' },
-      { href: '/side-hustle', label: '副業' },
-      { href: '/job-change', label: '転職準備' },
+      { href: '/investments', label: '投資', ownerOnly: true },
+      { href: '/side-hustle', label: '副業', ownerOnly: true },
+      { href: '/job-change', label: '転職準備', ownerOnly: true },
     ],
   },
   {

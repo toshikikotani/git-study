@@ -12,6 +12,9 @@ describe('連携系は、オーナー以外には出さない', () => {
     '/settings/rescued-emails',
     '/briefs',
     '/debts', // 借金(負債)まわり
+    '/investments',
+    '/side-hustle',
+    '/job-change',
   ];
 
   it('オーナーには、連携系がすべて出る', () => {
@@ -32,6 +35,9 @@ describe('連携系は、オーナー以外には出さない', () => {
       'app/(app)/settings/rescued-emails/page.tsx',
       'app/(app)/briefs/page.tsx',
       'app/(app)/debts/layout.tsx', // /debts 配下のすべての画面
+      'app/(app)/investments/layout.tsx',
+      'app/(app)/side-hustle/layout.tsx',
+      'app/(app)/job-change/layout.tsx',
     ]) {
       expect(readFileSync(f, 'utf8'), f).toContain('isCurrentUserOwner');
     }
