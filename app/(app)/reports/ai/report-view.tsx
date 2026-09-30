@@ -5,7 +5,6 @@
 import { useState } from 'react';
 
 import { AiLabel } from '@/components/ui/ai-label';
-import { useIsOwner } from '@/components/ui/owner-context';
 import { BulletList } from '@/components/ui/bullet-list';
 import { ProgressGauge } from '@/components/ui/meter';
 import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
@@ -15,7 +14,6 @@ import type { MonthlyAiReportView } from '@/features/ai-report/store';
 import { generateMonthlyAiReportAction } from './actions';
 
 export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
-  const isOwner = useIsOwner();
   const [report, setReport] = useState(view.report);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,25 +80,22 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
       <WasteRatioBars points={wasteRatioPoints} />
 
-      {/* 負債(借金)の返済の進捗は、オーナーだけ */}
-      {isOwner ? (
-        <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              負債返済の進捗
-            </p>
-            <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>
-              {formatYen(input.payoff.remainingYen, { sign: 'never' })} 残
-            </p>
-          </div>
-          <div className="mt-2">
-            <ProgressGauge
-              ratio={input.payoff.progressRatio}
-              label={`返済進捗 ${Math.round(input.payoff.progressRatio * 100)}%`}
-            />
-          </div>
+      <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            負債返済の進捗
+          </p>
+          <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>
+            {formatYen(input.payoff.remainingYen, { sign: 'never' })} 残
+          </p>
         </div>
-      ) : null}
+        <div className="mt-2">
+          <ProgressGauge
+            ratio={input.payoff.progressRatio}
+            label={`返済進捗 ${Math.round(input.payoff.progressRatio * 100)}%`}
+          />
+        </div>
+      </div>
 
       <button
         type="button"
