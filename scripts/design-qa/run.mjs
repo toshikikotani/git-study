@@ -409,6 +409,13 @@ const NAV_CHECKS = () => {
       fail('固定', `帯が固定されていない(top ${sb.top})`);
     }
   }
+  // 描画の重さ:背景をぼかす面(backdrop-filter)は、常時いくつも載せない。閉じたシートを載せたままだと、
+  // 明細の数だけ増えて iPhone が描画メモリを使い切って落ちる。
+  const blurred = [...document.querySelectorAll('*')].filter((e) => {
+    const f = getComputedStyle(e).backdropFilter;
+    return f && f !== 'none';
+  }).length;
+  if (blurred > 6) fail('性能', `背景をぼかす面が ${blurred} 枚ある(6枚まで)`);
   window.scrollTo(0, 0);
   return out;
 };

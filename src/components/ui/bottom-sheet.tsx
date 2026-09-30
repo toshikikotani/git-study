@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useIsClient } from './use-is-client';
@@ -12,8 +13,11 @@ import { useIsClient } from './use-is-client';
  * 明細行の長押しプレビュー(split-editor.tsx)でも同じものとして使うため
  * ここへ切り出した(3箇所目が増える前に、2箇所目の時点で共通化)。
  *
- * `more-menu.tsx` と同じ理由でアンマウントしない(閉じる transition を
- * 再生できるようにするため)。`document.body` へ Portal する理由・
+ * 閉じているあいだは何も描かない(開くときに描き、閉じる動きが終わったら外す)。
+ * 以前は閉じていても常に描いており、明細の行ごとに4枚のシート(背景をぼかす
+ * `backdrop-filter` つき)が載って、明細が数百件になると iPhone の描画メモリを
+ * 使い切ってページごと落ちた。閉じる動きは、外す前に最後まで再生する。
+ * `document.body` へ Portal する理由・
  * `useIsClient` の必要性も同じ(祖先の backdrop-filter が position:fixed の
  * 基準になる不具合の回避)。
  */
@@ -30,31 +34,32 @@ export function BottomSheet({
   children: React.ReactNode;
 }) {
   const isClient = useIsClient();
-  if (!isClient) return null;
+  const { mounted, shown } = useSheetPresence(open, SHEET_EXIT_MS);
+  if (!isClient || !mounted) return null;
 
   return createPortal(
     <>
       {/* 背景。フェードのみ、動きは付けない(方向感が要らない)。ここをタップすると閉じる */}
       <div
-        aria-hidden={!open}
+        aria-hidden={!shown}
         onClick={onClose}
         className="fixed inset-0 z-40 transition-opacity duration-200 ease-out motion-reduce:transition-none"
         style={{
           background: 'rgba(10, 16, 32, 0.45)',
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? 'auto' : 'none',
+          opacity: shown ? 1 : 0,
+          pointerEvents: shown ? 'auto' : 'none',
         }}
       />
 
       <div
         role={role}
-        aria-hidden={!open}
+        aria-hidden={!shown}
         className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform will-change-transform motion-reduce:transition-none"
         style={{
-          transform: open ? 'translateY(0)' : 'translateY(110%)',
+          transform: shown ? 'translateY(0)' : 'translateY(110%)',
           transitionDuration: 'var(--duration-slow)',
           transitionTimingFunction: 'var(--ease-sheet)',
-          pointerEvents: open ? 'auto' : 'none',
+          pointerEvents: shown ? 'auto' : 'none',
         }}
       >
         <div
@@ -77,4 +82,42 @@ export function BottomSheet({
     </>,
     document.body,
   );
+}
+
+/** 閉じる動き(`--duration-slow`)より少し長く待ってから外す。 */
+export const SHEET_EXIT_MS = 500;
+
+/**
+ * シートを描く期間の管理。
+ *   mounted: 描くか(開いたときから、閉じる動きが終わるまで)
+ *   shown  : 開いた見た目か(描いた直後は閉じた位置から始め、次のフレームで開く=スライドが動く)
+ */
+export function useSheetPresence(
+  open: boolean,
+  exitMs: number,
+): { mounted: boolean; shown: boolean } {
+  const [mounted, setMounted] = useState(open);
+  const [entered, setEntered] = useState(false);
+  // 開くときは、その描画のうちに描き始める(1フレーム遅れて出ない)。
+  if (open && !mounted) setMounted(true);
+
+  useEffect(() => {
+    if (open) {
+      let inner = 0;
+      const outer = window.requestAnimationFrame(() => {
+        inner = window.requestAnimationFrame(() => setEntered(true));
+      });
+      return () => {
+        window.cancelAnimationFrame(outer);
+        window.cancelAnimationFrame(inner);
+      };
+    }
+    const t = window.setTimeout(() => {
+      setMounted(false);
+      setEntered(false);
+    }, exitMs);
+    return () => window.clearTimeout(t);
+  }, [open, exitMs]);
+
+  return { mounted, shown: open && entered };
 }
