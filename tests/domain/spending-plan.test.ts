@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   baselineForPeriod,
   clampAiTarget,
+  emptyPlanReason,
   fallbackTarget,
   forecastLine,
   nextPlanRange,
@@ -432,5 +433,21 @@ describe('planGuidance(目標との連携の規則)', () => {
       ],
     });
     expect(g.actions).toHaveLength(2);
+  });
+});
+
+describe('emptyPlanReason', () => {
+  it('分類済みの実績があるジャンルが1つでもあれば作れる', () => {
+    expect(emptyPlanReason({ genreBaselines: [0, 12000], uncategorizedYen: 5000 })).toBeNull();
+  });
+
+  it('支出がすべて未分類なら、総額0円の案ではなく分類を案内する', () => {
+    expect(emptyPlanReason({ genreBaselines: [0, 0, 0], uncategorizedYen: 27140 })).toBe(
+      'unclassified',
+    );
+  });
+
+  it('分類済みも未分類も無ければ no-spend', () => {
+    expect(emptyPlanReason({ genreBaselines: [0], uncategorizedYen: 0 })).toBe('no-spend');
   });
 });

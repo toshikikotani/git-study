@@ -33,6 +33,19 @@ export function baselineForPeriod(
   return Math.round((spentYen / lookbackDays) * periodDays);
 }
 
+/**
+ * 目標案を作れない理由。ジャンル別の目安額は「ジャンル分類済みの支出」だけから出すので、
+ * 支出がすべて未分類だと全ジャンルが0円になり、総額0円の案ができてしまう。
+ * 0円の案を見せる代わりに、先にジャンル分類するよう案内する。
+ */
+export function emptyPlanReason(input: {
+  genreBaselines: readonly number[];
+  uncategorizedYen: number;
+}): 'unclassified' | 'no-spend' | null {
+  if (input.genreBaselines.some((yen) => yen > 0)) return null;
+  return input.uncategorizedYen > 0 ? 'unclassified' : 'no-spend';
+}
+
 export type PlanGenreFacts = {
   /** 過去実績から出した、この期間の目安額(削る前の水準)。 */
   baselineYen: number;

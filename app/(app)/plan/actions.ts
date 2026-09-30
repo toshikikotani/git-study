@@ -8,7 +8,7 @@
 import { revalidatePath } from 'next/cache';
 
 import type { PlanEvidence } from '@/domain/plan-evidence';
-import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
+import { emptyPlanReason, PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
 import { refinePlanAllocation } from '@/features/spending-plan/plan-ai';
@@ -35,7 +35,7 @@ export type SuggestPlanResult =
       /** ジャンルごとの1日あたりの中央値(根拠の表示用)。 */
       medianByGenre: Record<string, number>;
     }
-  | { error: string };
+  | { error: string; needsGenres?: boolean };
 
 function isStepOption(value: number): value is (typeof PLAN_STEP_OPTIONS)[number] {
   return (PLAN_STEP_OPTIONS as readonly number[]).includes(value);
@@ -58,6 +58,20 @@ export async function suggestPlanAction(
     const context = await loadPlanContext(start, end);
     if (context.lookbackDays === 0) {
       return { error: 'まだ支出の記録が無いため、目標案を作れません。' };
+    }
+    const empty = emptyPlanReason({
+      genreBaselines: context.genres.map((g) => g.baselineYen),
+      uncategorizedYen: context.uncategorizedYen,
+    });
+    if (empty === 'unclassified') {
+      return {
+        error:
+          '記録されている支出がまだジャンルに分類されていないため、ジャンルごとの目標案を作れません。先にジャンル分類をすると作れます。',
+        needsGenres: true,
+      };
+    }
+    if (empty === 'no-spend') {
+      return { error: 'まだ分類済みの支出が無いため、目標案を作れません。' };
     }
     const suggestion = await suggestPlanTargets(readAnthropicApiKey(), context, stepPercent);
     return {
