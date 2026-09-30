@@ -97,6 +97,20 @@ describe('手入力フォーム', () => {
     ).toBeDefined();
   });
 
+  it('日付の上限は「今日から1年先まで」:昨日・今日・近い未来の予定は保存でき、2年先は弾く', () => {
+    const at = (occurredOn: string) =>
+      validateManualEntry(
+        { ...emptyManualValues(TODAY, 'acc'), amountYen: 500, occurredOn },
+        TODAY,
+      );
+    expect(at('2026-09-28').occurredOn).toBeUndefined(); // 昨日
+    expect(at(TODAY).occurredOn).toBeUndefined(); // 今日
+    expect(at('2026-10-03').occurredOn).toBeUndefined(); // 近い未来の予定(発表会など)
+    expect(at('2027-09-29').occurredOn).toBeUndefined(); // ちょうど1年先
+    expect(at('2027-09-30').occurredOn).toBeDefined();
+    expect(at('2028-01-01').occurredOn).toBeDefined();
+  });
+
   it('保存する形:金額は負(支出)、店名なしは「レシート(手入力)」', () => {
     const p = toParsedReceipt({ ...emptyManualValues(TODAY, 'acc'), amountYen: 500 });
     expect(p.amountYen).toBe(-500);

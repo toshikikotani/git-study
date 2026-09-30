@@ -80,7 +80,7 @@ export function NewTransactionForm({
     void fetchQuickEntryGenresAction().then(setGenreOptions);
   }
 
-  const errors = validateManualEntry(values, '9999-12-31');
+  const errors = validateManualEntry(values, todayJst());
 
   async function save(): Promise<void> {
     setShowErrors(true);
