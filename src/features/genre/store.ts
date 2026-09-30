@@ -15,7 +15,7 @@ import type { GenredEntry } from '@/domain/genre';
 import { sortQuickEntryGenres, type QuickEntryGenreInput } from '@/domain/quick-entry-genres';
 import { addDays, monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
-import { isMissingTableError } from '@/lib/supabase/errors';
+import { isMissingColumnError, isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 
 export class GenreStoreError extends AppError {}
@@ -436,13 +436,23 @@ export type QuickEntryGenreSetting = QuickEntryGenre & {
 async function computeQuickEntryInputs(now: Date): Promise<QuickEntryGenreInput[]> {
   const supabase = await createClient();
 
-  const { data: genres, error } = await supabase
+  let { data: genres, error } = await supabase
     .from('genres')
     .select('id, name, quick_entry_order, hidden_in_quick_entry');
+  // quick_entry_order・hidden_in_quick_entry が本番に未適用のあいだは、
+  // その2列を外して再取得する(ADR-033。並び順は頻度順、非表示は無しとして扱う)。
+  if (error && isMissingColumnError(error)) {
+    const retry = await supabase.from('genres').select('id, name');
+    genres =
+      retry.data?.map((g) => ({ ...g, quick_entry_order: null, hidden_in_quick_entry: false })) ??
+      null;
+    error = retry.error;
+  }
   if (error) {
     if (isMissingTableError(error)) return [];
     throw new GenreStoreError(`ジャンルを取得できませんでした: ${error.message}`);
   }
+  if (genres === null) return [];
 
   const since = addDays(todayJst(now), -QUICK_ENTRY_FREQUENCY_WINDOW_DAYS);
   const { data: recent, error: recentError } = await supabase

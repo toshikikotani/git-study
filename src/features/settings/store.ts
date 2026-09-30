@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
+import { isMissingColumnError } from '@/lib/supabase/errors';
 import type { Database } from '@/lib/supabase/types';
 
 export type RepaymentStrategy = Database['public']['Enums']['repayment_strategy'];
@@ -47,14 +48,31 @@ export async function getAppSettingsAsAdmin(
   client: SupabaseClient<Database>,
   userId: string,
 ): Promise<AppSettings> {
-  const { data, error } = await client
+  let { data, error } = await client
     .from('app_settings')
     .select(
       'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio, ai_enabled',
     )
     .eq('user_id', userId)
     .single();
+
+  // ai_enabled 列が本番に未適用のあいだは、その列を外して再取得する
+  // (ADR-033・isMissingColumnError と同じ扱い。AI既定はオン)。
+  let aiEnabled = data?.ai_enabled ?? true;
+  if (error && isMissingColumnError(error)) {
+    const retry = await client
+      .from('app_settings')
+      .select(
+        'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio',
+      )
+      .eq('user_id', userId)
+      .single();
+    data = retry.data as typeof data;
+    error = retry.error;
+    aiEnabled = true;
+  }
   if (error) throw new SettingsStoreError(`設定を取得できませんでした: ${error.message}`);
+  if (data === null) throw new SettingsStoreError('設定を取得できませんでした');
 
   return {
     monthlyRepaymentTargetYen: data.monthly_repayment_target_yen,
@@ -64,7 +82,7 @@ export async function getAppSettingsAsAdmin(
     highRiskAllocationRatio: data.high_risk_allocation_ratio,
     payday: data.payday,
     sideIncomeRepaymentRatio: data.side_income_repayment_ratio,
-    aiEnabled: data.ai_enabled,
+    aiEnabled,
   };
 }
 
