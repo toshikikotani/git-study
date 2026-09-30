@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { saveImportBatchAction } from '../actions';
 import { Card } from '@/components/ui/card';
-import { useIsOwner } from '@/components/ui/owner-context';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import {
   parseNotificationEmail,
@@ -33,7 +32,6 @@ import type { StoredTransaction } from '@/features/transactions/store';
  */
 
 export default function PastePage() {
-  const isOwner = useIsOwner();
   const [body, setBody] = useState('');
   const [saved, setSaved] = useState<{ imported: number; duplicates: number } | null>(null);
   /** 辞書で読めなかったときに AI が読み取った結果(ADR-019)。 */
@@ -163,18 +161,16 @@ export default function PastePage() {
         <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           これは一時的な手段です。毎回貼り付ける必要はありません。
           <br />
-          {isOwner ? 'Gmail 連携を設定すると、通知メールは自動で取り込まれます。' : null}
+          Gmail 連携を設定すると、通知メールは自動で取り込まれます。
         </p>
-        {isOwner ? (
-          <Link
-            href="/settings/gmail"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            自動取得を設定する
-            <span aria-hidden>→</span>
-          </Link>
-        ) : null}
+        <Link
+          href="/settings/gmail"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          自動取得を設定する
+          <span aria-hidden>→</span>
+        </Link>
       </div>
 
       {saved ? (

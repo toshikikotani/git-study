@@ -1,7 +1,5 @@
 import Link from 'next/link';
 
-import { OwnerOnlyNotice } from '@/components/ui/owner-only-notice';
-import { isCurrentUserOwner } from '@/features/auth/owner';
 import { listRescuedEmails, type RescuedEmail } from '@/features/import/rescue-store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { RescuedEmailRow } from './rescued-email-row';
@@ -18,7 +16,6 @@ import { RescuedEmailRow } from './rescued-email-row';
  * マイグレーション未適用などの理由で読めない間も他の画面に影響させない。
  */
 export default async function RescuedEmailsPage() {
-  if (!(await isCurrentUserOwner())) return <OwnerOnlyNotice title="読み取れなかったメール" />;
   let emails: RescuedEmail[] = [];
   let loadError: string | null = null;
   try {
