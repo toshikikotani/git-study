@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { Yen } from '@/components/ui/money';
+import { STATE_COLOR } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
 import type { GoalCardModel } from '@/features/goals/card';
 import { formatDateJa } from '@/lib/date';
@@ -63,6 +64,14 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
               内訳を見る →
             </span>
           </p>
+          {model.forecast ? (
+            <p
+              className="mt-1 text-sm leading-relaxed"
+              style={{ color: STATE_COLOR[model.forecast.tone] }}
+            >
+              {model.forecast.text}
+            </p>
+          ) : null}
         </summary>
 
         <dl

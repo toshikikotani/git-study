@@ -475,6 +475,101 @@ export function planGuidance(input: {
   };
 }
 
+export type ForecastTone = 'ok' | 'caution' | 'over';
+
+export type Forecast = {
+  /** 事実 + 次にできること1つだけの一文(docs/WRITING.md)。数字には必ず単位・期間を添える。 */
+  text: string;
+  tone: ForecastTone;
+  /** 文中で使った、内訳(details)と重複しうる金額。無ければ null(重複判定用)。 */
+  amountYen: number | null;
+};
+
+/**
+ * 「今日あと使える額」の下に出す、結果予想の一言(N5)。状態(余裕/注意/超過)に応じて
+ * トーンを変え、必ず具体的な次の一手を1つ添える(叱らない)。予算なし・未開始は
+ * 出す数字が無いため null。headlineMessage() は要約(SUMMARY)と同じ言葉で始まり画面の
+ * 要約行と重なるため未使用のまま残し、これはこのカード専用に新設した(ADR-065 N5)。
+ */
+export function forecastLine(g: PlanGuidance): Forecast | null {
+  const remaining = g.remainingDays;
+  const daily = g.dailyAllowanceYen;
+  switch (g.status) {
+    case 'no_budget':
+    case 'not_started':
+      return null;
+    case 'reserved':
+      return {
+        text: `予定${yen(g.scheduledYen)}で確保済みです。自由に使えるのは${yen(Math.max(g.freeYen, 0))}です`,
+        tone: 'caution',
+        amountYen: g.scheduledYen,
+      };
+    case 'ended':
+      return g.spentYen > g.targetYen
+        ? {
+            text: `目標を${yen(g.spentYen - g.targetYen)}超えて終えました。次の目標では配分を見直しましょう`,
+            tone: 'over',
+            amountYen: null,
+          }
+        : null;
+    case 'over': {
+      const overYen = g.spentYen - g.targetYen;
+      return remaining > 0
+        ? {
+            text: `目標を${yen(overYen)}超えています。残り${remaining}日はこれ以上増やさないのが目安です`,
+            tone: 'over',
+            amountYen: null,
+          }
+        : {
+            text: `目標を${yen(overYen)}超えて終える見込みです。次の目標では配分を見直しましょう`,
+            tone: 'over',
+            amountYen: null,
+          };
+    }
+    case 'over_pace': {
+      if (g.freeYen < 0) {
+        return {
+          text: `予定を含めると目標を${yen(-g.freeYen)}超える見込みです。残り${remaining}日は新たな支出を控えめにしましょう`,
+          tone: 'over',
+          amountYen: null,
+        };
+      }
+      const action =
+        daily !== null
+          ? `1日${yen(daily)}までに抑えると間に合います`
+          : '新たな支出を控えめにしましょう';
+      return g.projectedYen !== null
+        ? {
+            text: `このペースだと期間末に目標より${yen(g.projectedYen - g.targetYen)}多くなる見込みです。残り${remaining}日は${action}`,
+            tone: 'caution',
+            amountYen: daily,
+          }
+        : {
+            text: `このペースだと目標を超えそうです。残り${remaining}日は${action}`,
+            tone: 'caution',
+            amountYen: daily,
+          };
+    }
+    case 'watch': {
+      const action =
+        daily !== null ? `1日${yen(daily)}を目安に抑えましょう` : '新たな支出を控えめにしましょう';
+      return {
+        text: `目標に近づいています。残り${remaining}日は${action}`,
+        tone: 'caution',
+        amountYen: daily,
+      };
+    }
+    case 'on_track': {
+      const action = daily !== null ? `1日${yen(daily)}まで使えます` : '';
+      return {
+        text: `このペースなら目標内に収まりそうです。残り${remaining}日は${action}`,
+        tone: 'ok',
+        amountYen: daily,
+      };
+    }
+  }
+}
+
 /** 理想ペースとの差を、符号ではなく言葉で表す。 */
 export function paceDiffWords(paceDiffYen: number): string {
   if (paceDiffYen === 0) return '理想ペースどおりです';

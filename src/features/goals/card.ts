@@ -10,7 +10,12 @@
 
 import { formatYen } from '@/domain/money';
 import { formatRemainingDays } from '@/domain/period';
-import { paceDiffWords, type GuidanceStatus } from '@/domain/spending-plan';
+import {
+  forecastLine,
+  paceDiffWords,
+  type Forecast,
+  type GuidanceStatus,
+} from '@/domain/spending-plan';
 import type { GoalView } from './view';
 
 export type GoalCardDetail = {
@@ -28,6 +33,8 @@ export type GoalCardModel = {
   primary: { label: string; amountYen: number | null; note: string | null };
   badge: { state: 'caution' | 'over'; label: string } | null;
   summary: string;
+  /** 結果予想の一言(N5)。今日あと使える額の下に出す。予算なし・未開始は null。 */
+  forecast: Forecast | null;
   details: GoalCardDetail[];
   scheduled: { count: number; totalYen: number; items: GoalView['scheduledItems'] } | null;
   uncategorized: { yen: number } | null;
@@ -109,8 +116,14 @@ export function buildGoalCard(
     amountYen: g.spentYen,
   });
 
+  const forecast = forecastLine(g);
+
   const seen = new Set<number>();
   if (primaryYen !== null && primaryYen > 0) seen.add(primaryYen);
+  // 結果予想の一言(forecast)に出した金額は、内訳(details)に同じ値を重ねない。
+  if (forecast?.amountYen !== null && forecast?.amountYen !== undefined && forecast.amountYen > 0) {
+    seen.add(forecast.amountYen);
+  }
   const details: GoalCardDetail[] = [];
   for (const d of candidates) {
     // 0円と、差が0(理想どおり)は重複とみなさない。
@@ -125,6 +138,7 @@ export function buildGoalCard(
     primary,
     badge,
     summary: SUMMARY[g.status],
+    forecast,
     details,
     scheduled:
       view.scheduledItems.length > 0

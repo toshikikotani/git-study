@@ -53,13 +53,13 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
       {report === null ? (
         <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          今月の家計データから、浪費傾向のタイプ・気づき・アドバイスをAIがまとめます。
+          今月の家計データから、支出傾向のタイプ・気づき・アドバイスをAIがまとめます。
         </p>
       ) : (
         <>
           <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
             <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              浪費傾向のタイプ
+              支出傾向のタイプ
             </p>
             <p className="mt-1 text-base font-semibold" style={{ color: 'var(--accent)' }}>
               {SPENDING_PERSONA_LABELS[report.personaType]}

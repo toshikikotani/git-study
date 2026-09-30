@@ -6,14 +6,17 @@ export type WasteRatioPoint = {
   ratio: number | null;
 };
 
-/** 月ごとの浪費比率(家計簿の診断カードと AIレポートで同じものを見せる)。 */
+/**
+ * 月ごとの見直し候補の比率(家計簿の診断カードと AIレポートで同じものを見せる)。
+ * 表示文言は「見直し候補」で統一する(N5 docs/WRITING.md、insights-card.tsx と同じ)。
+ */
 export function WasteRatioBars({ points }: { points: readonly WasteRatioPoint[] }) {
   if (points.every((p) => p.ratio === null)) return null;
 
   return (
     <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-        浪費比率の推移
+        見直し候補の比率の推移
       </p>
       <div className="mt-2 flex h-16 items-end gap-[3px]">
         {points.map((point) => (
@@ -24,7 +27,7 @@ export function WasteRatioBars({ points }: { points: readonly WasteRatioPoint[] 
             title={
               point.ratio === null
                 ? `${formatMonthJa(point.monthKey)}: 未診断`
-                : `${formatMonthJa(point.monthKey)}: 浪費 ${Math.round(point.ratio * 100)}%`
+                : `${formatMonthJa(point.monthKey)}: 見直し候補 ${Math.round(point.ratio * 100)}%`
             }
           >
             {point.ratio !== null ? (

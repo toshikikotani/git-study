@@ -2021,7 +2021,28 @@ ADR-061 の続き。仮定とフォールバックをセクションごとに記
 
 **検証**:`npx tsc --noEmit`/`npx eslint .`(`genre-donut-chart.tsx` の `react-hooks/immutability` 指摘を修正、`fixed-variable-card.tsx` の `py-1.5` を `design-tokens.test.ts` に合わせて `py-2` へ修正)/`npx prettier --check .`/`npx vitest run`(1421件全通過)/`npx next build`/`npm run verify:migrations`(`fixed_cost_confirmations` を含めて一致確認)すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、ドーナツグラフのタップ操作・固定費の実データでの検出結果は確認できていない。
 
-### N5 以降
+### N5:結果予想と言葉のルール
+
+着手前の調査で、目標カード(`app/(app)/plan/goal-card.tsx`、`/plan`・`/spending` 両方に表示)の「今日あと○円」がN5の言う「今日の残り予算」そのものであること、`src/domain/spending-plan.ts` に `headlineMessage()`(状態ごとの一文、数字+次の一手)が既に存在するが**未使用のまま残されていた**ことを確認した。既存テスト(`tests/features/goals/card.test.ts`「同じ数値を並べる旧レイアウトが残っていない」)が、`headline` を要約(summary)と並べて表示する旧レイアウトを明示的に禁止していたため、`headline`/`headlineMessage` はそのまま流用せず、このカード専用の新しい一言を別に作った。
+
+1. **結果予想の一言**:`src/domain/spending-plan.ts` に `forecastLine(g: PlanGuidance)` を新設(`export type ForecastTone = 'ok' | 'caution' | 'over'`)。状態ごとに事実→次の一手1つだけの文を返す:余裕(on_track)は「このペースなら目標内に収まりそうです。残り○日は1日○円まで使えます」、注意(watch/over_pace)は「…残り○日は1日○円までに抑えると間に合います」、超過(over)は「目標を○円超えています。残り○日はこれ以上増やさないのが目安です」。予算なし・未開始は出す数字が無いため `null`。
+2. **同じ数値を二重に出さない**:`forecastLine()` の戻り値に `amountYen`(文中で使った金額)を持たせ、`buildGoalCard()`(`src/features/goals/card.ts`)の内訳(details)の重複判定 `seen` セットへ、主役(primary)の金額と同様に追加した。これにより、たとえば「1日の目安」を結果予想の一言で見せた場合、同じ金額の内訳行(`daily`)は自動的に内訳から落ちる——カード既存の「同じ数値を、別の意味で二度並べない」という約束(`goal-card.tsx` 冒頭コメント)を、新しい一言にも一貫して適用した。
+3. **表示**:`goal-card.tsx` の要約(summary)行の直下に追加。色は `domain/budget-state.ts` の `STATE_COLOR`(`ok`/`caution`/`over`。全画面で状態色を決める唯一の場所)をそのまま使い、新しいトークンは作らなかった。
+4. **docs/WRITING.md**:言葉のルールを明文化(責めない/事実→次の一手1つ/数字には単位と期間を添える)。既存の慣習(`insights-card.tsx` が「浪費」を「見直し候補」と表記する、ADR-061 コミットB決定6)を実例として引用し、同じ言い換えを漏れていた2箇所(`waste-ratio-bars.tsx` の見出し・ツールチップ、`reports/ai/report-view.tsx` の「浪費傾向のタイプ」→「支出傾向のタイプ」)にも広げた。「浪費/必要経費」診断機能そのもの(ADR-030/031、本人発案)の内部名・ドメイン概念は維持し、画面表示のみ統一した(WRITING.md 4に明記)。「失敗」は機械チェックの対象から外した——「読み込みに失敗しました」のような正当なシステムエラー表現がアプリ全体に広く存在し、文字列一致では本人への評価語と区別できないため。
+5. **機械チェック**:`tests/writing-rules.test.ts`(新規)+ `tests/helpers/writing-rules.ts`。TypeScript の AST で `app/**/*.tsx` の文字列・テンプレートリテラル・JSXText を走査し、禁止語(浪費・無駄・無駄遣い・使いすぎ・怠け)を検出する。コメントは AST 上トリビア扱いのため自然に対象外になる(ADRの用語解説コメントを誤検知しない)。
+
+**却下した選択肢**
+
+- **既存の `headlineMessage()`/`g.headline` をそのまま表示する**:上記のとおり、既存テストが禁止する「要約と並べて同じ言葉が重なるレイアウト」を再現してしまうため、専用の新関数にした。`headlineMessage()` 自体はそのまま(未使用のまま)残した——他の呼び出し元を増やすとテストの意図と衝突するため。
+- **「失敗」も機械チェックの禁止語に含める**:システムエラー文言との衝突が大きすぎるため、人が判断する運用ルール(WRITING.md本文)に留め、機械チェックは対象外にした。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(1429件全通過、`forecastLine`・`writing-rules.test.ts` を新規追加)/`npx next build`すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、結果予想の一言・色分けの実際の見え方は確認できていない。
+
+### マージ後の不具合修正(N4→N5のあいだ、緊急)
+
+本人からの報告「マージしたんだけど上手く動かないわ明細以外」を受けて調査。原因は N1(`app_settings.ai_enabled`)・N2(`genres.quick_entry_order`/`hidden_in_quick_entry`)で追加した新しい列を select する既存関数が、本番マイグレーション未適用時の `isMissingColumnError` を見ておらず例外を投げていたこと。`getAppSettingsAsAdmin()`(`src/features/settings/store.ts`)は `/plan`・`/debts`・`/investments`・`/side-hustle`・`/settings/ai` など多くの画面から直接呼ばれるため、この1箇所の欠落が広範囲の画面破損として現れた(明細一覧はこの関数を呼ばないため無事だった)。`computeQuickEntryInputs()`(`src/features/genre/store.ts`、手入力のカテゴリ格子)にも同じ欠落があった。既存の ADR-033 の約束(列が無ければ握り潰して空/既定値で描画する)どおり、列を外して再取得するフォールバックを両関数に追加し、回帰テスト(`tests/features/settings/store.test.ts`・`tests/features/genre/store.test.ts`)を新設した。**教訓**:新しい列を select に追加するたびに `isMissingColumnError` の扱いを確認することを、以降のNセクションでも徹底する。
+
+### N6 以降
 
 以降のセクションの記録はコミットごとに追記する。
 
