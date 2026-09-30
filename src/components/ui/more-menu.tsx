@@ -53,7 +53,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/debts', label: '負債' },
+      { href: '/debts', label: '負債', ownerOnly: true },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',
