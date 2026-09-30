@@ -10,7 +10,7 @@ import type { Route } from 'next';
  *   tonal      準主役。accent-track の塗り(filled ほど強くない)
  *   outlined   輪郭線のみ。取り消し線的な操作、または filled と並べる第2候補
  *   text       最も控えめ。カード内の付随アクション
- *   elevated   カードやヒーローの上に浮かせるボタン。Liquid Glass 素材を使う
+ *   elevated   カードやヒーローの上に浮かせるボタン。不透明の面+影で浮かせる(半透明はナビゲーションの層だけ)
  *              唯一の variant(HIG が chrome にだけガラスを使う方針に倣う、
  *              app/globals.css の ADR-028 コメント参照)
  *
@@ -48,13 +48,12 @@ const VARIANT_STYLE: Record<Variant, React.CSSProperties> = {
     border: '1px solid var(--hairline)',
   },
   text: { background: 'transparent', color: 'var(--accent)' },
+  // コンテンツ(カード・ヒーロー)の上に置くボタンなので、半透明の素材は使わない。
   elevated: {
-    background: 'var(--glass-tint)',
-    backdropFilter: 'var(--glass-blur)',
-    WebkitBackdropFilter: 'var(--glass-blur)',
+    background: 'var(--surface-raised)',
     color: 'var(--accent)',
-    border: '1px solid var(--glass-border)',
-    boxShadow: 'var(--glass-shadow)',
+    border: '1px solid var(--hairline)',
+    boxShadow: 'var(--card-shadow)',
   },
 };
 

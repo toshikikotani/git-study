@@ -398,6 +398,43 @@ body {
   --sticky-top: env(safe-area-inset-top, 0px);
 }
 
+/* タブバー:下へスクロールすると縮み(幅と余白)、上へ戻すと元の大きさになる(lib/chrome.ts)。
+   押せる高さ(44pt)は縮めない。視差効果を減らす設定では動かさず切り替える。 */
+.tabbar {
+  max-width: 28rem;
+  transition:
+    max-width var(--motion-medium, 300ms) var(--ease-standard, ease),
+    padding var(--motion-medium, 300ms) var(--ease-standard, ease);
+}
+.tabbar[data-compact='true'] {
+  max-width: 21rem;
+}
+.tabbar[data-compact='true'] .tabbar-pill {
+  padding: 4px;
+}
+.tabbar-pill {
+  transition: padding var(--motion-medium, 300ms) var(--ease-standard, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabbar,
+  .tabbar-pill {
+    transition: none;
+  }
+}
+
+/* 「透明度を下げる」:半透明の素材(ナビゲーションの層)をやめて、不透明の面にする。 */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'] {
+    --glass-tint: var(--surface);
+    --glass-tint-strong: var(--surface);
+    --glass-blur: none;
+    --glass-blur-strong: none;
+    --glass-border: var(--hairline);
+  }
+}
+
 /* ステータスバーの下のぼかし。ノッチ・ダイナミックアイランドの背後を本文が透けて
    見えないよう、safe-area の高さだけ半透明+ぼかしの帯を敷く(layout.tsx)。 */
 .status-blur {

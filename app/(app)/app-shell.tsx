@@ -21,6 +21,7 @@ import {
   restoreWaitingReceipts,
   useReceiptJobs,
 } from '@/features/import/receipt-queue';
+import { nextChromeCompact } from '@/lib/chrome';
 import { scrollToTop, tabTapAction } from '@/lib/scroll';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
 
@@ -136,6 +137,26 @@ function BottomBar() {
   // 前回オフラインで撮ったまま残っているレシートを「読み取り待ち」として戻す(1回だけ)。
   useEffect(() => {
     void restoreWaitingReceipts();
+  }, []);
+  // 下へスクロールするとタブバーを縮め、上へ戻すと元の大きさにする。
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        setCompact((prev) => nextChromeCompact(prev, y, last));
+        if (Math.abs(y - last) > 8 || y <= 0) last = y;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
   }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<'single' | 'continuous'>('single');
@@ -281,10 +302,10 @@ function BottomBar() {
       {/* 主タブ(最大4つ)のピルと、独立した「その他」丸ボタンを横並びにする。
           以前はその他もピルの6項目目だったため1項目が詰まって小さかった
           (本人発案での見直し、上のコメント参照)。 */}
-      <div className="flex w-full max-w-md items-center">
+      <div className="tabbar flex w-full items-center" data-compact={compact}>
         <nav className="min-w-0 flex-1">
           <ul
-            className="flex items-end gap-1 p-2"
+            className="tabbar-pill flex items-end gap-1 p-2"
             style={{
               borderRadius: 'var(--radius-card)',
               background: 'var(--glass-tint)',

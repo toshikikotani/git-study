@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
+import { Segmented } from '@/components/ui/segmented';
 import {
   buildItemDetail,
   flattenRows,
@@ -31,6 +32,10 @@ import { CategoryTransactionRow } from './transaction-row';
 import { VirtualList } from './virtual-list';
 
 export type CategoryTab = 'tx' | 'items' | 'stores';
+
+/** 上部に固定される小さなヘッダーの高さ(44pt)と、その下の取引/品目/店の帯の高さ。 */
+const COMPACT_HEADER_PX = 44;
+const TABS_STICKY_PX = 60;
 
 const TABS: { value: CategoryTab; label: string }[] = [
   { value: 'tx', label: '取引' },
@@ -176,24 +181,21 @@ export function CategoryTabs({
 
   return (
     <section id="category-tabs" aria-label="取引・品目・店" className="scroll-mt-16 space-y-3">
-      <div role="tablist" aria-label="見方の切り替え" className="flex gap-1">
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.value}
-            onClick={() => select(t.value)}
-            className="min-h-11 flex-1 rounded-full text-sm font-semibold"
-            style={{
-              background: tab === t.value ? 'var(--accent)' : 'transparent',
-              color: tab === t.value ? 'var(--on-accent)' : 'var(--ink-secondary)',
-              border: `1px solid ${tab === t.value ? 'transparent' : 'var(--hairline)'}`,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* 取引 / 品目 / 店:スクロールすると、上部に固定されたヘッダーの直下に留まる */}
+      <div
+        className="sticky z-20 -mx-4 px-4 py-1"
+        style={{
+          top: `calc(var(--sticky-top) + ${COMPACT_HEADER_PX}px)`,
+          background: 'var(--plane)',
+        }}
+      >
+        <Segmented
+          value={tab}
+          options={TABS}
+          onChange={(v) => select(v)}
+          label="見方の切り替え"
+          className="flex w-full [&>button]:flex-1"
+        />
       </div>
 
       {tab === 'tx' ? (
@@ -278,7 +280,10 @@ export function CategoryTabs({
                 <div
                   aria-hidden
                   className="sticky z-10 rounded-t-2xl"
-                  style={{ top: 'calc(var(--sticky-top) + 56px)', background: 'var(--surface)' }}
+                  style={{
+                    top: `calc(var(--sticky-top) + ${COMPACT_HEADER_PX + TABS_STICKY_PX}px)`,
+                    background: 'var(--surface)',
+                  }}
                 >
                   <DayHeader row={sticky} />
                 </div>
