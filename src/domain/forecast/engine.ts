@@ -6,6 +6,7 @@
 import { remainingDays as remainingDaysOf } from '@/domain/period';
 import type { DetectedSubscription } from '@/domain/subscriptions';
 import type { DateOnly } from '@/lib/date';
+import { applyWidthFactor, type CalibrationResult } from './backtest';
 import { decomposeSpending, type ForecastSourceTransaction } from './decompose';
 import { fitModel } from './model';
 import { DEFAULT_TRIALS, simulateForecast } from './simulate';
@@ -26,6 +27,12 @@ export type BuildForecastInput = {
   /** 0=ベイズのみ、1=ブートストラップのみ(M4の検証結果で決める。既定はベイズのみ)。 */
   bootstrapWeight?: number;
   trials?: number;
+  /**
+   * M4のバックテストで求めた幅の補正係数。毎回その場でバックテストを
+   * 走らせるのは重いため、呼び出し側が別途(定期ジョブ等で)計算した値を
+   * 渡す形にした。無ければ補正なし(widthFactor=1相当)で返す。
+   */
+  calibration?: CalibrationResult | null;
 };
 
 export function buildForecast(input: BuildForecastInput): Forecast {
@@ -66,11 +73,26 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     seed,
   });
 
-  return {
+  const withCommitted: Forecast = {
     ...forecast,
     committed: {
       scheduledYen: decomposed.committed.scheduledYen,
       fixedYen: decomposed.committed.fixedYen,
     },
+  };
+
+  if (!input.calibration || input.calibration.widthFactor === 1) {
+    return { ...withCommitted, calibration: input.calibration ?? null };
+  }
+
+  const totalBand = applyWidthFactor(withCommitted.total, input.calibration.widthFactor);
+  return {
+    ...withCommitted,
+    total: { ...withCommitted.total, p10: totalBand.p10, p90: totalBand.p90 },
+    byCategory: withCommitted.byCategory.map((c) => ({
+      ...c,
+      ...applyWidthFactor(c, input.calibration!.widthFactor),
+    })),
+    calibration: input.calibration,
   };
 }

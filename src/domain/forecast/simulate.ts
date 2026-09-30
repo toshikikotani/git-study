@@ -271,6 +271,69 @@ export function simulateForecast(input: SimulateInput): Forecast {
 }
 
 /**
+ * simulateForecast() と同じ計算のうち、合計額の生の試行サンプルだけを返す
+ * 軽量版(M4のバックテストで CRPS を計算するために使う。カテゴリ別内訳・
+ * drivers・安全額は使わないため省く)。同じ seed・同じ入力なら
+ * simulateForecast() の total.p10/p50/p90 と整合する値になる。
+ */
+export function simulateTotalSamples(input: SimulateInput): Float64Array {
+  const futureDates = eachDay(input.today, input.periodTo).filter((d) => d > input.today);
+  const categories = input.fitted.categories;
+  const nCat = categories.length;
+  const trials = trialsFor(input.trials ?? DEFAULT_TRIALS, nCat, futureDates.length);
+  const rng = createRng(input.seed);
+
+  const totalFactorByCategory: number[] = categories.map((cat) =>
+    futureDates.reduce((sum, date) => {
+      const wd = weekdayOf(date);
+      let factor = cat.weekdayFactor[wd] ?? 1;
+      if (input.payday !== null && isPaydayWindow(date, input.payday)) factor *= cat.paydayFactor;
+      if (isFixedHoliday(date)) factor *= cat.holidayFactor;
+      return sum + Math.max(0, factor);
+    }, 0),
+  );
+
+  const dayBundles = input.fitted.dayBundles;
+  const categoryIds = categories.map((c) => c.categoryId);
+  const totalSamples = new Float64Array(trials);
+
+  for (let t = 0; t < trials; t += 1) {
+    let variableTotal = 0;
+    const useBootstrap = input.bootstrapWeight > 0 && rng() < input.bootstrapWeight;
+
+    if (useBootstrap && dayBundles.length > 0) {
+      for (let d = 0; d < futureDates.length; d += 1) {
+        const bundle = pickWeighted(rng, dayBundles, (b) => b.weight);
+        for (let c = 0; c < nCat; c += 1)
+          variableTotal += bundle.amountsByCategory.get(categoryIds[c]!) ?? 0;
+      }
+    } else {
+      for (let c = 0; c < nCat; c += 1) {
+        const cat = categories[c]!;
+        const lambda = sampleGamma(rng, cat.countPosterior.alpha, 1 / cat.countPosterior.beta);
+        const muTrial =
+          cat.amountPosterior.mu +
+          Math.sqrt(cat.amountPosterior.sigmaSq / Math.max(cat.amountPosterior.kappa, 0.01)) *
+            sampleStandardNormal(rng);
+        const sigma = Math.sqrt(cat.amountPosterior.sigmaSq);
+        const count = samplePoisson(rng, lambda * totalFactorByCategory[c]!);
+        for (let i = 0; i < count; i += 1) variableTotal += sampleLognormal(rng, muTrial, sigma);
+      }
+    }
+
+    const specialTotal = sampleSpecial(
+      rng,
+      input.specialHistoricalAmounts,
+      input.specialOccurrencesPerDay,
+      input.remainingDays,
+    );
+    totalSamples[t] = input.actualYen + input.committedYen + variableTotal + specialTotal;
+  }
+
+  return totalSamples;
+}
+
+/**
  * 変動費全体に係数kを掛けたとき、予算内に収まる確率がちょうど80%になるkを
  * 二分探索で求める(M3)。(k × 変動費の1日あたりの期待値)を安全に使える額とする。
  */
