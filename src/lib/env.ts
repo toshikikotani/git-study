@@ -312,3 +312,26 @@ export const schemas = {
   lineSchema,
   googleSchema,
 };
+
+/**
+ * 新規登録を受け付けるか。既定は受け付ける。`REGISTRATION_OPEN=false` で止められる
+ * (荒らされたときの非常口。ログインは影響を受けない)。
+ */
+export function isRegistrationOpen(): boolean {
+  return process.env.REGISTRATION_OPEN?.trim().toLowerCase() !== 'false';
+}
+
+/** 登録できるユーザー数の上限(荒らし・使いすぎの歯止め)。既定は 200。 */
+export function getRegistrationMaxUsers(): number {
+  const n = Number(process.env.REGISTRATION_MAX_USERS);
+  return Number.isInteger(n) && n > 0 ? n : 200;
+}
+
+/**
+ * 本人(オーナー)のメールアドレス。cron・LINE・Gmail・Google のように、環境変数で1人分の
+ * 資格情報を持つ連携は、このユーザーのものとして動く。未設定なら最初に作ったユーザー。
+ */
+export function getOwnerEmail(): string | null {
+  const v = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  return v ? v : null;
+}

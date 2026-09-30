@@ -26,3 +26,12 @@ export function assertPasswordConfirmed(value: string, confirmation: string): st
   }
   return value;
 }
+
+/** 形式だけの確認(実在の確認はしない)。前後の空白は取り、小文字にそろえる。 */
+export function assertEmail(value: string): string {
+  const email = value.trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new AuthError('メールアドレスの形式が正しくありません');
+  }
+  return email;
+}

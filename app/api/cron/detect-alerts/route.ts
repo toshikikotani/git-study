@@ -15,6 +15,7 @@ import { recordNetWorthSnapshotAsAdmin } from '@/features/net-worth/store';
 import { detectAndRecordNewSubscriptionAlertsAsAdmin } from '@/features/subscriptions/store';
 import { getCronSecret, getLineEnv, getOptionalDiscordWebhookUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { findOwner } from '@/lib/supabase/owner';
 
 /**
  * アラートジョブ(毎時、M3-3)。
@@ -56,11 +57,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const admin = createAdminClient();
-  const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
+  const { user, error: usersError } = await findOwner(admin);
   if (usersError) {
     return NextResponse.json({ error: usersError.message }, { status: 500 });
   }
-  const user = usersPage.users[0];
   if (!user) {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
   }

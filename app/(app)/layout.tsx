@@ -1,4 +1,6 @@
 import { GenreStyleProvider } from '@/components/ui/genre-style-context';
+import { OwnerProvider } from '@/components/ui/owner-context';
+import { isCurrentUserOwner } from '@/features/auth/owner';
 import { loadGenreStyleOverrides } from '@/features/genre/style-store';
 import { AppShell } from './app-shell';
 
@@ -7,10 +9,12 @@ import { AppShell } from './app-shell';
  * カテゴリのバッジ・バーにも同じ見た目が出るようにする(読めなければ既定の見た目)。
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const overrides = await loadGenreStyleOverrides();
+  const [overrides, isOwner] = await Promise.all([loadGenreStyleOverrides(), isCurrentUserOwner()]);
   return (
     <GenreStyleProvider overrides={overrides}>
-      <AppShell>{children}</AppShell>
+      <OwnerProvider isOwner={isOwner}>
+        <AppShell>{children}</AppShell>
+      </OwnerProvider>
     </GenreStyleProvider>
   );
 }

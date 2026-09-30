@@ -1,6 +1,8 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
+import { OwnerOnlyNotice } from '@/components/ui/owner-only-notice';
+import { isCurrentUserOwner } from '@/features/auth/owner';
 import { formatYen } from '@/domain/money';
 import { listDailyBriefs } from '@/features/briefs/store';
 import { formatDateJa } from '@/lib/date';
@@ -17,6 +19,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 export const dynamic = 'force-dynamic';
 
 export default async function BriefsPage() {
+  if (!(await isCurrentUserOwner())) return <OwnerOnlyNotice title="朝配信" />;
   const briefs = await withMinDuration(listDailyBriefs());
 
   return (

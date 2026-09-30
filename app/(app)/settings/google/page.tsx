@@ -1,6 +1,8 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
+import { OwnerOnlyNotice } from '@/components/ui/owner-only-notice';
+import { isCurrentUserOwner } from '@/features/auth/owner';
 import { getGoogleEnv } from '@/lib/env';
 
 /**
@@ -15,7 +17,8 @@ import { getGoogleEnv } from '@/lib/env';
  * 発行された refresh_token は画面に一度だけ表示し、本人が環境変数
  * (Vercel + GitHub Secrets)へ手でコピーする(ADR-014、NFR-04)。
  */
-export default function GoogleSettingsPage() {
+export default async function GoogleSettingsPage() {
+  if (!(await isCurrentUserOwner())) return <OwnerOnlyNotice title="Google 連携" />;
   const connected = getGoogleEnv() !== null;
 
   return (
