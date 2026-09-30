@@ -4,6 +4,7 @@ import {
   baselineForPeriod,
   clampAiTarget,
   fallbackTarget,
+  forecastLine,
   nextPlanRange,
   planGuidance,
   planPeriodDays,
@@ -234,6 +235,99 @@ describe('planGuidance', () => {
   it('全体の目安と実績を比べる', () => {
     const g = planGuidance({ ...base, today: '2026-10-15', items });
     expect(g.expectedByTodayYen).toBe(30000); // 60000 × 15/30
+  });
+});
+
+describe('forecastLine(結果予想の一言、N5)', () => {
+  const base = { periodStart: '2026-10-01', periodEnd: '2026-10-30' };
+
+  it('未開始・予算なしは、出す数字が無いため null', () => {
+    const notStarted = planGuidance({
+      ...base,
+      today: '2026-09-28',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 30000, spentYen: 0 }],
+    });
+    expect(forecastLine(notStarted)).toBeNull();
+
+    const noBudget = planGuidance({
+      ...base,
+      today: '2026-10-10',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 0, spentYen: 0 }],
+    });
+    expect(forecastLine(noBudget)).toBeNull();
+  });
+
+  it('余裕(on_track)は ok トーンで、1日の目安を数字・単位・期間つきで示す', () => {
+    const g = planGuidance({
+      ...base,
+      today: '2026-10-05',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 30000, spentYen: 1000 }],
+    });
+    expect(g.status).toBe('on_track');
+    const f = forecastLine(g)!;
+    expect(f.tone).toBe('ok');
+    expect(f.text).toContain(`残り${g.remainingDays}日`);
+    expect(f.text).toContain(`1日${g.dailyAllowanceYen!.toLocaleString('ja-JP')}円まで使えます`);
+    expect(f.amountYen).toBe(g.dailyAllowanceYen);
+    expect(f.text).not.toMatch(/浪費|無駄|失敗|使いすぎ/);
+  });
+
+  it('ペースが速い(over_pace・予算内)は caution トーンで、期間末の見込みと1日の目安を示す', () => {
+    const g = planGuidance({
+      ...base,
+      today: '2026-10-10',
+      items: [
+        { genreId: 'g1', genreName: '外食', targetYen: 30000, spentYen: 20000 },
+        { genreId: 'g2', genreName: '食料品', targetYen: 30000, spentYen: 6000 },
+      ],
+    });
+    expect(g.status).toBe('over_pace');
+    expect(g.freeYen).toBeGreaterThanOrEqual(0);
+    const f = forecastLine(g)!;
+    expect(f.tone).toBe('caution');
+    expect(f.text).toContain('期間末に目標より');
+    expect(f.text).toContain(
+      `1日${g.dailyAllowanceYen!.toLocaleString('ja-JP')}円までに抑えると間に合います`,
+    );
+    expect(f.amountYen).toBe(g.dailyAllowanceYen);
+  });
+
+  it('予定込みで予算を超える見込み(freeYen<0)は over トーン', () => {
+    const g = planGuidance({
+      ...base,
+      today: '2026-10-05',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 10000, spentYen: 1000 }],
+      scheduledYen: 9500,
+    });
+    expect(g.status).toBe('over_pace');
+    expect(g.freeYen).toBeLessThan(0);
+    const f = forecastLine(g)!;
+    expect(f.tone).toBe('over');
+    expect(f.text).toContain(`${(-g.freeYen).toLocaleString('ja-JP')}円超える見込み`);
+  });
+
+  it('目標を超えた(over)は over トーンで、増やさない目安を示す', () => {
+    const g = planGuidance({
+      ...base,
+      today: '2026-10-20',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 10000, spentYen: 12000 }],
+    });
+    expect(g.status).toBe('over');
+    const f = forecastLine(g)!;
+    expect(f.tone).toBe('over');
+    expect(f.text).toContain('2,000円超えています');
+    expect(f.text).toContain(`残り${g.remainingDays}日はこれ以上増やさないのが目安です`);
+    expect(f.text).not.toMatch(/浪費|無駄|使いすぎ/);
+  });
+
+  it('期間内で終えた(ended・目標内)は、これ以上言うことが無いため null', () => {
+    const g = planGuidance({
+      ...base,
+      today: '2026-11-05',
+      items: [{ genreId: 'g1', genreName: '外食', targetYen: 10000, spentYen: 8000 }],
+    });
+    expect(g.status).toBe('ended');
+    expect(forecastLine(g)).toBeNull();
   });
 });
 
