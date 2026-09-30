@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 
+import { AiLabel } from '@/components/ui/ai-label';
 import { BulletList } from '@/components/ui/bullet-list';
 import { ProgressGauge } from '@/components/ui/meter';
 import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
@@ -73,6 +74,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
           <BulletList heading="気づき" items={report.insights} />
           <BulletList heading="アドバイス" items={report.advice} />
+          <AiLabel feature="monthly-report" contentKey={input.monthKey} evidenceHref="/spending" />
         </>
       )}
 

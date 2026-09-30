@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 
+import { AiLabel } from '@/components/ui/ai-label';
 import { BulletList } from '@/components/ui/bullet-list';
 import { formatYen } from '@/domain/money';
 import type { DailyAiReportView } from '@/features/ai-report/store';
@@ -54,6 +55,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
         <>
           <BulletList heading="気づき" items={report.insights} />
           <BulletList heading="アドバイス" items={report.advice} />
+          <AiLabel feature="daily-report" contentKey={input.dateKey} evidenceHref="/transactions" />
         </>
       )}
 

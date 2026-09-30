@@ -9,17 +9,20 @@ import {
   validateManualEntry,
   type ManualEntryValues,
 } from '@/domain/receipt-capture';
+import type { UsualEntryCandidate } from '@/domain/usual-entries';
 import { todayJst } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
 import { pushUndo } from '@/lib/undo';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
-import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
+import type { QuickEntryGenre } from '@/features/genre/store';
 // `./store` ではなく `./types` から読む(T-7/P10-4)。`store.ts` は
 // `next/headers` に依存するため、そこから型だけ import してもクライアント
 // バンドルへ引き込まれてビルドエラーになる。
 import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
 import { saveImportBatchAction, undoReceiptSaveAction } from '../actions';
 import { ManualEntryForm } from '../manual-entry-form';
+import { fetchQuickEntryGenresAction } from './actions';
+import { UsualEntryChips } from './usual-entry-chips';
 
 /**
  * 明細を手で登録する(レシートなし)。
@@ -38,14 +41,21 @@ export function NewTransactionForm({
   initialDate,
   initialIncome = false,
   recentStores = [],
+  initialQuickEntryGenres = [],
+  usualEntries = [],
 }: {
   initialDate: string;
   initialIncome?: boolean;
   /** 最近使った店(候補)。 */
   recentStores?: readonly string[];
+  /** カテゴリ格子(使用頻度順、N2)。 */
+  initialQuickEntryGenres?: readonly QuickEntryGenre[];
+  /** 「いつもの」予測(N2)。 */
+  usualEntries?: readonly UsualEntryCandidate[];
 }) {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
-  const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
+  const [genreOptions, setGenreOptions] =
+    useState<readonly QuickEntryGenre[]>(initialQuickEntryGenres);
   const [values, setValues] = useState<ManualEntryValues>(() => emptyManualValues(initialDate));
   // 支出 / 収入 / 返金(返品・返金は、収入ではなく、そのジャンルの支出から差し引く)。
   const [mode, setMode] = useState<'expense' | 'income' | 'refund'>(
@@ -64,8 +74,11 @@ export function NewTransactionForm({
       setAccounts(fetched);
       setValues((v) => ({ ...v, accountId: v.accountId || (fetched[0]?.id ?? '') }));
     });
-    void fetchGenreOptions().then(setGenreOptions);
   }, []);
+
+  function refreshQuickEntryGenres(): void {
+    void fetchQuickEntryGenresAction().then(setGenreOptions);
+  }
 
   const errors = validateManualEntry(values, '9999-12-31');
 
@@ -178,6 +191,21 @@ export function NewTransactionForm({
         </p>
       ) : null}
 
+      {mode === 'expense' ? (
+        <UsualEntryChips
+          candidates={usualEntries}
+          onPick={(c) => {
+            setValues((v) => ({
+              ...v,
+              amountYen: c.amountYen,
+              storeName: c.storeName,
+              genreId: c.genreId,
+            }));
+            setSaved(null);
+          }}
+        />
+      ) : null}
+
       {accounts !== null && accounts.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           口座がまだ登録されていません。
@@ -219,6 +247,7 @@ export function NewTransactionForm({
         recentStores={recentStores}
         errors={errors}
         showErrors={showErrors}
+        onQuickEntryGenresChanged={refreshQuickEntryGenres}
       />
 
       {mode === 'expense' ? (

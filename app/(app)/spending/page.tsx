@@ -130,9 +130,7 @@ export default async function SpendingPage() {
             totalSpentYen={ledger.totals.spentYen}
             pile={{ thresholdYen: pile.thresholdYen, smallSpendTotalYen: pile.smallSpendTotalYen }}
           />
-          <div className="mt-3">
-            <SubscriptionsCard subscriptions={subscriptions} />
-          </div>
+          <SubscriptionsCard subscriptions={subscriptions} />
         </CurrentMonthOnly>
       </SpendingMonthProvider>
     </div>

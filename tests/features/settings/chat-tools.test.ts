@@ -17,6 +17,7 @@ const SETTINGS: AppSettings = {
   highRiskAllocationRatio: 0.3,
   payday: 25,
   sideIncomeRepaymentRatio: 0.7,
+  aiEnabled: true,
 };
 
 describe('parseAppSettingsPatch', () => {

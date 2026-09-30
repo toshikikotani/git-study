@@ -14,6 +14,9 @@ import type { z } from 'zod';
 
 export type StructuredFailure = 'api_error' | 'truncated' | 'unparsable';
 
+/** 個々の Anthropic 呼び出しの既定タイムアウト(N1本人要件「タイムアウトは10秒」)。 */
+export const DEFAULT_AI_TIMEOUT_MS = 10_000;
+
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 
 export type StructuredResult<T> =
@@ -38,26 +41,41 @@ export type StructuredRequest<S extends z.ZodType> = {
    */
   disableThinking?: boolean;
   effort?: 'low' | 'medium' | 'high';
+  /** 既定 DEFAULT_AI_TIMEOUT_MS(10秒、N1本人要件)。長いレポート生成等は明示的に伸ばす。 */
+  timeoutMs?: number;
 };
 
 export async function parseStructured<S extends z.ZodType>(
   request: StructuredRequest<S>,
 ): Promise<StructuredResult<z.infer<S>>> {
-  const { client, model, maxTokens, system, messages, schema, hints, disableThinking, effort } =
-    request;
+  const {
+    client,
+    model,
+    maxTokens,
+    system,
+    messages,
+    schema,
+    hints,
+    disableThinking,
+    effort,
+    timeoutMs,
+  } = request;
 
   try {
-    const response = await client.messages.parse({
-      model,
-      max_tokens: maxTokens,
-      system,
-      messages,
-      ...(disableThinking ? { thinking: { type: 'disabled' as const } } : {}),
-      output_config: {
-        format: zodOutputFormat(schema),
-        ...(effort ? { effort } : {}),
+    const response = await client.messages.parse(
+      {
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages,
+        ...(disableThinking ? { thinking: { type: 'disabled' as const } } : {}),
+        output_config: {
+          format: zodOutputFormat(schema),
+          ...(effort ? { effort } : {}),
+        },
       },
-    });
+      { timeout: timeoutMs ?? DEFAULT_AI_TIMEOUT_MS },
+    );
 
     const usage = {
       inputTokens: response.usage.input_tokens ?? 0,
@@ -98,6 +116,9 @@ export function apiKeyMissingMessage(feature: string): string {
 
 /** API の失敗を本人に見える言葉にする。 */
 export function describeAnthropicError(error: unknown, rateLimitHint?: string): string {
+  if (error instanceof Anthropic.APIConnectionTimeoutError) {
+    return 'AI の応答がタイムアウトしました(10秒)。もう一度お試しください。';
+  }
   if (error instanceof Anthropic.AuthenticationError) {
     return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
   }

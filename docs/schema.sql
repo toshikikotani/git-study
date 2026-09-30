@@ -322,6 +322,10 @@ create table public.app_settings (
   classification_confidence_threshold numeric(4,3) not null default 0.800,
   classification_model                text         not null default 'claude-haiku-4-5',
 
+  -- AIゲートウェイ(N1)。全AI機能の一括オフ。オフでも基本機能はすべて使える。
+  -- gmail_enabled と同じ、設定は残したまま条件だけ切り替える方式。
+  ai_enabled                           boolean      not null default true,
+
   -- 朝配信(FR-30)
   brief_send_at                       time         not null default '07:00',
   brief_channel                       notification_channel not null default 'discord',
@@ -462,6 +466,12 @@ create table public.genres (
   -- 見た目(利用者が選ぶ。null は名前からの既定。domain/genre-style.ts)
   icon_key     text,
   color_index  smallint,
+
+  -- 手入力のカテゴリ格子(N2)。null のあいだは使用頻度で自動的に並ぶ。値が
+  -- 入ると(長押しで手動並べ替え)その値の昇順を頻度より優先する。
+  quick_entry_order     integer,
+  -- 手入力のカテゴリ格子からだけ隠す(ジャンル自体・他の画面には影響しない)。
+  hidden_in_quick_entry boolean     not null default false,
 
   created_at   timestamptz not null default now(),
 
@@ -1712,6 +1722,31 @@ create index ix_receipt_captures_user_status
   on public.receipt_captures (user_id, status, created_at desc);
 
 
+-- AIゲートウェイ(N1):同一入力に対するAI応答のキャッシュ。キーは呼び出し側が
+-- 「機能名+入力の決定的な文字列」から作るハッシュ(src/lib/ai-gateway/cache.ts)。
+create table public.ai_cache (
+  cache_key      text        primary key,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  feature        text        not null,
+  response_json  jsonb       not null,
+  created_at     timestamptz not null default now(),
+  expires_at     timestamptz not null
+);
+
+create index ai_cache_user_id_idx on public.ai_cache (user_id);
+create index ai_cache_expires_at_idx on public.ai_cache (expires_at);
+
+
+-- 固定費の確認(N4)。domain/subscriptions.ts の subscriptionKeyOf() と同じ規則の
+-- キー(正規化した店名/摘要 + 金額)。detectSubscriptions() の検知結果と1対1対応。
+create table public.fixed_cost_confirmations (
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  subscription_key text        not null,
+  confirmed_at     timestamptz not null default now(),
+  primary key (user_id, subscription_key)
+);
+
+
 
 
 -- =============================================================================
@@ -2054,7 +2089,7 @@ begin
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
     'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
-    'genre_memory','receipt_captures'
+    'genre_memory','receipt_captures','ai_cache','fixed_cost_confirmations'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);

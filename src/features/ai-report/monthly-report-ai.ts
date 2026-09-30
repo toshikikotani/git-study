@@ -4,13 +4,21 @@
  *
  * 医学的な断定(体質・食事・ホルモン)はさせない。本人が明示的に外した領域で、
  * 支出データからは根拠が出せないため。
+ *
+ * N1(AIゲートウェイ)適用。プロンプトは src/prompts/monthly-report.ts
+ * (バージョン付き)、呼び出しは parseStructuredGated(AI一括オフ・1回再試行)、
+ * 結果は withAiCache(同一入力はキャッシュ)、personaReasoning/insights/advice の
+ * 数値は verifyNumbersAgainstFacts で本文中の数字とだけ突き合わせる(N1本人要件)。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
 import { SPENDING_PERSONA_TYPES, type SpendingPersonaType } from '@/domain/persona';
-import { parseStructured } from '@/lib/anthropic';
+import { withAiCache } from '@/lib/ai-gateway/cache';
+import { parseStructuredGated } from '@/lib/ai-gateway/gated';
+import { extractNumbers, verifyNumbersAgainstFacts } from '@/lib/ai-gateway/numeric-verification';
+import { MONTHLY_REPORT_PROMPT } from '@/prompts/monthly-report';
 
 /** レポート生成に使うモデル(ADR-031)。日付サフィックスは付けない。 */
 export const MONTHLY_REPORT_MODEL = 'claude-sonnet-5-5';
@@ -87,22 +95,6 @@ const reportSchema = z.object({
 
 type ReportRow = z.infer<typeof reportSchema>;
 
-const SYSTEM_PROMPT = [
-  'あなたは本人の家計データだけを見て月次レポートを書くファイナンシャルアドバイザーです。',
-  '',
-  '厳守事項:',
-  '- personaType は必ず渡された6分類から選ぶ(impulsive/steady/social/goal_oriented/frugal/balanced)。',
-  '  それ以外の分類名を作らない。',
-  '- persona・insights・advice はすべて渡された数字だけを根拠にする。渡されていない',
-  '  情報(食事・睡眠・ホルモン・血液検査・生年月日から推測する性格等)を作り出さない。',
-  '- 医学的な診断、体質の断定、食事・サプリ・栄養に関する助言は一切書かない。本人から',
-  '  「そういう身体的な話は要らない」と明示されている。',
-  '- advice はあくまで支出行動(買い物のタイミング・記録の習慣・予算の見直し等)に関する',
-  '  一般的な工夫に限る。',
-  '- insights は数字を引用する(円・%・件数など)。「浪費が多い」のような曖昧な言い方だけで',
-  '  終わらせない。',
-].join('\n');
-
 export interface MonthlyReportAnalyzer {
   generate(input: MonthlyReportInput): Promise<GenerateMonthlyReportOutcome>;
 }
@@ -116,18 +108,39 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
   }
 
   async generate(input: MonthlyReportInput): Promise<GenerateMonthlyReportOutcome> {
-    const result = await parseStructured({
-      client: this.client,
-      model: MONTHLY_REPORT_MODEL,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserContent(input) }],
-      schema: reportSchema,
-      hints: { truncated: 'もう一度お試しください。' },
-    });
-    if (!result.ok) return { report: null, warnings: [result.message] };
+    return withAiCache(
+      'monthly-report',
+      input,
+      async () => {
+        const userContent = buildUserContent(input);
+        const result = await parseStructuredGated({
+          client: this.client,
+          model: MONTHLY_REPORT_MODEL,
+          maxTokens: MAX_OUTPUT_TOKENS,
+          system: MONTHLY_REPORT_PROMPT.text,
+          messages: [{ role: 'user', content: userContent }],
+          schema: reportSchema,
+          hints: { truncated: 'もう一度お試しください。' },
+        });
+        if (!result.ok) return { report: null, warnings: [result.message] };
 
-    return buildFromAiOutput(result.value);
+        // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
+        const facts = extractNumbers(userContent);
+        const verification = verifyNumbersAgainstFacts(
+          [result.value.personaReasoning, ...result.value.insights, ...result.value.advice],
+          facts,
+        );
+        if (!verification.ok) {
+          return {
+            report: null,
+            warnings: ['AIの出力に台帳と一致しない数字があったため、今回は表示しません。'],
+          };
+        }
+
+        return buildFromAiOutput(result.value);
+      },
+      { shouldCache: (outcome) => outcome.report !== null },
+    );
   }
 }
 

@@ -1,13 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 import { hapticFor } from '@/lib/haptics';
 import { scrollToLedger, scrollToTop, LEDGER_ANCHOR } from '@/lib/scroll';
 
 /**
- * 「概要 / 明細」の切り替え。明細を選ぶと明細の先頭まで一気に移動し(1タップ)、
- * 概要を選ぶと一番上へ戻る。今どちらを見ているかは、スクロール位置に追従する。
+ * 「概要 / 明細 / レポート」の切り替え(N4で3つ目を追加)。概要・明細は
+ * この画面内のスクロール位置と連動する(明細を選ぶと明細の先頭まで一気に
+ * 移動し、概要を選ぶと一番上へ戻る。今どちらを見ているかはスクロール位置に
+ * 追従する)。レポートは別画面(/reports)のため、見た目だけ同じタブ列に
+ * 揃えた通常のナビゲーションリンクにする(押しても「選択状態」にはならない
+ * ——遷移後は /reports 自身の見出しがそれを表す)。
  * 画面の上部に固定する(スクロールしても届く)。
  */
 export function ViewSwitch() {
@@ -63,6 +68,20 @@ export function ViewSwitch() {
           {label}
         </button>
       ))}
+      <Link
+        href="/reports"
+        role="tab"
+        aria-selected={false}
+        onClick={() => hapticFor('tabChange')}
+        className="min-h-11 flex flex-1 items-center justify-center text-sm font-semibold"
+        style={{
+          borderRadius: 'var(--radius-full)',
+          background: 'transparent',
+          color: 'var(--ink-secondary)',
+        }}
+      >
+        レポート
+      </Link>
     </div>
   );
 }
