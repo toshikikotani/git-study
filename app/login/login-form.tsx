@@ -1,16 +1,9 @@
 /**
- * ログイン画面(M0-3、ADR-011改定)。
+ * ログイン画面(M0-3、ADR-011改定、ADR-065)。
  *
- * パスワードのみ。Magic Link(メール経由のリンク)は「リンクが無効です」
- * というエラーが頻発し実運用に耐えなかったため廃止した(2026-09-13)。
- * 初回のパスワード設定・失念時の復旧経路は「新規登録」タブに置き換えた
- * ――ここでの「登録」は新しいアカウントを作るものではなく、既存の
- * (本人の)アカウントのメールアドレスと一致した場合にしかパスワードを
- * 設定できない(actions.ts の `registerPasswordAction` 参照)。
- *
- * 合言葉による2要素目は本人の意向で廃止した(2026-09-13改定)。
- * メールアドレスが既存アカウントと一致しさえすれば誰でもパスワードを
- * 変更できる状態になる点は actions.ts に明記している。
+ * パスワードでログインする。「新規登録」で、誰でも自分のアカウントを作れる(データはユーザーごとに
+ * 分かれる)。既存アカウントのパスワードを、メールアドレスだけで書き換える経路は廃止した
+ * (actions.ts の `signUpAction`)。
  */
 'use client';
 
@@ -19,7 +12,7 @@ import { useState } from 'react';
 
 import { createClient } from '@/lib/supabase/client';
 
-import { registerPasswordAction } from './actions';
+import { signUpAction } from './actions';
 
 type Tab = 'password' | 'register';
 
@@ -100,8 +93,8 @@ function PasswordForm() {
 
       {status === 'error' ? (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
-          メールアドレスまたはパスワードが違います。初めての場合やお忘れの場合は
-          「新規登録」からお試しください。
+          メールアドレスまたはパスワードが違います。初めての場合は「新規登録」から
+          アカウントを作れます。
         </p>
       ) : null}
 
@@ -131,7 +124,7 @@ function RegisterForm() {
 
     let result: { error: string | null };
     try {
-      result = await registerPasswordAction(email, password, passwordConfirmation);
+      result = await signUpAction(email, password, passwordConfirmation);
     } catch {
       // サーバー側の設定不備などで例外が飛んでくることがある。
       // 「設定しています…」のまま固まって見えるのを防ぐため、
@@ -152,7 +145,7 @@ function RegisterForm() {
     if (signInError) {
       setStatus('error');
       setErrorMessage(
-        'パスワードは設定できましたが、ログインに失敗しました。パスワードタブからログインしてください。',
+        'アカウントは作れましたが、ログインに失敗しました。パスワードタブからログインしてください。',
       );
       return;
     }
@@ -164,7 +157,8 @@ function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        パスワードを初めて設定する場合や忘れた場合は、こちらから直接設定できます。
+        メールアドレスとパスワードで、自分のアカウントを作れます。家計簿のデータは、あなただけが
+        見られます(ほかの人には見えません)。
       </p>
       <input
         type="email"
@@ -186,7 +180,7 @@ function RegisterForm() {
         autoComplete="new-password"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
-        placeholder="新しいパスワード(8文字以上)"
+        placeholder="パスワード(8文字以上)"
         className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
         style={{
           background: 'var(--surface)',
@@ -220,7 +214,7 @@ function RegisterForm() {
         className="w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
         style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
       >
-        {status === 'sending' ? '設定しています…' : 'パスワードを設定してログイン'}
+        {status === 'sending' ? '登録しています…' : 'アカウントを作ってはじめる'}
       </button>
     </form>
   );

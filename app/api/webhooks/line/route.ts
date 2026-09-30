@@ -8,6 +8,7 @@ import { getLineChannelSecret, getLineEnv, getLineReceiptAccountId } from '@/lib
 import { readAnthropicApiKey } from '@/lib/env';
 import { fetchLineImageAsBase64, postLineMessage } from '@/lib/line';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { findOwner } from '@/lib/supabase/owner';
 
 /**
  * LINEでのレシート画像受信(受信 Webhook、本人発案)。
@@ -98,11 +99,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const admin = createAdminClient();
-  const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
+  const { user, error: usersError } = await findOwner(admin);
   if (usersError) {
     return NextResponse.json({ error: usersError.message }, { status: 500 });
   }
-  const user = usersPage.users[0];
   if (!user) {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
   }

@@ -11,6 +11,7 @@ import { getCronSecret, getGmailEnv, getGmailImportAccountId } from '@/lib/env';
 import { addDays, todayJst } from '@/lib/date';
 import { readAnthropicApiKey } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { findOwner } from '@/lib/supabase/owner';
 
 /**
  * Gmail 通知メールの自動取り込み(M2-7c、ADR-018)。
@@ -64,11 +65,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   const startedAtMs = Date.now();
   const admin = createAdminClient();
 
-  const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
+  const { user, error: usersError } = await findOwner(admin);
   if (usersError) {
     return NextResponse.json({ error: usersError.message }, { status: 500 });
   }
-  const user = usersPage.users[0];
   if (!user) {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
   }

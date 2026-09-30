@@ -1,74 +1,84 @@
 'use server';
 
 /**
- * 「新規登録」タブの Server Action(ADR-011改定)。
+ * 「新規登録」タブの Server Action(ADR-065)。
  *
- * Magic Link(メール経由のリンク)は「リンクが無効です」という
- * エラーが頻発し実運用に耐えなかったため廃止し、パスワードを直接
- * 設定する経路に置き換えた。ここでの「登録」は新しいアカウントを
- * 作るものではない――既存の(本人の)アカウントのメールアドレスと
- * 一致した場合にしかパスワードを設定できない(admin.auth.admin
- * .updateUserById() で直接書き換えるだけで、admin.createUser() は
- * 一切呼ばない)。
+ * 誰でも自分でアカウントを作れる。データはユーザーごとに分かれる(全テーブルの
+ * `user_id` + RLS。他人の家計簿は見えない)。
  *
- * 合言葉(REGISTRATION_SECRET)による2要素目は本人の意向で廃止した
- * (2026-09-13改定)。メールアドレスが既存アカウントと一致しさえすれば
- * 誰でもパスワードを変更できる状態になる点は明示しておく。
+ * 以前の「新規登録」は、既存アカウントのメールアドレスを知っていれば、誰でもそのアカウントの
+ * パスワードを書き換えられた(ADR-011改定)。誰でも登録できるなら、それは乗っ取りの入口に
+ * なるため廃止した。すでにあるメールアドレスには、何もしない(パスワードは書き換えない)。
  *
- * 成功してもここではセッションを作らない(admin 操作はブラウザの cookie
- * を書けない)。呼び出し側(login-form.tsx)が続けて
- * `supabase.auth.signInWithPassword()` を呼び、そこで初めてログインする。
+ * メールの確認は挟まない(確認リンクは実運用で機能しなかった、ADR-011改定)。代わりに、
+ * 登録を止める非常口(REGISTRATION_OPEN=false)、ユーザー数の上限、IP ごとの回数制限を置く。
+ * 成功してもここではセッションを作らない。呼び出し側が続けて signInWithPassword を呼ぶ。
  */
 
-import { assertPassword, assertPasswordConfirmed } from '@/domain/auth';
+import { headers } from 'next/headers';
+
+import { assertEmail, assertPassword, assertPasswordConfirmed } from '@/domain/auth';
+import { getRegistrationMaxUsers, isRegistrationOpen } from '@/lib/env';
 import { describeUserError } from '@/lib/errors';
+import { createRateLimiter } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export async function registerPasswordAction(
+/** 1つの IP からの登録は、10分に5回まで。 */
+const limiter = createRateLimiter({ max: 5, windowMs: 10 * 60 * 1000 });
+
+const GENERIC_FAILURE =
+  '登録できませんでした。すでに登録済みの場合は「パスワード」タブからログインしてください。';
+
+export async function signUpAction(
   email: string,
   password: string,
   passwordConfirmation: string,
 ): Promise<{ error: string | null }> {
+  if (!isRegistrationOpen()) {
+    return { error: '現在、新規登録は受け付けていません。' };
+  }
+
+  let normalizedEmail: string;
   let confirmedPassword: string;
   try {
+    normalizedEmail = assertEmail(email);
     confirmedPassword = assertPassword(password);
     assertPasswordConfirmed(confirmedPassword, passwordConfirmation);
   } catch (error) {
     return {
-      error: describeUserError(
-        error,
-        'パスワードを設定できませんでした。入力内容を確認してください。',
-      ),
+      error: describeUserError(error, '入力内容を確認してください。'),
     };
+  }
+
+  const h = await headers();
+  const ip = (h.get('x-forwarded-for') ?? '').split(',')[0]!.trim() || 'unknown';
+  if (!limiter.take(ip)) {
+    return { error: '短時間に何度も試されています。しばらくしてからお試しください。' };
   }
 
   try {
     const admin = createAdminClient();
-    const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
-    if (usersError) {
-      return { error: `ユーザーを確認できませんでした: ${usersError.message}` };
-    }
-
-    const user = usersPage.users.find((u) => u.email === email.trim());
-    if (!user) {
-      return { error: 'メールアドレスが正しくありません' };
-    }
-
-    const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
-      password: confirmedPassword,
+    const { data: page, error: listError } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
     });
-    if (updateError) {
-      return { error: `パスワードを設定できませんでした: ${updateError.message}` };
+    if (listError) return { error: '登録処理でエラーが発生しました。' };
+    const total = (page as { total?: number }).total ?? 0;
+    if (total >= getRegistrationMaxUsers()) {
+      return { error: '現在、新規登録は受け付けていません(利用者数の上限に達しています)。' };
     }
 
+    const { error: createError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password: confirmedPassword,
+      email_confirm: true,
+    });
+    if (createError) {
+      // すでにあるメールアドレスでも、そうでなくても、同じ言葉で返す(登録の有無を知らせない)。
+      return { error: GENERIC_FAILURE };
+    }
     return { error: null };
   } catch {
-    // SUPABASE_SERVICE_ROLE_KEY 未設定など、サーバー側の設定不備で例外が
-    // 飛んでくることがある。Server Action の例外はクライアントへ生の内容が
-    // 伝わらず「固まって見える」原因になるため、ここで必ず分かるメッセージへ
-    // 変換する。
-    return {
-      error: 'サーバー側の設定が完了していません。しばらくしてから再度お試しください。',
-    };
+    return { error: '登録処理でエラーが発生しました。しばらくしてから再度お試しください。' };
   }
 }
