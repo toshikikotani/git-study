@@ -1932,7 +1932,24 @@ ADR-061 の続き。仮定とフォールバックをセクションごとに記
 
 ---
 
-## 未決のまま残す事項
+## ADR-065:N0〜N11 大規模強化(自律実装での仮定・スコープ判断の記録)
+
+「日本No.1の家計簿アプリを目指す」という大規模な仕様(N0:概要画面の不具合修正〜N11:品質保証とAI評価)を自律実装するにあたっての判断を、セクションごとにここへ追記していく。実装前に既存コードを広く調査した結果、仕様が前提にしていたよりもはるかに多くの基盤(ADR-061〜064)が既に存在することが分かったため、各セクションはまず「既存で満たされているか」を確認し、満たされていなければ差分だけを作る方針にした(既存の統一集計関数・デザイントークンの再利用というN0〜N11自身の指示にも沿う)。
+
+### N0:概要画面の不具合と画面の修正
+
+- **調査結果、既に解消済みだった項目**:
+  - 「ジャンル内訳の各行のバーをグレーではなくカテゴリ色に」: `app/(app)/spending/genre-breakdown.tsx` は既に `genreBarColor()`(`src/domain/genre-style.ts`)でカテゴリごとの色(彩度を落とした値)を使っている。変更不要。
+  - 「画面左端の「❯」を本番非表示にするか、端スワイプに置き換える」: ADR-064 R5 で既に調査済みで、アプリのコードには存在せず(`tests/ui/category-r5.test.ts` が全ソースを検索して確認)、アプリ内ブラウザ(iPhone のアプリ内 Safari 等)側のUIで、アプリからは操作・削除できないと結論づけられている。アプリの「端からのスワイプで戻る」自体は既にある(`EDGE_BACK_PX`)。この判断を踏襲し、再調査のみで変更は加えていない。
+  - 「スクロール領域の下端にタブバー+安全領域ぶんの余白」: `app/(app)/app-shell.tsx` の `<main>` が既に `pb-[calc(9rem+env(safe-area-inset-bottom))]` を持ち、カテゴリ詳細等の主要な独立スクロール領域も同じ規約に従っている(`tests/ui/category-r5.test.ts` 参照)。
+- **実際に直した項目**:
+  1. **「← 目標期間・月 →(スワイプで切り替え)」の説明文と「今月/目標期間」ボタンの一本化**:`app/(app)/spending/summary-card.tsx``SwipeableSummary`(新規)。説明文を削除し、`genre-breakdown.tsx` の「今月 / 目標期間」`radiogroup` と同じ見た目のボタンをサマリーカードにも追加。ボタン押下で対象の面へ `scrollIntoView({behavior:'smooth'})`、スワイプでの切り替えは `IntersectionObserver`(閾値0.5)でボタンの選択状態に反映——双方向に連動する。
+  2. **カード間の不自然な余白**:`app/(app)/spending/page.tsx` で `SubscriptionsCard` を `<div className="mt-3">` で包んでいた箇所を削除。`CurrentMonthOnly`・`SpendingMonthProvider` はどちらも DOM 要素を作らない(`<>{children}</>` / `Context.Provider` のみ)ため、外側の `<div className="rise space-y-3">` の `space-y-3`(12px)がそのまま隣接カード間の間隔になる——`mt-3` の追加分だけ `InsightsCard`↔`SubscriptionsCard` の間だけ24pxになっていた(他は全て12pxで統一)。
+- **ついでに直した無関係の pre-existing 問題**:検証(`npx eslint .`/`npx prettier --check .`)を実行したところ、並行セッションの WIP コミット(`99a2dd0`, デザインQA実行基盤)に由来する lint エラー3件(`scripts/design-qa/run.mjs` の `parseFloat` 使用——このファイルはブラウザの `getComputedStyle()` が返す px 文字列をパースしているだけで金額とは無関係だが、リポジトリ全体を対象にした `no-restricted-globals` ルールに引っかかっていた)と prettier 未整形2件(`docs/design-qa/results.json`、`tests/features/category/rule-actions.test.ts`)が既に main 上に存在していた。「各コミットの前に型チェック・lint・テストをすべて通すこと」という実行ルールに従い、`parseFloat` → `Number.parseFloat`(同じグローバル制限ルールの対象外、意味は同一)に置き換え、2ファイルを `prettier --write` しただけで機能的な変更は加えていない。
+
+### N1 以降
+
+以降のセクションの記録はコミットごとに追記する。
 
 以下は初期値を決めず、本人の入力を待つ。システムは値が無くても動くように作る。
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { formatSignedYen } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
@@ -44,21 +44,92 @@ export function SummaryCard({
   );
   if (goal === null) return monthPane;
 
+  return <SwipeableSummary goal={goal} monthPane={monthPane} />;
+}
+
+/**
+ * 目標と月のサマリーをスワイプで切り替える(N0)。以前は説明文
+ * 「← 目標期間 ・ 月 →(スワイプで切り替え)」だけで案内していたが、
+ * ジャンル内訳(genre-breakdown.tsx)の「今月 / 目標期間」と見た目が重複し、
+ * かつボタンで直接切り替える手段が無かった。同じ「今月 / 目標期間」の
+ * 切り替えボタンに一本化し、スワイプはそのボタンの状態と双方向に連動させる
+ * (ボタンを押すと対応する面へスクロールし、スワイプで面が変わるとボタンの
+ * 選択状態も追従する)。
+ */
+function SwipeableSummary({ goal, monthPane }: { goal: ReactNode; monthPane: ReactNode }) {
+  const [active, setActive] = useState<'goal' | 'month'>('goal');
+  const goalRef = useRef<HTMLDivElement>(null);
+  const monthRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const goalEl = goalRef.current;
+    const monthEl = monthRef.current;
+    if (goalEl === null || monthEl === null) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.intersectionRatio > 0.5) {
+            setActive(entry.target === goalEl ? 'goal' : 'month');
+          }
+        }
+      },
+      { threshold: [0.5] },
+    );
+    observer.observe(goalEl);
+    observer.observe(monthEl);
+    return () => observer.disconnect();
+  }, []);
+
+  function goTo(pane: 'goal' | 'month'): void {
+    (pane === 'goal' ? goalRef.current : monthRef.current)?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+  }
+
   return (
     <div>
+      <div className="flex justify-center">
+        <div role="radiogroup" aria-label="サマリーの表示" className="flex gap-1 text-xs">
+          {(
+            [
+              ['month', '今月'],
+              ['goal', '目標期間'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={active === value}
+              onClick={() => goTo(value)}
+              className="min-h-11 rounded-full px-3 py-1 font-semibold"
+              style={{
+                background: active === value ? 'var(--accent)' : 'var(--plane)',
+                color: active === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2"
+        className="-mx-4 mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2"
         style={{ scrollbarWidth: 'none' }}
         role="region"
         aria-label="サマリー(横にスワイプで目標と月を切り替え)"
         tabIndex={0}
       >
-        <div className="w-full shrink-0 snap-center">{goal}</div>
-        <div className="w-full shrink-0 snap-center">{monthPane}</div>
+        <div ref={goalRef} className="w-full shrink-0 snap-center">
+          {goal}
+        </div>
+        <div ref={monthRef} className="w-full shrink-0 snap-center">
+          {monthPane}
+        </div>
       </div>
-      <p className="text-center text-xs" style={{ color: 'var(--ink-muted)' }}>
-        ← 目標期間 ・ 月 →(スワイプで切り替え)
-      </p>
     </div>
   );
 }

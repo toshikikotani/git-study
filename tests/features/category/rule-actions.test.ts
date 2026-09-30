@@ -50,7 +50,14 @@ import {
   undoRuleAction,
 } from '../../../app/(app)/spending/category/actions';
 
-const tx = (id: string, date: string, description: string, merchant: string | null, yen: number, genre: string | null) => ({
+const tx = (
+  id: string,
+  date: string,
+  description: string,
+  merchant: string | null,
+  yen: number,
+  genre: string | null,
+) => ({
   id,
   occurred_on: date,
   description,
@@ -80,8 +87,20 @@ beforeEach(() => {
     tx('t4', '2026-07-01', 'ファミリーマート', 'ファミリーマート', -100, 'cafe'),
   ];
   rows.receipt_items = [
-    { transaction_id: 't1', name: "TULLY'S ブラック", id: 'i1', amount_yen: -500, genre_id: 'dining' },
-    { transaction_id: 't2', name: 'ＴＵＬＬＹ’Ｓ ブラック', id: 'i2', amount_yen: -300, genre_id: null },
+    {
+      transaction_id: 't1',
+      name: "TULLY'S ブラック",
+      id: 'i1',
+      amount_yen: -500,
+      genre_id: 'dining',
+    },
+    {
+      transaction_id: 't2',
+      name: 'ＴＵＬＬＹ’Ｓ ブラック',
+      id: 'i2',
+      amount_yen: -300,
+      genre_id: null,
+    },
   ];
   rows.transaction_splits = [];
 });
