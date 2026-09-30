@@ -1982,7 +1982,20 @@ ADR-061 の続き。仮定とフォールバックをセクションごとに記
 
 **検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(1397件全通過、`calculator.test.ts`・`usual-entries.test.ts`・`quick-entry-genres.test.ts`・`money.test.ts`のtoTaxIncluded分・`date.test.ts`のhourJst分を新規追加)/`npx next build`/`npm run verify:migrations`すべて成功。**未検証**:このセッションには実機・本人のログイン手段が無いため、電卓の実際のタップ操作・カテゴリ格子の長押し起動・「いつもの」予測の実データでの見え方は確認できていない。
 
-### N3 以降
+### N3:AIによる入力(話す・打つ・スクショ)
+
+着手前の調査で、`src/features/import/receipt-ai.ts` が既に「画像 → AI構造化抽出」の骨格(`parseStructured` へ image content block を渡す、1枚に複数取引、振込/送金画面も対象)を持っていることを確認した。N3 はこの骨格を再利用しつつ、対象・確認画面が違う3つの入口を追加した。
+
+1. **文字で記録・話して記録は同じ後段**:`src/features/import/natural-text-ai.ts`(新規、`parseStructuredGated` 経由)。「話して記録」は端末の音声認識(Web Speech API、`window.SpeechRecognition`/`webkitSpeechRecognition`)でテキスト化するだけで、テキスト化した後は「文字で記録」と完全に同じ経路(`extractFromTextAction`)に合流させた——入口を2つ作ると同じロジックを2箇所に持つことになり(ADR-033)、かつ音声そのものをサーバーへ送らずに済む(N1「端末内で処理できるものは端末内で処理する」)。1画面(`/transactions/capture-text`)にテキストエリア+🎙️ボタンとして実装。
+2. **スクショから記録は receipt-ai.ts と並ぶ別ファイル**:`src/features/import/screenshot-ai.ts`(新規)。receipt-ai.ts は商品行(items)・税率・`reconcileReceipt` 照合というレシート特有の作り込みを多く持っており、それらを決済アプリ通知・通販注文完了・カード利用通知にまで持ち込むと無関係な複雑さが増えるため、「画像を渡して構造化データを受け取る」という骨格だけを踏襲した別ファイルにした(プロンプト・スキーマは対象に合わせて作り直す一方、`parseStructuredGated`・`resizeToJpegBase64`(既存の画像リサイズ共通処理)は完全に再利用)。
+3. **重複警告**:`src/features/transactions/duplicate-check.ts`(新規)。スクショから書き起こした店名は、CSV・レシート等で既に記録済みの表記と一致することがまず無いため、`fingerprintOf()`(完全一致)ではなく「金額が一致し、日付が前後2日以内」というゆるい一致で警告する。**「既存の取引に紐付ける」の実装範囲を判断した**:新しいテーブル・外部キーを追加して実際に2つの明細を関連付ける仕組みは作らず、「この候補は新規登録しない(既存の記録がもう既にあるとみなす)」という扱いに留めた——本人要件の核心は「二重に記録してしまうことを防ぐ」ことであり、関連付け自体の閲覧・管理UIまでは要求されていないと判断した。
+4. **低確信度の黄色ハイライト**:`capture-candidate-card.tsx`(3画面で共通、confidence < 0.6 で警告枠+文言)。
+5. **確認カードは1件ずつ保存**:一括保存ではなく、既存の手入力(N2)・レシート取り込みと同じ「明細を変える操作は必ず Undo を積む」規約(`tests/h-usability.test.ts` が検証)に従い、`saveImportBatchAction` + `pushUndo` を個々の候補ごとに呼ぶ形にした。
+6. **Siri・ショートカットアプリからの起動**:ネイティブアプリを持たないウェブアプリでは真のSiriショートカット統合は作れない(プラットフォームの制約)。ADR-062のウィジェット代替(PWAのホーム画面ショートカット)と同じ考え方で、`app/manifest.ts` に「話して記録・文字で記録」のショートカットを追加した(既存のスクリーンショットからの記録は、ショートカットの実用上の上限(主要4件程度)を超えるため、長押しメニューからのみ辿れる形にした)。
+
+**検証**:`npx tsc --noEmit`/`npx eslint .`/`npx prettier --check .`/`npx vitest run`(1414件全通過、`natural-text-ai.test.ts`・`screenshot-ai.test.ts`・`genre-hint.test.ts`を新規追加)/`npx next build`すべて成功。**未検証**:このセッションには実際のAnthropic API・本人のログイン手段・実機の音声認識・実際のスクリーンショット画像が無いため、AIの実際の書き起こし精度・音声認識の実際の挙動は確認できていない(N11のAI評価で改めて扱う)。
+
+### N4 以降
 
 以降のセクションの記録はコミットごとに追記する。
 
