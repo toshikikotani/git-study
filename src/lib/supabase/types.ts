@@ -82,6 +82,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_cache: {
+        Row: {
+          cache_key: string;
+          created_at: string;
+          expires_at: string;
+          feature: string;
+          response_json: Json;
+          user_id: string;
+        };
+        Insert: {
+          cache_key: string;
+          created_at?: string;
+          expires_at: string;
+          feature: string;
+          response_json: Json;
+          user_id: string;
+        };
+        Update: {
+          cache_key?: string;
+          created_at?: string;
+          expires_at?: string;
+          feature?: string;
+          response_json?: Json;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       alerts: {
         Row: {
           acknowledged_at: string | null;
@@ -200,6 +227,7 @@ export type Database = {
       };
       app_settings: {
         Row: {
+          ai_enabled: boolean;
           brief_channel: Database['public']['Enums']['notification_channel'];
           brief_send_at: string;
           classification_confidence_threshold: number;
@@ -230,6 +258,7 @@ export type Database = {
           waste_alert_threshold: number;
         };
         Insert: {
+          ai_enabled?: boolean;
           brief_channel?: Database['public']['Enums']['notification_channel'];
           brief_send_at?: string;
           classification_confidence_threshold?: number;
@@ -260,6 +289,7 @@ export type Database = {
           waste_alert_threshold?: number;
         };
         Update: {
+          ai_enabled?: boolean;
           brief_channel?: Database['public']['Enums']['notification_channel'];
           brief_send_at?: string;
           classification_confidence_threshold?: number;

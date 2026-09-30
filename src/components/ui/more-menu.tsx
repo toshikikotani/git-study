@@ -103,6 +103,7 @@ const GROUPS = [
   {
     title: '設定',
     items: [
+      { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
       { href: '/settings/gmail', label: 'Gmail連携' },
       { href: '/settings/google', label: 'Google連携' },
       { href: '/settings/password', label: 'パスワード' },
