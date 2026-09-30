@@ -16,7 +16,6 @@ import {
   loadIncomeExpenseTrend,
   loadMerchantSpendingRanking,
 } from '@/features/reports/store';
-import { isCurrentUserOwner } from '@/features/auth/owner';
 import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import {
@@ -31,7 +30,6 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 export const dynamic = 'force-dynamic';
 
 export default async function ReportsPage() {
-  const isOwner = await isCurrentUserOwner();
   const [
     trend,
     netWorthPoints,
@@ -48,8 +46,7 @@ export default async function ReportsPage() {
       // net_worth_snapshots は本番マイグレーション未適用の間、テーブル自体が
       // 無く失敗する(TASKS.md のブロック事項参照)。本人にとっては「記録が
       // まだ無い」のと同じなので、レポート画面全体を落とさず空状態にする。
-      // 資産推移(残債・投資評価額)は、オーナーだけ。
-      isOwner ? loadNetWorthTrend().catch(() => []) : Promise.resolve([]),
+      loadNetWorthTrend().catch(() => []),
       loadIncomeExpenseTrend(),
       loadMerchantSpendingRanking(),
       loadAccountBalanceByPurpose(),
@@ -121,7 +118,7 @@ export default async function ReportsPage() {
 
       <MerchantRankingCard ranking={merchantRanking} />
 
-      {isOwner ? <NetWorthChart points={netWorthPoints} /> : null}
+      <NetWorthChart points={netWorthPoints} />
 
       <PurposeBalanceCard balances={purposeBalances} />
     </div>

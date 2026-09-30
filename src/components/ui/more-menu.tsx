@@ -43,8 +43,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { MdMoreHoriz } from 'react-icons/md';
 
+import { signOutAction } from '@/features/auth/actions';
 import { BottomSheet } from './bottom-sheet';
-import { useIsOwner } from './owner-context';
 
 // `as const` にして href をリテラル型のまま保つ。Next の typed routes(next.config.ts)は
 // `<Link href>` に渡る型がリテラルの Route であることを要求するため、途中で
@@ -53,7 +53,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/debts', label: '負債', ownerOnly: true },
+      { href: '/debts', label: '負債' },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',
@@ -83,9 +83,9 @@ const GROUPS = [
   {
     title: 'この先に向けて',
     items: [
-      { href: '/investments', label: '投資', ownerOnly: true },
-      { href: '/side-hustle', label: '副業', ownerOnly: true },
-      { href: '/job-change', label: '転職準備', ownerOnly: true },
+      { href: '/investments', label: '投資' },
+      { href: '/side-hustle', label: '副業' },
+      { href: '/job-change', label: '転職準備' },
     ],
   },
   {
@@ -98,34 +98,23 @@ const GROUPS = [
         label: 'ジャンル管理・分析',
         dek: 'ジャンルの追加削除・予算設定、AIによる客観的な支出分類',
       },
-      { href: '/briefs', label: '朝配信', ownerOnly: true },
+      { href: '/briefs', label: '朝配信' },
     ],
   },
   {
     title: '設定',
     items: [
       { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
-      { href: '/settings/gmail', label: 'Gmail連携', ownerOnly: true },
-      { href: '/settings/google', label: 'Google連携', ownerOnly: true },
+      { href: '/settings/gmail', label: 'Gmail連携' },
+      { href: '/settings/google', label: 'Google連携' },
       { href: '/settings/password', label: 'パスワード' },
-      { href: '/settings/rescued-emails', label: '読み取れなかったメール', ownerOnly: true },
+      { href: '/settings/rescued-emails', label: '読み取れなかったメール' },
     ],
   },
 ] as const;
 
-/** オーナー以外には、オーナー専用の項目(連携系)を出さない。項目が空になった見出しも出さない。 */
-export function visibleGroups(isOwner: boolean) {
-  return GROUPS.map((g) => ({
-    ...g,
-    items: g.items.filter((i) => isOwner || !('ownerOnly' in i && i.ownerOnly)),
-  })).filter((g) => g.items.length > 0);
-}
-
 export function MoreMenu() {
   const [open, setOpen] = useState(false);
-  // 連携系(Gmail・Google・朝配信など、オーナーの資格情報で動くもの)は、オーナー以外には出さない。
-  const isOwner = useIsOwner();
-  const groups = visibleGroups(isOwner);
   const pathname = usePathname();
 
   // 画面遷移が起きたら(リンクを踏んだ・戻るボタンなど)必ず閉じる。
@@ -179,7 +168,7 @@ export function MoreMenu() {
         </div>
 
         <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
-          {groups.map((group) => (
+          {GROUPS.map((group) => (
             <section key={group.title}>
               <h3
                 className="px-2 pb-2 text-xs font-medium tracking-[0.06em] uppercase"
@@ -227,6 +216,26 @@ export function MoreMenu() {
               </div>
             </section>
           ))}
+
+          {/* ログアウト。共有の端末で、次の人が自分のアカウントで使えるように */}
+          <form
+            action={signOutAction}
+            onSubmit={() => {
+              try {
+                window.sessionStorage.clear();
+              } catch {
+                // 消せなくてもログアウトは続ける
+              }
+            }}
+          >
+            <button
+              type="submit"
+              className="min-h-11 w-full rounded-2xl px-4 py-3 text-left text-sm font-medium"
+              style={{ background: 'var(--surface)', color: 'var(--over)' }}
+            >
+              ログアウト
+            </button>
+          </form>
         </div>
       </BottomSheet>
     </>

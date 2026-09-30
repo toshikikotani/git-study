@@ -1,8 +1,6 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
-import { OwnerOnlyNotice } from '@/components/ui/owner-only-notice';
-import { isCurrentUserOwner } from '@/features/auth/owner';
 import { getGoogleEnv } from '@/lib/env';
 
 /**
@@ -18,7 +16,6 @@ import { getGoogleEnv } from '@/lib/env';
  * (Vercel + GitHub Secrets)へ手でコピーする(ADR-014、NFR-04)。
  */
 export default async function GoogleSettingsPage() {
-  if (!(await isCurrentUserOwner())) return <OwnerOnlyNotice title="Google 連携" />;
   const connected = getGoogleEnv() !== null;
 
   return (
