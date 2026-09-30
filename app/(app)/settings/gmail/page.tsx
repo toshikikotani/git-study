@@ -1,8 +1,6 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
-import { OwnerOnlyNotice } from '@/components/ui/owner-only-notice';
-import { isCurrentUserOwner } from '@/features/auth/owner';
 import { getGmailSettings } from '@/features/settings/gmail-store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GmailSettingsForm } from './gmail-settings-form';
@@ -16,7 +14,6 @@ import { GmailSettingsForm } from './gmail-settings-form';
  * 有効フラグ・差出人の絞り込み・取得件数上限の3つだけ(NFR-04)。
  */
 export default async function GmailSettingsPage() {
-  if (!(await isCurrentUserOwner())) return <OwnerOnlyNotice title="Gmail 自動取得" />;
   const settings = await withMinDuration(getGmailSettings());
 
   return (
