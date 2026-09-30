@@ -43,6 +43,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { MdMoreHoriz } from 'react-icons/md';
 
+import { signOutAction } from '@/features/auth/actions';
 import { BottomSheet } from './bottom-sheet';
 import { useIsOwner } from './owner-context';
 
@@ -227,6 +228,26 @@ export function MoreMenu() {
               </div>
             </section>
           ))}
+
+          {/* ログアウト。共有の端末で、次の人が自分のアカウントで使えるように */}
+          <form
+            action={signOutAction}
+            onSubmit={() => {
+              try {
+                window.sessionStorage.clear();
+              } catch {
+                // 消せなくてもログアウトは続ける
+              }
+            }}
+          >
+            <button
+              type="submit"
+              className="min-h-11 w-full rounded-2xl px-4 py-3 text-left text-sm font-medium"
+              style={{ background: 'var(--surface)', color: 'var(--over)' }}
+            >
+              ログアウト
+            </button>
+          </form>
         </div>
       </BottomSheet>
     </>
