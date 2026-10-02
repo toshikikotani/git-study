@@ -78,7 +78,10 @@ export function UnrecordedSheet({
                 <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                   {genre.genreName}
                   {spent.get(genre.genreId) ? (
-                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+                    <span
+                      className="ml-2 text-xs font-normal"
+                      style={{ color: 'var(--ink-muted)' }}
+                    >
                       この期間に {formatYen(spent.get(genre.genreId) ?? 0, { sign: 'never' })}
                     </span>
                   ) : null}
@@ -96,7 +99,10 @@ export function UnrecordedSheet({
                 <li key="none" className="px-2">
                   <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                     未分類
-                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+                    <span
+                      className="ml-2 text-xs font-normal"
+                      style={{ color: 'var(--ink-muted)' }}
+                    >
                       この期間に {formatYen(row.spentYen, { sign: 'never' })}
                     </span>
                   </p>
