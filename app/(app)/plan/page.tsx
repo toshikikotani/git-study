@@ -5,6 +5,7 @@ import { planPeriodDays } from '@/domain/spending-plan';
 import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { buildGoalCard } from '@/features/goals/card';
 import { loadGoalView } from '@/features/goals/loader';
+import { listGenreOptions } from '@/features/spending-plan/membership';
 import { listPlanRanges } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
 import { categoryHref } from '@/lib/category-nav';
@@ -15,29 +16,27 @@ import { DeletePlanButton } from './delete-plan-button';
 import { EditPlanSection } from './edit-plan-section';
 import { PlanBuilder } from './plan-builder';
 import { ReviewCard } from './review-card';
-import { ExcludeGenreButton, UnrecordedSheet } from './unrecorded-sheet';
-
-/**
- * 目標。主役は期間の残り。期間中に発生したのに行が無い支出は未収録として面上に出し、
- * その場で目標へ加えるか、分類へ送る。予算なしの折りたたみと要対応の文章は置かない。
- */
+import { UnrecordedSheet } from './unrecorded-sheet';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export default async function PlanPage() {
   const today = todayJst();
-  const [loaded, settings, ranges, captures] = await withMinDuration(
+  const [loaded, settings, ranges, captures, genres] = await withMinDuration(
     Promise.all([
       loadGoalView(),
       getAppSettings(),
       listPlanRanges(),
       listOpenCaptures().catch(() => []),
+      listGenreOptions().catch(() => []),
     ]),
   );
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
   const guidance = view?.guidance ?? null;
+  const taken = new Set((plan?.items ?? []).filter((item) => item.targetYen > 0).map((item) => item.genreId));
+  const addable = genres.filter((genre) => !taken.has(genre.genreId));
 
   return (
     <div className="rise space-y-3">
@@ -49,10 +48,10 @@ export default async function PlanPage() {
 
       {view?.review && plan ? <ReviewCard planId={plan.id} review={view.review} /> : null}
 
-      {view !== null && guidance !== null && !view.ended ? (
+      {view !== null && guidance !== null && !view.ended && plan ? (
         <>
           <GoalCard model={buildGoalCard(view, today, { pendingCount: captures.length })} />
-          <UnrecordedSheet planId={plan!.id} rows={view.noBudget} />
+          <UnrecordedSheet planId={plan.id} rows={view.noBudget} addable={addable} />
         </>
       ) : null}
 
@@ -87,7 +86,6 @@ export default async function PlanPage() {
                     sharedKey={r.genreId ?? 'none'}
                     maxYen={Math.max(...view.breakdown.map((x) => x.spentYen), 1)}
                   />
-                  {r.genreId ? <ExcludeGenreButton planId={plan.id} genreId={r.genreId} /> : null}
                 </li>
               ))}
           </ul>
