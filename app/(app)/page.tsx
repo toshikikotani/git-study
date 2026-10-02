@@ -18,7 +18,6 @@ import {
 import { listDebts } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
-import { formatTimeJa } from '@/lib/date';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
