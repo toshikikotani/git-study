@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -68,9 +69,9 @@ export function UnrecordedSheet({ planId, rows }: { planId: string; rows: readon
                   </span>
                 </p>
                 {row.genreId === null ? (
-                  <a href="/spending/category/none" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+                  <Link href="/spending/category/none" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold" style={{ color: 'var(--accent)' }}>
                     分類する
-                  </a>
+                  </Link>
                 ) : (
                   <AddRow
                     spentYen={row.spentYen}
