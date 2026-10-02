@@ -11,6 +11,14 @@ async function userId() {
   return { supabase, userId: data.user.id };
 }
 
+/** 目標に足せるジャンル一覧。支出が無くても出す。 */
+export async function listGenreOptions(): Promise<{ genreId: string; genreName: string }[]> {
+  const { supabase } = await userId();
+  const { data, error } = await supabase.from('genres').select('id, name').order('sort_order');
+  if (error) throw new PlanMembershipError(`ジャンルを取得できませんでした: ${error.message}`);
+  return (data ?? []).map((genre) => ({ genreId: genre.id, genreName: genre.name }));
+}
+
 /** 期間中に発生したジャンルを、今の目標の行にする。既存行があれば金額だけ更新する。 */
 export async function addPlanGenre(
   planId: string,
