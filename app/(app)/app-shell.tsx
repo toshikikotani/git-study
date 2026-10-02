@@ -67,24 +67,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </PullToRefresh>
       <UndoToastHost />
       {isClient ? (
-        createPortal(
-          <BottomBar pendingHref={navigating ? pendingHref : null} onNavigate={beginNavigate} />,
-          document.body,
-        )
+        createPortal(<BottomBar onNavigate={beginNavigate} />, document.body)
       ) : (
-        <BottomBar pendingHref={null} onNavigate={beginNavigate} />
+        <BottomBar onNavigate={beginNavigate} />
       )}
     </div>
   );
 }
 
-function BottomBar({
-  pendingHref,
-  onNavigate,
-}: {
-  pendingHref: string | null;
-  onNavigate: (href: string) => void;
-}) {
+function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
   const pathname = usePathname();
   const isClient = useIsClient();
   const jobs = useReceiptJobs();
@@ -263,8 +254,7 @@ function BottomBar({
         <nav className="min-w-0 flex-1">
           <ul className="tabbar-pill liquid-capsule flex items-center gap-1">
             {NAV.map((item, index) => {
-              const shown = pendingHref ?? pathname;
-              const isActive = isSameTab(shown, item.href);
+              const isActive = isSameTab(pathname, item.href);
               return (
                 <Fragment key={item.href}>
                   {index === 2 ? (
@@ -295,9 +285,6 @@ function BottomBar({
                       href={item.href}
                       prefetch
                       aria-current={isActive ? 'page' : undefined}
-                      onPointerDown={() => {
-                        if (tabTapAction(pathname, item.href) === 'navigate') onNavigate(item.href);
-                      }}
                       onClick={(e) => {
                         if (tabTapAction(pathname, item.href) === 'scroll-top') {
                           e.preventDefault();
