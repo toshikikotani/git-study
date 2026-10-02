@@ -12,6 +12,7 @@ import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
 import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
 import {
@@ -35,23 +36,73 @@ const NAV = [
   { href: '/payday', label: '給料日' },
 ] as const;
 
+/** タブの href に着いたか。`/` は完全一致だけ、他は下の画面も同じタブ。 */
+function isSameTab(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const isClient = useIsClient();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const navigating = pendingHref !== null && !isSameTab(pathname, pendingHref);
+
+  useEffect(() => {
+    if (pendingHref !== null && isSameTab(pathname, pendingHref)) setPendingHref(null);
+  }, [pathname, pendingHref]);
+
+  function beginNavigate(href: string) {
+    if (isSameTab(pathname, href) || pendingHref === href) return;
+    setPendingHref(href);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
       <div aria-hidden className="status-blur" />
       <PullToRefresh>
-        <main className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(9rem+env(safe-area-inset-bottom))]">
-          {children}
+        <main
+          className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(9rem+env(safe-area-inset-bottom))]"
+          aria-busy={navigating}
+        >
+          {navigating ? <TabSwitchSkeleton /> : children}
         </main>
       </PullToRefresh>
       <UndoToastHost />
-      {isClient ? createPortal(<BottomBar />, document.body) : <BottomBar />}
+      {isClient ? (
+        createPortal(
+          <BottomBar pendingHref={navigating ? pendingHref : null} onNavigate={beginNavigate} />,
+          document.body,
+        )
+      ) : (
+        <BottomBar pendingHref={null} onNavigate={beginNavigate} />
+      )}
     </div>
   );
 }
 
-function BottomBar() {
+/** タップ直後に出す骨格。データを待たず、先に画面が切り替わったことを伝える。 */
+function TabSwitchSkeleton() {
+  return (
+    <div className="space-y-3" role="status" aria-live="polite" aria-label="読み込み中">
+      <Skeleton className="h-8 w-28" />
+      <Skeleton className="h-[220px] rounded-[28px]" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Skeleton className="h-[120px] rounded-[22px]" />
+        <Skeleton className="h-[120px] rounded-[22px]" />
+      </div>
+    </div>
+  );
+}
+
+function BottomBar({
+  pendingHref,
+  onNavigate,
+}: {
+  pendingHref: string | null;
+  onNavigate: (href: string) => void;
+}) {
   const pathname = usePathname();
   const isClient = useIsClient();
   const jobs = useReceiptJobs();
@@ -118,6 +169,7 @@ function BottomBar() {
           href="/transactions/receipt"
           prefetch={false}
           role="status"
+          onPointerDown={() => onNavigate('/transactions/receipt')}
           className="min-h-11 inline-flex items-center label-text px-4 py-2 text-xs"
           style={{
             borderRadius: 'var(--radius-full)',
@@ -152,6 +204,7 @@ function BottomBar() {
               href="/transactions/new"
               prefetch={false}
               role="menuitem"
+              onPointerDown={() => onNavigate('/transactions/new')}
               onClick={() => setFabMenuOpen(false)}
               className="flex min-h-11 items-center px-2 text-base font-semibold"
               style={{ color: 'var(--ink)' }}
@@ -201,6 +254,7 @@ function BottomBar() {
               href="/transactions/capture-text"
               prefetch={false}
               role="menuitem"
+              onPointerDown={() => onNavigate('/transactions/capture-text')}
               onClick={() => setFabMenuOpen(false)}
               className="flex min-h-11 items-center px-2 text-base font-semibold"
               style={{ color: 'var(--ink)' }}
@@ -213,6 +267,7 @@ function BottomBar() {
               href="/transactions/capture-screenshot"
               prefetch={false}
               role="menuitem"
+              onPointerDown={() => onNavigate('/transactions/capture-screenshot')}
               onClick={() => setFabMenuOpen(false)}
               className="flex min-h-11 items-center px-2 text-base font-semibold"
               style={{ color: 'var(--ink)' }}
@@ -226,7 +281,8 @@ function BottomBar() {
         <nav className="min-w-0 flex-1">
           <ul className="tabbar-pill liquid-capsule flex items-center gap-1">
             {NAV.map((item, index) => {
-              const isActive = pathname === item.href;
+              const shown = pendingHref ?? pathname;
+              const isActive = isSameTab(shown, item.href);
               return (
                 <Fragment key={item.href}>
                   {index === 2 ? (
@@ -252,8 +308,11 @@ function BottomBar() {
                   <li className="flex-1">
                     <Link
                       href={item.href}
-                      prefetch={false}
+                      prefetch
                       aria-current={isActive ? 'page' : undefined}
+                      onPointerDown={() => {
+                        if (tabTapAction(pathname, item.href) === 'navigate') onNavigate(item.href);
+                      }}
                       onClick={(e) => {
                         if (tabTapAction(pathname, item.href) === 'scroll-top') {
                           e.preventDefault();
@@ -273,7 +332,7 @@ function BottomBar() {
               );
             })}
             <li className="flex shrink-0 items-center justify-center self-center">
-              <MoreMenu />
+              <MoreMenu onNavigate={onNavigate} />
             </li>
           </ul>
         </nav>

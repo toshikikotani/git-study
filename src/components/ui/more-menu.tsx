@@ -73,7 +73,7 @@ const GROUPS = [
   },
 ] as const;
 
-export function MoreMenu() {
+export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const [pathAtOpen, setPathAtOpen] = useState(pathname);
@@ -139,6 +139,10 @@ export function MoreMenu() {
                     href={item.href}
                     prefetch={false}
                     role="menuitem"
+                    onPointerDown={() => {
+                      onNavigate?.(item.href);
+                      setOpen(false);
+                    }}
                     onClick={() => setOpen(false)}
                     className="min-h-11 flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
                     style={{
