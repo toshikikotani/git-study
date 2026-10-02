@@ -90,7 +90,7 @@ export function ReceiptItemsPanel({
   useEffect(() => {
     if (!dialogOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeDialog();
+      if (event.key === 'Escape') setDialogOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
