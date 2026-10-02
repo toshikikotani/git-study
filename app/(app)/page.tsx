@@ -48,7 +48,7 @@ export default async function HomePage() {
     listTransferRules().catch(() => []),
   ]);
   const streak = await getCheckinStreak();
-  const { payoff, tiles } = summary;
+  const { tiles } = summary;
   const obligation = obligationYen(
     debts.reduce((sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0), 0),
     settings?.monthlyRepaymentTargetYen ?? 0,
@@ -72,8 +72,6 @@ export default async function HomePage() {
   // この関数が実際に実行された時刻(=最後にサーバーへ取りに行った時刻)。
   // ADR-029:画面は pull-to-refresh するまで保持されるため、いつ時点の
   // 数字かを本人が判断できるようにする。
-  const updatedAt = formatTimeJa();
-
   return (
     <div className="space-y-3">
       {/* FR-03:完済カウントダウンは最上部に固定。
