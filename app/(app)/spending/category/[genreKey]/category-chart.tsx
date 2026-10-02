@@ -30,7 +30,6 @@ import {
 import { useFontScale } from '@/lib/font-scale';
 import { hapticFor } from '@/lib/haptics';
 import { DeltaLabel, type DeltaGeometry, type Pt } from './delta-label';
-import { BudgetPaceChart } from './budget-pace-chart';
 import { ChartGesture } from '@/lib/chart-gesture';
 
 /** 右端の余白(金額の目盛りと、目安・平均のタグ)。描画領域の外側に確保する。文字の大きさに合わせて広がる(ch)。 */
@@ -100,7 +99,7 @@ export function CategoryChart({
   const override = genreName === '未分類' ? null : overrides[genreName];
   const barColor = genreBarColor(genreName === '未分類' ? null : genreName, override);
   const lineColor = genreColorVar(genreName === '未分類' ? null : genreName, override);
-  const maxYen = isCum ? cumulative.maxYen : series.maxYen;
+  const maxYen = isCum ? (budgetYen && budgetYen > 0 ? budgetYen : cumulative.maxYen) : series.maxYen;
   const ticks = isCum ? cumulative.ticks : series.ticks;
 
   // なぞり操作(長押し・なぞる・タップ)の状態機械。DOM に触れない(lib/chart-gesture.ts)。
@@ -375,11 +374,14 @@ export function CategoryChart({
             />
 
             {isCum ? (
-              <BudgetPaceChart
+              <CumulativeLayer
                 chart={cumulative}
-                budgetYen={budgetYen}
+                x={x}
+                y={y}
+                n={n}
                 color={lineColor}
-                height={plotPx}
+                dim={tip !== null}
+                budgetYen={budgetYen}
               />
             ) : (
               <>
@@ -652,5 +654,117 @@ function Line({
         opacity: dim ? 0.5 : 1,
       }}
     />
+  );
+}
+
+function CumulativeLayer({
+  chart,
+  x,
+  y,
+  n,
+  color,
+  dim,
+  budgetYen,
+}: {
+  chart: CumulativeChart;
+  x: (i: number) => number;
+  y: (v: number) => number;
+  n: number;
+  color: string;
+  dim: boolean;
+  budgetYen: number | null;
+}) {
+  void budgetYen;
+
+  const actual = chart.days.filter((d) => d.actualYen !== null);
+  const ideal = chart.days.filter((d) => d.idealYen !== null);
+  const fut = chart.days.filter((d) => d.forecastHighYen !== null);
+  const end = chart.endIndex !== null ? chart.days[chart.endIndex]! : null;
+  const pts = (list: { index: number; v: number }[]) =>
+    list.map((p) => `${x(p.index).toFixed(2)},${y(p.v).toFixed(2)}`).join(' ');
+  const band =
+    end && end.actualYen !== null && fut.length > 0
+      ? [
+          `${x(end.index).toFixed(2)},${y(end.actualYen).toFixed(2)}`,
+          ...fut.map((d) => `${x(d.index).toFixed(2)},${y(d.forecastHighYen!).toFixed(2)}`),
+          ...[...fut]
+            .reverse()
+            .map((d) => `${x(d.index).toFixed(2)},${y(d.forecastLowYen!).toFixed(2)}`),
+        ].join(' ')
+      : null;
+  return (
+    <>
+      <svg
+        aria-hidden
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="pointer-events-none absolute inset-0 size-full overflow-visible"
+      >
+        {band ? (
+          <polygon points={band} fill={color} fillOpacity={dim ? 0.07 : 0.14} data-forecast-band />
+        ) : null}
+        {ideal.length > 1 ? (
+          <polyline
+            data-ideal
+            points={pts(ideal.map((d) => ({ index: d.index, v: d.idealYen! })))}
+            fill="none"
+            stroke="var(--ink-secondary)"
+            strokeWidth={1.5}
+            strokeDasharray="1 4"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            opacity={dim ? 0.5 : 1}
+          />
+        ) : null}
+        {end && end.actualYen !== null && fut.length > 0 ? (
+          <polyline
+            points={pts([
+              { index: end.index, v: end.actualYen },
+              ...fut.map((d) => ({ index: d.index, v: d.forecastYen! })),
+            ])}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.5}
+            strokeDasharray="4 4"
+            vectorEffect="non-scaling-stroke"
+            opacity={0.6}
+          />
+        ) : null}
+        {actual.length > 0 ? (
+          <polyline
+            data-actual
+            points={pts(actual.map((d) => ({ index: d.index, v: d.actualYen! })))}
+            fill="none"
+            stroke={color}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+      </svg>
+      {/* 予定の支出:その日の白抜きの段差 */}
+      {fut
+        .filter((d) => d.scheduledYen > 0)
+        .map((d) => (
+          <span
+            key={d.date}
+            data-scheduled-step
+            aria-hidden
+            className="pointer-events-none absolute"
+            style={{
+              left: `${x(d.index)}%`,
+              width: Math.min(10, (100 / Math.max(n, 1)) * 0.7 * 3),
+              bottom: `${100 - y(d.forecastYen!)}%`,
+              height: `${Math.max(y(d.forecastYen! - d.scheduledYen) - y(d.forecastYen!), 0)}%`,
+              minHeight: 3,
+              transform: 'translateX(-50%)',
+              background: 'var(--surface)',
+              border: `1.5px solid ${color}`,
+              borderRadius: 2,
+            }}
+          />
+        ))}
+    </>
   );
 }

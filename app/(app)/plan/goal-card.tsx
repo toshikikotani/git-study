@@ -133,14 +133,6 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
         </Link>
       ) : null}
 
-      {model.pending ? (
-        <p
-          className="mt-3 border-t pt-3 text-sm"
-          style={{ borderColor: 'var(--hairline)', color: 'var(--ink-secondary)' }}
-        >
-          入力待ちのレシート {model.pending.count}件(目標に未反映)
-        </p>
-      ) : null}
     </section>
   );
 }
