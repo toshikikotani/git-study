@@ -75,17 +75,16 @@ export function ReceiptItemsPanel({
     setDialogOpen(false);
   }
 
-  const seenRequest = useRef(openRequest);
-  useEffect(() => {
-    if (openRequest === seenRequest.current) return;
-    seenRequest.current = openRequest;
+  const [seenRequest, setSeenRequest] = useState(openRequest);
+  if (openRequest !== seenRequest) {
+    setSeenRequest(openRequest);
     if (openRequest > 0) {
       setEditRows(toEditRows(items));
       setEditError(null);
       setRescanError(null);
       setDialogOpen(true);
     }
-  }, [openRequest, items]);
+  }
 
   useEffect(() => {
     if (!dialogOpen) return;
