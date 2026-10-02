@@ -10,6 +10,16 @@ import { streakBadgeFor } from '@/domain/streak';
 import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
+import { loadMonthlyLedger } from '@/features/spending/store';
+import {
+  lockedSavingsYen,
+  MISSING_INCOME_NOTE,
+  obligationYen,
+  sinkingFromRules,
+} from '@/domain/locked-savings';
+import { listDebts } from '@/features/debts/store';
+import { getAppSettings } from '@/features/settings/store';
+import { listTransferRules } from '@/features/transfer-rules/store';
 import { formatDateJa, formatTimeJa } from '@/lib/date';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
@@ -31,12 +41,31 @@ export default async function HomePage() {
   // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
   // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
   // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
-  const [, summary] = await Promise.all([
+  const [, summary, ledger, debts, settings, rules] = await Promise.all([
     recordCheckin().catch(() => undefined),
     loadHomeSummary(),
+    loadMonthlyLedger().catch(() => null),
+    listDebts().catch(() => []),
+    getAppSettings().catch(() => null),
+    listTransferRules().catch(() => []),
   ]);
   const streak = await getCheckinStreak();
   const { payoff, tiles } = summary;
+  const obligation = obligationYen(
+    debts.reduce((sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0), 0),
+    settings?.monthlyRepaymentTargetYen ?? 0,
+  );
+  const sinking = sinkingFromRules(rules);
+  const scheduled = ledger?.totals.scheduledYen ?? 0;
+  const savingsYen = ledger
+    ? lockedSavingsYen({
+        incomeYen: ledger.totals.incomeYen,
+        obligationYen: obligation,
+        sinkingYen: sinking,
+        scheduledYen: scheduled,
+        discretionaryCapYen: tiles.reduce((sum, tile) => sum + (tile.budgetYen ?? 0), 0),
+      })
+    : null;
 
   // タイルを押すとその場で内訳を開く(本人発案:遷移せずに見たい)。
   // タイルは高々数枠(FR-61)なので、ここで内訳もまとめて先読みしておく。
@@ -69,7 +98,7 @@ export default async function HomePage() {
                 className="text-xs font-medium tracking-[0.1em] uppercase"
                 style={{ color: 'var(--ink-muted)' }}
               >
-                完済まで
+                確保した貯蓄
               </span>
               {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
               {payoff.isEstimated ? (
@@ -86,6 +115,18 @@ export default async function HomePage() {
 
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             最終更新 {updatedAt}
+          </p>
+
+          <p
+            className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em] tabular"
+            style={{ color: 'var(--ink)' }}
+          >
+            {savingsYen === null ? '—' : formatYen(savingsYen)}
+          </p>
+          <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            {savingsYen === null
+              ? MISSING_INCOME_NOTE
+              : `義務 ${formatYen(obligation)} ・ 積立 ${formatYen(sinking)} ・ 予定 ${formatYen(scheduled)} を引いた`}
           </p>
 
           {payoff.daysRemaining === null ? (

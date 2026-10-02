@@ -109,23 +109,6 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
             </span>
           </Link>
         ) : null}
-        {captures.length > 0 ? (
-          <Link
-            href={`/transactions/receipt/${captures[0]!.id}` as Route}
-            prefetch={false}
-            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
-            style={{ color: 'var(--ink-secondary)' }}
-          >
-            <span className="tabular">
-              入力待ち {captures.length}件{'(集計に入っていません'}
-              {hasGoal ? '・目標に未反映' : ''}
-              {')'}
-            </span>
-            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
-              入力する →
-            </span>
-          </Link>
-        ) : null}
       </div>
 
       <AttentionFixer

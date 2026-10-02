@@ -9,6 +9,10 @@ import { loadGoalView } from '@/features/goals/loader';
 import { listGenreOptions } from '@/features/spending-plan/membership';
 import { getCurrentPlan, listPlanRanges, type SpendingPlan } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
+import { lockedSavingsYen, obligationYen, sinkingFromRules } from '@/domain/locked-savings';
+import { listDebts } from '@/features/debts/store';
+import { loadMonthlyLedger } from '@/features/spending/store';
+import { listTransferRules } from '@/features/transfer-rules/store';
 import { categoryHref } from '@/lib/category-nav';
 import { formatDateJa, todayJst } from '@/lib/date';
 import { GoalCard } from './goal-card';
@@ -93,15 +97,36 @@ function BudgetRows({ plan, today }: { plan: SpendingPlan | null; today: string 
 }
 
 async function SpentRows({ today }: { today: string }) {
-  const loaded = await loadGoalView();
+  const [loaded, ledger, debts, settings, rules] = await Promise.all([
+    loadGoalView(),
+    loadMonthlyLedger().catch(() => null),
+    listDebts().catch(() => []),
+    getAppSettings().catch(() => null),
+    listTransferRules().catch(() => []),
+  ]);
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
   const guidance = view?.guidance ?? null;
   if (plan === null || view === null || guidance === null) return null;
+  const savingsYen = ledger
+    ? lockedSavingsYen({
+        incomeYen: ledger.totals.incomeYen,
+        obligationYen: obligationYen(
+          debts.reduce(
+            (sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0),
+            0,
+          ),
+          settings?.monthlyRepaymentTargetYen ?? 0,
+        ),
+        sinkingYen: sinkingFromRules(rules),
+        scheduledYen: ledger.totals.scheduledYen,
+        discretionaryCapYen: view.guidance.targetYen,
+      })
+    : null;
   return (
     <>
       {view.review ? <ReviewCard planId={plan.id} review={view.review} /> : null}
-      {!view.ended ? <GoalCard model={buildGoalCard(view, today)} /> : null}
+      {!view.ended ? <GoalCard model={buildGoalCard(view, today, { savingsYen })} /> : null}
       <section
         aria-label="今の目標"
         className="rounded-2xl p-4"

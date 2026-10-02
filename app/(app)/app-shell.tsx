@@ -14,6 +14,7 @@ import { MoreMenu } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
+import { CaptureImpact } from './capture-impact';
 import {
   configureReceiptQueue,
   countReading,
@@ -146,6 +147,11 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
   );
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {jobs.some((j) => j.status === 'ready' || j.status === 'needs_input') ? (
+        <CaptureImpact
+          job={jobs.filter((j) => j.status === 'ready' || j.status === 'needs_input').at(-1)!}
+        />
+      ) : null}
       {reading + waiting + offlineWaiting + needInput > 0 ? (
         <Link
           href="/transactions/receipt"
