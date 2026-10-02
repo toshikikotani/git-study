@@ -117,7 +117,10 @@ export default async function HomePage() {
             最終更新 {updatedAt}
           </p>
 
-          <p className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em] tabular" style={{ color: 'var(--ink)' }}>
+          <p
+            className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em] tabular"
+            style={{ color: 'var(--ink)' }}
+          >
             {savingsYen === null ? '—' : formatYen(savingsYen)}
           </p>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>

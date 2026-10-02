@@ -112,7 +112,10 @@ async function SpentRows({ today }: { today: string }) {
     ? lockedSavingsYen({
         incomeYen: ledger.totals.incomeYen,
         obligationYen: obligationYen(
-          debts.reduce((sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0), 0),
+          debts.reduce(
+            (sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0),
+            0,
+          ),
           settings?.monthlyRepaymentTargetYen ?? 0,
         ),
         sinkingYen: sinkingFromRules(rules),

@@ -99,7 +99,11 @@ export function CategoryChart({
   const override = genreName === '未分類' ? null : overrides[genreName];
   const barColor = genreBarColor(genreName === '未分類' ? null : genreName, override);
   const lineColor = genreColorVar(genreName === '未分類' ? null : genreName, override);
-  const maxYen = isCum ? (budgetYen && budgetYen > 0 ? budgetYen : cumulative.maxYen) : series.maxYen;
+  const maxYen = isCum
+    ? budgetYen && budgetYen > 0
+      ? budgetYen
+      : cumulative.maxYen
+    : series.maxYen;
   const ticks = isCum ? cumulative.ticks : series.ticks;
 
   // なぞり操作(長押し・なぞる・タップ)の状態機械。DOM に触れない(lib/chart-gesture.ts)。

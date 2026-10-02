@@ -109,7 +109,6 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
             </span>
           </Link>
         ) : null}
-
       </div>
 
       <AttentionFixer

@@ -63,7 +63,10 @@ export function buildGoalCard(
   const primary: GoalCardModel['primary'] = {
     label: '確保した貯蓄',
     amountYen: options.savingsYen === undefined ? null : options.savingsYen,
-    note: options.savingsYen === undefined || options.savingsYen === null ? '手取りを入れると、ここが埋まる' : null,
+    note:
+      options.savingsYen === undefined || options.savingsYen === null
+        ? '手取りを入れると、ここが埋まる'
+        : null,
   };
   const badge = null;
 

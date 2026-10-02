@@ -132,7 +132,6 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
           <span style={{ color: 'var(--ink)' }}>分類する →</span>
         </Link>
       ) : null}
-
     </section>
   );
 }

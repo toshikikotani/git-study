@@ -28,7 +28,9 @@ describe('forecastPlan', () => {
       seed: 's',
       trials: 400,
     });
-    expect(withPlan.genres[0]!.medianYen! - plain.genres[0]!.medianYen!).toBeGreaterThanOrEqual(3000);
+    expect(withPlan.genres[0]!.medianYen! - plain.genres[0]!.medianYen!).toBeGreaterThanOrEqual(
+      3000,
+    );
   });
 
   it('支出日が少なく予定も無いときは目標を出さない', () => {

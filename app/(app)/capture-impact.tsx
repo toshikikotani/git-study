@@ -21,7 +21,8 @@ export function CaptureImpact({ job }: { job: ReceiptJob }) {
     };
   }, [job.id]);
 
-  const read = job.status === 'ready' ? receiptTotalYen(job.parsed.map((row) => row.amountYen)) : null;
+  const read =
+    job.status === 'ready' ? receiptTotalYen(job.parsed.map((row) => row.amountYen)) : null;
   const after = free != null && read != null ? freeAfterReceipt(free, read) : null;
 
   return (
@@ -46,11 +47,7 @@ export function CaptureImpact({ job }: { job: ReceiptJob }) {
         </p>
       )}
       <Link
-        href={
-          job.captureId
-            ? `/transactions/receipt/${job.captureId}`
-            : '/transactions/receipt'
-        }
+        href={job.captureId ? `/transactions/receipt/${job.captureId}` : '/transactions/receipt'}
         className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold"
         style={{ color: 'var(--accent)' }}
       >
