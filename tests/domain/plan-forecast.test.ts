@@ -56,28 +56,30 @@ describe('forecastPlan', () => {
 import { savingsAsk } from '@/domain/plan-forecast';
 
 describe('抑えてほしい額', () => {
-  it('着地が目標を超えるときは節約額と1日の上限を出す', () => {
+  it('着地より下に抑える。予算に届くことは成功にしない', () => {
     const ask = savingsAsk({
-      verdict: 'over',
-      targetYen: 10500,
-      medianYen: 12400,
+      verdict: 'on_track',
+      targetYen: 40000,
+      medianYen: 26400,
+      lowYen: 20500,
+      committedYen: 2600,
       remainingDays: 29,
-      dailyCapYen: 270,
     });
-    expect(ask.saveYen).toBe(1900);
-    expect(ask.text).toContain('1,900 円節約');
-    expect(ask.text).toContain('1 日 270 円に抑えてほしい');
+    expect(ask.keepUnderYen).toBe(20500);
+    expect(ask.saveYen).toBe(5900);
+    expect(ask.text).toContain('届かせない方が貯蓄になる');
+    expect(ask.text).not.toContain('目標に届く');
   });
 
-  it('届くときは抑える額を出さない', () => {
-    expect(
-      savingsAsk({
-        verdict: 'on_track',
-        targetYen: 10500,
-        medianYen: 8000,
-        remainingDays: 29,
-        dailyCapYen: 270,
-      }).saveYen,
-    ).toBe(0);
+  it('上限を超えている自由な支出は 0 円', () => {
+    const ask = savingsAsk({
+      verdict: 'unreachable',
+      targetYen: 10500,
+      medianYen: 18000,
+      lowYen: 16000,
+      committedYen: 12000,
+      remainingDays: 29,
+    });
+    expect(ask.keepDailyYen).toBe(0);
   });
 });

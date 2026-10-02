@@ -205,8 +205,9 @@ export async function refinePlanAction(input: {
           verdict: forecast.verdict,
           targetYen: row.item.targetYen,
           medianYen: forecast.medianYen,
+          lowYen: forecast.lowYen,
+          committedYen: row.spentYen + row.scheduledYen,
           remainingDays: remaining,
-          dailyCapYen: forecast.dailyCapYen,
         }).text,
         detail,
       };
@@ -216,7 +217,7 @@ export async function refinePlanAction(input: {
     const summary =
       known.length === 0
         ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
-        : `このままだと 70% で ${landing?.toLocaleString('ja-JP')} 円に着く。超えるジャンルは、下の「抑えてほしい額」まで節約してほしい。予定は使った額に入っていない。`;
+        : `このままだと 70% で ${landing?.toLocaleString('ja-JP')} 円まで使う。予算は上限で、届かせない方が貯蓄になる。下の額まで抑えると、その差が残る。`;
     return {
       error: null,
       summary,

@@ -209,47 +209,53 @@ export function forecastPlan(input: {
 }
 
 export type SavingsAsk = {
-  /** 今の着地から目標まで削る額。届くときは 0。 */
+  /** 着地より下に抑える額。予算に届かせないための差。 */
   saveYen: number;
-  /** 残り日数で抑えてほしい1日の額。届かないときは 0。 */
+  /** 残り日数で抑えてほしい1日の額。 */
   keepDailyYen: number | null;
+  /** 着地より下の、抑えてほしい期間額。 */
+  keepUnderYen: number | null;
   text: string;
 };
 
-/** 予想ではなく、抑えてほしい額。着地が目標を超えるときだけ節約を出す。 */
+/** 予算は届ける目標ではない。着地より下に抑えた差が貯蓄になる。 */
 export function savingsAsk(input: {
   verdict: ForecastVerdict;
   targetYen: number;
   medianYen: number | null;
+  lowYen: number | null;
+  committedYen: number;
   remainingDays: number;
-  dailyCapYen: number | null;
 }): SavingsAsk {
   const yen = (n: number) => n.toLocaleString('ja-JP');
   if (input.verdict === 'unknown' || input.medianYen === null) {
-    return { saveYen: 0, keepDailyYen: null, text: 'まだ判断できない。支出のあった日が少ない。' };
+    return {
+      saveYen: 0,
+      keepDailyYen: null,
+      keepUnderYen: null,
+      text: 'まだ判断できない。支出のあった日が少ない。',
+    };
   }
   if (input.verdict === 'unreachable') {
     return {
       saveYen: Math.max(0, input.medianYen - input.targetYen),
       keepDailyYen: 0,
-      text: `使った額と予定だけで目標を超えている。今日からの自由な支出は 0 円に抑えてほしい。`,
+      keepUnderYen: input.committedYen,
+      text: '使った額と予定だけで上限を超えている。今日からの自由な支出は 0 円に抑えてほしい。',
     };
   }
-  const saveYen = Math.max(0, input.medianYen - input.targetYen);
-  if (saveYen === 0) {
-    return {
-      saveYen: 0,
-      keepDailyYen: input.dailyCapYen,
-      text: `このままで目標に届く。抑える額はない。`,
-    };
-  }
-  const daily =
-    input.dailyCapYen === null
-      ? ''
-      : `残り ${input.remainingDays} 日は 1 日 ${yen(input.dailyCapYen)} 円に抑えてほしい。`;
+  const floor =
+    input.lowYen !== null && input.lowYen < input.medianYen
+      ? input.lowYen
+      : round100(input.medianYen * 0.8);
+  const keepUnderYen = Math.max(input.committedYen, Math.min(floor, input.medianYen));
+  const saveYen = Math.max(0, input.medianYen - keepUnderYen);
+  const room = Math.max(0, keepUnderYen - input.committedYen);
+  const keepDailyYen = input.remainingDays > 0 ? round100(room / input.remainingDays) : 0;
   return {
     saveYen,
-    keepDailyYen: input.dailyCapYen,
-    text: `着地は ${yen(input.medianYen)} 円。${yen(saveYen)} 円節約して ${yen(input.targetYen)} 円に抑えてほしい。${daily}`,
+    keepDailyYen,
+    keepUnderYen,
+    text: `着地は ${yen(input.medianYen)} 円。予算は上限で、届かせない方が貯蓄になる。${yen(saveYen)} 円抑えて ${yen(keepUnderYen)} 円にしてほしい。残り ${input.remainingDays} 日は 1 日 ${yen(keepDailyYen)} 円。`,
   };
 }
