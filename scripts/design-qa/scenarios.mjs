@@ -7,7 +7,6 @@ import { GENRES } from './fake-supabase.mjs';
 export const TODAY = '2026-09-15';
 const T = GENRES[0].id; // 交通・車両
 const D = GENRES[1].id;
-const N = GENRES[2].id;
 const ACC = '30000000-0000-0000-0000-000000000001';
 
 let n = 0;
