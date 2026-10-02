@@ -30,7 +30,9 @@ export function UnrecordedSheet({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  const spent = new Map(rows.filter((row) => row.genreId).map((row) => [row.genreId, row.spentYen]));
+  const spent = new Map(
+    rows.filter((row) => row.genreId).map((row) => [row.genreId, row.spentYen]),
+  );
   if (addable.length === 0 && rows.length === 0) return null;
 
   async function add(genreId: string, yen: number) {
