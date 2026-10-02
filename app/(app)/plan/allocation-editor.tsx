@@ -207,7 +207,10 @@ export function AllocationEditor({
         {rows.map((row, i) => (
           <li key={row.genreId}>
             <div className="flex items-center justify-between gap-2">
-              <span className="min-w-0 truncate text-sm font-medium" style={{ color: 'var(--ink)' }}>
+              <span
+                className="min-w-0 truncate text-sm font-medium"
+                style={{ color: 'var(--ink)' }}
+              >
                 {row.genreName}
                 {pinned.has(row.genreId) ? (
                   <span className="ml-1 text-xs font-normal" style={{ color: 'var(--accent)' }}>
