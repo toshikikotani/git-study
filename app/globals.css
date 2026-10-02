@@ -440,10 +440,8 @@ body {
   position: fixed;
   inset: 0 0 auto 0;
   z-index: 30;
-  height: env(safe-area-inset-top, 0px);
-  background: var(--glass-tint-strong);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  height: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+  background: linear-gradient(to bottom, var(--surface) 62%, transparent);
   pointer-events: none;
 }
 
