@@ -139,11 +139,10 @@ export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }
                     href={item.href}
                     prefetch={false}
                     role="menuitem"
-                    onPointerDown={() => {
+                    onClick={() => {
                       onNavigate?.(item.href);
                       setOpen(false);
                     }}
-                    onClick={() => setOpen(false)}
                     className="min-h-11 flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
                     style={{
                       borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
