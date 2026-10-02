@@ -83,3 +83,14 @@ describe('抑えてほしい額', () => {
     expect(ask.keepDailyYen).toBe(0);
   });
 });
+
+import { twoMonthTendency } from '@/domain/plan-forecast';
+
+describe('過去2ヶ月の傾向', () => {
+  it('増えているときは低い月に抑えた差を出す', () => {
+    const result = twoMonthTendency({ priorYen: 18000, previousYen: 24000, landingYen: 26400 });
+    expect(result.savedYen).toBe(8400);
+    expect(result.text).toContain('増えている');
+    expect(result.text).toContain('8,400 円残る');
+  });
+});
