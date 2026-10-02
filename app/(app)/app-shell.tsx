@@ -148,30 +148,75 @@ function BottomBar() {
       <BottomSheet open={fabMenuOpen} onClose={() => setFabMenuOpen(false)} role="menu">
         <ul className="px-2 pb-2">
           <li>
-            <Link href="/transactions/new" prefetch={false} role="menuitem" onClick={() => setFabMenuOpen(false)} className="flex min-h-11 items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <Link
+              href="/transactions/new"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               手入力
             </Link>
           </li>
           <li>
-            <label role="menuitem" className="flex min-h-11 cursor-pointer items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <label
+              role="menuitem"
+              className="flex min-h-11 cursor-pointer items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               写真から選ぶ
-              <input type="file" accept="image/*" multiple hidden onChange={(e) => { enqueueReceiptFiles(Array.from(e.target.files ?? [])); e.target.value = ''; setFabMenuOpen(false); }} />
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  enqueueReceiptFiles(Array.from(e.target.files ?? []));
+                  e.target.value = '';
+                  setFabMenuOpen(false);
+                }}
+              />
             </label>
           </li>
           {canStream ? (
             <li>
-              <button type="button" role="menuitem" onClick={() => { setFabMenuOpen(false); setCameraMode('continuous'); setCameraOpen(true); }} className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFabMenuOpen(false);
+                  setCameraMode('continuous');
+                  setCameraOpen(true);
+                }}
+                className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold"
+                style={{ color: 'var(--ink)' }}
+              >
                 連続撮影
               </button>
             </li>
           ) : null}
           <li>
-            <Link href="/transactions/capture-text" prefetch={false} role="menuitem" onClick={() => setFabMenuOpen(false)} className="flex min-h-11 items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <Link
+              href="/transactions/capture-text"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               話して記録・文字で記録
             </Link>
           </li>
           <li>
-            <Link href="/transactions/capture-screenshot" prefetch={false} role="menuitem" onClick={() => setFabMenuOpen(false)} className="flex min-h-11 items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <Link
+              href="/transactions/capture-screenshot"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               スクショから記録
             </Link>
           </li>
@@ -217,7 +262,9 @@ function BottomBar() {
                       }}
                       className="min-h-11 flex flex-col items-center gap-1 py-2"
                     >
-                      <span className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}>
+                      <span
+                        className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                      >
                         {item.label}
                       </span>
                     </Link>
