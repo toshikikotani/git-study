@@ -1,23 +1,18 @@
 import { Suspense } from 'react';
 import { paceComparison, canShowForecast, hasIncome } from '@/domain/summary-rules';
 import { listAccounts } from '@/features/accounts/store';
-import { buildGoalView } from '@/features/goals/view';
-import { getCurrentPlan } from '@/features/spending-plan/store';
-import { toLedgerEntries } from '@/features/spending/views';
 import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
-import { addMonths, todayJst } from '@/lib/date';
+import { addMonths } from '@/lib/date';
 import { AttentionCard } from './attention-card';
 import { CalendarHeatmap } from './calendar-heatmap';
 import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
-import { GoalCard } from '../plan/goal-card';
-import { buildGoalCard } from '@/features/goals/card';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
 import { ViewSwitch } from './view-switch';
@@ -52,13 +47,12 @@ export default function SpendingPage() {
 }
 
 async function SpendingBody() {
-  const [ledger, genres, accounts, duplicates, captures, plan] = await Promise.all([
+  const [ledger, genres, accounts, duplicates, captures] = await Promise.all([
     loadMonthlyLedger(),
     listGenres(),
     listAccounts(),
     listDuplicateCandidates(),
     listOpenCaptures().catch(() => []),
-    getCurrentPlan(todayJst()).catch(() => null),
   ]);
   const ids = ledger.transactions.map((t) => t.id);
   const [items, subtypes] = await Promise.all([
@@ -68,18 +62,6 @@ async function SpendingBody() {
   const transactions = toDrilldownTransactions(ledger.transactions, items, subtypes);
 
   const today = ledger.period.to;
-  const covered =
-    plan !== null && plan.periodStart >= ledger.loadedFrom && plan.periodEnd <= ledger.loadedTo;
-  const goalView = covered
-    ? buildGoalView({
-        plan,
-        entries: toLedgerEntries(ledger.sourceTransactions),
-        genreNames: ledger.genreNames,
-        today,
-        transactions: ledger.sourceTransactions,
-      })
-    : null;
-  const goal = goalView !== null && goalView.active ? goalView : null;
   const pace = paceComparison({
     today,
     firstRecordedOn: ledger.record.firstRecordedOn,
@@ -113,18 +95,12 @@ async function SpendingBody() {
           pace={pace}
           forecast={forecast}
           hasIncomeRegistered={hasIncome(ledger.totals.incomeYen)}
-          goal={
-            goal ? (
-              <GoalCard model={buildGoalCard(goal, today, { pendingCount: captures.length })} />
-            ) : null
-          }
+          goal={null}
         />
-        <AttentionCard hasGoal={goal !== null} />
-        <GenreBreakdown goalRows={goal ? goal.breakdown : null} />
-        <CalendarHeatmap
-          goal={goal ? { range: goal.range, dailyAllowanceYen: goal.dailyAllowanceYen } : null}
-        />
-        <LedgerList goalRange={goal ? goal.range : null} duplicateCount={duplicates.length} />
+        <AttentionCard hasGoal={false} />
+        <GenreBreakdown goalRows={null} />
+        <CalendarHeatmap goal={null} />
+        <LedgerList goalRange={null} duplicateCount={duplicates.length} />
         <CurrentMonthOnly>
           <Suspense fallback={null}>
             <LaterCards totalSpentYen={ledger.totals.spentYen} />
