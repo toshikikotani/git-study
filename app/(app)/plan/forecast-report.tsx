@@ -17,6 +17,14 @@ export type ForecastRow = {
   detail: string;
 };
 
+function lead(advice: string): string {
+  const parts = advice
+    .split('。')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.slice(0, 2).join('。') + (parts.length > 0 ? '。' : '');
+}
+
 export function ForecastReport({
   summary,
   proposedTotalYen,
@@ -33,15 +41,21 @@ export function ForecastReport({
   applying?: boolean;
 }) {
   return (
-    <section className="mt-3 space-y-3" aria-label="着地の分析">
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-        {summary}
-      </p>
-      {proposedTotalYen !== null ? (
-        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          着地から見た総額 {formatYen(proposedTotalYen, { sign: 'never' })}
+    <section className="mt-3 space-y-4" aria-label="抑えてほしい額">
+      <div>
+        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          抑えてほしい額
         </p>
-      ) : null}
+        <p
+          className="tabular mt-1 text-4xl font-semibold tracking-[-0.04em]"
+          style={{ color: 'var(--ink)' }}
+        >
+          {proposedTotalYen === null ? '—' : formatYen(proposedTotalYen, { sign: 'never' })}
+        </p>
+        <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          {summary}
+        </p>
+      </div>
       {onApplyAll && rows.some((row) => row.recommendedYen !== null) ? (
         <button
           type="button"
@@ -50,51 +64,47 @@ export function ForecastReport({
           disabled={applying}
           onClick={onApplyAll}
         >
-          {applying ? '全部の目標を保存しています…' : '全部の目標案を保存する'}
+          {applying ? '保存しています' : 'この額にする'}
         </button>
       ) : null}
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {rows.map((row) => (
           <li
             key={row.genreId}
-            className="rounded-2xl px-3 py-3"
-            style={{
-              background: 'rgba(255, 255, 255, 0.38)',
-              border: '1px solid rgba(255, 255, 255, 0.72)',
-            }}
+            className="rounded-[22px] px-4 py-4"
+            style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
           >
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               {row.genreName}
             </p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              すでに {formatYen(row.spentYen, { sign: 'never' })}
-              {row.scheduledYen > 0
-                ? ` ・ 予定 ${formatYen(row.scheduledYen, { sign: 'never' })}`
-                : ' ・ 予定なし'}
-              {row.recommendedYen !== null
-                ? ` ・ 目標案 ${formatYen(row.recommendedYen, { sign: 'never' })}`
-                : row.medianYen !== null
-                  ? ` ・ 着地 ${formatYen(row.medianYen, { sign: 'never' })}`
-                  : ''}
-              {row.exceedance !== null ? ` ・ 超過 ${Math.round(row.exceedance * 100)}%` : ''}
-            </p>
             <p
-              className="mt-2 text-sm font-semibold leading-relaxed"
+              className="tabular mt-1 text-3xl font-semibold tracking-[-0.04em]"
               style={{ color: 'var(--ink)' }}
             >
-              {row.advice}
+              {row.recommendedYen === null ? '—' : formatYen(row.recommendedYen, { sign: 'never' })}
             </p>
-            <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              {row.detail}
+            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+              {lead(row.advice)}
             </p>
+            <details className="mt-2">
+              <summary
+                className="min-h-11 cursor-pointer text-xs"
+                style={{ color: 'var(--ink-muted)' }}
+              >
+                根拠
+              </summary>
+              <p className="pb-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                {row.detail}
+              </p>
+            </details>
             {row.recommendedYen !== null ? (
               <button
                 type="button"
-                className="mt-2 min-h-11 text-xs font-semibold"
+                className="min-h-11 text-sm font-semibold"
                 style={{ color: 'var(--accent)' }}
                 onClick={() => onApply(row)}
               >
-                この目標案にする
+                この額にする
               </button>
             ) : null}
           </li>
