@@ -10,7 +10,8 @@ import { streakBadgeFor } from '@/domain/streak';
 import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
-import { formatDateJa, formatTimeJa } from '@/lib/date';
+import { loadMonthSavings } from '@/features/home/savings';
+import { formatTimeJa } from '@/lib/date';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
@@ -31,9 +32,10 @@ export default async function HomePage() {
   // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
   // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
   // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
-  const [, summary] = await Promise.all([
+  const [, summary, savings] = await Promise.all([
     recordCheckin().catch(() => undefined),
     loadHomeSummary(),
+    loadMonthSavings(),
   ]);
   const streak = await getCheckinStreak();
   const { payoff, tiles } = summary;
@@ -88,7 +90,7 @@ export default async function HomePage() {
             最終更新 {updatedAt}
           </p>
 
-          {payoff.daysRemaining === null ? (
+          {savings.incomeYen === 0 ? (
             <p
               className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em]"
               style={{ color: 'var(--income)' }}
@@ -99,56 +101,29 @@ export default async function HomePage() {
             <>
               <p className="mt-2 flex items-baseline gap-2">
                 <CountUp
-                  value={payoff.daysRemaining}
+                  value={savings.savedYen}
                   className="text-4xl leading-[0.88] font-semibold tracking-[-0.05em]"
                   style={{ color: 'var(--ink)' }}
                 />
                 <span className="text-xl font-medium" style={{ color: 'var(--ink-secondary)' }}>
-                  日
+                  円
                 </span>
               </p>
-
-              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                <span style={{ color: 'var(--ink-secondary)' }}>
-                  残り
-                  <span className="tabular ml-1 font-semibold" style={{ color: 'var(--ink)' }}>
-                    {formatYen(payoff.remainingYen)}
-                  </span>
-                </span>
-                {payoff.payoffOn ? (
-                  <span style={{ color: 'var(--ink-muted)' }}>
-                    {formatDateJa(payoff.payoffOn)} までの目安
-                  </span>
-                ) : null}
-              </div>
-
-              {/* 残高のスナップショットだけでは「進んでいる」ことが伝わらない。
-                  減った分を出すことが、返済アプリの正のフィードバックそのもの。 */}
-              {payoff.reducedThisMonthYen > 0 ? (
-                <p
-                  className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  <span aria-hidden>↓</span>
-                  今月{formatYen(payoff.reducedThisMonthYen)}移した
-                </p>
-              ) : null}
+              <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+                収入 {formatYen(savings.incomeYen, { sign: 'never' })} ・ 使った額{' '}
+                {formatYen(savings.spentYen, { sign: 'never' })}
+              </p>
             </>
           )}
 
           <div className="mt-5">
-            <ProgressGauge
-              ratio={payoff.progressRatio}
-              label="移した割合"
-              nextMilestone={payoff.nextMilestone}
-            />
+            <ProgressGauge ratio={savings.rate ?? 0} label="今月の貯蓄率" nextMilestone={null} />
           </div>
 
-          {/* リンクを本文に混ぜると行をまたいで割れる。行を分けて動線として立てる。 */}
-          {payoff.isEstimated ? (
+          {savings.incomeYen === 0 ? (
             <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-                残高と金利に推定値が含まれています。正確な値を入れると、この日付が確定します。
+                手取りを入れると、ここに今月残した額が出ます。
               </p>
               <a
                 href="/payday"
