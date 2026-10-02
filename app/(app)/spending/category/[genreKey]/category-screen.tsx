@@ -406,6 +406,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         onUnit={setUnit}
         onPick={pickBucket}
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
+        budgetYen={data.goal?.row?.targetYen ?? null}
       />
 
       <CategoryTabs

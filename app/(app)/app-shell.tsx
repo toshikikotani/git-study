@@ -83,11 +83,14 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
     void restoreWaitingReceipts();
   }, []);
   const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    // スクロール中にタブを変えると、縮んだメニューのまま次の画面が出る。
-    // 画面が変わったら一番上へ戻し、メニューは通常の大きさにする。
-    window.scrollTo({ top: 0, behavior: 'auto' });
+  const [compactPath, setCompactPath] = useState(pathname);
+  if (compactPath !== pathname) {
+    // 画面が変わったら縮んだメニューを戻す。effect 内の setState は lint が拒否する。
+    setCompactPath(pathname);
     setCompact(false);
+  }
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }, [pathname]);
   useEffect(() => {
     let last = window.scrollY;
