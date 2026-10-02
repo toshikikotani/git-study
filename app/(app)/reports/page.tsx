@@ -10,6 +10,8 @@ import { NetWorthChart } from './net-worth-chart';
 import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
+import { biggestIncrease } from '@/domain/report-finding';
+import { formatYen } from '@/domain/money';
 import {
   loadAccountBalanceByPurpose,
   loadCategorySpendingTrend,
@@ -58,20 +60,32 @@ export default async function ReportsPage() {
   );
   const monthKey = ledger.period.from.slice(0, 7);
 
+  const finding = biggestIncrease(trend);
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
-            支出レポート
-          </h1>
-          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            収支・カテゴリ別支出・店舗別支出・資産推移・用途別残高
+      <header>
+        <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          レポート
+        </h1>
+        {finding ? (
+          <>
+            <p
+              className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
+              style={{ color: 'var(--ink)' }}
+            >
+              {formatYen(finding.saveYen, { sign: 'never' })}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+              {finding.genreName}が {formatYen(finding.priorYen, { sign: 'never' })} から{' '}
+              {formatYen(finding.previousYen, { sign: 'never' })}{' '}
+              に増えた。前の月の額に抑えると、この額だけ残る。
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            直近2ヶ月で増えたジャンルはない。
           </p>
-        </div>
-        <Link href="/reports/ai" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          AIレポート →
-        </Link>
+        )}
       </header>
 
       <MonthSummaryRow
