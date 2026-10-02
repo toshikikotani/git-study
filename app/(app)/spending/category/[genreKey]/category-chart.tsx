@@ -602,7 +602,7 @@ export function CategoryChart({
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {isCum
-            ? '実線=実際の累計、点線=理想ペース。長押しでなぞれます'
+            ? '実線=実績の累計、点線=予算までの理想。軸は予算'
             : '長押ししてなぞると、日ごとの金額が見られます'}
         </p>
         <button

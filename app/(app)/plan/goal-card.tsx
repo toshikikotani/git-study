@@ -7,8 +7,8 @@ import type { GoalCardModel } from '@/features/goals/card';
 import { formatDateJa } from '@/lib/date';
 
 /**
- * 目標カード。主役は「今日あと○円」1つ。1日の目安・理想ペースとの差・予算・予定・実績は、
- * 主役をタップして開く内訳にまとめた(同じ数値を別の意味で並べない)。
+ * 目標カード。第一行は確保した貯蓄。今日あとは出さない。
+ * 予定と自由残は内訳に置く。注意と「近づいています」は同時に出さない。
  * 状態バッジは注意・超過のときだけ。予定の行は展開して日付・名前・金額・ジャンルを見られる。
  */
 export function GoalCard({ model }: { model: GoalCardModel }) {
@@ -26,7 +26,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
       <details className="mt-2">
         <summary
           className="min-h-11 cursor-pointer list-none"
-          aria-label="今日あと使える額(タップで内訳)"
+          aria-label="確保した貯蓄(タップで内訳)"
         >
           <div className="flex items-baseline justify-between gap-3">
             <div>

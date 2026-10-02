@@ -204,7 +204,10 @@ export function buildCumulative(input: {
           : null,
       forecastHighYen:
         hasForecast && future
-          ? Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum)
+          ? Math.min(
+              goal?.budgetYen ?? Number.POSITIVE_INFINITY,
+              Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum),
+            )
           : null,
     });
   }
@@ -217,7 +220,8 @@ export function buildCumulative(input: {
     0,
     ...days.map((d) => Math.max(d.actualYen ?? 0, d.idealYen ?? 0, d.forecastHighYen ?? 0)),
   );
-  const maxYen = niceCeil(rawMax);
+  const cap = goal?.budgetYen && goal.budgetYen > 0 ? goal.budgetYen : null;
+  const maxYen = cap !== null ? cap : niceCeil(rawMax);
   return {
     days,
     idealKind,

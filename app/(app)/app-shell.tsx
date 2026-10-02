@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div aria-hidden className="status-blur" />
       <PullToRefresh>
         <main
-          className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(9rem+env(safe-area-inset-bottom))]"
+          className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
           aria-busy={navigating}
         >
           {navigating ? <TabSwitchSkeleton href={pendingHref} /> : children}
