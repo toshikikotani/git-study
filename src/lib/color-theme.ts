@@ -12,29 +12,32 @@ export type ColorTheme =
   | { id: 'kinari' | 'sumi' | 'ai' | 'koke'; colors: ThemeColors }
   | { id: 'custom'; colors: ThemeColors };
 
-export const PRESETS: { id: 'kinari' | 'sumi' | 'ai' | 'koke'; label: string; colors: ThemeColors }[] =
-  [
-    {
-      id: 'kinari',
-      label: '生成り',
-      colors: { plane: '#f4efe6', surface: '#fffaf3', ink: '#2a241c', accent: '#8a6a3b' },
-    },
-    {
-      id: 'sumi',
-      label: '墨',
-      colors: { plane: '#121418', surface: '#1c2128', ink: '#f4f1ea', accent: '#d7c4a3' },
-    },
-    {
-      id: 'ai',
-      label: '藍',
-      colors: { plane: '#e7eef6', surface: '#f7fbff', ink: '#102033', accent: '#1d4e89' },
-    },
-    {
-      id: 'koke',
-      label: '苔',
-      colors: { plane: '#e7f0ea', surface: '#f6fbf7', ink: '#173026', accent: '#2f6f56' },
-    },
-  ];
+export const PRESETS: {
+  id: 'kinari' | 'sumi' | 'ai' | 'koke';
+  label: string;
+  colors: ThemeColors;
+}[] = [
+  {
+    id: 'kinari',
+    label: '生成り',
+    colors: { plane: '#f4efe6', surface: '#fffaf3', ink: '#2a241c', accent: '#8a6a3b' },
+  },
+  {
+    id: 'sumi',
+    label: '墨',
+    colors: { plane: '#121418', surface: '#1c2128', ink: '#f4f1ea', accent: '#d7c4a3' },
+  },
+  {
+    id: 'ai',
+    label: '藍',
+    colors: { plane: '#e7eef6', surface: '#f7fbff', ink: '#102033', accent: '#1d4e89' },
+  },
+  {
+    id: 'koke',
+    label: '苔',
+    colors: { plane: '#e7f0ea', surface: '#f6fbf7', ink: '#173026', accent: '#2f6f56' },
+  },
+];
 
 export const DEFAULT_CUSTOM: ThemeColors = {
   plane: '#f4efe6',
