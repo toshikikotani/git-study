@@ -55,15 +55,15 @@ const SUMMARY: Record<GuidanceStatus, string> = {
 export function buildGoalCard(
   view: GoalView,
   today: string,
-  options: { pendingCount?: number } = {},
+  options: { pendingCount?: number; savingsYen?: number | null } = {},
 ): GoalCardModel {
   const g = view.guidance;
   const { from, to } = view.range;
 
   const primary: GoalCardModel['primary'] = {
     label: '確保した貯蓄',
-    amountYen: null,
-    note: '手取りを入れると、ここが埋まる',
+    amountYen: options.savingsYen === undefined ? null : options.savingsYen,
+    note: options.savingsYen === undefined || options.savingsYen === null ? '手取りを入れると、ここが埋まる' : null,
   };
   const badge = null;
 
