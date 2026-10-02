@@ -139,7 +139,14 @@ export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }
                     href={item.href}
                     prefetch={false}
                     role="menuitem"
-                    onClick={() => {
+                    onClick={(e) => {
+                      const scroller = (e.currentTarget as HTMLElement).closest(
+                        '[data-sheet-scroll]',
+                      );
+                      if (scroller instanceof HTMLElement && scroller.dataset.moved === '1') {
+                        e.preventDefault();
+                        return;
+                      }
                       onNavigate?.(item.href);
                       setOpen(false);
                     }}

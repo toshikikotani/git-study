@@ -63,20 +63,44 @@ export function BottomSheet({
         }}
       >
         <div
-          className="max-h-[75dvh] touch-pan-y overflow-y-auto overscroll-contain p-2"
+          className="relative max-h-[70dvh]"
           style={{
             borderRadius: 'var(--radius-card)',
-            background: 'var(--glass-tint-strong)',
-            backdropFilter: 'var(--glass-blur-strong)',
-            WebkitBackdropFilter: 'var(--glass-blur-strong)',
             border: '1px solid var(--glass-border)',
             boxShadow: 'var(--glass-shadow-float)',
           }}
         >
-          <div className="flex justify-center pt-2 pb-1">
-            <span className="h-2 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              borderRadius: 'inherit',
+              background: 'var(--glass-tint-strong)',
+              backdropFilter: 'var(--glass-blur-strong)',
+              WebkitBackdropFilter: 'var(--glass-blur-strong)',
+            }}
+          />
+          <div
+            data-sheet-scroll
+            className="relative max-h-[70dvh] overflow-y-auto overscroll-contain p-2"
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            onPointerDown={(e) => {
+              const el = e.currentTarget;
+              el.dataset.moved = '0';
+              el.dataset.x = String(e.clientX);
+              el.dataset.y = String(e.clientY);
+            }}
+            onPointerMove={(e) => {
+              const el = e.currentTarget;
+              const y = Number(el.dataset.y ?? e.clientY);
+              if (Math.abs(e.clientY - y) > 8) el.dataset.moved = '1';
+            }}
+          >
+            <div className="flex justify-center pt-2 pb-1">
+              <span className="h-2 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
+            </div>
+            {children}
           </div>
-          {children}
         </div>
       </div>
     </>,
