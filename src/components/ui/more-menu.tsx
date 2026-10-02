@@ -115,9 +115,6 @@ export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             その他の機能
           </h2>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            外側をタップで閉じる
-          </span>
         </div>
 
         <div className="flex flex-col gap-4 px-1 pt-1 pb-3">

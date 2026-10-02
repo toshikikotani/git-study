@@ -266,9 +266,6 @@ export function ReceiptItemsPanel({
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             品目を編集
           </h2>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            外側をタップで閉じる
-          </span>
         </div>
         <div className="space-y-2 px-3 pb-3">
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>

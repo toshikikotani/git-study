@@ -1095,9 +1095,6 @@ export function TransactionRowWithSplit({
             <h2 className="text-base font-semibold break-words" style={{ color: 'var(--ink)' }}>
               {display?.name ?? transaction.description}
             </h2>
-            <span className="shrink-0 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              外側をタップで閉じる
-            </span>
           </div>
           <input
             type="text"
@@ -1286,9 +1283,6 @@ export function TransactionRowWithSplit({
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             明細のプレビュー
           </h2>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            外側をタップで閉じる
-          </span>
         </div>
 
         <div className="space-y-3 px-3 pb-3">
