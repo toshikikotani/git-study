@@ -200,8 +200,15 @@ export async function refinePlanAction(input: {
         forecast.medianYen === null
           ? '支出のあった日が少なく、残りの着地はまだ置けない。'
           : `残りの ${remaining} 日を 2,000 回引くと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
-        forecast.label,
       ].join('');
+      const ask = savingsAsk({
+        verdict: forecast.verdict,
+        targetYen: row.item.targetYen,
+        medianYen: forecast.medianYen,
+        lowYen: forecast.lowYen,
+        committedYen: row.spentYen + row.scheduledYen,
+        remainingDays: remaining,
+      });
       return {
         genreId: row.item.genreId,
         genreName: row.genre.genreName,
@@ -210,18 +217,11 @@ export async function refinePlanAction(input: {
         medianYen: forecast.medianYen,
         lowYen: forecast.lowYen,
         highYen: forecast.highYen,
-        recommendedYen: forecast.recommendedYen,
+        recommendedYen: ask.keepUnderYen,
         exceedance: forecast.exceedance,
         label: forecast.label,
         advice: [
-          savingsAsk({
-            verdict: forecast.verdict,
-            targetYen: row.item.targetYen,
-            medianYen: forecast.medianYen,
-            lowYen: forecast.lowYen,
-            committedYen: row.spentYen + row.scheduledYen,
-            remainingDays: remaining,
-          }).text,
+          ask.text,
           twoMonthTendency({
             priorYen: priorMonth.byGenre.get(row.item.genreId) ?? 0,
             previousYen: previousMonth.byGenre.get(row.item.genreId) ?? 0,
@@ -234,15 +234,15 @@ export async function refinePlanAction(input: {
       };
     });
     const known = forecasts.filter((row) => row.recommendedYen !== null);
-    const landing = plan.totalRecommendedYen;
+    const proposed = known.reduce((sum, row) => sum + (row.recommendedYen ?? 0), 0);
     const summary =
       known.length === 0
         ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
-        : `このままだと 70% で ${landing?.toLocaleString('ja-JP')} 円まで使う。予算は上限で、届かせない方が貯蓄になる。下の額まで抑えると、その差が残る。`;
+        : `抑えてほしい額の合計は ${proposed.toLocaleString('ja-JP')} 円。着地ではなく、この額を目標案にする。`;
     return {
       error: null,
       summary,
-      proposedTotalYen: landing,
+      proposedTotalYen: known.length === 0 ? null : proposed,
       forecasts,
     };
   } catch (error) {

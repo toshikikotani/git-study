@@ -274,10 +274,14 @@ export function twoMonthTendency(input: {
 }): TwoMonthTendency {
   const yen = (n: number) => n.toLocaleString('ja-JP');
   if (input.priorYen <= 0 && input.previousYen <= 0) return { text: '', savedYen: null };
-  const lower = Math.min(
-    input.priorYen > 0 ? input.priorYen : input.previousYen,
-    input.previousYen > 0 ? input.previousYen : input.priorYen,
-  );
+  if (input.priorYen <= 0 || input.previousYen <= 0) {
+    const known = Math.max(input.priorYen, input.previousYen);
+    return {
+      text: `2ヶ月そろっていない。記録がある月は ${known.toLocaleString('ja-JP')} 円。`,
+      savedYen: null,
+    };
+  }
+  const lower = Math.min(input.priorYen, input.previousYen);
   const rising = input.previousYen > input.priorYen * 1.15 && input.priorYen > 0;
   const falling = input.priorYen > input.previousYen * 1.15 && input.previousYen > 0;
   const direction = rising ? '増えている。' : falling ? '減っている。' : 'ほぼ同じ水準。';
