@@ -48,7 +48,7 @@ export default async function HomePage() {
     listTransferRules().catch(() => []),
   ]);
   const streak = await getCheckinStreak();
-  const { payoff, tiles } = summary;
+  const { tiles } = summary;
   const obligation = obligationYen(
     debts.reduce((sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0), 0),
     settings?.monthlyRepaymentTargetYen ?? 0,
@@ -72,8 +72,6 @@ export default async function HomePage() {
   // この関数が実際に実行された時刻(=最後にサーバーへ取りに行った時刻)。
   // ADR-029:画面は pull-to-refresh するまで保持されるため、いつ時点の
   // 数字かを本人が判断できるようにする。
-  const updatedAt = formatTimeJa();
-
   return (
     <div className="space-y-3">
       {/* FR-03:完済カウントダウンは最上部に固定。
@@ -91,40 +89,22 @@ export default async function HomePage() {
 
         <div className="relative">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                className="text-xs font-medium tracking-[0.1em] uppercase"
-                style={{ color: 'var(--ink-muted)' }}
-              >
-                確保した貯蓄
-              </span>
-              {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
-              {payoff.isEstimated ? (
-                <span
-                  className="rounded-full px-2 py-1 text-xs font-medium"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  推定
-                </span>
-              ) : null}
-            </div>
+            <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+              今日残せる
+            </p>
             <StreakBadge streak={streak} />
           </div>
 
-          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            最終更新 {updatedAt}
-          </p>
-
           <p
-            className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em] tabular"
+            className="mt-3 text-5xl leading-none font-semibold tracking-[-0.045em] tabular"
             style={{ color: 'var(--ink)' }}
           >
             {savingsYen === null ? '—' : formatYen(savingsYen)}
           </p>
-          <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
             {savingsYen === null
               ? MISSING_INCOME_NOTE
-              : `義務 ${formatYen(obligation)} ・ 積立 ${formatYen(sinking)} ・ 予定 ${formatYen(scheduled)} を引いた`}
+              : '撮ると、この数字が減る。残った分が貯蓄になる。'}
           </p>
           {savingsYen === null ? (
             <a
