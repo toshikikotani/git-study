@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { formatYen } from '@/domain/money';
 import { formatRemainingDays } from '@/domain/period';
@@ -20,7 +21,37 @@ import { UnrecordedSheet } from './unrecorded-sheet';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-export default async function PlanPage() {
+export default function PlanPage() {
+  return (
+    <Suspense fallback={<PlanFrame />}>
+      <PlanBody />
+    </Suspense>
+  );
+}
+
+function PlanFrame() {
+  return (
+    <div role="status" aria-label="目標を読み込み中" className="space-y-3">
+      <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
+        目標
+      </h1>
+      <div
+        className="h-36 rounded-3xl"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      />
+      <div
+        className="h-24 rounded-2xl"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      />
+      <div
+        className="h-64 rounded-2xl"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      />
+    </div>
+  );
+}
+
+async function PlanBody() {
   const today = todayJst();
   const [loaded, settings, ranges, captures, genres] = await Promise.all([
     loadGoalView(),
