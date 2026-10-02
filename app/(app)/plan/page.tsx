@@ -15,18 +15,14 @@ import { DeletePlanButton } from './delete-plan-button';
 import { EditPlanSection } from './edit-plan-section';
 import { PlanBuilder } from './plan-builder';
 import { ReviewCard } from './review-card';
+import { ExcludeGenreButton, UnrecordedSheet } from './unrecorded-sheet';
 
 /**
- * 目標(本人発案「カレンダーの範囲を選択して、そこまでの支出目標を立てたい。
- * AIと相談してカテゴリごとに目標設定する…徐々に改善をかけれるような設定で」、ADR-058)。
- *
- * 上に直近の目標の進み具合、下に新しい目標を立てる画面。数字は家計簿と同じ集計
- * (特別費・予定はペースに含めず、別の行で見せる)。目標期間が終わったら振り返りを出し、
- * 「この結果で次の目標を作る」で次の目標へつなぐ。
+ * 目標。主役は期間の残り。期間中に発生したのに行が無い支出は未収録として面上に出し、
+ * その場で目標へ加えるか、分類へ送る。予算なしの折りたたみと要対応の文章は置かない。
  */
 
 export const dynamic = 'force-dynamic';
-// 「AIに目標案を作ってもらう」の Server Action はこのページの上限時間で動く。
 export const maxDuration = 60;
 
 export default async function PlanPage() {
@@ -49,9 +45,6 @@ export default async function PlanPage() {
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           目標
         </h1>
-        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          期間を決めて、ジャンルごとの支出目標を少しずつ改善していく
-        </p>
       </header>
 
       {view?.review && plan ? <ReviewCard planId={plan.id} review={view.review} /> : null}
@@ -59,29 +52,7 @@ export default async function PlanPage() {
       {view !== null && guidance !== null && !view.ended ? (
         <>
           <GoalCard model={buildGoalCard(view, today, { pendingCount: captures.length })} />
-          {/* 要対応のジャンル(上位2件)だけ。下の一覧に同じ一言を繰り返さない */}
-          {guidance.actions.length > 0 ? (
-            <section
-              aria-label="要対応"
-              className="rounded-2xl p-4"
-              style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-            >
-              <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-                要対応
-              </p>
-              <ul className="mt-2 space-y-2">
-                {guidance.actions.map((action) => (
-                  <li
-                    key={action}
-                    className="text-sm leading-relaxed"
-                    style={{ color: 'var(--ink-secondary)' }}
-                  >
-                    ・{action}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <UnrecordedSheet planId={plan!.id} rows={view.noBudget} />
         </>
       ) : null}
 
@@ -116,11 +87,11 @@ export default async function PlanPage() {
                     sharedKey={r.genreId ?? 'none'}
                     maxYen={Math.max(...view.breakdown.map((x) => x.spentYen), 1)}
                   />
+                  {r.genreId ? <ExcludeGenreButton planId={plan.id} genreId={r.genreId} /> : null}
                 </li>
               ))}
           </ul>
 
-          {/* 特別費は、ペースから除いて別の行で見せる(予定は目標カードで展開して見せる) */}
           {guidance.specialYen > 0 ? (
             <p
               className="tabular mt-3 border-t pt-3 text-xs"
@@ -128,38 +99,6 @@ export default async function PlanPage() {
             >
               特別費(ペースに含めない) {formatYen(guidance.specialYen, { sign: 'never' })}
             </p>
-          ) : null}
-
-          {/* 記録がない・目標のないジャンルは 0円の予算として並べず、「予算なし」に折りたたむ */}
-          {view.noBudget.length > 0 ? (
-            <details className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-              <summary
-                className="min-h-11 cursor-pointer text-xs font-semibold"
-                style={{ color: 'var(--ink-secondary)' }}
-              >
-                予算なし({view.noBudget.length}件)
-              </summary>
-              <ul className="mt-2 space-y-1">
-                {view.noBudget.map((r) => (
-                  <li key={r.genreId ?? 'none'}>
-                    <GenreBudgetRow
-                      name={r.genreName}
-                      spentYen={r.spentYen}
-                      budgetYen={null}
-                      href={categoryHref(r.genreId ?? 'none', today)}
-                      sharedKey={r.genreId ?? 'none'}
-                      maxYen={Math.max(...view.noBudget.map((x) => x.spentYen), 1)}
-                    />
-                  </li>
-                ))}
-              </ul>
-              {view.uncategorizedYen > 0 ? (
-                <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-                  未分類の {formatYen(view.uncategorizedYen, { sign: 'never' })}{' '}
-                  は、ジャンルが決まるまで目標に反映されません。
-                </p>
-              ) : null}
-            </details>
           ) : null}
 
           <div className="mt-4 space-y-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>

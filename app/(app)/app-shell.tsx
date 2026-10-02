@@ -91,6 +91,7 @@ function BottomBar() {
     url.searchParams.delete('capture');
     window.history.replaceState(null, '', url.pathname + url.search);
     if (typeof navigator.mediaDevices?.getUserMedia === 'function') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
       setCameraOpen(true);
     }
   }, []);
