@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { freeAfterReceipt, receiptTotalYen } from '@/domain/receipt-impact';
 import { formatYen } from '@/domain/money';
 import type { ReceiptJob } from '@/features/import/receipt-queue';
-import { freeRemainingAction } from '@/app/(app)/transactions/receipt/free-remaining-action';
+import { freeRemainingAction } from './transactions/receipt/free-remaining-action';
 
 /** 撮ったその場の結果。読めた額は自由残から引き、読めなければその一枚だけを残す。 */
 export function CaptureImpact({ job }: { job: ReceiptJob }) {
