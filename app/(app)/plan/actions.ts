@@ -6,7 +6,7 @@ import type { PlanEvidence } from '@/domain/plan-evidence';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
-import { forecastPlan, savingsAsk } from '@/domain/plan-forecast';
+import { forecastPlan, savingsAsk, twoMonthTendency } from '@/domain/plan-forecast';
 import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
 import {
   deletePlan,
@@ -17,7 +17,14 @@ import {
 import type { GoalSnapshot } from '@/domain/goal-impact';
 import { nextPlanTargets } from '@/domain/goal-review';
 import { loadGoalView } from '@/features/goals/loader';
-import { addDays, assertDateOnly, daysBetween, todayJst } from '@/lib/date';
+import {
+  addDays,
+  addMonths,
+  assertDateOnly,
+  daysBetween,
+  monthStartJst,
+  todayJst,
+} from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
 
@@ -143,9 +150,14 @@ export async function refinePlanAction(input: {
     const today = todayJst();
     const context = await loadPlanContext(start, end);
     const spentTo = today < end ? today : end;
-    const [spent, scheduled] = await Promise.all([
+    const thisMonth = monthStartJst();
+    const previousStart = addMonths(thisMonth, -1);
+    const priorStart = addMonths(thisMonth, -2);
+    const [spent, scheduled, previousMonth, priorMonth] = await Promise.all([
       loadGenreSpend(start, spentTo),
       loadScheduledByGenre(start, end),
+      loadGenreSpend(previousStart, addDays(thisMonth, -1)),
+      loadGenreSpend(priorStart, addDays(previousStart, -1)),
     ]);
     const remaining = today >= end ? 0 : daysBetween(today, end);
     const byId = new Map(context.genres.map((genre) => [genre.genreId, genre]));
@@ -201,13 +213,23 @@ export async function refinePlanAction(input: {
         recommendedYen: forecast.recommendedYen,
         exceedance: forecast.exceedance,
         label: forecast.label,
-        advice: savingsAsk({
-          verdict: forecast.verdict,
-          targetYen: row.item.targetYen,
-          medianYen: forecast.medianYen,
-          remainingDays: remaining,
-          dailyCapYen: forecast.dailyCapYen,
-        }).text,
+        advice: [
+          savingsAsk({
+            verdict: forecast.verdict,
+            targetYen: row.item.targetYen,
+            medianYen: forecast.medianYen,
+            lowYen: forecast.lowYen,
+            committedYen: row.spentYen + row.scheduledYen,
+            remainingDays: remaining,
+          }).text,
+          twoMonthTendency({
+            priorYen: priorMonth.byGenre.get(row.item.genreId) ?? 0,
+            previousYen: previousMonth.byGenre.get(row.item.genreId) ?? 0,
+            landingYen: forecast.medianYen,
+          }).text,
+        ]
+          .filter(Boolean)
+          .join(''),
         detail,
       };
     });
@@ -216,7 +238,7 @@ export async function refinePlanAction(input: {
     const summary =
       known.length === 0
         ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
-        : `このままだと 70% で ${landing?.toLocaleString('ja-JP')} 円に着く。超えるジャンルは、下の「抑えてほしい額」まで節約してほしい。予定は使った額に入っていない。`;
+        : `このままだと 70% で ${landing?.toLocaleString('ja-JP')} 円まで使う。予算は上限で、届かせない方が貯蓄になる。下の額まで抑えると、その差が残る。`;
     return {
       error: null,
       summary,
