@@ -1068,7 +1068,6 @@ export function TransactionRowWithSplit({
         </div>
       </BottomSheet>
 
-
       <BottomSheet open={editSheetOpen} onClose={() => setEditSheetOpen(false)} role="dialog">
         <div className="space-y-3 px-3 pb-3">
           <div className="flex items-start justify-between gap-3 px-1 pt-1">
@@ -1086,7 +1085,11 @@ export function TransactionRowWithSplit({
               value={occurredOnInput}
               onChange={(e) => setOccurredOnInput(e.target.value)}
               className="min-h-11 flex-1 rounded-xl px-3 text-sm"
-              style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
             />
             <input
               type="text"
@@ -1095,7 +1098,11 @@ export function TransactionRowWithSplit({
               value={amountAbsYenInput}
               onChange={(e) => setAmountAbsYenInput(e.target.value.replace(/[^0-9]/g, ''))}
               className="min-h-11 w-28 rounded-xl px-3 text-sm"
-              style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
             />
           </div>
           <select
@@ -1103,7 +1110,11 @@ export function TransactionRowWithSplit({
             value={genreId}
             onChange={(e) => setGenreId(e.target.value)}
             className="min-h-11 w-full rounded-xl px-3 text-sm"
-            style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
           >
             <option value="" disabled>
               カテゴリを選ぶ
