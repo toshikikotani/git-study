@@ -12,7 +12,11 @@ async function userId() {
 }
 
 /** 期間中に発生したジャンルを、今の目標の行にする。既存行があれば金額だけ更新する。 */
-export async function addPlanGenre(planId: string, genreId: string, targetYen: number): Promise<void> {
+export async function addPlanGenre(
+  planId: string,
+  genreId: string,
+  targetYen: number,
+): Promise<void> {
   if (!Number.isInteger(targetYen) || targetYen < 0) {
     throw new PlanMembershipError('目標額は0円以上の整数で入力してください');
   }
