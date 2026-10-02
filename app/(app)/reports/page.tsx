@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
+import { ForecastGraphic } from './forecast-graphic';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
@@ -87,6 +88,7 @@ export default async function ReportsPage() {
           </p>
         )}
       </header>
+      {finding ? <ForecastGraphic {...finding} /> : null}
 
       <MonthSummaryRow
         spentYen={ledger.totalSpentYen}
