@@ -35,7 +35,9 @@ export default async function PlanPage() {
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
   const guidance = view?.guidance ?? null;
-  const taken = new Set((plan?.items ?? []).filter((item) => item.targetYen > 0).map((item) => item.genreId));
+  const taken = new Set(
+    (plan?.items ?? []).filter((item) => item.targetYen > 0).map((item) => item.genreId),
+  );
   const addable = genres.filter((genre) => !taken.has(genre.genreId));
 
   return (
