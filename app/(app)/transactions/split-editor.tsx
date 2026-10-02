@@ -208,7 +208,7 @@ export function TransactionRowWithSplit({
   // 長押しのメニュー(ジャンル変更・分割・複製・削除、レシート付きは画像を見る・もう一度読み取る)。
   const [menuOpen, setMenuOpen] = useState(false);
   // 行を展開せず、明細から品目編集を開く。増やすたびにダイアログが開く。
-  const [itemEditRequest, setItemEditRequest] = useState(0);
+  const [itemEditRequest] = useState(0);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
