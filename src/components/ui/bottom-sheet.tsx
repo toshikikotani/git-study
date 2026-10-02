@@ -54,16 +54,16 @@ export function BottomSheet({
       <div
         role={role}
         aria-hidden={!shown}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform will-change-transform motion-reduce:transition-none"
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] motion-reduce:transition-none"
         style={{
-          transform: shown ? 'translateY(0)' : 'translateY(110%)',
-          transitionDuration: 'var(--duration-slow)',
-          transitionTimingFunction: 'var(--ease-sheet)',
+          // iOS は transform の子をスクロールできない。開いたあとは変形を外す。
+          transform: shown ? 'none' : 'translateY(110%)',
+          transition: 'transform var(--duration-slow) var(--ease-sheet)',
           pointerEvents: shown ? 'auto' : 'none',
         }}
       >
         <div
-          className="max-h-[75dvh] overflow-y-auto p-2"
+          className="max-h-[75dvh] touch-pan-y overflow-y-auto overscroll-contain p-2"
           style={{
             borderRadius: 'var(--radius-card)',
             background: 'var(--glass-tint-strong)',
@@ -100,6 +100,15 @@ export function useSheetPresence(
   const [entered, setEntered] = useState(false);
   // 開くときは、その描画のうちに描き始める(1フレーム遅れて出ない)。
   if (open && !mounted) setMounted(true);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
