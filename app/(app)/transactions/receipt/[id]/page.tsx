@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -14,15 +12,7 @@ import { CaptureEntry } from './capture-entry';
  * 入力待ちのレシート(読み取れなかった/一部だけ読めた)を手で入力する画面(F7)。
  * 画像とフォームを同じ画面に置き、見ながら 金額 → 日付 → 店名 → ジャンル と入力する。
  */
-export default function CapturePage(props: { params: Promise<{ id: string }> }) {
-  return (
-    <Suspense fallback={<ScreenFrame title="レシート" />}>
-      <CapturePageBody {...props} />
-    </Suspense>
-  );
-}
-
-async function CapturePageBody({ params }: { params: Promise<{ id: string }> }) {
+export default async function CapturePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const capture = await getCapture(id);
   if (capture === null) notFound();

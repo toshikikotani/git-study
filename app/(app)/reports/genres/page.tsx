@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import {
@@ -27,15 +25,7 @@ export const dynamic = 'force-dynamic';
 // 「ジャンル分類する」の Server Action(AI呼び出し)はこのページの上限時間で動く。
 export const maxDuration = 60;
 
-export default function GenresPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="ジャンル" />}>
-      <GenresPageBody />
-    </Suspense>
-  );
-}
-
-async function GenresPageBody() {
+export default async function GenresPage() {
   const [view, genres, allPendingCount] = await withMinDuration(
     Promise.all([loadGenreAnalysisView(), listGenres(), countUngenredSpendTargetsAllPeriods()]),
   );

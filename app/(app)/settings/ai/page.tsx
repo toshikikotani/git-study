@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
@@ -15,15 +13,7 @@ import { AiSettingsForm } from './ai-settings-form';
  * src/lib/ai-gateway/settings.ts の isAiEnabled())。記録・集計・予算といった
  * アプリの基本機能はAIに依存していないため、オフでも変わらず使える。
  */
-export default function AiSettingsPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="AI設定" />}>
-      <AiSettingsPageBody />
-    </Suspense>
-  );
-}
-
-async function AiSettingsPageBody() {
+export default async function AiSettingsPage() {
   const settings = await withMinDuration(getAppSettings());
 
   return (

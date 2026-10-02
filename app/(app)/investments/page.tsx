@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../screen-frame';
-import { Suspense } from 'react';
 import { Card } from '@/components/ui/card';
 import { computeInvestmentPlan } from '@/domain/investment';
 import { formatYen } from '@/domain/money';
@@ -27,15 +25,7 @@ import { SnapshotSection } from './snapshot-section';
 // 完済検知(is_high_risk_unlocked)を反映するため、常に最新の設定を読む。
 export const dynamic = 'force-dynamic';
 
-export default function InvestmentsPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="資産" />}>
-      <InvestmentsPageBody />
-    </Suspense>
-  );
-}
-
-async function InvestmentsPageBody() {
+export default async function InvestmentsPage() {
   const justUnlocked = await withMinDuration(checkAndUnlockHighRisk());
   const [settings, contributions, snapshots] = await Promise.all([
     getAppSettings(),

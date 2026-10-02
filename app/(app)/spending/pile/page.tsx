@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { formatYen } from '@/domain/money';
@@ -34,15 +32,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default function SpendingPilePage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="ちりつも" />}>
-      <SpendingPilePageBody />
-    </Suspense>
-  );
-}
-
-async function SpendingPilePageBody() {
+export default async function SpendingPilePage() {
   const view = await withMinDuration(loadAccumulationView());
 
   return (

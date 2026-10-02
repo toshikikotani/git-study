@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../screen-frame';
-import { Suspense } from 'react';
 import { listAccounts } from '@/features/accounts/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { AccountRow } from './account-row';
@@ -15,15 +13,7 @@ import { NewAccount } from './new-account';
 // 一覧は常に最新でなければならない。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default function AccountsPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="口座" />}>
-      <AccountsPageBody />
-    </Suspense>
-  );
-}
-
-async function AccountsPageBody() {
+export default async function AccountsPage() {
   const accounts = await withMinDuration(listAccounts());
 
   return (

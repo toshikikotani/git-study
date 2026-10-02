@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { computePlanActualDelta, type PlanActualDelta } from '@/domain/debt-payment';
@@ -25,15 +23,7 @@ import { RefinanceSimulation } from './refinance-simulation';
 // 残高は常に最新でなければならない。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default function DebtsPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="借金" />}>
-      <DebtsPageBody />
-    </Suspense>
-  );
-}
-
-async function DebtsPageBody() {
+export default async function DebtsPage() {
   const [debts, settings, scenarios] = await withMinDuration(
     Promise.all([listDebts(), getAppSettings(), listRefinanceScenarios()]),
   );

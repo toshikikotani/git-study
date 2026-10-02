@@ -18,7 +18,6 @@ import { PeriodSwitcher } from './period-switcher';
 import { ViewSwitch } from './view-switch';
 import { SpendingMonthProvider } from './spending-month-provider';
 import { LaterCards } from './later-cards';
-import { SpendingFrame } from './spending-frame';
 import { SummaryCard } from './summary-card';
 
 /**
@@ -38,15 +37,7 @@ import { SummaryCard } from './summary-card';
 // 取り込み直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default function SpendingPage() {
-  return (
-    <Suspense fallback={<SpendingFrame />}>
-      <SpendingBody />
-    </Suspense>
-  );
-}
-
-async function SpendingBody() {
+export default async function SpendingPage() {
   const [ledger, genres, accounts, duplicates, captures] = await Promise.all([
     loadMonthlyLedger(),
     listGenres(),

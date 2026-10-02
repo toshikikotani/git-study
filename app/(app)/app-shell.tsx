@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className="flex-1 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
           aria-busy={navigating}
         >
-          {navigating ? <TabSwitchSkeleton href={pendingHref} /> : children}
+          {children}
         </main>
       </PullToRefresh>
       <UndoToastHost />
@@ -74,36 +74,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : (
         <BottomBar pendingHref={null} onNavigate={beginNavigate} />
       )}
-    </div>
-  );
-}
-
-function TabSwitchSkeleton({ href }: { href: string | null }) {
-  const title =
-    href === '/plan'
-      ? '目標'
-      : href === '/spending'
-        ? '家計簿'
-        : href === '/payday'
-          ? '給料日'
-          : 'ホーム';
-  return (
-    <div className="space-y-3" role="status" aria-live="polite" aria-label={`${title}を読み込み中`}>
-      <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-        {title}
-      </h1>
-      <div
-        className="h-36 rounded-3xl"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      />
-      <div
-        className="h-24 rounded-2xl"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      />
-      <div
-        className="h-64 rounded-2xl"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      />
     </div>
   );
 }

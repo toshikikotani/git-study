@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
@@ -18,15 +16,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 // 新しい配信が増えるたびに最新の一覧を見せる。
 export const dynamic = 'force-dynamic';
 
-export default function BriefsPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="ブリーフ" />}>
-      <BriefsPageBody />
-    </Suspense>
-  );
-}
-
-async function BriefsPageBody() {
+export default async function BriefsPage() {
   const briefs = await withMinDuration(listDailyBriefs());
 
   return (

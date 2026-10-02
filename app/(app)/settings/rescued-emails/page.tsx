@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { listRescuedEmails, type RescuedEmail } from '@/features/import/rescue-store';
@@ -17,15 +15,7 @@ import { RescuedEmailRow } from './rescued-email-row';
  * `fetchAccounts()` と同じ考え方)。診断用の副次的な画面のため、
  * マイグレーション未適用などの理由で読めない間も他の画面に影響させない。
  */
-export default function RescuedEmailsPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="メール" />}>
-      <RescuedEmailsPageBody />
-    </Suspense>
-  );
-}
-
-async function RescuedEmailsPageBody() {
+export default async function RescuedEmailsPage() {
   let emails: RescuedEmail[] = [];
   let loadError: string | null = null;
   try {

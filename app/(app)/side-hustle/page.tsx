@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../screen-frame';
-import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { computeHourlyRateYen } from '@/domain/side-hustle';
@@ -18,15 +16,7 @@ import { WorkLogSection } from './work-log-section';
  * を表示する。実際の送金操作はアプリの対象外(他の資金移動と同じく
  * 手動で行い、ここに出す金額は「いくら動かせばよいか」の指示)。
  */
-export default function SideHustlePage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="副業" />}>
-      <SideHustlePageBody />
-    </Suspense>
-  );
-}
-
-async function SideHustlePageBody() {
+export default async function SideHustlePage() {
   const [projects, workLogs, incomes, settings] = await withMinDuration(
     Promise.all([listProjects(), listWorkLogs(), listIncomes(), getAppSettings()]),
   );

@@ -1,5 +1,3 @@
-import { ScreenFrame } from './screen-frame';
-import { Suspense } from 'react';
 import { MdLocalFireDepartment } from 'react-icons/md';
 
 import { Button } from '@/components/ui/button';
@@ -22,15 +20,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 // 下の最終更新時刻の表示で担保する(古いままなら本人が見て分かる)。
 export const dynamic = 'force-dynamic';
 
-export default function HomePage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="ホーム" />}>
-      <HomePageBody />
-    </Suspense>
-  );
-}
-
-async function HomePageBody() {
+export default async function HomePage() {
   // ホームを開いた = 今日確認した(FR-62)。失敗しても画面は止めない。
   //
   // recordCheckin() は loadHomeSummary() と依存関係が無い(片方の結果を

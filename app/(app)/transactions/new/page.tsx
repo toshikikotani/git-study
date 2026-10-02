@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../screen-frame';
-import { Suspense } from 'react';
 import { hourJst, parseDateOnlyOr, todayJst, weekdayOf } from '@/lib/date';
 import { recentStoreNames } from '@/features/transactions/recent-stores';
 import { fetchQuickEntryGenres } from '@/features/genre/store';
@@ -12,17 +10,7 @@ import { NewTransactionForm } from './new-transaction-form';
  * (家計簿のカレンダーの日付メニューから開く、本人発案)。形式が正しくない値は
  * 無視して今日にする。
  */
-export default function NewTransactionPage(props: {
-  searchParams: Promise<{ date?: string | string[]; type?: string | string[] }>;
-}) {
-  return (
-    <Suspense fallback={<ScreenFrame title="手入力" />}>
-      <NewTransactionPageBody {...props} />
-    </Suspense>
-  );
-}
-
-async function NewTransactionPageBody({
+export default async function NewTransactionPage({
   searchParams,
 }: {
   searchParams: Promise<{ date?: string | string[]; type?: string | string[] }>;

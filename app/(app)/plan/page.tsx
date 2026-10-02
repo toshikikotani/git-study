@@ -21,38 +21,7 @@ import { UnrecordedSheet } from './unrecorded-sheet';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-export default function PlanPage() {
-  return (
-    <Suspense fallback={<PlanFrame />}>
-      <PlanOutline />
-    </Suspense>
-  );
-}
-
-function PlanFrame() {
-  return (
-    <div role="status" aria-label="目標を読み込み中" className="space-y-3">
-      <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-        目標
-      </h1>
-      <div
-        className="h-36 rounded-3xl"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      />
-      <div
-        className="h-24 rounded-2xl"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      />
-      <div
-        className="h-64 rounded-2xl"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      />
-    </div>
-  );
-}
-
-/** 予算の行だけ先に出す。実績・予定・編集用の設定は、開いてから取る。 */
-async function PlanOutline() {
+export default async function PlanPage() {
   const today = todayJst();
   const plan = await getCurrentPlan(today);
   return (

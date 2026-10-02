@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../../screen-frame';
-import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 
 import { loadCategoryDetail } from '@/features/category/loader';
@@ -11,18 +9,7 @@ import { CategoryScreen } from './category-screen';
  */
 export const dynamic = 'force-dynamic';
 
-export default function CategoryPage(props: {
-  params: Promise<{ genreKey: string }>;
-  searchParams: Promise<{ month?: string | string[] }>;
-}) {
-  return (
-    <Suspense fallback={<ScreenFrame title="カテゴリ" />}>
-      <CategoryPageBody {...props} />
-    </Suspense>
-  );
-}
-
-async function CategoryPageBody({
+export default async function CategoryPage({
   params,
   searchParams,
 }: {

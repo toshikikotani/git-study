@@ -1,5 +1,3 @@
-import { ScreenFrame } from '../../screen-frame';
-import { Suspense } from 'react';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { DailyReportCard } from './daily-report-view';
 import { loadDailyAiReportView, loadMonthlyAiReportView } from '@/features/ai-report/store';
@@ -21,15 +19,7 @@ import { MonthlyReportCard } from './report-view';
  */
 export const dynamic = 'force-dynamic';
 
-export default function AiReportPage() {
-  return (
-    <Suspense fallback={<ScreenFrame title="AIレポート" />}>
-      <AiReportPageBody />
-    </Suspense>
-  );
-}
-
-async function AiReportPageBody() {
+export default async function AiReportPage() {
   const [dailyView, monthlyView, ledger] = await withMinDuration(
     Promise.all([loadDailyAiReportView(), loadMonthlyAiReportView(), loadMonthlyLedger()]),
   );
