@@ -10,7 +10,6 @@ import { listPlanRanges } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
 import { categoryHref } from '@/lib/category-nav';
 import { formatDateJa, todayJst } from '@/lib/date';
-import { withMinDuration } from '@/lib/min-loading-duration';
 import { GoalCard } from './goal-card';
 import { DeletePlanButton } from './delete-plan-button';
 import { EditPlanSection } from './edit-plan-section';
@@ -23,15 +22,13 @@ export const maxDuration = 60;
 
 export default async function PlanPage() {
   const today = todayJst();
-  const [loaded, settings, ranges, captures, genres] = await withMinDuration(
-    Promise.all([
-      loadGoalView(),
-      getAppSettings(),
-      listPlanRanges(),
-      listOpenCaptures().catch(() => []),
-      listGenreOptions().catch(() => []),
-    ]),
-  );
+  const [loaded, settings, ranges, captures, genres] = await Promise.all([
+    loadGoalView(),
+    getAppSettings(),
+    listPlanRanges(),
+    listOpenCaptures().catch(() => []),
+    listGenreOptions().catch(() => []),
+  ]);
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
   const guidance = view?.guidance ?? null;
