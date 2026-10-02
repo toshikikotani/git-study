@@ -20,7 +20,7 @@ import {
 import { listDebts } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
-import { formatDateJa, formatTimeJa } from '@/lib/date';
+import { formatTimeJa } from '@/lib/date';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
@@ -128,78 +128,15 @@ export default async function HomePage() {
               ? MISSING_INCOME_NOTE
               : `義務 ${formatYen(obligation)} ・ 積立 ${formatYen(sinking)} ・ 予定 ${formatYen(scheduled)} を引いた`}
           </p>
-
-          {payoff.daysRemaining === null ? (
-            <p
-              className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em]"
-              style={{ color: 'var(--income)' }}
+          {savingsYen === null ? (
+            <a
+              href="/payday"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold"
+              style={{ color: 'var(--accent)' }}
             >
-              完済済み
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 flex items-baseline gap-2">
-                <CountUp
-                  value={payoff.daysRemaining}
-                  className="text-4xl leading-[0.88] font-semibold tracking-[-0.05em]"
-                  style={{ color: 'var(--ink)' }}
-                />
-                <span className="text-xl font-medium" style={{ color: 'var(--ink-secondary)' }}>
-                  日
-                </span>
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                <span style={{ color: 'var(--ink-secondary)' }}>
-                  残り
-                  <span className="tabular ml-1 font-semibold" style={{ color: 'var(--ink)' }}>
-                    {formatYen(payoff.remainingYen)}
-                  </span>
-                </span>
-                {payoff.payoffOn ? (
-                  <span style={{ color: 'var(--ink-muted)' }}>
-                    {formatDateJa(payoff.payoffOn)} 完済見込み
-                  </span>
-                ) : null}
-              </div>
-
-              {/* 残高のスナップショットだけでは「進んでいる」ことが伝わらない。
-                  減った分を出すことが、返済アプリの正のフィードバックそのもの。 */}
-              {payoff.reducedThisMonthYen > 0 ? (
-                <p
-                  className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  <span aria-hidden>↓</span>
-                  今月{formatYen(payoff.reducedThisMonthYen)}減らした
-                </p>
-              ) : null}
-            </>
-          )}
-
-          <div className="mt-5">
-            <ProgressGauge
-              ratio={payoff.progressRatio}
-              label="返済済み"
-              nextMilestone={payoff.nextMilestone}
-            />
-          </div>
-
-          {/* リンクを本文に混ぜると行をまたいで割れる。行を分けて動線として立てる。 */}
-          {payoff.isEstimated ? (
-            <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-                残高と金利に推定値が含まれています。正確な値を入れると、この日付が確定します。
-              </p>
-              <a
-                href="/debts"
-                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
-                負債を入力する
-                <span aria-hidden>→</span>
-              </a>
-            </div>
+              手取りを入れる
+              <span aria-hidden>→</span>
+            </a>
           ) : null}
         </div>
       </section>

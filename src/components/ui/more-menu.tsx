@@ -12,7 +12,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/debts', label: '負債' },
+      { href: '/plan', label: '貯蓄', dek: '先に移した分。借金の画面は設定で切り替える' },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',

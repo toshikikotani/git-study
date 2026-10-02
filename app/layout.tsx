@@ -20,7 +20,7 @@ const mplus2 = M_PLUS_2({
 
 export const metadata: Metadata = {
   title: '資産形成',
-  description: '負債の完済と資産形成を構造で支える、本人専用の個人財務環境',
+  description: '先に貯蓄へ移す家計簿',
   robots: { index: false, follow: false, nocache: true },
 };
 
