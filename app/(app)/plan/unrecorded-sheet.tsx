@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
-import { addGoalGenreAction, excludeGoalGenreAction } from './membership-actions';
+import { addGoalGenreAction } from './membership-actions';
 
 export type UnrecordedRow = {
   genreId: string | null;
@@ -14,19 +14,24 @@ export type UnrecordedRow = {
   spentYen: number;
 };
 
-/** 期間中に発生したのに目標行が無い支出。折りたたまない。 */
+export type AddableGenre = { genreId: string; genreName: string };
+
+/** 支出が無いジャンルも含めて、目標に足せる。 */
 export function UnrecordedSheet({
   planId,
   rows,
+  addable,
 }: {
   planId: string;
   rows: readonly UnrecordedRow[];
+  addable: readonly AddableGenre[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  if (rows.length === 0) return null;
+  const spent = new Map(rows.filter((row) => row.genreId).map((row) => [row.genreId, row.spentYen]));
+  if (addable.length === 0 && rows.length === 0) return null;
 
   async function add(genreId: string, yen: number) {
     setPending(genreId);
@@ -57,8 +62,8 @@ export function UnrecordedSheet({
           color: 'var(--ink)',
         }}
       >
-        <span>未収録の支出</span>
-        <span>{rows.length}件</span>
+        <span>カテゴリを足す</span>
+        <span>{rows.length > 0 ? `未収録 ${rows.length}件` : `${addable.length}件`}</span>
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)}>
         <div className="px-2 pb-2">
@@ -66,15 +71,33 @@ export function UnrecordedSheet({
             目標に加える
           </h2>
           <ul className="mt-3 space-y-3">
-            {rows.map((row) => (
-              <li key={row.genreId ?? 'none'} className="px-2">
+            {addable.map((genre) => (
+              <li key={genre.genreId} className="px-2">
                 <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {row.genreName}
-                  <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
-                    この期間に {formatYen(row.spentYen, { sign: 'never' })}
-                  </span>
+                  {genre.genreName}
+                  {spent.get(genre.genreId) ? (
+                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+                      この期間に {formatYen(spent.get(genre.genreId) ?? 0, { sign: 'never' })}
+                    </span>
+                  ) : null}
                 </p>
-                {row.genreId === null ? (
+                <AddRow
+                  spentYen={spent.get(genre.genreId) ?? 0}
+                  busy={pending === genre.genreId}
+                  onAdd={(yen) => add(genre.genreId, yen)}
+                />
+              </li>
+            ))}
+            {rows
+              .filter((row) => row.genreId === null)
+              .map((row) => (
+                <li key="none" className="px-2">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                    未分類
+                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+                      この期間に {formatYen(row.spentYen, { sign: 'never' })}
+                    </span>
+                  </p>
                   <Link
                     href="/spending/category/none"
                     className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold"
@@ -82,15 +105,8 @@ export function UnrecordedSheet({
                   >
                     分類する
                   </Link>
-                ) : (
-                  <AddRow
-                    spentYen={row.spentYen}
-                    busy={pending === row.genreId}
-                    onAdd={(yen) => add(row.genreId!, yen)}
-                  />
-                )}
-              </li>
-            ))}
+                </li>
+              ))}
           </ul>
           {error ? (
             <p className="mt-3 px-2 text-sm" style={{ color: 'var(--over)' }}>
@@ -112,12 +128,13 @@ function AddRow({
   busy: boolean;
   onAdd: (yen: number) => void;
 }) {
-  const [yen, setYen] = useState(String(spentYen));
+  const [yen, setYen] = useState(spentYen > 0 ? String(spentYen) : '');
   return (
     <div className="mt-1 flex items-center gap-2">
       <input
         inputMode="numeric"
         value={yen}
+        placeholder="目標額"
         onChange={(e) => setYen(e.target.value.replace(/[^0-9]/g, ''))}
         className="min-h-11 w-28 rounded-full px-3 text-sm"
         style={{ background: 'var(--surface)', color: 'var(--ink)' }}
@@ -125,39 +142,13 @@ function AddRow({
       />
       <button
         type="button"
-        disabled={busy}
-        onClick={() => onAdd(Number(yen || 0))}
+        disabled={busy || yen === ''}
+        onClick={() => onAdd(Number(yen))}
         className="min-h-11 rounded-full px-4 text-sm font-semibold"
         style={{ background: 'var(--ink)', color: 'var(--surface)' }}
       >
         目標に加える
       </button>
     </div>
-  );
-}
-
-export function ExcludeGenreButton({ planId, genreId }: { planId: string; genreId: string }) {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <span className="ml-2">
-      <button
-        type="button"
-        className="min-h-11 text-xs font-semibold"
-        style={{ color: 'var(--ink-muted)' }}
-        onClick={async () => {
-          const result = await excludeGoalGenreAction(planId, genreId);
-          if (result.error) setError(result.error);
-          else router.refresh();
-        }}
-      >
-        数えない
-      </button>
-      {error ? (
-        <span className="ml-1 text-xs" style={{ color: 'var(--over)' }}>
-          {error}
-        </span>
-      ) : null}
-    </span>
   );
 }
