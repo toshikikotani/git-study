@@ -6,7 +6,7 @@ import type { PlanEvidence } from '@/domain/plan-evidence';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
-import { forecastFromPace, type GenreForecast } from '@/domain/plan-forecast';
+import { forecastPlan } from '@/domain/plan-forecast';
 import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
 import {
   deletePlan,
@@ -119,6 +119,8 @@ export type RefinePlanResult =
         medianYen: number | null;
         lowYen: number | null;
         highYen: number | null;
+        recommendedYen: number | null;
+        exceedance: number | null;
         label: string;
         detail: string;
       }[];
@@ -146,54 +148,71 @@ export async function refinePlanAction(input: {
     ]);
     const remaining = today >= end ? 0 : daysBetween(today, end);
     const byId = new Map(context.genres.map((genre) => [genre.genreId, genre]));
-    const forecasts = input.items.flatMap((item) => {
+    const items = input.items.flatMap((item) => {
       const genre = byId.get(item.genreId);
       if (genre === undefined || !Number.isInteger(item.targetYen) || item.targetYen < 0) return [];
-      const spentYen = spent.byGenre.get(item.genreId) ?? 0;
-      const scheduledYen = scheduled.get(item.genreId) ?? 0;
-      const forecast: GenreForecast = forecastFromPace({
-        spentYen,
-        scheduledYen,
-        paceYen: genre.medianDailyYen,
-        observedDays: context.lookbackDays,
-        remainingDays: remaining,
-        targetYen: item.targetYen,
-      });
-      const yen = (n: number) => n.toLocaleString('ja-JP');
-      const detail = [
-        `この期間にすでに ${yen(spentYen)} 円使っている。`,
-        scheduledYen > 0
-          ? `これから日付の入っている予定が ${yen(scheduledYen)} 円ある。`
-          : '日付の入っている予定は無い。',
-        forecast.medianYen === null
-          ? '支出のあった日が少なく、残りの着地はまだ置けない。'
-          : `直近のペースが残りの ${remaining} 日続くと、着地は ${yen(forecast.medianYen)} 円、幅は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。`,
-        forecast.label,
-      ].join('');
       return [
         {
-          genreId: item.genreId,
-          genreName: genre.genreName,
-          spentYen,
-          scheduledYen,
-          medianYen: forecast.medianYen,
-          lowYen: forecast.lowYen,
-          highYen: forecast.highYen,
-          label: forecast.label,
-          detail,
+          item,
+          genre,
+          spentYen: spent.byGenre.get(item.genreId) ?? 0,
+          scheduledYen: scheduled.get(item.genreId) ?? 0,
         },
       ];
     });
-    const known = forecasts.filter((row) => row.medianYen !== null);
-    const landing = known.reduce((acc, row) => acc + (row.medianYen ?? 0), 0);
+    const plan = forecastPlan({
+      remainingDays: remaining,
+      seed: `${start}:${end}:${today}:${items.map((row) => row.item.genreId).join(',')}`,
+      genres: items.map((row) => ({
+        spentYen: row.spentYen,
+        scheduledYen: row.scheduledYen,
+        meanDailyYen: row.genre.dailyYen,
+        medianDailyYen: row.genre.medianDailyYen,
+        observedDays: context.lookbackDays,
+        targetYen: row.item.targetYen,
+      })),
+    });
+    const yen = (n: number) => n.toLocaleString('ja-JP');
+    const forecasts = items.map((row, index) => {
+      const forecast = plan.genres[index]!;
+      const probability =
+        forecast.exceedance === null
+          ? ''
+          : `今の目標を超える確率は ${Math.round(forecast.exceedance * 100)}%。`;
+      const detail = [
+        `この期間にすでに ${yen(row.spentYen)} 円使っている。`,
+        row.scheduledYen > 0
+          ? `これから日付の入っている予定が ${yen(row.scheduledYen)} 円ある。`
+          : '日付の入っている予定は無い。',
+        forecast.medianYen === null
+          ? '支出のあった日が少なく、残りの着地はまだ置けない。'
+          : `残りの ${remaining} 日を 2,000 回引くと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+        forecast.label,
+      ].join('');
+      return {
+        genreId: row.item.genreId,
+        genreName: row.genre.genreName,
+        spentYen: row.spentYen,
+        scheduledYen: row.scheduledYen,
+        medianYen: forecast.medianYen,
+        lowYen: forecast.lowYen,
+        highYen: forecast.highYen,
+        recommendedYen: forecast.recommendedYen,
+        exceedance: forecast.exceedance,
+        label: forecast.label,
+        detail,
+      };
+    });
+    const known = forecasts.filter((row) => row.recommendedYen !== null);
+    const landing = plan.totalRecommendedYen;
     const summary =
       known.length === 0
         ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
-        : `このままの行動だと、判断できた ${known.length} ジャンルの合計は ${landing.toLocaleString('ja-JP')} 円に着く。いまの総額と違うときは、総額の方を着地に合わせてよい。予定は未来日の明細をジャンルごとに足している。`;
+        : `このままの行動だと、判断できた ${known.length} ジャンルは 70% で ${landing?.toLocaleString('ja-JP')} 円以内に着く。目標案はこの額です。予定は未来日の明細をジャンルごとに足し、残りは回数と金額を分けて引いています。`;
     return {
       error: null,
       summary,
-      proposedTotalYen: known.length === 0 ? null : landing,
+      proposedTotalYen: landing,
       forecasts,
     };
   } catch (error) {

@@ -10,6 +10,8 @@ export type ForecastRow = {
   medianYen: number | null;
   lowYen: number | null;
   highYen: number | null;
+  recommendedYen: number | null;
+  exceedance: number | null;
   label: string;
   detail: string;
 };
@@ -39,7 +41,7 @@ export function ForecastReport({
           着地から見た総額 {formatYen(proposedTotalYen, { sign: 'never' })}
         </p>
       ) : null}
-      {onApplyAll && rows.some((row) => row.medianYen !== null) ? (
+      {onApplyAll && rows.some((row) => row.recommendedYen !== null) ? (
         <button
           type="button"
           className="min-h-11 w-full rounded-full px-4 text-sm font-semibold disabled:opacity-40"
@@ -47,7 +49,7 @@ export function ForecastReport({
           disabled={applying}
           onClick={onApplyAll}
         >
-          {applying ? '全部の目標を保存しています…' : '全部の着地を目標にする'}
+          {applying ? '全部の目標を保存しています…' : '全部の目標案を保存する'}
         </button>
       ) : null}
       <ul className="space-y-2">
@@ -68,21 +70,24 @@ export function ForecastReport({
               {row.scheduledYen > 0
                 ? ` ・ 予定 ${formatYen(row.scheduledYen, { sign: 'never' })}`
                 : ' ・ 予定なし'}
-              {row.medianYen !== null
-                ? ` ・ 着地 ${formatYen(row.medianYen, { sign: 'never' })}`
-                : ''}
+              {row.recommendedYen !== null
+                ? ` ・ 目標案 ${formatYen(row.recommendedYen, { sign: 'never' })}`
+                : row.medianYen !== null
+                  ? ` ・ 着地 ${formatYen(row.medianYen, { sign: 'never' })}`
+                  : ''}
+              {row.exceedance !== null ? ` ・ 超過 ${Math.round(row.exceedance * 100)}%` : ''}
             </p>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
               {row.detail}
             </p>
-            {row.medianYen !== null ? (
+            {row.recommendedYen !== null ? (
               <button
                 type="button"
                 className="mt-2 min-h-11 text-xs font-semibold"
                 style={{ color: 'var(--accent)' }}
                 onClick={() => onApply(row)}
               >
-                この着地を目標にする
+                この目標案にする
               </button>
             ) : null}
           </li>

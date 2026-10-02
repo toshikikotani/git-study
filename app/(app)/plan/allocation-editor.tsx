@@ -122,10 +122,10 @@ export function AllocationEditor({
   };
 
   const applyAllForecasts = async () => {
-    const applicable = forecasts.filter((row) => row.medianYen !== null);
+    const applicable = forecasts.filter((row) => row.recommendedYen !== null);
     if (applicable.length === 0) return;
     const nextInputs = { ...inputs };
-    for (const row of applicable) nextInputs[row.genreId] = String(row.medianYen);
+    for (const row of applicable) nextInputs[row.genreId] = String(row.recommendedYen);
     const items = rows.map((row) => ({
       genreId: row.genreId,
       targetYen: parseYen(nextInputs[row.genreId] ?? '') ?? 0,
@@ -330,8 +330,8 @@ export function AllocationEditor({
             proposedTotalYen={proposedTotal}
             rows={forecasts}
             onApply={(row) => {
-              if (row.medianYen === null) return;
-              setYen(row.genreId, row.medianYen, true);
+              if (row.recommendedYen === null) return;
+              setYen(row.genreId, row.recommendedYen, true);
               setLockTotal(false);
             }}
             onApplyAll={() => void applyAllForecasts()}
