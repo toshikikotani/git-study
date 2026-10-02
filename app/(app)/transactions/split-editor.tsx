@@ -210,6 +210,16 @@ export function TransactionRowWithSplit({
   // 行を展開せず、明細から品目編集を開く。増やすたびにダイアログが開く。
   const [itemEditRequest, setItemEditRequest] = useState(0);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const initialTitle = display?.name ?? transaction.description;
+  const [titleInput, setTitleInput] = useState(initialTitle);
+  const [itemRows, setItemRows] = useState(() =>
+    receiptItems.map((it) => ({
+      name: it.name,
+      amountYen: String(Math.abs(it.amountYen)),
+      genreId: it.genreId ?? '',
+      productType: it.productType,
+    })),
+  );
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -230,12 +240,32 @@ export function TransactionRowWithSplit({
   }
 
   const amountAbsYen = Number(amountAbsYenInput);
+  const titleTrimmed = titleInput.trim();
+  const itemsChanged =
+    itemRows.length !== items.length ||
+    itemRows.some((row, i) => {
+      const prev = items[i];
+      return (
+        !prev ||
+        row.name.trim() !== prev.name ||
+        Number(row.amountYen) !== Math.abs(prev.amountYen) ||
+        (row.genreId || null) !== (prev.genreId ?? null)
+      );
+    });
   const simpleEditUnchanged =
     genreId === (transaction.genreId ?? '') &&
     amountAbsYen === targetAbsYen &&
-    occurredOnInput === transaction.occurredOn;
+    occurredOnInput === transaction.occurredOn &&
+    titleTrimmed === initialTitle &&
+    !itemsChanged;
+  const itemsReady = itemRows.every((row) => row.name.trim() !== '' && Number(row.amountYen) > 0);
   const canSaveSimpleEdit =
-    !!genreId && amountAbsYen > 0 && occurredOnInput !== '' && !simpleEditUnchanged;
+    !!genreId &&
+    amountAbsYen > 0 &&
+    occurredOnInput !== '' &&
+    titleTrimmed !== '' &&
+    itemsReady &&
+    !simpleEditUnchanged;
 
   async function saveSimpleEdit(): Promise<void> {
     if (!canSaveSimpleEdit) return;
@@ -245,23 +275,66 @@ export function TransactionRowWithSplit({
       amountAbsYen,
       occurredOn: occurredOnInput,
       isIncome,
+      title: titleTrimmed,
     });
-    setSaving(false);
     if (result.error) {
       setError(result.error);
+      setSaving(false);
       return;
     }
+    const sign = transaction.amountYen < 0 ? -1 : 1;
+    const itemPayload = itemRows.map((row) => ({
+      name: row.name.trim(),
+      amountYen: sign * Number(row.amountYen),
+      genreId: row.genreId || null,
+      productType: row.productType,
+    }));
+    if (itemsChanged) {
+      const itemsResult = await replaceReceiptItemsAction(transaction.id, itemPayload);
+      if (itemsResult.error) {
+        setError(itemsResult.error);
+        setSaving(false);
+        return;
+      }
+      setItems(
+        itemPayload.map((row, i) => ({
+          id: items[i]?.id ?? `pending-${i}`,
+          name: row.name,
+          amountYen: row.amountYen,
+          genreId: row.genreId,
+          genreName: categories.find((c) => c.id === row.genreId)?.name ?? null,
+          productType: row.productType,
+        })),
+      );
+    }
+    setSaving(false);
     const prevGenreId = transaction.genreId ?? '';
     const prevAmount = String(targetAbsYen);
     const prevDate = transaction.occurredOn;
+    const prevTitle = initialTitle;
+    const prevItems = items;
     if (result.previous) {
       const previous = result.previous;
       pushUndo('変更しました', async () => {
         const r = await restoreRowFieldsAction(previous);
         if (r.error) return r.error;
+        if (itemsChanged) {
+          const restored = await replaceReceiptItemsAction(
+            transaction.id,
+            prevItems.map((row) => ({
+              name: row.name,
+              amountYen: row.amountYen,
+              genreId: row.genreId,
+              productType: row.productType,
+            })),
+          );
+          if (restored.error) return restored.error;
+          setItems([...prevItems]);
+        }
         setGenreId(prevGenreId);
         setAmountAbsYenInput(prevAmount);
         setOccurredOnInput(prevDate);
+        setTitleInput(prevTitle);
         return null;
       });
     }
@@ -570,7 +643,18 @@ export function TransactionRowWithSplit({
           <button
             type="button"
             aria-expanded={open}
-            onClick={() => setEditSheetOpen(true)}
+            onClick={() => {
+              setTitleInput(initialTitle);
+              setItemRows(
+                items.map((it) => ({
+                  name: it.name,
+                  amountYen: String(Math.abs(it.amountYen)),
+                  genreId: it.genreId ?? '',
+                  productType: it.productType,
+                })),
+              );
+              setEditSheetOpen(true);
+            }}
             className="min-h-11 flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
             aria-label={rowAriaLabel}
           >
@@ -587,7 +671,7 @@ export function TransactionRowWithSplit({
             <div className="min-w-0 flex-1">
               {/* 1行目:正規化した店名(切れないように折り返す) */}
               <p className="text-sm leading-snug break-words" style={{ color: 'var(--ink)' }}>
-                {display?.name ?? transaction.description}
+                {titleInput}
                 {special ? (
                   <span
                     className="ml-2 rounded-full px-2 py-1 align-middle text-xs font-semibold"
@@ -1071,14 +1155,23 @@ export function TransactionRowWithSplit({
 
       <BottomSheet open={editSheetOpen} onClose={() => setEditSheetOpen(false)} role="dialog">
         <div className="space-y-3 px-3 pb-3">
-          <div className="flex items-start justify-between gap-3 px-1 pt-1">
-            <h2 className="text-base font-semibold break-words" style={{ color: 'var(--ink)' }}>
-              {display?.name ?? transaction.description}
-            </h2>
-            <span className="shrink-0 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <div className="flex items-center justify-end px-1 pt-1">
+            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               外側をタップで閉じる
             </span>
           </div>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+              タイトル
+            </span>
+            <input
+              aria-label="タイトル"
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              className="min-h-11 w-full rounded-2xl px-3 text-base font-semibold"
+              style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+            />
+          </label>
           <div className="flex gap-2">
             <input
               type="date"
@@ -1114,6 +1207,90 @@ export function TransactionRowWithSplit({
               </option>
             ))}
           </select>
+          <div className="space-y-2">
+            <p className="px-1 text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+              品目
+            </p>
+            {itemRows.length === 0 ? (
+              <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                品目はまだありません。
+              </p>
+            ) : (
+              itemRows.map((row, index) => (
+                <div
+                  key={index}
+                  className="space-y-2 rounded-2xl p-3"
+                  style={{ background: 'var(--surface)', border: '1px solid var(--hairline)' }}
+                >
+                  <input
+                    aria-label={`品目${index + 1}の名前`}
+                    value={row.name}
+                    onChange={(e) =>
+                      setItemRows((prev) =>
+                        prev.map((r, i) => (i === index ? { ...r, name: e.target.value } : r)),
+                      )
+                    }
+                    placeholder="品名"
+                    className="min-h-11 w-full rounded-xl px-3 text-sm"
+                    style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      aria-label={`品目${index + 1}の金額`}
+                      inputMode="numeric"
+                      value={row.amountYen}
+                      onChange={(e) =>
+                        setItemRows((prev) =>
+                          prev.map((r, i) =>
+                            i === index ? { ...r, amountYen: e.target.value.replace(/[^0-9]/g, '') } : r,
+                          ),
+                        )
+                      }
+                      placeholder="金額"
+                      className="min-h-11 w-24 rounded-xl px-3 text-sm"
+                      style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+                    />
+                    <select
+                      aria-label={`品目${index + 1}のカテゴリ`}
+                      value={row.genreId}
+                      onChange={(e) =>
+                        setItemRows((prev) =>
+                          prev.map((r, i) => (i === index ? { ...r, genreId: e.target.value } : r)),
+                        )
+                      }
+                      className="min-h-11 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                      style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+                    >
+                      <option value="">未分類</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setItemRows((prev) => prev.filter((_, i) => i !== index))}
+                    className="min-h-11 text-xs font-semibold"
+                    style={{ color: 'var(--ink-muted)' }}
+                  >
+                    この品目を外す
+                  </button>
+                </div>
+              ))
+            )}
+            <button
+              type="button"
+              onClick={() =>
+                setItemRows((prev) => [...prev, { name: '', amountYen: '', genreId: '', productType: null }])
+              }
+              className="min-h-11 w-full rounded-2xl text-sm font-semibold"
+              style={{ background: 'var(--surface)', color: 'var(--accent)', border: '1px solid var(--hairline)' }}
+            >
+              品目を追加
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => void saveSimpleEdit()}
@@ -1128,21 +1305,6 @@ export function TransactionRowWithSplit({
               {error}
             </p>
           ) : null}
-          <ReceiptItemsPanel
-            transaction={{
-              id: transaction.id,
-              occurredOn: transaction.occurredOn,
-              accountId: transaction.accountId,
-              paymentMethod: transaction.paymentMethod,
-              amountYen: transaction.amountYen,
-            }}
-            categories={categories}
-            items={items}
-            onItemsReplaced={setItems}
-            subtype={subtype}
-            onSubtypeReplaced={setSubtype}
-            openRequest={itemEditRequest}
-          />
         </div>
       </BottomSheet>
 

@@ -46,6 +46,8 @@ export type RowFields = {
   note: string | null;
   kind: string | null;
   reconcile_diff_yen: number | null;
+  description: string;
+  merchant_name: string | null;
 };
 
 /** 削除した明細の丸ごとの控え(Undo で同じ id のまま戻す)。 */
@@ -76,6 +78,8 @@ async function readRowFields(ids: readonly string[]): Promise<RowFields[]> {
       note: r.note,
       kind: (row.kind as string | undefined) ?? null,
       reconcile_diff_yen: (row.reconcile_diff_yen as number | null | undefined) ?? null,
+      description: r.description,
+      merchant_name: r.merchant_name,
     };
   });
 }
@@ -213,21 +217,26 @@ export async function saveImportBatchAction(
 export async function updateTransactionAction(
   id: string,
   genreId: string,
-  patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean },
+  patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean; title?: string },
 ): Promise<{ error: string | null; previous?: RowFields[] }> {
   let previous: RowFields[] = [];
   try {
     previous = await readRowFields([id]);
-    let storePatch: { amountYen: number; occurredOn: string } | undefined;
+    let storePatch: { amountYen: number; occurredOn: string; title?: string } | undefined;
     if (patch) {
       const amountAbsYen = assertYen(patch.amountAbsYen, '金額');
       if (amountAbsYen <= 0) {
         throw new MoneyError(`金額は正の値で指定してください: ${amountAbsYen}`);
       }
       const occurredOn = assertDateOnly(patch.occurredOn);
+      const title = patch.title?.trim();
+      if (title !== undefined && title === '') {
+        throw new MoneyError('タイトルを入力してください。');
+      }
       storePatch = {
         amountYen: patch.isIncome ? amountAbsYen : -amountAbsYen,
         occurredOn,
+        ...(title ? { title } : {}),
       };
     }
     await updateTransaction(id, genreId, storePatch);
