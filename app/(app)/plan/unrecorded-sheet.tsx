@@ -15,7 +15,13 @@ export type UnrecordedRow = {
 };
 
 /** 期間中に発生したのに目標行が無い支出。折りたたまない。 */
-export function UnrecordedSheet({ planId, rows }: { planId: string; rows: readonly UnrecordedRow[] }) {
+export function UnrecordedSheet({
+  planId,
+  rows,
+}: {
+  planId: string;
+  rows: readonly UnrecordedRow[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +75,11 @@ export function UnrecordedSheet({ planId, rows }: { planId: string; rows: readon
                   </span>
                 </p>
                 {row.genreId === null ? (
-                  <Link href="/spending/category/none" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+                  <Link
+                    href="/spending/category/none"
+                    className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold"
+                    style={{ color: 'var(--accent)' }}
+                  >
                     分類する
                   </Link>
                 ) : (
@@ -82,14 +92,26 @@ export function UnrecordedSheet({ planId, rows }: { planId: string; rows: readon
               </li>
             ))}
           </ul>
-          {error ? <p className="mt-3 px-2 text-sm" style={{ color: 'var(--over)' }}>{error}</p> : null}
+          {error ? (
+            <p className="mt-3 px-2 text-sm" style={{ color: 'var(--over)' }}>
+              {error}
+            </p>
+          ) : null}
         </div>
       </BottomSheet>
     </>
   );
 }
 
-function AddRow({ spentYen, busy, onAdd }: { spentYen: number; busy: boolean; onAdd: (yen: number) => void }) {
+function AddRow({
+  spentYen,
+  busy,
+  onAdd,
+}: {
+  spentYen: number;
+  busy: boolean;
+  onAdd: (yen: number) => void;
+}) {
   const [yen, setYen] = useState(String(spentYen));
   return (
     <div className="mt-1 flex items-center gap-2">
@@ -131,7 +153,11 @@ export function ExcludeGenreButton({ planId, genreId }: { planId: string; genreI
       >
         数えない
       </button>
-      {error ? <span className="ml-1 text-xs" style={{ color: 'var(--over)' }}>{error}</span> : null}
+      {error ? (
+        <span className="ml-1 text-xs" style={{ color: 'var(--over)' }}>
+          {error}
+        </span>
+      ) : null}
     </span>
   );
 }
