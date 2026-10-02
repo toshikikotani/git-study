@@ -207,6 +207,8 @@ export function TransactionRowWithSplit({
   const [viewerOpen, setViewerOpen] = useState(false);
   // 長押しのメニュー(ジャンル変更・分割・複製・削除、レシート付きは画像を見る・もう一度読み取る)。
   const [menuOpen, setMenuOpen] = useState(false);
+  // 行を展開せず、明細から品目編集を開く。増やすたびにダイアログが開く。
+  const [itemEditRequest, setItemEditRequest] = useState(0);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -643,6 +645,19 @@ export function TransactionRowWithSplit({
               className="shrink-0 text-sm font-semibold"
             />
           </button>
+          <button
+            type="button"
+            aria-label="金額・日付・カテゴリを編集"
+            onClick={() => {
+              setMode(splits.length > 0 ? 'split' : 'simple');
+              setOpen(true);
+              setCategoryFormOpen(true);
+            }}
+            className="min-h-11 shrink-0 px-1 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            編集
+          </button>
           {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
           {display?.thumbnailUrl ? (
             <button
@@ -657,6 +672,16 @@ export function TransactionRowWithSplit({
           ) : null}
         </div>
         {/* 未分類:行の中の「ジャンルを選ぶ」チップ。タップ → 予測上位3件 → 1タップで確定 */}
+        <div className="pr-4 pb-1 pl-[60px]">
+          <button
+            type="button"
+            onClick={() => setItemEditRequest((n) => n + 1)}
+            className="min-h-11 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            {items.length > 0 ? '品目を編集' : '品目を追加'}
+          </button>
+        </div>
         {uncategorized ? (
           <div className="pr-4 pb-3 pl-[60px]">
             <button
@@ -685,24 +710,24 @@ export function TransactionRowWithSplit({
           明示する(本人発案「品目が不明な場合はその旨書いてくれ」)。表示・
           未登録時の再登録ボタンは家計簿(/spending)と共通の部品
           (receipt-items-panel.tsx、ADR-040)。 */}
-        {open ? (
-          <div className="mt-3">
-            <ReceiptItemsPanel
-              transaction={{
-                id: transaction.id,
-                occurredOn: transaction.occurredOn,
-                accountId: transaction.accountId,
-                paymentMethod: transaction.paymentMethod,
-                amountYen: transaction.amountYen,
-              }}
-              categories={categories}
-              items={items}
-              onItemsReplaced={setItems}
-              subtype={subtype}
-              onSubtypeReplaced={setSubtype}
-            />
-          </div>
-        ) : null}
+        <div className={open ? 'mt-3' : undefined}>
+          <ReceiptItemsPanel
+            transaction={{
+              id: transaction.id,
+              occurredOn: transaction.occurredOn,
+              accountId: transaction.accountId,
+              paymentMethod: transaction.paymentMethod,
+              amountYen: transaction.amountYen,
+            }}
+            categories={categories}
+            items={items}
+            onItemsReplaced={setItems}
+            subtype={subtype}
+            onSubtypeReplaced={setSubtype}
+            summary={open}
+            openRequest={itemEditRequest}
+          />
+        </div>
 
         {/* 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付
           とは独立した操作なので、別の開閉状態を持つ(このファイル冒頭の

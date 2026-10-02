@@ -65,6 +65,8 @@ export function ReceiptItemsPanel({
   onItemsReplaced,
   subtype,
   onSubtypeReplaced,
+  openRequest = 0,
+  summary = true,
 }: {
   transaction: {
     id: string;
@@ -78,6 +80,10 @@ export function ReceiptItemsPanel({
   onItemsReplaced: (items: ReceiptItem[]) => void;
   subtype: string | null;
   onSubtypeReplaced: (subtype: string) => void;
+  /** 値を増やすと、行を展開せずに編集ダイアログを開く。 */
+  openRequest?: number;
+  /** false のときは一覧を出さず、ダイアログだけ持つ。 */
+  summary?: boolean;
 }) {
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const [rescanning, setRescanning] = useState(false);
@@ -101,6 +107,14 @@ export function ReceiptItemsPanel({
   function closeDialog(): void {
     setDialogOpen(false);
   }
+
+  // 明細の行から「品目を編集」を押したとき。展開を待たずにダイアログを開く。
+  const seenRequest = useRef(openRequest);
+  useEffect(() => {
+    if (openRequest === seenRequest.current) return;
+    seenRequest.current = openRequest;
+    if (openRequest > 0) openDialog();
+  }, [openRequest, items]);
 
   // Escape でも閉じる(more-menu.tsx・split-editor.tsx の BottomSheet と同じ流儀)。
   useEffect(() => {
@@ -232,7 +246,9 @@ export function ReceiptItemsPanel({
   }
 
   return (
-    <div className="rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
+    <div className={summary ? 'rounded-2xl border p-3' : undefined} style={summary ? { borderColor: 'var(--hairline)' } : undefined}>
+      {summary ? (
+      <>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           レシートの品目
@@ -294,6 +310,8 @@ export function ReceiptItemsPanel({
         </p>
       ) : null}
 
+      </>
+      ) : null}
       <BottomSheet open={dialogOpen} onClose={closeDialog} role="dialog">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
