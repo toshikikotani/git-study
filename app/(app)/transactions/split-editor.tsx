@@ -209,6 +209,7 @@ export function TransactionRowWithSplit({
   const [menuOpen, setMenuOpen] = useState(false);
   // 行を展開せず、明細から品目編集を開く。増やすたびにダイアログが開く。
   const [itemEditRequest, setItemEditRequest] = useState(0);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -266,6 +267,7 @@ export function TransactionRowWithSplit({
     }
     setOpen(false);
     setCategoryFormOpen(false);
+    setEditSheetOpen(false);
   }
 
   async function saveMemo(): Promise<void> {
@@ -568,14 +570,7 @@ export function TransactionRowWithSplit({
           <button
             type="button"
             aria-expanded={open}
-            onClick={() => {
-              // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
-              setOpen((v) => {
-                const next = !v;
-                if (!next) setCategoryFormOpen(false);
-                return next;
-              });
-            }}
+            onClick={() => setEditSheetOpen(true)}
             className="min-h-11 flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
             aria-label={rowAriaLabel}
           >
@@ -645,19 +640,6 @@ export function TransactionRowWithSplit({
               className="shrink-0 text-sm font-semibold"
             />
           </button>
-          <button
-            type="button"
-            aria-label="金額・日付・カテゴリを編集"
-            onClick={() => {
-              setMode(splits.length > 0 ? 'split' : 'simple');
-              setOpen(true);
-              setCategoryFormOpen(true);
-            }}
-            className="min-h-11 shrink-0 px-1 text-xs font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            編集
-          </button>
           {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
           {display?.thumbnailUrl ? (
             <button
@@ -672,16 +654,6 @@ export function TransactionRowWithSplit({
           ) : null}
         </div>
         {/* 未分類:行の中の「ジャンルを選ぶ」チップ。タップ → 予測上位3件 → 1タップで確定 */}
-        <div className="pr-4 pb-1 pl-[60px]">
-          <button
-            type="button"
-            onClick={() => setItemEditRequest((n) => n + 1)}
-            className="min-h-11 text-xs font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            {items.length > 0 ? '品目を編集' : '品目を追加'}
-          </button>
-        </div>
         {uncategorized ? (
           <div className="pr-4 pb-3 pl-[60px]">
             <button
@@ -710,24 +682,24 @@ export function TransactionRowWithSplit({
           明示する(本人発案「品目が不明な場合はその旨書いてくれ」)。表示・
           未登録時の再登録ボタンは家計簿(/spending)と共通の部品
           (receipt-items-panel.tsx、ADR-040)。 */}
-        <div className={open ? 'mt-3' : undefined}>
-          <ReceiptItemsPanel
-            transaction={{
-              id: transaction.id,
-              occurredOn: transaction.occurredOn,
-              accountId: transaction.accountId,
-              paymentMethod: transaction.paymentMethod,
-              amountYen: transaction.amountYen,
-            }}
-            categories={categories}
-            items={items}
-            onItemsReplaced={setItems}
-            subtype={subtype}
-            onSubtypeReplaced={setSubtype}
-            summary={open}
-            openRequest={itemEditRequest}
-          />
-        </div>
+        {open ? (
+          <div className="mt-3">
+            <ReceiptItemsPanel
+              transaction={{
+                id: transaction.id,
+                occurredOn: transaction.occurredOn,
+                accountId: transaction.accountId,
+                paymentMethod: transaction.paymentMethod,
+                amountYen: transaction.amountYen,
+              }}
+              categories={categories}
+              items={items}
+              onItemsReplaced={setItems}
+              subtype={subtype}
+              onSubtypeReplaced={setSubtype}
+            />
+          </div>
+        ) : null}
 
         {/* 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付
           とは独立した操作なので、別の開閉状態を持つ(このファイル冒頭の
@@ -1093,6 +1065,84 @@ export function TransactionRowWithSplit({
           >
             ほかのジャンルから選ぶ →
           </button>
+        </div>
+      </BottomSheet>
+
+
+      <BottomSheet open={editSheetOpen} onClose={() => setEditSheetOpen(false)} role="dialog">
+        <div className="space-y-3 px-3 pb-3">
+          <div className="flex items-start justify-between gap-3 px-1 pt-1">
+            <h2 className="text-base font-semibold break-words" style={{ color: 'var(--ink)' }}>
+              {display?.name ?? transaction.description}
+            </h2>
+            <span className="shrink-0 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              外側をタップで閉じる
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              aria-label="日付"
+              value={occurredOnInput}
+              onChange={(e) => setOccurredOnInput(e.target.value)}
+              className="min-h-11 flex-1 rounded-xl px-3 text-sm"
+              style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label="金額"
+              value={amountAbsYenInput}
+              onChange={(e) => setAmountAbsYenInput(e.target.value.replace(/[^0-9]/g, ''))}
+              className="min-h-11 w-28 rounded-xl px-3 text-sm"
+              style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+            />
+          </div>
+          <select
+            aria-label="カテゴリ"
+            value={genreId}
+            onChange={(e) => setGenreId(e.target.value)}
+            className="min-h-11 w-full rounded-xl px-3 text-sm"
+            style={{ background: 'var(--plane)', color: 'var(--ink)', border: '1px solid var(--hairline)' }}
+          >
+            <option value="" disabled>
+              カテゴリを選ぶ
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void saveSimpleEdit()}
+            disabled={saving || !canSaveSimpleEdit}
+            className="min-h-11 w-full rounded-full text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            {saving ? '保存中…' : '保存'}
+          </button>
+          {error ? (
+            <p className="text-xs" style={{ color: 'var(--over)' }}>
+              {error}
+            </p>
+          ) : null}
+          <ReceiptItemsPanel
+            transaction={{
+              id: transaction.id,
+              occurredOn: transaction.occurredOn,
+              accountId: transaction.accountId,
+              paymentMethod: transaction.paymentMethod,
+              amountYen: transaction.amountYen,
+            }}
+            categories={categories}
+            items={items}
+            onItemsReplaced={setItems}
+            subtype={subtype}
+            onSubtypeReplaced={setSubtype}
+            openRequest={itemEditRequest}
+          />
         </div>
       </BottomSheet>
 
