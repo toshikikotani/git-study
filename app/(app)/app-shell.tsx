@@ -196,30 +196,78 @@ function BottomBar({
       <BottomSheet open={fabMenuOpen} onClose={() => setFabMenuOpen(false)} role="menu">
         <ul className="px-2 pb-2">
           <li>
-            <Link href="/transactions/new" prefetch={false} role="menuitem" onPointerDown={() => onNavigate('/transactions/new')} onClick={() => setFabMenuOpen(false)} className="flex min-h-11 items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <Link
+              href="/transactions/new"
+              prefetch={false}
+              role="menuitem"
+              onPointerDown={() => onNavigate('/transactions/new')}
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               手入力
             </Link>
           </li>
           <li>
-            <label role="menuitem" className="flex min-h-11 cursor-pointer items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <label
+              role="menuitem"
+              className="flex min-h-11 cursor-pointer items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               写真から選ぶ
-              <input type="file" accept="image/*" multiple hidden onChange={(e) => { enqueueReceiptFiles(Array.from(e.target.files ?? [])); e.target.value = ''; setFabMenuOpen(false); }} />
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  enqueueReceiptFiles(Array.from(e.target.files ?? []));
+                  e.target.value = '';
+                  setFabMenuOpen(false);
+                }}
+              />
             </label>
           </li>
           {canStream ? (
             <li>
-              <button type="button" role="menuitem" onClick={() => { setFabMenuOpen(false); setCameraMode('continuous'); setCameraOpen(true); }} className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFabMenuOpen(false);
+                  setCameraMode('continuous');
+                  setCameraOpen(true);
+                }}
+                className="flex min-h-11 w-full items-center px-2 text-left text-base font-semibold"
+                style={{ color: 'var(--ink)' }}
+              >
                 連続撮影
               </button>
             </li>
           ) : null}
           <li>
-            <Link href="/transactions/capture-text" prefetch={false} role="menuitem" onPointerDown={() => onNavigate('/transactions/capture-text')} onClick={() => setFabMenuOpen(false)} className="flex min-h-11 items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <Link
+              href="/transactions/capture-text"
+              prefetch={false}
+              role="menuitem"
+              onPointerDown={() => onNavigate('/transactions/capture-text')}
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               話して記録・文字で記録
             </Link>
           </li>
           <li>
-            <Link href="/transactions/capture-screenshot" prefetch={false} role="menuitem" onPointerDown={() => onNavigate('/transactions/capture-screenshot')} onClick={() => setFabMenuOpen(false)} className="flex min-h-11 items-center px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            <Link
+              href="/transactions/capture-screenshot"
+              prefetch={false}
+              role="menuitem"
+              onPointerDown={() => onNavigate('/transactions/capture-screenshot')}
+              onClick={() => setFabMenuOpen(false)}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               スクショから記録
             </Link>
           </li>
@@ -234,15 +282,47 @@ function BottomBar({
               return (
                 <Fragment key={item.href}>
                   {index === 2 ? (
-                    <li className="flex w-16 shrink-0 justify-center self-center" aria-label="レシートを撮る">
-                      <div style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }} onPointerDown={(e) => longPress.start(e.clientX, e.clientY)} onPointerMove={(e) => longPress.move(e.clientX, e.clientY)} onPointerUp={longPress.end} onPointerCancel={longPress.end} onContextMenu={(e) => e.preventDefault()} onClickCapture={(e) => { if (longPress.consumeClick()) { e.preventDefault(); e.stopPropagation(); } }}>
+                    <li
+                      className="flex w-16 shrink-0 justify-center self-center"
+                      aria-label="レシートを撮る"
+                    >
+                      <div
+                        style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}
+                        onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
+                        onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
+                        onPointerUp={longPress.end}
+                        onPointerCancel={longPress.end}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClickCapture={(e) => {
+                          if (longPress.consumeClick()) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
+                      >
                         {fab}
                       </div>
                     </li>
                   ) : null}
                   <li className="flex-1">
-                    <Link href={item.href} prefetch aria-current={isActive ? 'page' : undefined} onPointerDown={() => { if (tabTapAction(pathname, item.href) === 'navigate') onNavigate(item.href); }} onClick={(e) => { if (tabTapAction(pathname, item.href) === 'scroll-top') { e.preventDefault(); scrollToTop(); } }} className="min-h-11 flex flex-col items-center gap-1 py-2">
-                      <span className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}>
+                    <Link
+                      href={item.href}
+                      prefetch
+                      aria-current={isActive ? 'page' : undefined}
+                      onPointerDown={() => {
+                        if (tabTapAction(pathname, item.href) === 'navigate') onNavigate(item.href);
+                      }}
+                      onClick={(e) => {
+                        if (tabTapAction(pathname, item.href) === 'scroll-top') {
+                          e.preventDefault();
+                          scrollToTop();
+                        }
+                      }}
+                      className="min-h-11 flex flex-col items-center gap-1 py-2"
+                    >
+                      <span
+                        className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                      >
                         {item.label}
                       </span>
                     </Link>
