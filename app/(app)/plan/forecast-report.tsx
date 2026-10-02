@@ -48,6 +48,15 @@ export function ForecastReport({
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               {row.genreName}
             </p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              すでに {formatYen(row.spentYen, { sign: 'never' })}
+              {row.scheduledYen > 0
+                ? ` ・ 予定 ${formatYen(row.scheduledYen, { sign: 'never' })}`
+                : ' ・ 予定なし'}
+              {row.medianYen !== null
+                ? ` ・ 着地 ${formatYen(row.medianYen, { sign: 'never' })}`
+                : ''}
+            </p>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
               {row.detail}
             </p>
