@@ -52,3 +52,32 @@ describe('forecastPlan', () => {
     expect(result.genres[0]?.verdict).toBe('unreachable');
   });
 });
+
+import { savingsAsk } from '@/domain/plan-forecast';
+
+describe('抑えてほしい額', () => {
+  it('着地が目標を超えるときは節約額と1日の上限を出す', () => {
+    const ask = savingsAsk({
+      verdict: 'over',
+      targetYen: 10500,
+      medianYen: 12400,
+      remainingDays: 29,
+      dailyCapYen: 270,
+    });
+    expect(ask.saveYen).toBe(1900);
+    expect(ask.text).toContain('1,900 円節約');
+    expect(ask.text).toContain('1 日 270 円に抑えてほしい');
+  });
+
+  it('届くときは抑える額を出さない', () => {
+    expect(
+      savingsAsk({
+        verdict: 'on_track',
+        targetYen: 10500,
+        medianYen: 8000,
+        remainingDays: 29,
+        dailyCapYen: 270,
+      }).saveYen,
+    ).toBe(0);
+  });
+});
