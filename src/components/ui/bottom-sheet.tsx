@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useIsClient } from './use-is-client';
@@ -35,14 +35,35 @@ export function BottomSheet({
 }) {
   const isClient = useIsClient();
   const { mounted, shown } = useSheetPresence(open, SHEET_EXIT_MS);
+  const dragY = useRef(0);
+  const pullRef = useRef(0);
+  const [pull, setPull] = useState(0);
+  if (!open && pull !== 0) setPull(0);
   if (!isClient || !mounted) return null;
+
+  const onHandleDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    dragY.current = event.clientY;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onHandleMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (dragY.current === 0) return;
+    const next = Math.max(0, event.clientY - dragY.current);
+    pullRef.current = next;
+    setPull(next);
+  };
+  const onHandleUp = () => {
+    if (pullRef.current > 72) onClose();
+    dragY.current = 0;
+    pullRef.current = 0;
+    setPull(0);
+  };
 
   return createPortal(
     <>
       {/* 背景。フェードのみ、動きは付けない(方向感が要らない)。ここをタップすると閉じる */}
       <div
         aria-hidden={!shown}
-        onClick={onClose}
+        onPointerDown={onClose}
         className="fixed inset-0 z-40 transition-opacity duration-200 ease-out motion-reduce:transition-none"
         style={{
           background: 'rgba(10, 16, 32, 0.45)',
@@ -57,7 +78,7 @@ export function BottomSheet({
         className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] motion-reduce:transition-none"
         style={{
           // iOS は transform の子をスクロールできない。開いたあとは変形を外す。
-          transform: shown ? 'none' : 'translateY(110%)',
+          transform: shown ? `translateY(${pull}px)` : 'translateY(110%)',
           transition: 'transform var(--duration-slow) var(--ease-sheet)',
           pointerEvents: shown ? 'auto' : 'none',
         }}
@@ -80,6 +101,18 @@ export function BottomSheet({
               WebkitBackdropFilter: 'var(--glass-blur-strong)',
             }}
           />
+          <button
+            type="button"
+            aria-label="下へ引いて閉じる"
+            className="relative flex min-h-11 w-full items-center justify-center"
+            style={{ touchAction: 'none' }}
+            onPointerDown={onHandleDown}
+            onPointerMove={onHandleMove}
+            onPointerUp={onHandleUp}
+            onPointerCancel={onHandleUp}
+          >
+            <span className="h-1.5 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
+          </button>
           <div
             data-sheet-scroll
             className="relative max-h-[70dvh] overflow-y-auto overscroll-contain p-2"
@@ -96,9 +129,6 @@ export function BottomSheet({
               if (Math.abs(e.clientY - y) > 8) el.dataset.moved = '1';
             }}
           >
-            <div className="flex justify-center pt-2 pb-1">
-              <span className="h-2 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
-            </div>
             {children}
           </div>
         </div>
