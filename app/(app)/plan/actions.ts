@@ -8,7 +8,12 @@ import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
 import { forecastFromPace, type GenreForecast } from '@/domain/plan-forecast';
 import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
-import { deletePlan, savePlan, updatePlanTargets, loadGenreSpend } from '@/features/spending-plan/store';
+import {
+  deletePlan,
+  savePlan,
+  updatePlanTargets,
+  loadGenreSpend,
+} from '@/features/spending-plan/store';
 import type { GoalSnapshot } from '@/domain/goal-impact';
 import { nextPlanTargets } from '@/domain/goal-review';
 import { loadGoalView } from '@/features/goals/loader';
@@ -165,17 +170,19 @@ export async function refinePlanAction(input: {
           : `直近のペースが残りの ${remaining} 日続くと、着地は ${yen(forecast.medianYen)} 円、幅は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。`,
         forecast.label,
       ].join('');
-      return [{
-        genreId: item.genreId,
-        genreName: genre.genreName,
-        spentYen,
-        scheduledYen,
-        medianYen: forecast.medianYen,
-        lowYen: forecast.lowYen,
-        highYen: forecast.highYen,
-        label: forecast.label,
-        detail,
-      }];
+      return [
+        {
+          genreId: item.genreId,
+          genreName: genre.genreName,
+          spentYen,
+          scheduledYen,
+          medianYen: forecast.medianYen,
+          lowYen: forecast.lowYen,
+          highYen: forecast.highYen,
+          label: forecast.label,
+          detail,
+        },
+      ];
     });
     const known = forecasts.filter((row) => row.medianYen !== null);
     const landing = known.reduce((acc, row) => acc + (row.medianYen ?? 0), 0);
@@ -183,7 +190,12 @@ export async function refinePlanAction(input: {
       known.length === 0
         ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
         : `このままの行動だと、判断できた ${known.length} ジャンルの合計は ${landing.toLocaleString('ja-JP')} 円に着く。いまの総額と違うときは、総額の方を着地に合わせてよい。予定は未来日の明細をジャンルごとに足している。`;
-    return { error: null, summary, proposedTotalYen: known.length === 0 ? null : landing, forecasts };
+    return {
+      error: null,
+      summary,
+      proposedTotalYen: known.length === 0 ? null : landing,
+      forecasts,
+    };
   } catch (error) {
     return { error: describeUserError(error) };
   }
