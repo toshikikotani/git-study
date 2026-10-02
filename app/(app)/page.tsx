@@ -69,7 +69,7 @@ export default async function HomePage() {
                 className="text-xs font-medium tracking-[0.1em] uppercase"
                 style={{ color: 'var(--ink-muted)' }}
               >
-                完済まで
+                確保した貯蓄
               </span>
               {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
               {payoff.isEstimated ? (
@@ -93,7 +93,7 @@ export default async function HomePage() {
               className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em]"
               style={{ color: 'var(--income)' }}
             >
-              完済済み
+              まだ入っていません
             </p>
           ) : (
             <>
@@ -117,7 +117,7 @@ export default async function HomePage() {
                 </span>
                 {payoff.payoffOn ? (
                   <span style={{ color: 'var(--ink-muted)' }}>
-                    {formatDateJa(payoff.payoffOn)} 完済見込み
+                    {formatDateJa(payoff.payoffOn)} までの目安
                   </span>
                 ) : null}
               </div>
@@ -130,7 +130,7 @@ export default async function HomePage() {
                   style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                 >
                   <span aria-hidden>↓</span>
-                  今月{formatYen(payoff.reducedThisMonthYen)}減らした
+                  今月{formatYen(payoff.reducedThisMonthYen)}移した
                 </p>
               ) : null}
             </>
@@ -139,7 +139,7 @@ export default async function HomePage() {
           <div className="mt-5">
             <ProgressGauge
               ratio={payoff.progressRatio}
-              label="返済済み"
+              label="移した割合"
               nextMilestone={payoff.nextMilestone}
             />
           </div>
@@ -151,11 +151,11 @@ export default async function HomePage() {
                 残高と金利に推定値が含まれています。正確な値を入れると、この日付が確定します。
               </p>
               <a
-                href="/debts"
+                href="/payday"
                 className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
-                負債を入力する
+                手取りを入れる
                 <span aria-hidden>→</span>
               </a>
             </div>
