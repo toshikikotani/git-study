@@ -1,9 +1,7 @@
 import { MdLocalFireDepartment } from 'react-icons/md';
 
 import { Button } from '@/components/ui/button';
-import { CountUp } from '@/components/ui/count-up';
 import { ExpandableBudgetTile } from '@/components/ui/expandable-budget-tile';
-import { ProgressGauge } from '@/components/ui/meter';
 import { budgetTone } from '@/domain/budget';
 import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { streakBadgeFor } from '@/domain/streak';
