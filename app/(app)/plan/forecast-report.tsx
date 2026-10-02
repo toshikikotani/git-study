@@ -19,11 +19,15 @@ export function ForecastReport({
   proposedTotalYen,
   rows,
   onApply,
+  onApplyAll,
+  applying = false,
 }: {
   summary: string;
   proposedTotalYen: number | null;
   rows: readonly ForecastRow[];
   onApply: (row: ForecastRow) => void;
+  onApplyAll?: () => void;
+  applying?: boolean;
 }) {
   return (
     <section className="mt-3 space-y-3" aria-label="着地の分析">
@@ -34,6 +38,17 @@ export function ForecastReport({
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           着地から見た総額 {formatYen(proposedTotalYen, { sign: 'never' })}
         </p>
+      ) : null}
+      {onApplyAll && rows.some((row) => row.medianYen !== null) ? (
+        <button
+          type="button"
+          className="min-h-11 w-full rounded-full px-4 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          disabled={applying}
+          onClick={onApplyAll}
+        >
+          {applying ? '全部の目標を保存しています…' : '全部の着地を目標にする'}
+        </button>
       ) : null}
       <ul className="space-y-2">
         {rows.map((row) => (

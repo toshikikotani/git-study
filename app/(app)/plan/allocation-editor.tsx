@@ -66,7 +66,6 @@ export function AllocationEditor({
   const setYen = (genreId: string, yen: number, pin: boolean) => {
     setInputs((prev) => ({ ...prev, [genreId]: String(Math.max(yen, 0)) }));
     if (pin) setPinned((prev) => new Set(prev).add(genreId));
-    setAiSummary(null);
   };
 
   const rebalanceInputs = (nextTotal: number, respectPins: boolean) => {
@@ -120,6 +119,30 @@ export function AllocationEditor({
     setForecasts(result.forecasts);
     setProposedTotal(result.proposedTotalYen);
     setAiSummary(result.summary);
+  };
+
+  const applyAllForecasts = async () => {
+    const applicable = forecasts.filter((row) => row.medianYen !== null);
+    if (applicable.length === 0) return;
+    const nextInputs = { ...inputs };
+    for (const row of applicable) nextInputs[row.genreId] = String(row.medianYen);
+    const items = rows.map((row) => ({
+      genreId: row.genreId,
+      targetYen: parseYen(nextInputs[row.genreId] ?? '') ?? 0,
+    }));
+    const nextTotal = items.reduce((acc, item) => acc + item.targetYen, 0);
+    setBusy('save');
+    setError(null);
+    const result = await onSave(items);
+    setBusy(null);
+    if (result.error !== null) {
+      setError(result.error);
+      return;
+    }
+    setInputs(nextInputs);
+    setLockTotal(false);
+    setCommittedTotal(String(nextTotal));
+    setTotalDraft(null);
   };
 
   const save = async () => {
@@ -311,27 +334,9 @@ export function AllocationEditor({
               setYen(row.genreId, row.medianYen, true);
               setLockTotal(false);
             }}
+            onApplyAll={() => void applyAllForecasts()}
+            applying={busy === 'save'}
           />
-        ) : null}
-        {proposedTotal !== null ? (
-          <button
-            type="button"
-            className="mt-2 min-h-11 text-xs font-semibold"
-            style={{ color: 'var(--accent)' }}
-            onClick={() => {
-              setLockTotal(false);
-              setCommittedTotal(String(proposedTotal));
-              setInputs((prev) => {
-                const next = { ...prev };
-                for (const row of forecasts) {
-                  if (row.medianYen !== null) next[row.genreId] = String(row.medianYen);
-                }
-                return next;
-              });
-            }}
-          >
-            総額も着地に合わせる
-          </button>
         ) : null}
       </div>
       <Button
