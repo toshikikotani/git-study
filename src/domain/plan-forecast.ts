@@ -13,10 +13,7 @@ function round100(yen: number): number {
   return Math.max(0, Math.round(yen / 100) * 100);
 }
 
-/**
- * 今期の支出と、1日あたりの中央値から着地を出す。
- * 幅は直近ペースの 0.6〜1.6 倍。正規分布は使わない。
- */
+/** 今期の支出、残りの予定、直近ペースから着地を出す。 */
 export function forecastFromPace(input: {
   spentYen: number;
   scheduledYen: number;
@@ -25,7 +22,9 @@ export function forecastFromPace(input: {
   remainingDays: number;
   targetYen: number;
 }): GenreForecast {
-  if (input.observedDays < 7 || input.paceYen <= 0) {
+  const scheduledNote =
+    input.scheduledYen > 0 ? `予定 ${input.scheduledYen.toLocaleString('ja-JP')} 円を含む。` : '';
+  if (input.observedDays < 7 && input.scheduledYen <= 0) {
     return {
       medianYen: null,
       lowYen: null,
@@ -36,21 +35,21 @@ export function forecastFromPace(input: {
     };
   }
   const days = Math.max(input.remainingDays, 0);
+  const pace = input.paceYen > 0 ? input.paceYen : 0;
   const base = input.spentYen + input.scheduledYen;
-  const medianYen = round100(base + input.paceYen * days);
-  const lowYen = round100(base + input.paceYen * 0.6 * days);
-  const highYen = round100(base + input.paceYen * 1.6 * days);
-  const cap =
-    days > 0 && input.targetYen > base ? round100((input.targetYen - base) / days) : null;
-  const dailyCapYen = cap !== null && cap >= input.paceYen / 2 ? cap : null;
+  const medianYen = round100(base + pace * days);
+  const lowYen = round100(base + pace * 0.6 * days);
+  const highYen = round100(base + pace * 1.6 * days);
+  const cap = days > 0 && input.targetYen > base ? round100((input.targetYen - base) / days) : null;
+  const dailyCapYen = cap !== null && pace > 0 && cap >= pace / 2 ? cap : null;
 
-  if (input.scheduledYen > 0 && input.scheduledYen >= input.targetYen) {
+  if (input.scheduledYen > 0 && input.scheduledYen + input.spentYen >= input.targetYen) {
     return {
       medianYen,
       lowYen,
       highYen,
       verdict: 'unreachable',
-      label: '届かない。確定の支払いだけで目標を超える。',
+      label: `届かない。使った額と予定だけで目標を超える。${scheduledNote}`,
       dailyCapYen: null,
     };
   }
@@ -60,7 +59,7 @@ export function forecastFromPace(input: {
       lowYen,
       highYen,
       verdict: 'on_track',
-      label: 'このままで届きそう。',
+      label: `このままで届きそう。${scheduledNote}`,
       dailyCapYen,
     };
   }
@@ -70,7 +69,7 @@ export function forecastFromPace(input: {
       lowYen,
       highYen,
       verdict: 'tight',
-      label: '中央では届く。上振れすると超える。',
+      label: `中央では届く。上振れすると超える。${scheduledNote}`,
       dailyCapYen,
     };
   }
@@ -79,7 +78,7 @@ export function forecastFromPace(input: {
     lowYen,
     highYen,
     verdict: 'over',
-    label: `このままだと ${medianYen.toLocaleString('ja-JP')} 円ぐらいで着く。`,
+    label: `このままだと ${medianYen.toLocaleString('ja-JP')} 円ぐらいで着く。${scheduledNote}`,
     dailyCapYen,
   };
 }
