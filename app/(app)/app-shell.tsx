@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdCameraAlt } from 'react-icons/md';
 
@@ -162,6 +162,24 @@ function BottomBar({
       <MdCameraAlt aria-hidden size={26} />
     </Fab>
   );
+  const listRef = useRef<HTMLUListElement>(null);
+  const shown = pendingHref ?? pathname;
+  const [lens, setLens] = useState({ x: 0, w: 0, ready: false });
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const active = list.querySelector<HTMLElement>('.liquid-tab.is-active');
+      if (!active) return;
+      const listBox = list.getBoundingClientRect();
+      const tabBox = active.getBoundingClientRect();
+      setLens({ x: tabBox.left - listBox.left, w: tabBox.width, ready: true });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [shown, compact]);
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {reading + waiting + offlineWaiting + needInput > 0 ? (
@@ -279,16 +297,20 @@ function BottomBar({
       </BottomSheet>
       <div className="tabbar flex w-full items-center" data-compact={compact}>
         <nav className="min-w-0 flex-1">
-          <ul className="tabbar-pill liquid-capsule flex items-center gap-1">
+          <ul
+            ref={listRef}
+            className="tabbar-pill liquid-capsule flex items-center gap-1"
+            style={{ ['--lens-x' as string]: `${lens.x}px`, ['--lens-w' as string]: `${lens.w}px` }}
+          >
+            <li className="liquid-lens" data-ready={lens.ready} aria-hidden />
             {NAV.map((item, index) => {
-              const shown = pendingHref ?? pathname;
               const isActive = isSameTab(shown, item.href);
               return (
                 <Fragment key={item.href}>
                   {index === 2 ? (
-                    <li className="flex w-16 shrink-0 justify-center self-center" aria-label="レシートを撮る">
+                    <li className="liquid-slot" aria-label="レシートを撮る">
                       <div
-                        style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}
+                        className="liquid-orb"
                         onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
                         onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
                         onPointerUp={longPress.end}
