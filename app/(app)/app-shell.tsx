@@ -84,6 +84,12 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
   }, []);
   const [compact, setCompact] = useState(false);
   useEffect(() => {
+    // スクロール中にタブを変えると、縮んだメニューのまま次の画面が出る。
+    // 画面が変わったら一番上へ戻し、メニューは通常の大きさにする。
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    setCompact(false);
+  }, [pathname]);
+  useEffect(() => {
     let last = window.scrollY;
     let frame = 0;
     const onScroll = () => {
@@ -91,7 +97,7 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
       frame = window.requestAnimationFrame(() => {
         frame = 0;
         const y = window.scrollY;
-        setCompact((prev) => nextChromeCompact(prev, y, last));
+        setCompact((prev) => (y <= 0 ? false : nextChromeCompact(prev, y, last)));
         if (Math.abs(y - last) > 8 || y <= 0) last = y;
       });
     };
