@@ -207,3 +207,49 @@ export function forecastPlan(input: {
     totalRecommendedYen: known ? round100(quantile(sortedTotals, 0.7)) : null,
   };
 }
+
+export type SavingsAsk = {
+  /** 今の着地から目標まで削る額。届くときは 0。 */
+  saveYen: number;
+  /** 残り日数で抑えてほしい1日の額。届かないときは 0。 */
+  keepDailyYen: number | null;
+  text: string;
+};
+
+/** 予想ではなく、抑えてほしい額。着地が目標を超えるときだけ節約を出す。 */
+export function savingsAsk(input: {
+  verdict: ForecastVerdict;
+  targetYen: number;
+  medianYen: number | null;
+  remainingDays: number;
+  dailyCapYen: number | null;
+}): SavingsAsk {
+  const yen = (n: number) => n.toLocaleString('ja-JP');
+  if (input.verdict === 'unknown' || input.medianYen === null) {
+    return { saveYen: 0, keepDailyYen: null, text: 'まだ判断できない。支出のあった日が少ない。' };
+  }
+  if (input.verdict === 'unreachable') {
+    return {
+      saveYen: Math.max(0, input.medianYen - input.targetYen),
+      keepDailyYen: 0,
+      text: `使った額と予定だけで目標を超えている。今日からの自由な支出は 0 円に抑えてほしい。`,
+    };
+  }
+  const saveYen = Math.max(0, input.medianYen - input.targetYen);
+  if (saveYen === 0) {
+    return {
+      saveYen: 0,
+      keepDailyYen: input.dailyCapYen,
+      text: `このままで目標に届く。抑える額はない。`,
+    };
+  }
+  const daily =
+    input.dailyCapYen === null
+      ? ''
+      : `残り ${input.remainingDays} 日は 1 日 ${yen(input.dailyCapYen)} 円に抑えてほしい。`;
+  return {
+    saveYen,
+    keepDailyYen: input.dailyCapYen,
+    text: `着地は ${yen(input.medianYen)} 円。${yen(saveYen)} 円節約して ${yen(input.targetYen)} 円に抑えてほしい。${daily}`,
+  };
+}

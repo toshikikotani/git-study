@@ -13,6 +13,7 @@ export type ForecastRow = {
   recommendedYen: number | null;
   exceedance: number | null;
   label: string;
+  advice: string;
   detail: string;
 };
 
@@ -76,6 +77,12 @@ export function ForecastReport({
                   ? ` ・ 着地 ${formatYen(row.medianYen, { sign: 'never' })}`
                   : ''}
               {row.exceedance !== null ? ` ・ 超過 ${Math.round(row.exceedance * 100)}%` : ''}
+            </p>
+            <p
+              className="mt-2 text-sm font-semibold leading-relaxed"
+              style={{ color: 'var(--ink)' }}
+            >
+              {row.advice}
             </p>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
               {row.detail}

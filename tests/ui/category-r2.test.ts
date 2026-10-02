@@ -79,6 +79,7 @@ const renderChart = (
         onUnit: () => {},
         onPick: () => {},
         selectedIndex: null,
+        budgetYen: null,
       }),
     ),
   );

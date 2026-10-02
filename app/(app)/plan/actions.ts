@@ -6,7 +6,7 @@ import type { PlanEvidence } from '@/domain/plan-evidence';
 import { PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
-import { forecastPlan } from '@/domain/plan-forecast';
+import { forecastPlan, savingsAsk } from '@/domain/plan-forecast';
 import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
 import {
   deletePlan,
@@ -122,6 +122,7 @@ export type RefinePlanResult =
         recommendedYen: number | null;
         exceedance: number | null;
         label: string;
+        advice: string;
         detail: string;
       }[];
     }
@@ -200,6 +201,13 @@ export async function refinePlanAction(input: {
         recommendedYen: forecast.recommendedYen,
         exceedance: forecast.exceedance,
         label: forecast.label,
+        advice: savingsAsk({
+          verdict: forecast.verdict,
+          targetYen: row.item.targetYen,
+          medianYen: forecast.medianYen,
+          remainingDays: remaining,
+          dailyCapYen: forecast.dailyCapYen,
+        }).text,
         detail,
       };
     });
@@ -208,7 +216,7 @@ export async function refinePlanAction(input: {
     const summary =
       known.length === 0
         ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
-        : `このままの行動だと、判断できた ${known.length} ジャンルは 70% で ${landing?.toLocaleString('ja-JP')} 円以内に着く。目標案はこの額です。予定は未来日の明細をジャンルごとに足し、残りは回数と金額を分けて引いています。`;
+        : `このままだと 70% で ${landing?.toLocaleString('ja-JP')} 円に着く。超えるジャンルは、下の「抑えてほしい額」まで節約してほしい。予定は使った額に入っていない。`;
     return {
       error: null,
       summary,

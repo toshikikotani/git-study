@@ -14,5 +14,5 @@ export async function freeRemainingAction(): Promise<number | null> {
   if (!ledger || !plan) return null;
   const cap = plan.items.reduce((sum, item) => sum + item.targetYen, 0);
   if (cap <= 0) return null;
-  return cap - ledger.totals.paceSpentYen - ledger.totals.scheduledYen;
+  return cap - ledger.totals.spentYen - ledger.totals.scheduledYen;
 }
