@@ -366,6 +366,23 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         </button>
       ) : null}
 
+      {data.genreName.includes('食料')
+        ? lines
+            .filter(
+              (l) => l.status === 'actual' && /ショコラ|菓子|ケーキ|sucr|カフェ/i.test(l.label),
+            )
+            .slice(0, 1)
+            .map((l) => (
+              <p
+                key={l.txId}
+                className="text-sm leading-relaxed"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
+                {l.label} {Math.abs(l.amountYen).toLocaleString('ja-JP')}
+                円は菓子店です。カフェ・飲料へ移すと、食料の注意は消えます。
+              </p>
+            ))
+        : null}
       <SummarySection
         summary={summary}
         goal={data.goal}

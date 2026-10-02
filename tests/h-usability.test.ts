@@ -137,19 +137,19 @@ describe('H 金額の見た目(G の続き)', () => {
 });
 
 describe('H ウィジェット・ショートカット(代替の実装)', () => {
-  it('「今日あと○円」と入力待ちの件数を1行にまとめる', () => {
-    const view = { active: true, guidance: { todayAllowanceYen: 2300 } } as never;
+  it('自由残と次の予定を1行にまとめる。今日あとは出さない', () => {
+    const view = {
+      active: true,
+      guidance: { freeYen: 16376 },
+      scheduledItems: [{ label: '発表会', date: '2026-10-03', amountYen: 26540 }],
+    } as never;
     expect(buildWidgetSummary(view, 0)).toMatchObject({
-      todayAllowanceYen: 2300,
-      pendingReceipts: 0,
-      label: '今日あと 2,300円',
-      captureUrl: '/spending?capture=1',
+      freeYen: 16376,
+      label: '自由残 16,376円 ・ 次の予定 発表会',
+      captureUrl: '/plan',
     });
-    expect(buildWidgetSummary(view, 2).label).toBe('今日あと 2,300円 ・ 入力待ち 2件');
-    expect(buildWidgetSummary(null, 1)).toMatchObject({
-      todayAllowanceYen: null,
-      label: '目標なし ・ 入力待ち 1件',
-    });
+    expect(buildWidgetSummary(view, 0).label).not.toContain('今日あと');
+    expect(buildWidgetSummary(null, 1).label).toBe('自由残なし ・ 入力待ち 1件');
   });
 
   it('マニフェストに、撮影を直接開くショートカットと手入力がある', () => {

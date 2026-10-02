@@ -620,26 +620,39 @@ export function TransactionRowWithSplit({
                 </p>
               ) : null}
               {shares.length > 0 ? (
-                <div
-                  role="img"
-                  aria-label={`ジャンルの内訳:${shares
-                    .map((sh) => `${sh.genreName ?? '未分類'} ${Math.round(sh.ratio * 100)}%`)
-                    .join('、')}`}
-                  className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
-                >
-                  {shares.map((sh) => (
-                    <span
-                      key={sh.genreId ?? 'none'}
-                      style={{
-                        width: `${sh.ratio * 100}%`,
-                        background: genreBarColor(
-                          sh.genreName,
-                          sh.genreName ? overrides[sh.genreName] : null,
-                        ),
-                      }}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div
+                    role="img"
+                    aria-label={`ジャンルの内訳:${shares
+                      .map(
+                        (sh) =>
+                          `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
+                      )
+                      .join('、')}`}
+                    className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
+                  >
+                    {shares.map((sh) => (
+                      <span
+                        key={sh.genreId ?? 'none'}
+                        style={{
+                          width: `${sh.ratio * 100}%`,
+                          background: genreBarColor(
+                            sh.genreName,
+                            sh.genreName ? overrides[sh.genreName] : null,
+                          ),
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs break-words" style={{ color: 'var(--ink-secondary)' }}>
+                    {shares
+                      .map(
+                        (sh) =>
+                          `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
+                      )
+                      .join(' + ')}
+                  </p>
+                </>
               ) : null}
             </div>
 
