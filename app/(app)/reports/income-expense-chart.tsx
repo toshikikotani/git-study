@@ -103,7 +103,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mt-3 w-full"
         role="img"
-        aria-label={`${formatMonthJa(monthKeys[monthKeys.length - 1]!)}時点:収入${formatYen(latest.incomeYen)}、支出${formatYen(latest.expenseYen)}`}
+        aria-label={`${formatMonthJa(monthKeys[monthKeys.length - 1]!)}時点:収入${formatYen(latest.incomeYen)}、支出${formatYen(latest.expenseYen)}、予定${formatYen(latest.scheduledYen)}`}
       >
         <path
           d={linePath(rows.map((r) => r.incomeYen))}
@@ -128,7 +128,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
                 <title>{`${formatMonthJa(row.monthKey)}: 収入 ${formatYen(row.incomeYen)}`}</title>
               </circle>
               <circle cx={expensePoint.x} cy={expensePoint.y} r={3} fill="var(--over)">
-                <title>{`${formatMonthJa(row.monthKey)}: 支出 ${formatYen(row.expenseYen)}`}</title>
+                <title>{`${formatMonthJa(row.monthKey)}: 支出 ${formatYen(row.expenseYen)}、予定 ${formatYen(row.scheduledYen)}`}</title>
               </circle>
             </g>
           );
@@ -138,6 +138,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <Legend color="var(--income)" label={`収入 ${formatYen(latest.incomeYen)}`} />
         <Legend color="var(--over)" label={`支出 ${formatYen(latest.expenseYen)}`} />
+        <Legend color="var(--ink-muted)" label={`予定 ${formatYen(latest.scheduledYen)}`} />
       </div>
 
       <IncomeExpenseTable trend={trend} />
@@ -174,6 +175,9 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
               支出
             </th>
             <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+              予定
+            </th>
+            <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
               貯蓄率
             </th>
           </tr>
@@ -191,6 +195,9 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
                 </td>
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {formatYen(row.expenseYen)}
+                </td>
+                <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
+                  {formatYen(row.scheduledYen)}
                 </td>
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {rate === null ? '—' : `${Math.round(rate * 100)}%`}

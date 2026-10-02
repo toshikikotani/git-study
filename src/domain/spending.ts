@@ -108,8 +108,10 @@ export function distinctYearsWithSpend(transactions: readonly SpendingTransactio
 export type MonthlyIncomeExpense = {
   monthKey: string;
   incomeYen: number;
-  /** 正の数。 */
+  /** 記帳済みの実績。正の数。予定は含めない。 */
   expenseYen: number;
+  /** 今日より先の予定。正の数。支出とは呼ばない。 */
+  scheduledYen: number;
 };
 
 /**
@@ -122,15 +124,21 @@ export type MonthlyIncomeExpense = {
 export function summarizeMonthlyIncomeExpense(
   transactions: readonly SpendingTransaction[],
   monthKeys: readonly string[],
+  today?: string,
 ): MonthlyIncomeExpense[] {
-  const byMonth = new Map<string, { incomeYen: number; expenseYen: number }>();
+  const byMonth = new Map<
+    string,
+    { incomeYen: number; expenseYen: number; scheduledYen: number }
+  >();
 
   for (const tx of transactions) {
     if (!isCountable(tx)) continue;
     const monthKey = tx.occurredOn.slice(0, 7);
-    const current = byMonth.get(monthKey) ?? { incomeYen: 0, expenseYen: 0 };
+    const current = byMonth.get(monthKey) ?? { incomeYen: 0, expenseYen: 0, scheduledYen: 0 };
     if (tx.amountYen > 0) {
       current.incomeYen += tx.amountYen;
+    } else if (today !== undefined && tx.occurredOn > today) {
+      current.scheduledYen += -tx.amountYen;
     } else {
       current.expenseYen += -tx.amountYen;
     }
@@ -141,6 +149,7 @@ export function summarizeMonthlyIncomeExpense(
     monthKey,
     incomeYen: byMonth.get(monthKey)?.incomeYen ?? 0,
     expenseYen: byMonth.get(monthKey)?.expenseYen ?? 0,
+    scheduledYen: byMonth.get(monthKey)?.scheduledYen ?? 0,
   }));
 }
 

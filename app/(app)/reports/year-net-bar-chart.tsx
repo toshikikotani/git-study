@@ -117,6 +117,9 @@ export function YearNetBarChart({ trend }: { trend: IncomeExpenseTrend }) {
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {formatYen(row.expenseYen, { sign: 'never' })}
                 </td>
+                <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
+                  {formatYen(row.scheduledYen, { sign: 'never' })}
+                </td>
                 <td
                   className="tabular p-2 text-right"
                   style={{ color: nets[i]! >= 0 ? 'var(--income)' : 'var(--over)' }}
