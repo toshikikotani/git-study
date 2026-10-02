@@ -1,0 +1,95 @@
+/* タブバーをスクショの浮いたカプセルに合わせる。
+   角を16pxのカードにすると縁が短く、ぼかしが面に見えずガラスにならない。
+   カプセルを大きくし、塗りを38%まで落として本文が下から透けるようにする。
+   選択中はもう一枚のレンズ(内側ハイライト)で、色面ではなく屈折に見せる。 */
+.tabbar {
+  position: relative;
+  max-width: 36rem;
+}
+.tabbar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 30% -6% -20%;
+  background: radial-gradient(circle, rgba(110, 196, 214, 0.35), transparent 68%);
+  filter: blur(16px);
+  pointer-events: none;
+}
+.liquid-capsule {
+  border-radius: 40px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(34px) saturate(190%);
+  -webkit-backdrop-filter: blur(34px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 14px 36px rgba(16, 24, 40, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(16, 24, 40, 0.05);
+}
+.tabbar[data-compact="true"] .liquid-capsule {
+  padding: 8px 10px;
+}
+.liquid-tab {
+  display: flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: var(--ink-muted);
+  transition:
+    transform var(--duration-medium) var(--ease-spring),
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.liquid-tab.is-active {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(18px) saturate(220%);
+  -webkit-backdrop-filter: blur(18px) saturate(220%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -10px 18px rgba(255, 255, 255, 0.32),
+    0 8px 18px rgba(16, 24, 40, 0.08);
+  transform: scale(1.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .liquid-capsule {
+    background: rgba(32, 38, 52, 0.4);
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow:
+      0 14px 36px rgba(0, 0, 0, 0.46),
+      inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  }
+  :root:not([data-theme="light"]) .liquid-tab.is-active {
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      0 8px 18px rgba(0, 0, 0, 0.28);
+  }
+}
+:root[data-theme="dark"] .liquid-capsule {
+  background: rgba(32, 38, 52, 0.4);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+:root[data-theme="dark"] .liquid-tab.is-active {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 8px 18px rgba(0, 0, 0, 0.28);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-capsule,
+  .liquid-tab.is-active {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
