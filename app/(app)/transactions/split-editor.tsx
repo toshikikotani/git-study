@@ -173,6 +173,7 @@ export function TransactionRowWithSplit({
     String(Math.abs(transaction.amountYen)),
   );
   const [occurredOnInput, setOccurredOnInput] = useState(transaction.occurredOn);
+  const [nameInput, setNameInput] = useState(display?.name ?? transaction.description);
   // 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付とは
   // 独立した操作のため、別の開閉状態・別のServer Actionにした。
   const [memo, setMemo] = useState(transaction.memo);
@@ -230,12 +231,18 @@ export function TransactionRowWithSplit({
   }
 
   const amountAbsYen = Number(amountAbsYenInput);
+  const nameTrimmed = nameInput.trim();
   const simpleEditUnchanged =
     genreId === (transaction.genreId ?? '') &&
     amountAbsYen === targetAbsYen &&
-    occurredOnInput === transaction.occurredOn;
+    occurredOnInput === transaction.occurredOn &&
+    nameTrimmed === (display?.name ?? transaction.description);
   const canSaveSimpleEdit =
-    !!genreId && amountAbsYen > 0 && occurredOnInput !== '' && !simpleEditUnchanged;
+    !!genreId &&
+    amountAbsYen > 0 &&
+    occurredOnInput !== '' &&
+    nameTrimmed !== '' &&
+    !simpleEditUnchanged;
 
   async function saveSimpleEdit(): Promise<void> {
     if (!canSaveSimpleEdit) return;
@@ -245,6 +252,7 @@ export function TransactionRowWithSplit({
       amountAbsYen,
       occurredOn: occurredOnInput,
       isIncome,
+      description: nameTrimmed,
     });
     setSaving(false);
     if (result.error) {
@@ -1078,6 +1086,18 @@ export function TransactionRowWithSplit({
               外側をタップで閉じる
             </span>
           </div>
+          <input
+            type="text"
+            aria-label="名前"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            className="min-h-11 w-full rounded-xl px-3 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          />
           <div className="flex gap-2">
             <input
               type="date"
@@ -1134,6 +1154,11 @@ export function TransactionRowWithSplit({
           >
             {saving ? '保存中…' : '保存'}
           </button>
+          {!canSaveSimpleEdit && !saving ? (
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              名前・日付・金額・カテゴリを変えると保存できます
+            </p>
+          ) : null}
           {error ? (
             <p className="text-xs" style={{ color: 'var(--over)' }}>
               {error}
