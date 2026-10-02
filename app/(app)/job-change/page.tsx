@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
@@ -22,7 +24,15 @@ const PHASE_LABEL: Record<MilestonePhase, string> = {
   offer: '内定',
 };
 
-export default async function JobChangePage() {
+export default function JobChangePage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="転職" />}>
+      <JobChangePageBody />
+    </Suspense>
+  );
+}
+
+async function JobChangePageBody() {
   const milestones = await withMinDuration(listMilestones());
   const byPhase = new Map<MilestonePhase, Milestone[]>();
   for (const phase of PHASES) byPhase.set(phase, []);

@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { listActiveGoals } from '@/features/goals/store';
@@ -15,7 +17,15 @@ import { GoalCard } from './goal-card';
 // 目標の進捗・保存直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default async function AdvisorPage() {
+export default function AdvisorPage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="相談" />}>
+      <AdvisorPageBody />
+    </Suspense>
+  );
+}
+
+async function AdvisorPageBody() {
   const goals = await withMinDuration(listActiveGoals());
 
   return (

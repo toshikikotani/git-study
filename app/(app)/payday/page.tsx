@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../screen-frame';
+import { Suspense } from 'react';
 import { listAccounts } from '@/features/accounts/store';
 import { listCategoryOptions, listTransferRules } from '@/features/transfer-rules/store';
 import { resolvePaydayChecklistState } from '@/features/transfer-runs/store';
@@ -17,7 +19,15 @@ import { RuleRow } from './rule-row';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PaydayPage() {
+export default function PaydayPage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="給料日" />}>
+      <PaydayPageBody />
+    </Suspense>
+  );
+}
+
+async function PaydayPageBody() {
   const [rules, accounts, categories, checklistState] = await withMinDuration(
     Promise.all([
       listTransferRules(),

@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
@@ -29,7 +31,15 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 // キャッシュに乗せると取り込み直後の反映が遅れる(ADR-001と同じ考え方)。
 export const dynamic = 'force-dynamic';
 
-export default async function ReportsPage() {
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="レポート" />}>
+      <ReportsPageBody />
+    </Suspense>
+  );
+}
+
+async function ReportsPageBody() {
   const [
     trend,
     netWorthPoints,

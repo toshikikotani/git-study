@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
@@ -13,7 +15,15 @@ import { GmailSettingsForm } from './gmail-settings-form';
  * 漏洩経路になる。入力先は環境変数で、ここで編集するのは
  * 有効フラグ・差出人の絞り込み・取得件数上限の3つだけ(NFR-04)。
  */
-export default async function GmailSettingsPage() {
+export default function GmailSettingsPage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="Gmail" />}>
+      <GmailSettingsPageBody />
+    </Suspense>
+  );
+}
+
+async function GmailSettingsPageBody() {
   const settings = await withMinDuration(getGmailSettings());
 
   return (

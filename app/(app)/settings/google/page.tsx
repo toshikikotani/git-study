@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
@@ -15,7 +17,15 @@ import { getGoogleEnv } from '@/lib/env';
  * 発行された refresh_token は画面に一度だけ表示し、本人が環境変数
  * (Vercel + GitHub Secrets)へ手でコピーする(ADR-014、NFR-04)。
  */
-export default async function GoogleSettingsPage() {
+export default function GoogleSettingsPage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="Google" />}>
+      <GoogleSettingsPageBody />
+    </Suspense>
+  );
+}
+
+async function GoogleSettingsPageBody() {
   const connected = getGoogleEnv() !== null;
 
   return (

@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
@@ -16,7 +18,15 @@ import { DuplicateList } from './duplicate-list';
 // 除外した直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default async function DuplicatesPage() {
+export default function DuplicatesPage() {
+  return (
+    <Suspense fallback={<ScreenFrame title="重複" />}>
+      <DuplicatesPageBody />
+    </Suspense>
+  );
+}
+
+async function DuplicatesPageBody() {
   const candidates = await withMinDuration(listDuplicateCandidates());
 
   return (

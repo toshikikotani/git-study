@@ -1,3 +1,5 @@
+import { ScreenFrame } from '../../screen-frame';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -16,7 +18,15 @@ import { BRIEF_EXCLUSION_REASON_LABELS, BRIEF_ITEM_KIND_LABELS } from '../kind-l
 
 export const dynamic = 'force-dynamic';
 
-export default async function BriefDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function BriefDetailPage(props: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<ScreenFrame title="ブリーフ" />}>
+      <BriefDetailPageBody {...props} />
+    </Suspense>
+  );
+}
+
+async function BriefDetailPageBody({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const brief = await withMinDuration(getDailyBrief(id));
   if (!brief) notFound();
