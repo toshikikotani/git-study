@@ -11,7 +11,6 @@ import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
 import { formatDateJa, formatTimeJa } from '@/lib/date';
-import { withMinDuration } from '@/lib/min-loading-duration';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
@@ -32,9 +31,10 @@ export default async function HomePage() {
   // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
   // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
   // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
-  const [, summary] = await withMinDuration(
-    Promise.all([recordCheckin().catch(() => undefined), loadHomeSummary()]),
-  );
+  const [, summary] = await Promise.all([
+    recordCheckin().catch(() => undefined),
+    loadHomeSummary(),
+  ]);
   const streak = await getCheckinStreak();
   const { payoff, tiles } = summary;
 
