@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { CategoryTrendChart } from './category-trend-chart';
 import { ForecastGraphic } from './forecast-graphic';
 import { GoalChart } from './goal-chart';
+import { goalLanding } from '@/domain/goal-range';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
@@ -22,7 +23,6 @@ import {
 import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
-import { buildCategoryLines } from '@/features/category/model';
 import { todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
@@ -72,15 +72,21 @@ export default async function ReportsPage() {
   const forecast = forecastReport({ ...trend, currentMonthKey: monthKey, scheduledByGenre });
   const today = todayJst();
   const plan = await getCurrentPlan(today);
-  const goalItem = plan?.items.find((item) => item.targetYen > 0) ?? null;
-  const goalLines = goalItem
-    ? buildCategoryLines(
-        ledger.transactions.map((tx) => ({ ...tx, items: [] })),
-        goalItem.genreId,
-        { from: ledger.period.from, to: ledger.period.to },
-        today,
-      )
-    : [];
+  const history = trend.monthKeys
+    .filter((key) => key < monthKey)
+    .map((key) =>
+      trend.rows.filter((row) => row.monthKey === key).reduce((sum, row) => sum + row.spentYen, 0),
+    );
+  const goal = plan
+    ? goalLanding({
+        targetYen: plan.items.reduce((sum, item) => sum + item.targetYen, 0),
+        spentYen: ledger.totalSpentYen,
+        scheduledYen: ledger.totals.scheduledYen,
+        elapsedDays: ledger.forecast.elapsedDays,
+        totalDays: ledger.forecast.totalDaysInMonth,
+        history,
+      })
+    : null;
   return (
     <div className="rise space-y-4">
       <header>
@@ -88,23 +94,10 @@ export default async function ReportsPage() {
           レポート
         </h1>
         <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          {goalItem
-            ? `${goalItem.genreName}は、目標の予算を理想線にしている。`
-            : '進行中の目標がない。'}
+          {goal ? '目標の予算と、着地の範囲。' : '進行中の目標がない。'}
         </p>
       </header>
-      {goalItem && plan ? (
-        <GoalChart
-          genreName={goalItem.genreName}
-          lines={goalLines}
-          monthStart={ledger.period.from}
-          monthEnd={ledger.period.to}
-          today={today}
-          budgetYen={goalItem.targetYen}
-          goalFrom={plan.periodStart}
-          goalTo={plan.periodEnd}
-        />
-      ) : null}
+      {goal ? <GoalChart range={goal} /> : null}
       <ForecastGraphic {...forecast} />
 
       <MonthSummaryRow
