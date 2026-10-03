@@ -23,6 +23,7 @@ import {
 import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
+import { buildCategoryLines } from '@/features/category/model';
 import { todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
@@ -97,7 +98,26 @@ export default async function ReportsPage() {
           {goal ? '目標の予算と、着地の範囲。' : '進行中の目標がない。'}
         </p>
       </header>
-      {goal ? <GoalChart range={goal} /> : null}
+      {goal && plan ? (
+        <GoalChart
+          genreName="目標"
+          lines={plan.items.flatMap((item) =>
+            buildCategoryLines(
+              ledger.transactions.map((tx) => ({ ...tx, items: [] })),
+              item.genreId,
+              { from: ledger.period.from, to: ledger.period.to },
+              today,
+            ),
+          )}
+          monthStart={ledger.period.from}
+          monthEnd={ledger.period.to}
+          today={today}
+          budgetYen={goal.targetYen}
+          goalFrom={plan.periodStart}
+          goalTo={plan.periodEnd}
+          range={goal}
+        />
+      ) : null}
       <ForecastGraphic {...forecast} />
 
       <MonthSummaryRow
