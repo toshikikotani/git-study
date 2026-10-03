@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
 import { ForecastGraphic } from './forecast-graphic';
+import { GoalChart } from './goal-chart';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
@@ -12,7 +13,6 @@ import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
 import { forecastReport } from '@/domain/report-forecast';
-import { formatYen } from '@/domain/money';
 import {
   loadAccountBalanceByPurpose,
   loadCategorySpendingTrend,
@@ -21,6 +21,9 @@ import {
 } from '@/features/reports/store';
 import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
+import { getCurrentPlan } from '@/features/spending-plan/store';
+import { buildCategoryLines } from '@/features/category/model';
+import { todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
   loadFixedVariableSplit,
@@ -67,29 +70,41 @@ export default async function ReportsPage() {
     scheduledByGenre[tx.genreId] = (scheduledByGenre[tx.genreId] ?? 0) + Math.abs(tx.amountYen);
   }
   const forecast = forecastReport({ ...trend, currentMonthKey: monthKey, scheduledByGenre });
-  const lead = forecast.genres[0];
+  const today = todayJst();
+  const plan = await getCurrentPlan(today);
+  const goalItem = plan?.items.find((item) => item.targetYen > 0) ?? null;
+  const goalLines = goalItem
+    ? buildCategoryLines(
+        ledger.transactions.map((tx) => ({ ...tx, items: [] })),
+        goalItem.genreId,
+        { from: ledger.period.from, to: ledger.period.to },
+        today,
+      )
+    : [];
   return (
     <div className="rise space-y-4">
       <header>
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
-        {lead?.saveYen ? (
-          <p
-            className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
-            style={{ color: 'var(--ink)' }}
-          >
-            {formatYen(lead.saveYen, { sign: 'never' })}
-          </p>
-        ) : null}
         <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          {lead
-            ? lead.saveYen
-              ? `${lead.genreName}を予測まで戻すと、この額だけ残る。`
-              : `${lead.genreName}は、予測まで戻せる差がない。`
-            : '予測に足る完了月がまだない。'}
+          {goalItem
+            ? `${goalItem.genreName}は、目標の予算を理想線にしている。`
+            : '進行中の目標がない。'}
         </p>
       </header>
+      {goalItem && plan ? (
+        <GoalChart
+          genreName={goalItem.genreName}
+          lines={goalLines}
+          monthStart={ledger.period.from}
+          monthEnd={ledger.period.to}
+          today={today}
+          budgetYen={goalItem.targetYen}
+          goalFrom={plan.periodStart}
+          goalTo={plan.periodEnd}
+        />
+      ) : null}
       <ForecastGraphic {...forecast} />
 
       <MonthSummaryRow
