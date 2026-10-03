@@ -11,7 +11,7 @@ import { NetWorthChart } from './net-worth-chart';
 import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
-import { biggestIncrease } from '@/domain/report-finding';
+import { forecastGenre } from '@/domain/report-forecast';
 import { formatYen } from '@/domain/money';
 import {
   loadAccountBalanceByPurpose,
@@ -61,7 +61,7 @@ export default async function ReportsPage() {
   );
   const monthKey = ledger.period.from.slice(0, 7);
 
-  const finding = biggestIncrease(trend);
+  const finding = forecastGenre({ ...trend, currentMonthKey: monthKey });
   return (
     <div className="rise space-y-4">
       <header>
@@ -77,14 +77,14 @@ export default async function ReportsPage() {
               {formatYen(finding.saveYen, { sign: 'never' })}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              {finding.genreName}が {formatYen(finding.priorYen, { sign: 'never' })} から{' '}
-              {formatYen(finding.previousYen, { sign: 'never' })}{' '}
-              に増えた。前の月の額に抑えると、この額だけ残る。
+              {finding.genreName}の直近{finding.months}ヶ月平均は{' '}
+              {formatYen(finding.meanYen, { sign: 'never' })}。先月は平均から {finding.zScore}
+              σ。平均まで戻すと {formatYen(finding.saveYen, { sign: 'never' })} 残る。
             </p>
           </>
         ) : (
           <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            直近2ヶ月で増えたジャンルはない。
+            予測に足る月次がまだない。
           </p>
         )}
       </header>

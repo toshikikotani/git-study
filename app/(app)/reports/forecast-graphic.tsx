@@ -1,33 +1,23 @@
 'use client';
 
 import { formatYen } from '@/domain/money';
+import type { GenreForecast } from '@/domain/report-forecast';
 
-export function ForecastGraphic({
-  genreName,
-  priorYen,
-  previousYen,
-  saveYen,
-}: {
-  genreName: string;
-  priorYen: number;
-  previousYen: number;
-  saveYen: number;
-}) {
-  const forecastYen = previousYen + Math.max(saveYen, 0);
-  const max = Math.max(priorYen, previousYen, forecastYen, 1);
+export function ForecastGraphic(forecast: GenreForecast) {
+  const max = Math.max(forecast.meanYen, forecast.latestYen, forecast.highYen, 1);
   const bars = [
-    { label: '先々月', yen: priorYen },
-    { label: '先月', yen: previousYen },
-    { label: 'このまま', yen: forecastYen },
+    { label: '平均', yen: forecast.meanYen },
+    { label: '先月', yen: forecast.latestYen },
+    { label: '点予測', yen: forecast.pointYen },
   ];
   return (
     <section
-      aria-label="支出の予想"
+      aria-label="支出の統計予測"
       className="rounded-[22px] px-4 py-4"
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        {genreName}の予想
+        {forecast.genreName}の80%予測区間
       </p>
       <div className="mt-4 flex h-28 items-end gap-3">
         {bars.map((bar) => (
@@ -39,8 +29,8 @@ export function ForecastGraphic({
               className="w-full rounded-t-xl"
               style={{
                 height: `${Math.max(8, (bar.yen / max) * 100)}%`,
-                background: bar.label === 'このまま' ? 'var(--over)' : 'var(--ink)',
-                opacity: bar.label === '先々月' ? 0.35 : 1,
+                background: bar.label === '点予測' ? 'var(--over)' : 'var(--ink)',
+                opacity: bar.label === '平均' ? 0.35 : 1,
               }}
             />
             <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -50,8 +40,10 @@ export function ForecastGraphic({
         ))}
       </div>
       <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-        このままだと {formatYen(forecastYen, { sign: 'never' })} まで増える。先々月の額に抑えると、
-        {formatYen(saveYen, { sign: 'never' })} 残る。
+        来月の点予測は {formatYen(forecast.pointYen, { sign: 'never' })}。80%区間は{' '}
+        {formatYen(forecast.lowYen, { sign: 'never' })} から{' '}
+        {formatYen(forecast.highYen, { sign: 'never' })}。傾きは月 {formatYen(forecast.slopeYen)}
+        、ばらつきは {formatYen(forecast.sdYen, { sign: 'never' })}。
       </p>
     </section>
   );
