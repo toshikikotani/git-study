@@ -105,7 +105,13 @@ function forecastOne(
 
 function selectModel(series: readonly number[]): { point: number; margin: number; error: number } {
   const n = series.length;
-  const candidates: Array<ReturnType<typeof lineModel>> = [medianModel(series), mean3(series)];
+  const candidates: Array<{
+    kind: 'median' | 'mean3' | 'line';
+    point: number;
+    margin: number;
+    error: number;
+    residual: number;
+  }> = [medianModel(series), mean3(series)];
   if (n >= 4) {
     const line = lineModel(series);
     if (line.residual > 0) candidates.push(line);
