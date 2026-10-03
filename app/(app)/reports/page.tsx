@@ -11,7 +11,7 @@ import { NetWorthChart } from './net-worth-chart';
 import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
-import { forecastGenre } from '@/domain/report-forecast';
+import { forecastReport } from '@/domain/report-forecast';
 import { formatYen } from '@/domain/money';
 import {
   loadAccountBalanceByPurpose,
@@ -61,34 +61,36 @@ export default async function ReportsPage() {
   );
   const monthKey = ledger.period.from.slice(0, 7);
 
-  const finding = forecastGenre({ ...trend, currentMonthKey: monthKey });
+  const scheduledByGenre: Record<string, number> = {};
+  for (const tx of ledger.transactions) {
+    if (tx.status !== 'scheduled' || tx.isTransfer || tx.needsInput || !tx.genreId) continue;
+    scheduledByGenre[tx.genreId] = (scheduledByGenre[tx.genreId] ?? 0) + Math.abs(tx.amountYen);
+  }
+  const forecast = forecastReport({ ...trend, currentMonthKey: monthKey, scheduledByGenre });
+  const lead = forecast.genres[0];
   return (
     <div className="rise space-y-4">
       <header>
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
-        {finding ? (
-          <>
-            <p
-              className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
-              style={{ color: 'var(--ink)' }}
-            >
-              {formatYen(finding.saveYen, { sign: 'never' })}
-            </p>
-            <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              {finding.genreName}の直近{finding.months}ヶ月平均は{' '}
-              {formatYen(finding.meanYen, { sign: 'never' })}。先月は平均から {finding.zScore}
-              σ。平均まで戻すと {formatYen(finding.saveYen, { sign: 'never' })} 残る。
-            </p>
-          </>
-        ) : (
-          <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            予測に足る月次がまだない。
+        {lead?.saveYen ? (
+          <p
+            className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
+            style={{ color: 'var(--ink)' }}
+          >
+            {formatYen(lead.saveYen, { sign: 'never' })}
           </p>
-        )}
+        ) : null}
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          {lead
+            ? lead.saveYen
+              ? `${lead.genreName}を予測まで戻すと、この額だけ残る。`
+              : `${lead.genreName}は、予測まで戻せる差がない。`
+            : '予測に足る完了月がまだない。'}
+        </p>
       </header>
-      {finding ? <ForecastGraphic {...finding} /> : null}
+      <ForecastGraphic {...forecast} />
 
       <MonthSummaryRow
         spentYen={ledger.totalSpentYen}
