@@ -43,7 +43,7 @@ export function ForecastGraphic({
         {selected.intermittent
           ? selected.history
               .filter((point) => point.yen > 0)
-              .map((point, index) => (
+              .map((point) => (
                 <circle
                   key={point.monthKey}
                   cx={x(selected.history.indexOf(point))}
