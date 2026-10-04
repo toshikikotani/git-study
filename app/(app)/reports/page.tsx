@@ -2,7 +2,6 @@ import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
 import { ForecastGraphic } from './forecast-graphic';
-import { GoalChart } from './goal-chart';
 import { MonthForecastChart } from './month-forecast-chart';
 import { goalLanding } from '@/domain/goal-range';
 import { buildForecast } from '@/domain/forecast/engine';
@@ -27,7 +26,6 @@ import {
 import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
-import { buildCategoryLines } from '@/features/category/model';
 import { todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
