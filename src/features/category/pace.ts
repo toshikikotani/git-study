@@ -204,10 +204,7 @@ export function buildCumulative(input: {
           : null,
       forecastHighYen:
         hasForecast && future
-          ? Math.min(
-              goal?.budgetYen ?? Number.POSITIVE_INFINITY,
-              Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum),
-            )
+          ? Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum)
           : null,
     });
   }
