@@ -25,7 +25,7 @@ export function ForecastGraphic({
   if (!selected || selected.history.length === 0) return null;
   const points = selected.history;
   const last = points[points.length - 1]!;
-  const max = Math.max(last.yen, selected.pointYen, selected.highYen ?? 0, 1);
+  const max = Math.max(last.yen, selected.pointYen, selected.highYen ?? 0, 1) * 1.08;
   const x = (index: number) => (index / points.length) * 100;
   const y = (yen: number) => 100 - (yen / max) * 100;
   const actual = points.map((point, index) => `${x(index)},${y(point.yen)}`).join(' ');
