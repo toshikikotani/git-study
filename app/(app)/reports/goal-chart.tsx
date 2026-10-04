@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 
 import { CategoryChart, type ChartMode } from '../spending/category/[genreKey]/category-chart';
-import type { GoalRange } from '@/domain/goal-range';
 import { buildCumulative, categoryAllowanceYen } from '@/features/category/pace';
 import type { CategoryLine } from '@/features/category/model';
 import { buildSeries, type ChartUnit } from '@/features/category/series';
@@ -18,7 +17,7 @@ export function GoalChart({
   budgetYen,
   goalFrom,
   goalTo,
-  range,
+  landing,
 }: {
   genreName: string;
   lines: CategoryLine[];
@@ -28,7 +27,7 @@ export function GoalChart({
   budgetYen: number;
   goalFrom: DateOnly;
   goalTo: DateOnly;
-  range: GoalRange;
+  landing: { p10: number; p50: number; p90: number };
 }) {
   const [mode, setMode] = useState<ChartMode>('cumulative');
   const [unit, setUnit] = useState<ChartUnit>('day');
@@ -60,24 +59,35 @@ export function GoalChart({
       recordStart: series.recordStart,
       goal: { range: { from: goalFrom, to: goalTo }, budgetYen },
     });
-    const future = chart.days.filter((day) => day.forecastYen !== null);
-    const last = future.length - 1;
+    const future = chart.days.filter((day) => day.date > today);
+    const start = chart.days.find((day) => day.date === today)?.actualYen ?? 0;
+    const last = Math.max(future.length - 1, 1);
     return {
       ...chart,
       hasForecast: future.length > 0,
-      maxYen: Math.max(chart.maxYen, range.highYen, budgetYen),
+      maxYen: Math.max(chart.maxYen, landing.p90, budgetYen),
       days: chart.days.map((day) => {
-        if (day.forecastYen === null) return day;
-        const step = last <= 0 ? 1 : future.indexOf(day) / last;
+        if (day.date <= today) return day;
+        const step = future.indexOf(day) / last;
         return {
           ...day,
-          forecastYen: Math.round(range.spentYen + (range.pointYen - range.spentYen) * step),
-          forecastLowYen: Math.round(range.spentYen + (range.lowYen - range.spentYen) * step),
-          forecastHighYen: Math.round(range.spentYen + (range.highYen - range.spentYen) * step),
+          forecastYen: Math.round(start + (landing.p50 - start) * step),
+          forecastLowYen: Math.round(start + (landing.p10 - start) * step),
+          forecastHighYen: Math.round(start + (landing.p90 - start) * step),
         };
       }),
     };
-  }, [lines, monthStart, monthEnd, today, series.recordStart, goalFrom, goalTo, budgetYen, range]);
+  }, [
+    lines,
+    monthStart,
+    monthEnd,
+    today,
+    series.recordStart,
+    goalFrom,
+    goalTo,
+    budgetYen,
+    landing,
+  ]);
   return (
     <CategoryChart
       series={series}

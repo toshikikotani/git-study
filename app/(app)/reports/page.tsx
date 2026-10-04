@@ -171,7 +171,7 @@ export default async function ReportsPage() {
           budgetYen={goal.targetYen}
           goalFrom={plan.periodStart}
           goalTo={plan.periodEnd}
-          range={goal}
+          landing={{ p10: engine.total.p10, p50: engine.total.p50, p90: engine.total.p90 }}
         />
       ) : null}
       <ForecastGraphic {...forecast} />
