@@ -99,14 +99,12 @@ export function CategoryChart({
   const override = genreName === '未分類' ? null : overrides[genreName];
   const barColor = genreBarColor(genreName === '未分類' ? null : genreName, override);
   const lineColor = genreColorVar(genreName === '未分類' ? null : genreName, override);
-  const forecastHigh = Math.max(0, ...cumulative.days.map((day) => day.forecastHighYen ?? 0));
-  const forecastMid =
-    cumulative.days.filter((day) => day.forecastYen !== null).at(-1)?.forecastYen ?? 0;
-  const forecastLow =
-    cumulative.days.filter((day) => day.forecastLowYen !== null).at(-1)?.forecastLowYen ?? 0;
+  const forecastEnd = cumulative.days.filter((day) => day.forecastYen !== null).at(-1);
+  const forecastLow = forecastEnd?.forecastLowYen ?? 0;
+  const forecastMid = forecastEnd?.forecastYen ?? 0;
+  const forecastHigh = Math.max(forecastEnd?.forecastHighYen ?? 0, forecastMid);
   const maxYen = isCum
-    ? Math.max(budgetYen ?? 0, cumulative.maxYen, forecastHigh) *
-      (forecastHigh > (budgetYen ?? 0) ? 1.08 : 1)
+    ? Math.max(budgetYen ?? 0, cumulative.maxYen, forecastLow, forecastMid, forecastHigh, 1) * 1.08
     : series.maxYen;
   const ticks = isCum
     ? [...new Set([forecastLow, forecastMid, forecastHigh].filter((yen) => yen > 0))].sort(
