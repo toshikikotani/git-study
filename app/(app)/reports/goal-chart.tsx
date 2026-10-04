@@ -78,7 +78,8 @@ export function GoalChart({
     return {
       ...chart,
       hasForecast: future.length > 0,
-      maxYen: Math.max(chart.maxYen, landing.p90, landing.p50, end),
+      maxYen: Math.max(landing.p90, landing.p50, end, 1),
+      ticks: [Math.max(landing.p90, end) / 2, Math.max(landing.p90, end, 1)],
       days: chart.days.map((day) => {
         const point = path.get(day.date);
         if (point === undefined) return day;
