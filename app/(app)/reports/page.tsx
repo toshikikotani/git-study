@@ -49,7 +49,7 @@ export default async function ReportsPage() {
     ledger,
     fixedVariable,
     subscriptionCandidates,
-    confirmedKeys,
+    confirmedFixedKeys: confirmedKeys,
   ] = await withMinDuration(
     Promise.all([
       loadCategorySpendingTrend(),
@@ -109,7 +109,7 @@ export default async function ReportsPage() {
     today,
     trainingFrom: addDays(today, -90),
     recordStart: ledger.record.firstRecordedOn,
-    confirmedKeys,
+    confirmedFixedKeys: confirmedKeys,
     detectedSubscriptions: subscriptionCandidates,
     budgetYen:
       plan && plan.items.some((item) => item.targetYen > 0)
