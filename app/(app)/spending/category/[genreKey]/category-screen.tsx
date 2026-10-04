@@ -23,6 +23,7 @@ import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
+import { setCategoryForecastClosedAction } from '../actions';
 import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
@@ -166,8 +167,17 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
           data.goal?.active && data.goal.row && data.goal.row.targetYen !== null
             ? { range: data.goal.range, budgetYen: data.goal.row.targetYen }
             : null,
+        holdForecast: data.forecastClosed,
       }),
-    [historyLines, data.monthStart, data.range.to, data.today, series.recordStart, data.goal],
+    [
+      historyLines,
+      data.monthStart,
+      data.range.to,
+      data.today,
+      series.recordStart,
+      data.goal,
+      data.forecastClosed,
+    ],
   );
 
   const currentGenreId = genreIdOfKey(data.genreKey);
@@ -394,6 +404,23 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
 
       <InsightsSection insights={insights} onFocus={focusInsight} />
 
+      {currentGenreId ? (
+        <button
+          type="button"
+          className="min-h-11 rounded-full px-4 text-sm font-semibold"
+          style={{
+            background: data.forecastClosed ? 'var(--action)' : 'var(--surface)',
+            color: data.forecastClosed ? 'var(--on-action)' : 'var(--ink)',
+          }}
+          onClick={() =>
+            void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(() =>
+              router.refresh(),
+            )
+          }
+        >
+          {data.forecastClosed ? 'これ以上は予測しない' : 'これ以上は使わない'}
+        </button>
+      ) : null}
       <CategoryChart
         series={series}
         cumulative={cumulative}

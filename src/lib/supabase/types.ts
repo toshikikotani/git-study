@@ -1705,6 +1705,7 @@ export type Database = {
           name: string;
           quick_entry_order: number | null;
           show_on_home: boolean;
+          forecast_closed: boolean;
           sort_order: number;
           user_id: string;
         };
@@ -1718,6 +1719,7 @@ export type Database = {
           name: string;
           quick_entry_order?: number | null;
           show_on_home?: boolean;
+          forecast_closed?: boolean;
           sort_order?: number;
           user_id: string;
         };
@@ -1731,6 +1733,7 @@ export type Database = {
           name?: string;
           quick_entry_order?: number | null;
           show_on_home?: boolean;
+          forecast_closed?: boolean;
           sort_order?: number;
           user_id?: string;
         };

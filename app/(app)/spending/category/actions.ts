@@ -34,7 +34,7 @@ import {
   updateRuleGenre,
 } from '@/features/genre/memory-store';
 import { recordCorrection } from '@/features/genre/memory-store';
-import { updateGenreBudget } from '@/features/genre/store';
+import { setGenreForecastClosed, updateGenreBudget } from '@/features/genre/store';
 import { renameGenre, saveGenreStyle } from '@/features/genre/style-store';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { describeUserError } from '@/lib/errors';
@@ -579,5 +579,17 @@ export async function updateCategoryBudgetAction(
     return { error: describeUserError(error) };
   }
   revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+export async function setCategoryForecastClosedAction(
+  genreId: string,
+  closed: boolean,
+): Promise<{ error: string | null }> {
+  try {
+    await setGenreForecastClosed(genreId, closed);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : '予測の停止を保存できませんでした' };
+  }
   return { error: null };
 }

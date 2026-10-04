@@ -116,6 +116,7 @@ export function buildCumulative(input: {
   today: DateOnly;
   recordStart: DateOnly;
   goal: { range: { from: DateOnly; to: DateOnly }; budgetYen: number } | null;
+  holdForecast?: boolean;
 }): CumulativeChart {
   const { lines, monthStart, monthEnd, today, recordStart } = input;
   const dayCount = daysBetween(recordStart, monthEnd) + 1;
@@ -168,9 +169,9 @@ export function buildCumulative(input: {
   };
 
   const perDay =
-    started && isThisMonth
-      ? (cumAt.get(lastActual) ?? 0) / (daysBetween(recordStart, lastActual) + 1)
-      : 0;
+    input.holdForecast || !started || !isThisMonth
+      ? 0
+      : (cumAt.get(lastActual) ?? 0) / (daysBetween(recordStart, lastActual) + 1);
   const hasForecast = isThisMonth && started && today < monthEnd;
 
   let scheduledCum = 0;

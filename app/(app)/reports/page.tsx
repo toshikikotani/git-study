@@ -7,6 +7,7 @@ import { goalLanding } from '@/domain/goal-range';
 import { buildForecast } from '@/domain/forecast/engine';
 import { forecastPlan } from '@/domain/plan-forecast';
 import { loadPlanContext } from '@/features/spending-plan/context';
+import { listGenres } from '@/features/genre/store';
 import { loadGenreSpend } from '@/features/spending-plan/store';
 import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
 import { daysBetween } from '@/lib/date';
@@ -133,6 +134,10 @@ export default async function ReportsPage() {
           today < plan.periodEnd ? today : plan.periodEnd,
         );
         const scheduled = await loadScheduledByGenre(plan.periodStart, plan.periodEnd);
+        const listed = await listGenres().catch(() => []);
+        const closedIds = new Set(
+          listed.filter((genre) => genre.forecastClosed).map((genre) => genre.id),
+        );
         const byId = new Map(context.genres.map((genre) => [genre.genreId, genre]));
         const genres = plan.items.flatMap((item) => {
           const genre = byId.get(item.genreId);
@@ -141,8 +146,8 @@ export default async function ReportsPage() {
             {
               spentYen: spent.byGenre.get(item.genreId) ?? 0,
               scheduledYen: scheduled.get(item.genreId) ?? 0,
-              meanDailyYen: genre.dailyYen,
-              medianDailyYen: genre.medianDailyYen,
+              meanDailyYen: closedIds.has(item.genreId) ? 0 : genre.dailyYen,
+              medianDailyYen: closedIds.has(item.genreId) ? 0 : genre.medianDailyYen,
               observedDays: context.lookbackDays,
               targetYen: item.targetYen,
             },
