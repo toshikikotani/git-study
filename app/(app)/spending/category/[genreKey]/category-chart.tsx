@@ -703,8 +703,6 @@ function CumulativeLayer({
   color: string;
   dim: boolean;
   budgetYen: number | null;
-  holdForecast?: boolean;
-  onHoldForecast?: () => void;
 }) {
   void budgetYen;
 

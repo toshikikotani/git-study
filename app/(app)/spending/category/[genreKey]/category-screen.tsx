@@ -418,14 +418,14 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
         budgetYen={data.goal?.row?.targetYen ?? null}
         holdForecast={data.forecastClosed}
-        onHoldForecast={
-          currentGenreId
-            ? () =>
+        {...(currentGenreId
+          ? {
+              onHoldForecast: () =>
                 void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
                   () => router.refresh(),
-                )
-            : undefined
-        }
+                ),
+            }
+          : {})}
       />
 
       <CategoryTabs
