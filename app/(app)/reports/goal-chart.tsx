@@ -61,19 +61,33 @@ export function GoalChart({
     });
     const future = chart.days.filter((day) => day.date > today);
     const start = chart.days.find((day) => day.date === today)?.actualYen ?? 0;
-    const last = Math.max(future.length - 1, 1);
+    const scheduledTotal = future.reduce((sum, day) => sum + day.scheduledYen, 0);
+    const variable = Math.max(landing.p50 - start - scheduledTotal, 0);
+    const openDays = Math.max(future.filter((day) => day.scheduledYen === 0).length, 1);
+    let scheduled = 0;
+    let varied = 0;
+    const path = new Map<string, number>();
+    for (const day of future) {
+      scheduled += day.scheduledYen;
+      if (day.scheduledYen === 0) varied += variable / openDays;
+      path.set(day.date, start + scheduled + varied);
+    }
+    const end = path.get(future.at(-1)?.date ?? '') ?? start;
+    const lowGap = landing.p10 - landing.p50;
+    const highGap = landing.p90 - landing.p50;
     return {
       ...chart,
       hasForecast: future.length > 0,
-      maxYen: Math.max(chart.maxYen, landing.p90, budgetYen),
+      maxYen: Math.max(chart.maxYen, landing.p90, end, budgetYen),
       days: chart.days.map((day) => {
-        if (day.date <= today) return day;
-        const step = future.indexOf(day) / last;
+        const point = path.get(day.date);
+        if (point === undefined) return day;
+        const scale = end === start ? 1 : (point - start) / (end - start);
         return {
           ...day,
-          forecastYen: Math.round(start + (landing.p50 - start) * step),
-          forecastLowYen: Math.round(start + (landing.p10 - start) * step),
-          forecastHighYen: Math.round(start + (landing.p90 - start) * step),
+          forecastYen: Math.round(point),
+          forecastLowYen: Math.round(point + lowGap * scale),
+          forecastHighYen: Math.round(point + highGap * scale),
         };
       }),
     };
