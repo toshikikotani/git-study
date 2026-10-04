@@ -6,7 +6,6 @@ import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expens
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
-import { getCurrentPlan } from '@/features/spending-plan/store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { addMonths } from '@/lib/date';
 import { AttentionCard } from './attention-card';
@@ -14,7 +13,6 @@ import { CalendarHeatmap } from './calendar-heatmap';
 import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
-import { CategoryCharts } from './category-charts';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
 import { ViewSwitch } from './view-switch';
@@ -47,7 +45,6 @@ export default async function SpendingPage() {
     listDuplicateCandidates(),
     listOpenCaptures().catch(() => []),
   ]);
-  const plan = await getCurrentPlan(ledger.period.to).catch(() => null);
   const ids = ledger.transactions.map((t) => t.id);
   const [items, subtypes] = await Promise.all([
     listReceiptItemsForTransactionIds(ids),
@@ -93,22 +90,6 @@ export default async function SpendingPage() {
         />
         <AttentionCard hasGoal={false} />
         <GenreBreakdown goalRows={null} />
-        <CategoryCharts
-          transactions={transactions}
-          genres={genres.map((genre) => ({
-            id: genre.id,
-            name: genre.name,
-            budgetYen:
-              plan?.items.find((item) => item.genreId === genre.id)?.targetYen ??
-              genre.budgetYen ??
-              null,
-          }))}
-          monthStart={ledger.period.from}
-          monthEnd={ledger.period.to}
-          today={today}
-          goalFrom={plan?.periodStart ?? null}
-          goalTo={plan?.periodEnd ?? null}
-        />
         <CalendarHeatmap goal={null} />
         <LedgerList goalRange={null} duplicateCount={duplicates.length} />
         <CurrentMonthOnly>
