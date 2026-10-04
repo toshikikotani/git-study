@@ -78,16 +78,17 @@ export function GoalChart({
     return {
       ...chart,
       hasForecast: future.length > 0,
-      maxYen: Math.max(chart.maxYen, landing.p90, end, budgetYen),
+      maxYen: Math.max(chart.maxYen, landing.p90, landing.p50, end),
       days: chart.days.map((day) => {
         const point = path.get(day.date);
         if (point === undefined) return day;
         const scale = end === start ? 1 : (point - start) / (end - start);
+        const lastDay = day.date === future.at(-1)?.date;
         return {
           ...day,
-          forecastYen: Math.round(point),
-          forecastLowYen: Math.round(point + lowGap * scale),
-          forecastHighYen: Math.round(point + highGap * scale),
+          forecastYen: lastDay ? landing.p50 : Math.round(point),
+          forecastLowYen: lastDay ? landing.p10 : Math.round(point + lowGap * scale),
+          forecastHighYen: lastDay ? landing.p90 : Math.round(point + highGap * scale),
         };
       }),
     };
@@ -115,7 +116,7 @@ export function GoalChart({
       onUnit={setUnit}
       onPick={() => undefined}
       selectedIndex={null}
-      budgetYen={budgetYen}
+      budgetYen={null}
     />
   );
 }
