@@ -13,6 +13,7 @@ import { NetWorthChart } from './net-worth-chart';
 import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
+import { formatYen } from '@/domain/money';
 import { forecastReport } from '@/domain/report-forecast';
 import {
   loadAccountBalanceByPurpose,
@@ -94,9 +95,31 @@ export default async function ReportsPage() {
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
-        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          {goal ? '目標の予算と、着地の範囲。' : '進行中の目標がない。'}
-        </p>
+        {goal ? (
+          <>
+            <p
+              className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
+              style={{ color: 'var(--ink)' }}
+            >
+              {formatYen(goal.pointYen, { sign: 'never' })}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+              月末の着地は {formatYen(goal.lowYen, { sign: 'never' })} から{' '}
+              {formatYen(goal.highYen, { sign: 'never' })}。 目標は{' '}
+              {formatYen(goal.targetYen, { sign: 'never' })}。
+              {history.length >= 2 && history[history.length - 1]! > history[0]!
+                ? '完了月の支出は増えている。'
+                : '完了月の支出は増えていない。'}
+              {forecast.genres[0]?.saveYen
+                ? ` ${forecast.genres[0].genreName}を平均まで戻すと ${formatYen(forecast.genres[0].saveYen, { sign: 'never' })} 残る。`
+                : ' 戻して残るジャンルはない。'}
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+            進行中の目標がないので、月末の着地は出せない。
+          </p>
+        )}
       </header>
       {goal && plan ? (
         <GoalChart
