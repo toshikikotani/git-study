@@ -91,7 +91,7 @@ export function GoalChart({
       onUnit={setUnit}
       onPick={() => undefined}
       selectedIndex={null}
-      budgetYen={null}
+      budgetYen={budgetYen}
     />
   );
 }

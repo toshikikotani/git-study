@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
 import { ForecastGraphic } from './forecast-graphic';
-import { MonthForecastChart } from './month-forecast-chart';
+import { GoalChart } from './goal-chart';
 import { goalLanding } from '@/domain/goal-range';
 import { buildForecast } from '@/domain/forecast/engine';
 import { addDays } from '@/lib/date';
@@ -26,6 +26,7 @@ import {
 import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
+import { buildCategoryLines } from '@/features/category/model';
 import { todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
@@ -152,17 +153,26 @@ export default async function ReportsPage() {
           </p>
         )}
       </header>
-      <MonthForecastChart
-        months={incomeExpenseTrend.rows
-          .filter((row) => row.monthKey < monthKey)
-          .slice(-5)
-          .map((row) => ({ label: `${Number(row.monthKey.slice(5))}`, yen: row.expenseYen }))}
-        currentYen={ledger.totalSpentYen}
-        p10={engine.total.p10}
-        p50={engine.total.p50}
-        p90={engine.total.p90}
-        budgetYen={goal?.targetYen ?? null}
-      />
+      {goal && plan ? (
+        <GoalChart
+          genreName="全体"
+          lines={plan.items.flatMap((item) =>
+            buildCategoryLines(
+              ledger.transactions.map((tx) => ({ ...tx, items: [] })),
+              item.genreId,
+              { from: ledger.period.from, to: ledger.period.to },
+              today,
+            ),
+          )}
+          monthStart={ledger.period.from}
+          monthEnd={ledger.period.to}
+          today={today}
+          budgetYen={goal.targetYen}
+          goalFrom={plan.periodStart}
+          goalTo={plan.periodEnd}
+          range={goal}
+        />
+      ) : null}
       <ForecastGraphic {...forecast} />
 
       <MonthSummaryRow
