@@ -353,6 +353,20 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
             {currentGenreId !== null ? (
               <button
                 type="button"
+                onClick={() =>
+                  void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
+                    () => router.refresh(),
+                  )
+                }
+                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
+                style={{ color: data.forecastClosed ? 'var(--income)' : 'var(--ink)' }}
+              >
+                {data.forecastClosed ? '予測しない' : '予測を止める'}
+              </button>
+            ) : null}
+            {currentGenreId !== null ? (
+              <button
+                type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-label={`${data.genreName}の設定`}
                 className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
