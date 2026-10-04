@@ -404,23 +404,6 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
 
       <InsightsSection insights={insights} onFocus={focusInsight} />
 
-      {currentGenreId ? (
-        <button
-          type="button"
-          className="min-h-11 rounded-full px-4 text-sm font-semibold"
-          style={{
-            background: data.forecastClosed ? 'var(--action)' : 'var(--surface)',
-            color: data.forecastClosed ? 'var(--on-action)' : 'var(--ink)',
-          }}
-          onClick={() =>
-            void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(() =>
-              router.refresh(),
-            )
-          }
-        >
-          {data.forecastClosed ? 'これ以上は予測しない' : 'これ以上は使わない'}
-        </button>
-      ) : null}
       <CategoryChart
         series={series}
         cumulative={cumulative}
@@ -435,6 +418,24 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
         budgetYen={data.goal?.row?.targetYen ?? null}
       />
+      {currentGenreId ? (
+        <button
+          type="button"
+          className="min-h-11 w-full rounded-2xl px-4 text-sm font-semibold"
+          style={{
+            background: data.forecastClosed ? 'var(--action)' : 'var(--surface-raised)',
+            color: data.forecastClosed ? 'var(--on-action)' : 'var(--ink)',
+            border: '1px solid var(--line)',
+          }}
+          onClick={() =>
+            void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(() =>
+              router.refresh(),
+            )
+          }
+        >
+          {data.forecastClosed ? 'これ以上は予測しない' : 'これ以上は使わない'}
+        </button>
+      ) : null}
 
       <CategoryTabs
         genreKey={data.genreKey}
