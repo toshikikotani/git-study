@@ -99,12 +99,20 @@ export function CategoryChart({
   const override = genreName === '未分類' ? null : overrides[genreName];
   const barColor = genreBarColor(genreName === '未分類' ? null : genreName, override);
   const lineColor = genreColorVar(genreName === '未分類' ? null : genreName, override);
+  const forecastHigh = Math.max(0, ...cumulative.days.map((day) => day.forecastHighYen ?? 0));
+  const forecastMid =
+    cumulative.days.filter((day) => day.forecastYen !== null).at(-1)?.forecastYen ?? 0;
+  const forecastLow =
+    cumulative.days.filter((day) => day.forecastLowYen !== null).at(-1)?.forecastLowYen ?? 0;
   const maxYen = isCum
-    ? budgetYen && budgetYen > 0
-      ? budgetYen
-      : cumulative.maxYen
+    ? Math.max(budgetYen ?? 0, cumulative.maxYen, forecastHigh) *
+      (forecastHigh > (budgetYen ?? 0) ? 1.08 : 1)
     : series.maxYen;
-  const ticks = isCum ? cumulative.ticks : series.ticks;
+  const ticks = isCum
+    ? [...new Set([forecastLow, forecastMid, forecastHigh].filter((yen) => yen > 0))].sort(
+        (a, b) => a - b,
+      )
+    : series.ticks;
 
   // なぞり操作(長押し・なぞる・タップ)の状態機械。DOM に触れない(lib/chart-gesture.ts)。
   const [gesture] = useState(() => new ChartGesture());
@@ -610,7 +618,7 @@ export function CategoryChart({
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {isCum
-            ? '実線=実績の累計、点線=予算までの理想。軸は予算'
+            ? '実線=実績の累計、点線=予算までの理想。右は予測の最小・中央・最大'
             : '長押ししてなぞると、日ごとの金額が見られます'}
         </p>
         <button
