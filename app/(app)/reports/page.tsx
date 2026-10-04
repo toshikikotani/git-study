@@ -4,6 +4,8 @@ import { CategoryTrendChart } from './category-trend-chart';
 import { ForecastGraphic } from './forecast-graphic';
 import { GoalChart } from './goal-chart';
 import { goalLanding } from '@/domain/goal-range';
+import { buildForecast } from '@/domain/forecast/engine';
+import { addDays } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
@@ -89,35 +91,65 @@ export default async function ReportsPage() {
         history,
       })
     : null;
+  const engine = buildForecast({
+    transactions: ledger.transactions.map((tx) => ({
+      occurredOn: tx.occurredOn,
+      genreId: tx.genreId,
+      genreName: tx.genreName,
+      amountYen: tx.amountYen,
+      status: tx.status,
+      kind: tx.kind,
+      isTransfer: tx.isTransfer,
+      reviewStatus: tx.reviewStatus,
+      needsInput: tx.needsInput,
+      merchantName: tx.label,
+      description: tx.description,
+    })),
+    period: { from: ledger.period.from, to: ledger.period.to },
+    today,
+    trainingFrom: addDays(today, -90),
+    recordStart: ledger.record.firstRecordedOn,
+    confirmedKeys,
+    detectedSubscriptions: subscriptionCandidates,
+    budgetYen:
+      plan && plan.items.some((item) => item.targetYen > 0)
+        ? plan.items.reduce((sum, item) => sum + item.targetYen, 0)
+        : null,
+    payday: null,
+    dataVersion: `${ledger.transactions.length}:${ledger.transactions.at(-1)?.occurredOn ?? ''}`,
+  });
   return (
     <div className="rise space-y-4">
       <header>
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
-        {goal ? (
+        {engine ? (
           <>
             <p
               className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
               style={{ color: 'var(--ink)' }}
             >
-              {formatYen(goal.pointYen, { sign: 'never' })}
+              {formatYen(round100(engine.total.p50), { sign: 'never' })}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              月末の着地は {formatYen(goal.lowYen, { sign: 'never' })} から{' '}
-              {formatYen(goal.highYen, { sign: 'never' })}。 目標は{' '}
-              {formatYen(goal.targetYen, { sign: 'never' })}。
-              {history.length >= 2 && history[history.length - 1]! > history[0]!
-                ? '完了月の支出は増えている。'
-                : '完了月の支出は増えていない。'}
-              {forecast.genres[0]?.saveYen
-                ? ` ${forecast.genres[0].genreName}を平均まで戻すと ${formatYen(forecast.genres[0].saveYen, { sign: 'never' })} 残る。`
-                : ' 戻して残るジャンルはない。'}
+              月末の着地は、10回中8回 {formatYen(round100(engine.total.p10), { sign: 'never' })}{' '}
+              から {formatYen(round100(engine.total.p90), { sign: 'never' })}。
+              {engine.probWithinBudget === null
+                ? '目標の予算がないので、収まる確率は出していない。'
+                : `予算内に収まる確率は ${Math.round(engine.probWithinBudget * 100)}%。${probabilityWord(engine.probWithinBudget)}。`}
+              {engine.status === 'learning' ? ' 記録が増えるほど幅は狭くなる。' : ''}
+              {engine.drivers[0]
+                ? ` 超えるとしたら、原因の${Math.round(engine.drivers[0].shareOfRisk * 100)}%は${engine.drivers[0].categoryName}。`
+                : ''}
+              {engine.safeDailyAllowance !== null
+                ? ` 8割の確率で予算内に収まる1日の額は ${formatYen(round100(engine.safeDailyAllowance), { sign: 'never' })}。`
+                : ''}
             </p>
           </>
         ) : (
           <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            進行中の目標がないので、月末の着地は出せない。
+            予測に足る記録がまだない。
           </p>
         )}
       </header>
@@ -192,4 +224,15 @@ export default async function ReportsPage() {
       <PurposeBalanceCard balances={purposeBalances} />
     </div>
   );
+}
+
+function round100(yen: number): number {
+  return Math.round(yen / 100) * 100;
+}
+function probabilityWord(prob: number): string {
+  if (prob >= 0.85) return 'ほぼ大丈夫';
+  if (prob >= 0.6) return 'おそらく大丈夫';
+  if (prob >= 0.4) return '五分五分';
+  if (prob >= 0.15) return '厳しめ';
+  return 'このままだと超えそう';
 }
