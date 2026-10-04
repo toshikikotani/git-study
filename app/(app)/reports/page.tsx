@@ -91,6 +91,7 @@ export default async function ReportsPage() {
         history,
       })
     : null;
+  const monthEnd = plan?.periodEnd ?? addDays(addMonths(ledger.period.from, 1), -1);
   const engine = buildForecast({
     transactions: ledger.transactions.map((tx) => ({
       occurredOn: tx.occurredOn,
@@ -105,7 +106,7 @@ export default async function ReportsPage() {
       merchantName: tx.label,
       description: tx.description,
     })),
-    period: { from: ledger.period.from, to: plan?.periodEnd ?? addDays(addMonths(ledger.period.from, 1), -1) },
+    period: { from: ledger.period.from, to: monthEnd },
     today,
     trainingFrom: addDays(today, -90),
     recordStart: ledger.record.firstRecordedOn,
@@ -160,12 +161,12 @@ export default async function ReportsPage() {
             buildCategoryLines(
               ledger.transactions.map((tx) => ({ ...tx, items: [] })),
               item.genreId,
-              { from: ledger.period.from, to: ledger.period.to },
+              { from: ledger.period.from, to: monthEnd },
               today,
             ),
           )}
           monthStart={ledger.period.from}
-          monthEnd={ledger.period.to}
+          monthEnd={monthEnd}
           today={today}
           budgetYen={goal.targetYen}
           goalFrom={plan.periodStart}
