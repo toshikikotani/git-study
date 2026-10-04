@@ -693,8 +693,6 @@ function CumulativeLayer({
   color,
   dim,
   budgetYen,
-  holdForecast,
-  onHoldForecast,
 }: {
   chart: CumulativeChart;
   x: (i: number) => number;
