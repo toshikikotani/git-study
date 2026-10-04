@@ -417,25 +417,16 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         onPick={pickBucket}
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
         budgetYen={data.goal?.row?.targetYen ?? null}
+        holdForecast={data.forecastClosed}
+        onHoldForecast={
+          currentGenreId
+            ? () =>
+                void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
+                  () => router.refresh(),
+                )
+            : undefined
+        }
       />
-      {currentGenreId ? (
-        <button
-          type="button"
-          className="min-h-11 w-full rounded-2xl px-4 text-sm font-semibold"
-          style={{
-            background: data.forecastClosed ? 'var(--action)' : 'var(--surface-raised)',
-            color: data.forecastClosed ? 'var(--on-action)' : 'var(--ink)',
-            border: '1px solid var(--line)',
-          }}
-          onClick={() =>
-            void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(() =>
-              router.refresh(),
-            )
-          }
-        >
-          {data.forecastClosed ? 'これ以上は予測しない' : 'これ以上は使わない'}
-        </button>
-      ) : null}
 
       <CategoryTabs
         genreKey={data.genreKey}
