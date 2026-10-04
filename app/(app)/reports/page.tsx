@@ -5,6 +5,11 @@ import { ForecastGraphic } from './forecast-graphic';
 import { GoalChart } from './goal-chart';
 import { goalLanding } from '@/domain/goal-range';
 import { buildForecast } from '@/domain/forecast/engine';
+import { forecastPlan } from '@/domain/plan-forecast';
+import { loadPlanContext } from '@/features/spending-plan/context';
+import { loadGenreSpend } from '@/features/spending-plan/store';
+import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
+import { daysBetween } from '@/lib/date';
 import { addDays, addMonths } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
@@ -119,6 +124,44 @@ export default async function ReportsPage() {
     payday: null,
     dataVersion: `${ledger.transactions.length}:${ledger.transactions.at(-1)?.occurredOn ?? ''}`,
   });
+
+  const planLanding = plan
+    ? await (async () => {
+        const context = await loadPlanContext(plan.periodStart, plan.periodEnd);
+        const spent = await loadGenreSpend(
+          plan.periodStart,
+          today < plan.periodEnd ? today : plan.periodEnd,
+        );
+        const scheduled = await loadScheduledByGenre(plan.periodStart, plan.periodEnd);
+        const byId = new Map(context.genres.map((genre) => [genre.genreId, genre]));
+        const genres = plan.items.flatMap((item) => {
+          const genre = byId.get(item.genreId);
+          if (!genre) return [];
+          return [
+            {
+              spentYen: spent.byGenre.get(item.genreId) ?? 0,
+              scheduledYen: scheduled.get(item.genreId) ?? 0,
+              meanDailyYen: genre.dailyYen,
+              medianDailyYen: genre.medianDailyYen,
+              observedDays: context.lookbackDays,
+              targetYen: item.targetYen,
+            },
+          ];
+        });
+        return forecastPlan({
+          remainingDays: today >= plan.periodEnd ? 0 : daysBetween(today, plan.periodEnd),
+          seed: `${plan.periodStart}:${plan.periodEnd}:${today}`,
+          genres,
+        });
+      })()
+    : null;
+  const landing = {
+    p10:
+      planLanding?.genres.reduce((sum, genre) => sum + (genre.lowYen ?? 0), 0) || engine.total.p10,
+    p50: planLanding?.totalMedianYen ?? engine.total.p50,
+    p90:
+      planLanding?.genres.reduce((sum, genre) => sum + (genre.highYen ?? 0), 0) || engine.total.p90,
+  };
   return (
     <div className="rise space-y-4">
       <header>
@@ -131,11 +174,11 @@ export default async function ReportsPage() {
               className="tabular mt-3 text-5xl font-semibold tracking-[-0.045em]"
               style={{ color: 'var(--ink)' }}
             >
-              {formatYen(round100(engine.total.p50), { sign: 'never' })}
+              {formatYen(round100(landing.p50), { sign: 'never' })}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              月末の着地は、10回中8回 {formatYen(round100(engine.total.p10), { sign: 'never' })}{' '}
-              から {formatYen(round100(engine.total.p90), { sign: 'never' })}。
+              月末の着地は、10回中8回 {formatYen(round100(landing.p10), { sign: 'never' })} から{' '}
+              {formatYen(round100(landing.p90), { sign: 'never' })}。
               {engine.probWithinBudget === null
                 ? '目標の予算がないので、収まる確率は出していない。'
                 : `予算内に収まる確率は ${Math.round(engine.probWithinBudget * 100)}%。${probabilityWord(engine.probWithinBudget)}。`}
@@ -171,7 +214,7 @@ export default async function ReportsPage() {
           budgetYen={goal.targetYen}
           goalFrom={plan.periodStart}
           goalTo={plan.periodEnd}
-          landing={{ p10: engine.total.p10, p50: engine.total.p50, p90: engine.total.p90 }}
+          landing={landing}
         />
       ) : null}
       <ForecastGraphic {...forecast} />
