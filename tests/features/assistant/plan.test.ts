@@ -31,8 +31,8 @@ const SETTINGS: AppSettings = {
 };
 
 const GENRES: Genre[] = [
-  { id: 'g-food', name: '食料品', sortOrder: 0, budgetYen: 30_000, showOnHome: true },
-  { id: 'g-out', name: '外食', sortOrder: 1, budgetYen: null, showOnHome: false },
+  { id: 'g-food', name: '食料品', sortOrder: 0, budgetYen: 30_000, showOnHome: true, forecastClosed: false },
+  { id: 'g-out', name: '外食', sortOrder: 1, budgetYen: null, showOnHome: false, forecastClosed: false },
 ];
 
 const TRANSACTION: StoredTransaction = {

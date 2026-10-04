@@ -66,7 +66,7 @@ describe('R5 「取引 / 品目 / 店」はヘッダーの直下に固定され�
   const base: CategoryDetailData = {
     genreKey: 'dining',
     genreName: '外食',
-    genreBudgetYen: null,
+    genreBudgetYen: null, forecastClosed: false,
     monthKey: '2026-09',
     monthStart: '2026-09-01',
     today: '2026-09-29',
