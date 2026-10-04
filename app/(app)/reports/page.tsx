@@ -278,10 +278,3 @@ export default async function ReportsPage() {
 function round100(yen: number): number {
   return Math.round(yen / 100) * 100;
 }
-function probabilityWord(prob: number): string {
-  if (prob >= 0.85) return 'ほぼ大丈夫';
-  if (prob >= 0.6) return 'おそらく大丈夫';
-  if (prob >= 0.4) return '五分五分';
-  if (prob >= 0.15) return '厳しめ';
-  return 'このままだと超えそう';
-}
