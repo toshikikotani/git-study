@@ -4,11 +4,7 @@ import { formatYen } from '@/domain/money';
 import type { GenreForecast } from '@/domain/report-forecast';
 
 function axisYen(yen: number): string {
-  if (yen >= 10000)
-    return `${(yen / 10000)
-      .toFixed(yen >= 100000 ? 0 : 2)
-      .replace(/0$/, '')
-      .replace(/\.$/, '')}万`;
+  if (yen >= 10000) return `${Math.round(yen / 10000)}万`;
   return `${yen.toLocaleString('ja-JP')}`;
 }
 

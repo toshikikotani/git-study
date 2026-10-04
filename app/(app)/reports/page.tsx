@@ -179,15 +179,13 @@ export default async function ReportsPage() {
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
               月末の着地は、10回中8回 {formatYen(round100(landing.p10), { sign: 'never' })} から{' '}
               {formatYen(round100(landing.p90), { sign: 'never' })}。
-              {engine.probWithinBudget === null
-                ? '目標の予算がないので、収まる確率は出していない。'
-                : `予算内に収まる確率は ${Math.round(engine.probWithinBudget * 100)}%。${probabilityWord(engine.probWithinBudget)}。`}
-              {engine.status === 'learning' ? ' 記録が増えるほど幅は狭くなる。' : ''}
+              {goal
+                ? landing.p50 > goal.targetYen
+                  ? `予算 ${formatYen(goal.targetYen, { sign: 'never' })} を ${formatYen(round100(landing.p50 - goal.targetYen), { sign: 'never' })} 超えそう。`
+                  : `予算 ${formatYen(goal.targetYen, { sign: 'never' })} には収まりそう。`
+                : '目標の予算がないので、収まるかどうかは出していない。'}
               {engine.drivers[0]
-                ? ` 超えるとしたら、原因の${Math.round(engine.drivers[0].shareOfRisk * 100)}%は${engine.drivers[0].categoryName}。`
-                : ''}
-              {engine.safeDailyAllowance !== null
-                ? ` 8割の確率で予算内に収まる1日の額は ${formatYen(round100(engine.safeDailyAllowance), { sign: 'never' })}。`
+                ? ` 増えるとしたら、大きいのは${engine.drivers[0].categoryName}。`
                 : ''}
             </p>
           </>
@@ -217,6 +215,13 @@ export default async function ReportsPage() {
           landing={landing}
         />
       ) : null}
+      <Link
+        href="/reports/ai"
+        className="flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+      >
+        AIに見てもらう
+      </Link>
       <ForecastGraphic {...forecast} />
 
       <MonthSummaryRow
