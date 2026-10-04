@@ -5,7 +5,7 @@ import { ForecastGraphic } from './forecast-graphic';
 import { GoalChart } from './goal-chart';
 import { goalLanding } from '@/domain/goal-range';
 import { buildForecast } from '@/domain/forecast/engine';
-import { addDays } from '@/lib/date';
+import { addDays, addMonths } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
@@ -105,7 +105,7 @@ export default async function ReportsPage() {
       merchantName: tx.label,
       description: tx.description,
     })),
-    period: { from: ledger.period.from, to: ledger.period.to },
+    period: { from: ledger.period.from, to: plan?.periodEnd ?? addDays(addMonths(ledger.period.from, 1), -1) },
     today,
     trainingFrom: addDays(today, -90),
     recordStart: ledger.record.firstRecordedOn,
