@@ -1799,6 +1799,57 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_forecast_reads: {
+        Row: {
+          adjusted_p50_yen: number;
+          ai_percent: number;
+          as_of: string;
+          created_at: string;
+          evidence: string[];
+          id: string;
+          known_yen: number;
+          month: string;
+          reason: string;
+          stat_p10_yen: number;
+          stat_p50_yen: number;
+          stat_p90_yen: number;
+          trust: number;
+          user_id: string;
+        };
+        Insert: {
+          adjusted_p50_yen: number;
+          ai_percent: number;
+          as_of: string;
+          created_at?: string;
+          evidence?: string[];
+          id?: string;
+          known_yen: number;
+          month: string;
+          reason: string;
+          stat_p10_yen: number;
+          stat_p50_yen: number;
+          stat_p90_yen: number;
+          trust: number;
+          user_id: string;
+        };
+        Update: {
+          adjusted_p50_yen?: number;
+          ai_percent?: number;
+          as_of?: string;
+          created_at?: string;
+          evidence?: string[];
+          id?: string;
+          known_yen?: number;
+          month?: string;
+          reason?: string;
+          stat_p10_yen?: number;
+          stat_p50_yen?: number;
+          stat_p90_yen?: number;
+          trust?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       receipt_items: {
         Row: {
           amount_yen: number;

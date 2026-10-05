@@ -10,7 +10,11 @@ import { ProgressGauge } from '@/components/ui/meter';
 import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
 import { formatYen } from '@/domain/money';
 import { SPENDING_PERSONA_DESCRIPTIONS, SPENDING_PERSONA_LABELS } from '@/domain/persona';
+import type { AiTrust } from '@/domain/ai-forecast-read';
+import type { ForecastReadView } from '@/features/ai-report/forecast-read';
+import type { MonthlyReportForecast } from '@/features/ai-report/monthly-report-ai';
 import type { MonthlyAiReportView } from '@/features/ai-report/store';
+import { formatDateJa } from '@/lib/date';
 import { generateMonthlyAiReportAction } from './actions';
 
 export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
@@ -72,6 +76,12 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
             </p>
           </div>
 
+          <ForecastReadSection
+            forecast={input.forecast}
+            read={report.forecastRead}
+            trust={input.evidence.trust}
+          />
+
           <BulletList heading="気づき" items={report.insights} />
           <BulletList heading="アドバイス" items={report.advice} />
           <AiLabel feature="monthly-report" contentKey={input.monthKey} evidenceHref="/spending" />
@@ -124,6 +134,82 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
           {error}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+const round100 = (yen: number) => Math.round(yen / 100) * 100;
+const yen = (n: number) => formatYen(round100(n), { sign: 'never' });
+
+/**
+ * 着地の見込み:統計(確率予測 v2)と、AIの読み(ADR-072)を並べる。AIの読みは、統計が見ていない
+ * 事情(メモ・品目・予定・暦)から残りの支出を動かしたもので、これまでの当たり具合に応じて効かせる。
+ */
+function ForecastReadSection({
+  forecast,
+  read,
+  trust,
+}: {
+  forecast: MonthlyReportForecast | null;
+  read: ForecastReadView | null;
+  trust: AiTrust;
+}) {
+  if (forecast === null && read === null) return null;
+  const stat = read?.stat ?? forecast!;
+  const signed = (p: number) => `${p > 0 ? '+' : ''}${p}%`;
+  return (
+    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+      <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+        着地の見込み{read ? `(${formatDateJa(read.asOf)}時点)` : ''}
+      </p>
+      <dl className="mt-2 space-y-2 text-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt style={{ color: 'var(--ink-secondary)' }}>統計</dt>
+          <dd className="tabular text-right" style={{ color: 'var(--ink)' }}>
+            中央 {yen(stat.p50)}
+            <span className="block text-xs" style={{ color: 'var(--ink-muted)' }}>
+              下振れ {yen(stat.p10)} 〜 上振れ {yen(stat.p90)}
+            </span>
+          </dd>
+        </div>
+        {read ? (
+          <div className="flex items-baseline justify-between gap-3">
+            <dt style={{ color: 'var(--ink-secondary)' }}>AIの読み</dt>
+            <dd className="tabular text-right font-semibold" style={{ color: 'var(--accent)' }}>
+              中央 {yen(read.adjusted.p50)}
+              <span className="block text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+                残りの支出 {signed(read.percent)}
+                {read.percent !== 0
+                  ? `(当たり具合から ${signed(read.adjusted.effectivePercent)} だけ効かせる)`
+                  : ''}
+              </span>
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+      {read ? (
+        <>
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            {read.reason}
+          </p>
+          {read.evidence.length > 0 ? (
+            <ul className="mt-1 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              {read.evidence.map((e, i) => (
+                <li key={i}>・{e}</li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          レポートを更新すると、AIの読み(統計が見ていない事情からの補正)が出ます。
+        </p>
+      )}
+      <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        {trust.compared === 0
+          ? 'AIの読みの当たり具合はまだ分からないので、補正は半分だけ効かせる。'
+          : `これまでAIの読みが統計より近かったのは ${trust.compared}回中${trust.wins}回。補正はその割合に応じて効かせる。`}
+      </p>
     </div>
   );
 }

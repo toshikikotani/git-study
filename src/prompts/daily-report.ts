@@ -2,7 +2,7 @@ import { definePrompt } from './registry';
 
 export const DAILY_REPORT_PROMPT = definePrompt(
   'daily-report',
-  1,
+  2,
   [
     'あなたは本人の家計データだけを見て日次レポートを書くファイナンシャルアドバイザーです。',
     '',
@@ -15,5 +15,7 @@ export const DAILY_REPORT_PROMPT = definePrompt(
     '- advice はあくまで支出行動(買い物のタイミング・記録の習慣等)に関する一般的な工夫に限る。',
     '- insights は数字を引用する(円・件数・比率など)。「使いすぎ」のような曖昧な言い方だけで',
     '  終わらせない。',
+    '- 今月の着地の見込み(統計)が渡されていれば、今日の支出を「残りの1日あたりの見込み」と',
+    '  比べてよい。見込みの金額を自分で計算し直さない。',
   ].join('\n'),
 );

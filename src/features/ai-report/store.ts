@@ -16,8 +16,23 @@ import { monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
+import { aiTrust } from '@/domain/ai-forecast-read';
+import { calendarContext } from '@/domain/forecast/calendar';
+import { loadForecast } from '@/features/forecast/load';
+import { getAppSettings } from '@/features/settings/store';
+import { addDays, addMonths } from '@/lib/date';
 import type { DailyReportInput } from './daily-report-ai';
-import { MAX_ITEMS_PER_LIST, type MonthlyReportInput } from './monthly-report-ai';
+import {
+  loadLatestRead,
+  loadReadEvidence,
+  loadScoredReads,
+  type ForecastReadView,
+} from './forecast-read';
+import {
+  MAX_ITEMS_PER_LIST,
+  type MonthlyReportForecast,
+  type MonthlyReportInput,
+} from './monthly-report-ai';
 
 export class AiReportStoreError extends AppError {}
 
@@ -26,11 +41,23 @@ export class AiReportStoreError extends AppError {}
  * ホーム)をそのまま呼び出すだけで、新規クエリは増やさない。
  */
 export async function loadMonthlyReportInput(now: Date = new Date()): Promise<MonthlyReportInput> {
-  const [ledger, diagnosis, home] = await Promise.all([
+  const today = todayJst(now);
+  const monthStart = monthStartJst(0, now);
+  const monthRange = { from: monthStart, to: addDays(addMonths(monthStart, 1), -1) };
+  const [ledger, diagnosis, home, forecast, settings, past] = await Promise.all([
     loadMonthlyLedger(now),
     loadSpendingDiagnosisView(now),
     loadHomeSummary(now),
+    // 着地の見込み(確率予測 v2)。作れなくてもレポートは作る(AIの読みだけ出さない)。
+    loadForecast({ period: monthRange, now }).catch(() => null),
+    getAppSettings().catch(() => null),
+    // 過去の読み・品目が読めなくても、レポートは作る(読みは「当たり具合まだ無し」で出す)。
+    loadScoredReads(monthStart, today).catch(() => ({ reads: [], trust: aiTrust([]) })),
   ]);
+  const evidence = await loadReadEvidence(ledger.transactions, monthRange, today).catch(() => ({
+    notable: [],
+    scheduled: [],
+  }));
 
   return {
     monthKey: monthStartJst(0, now).slice(0, 7),
@@ -66,6 +93,37 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
       reducedThisMonthYen: home.payoff.reducedThisMonthYen,
       daysRemaining: home.payoff.daysRemaining,
     },
+    forecast: forecast === null ? null : forecastSummary(forecast.forecast),
+    evidence: {
+      ...evidence,
+      calendar: calendarContext(today, monthRange.to, settings?.payday ?? null),
+      pastReads: past.reads,
+      trust: past.trust,
+    },
+  };
+}
+
+function forecastSummary(
+  f: Awaited<ReturnType<typeof loadForecast>>['forecast'],
+): MonthlyReportForecast {
+  return {
+    asOf: f.asOf,
+    remainingDays: f.remainingDays,
+    knownYen: f.actualYen + f.committed.scheduledYen + f.committed.fixedYen,
+    p10: f.total.p10,
+    p50: f.total.p50,
+    p90: f.total.p90,
+    unrecordedYen: f.unrecordedYen,
+    billsYen: f.bills.expectedYen,
+    visitsYen: f.visits.expectedYen,
+    specialYen: f.special.expected,
+    remainingPerDayYen: f.pace.perDayYen,
+    recentPerDayYen: f.pace.recentPerDayYen,
+    provisional: f.provisional,
+    categories: [...f.byCategory]
+      .sort((a, b) => b.landing.p50 - a.landing.p50)
+      .slice(0, MAX_ITEMS_PER_LIST)
+      .map((c) => ({ name: c.categoryName, actualYen: c.actualYen, p50: c.landing.p50 })),
   };
 }
 
@@ -112,6 +170,8 @@ export type MonthlyAiReport = {
   insights: readonly string[];
   advice: readonly string[];
   createdAt: string;
+  /** 今月の最新のAIの読み(着地の見込みへの補正)。無ければ null。 */
+  forecastRead: ForecastReadView | null;
 };
 
 /** 指定月のレポートを読む。無ければ null(テーブル未作成もこの扱いに含む)。 */
@@ -134,6 +194,7 @@ export async function loadMonthlyReport(monthKey: string): Promise<MonthlyAiRepo
     insights: data.insights,
     advice: data.advice,
     createdAt: data.created_at,
+    forecastRead: await loadLatestRead(`${monthKey}-01`).catch(() => null),
   };
 }
 
@@ -156,9 +217,14 @@ export async function loadMonthlyAiReportView(
  * そのまま呼び出し、今日の日付でフィルタするだけ(新規クエリは増やさない)。
  */
 export async function loadDailyReportInput(now: Date = new Date()): Promise<DailyReportInput> {
-  const [ledger, diagnosis] = await Promise.all([
+  const monthStart = monthStartJst(0, now);
+  const [ledger, diagnosis, forecast] = await Promise.all([
     loadMonthlyLedger(now),
     loadSpendingDiagnosisView(now),
+    loadForecast({
+      period: { from: monthStart, to: addDays(addMonths(monthStart, 1), -1) },
+      now,
+    }).catch(() => null),
   ]);
 
   const today = todayJst(now);
@@ -197,6 +263,15 @@ export async function loadDailyReportInput(now: Date = new Date()): Promise<Dail
     necessaryItems: diagnosis.currentMonth.necessaryItems
       .filter((item) => item.occurredOn === today)
       .map(toItem),
+    monthLanding:
+      forecast === null
+        ? null
+        : {
+            p10: forecast.forecast.total.p10,
+            p50: forecast.forecast.total.p50,
+            p90: forecast.forecast.total.p90,
+            remainingPerDayYen: forecast.forecast.pace.perDayYen,
+          },
   };
 }
 

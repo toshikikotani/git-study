@@ -2,6 +2,10 @@
  * AI月次レポートの生成(ADR-031)。1ヶ月分の実データから、浪費傾向のタイプ
  * (domain/persona.ts の固定6分類)・気づき・アドバイスを作る。
  *
+ * 着地の見込み(確率予測 v2)も渡し、AIの読み(ADR-072)を返させる:明細のメモ・品目、
+ * これからの予定、暦の事情、過去のAIの読みの当たり外れから、残りの支出を決まった選択肢
+ * (AI_ADJUST_CHOICES)のどれだけ動かすかを選ぶ。金額の計算はアプリがする。
+ *
  * 医学的な断定(体質・食事・ホルモン)はさせない。本人が明示的に外した領域で、
  * 支出データからは根拠が出せないため。
  *
@@ -14,6 +18,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
+import { AI_ADJUST_CHOICES, type AiTrust, type ScoredRead } from '@/domain/ai-forecast-read';
+import type { CalendarContext } from '@/domain/forecast/calendar';
 import { SPENDING_PERSONA_TYPES, type SpendingPersonaType } from '@/domain/persona';
 import { withAiCache } from '@/lib/ai-gateway/cache';
 import { parseStructuredGated } from '@/lib/ai-gateway/gated';
@@ -60,13 +66,59 @@ export type MonthlyReportInput = {
     reducedThisMonthYen: number;
     daysRemaining: number | null;
   };
+  /** 確率予測(v2)の着地の見込み。作れなければ null(そのときAIの読みは出さない)。 */
+  forecast: MonthlyReportForecast | null;
+  /** AIの読みの根拠に使ってよい事実。 */
+  evidence: MonthlyReportEvidence;
 };
+
+export type MonthlyReportForecast = {
+  asOf: string;
+  remainingDays: number;
+  /** すでに決まっている額(実績 + 予定 + 固定費)。補正はこれより上の部分にだけ掛ける。 */
+  knownYen: number;
+  p10: number;
+  p50: number;
+  p90: number;
+  /** 残りの期間の見込みの内訳。 */
+  unrecordedYen: number;
+  billsYen: number;
+  visitsYen: number;
+  specialYen: number;
+  remainingPerDayYen: number | null;
+  recentPerDayYen: number | null;
+  /** 検証できた月が3か月未満なら true(統計の数字は目安)。 */
+  provisional: boolean;
+  categories: readonly { name: string; actualYen: number; p50: number }[];
+};
+
+export type MonthlyReportEvidence = {
+  /** 今月の目立つ明細(金額の大きいもの・メモのあるもの)。 */
+  notable: readonly {
+    date: string;
+    label: string;
+    amountYen: number;
+    genre: string;
+    memo: string | null;
+    items: readonly string[];
+  }[];
+  /** これからの予定(今日より先の日付の明細)。 */
+  scheduled: readonly { date: string; label: string; amountYen: number; genre: string }[];
+  calendar: CalendarContext | null;
+  /** 過去のAIの読みと、その月の実際の着地。 */
+  pastReads: readonly ScoredRead[];
+  trust: AiTrust;
+};
+
+export type ForecastReadResult = { percent: number; reason: string; evidence: string[] };
 
 export type MonthlyReportResult = {
   personaType: SpendingPersonaType;
   personaReasoning: string;
   insights: string[];
   advice: string[];
+  /** AIの読み(着地の見込みへの補正)。予測が無い・返答が不十分なら null。 */
+  forecastRead: ForecastReadResult | null;
 };
 
 export type GenerateMonthlyReportOutcome =
@@ -91,6 +143,23 @@ const reportSchema = z.object({
       '3〜5件。支出行動を変えるための一般的な工夫(例:「衝動買いが多い時間帯は買い物アプリを閉じておく」)。' +
         '体質・性格を断定する言い方や医学的な助言(食事・栄養・ホルモン等)は書かない。',
     ),
+  forecastRead: z
+    .object({
+      percent: z
+        .enum(AI_ADJUST_CHOICES.map(String) as [string, ...string[]])
+        .describe(
+          '統計の見込みの「残りの支出」を何%動かすか。決まった選択肢から1つ。根拠が弱ければ "0"。',
+        ),
+      reason: z
+        .string()
+        .describe(
+          '1〜2文。なぜその補正にしたか。統計が見ていない事情を、渡した事実だけで説明する。',
+        ),
+      evidence: z
+        .array(z.string())
+        .describe('1〜3件。根拠にした事実(明細・予定・暦・過去の読み)を、渡した表記のまま短く。'),
+    })
+    .describe('着地の見込みへのAIの読み。統計の見込みが渡されていなければ percent は "0"。'),
 });
 
 type ReportRow = z.infer<typeof reportSchema>;
@@ -127,7 +196,13 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
         // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
         const facts = extractNumbers(userContent);
         const verification = verifyNumbersAgainstFacts(
-          [result.value.personaReasoning, ...result.value.insights, ...result.value.advice],
+          [
+            result.value.personaReasoning,
+            ...result.value.insights,
+            ...result.value.advice,
+            result.value.forecastRead.reason,
+            ...result.value.forecastRead.evidence,
+          ],
           facts,
         );
         if (!verification.ok) {
@@ -137,7 +212,7 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
           };
         }
 
-        return buildFromAiOutput(result.value);
+        return buildFromAiOutput(result.value, { hasForecast: input.forecast !== null });
       },
       { shouldCache: (outcome) => outcome.report !== null },
     );
@@ -200,7 +275,83 @@ function buildUserContent(input: MonthlyReportInput): string {
         : ''),
   );
 
+  appendForecastSection(lines, input);
+
   return lines.join('\n');
+}
+
+const yenOf = (n: number) => `${n}円`;
+
+/** 着地の見込みと、AIの読みの根拠に使ってよい事実。 */
+function appendForecastSection(lines: string[], input: MonthlyReportInput): void {
+  const f = input.forecast;
+  lines.push('');
+  if (f === null) {
+    lines.push('着地の見込み(統計): 今回は計算できなかった。forecastRead.percent は "0" にする。');
+    return;
+  }
+  lines.push(
+    `着地の見込み(統計、${f.asOf}時点、残り${f.remainingDays}日):` +
+      ` 中央 ${yenOf(f.p50)} ・ 下振れ ${yenOf(f.p10)} 〜 上振れ ${yenOf(f.p90)}(10回中8回)` +
+      (f.provisional ? ' ・ 過去の月での確認が3か月未満なので目安' : ''),
+    `すでに決まっている額(実績・予定・固定費): ${yenOf(f.knownYen)}`,
+    `残りの内訳の見込み: まだ記録されていない支出 ${yenOf(f.unrecordedYen)} ・ 月払いの請求 ${yenOf(f.billsYen)}` +
+      ` ・ 規則的な来店 ${yenOf(f.visitsYen)} ・ 特別費 ${yenOf(f.specialYen)}`,
+  );
+  if (f.remainingPerDayYen !== null) {
+    lines.push(
+      `残りの1日あたりの見込み: ${yenOf(f.remainingPerDayYen)}` +
+        (f.recentPerDayYen !== null ? ` ・ 直近14日の1日あたり: ${yenOf(f.recentPerDayYen)}` : ''),
+    );
+  }
+  if (f.categories.length > 0) {
+    lines.push('ジャンル別の着地の見込み(中央、多い順):');
+    for (const c of f.categories) {
+      lines.push(`- ${c.name}: ${yenOf(c.p50)}(ここまで ${yenOf(c.actualYen)})`);
+    }
+  }
+
+  const e = input.evidence;
+  if (e.notable.length > 0) {
+    lines.push('', '今月の目立つ明細(金額の大きいもの・メモのあるもの):');
+    for (const n of e.notable) {
+      const items = n.items.length > 0 ? ` 品目: ${n.items.join('、')}` : '';
+      const memo = n.memo ? ` メモ: ${n.memo}` : '';
+      lines.push(`- ${n.date} ${n.label} ${yenOf(n.amountYen)}(${n.genre})${memo}${items}`);
+    }
+  }
+  lines.push('', 'これからの予定:');
+  if (e.scheduled.length === 0) lines.push('- 日付の入った予定は無い');
+  for (const s of e.scheduled) {
+    lines.push(`- ${s.date} ${s.label} ${yenOf(s.amountYen)}(${s.genre})`);
+  }
+  if (e.calendar !== null) {
+    const c = e.calendar;
+    lines.push(
+      '',
+      `残りの日の暦: 休み(土日祝)${c.dayOffs}日、うち平日の祝日${c.weekdayHolidays}日` +
+        (c.longestBreak
+          ? ` ・ ${c.longestBreak.from}〜${c.longestBreak.to}に${c.longestBreak.days}連休`
+          : '') +
+        (c.payday ? ` ・ 給料日 ${c.payday}` : '') +
+        (c.seasons.length > 0 ? ` ・ 時期: ${c.seasons.join('、')}` : ''),
+    );
+  }
+  lines.push('', '過去のAIの読みの当たり外れ(月末の実際の着地と比べたもの):');
+  if (e.pastReads.length === 0) lines.push('- まだ無い');
+  for (const r of e.pastReads) {
+    const better =
+      Math.abs(r.adjustedP50Yen - r.actualYen) < Math.abs(r.statP50Yen - r.actualYen)
+        ? 'AIの読みが近かった'
+        : '統計が近かった';
+    lines.push(
+      `- ${r.month}: 補正 ${r.percent}% ・ 統計 ${yenOf(r.statP50Yen)} ・ AIの読み ${yenOf(r.adjustedP50Yen)} ・ 実際 ${yenOf(r.actualYen)}(${better})`,
+    );
+  }
+  lines.push(
+    '',
+    `forecastRead.percent の選択肢: ${AI_ADJUST_CHOICES.join(', ')}(%、統計の「残りの支出」に対して)`,
+  );
 }
 
 /**
@@ -208,7 +359,10 @@ function buildUserContent(input: MonthlyReportInput): string {
  * 同じ「モデルの出力を信用しきらない」考え方)。空文字の項目は捨て、想定より
  * 多く返ってきても表示側の見た目が壊れないよう件数を切る。
  */
-export function buildFromAiOutput(row: ReportRow): GenerateMonthlyReportOutcome {
+export function buildFromAiOutput(
+  row: ReportRow,
+  options: { hasForecast: boolean } = { hasForecast: true },
+): GenerateMonthlyReportOutcome {
   const personaReasoning = row.personaReasoning.trim();
   const insights = row.insights.map((s) => s.trim()).filter((s) => s !== '');
   const advice = row.advice.map((s) => s.trim()).filter((s) => s !== '');
@@ -217,12 +371,24 @@ export function buildFromAiOutput(row: ReportRow): GenerateMonthlyReportOutcome 
     return { report: null, warnings: ['AI の返答が不十分でした。もう一度お試しください。'] };
   }
 
+  // AIの読みは、予測があって、選択肢の中の値で、理由が書かれているときだけ採る。
+  const percent = Number(row.forecastRead.percent);
+  const reason = row.forecastRead.reason.trim();
+  const evidence = row.forecastRead.evidence.map((s) => s.trim()).filter((s) => s !== '');
+  const forecastRead =
+    options.hasForecast &&
+    (AI_ADJUST_CHOICES as readonly number[]).includes(percent) &&
+    reason !== ''
+      ? { percent, reason, evidence: evidence.slice(0, 3) }
+      : null;
+
   return {
     report: {
       personaType: row.personaType,
       personaReasoning,
       insights: insights.slice(0, 5),
       advice: advice.slice(0, 5),
+      forecastRead,
     },
     warnings: [],
   };

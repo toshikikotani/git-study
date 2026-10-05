@@ -6,6 +6,7 @@ import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
 import { GoalChart } from './goal-chart';
 import { formatProbability } from '@/domain/forecast/format';
+import { loadLatestRead } from '@/features/ai-report/forecast-read';
 import { remainingOfTotal } from '@/domain/forecast/remaining';
 import { reportInsights } from '@/domain/report-insights';
 import { loadForecast } from '@/features/forecast/load';
@@ -109,6 +110,8 @@ export default async function ReportsPage() {
     },
   );
   const forecast = outcome.ok ? outcome.value.forecast : null;
+  // AIの読み(AIレポートで作ったもの)。今月の全体の見込みのときだけ並べる(目標の範囲とは違うため)。
+  const aiRead = goalPlan ? null : await loadLatestRead(ledger.period.from).catch(() => null);
   const verification = outcome.ok ? outcome.value.verification : null;
   const forecastError = outcome.ok ? null : outcome.message;
   const budgetYen = goalPlan ? budgetTotal : null;
@@ -176,6 +179,12 @@ export default async function ReportsPage() {
                 ? ` 増えるとしたら、大きいのは${forecast.drivers[0].categoryName}。`
                 : ''}
             </p>
+            {aiRead ? (
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                AIの読み({formatDateJa(aiRead.asOf)}時点):中央{' '}
+                {formatYen(round100(aiRead.adjusted.p50), { sign: 'never' })}。{aiRead.reason}
+              </p>
+            ) : null}
             {forecast.balance ? (
               <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
                 収入 {formatYen(round100(forecast.balance.incomeYen), { sign: 'never' })}

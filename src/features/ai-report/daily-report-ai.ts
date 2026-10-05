@@ -45,6 +45,13 @@ export type DailyReportInput = {
   averageDailySpendYen: number;
   wasteItems: readonly DailyReportItem[];
   necessaryItems: readonly DailyReportItem[];
+  /** 今月の着地の見込み(確率予測 v2)。作れなければ null。 */
+  monthLanding: {
+    p10: number;
+    p50: number;
+    p90: number;
+    remainingPerDayYen: number | null;
+  } | null;
 };
 
 export type DailyReportResult = {
@@ -129,6 +136,17 @@ function buildUserContent(input: DailyReportInput): string {
     `今日の支出: ${input.totalSpentYen}円(${input.transactionCount}件) / 今月のここまでの1日あたり平均: ${input.averageDailySpendYen}円`,
     '',
   ];
+
+  if (input.monthLanding !== null) {
+    const m = input.monthLanding;
+    lines.push(
+      `今月の着地の見込み(統計): 中央 ${m.p50}円 ・ 下振れ ${m.p10}円 〜 上振れ ${m.p90}円(10回中8回)` +
+        (m.remainingPerDayYen !== null
+          ? ` ・ 残りの1日あたりの見込み ${m.remainingPerDayYen}円`
+          : ''),
+      '',
+    );
+  }
 
   if (input.categoryBreakdown.length > 0) {
     lines.push('今日のカテゴリ別支出:');

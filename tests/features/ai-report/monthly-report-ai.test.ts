@@ -14,6 +14,11 @@ function validRow(overrides: Partial<Parameters<typeof buildFromAiOutput>[0]> = 
     personaReasoning: '予算内に収まる支出が多く、大きな逸脱がないため。',
     insights: ['食費が予算を3,000円超過しました。', '浪費比率は先月から5ポイント改善しました。'],
     advice: ['固定費の見直しを月1回のペースで続けましょう。'],
+    forecastRead: {
+      percent: '10',
+      reason: '25日からの3連休に旅行の予定がある。',
+      evidence: ['10/25 ホテル予約 30000円'],
+    },
     ...overrides,
   };
 }
@@ -26,6 +31,11 @@ describe('buildFromAiOutput(monthly report) — モデルの出力を信用し�
       personaReasoning: '予算内に収まる支出が多く、大きな逸脱がないため。',
       insights: ['食費が予算を3,000円超過しました。', '浪費比率は先月から5ポイント改善しました。'],
       advice: ['固定費の見直しを月1回のペースで続けましょう。'],
+      forecastRead: {
+        percent: 10,
+        reason: '25日からの3連休に旅行の予定がある。',
+        evidence: ['10/25 ホテル予約 30000円'],
+      },
     });
     expect(result.warnings).toEqual([]);
   });
@@ -59,5 +69,34 @@ describe('buildFromAiOutput(monthly report) — モデルの出力を信用し�
     const result = buildFromAiOutput(validRow({ insights: many, advice: many }));
     expect(result.report?.insights).toHaveLength(5);
     expect(result.report?.advice).toHaveLength(5);
+  });
+});
+
+describe('buildFromAiOutput — AIの読み(ADR-072)', () => {
+  const read = (percent: string, reason = '連休がある。') => ({
+    personaType: 'steady' as const,
+    personaReasoning: '理由',
+    insights: ['気づき'],
+    advice: ['助言'],
+    forecastRead: { percent, reason, evidence: ['a', ' ', 'b', 'c', 'd'] },
+  });
+
+  it('予測が無ければ、AIの読みは採らない(レポート本体は出す)', () => {
+    const result = buildFromAiOutput(read('10'), { hasForecast: false });
+    expect(result.report?.forecastRead).toBeNull();
+    expect(result.report?.insights).toEqual(['気づき']);
+  });
+
+  it('選択肢にない値・理由が空なら、AIの読みは採らない', () => {
+    expect(buildFromAiOutput(read('15')).report?.forecastRead).toBeNull();
+    expect(buildFromAiOutput(read('10', '  ')).report?.forecastRead).toBeNull();
+  });
+
+  it('根拠は空を除いて3件まで', () => {
+    expect(buildFromAiOutput(read('-5')).report?.forecastRead).toEqual({
+      percent: -5,
+      reason: '連休がある。',
+      evidence: ['a', 'b', 'c'],
+    });
   });
 });
