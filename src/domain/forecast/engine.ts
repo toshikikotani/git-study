@@ -39,11 +39,27 @@ export type BuildForecastInput = {
   categoryTargets?: readonly CategoryTarget[];
 };
 
+/** 幅の補正を掛ける。金額は整数の円のまま返す(ADR-008)。 */
 function widen(band: Band, factor: number): Band {
   const wide = applyWidthFactor(band, factor);
   // p70 は中央と上端の間に置く(幅を変えても、p50 ≤ p70 ≤ p90 の並びを保つ)。
   const p70 = band.p50 + (band.p70 - band.p50) * factor;
-  return { ...wide, p70: Math.min(wide.p90, Math.max(wide.p50, p70)) };
+  const p10 = Math.max(0, Math.round(wide.p10));
+  const p50 = Math.round(wide.p50);
+  const p90 = Math.round(wide.p90);
+  return { p10, p50, p70: Math.min(p90, Math.max(p50, Math.round(p70))), p90 };
+}
+
+function widenVariable(
+  c: { p10: number; p50: number; p90: number },
+  factor: number,
+): { p10: number; p50: number; p90: number } {
+  const wide = applyWidthFactor(c, factor);
+  return {
+    p10: Math.max(0, Math.round(wide.p10)),
+    p50: Math.round(wide.p50),
+    p90: Math.round(wide.p90),
+  };
 }
 
 export function buildForecast(input: BuildForecastInput): Forecast {
@@ -92,7 +108,7 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     total: { ...withCommitted.total, ...total },
     byCategory: withCommitted.byCategory.map((c) => ({
       ...c,
-      ...applyWidthFactor(c, factor),
+      ...widenVariable(c, factor),
       landing: widen(c.landing, factor),
     })),
     calibration: input.calibration,

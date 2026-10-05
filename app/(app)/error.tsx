@@ -49,6 +49,11 @@ export default function AppError({
           通信が不安定なだけかもしれません。もう一度お試しください。
         </p>
       </div>
+      {error.digest ? (
+        <p className="tabular text-xs" style={{ color: 'var(--ink-muted)' }}>
+          エラーID {error.digest}
+        </p>
+      ) : null}
       <Button onClick={reset} variant="filled" className="mt-1">
         もう一度試す
       </Button>

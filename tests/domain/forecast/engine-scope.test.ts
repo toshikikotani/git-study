@@ -137,3 +137,45 @@ describe('buildForecast の規則的な来店', () => {
     expect(food.landing.p90 - food.landing.p10).toBeLessThan(12000);
   });
 });
+
+describe('buildForecast の金額は整数の円(画面の formatYen は小数だと例外にする、ADR-008)', () => {
+  const ints = (n: number) => Number.isInteger(n);
+  const allAmounts = (f: ReturnType<typeof buildForecast>): number[] => [
+    f.total.p10,
+    f.total.p50,
+    f.total.p70,
+    f.total.p90,
+    f.total.mean,
+    f.expectedOvershoot,
+    f.special.expected,
+    f.special.p90,
+    ...f.byCategory.flatMap((c) => [
+      c.p10,
+      c.p50,
+      c.p90,
+      c.landing.p10,
+      c.landing.p50,
+      c.landing.p70,
+      c.landing.p90,
+      c.baseYen,
+    ]),
+  ];
+
+  it('幅の補正が無いとき', () => {
+    const f = buildForecast({ ...base, budgetYen: 40000, transactions: data });
+    expect(allAmounts(f).every(ints)).toBe(true);
+  });
+
+  it('幅の補正(1以外の係数)があるとき', () => {
+    const f = buildForecast({
+      ...base,
+      budgetYen: 40000,
+      transactions: data,
+      calibration: { widthFactor: 1.2371, sampleSize: 20 },
+    });
+    expect(allAmounts(f).every(ints)).toBe(true);
+    expect(f.total.p10).toBeLessThanOrEqual(f.total.p50);
+    expect(f.total.p50).toBeLessThanOrEqual(f.total.p70);
+    expect(f.total.p70).toBeLessThanOrEqual(f.total.p90);
+  });
+});
