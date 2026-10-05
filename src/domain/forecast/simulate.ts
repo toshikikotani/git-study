@@ -88,12 +88,13 @@ function quantile(sortedAsc: readonly number[], p: number): number {
   return sortedAsc[idx]!;
 }
 
+/** 金額は整数の円で返す(画面の formatYen は整数でないと例外にする、ADR-008)。 */
 function bandOf(sortedAsc: readonly number[]): Band {
   return {
-    p10: quantile(sortedAsc, 0.1),
-    p50: quantile(sortedAsc, 0.5),
-    p70: quantile(sortedAsc, 0.7),
-    p90: quantile(sortedAsc, 0.9),
+    p10: Math.round(quantile(sortedAsc, 0.1)),
+    p50: Math.round(quantile(sortedAsc, 0.5)),
+    p70: Math.round(quantile(sortedAsc, 0.7)),
+    p90: Math.round(quantile(sortedAsc, 0.9)),
   };
 }
 
@@ -325,9 +326,9 @@ export function simulateForecast(input: SimulateInput): Forecast {
     return {
       categoryId: cat.id,
       categoryName: cat.name,
-      p10: quantile(variableSorted, 0.1),
-      p50: quantile(variableSorted, 0.5),
-      p90: quantile(variableSorted, 0.9),
+      p10: Math.round(quantile(variableSorted, 0.1)),
+      p50: Math.round(quantile(variableSorted, 0.5)),
+      p90: Math.round(quantile(variableSorted, 0.9)),
       landing: bandOf(landingSorted),
       baseYen: cat.base,
       actualYen: detail.actual,
@@ -378,7 +379,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
     periodId: input.periodId,
     asOf: input.today,
     remainingDays: input.remainingDays,
-    total: { ...bandOf(sortedTotal), mean: sumTotal / trials },
+    total: { ...bandOf(sortedTotal), mean: Math.round(sumTotal / trials) },
     byCategory,
     committed: { scheduledYen: 0, fixedYen: 0 }, // 呼び出し側(engine.ts)が上書きする
     visits: {
@@ -392,11 +393,11 @@ export function simulateForecast(input: SimulateInput): Forecast {
     },
     seasonal: { active: input.fitted.seasonal, periodFactor: null }, // engine.ts が期間の月の係数を入れる
     special: {
-      expected: sortedSpecial.reduce((a, b) => a + b, 0) / trials,
-      p90: quantile(sortedSpecial, 0.9),
+      expected: Math.round(sortedSpecial.reduce((a, b) => a + b, 0) / trials),
+      p90: Math.round(quantile(sortedSpecial, 0.9)),
     },
     probWithinBudget,
-    expectedOvershoot,
+    expectedOvershoot: Math.round(expectedOvershoot),
     drivers,
     safeDailyAllowance,
     status: input.fitted.dataDays < LEARNING_DATA_DAYS ? 'learning' : 'ready',
