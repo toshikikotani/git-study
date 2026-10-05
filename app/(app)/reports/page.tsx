@@ -82,7 +82,8 @@ export default async function ReportsPage() {
     ? { from: goalPlan.periodStart, to: goalPlan.periodEnd }
     : { from: ledger.period.from, to: addDays(addMonths(ledger.period.from, 1), -1) };
   const goalItems = goalPlan ? goalPlan.items.filter((item) => item.targetYen > 0) : [];
-  const { forecast, verification } = await loadForecast({
+  // 予測が失敗しても、ほかの集計(下のカード)は見られるようにする。
+  const view = await loadForecast({
     period,
     budgetYen: goalPlan ? budgetTotal : null,
     ...(goalPlan
@@ -95,7 +96,12 @@ export default async function ReportsPage() {
           })),
         }
       : {}),
+  }).catch((error: unknown) => {
+    console.error('[reports] 着地の予測を読み込めませんでした', error);
+    return null;
   });
+  const forecast = view?.forecast ?? null;
+  const verification = view?.verification ?? null;
   const budgetYen = goalPlan ? budgetTotal : null;
   const periodLabel = goalPlan ? 'この目標の期間' : '今月';
   const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
@@ -109,14 +115,16 @@ export default async function ReportsPage() {
             .map((row) => [row.categoryId, row.spentYen] as const),
         )
       : undefined;
-  const insights = reportInsights({
-    forecast,
-    budgetYen,
-    periodLabel,
-    ...(previousByGenre ? { previousByGenre, previousLabel: '先月' } : {}),
-  });
-  const landing = forecast.total;
-  const rangeRows: LandingRow[] = forecast.byCategory
+  const insights = forecast
+    ? reportInsights({
+        forecast,
+        budgetYen,
+        periodLabel,
+        ...(previousByGenre ? { previousByGenre, previousLabel: '先月' } : {}),
+      })
+    : [];
+  const landing = forecast?.total ?? null;
+  const rangeRows: LandingRow[] = (forecast?.byCategory ?? [])
     .filter((c) => c.landing.p90 > 0)
     .sort((a, b) => b.landing.p50 - a.landing.p50)
     .slice(0, 8)
@@ -136,7 +144,7 @@ export default async function ReportsPage() {
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
-        {forecast.total.p50 > 0 ? (
+        {forecast && landing && forecast.total.p50 > 0 ? (
           <>
             <p
               className="tabular mt-3 text-4xl font-semibold tracking-[-0.045em]"
@@ -159,11 +167,13 @@ export default async function ReportsPage() {
           </>
         ) : (
           <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            予測に足る記録がまだない。
+            {forecast === null
+              ? '着地の予測を計算できませんでした。ほかの集計は下に出ています。'
+              : '予測に足る記録がまだない。'}
           </p>
         )}
       </header>
-      {goalPlan && budgetYen !== null ? (
+      {goalPlan && budgetYen !== null && landing ? (
         <GoalChart
           genreName="全体"
           lines={linesForGoal(
@@ -195,7 +205,7 @@ export default async function ReportsPage() {
       </Link>
       <InsightsList insights={insights} />
       <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
-      <VerificationCard verification={verification} />
+      {forecast ? <VerificationCard verification={verification} /> : null}
 
       <MonthSummaryRow
         spentYen={ledger.totalSpentYen}
