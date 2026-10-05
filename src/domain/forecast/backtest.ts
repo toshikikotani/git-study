@@ -107,6 +107,8 @@ export function runBacktest(input: {
   payday?: number | null;
   /** 直近を重く見る重みの半減期(日)。 */
   halfLifeDays?: number;
+  /** 「予測を止める」にしたジャンル(本番と同じ扱いで検証する)。 */
+  noForecastGenreIds?: ReadonlySet<string>;
   bootstrapWeight: number;
   trials?: number;
 }): BacktestSummary {
@@ -139,6 +141,7 @@ export function runBacktest(input: {
         budgetYen: null,
         payday: input.payday ?? null,
         halfLifeDays: input.halfLifeDays,
+        noForecastGenreIds: input.noForecastGenreIds,
         bootstrapWeight: input.bootstrapWeight,
         trials,
         seed: `backtest:${periodId}:${asOf}`,

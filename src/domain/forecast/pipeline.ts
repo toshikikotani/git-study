@@ -39,6 +39,8 @@ export type PipelineInput = {
   remainingScale?: number | undefined;
   /** 直近を重く見る重みの半減期(日)。 */
   halfLifeDays?: number | undefined;
+  /** 「予測を止める」にしたジャンル(残りの変動費を予測しない)。 */
+  noForecastGenreIds?: ReadonlySet<string> | undefined;
 };
 
 export type Prepared = {
@@ -70,6 +72,7 @@ export function prepareSimulation(input: PipelineInput): Prepared {
     recordStart: input.recordStart,
     confirmedFixedKeys: input.confirmedFixedKeys,
     detectedSubscriptions: input.detectedSubscriptions,
+    noForecastGenreIds: input.noForecastGenreIds,
   });
   const fitted = fitModel({
     variable: decomposed.variable,

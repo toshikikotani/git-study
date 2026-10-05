@@ -179,3 +179,39 @@ describe('buildForecast の金額は整数の円(画面の formatYen は小数�
     expect(f.total.p70).toBeLessThanOrEqual(f.total.p90);
   });
 });
+
+describe('「予測を止める」にしたジャンル', () => {
+  const input = {
+    ...base,
+    budgetYen: 60000,
+    transactions: [
+      ...daily('2026-07-01', '2026-10-15', 'dining', '外食', 1000),
+      ...daily('2026-07-01', '2026-10-15', 'tax', '保険・税金・手数料', 800),
+    ],
+  };
+
+  it('残りの変動費は予測しない。実績は数え、着地の幅は実績のまま動かない', () => {
+    const f = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
+    const tax = f.byCategory.find((c) => c.categoryId === 'tax')!;
+    expect(tax.actualYen).toBe(800 * 15);
+    expect(tax.landing.p10).toBe(tax.baseYen);
+    expect(tax.landing.p90).toBe(tax.baseYen);
+  });
+
+  it('超過の原因(drivers)に出てこない', () => {
+    const f = buildForecast({ ...input, budgetYen: 30000, noForecastGenreIds: new Set(['tax']) });
+    expect(f.drivers.map((d) => d.categoryId)).not.toContain('tax');
+  });
+
+  it('止めていないジャンルの予測は、そのまま出る', () => {
+    const f = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
+    const dining = f.byCategory.find((c) => c.categoryId === 'dining')!;
+    expect(dining.landing.p90).toBeGreaterThan(dining.baseYen);
+  });
+
+  it('止めたぶん、全体の着地が小さくなる', () => {
+    const all = buildForecast(input);
+    const stopped = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
+    expect(stopped.total.p50).toBeLessThan(all.total.p50);
+  });
+});
