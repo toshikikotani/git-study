@@ -64,9 +64,12 @@ describe('projectVisits(残り期間の来店の見込み)', () => {
     expect(dates.at(-1)).toBe('2026-10-31');
   });
 
-  it('予定の日を過ぎていても間隔の半分以内なら、明日に置く', () => {
-    const dates = projectVisits({ ...base, today: '2026-09-28' }).map((e) => e.date);
-    expect(dates[0]).toBe('2026-09-29');
+  it('予定の日を過ぎていても間隔1回ぶん以内なら、明日に確率半分で置き、その後は明日から間隔ごと', () => {
+    const events = projectVisits({ ...base, today: '2026-09-28' });
+    expect(events[0]!.date).toBe('2026-09-29');
+    expect(events[0]!.probability).toBeCloseTo(merchant!.probability / 2);
+    expect(events[1]!.date).toBe('2026-10-06');
+    expect(events[1]!.probability).toBeCloseTo(merchant!.probability);
   });
 
   it('大きく過ぎていれば周期が崩れたとみなして、間隔の倍数ぶん先へ送る', () => {

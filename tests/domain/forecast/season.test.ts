@@ -33,16 +33,17 @@ describe('seasonalFactors(月の季節の係数)', () => {
     expect(result.factors[5]).toBeGreaterThan(0.8);
   });
 
-  it('観測が1年分だけなら、半分しか信じない(2年分より控えめ)', () => {
+  it('観測が1年分だけなら、年ごとの揺れと見分けられないので控えめ(2年分より1に近い)', () => {
     const oneYear = seasonalFactors(
-      [series('2025-10-01', '2026-09-30', (m) => (m === 12 ? 2000 : 1000))],
+      [series('2025-10-01', '2026-09-30', (m) => (m === 12 ? 1300 : 1000))],
       '2026-09-30',
     );
     const twoYears = seasonalFactors(
-      [series('2024-10-01', '2026-09-30', (m) => (m === 12 ? 2000 : 1000))],
+      [series('2024-10-01', '2026-09-30', (m) => (m === 12 ? 1300 : 1000))],
       '2026-09-30',
     );
     expect(oneYear.factors[12]).toBeLessThan(twoYears.factors[12]!);
+    expect(twoYears.factors[12]).toBeGreaterThan(1.2);
   });
 
   it('係数は0.6〜1.6の範囲に収まる', () => {
@@ -54,7 +55,11 @@ describe('seasonalFactors(月の季節の係数)', () => {
 });
 
 describe('rateFactorSum(残り期間の回数の係数)', () => {
-  const flat = { weekdayFactor: Array(7).fill(1), paydayFactor: 1, holidayFactor: 1 };
+  const flat = {
+    weekdayFactor: Array(7).fill(1),
+    payCycleFactor: Array(5).fill(1),
+    holidayFactor: 1,
+  };
 
   it('係数がすべて1なら、日数と同じ', () => {
     expect(rateFactorSum(flat, ['2026-10-06', '2026-10-07', '2026-10-08'], null)).toBe(3);
@@ -66,6 +71,12 @@ describe('rateFactorSum(残り期間の回数の係数)', () => {
     expect(rateFactorSum(cat, ['2026-10-13'], null)).toBe(1);
   });
 
+  it('土日の祝日には祝日の係数を掛けない(土日の係数に休みの効果が入っている)', () => {
+    const cat = { ...flat, holidayFactor: 2 };
+    expect(rateFactorSum(cat, ['2026-11-03'], null)).toBe(2); // 文化の日(火)
+    expect(rateFactorSum(cat, ['2027-01-02'], null)).toBe(1); // 土曜(祝日ではない)
+  });
+
   it('月の係数を掛ける', () => {
     const monthFactor = Array(13).fill(1);
     monthFactor[10] = 1.5;
@@ -73,7 +84,22 @@ describe('rateFactorSum(残り期間の回数の係数)', () => {
   });
 });
 
-import { fitModel, levelSigmaFor } from '@/domain/forecast/model';
+import { fitModel, payCycleBucket, paydayOn } from '@/domain/forecast/model';
+
+describe('給料日からの日数の区分', () => {
+  it('給料日が土日祝なら、前の平日にずらす', () => {
+    expect(paydayOn('2026-10-01', 25)).toBe('2026-10-23'); // 25日は日曜 → 23日(金)
+  });
+
+  it('0〜2・3〜6・7〜13・14〜20・21日以上の5区分', () => {
+    expect(payCycleBucket('2026-09-25', 25)).toBe(0);
+    expect(payCycleBucket('2026-09-28', 25)).toBe(1);
+    expect(payCycleBucket('2026-10-02', 25)).toBe(2);
+    expect(payCycleBucket('2026-10-12', 25)).toBe(3);
+    expect(payCycleBucket('2026-10-20', 25)).toBe(4);
+    expect(payCycleBucket('2026-10-23', 25)).toBe(0);
+  });
+});
 
 describe('金額の事前分布(カテゴリごとの金額の大きさを、他のカテゴリへ引き寄せない)', () => {
   /** 毎日 small 円のカテゴリと、6日おきに big 円のカテゴリ(90日分)。 */
@@ -108,15 +134,6 @@ describe('金額の事前分布(カテゴリごとの金額の大きさを、他
     // 以前は、金額を全カテゴリの平均へ強く引き寄せ(事前の強さ10)、5,000円が3,000円台になっていた。
     expect(mean).toBeGreaterThan(4000);
     expect(mean).toBeLessThan(5500);
-  });
-});
-
-describe('levelSigmaFor(支出の水準の不確かさ)', () => {
-  it('記録が短いほど大きく、長いほど小さい。範囲に収まる', () => {
-    expect(levelSigmaFor(10)).toBeGreaterThan(levelSigmaFor(30));
-    expect(levelSigmaFor(30)).toBeGreaterThan(levelSigmaFor(365));
-    expect(levelSigmaFor(1)).toBeLessThanOrEqual(0.6);
-    expect(levelSigmaFor(100000)).toBeGreaterThanOrEqual(0.05);
   });
 });
 

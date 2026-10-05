@@ -1,7 +1,9 @@
 /**
- * 確率予測の結果から、グラフに描く「残りの期間の支出」(予定を除く)を取り出す。
- * グラフの予測の線は、今日の実績にこの額を日数に比例して足し、予定の支出は日付の段差で足す。
- * 着地(実績 + 予定 + 固定費 + 残り)と同じ予測から描くので、画面ごとに数字が食い違わない。
+ * 確率予測の結果から、グラフに描く「今日より先に足される額」を取り出す。
+ * グラフの線と帯は、着地と同じ試行の日ごとの分位(forecast.path)をそのまま使うので、
+ * 見出しの着地とグラフの右端が食い違わない。カテゴリごとの日ごとの分位は持たないので、
+ * カテゴリは「残りの額を日数に比例して足す」近似にする(カテゴリ画面は、そのジャンルだけの
+ * 予測を作るので、全体の path がそのカテゴリの path になる)。
  */
 
 import type { RemainingForecast } from '@/features/category/pace';
@@ -14,6 +16,13 @@ export function remainingOfTotal(forecast: Forecast): RemainingForecast {
     lowYen: Math.max(0, forecast.total.p10 - known),
     medianYen: Math.max(0, forecast.total.p50 - known),
     highYen: Math.max(0, forecast.total.p90 - known),
+    path: forecast.path.map((p) => ({
+      date: p.date,
+      lowYen: p.p10,
+      medianYen: p.p50,
+      highYen: p.p90,
+    })),
+    profile: forecast.typicalProfile,
   };
 }
 
@@ -24,6 +33,8 @@ export function remainingOfCategory(
 ): RemainingForecast | null {
   const cat = forecast.byCategory.find((c) => c.categoryId === categoryId);
   if (cat === undefined) return null;
+  // そのジャンルだけの予測(カテゴリ画面)なら、全体の日ごとの分位がそのまま使える。
+  if (forecast.byCategory.length === 1) return remainingOfTotal(forecast);
   const known = cat.actualYen + cat.scheduledYen;
   return {
     lowYen: Math.max(0, cat.landing.p10 - known),

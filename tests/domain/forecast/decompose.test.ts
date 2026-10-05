@@ -38,7 +38,7 @@ describe('decomposeSpending(M1)', () => {
     expect(result.committed.scheduledYen).toBe(3000);
   });
 
-  it('振替・ignored・収入・入力待ちは対象外', () => {
+  it('振替・ignored・収入は対象外。入力待ちでも金額が分かっていれば実績に数える', () => {
     const result = decomposeSpending({
       transactions: [
         tx({ occurredOn: '2026-10-01', amountYen: -1000, isTransfer: true }),
@@ -54,7 +54,7 @@ describe('decomposeSpending(M1)', () => {
       confirmedFixedKeys: new Set(),
       detectedSubscriptions: [],
     });
-    expect(result.actualYen).toBe(500);
+    expect(result.actualYen).toBe(1500);
   });
 
   it('確認済みの固定費は残り期間の見込み回数ぶん確定分に計上する', () => {

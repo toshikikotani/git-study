@@ -3,7 +3,7 @@
  * 同じ確率エンジンの予測を受け取る(画面ごとに予測の仕組みを持たない)。
  *
  * 学習には過去2年ぶんの軽い読み方(history.ts)、予測の対象の期間は家計簿と同じ
- * 読み方(entries.ts)を使う。給料日・確認済みの固定費・検知したサブスク・記録開始日も渡す。
+ * 読み方(entries.ts)を使う。給料日・確認済みの固定費・検知したサブスク・記録開始日・収入も渡す。
  */
 
 import { unstable_cache } from 'next/cache';
@@ -19,13 +19,13 @@ import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { addDays, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
-import { BOOTSTRAP_WEIGHT, verifyForecast, type Verification } from './calibration';
+import { continuousRecordStart, periodIncome } from '@/domain/forecast/record';
+import { verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
 import { toForecastSource } from './source';
 
 /** 学習に使う過去の長さ(日)。2年ぶんあれば、同じ月を2回見られる。 */
 const HISTORY_DAYS = 730;
-
 export type ForecastView = {
   forecast: Forecast;
   period: { from: DateOnly; to: DateOnly };
@@ -33,6 +33,16 @@ export type ForecastView = {
   verification: Verification | null;
   today: DateOnly;
 };
+
+async function loadTakeHomeYen(): Promise<number | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('monthly_take_home_yen')
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data as { monthly_take_home_yen: number | null }).monthly_take_home_yen ?? null;
+}
 
 export async function loadForecast(args: {
   period: { from: DateOnly; to: DateOnly };
@@ -43,13 +53,15 @@ export async function loadForecast(args: {
 }): Promise<ForecastView> {
   const today = todayJst(args.now ?? new Date());
   const supabase = await createClient();
-  const [{ data: auth }, settings, fixedKeys, subscriptions, genres] = await Promise.all([
-    supabase.auth.getUser(),
-    getAppSettings().catch(() => null),
-    listConfirmedFixedCostKeys().catch(() => new Set<string>()),
-    loadDetectedSubscriptions(args.now).catch(() => []),
-    listGenres().catch(() => []),
-  ]);
+  const [{ data: auth }, settings, fixedKeys, subscriptions, genres, takeHomeYen] =
+    await Promise.all([
+      supabase.auth.getUser(),
+      getAppSettings().catch(() => null),
+      listConfirmedFixedCostKeys().catch(() => new Set<string>()),
+      loadDetectedSubscriptions(args.now).catch(() => []),
+      listGenres().catch(() => []),
+      args.scope ? Promise.resolve(null) : loadTakeHomeYen().catch(() => null),
+    ]);
   // 「予測を止める」にしたジャンルは、残りの変動費を予測しない(実績と日付入りの予定は数える)。
   const noForecast = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
   const userId = auth.user?.id ?? 'anonymous';
@@ -65,15 +77,10 @@ export async function loadForecast(args: {
   // 期間の前の履歴は軽い読み方、期間の中は家計簿と同じ読み方。重なる日は期間側だけを使う。
   const transactions = [...history.filter((t) => t.occurredOn < args.period.from), ...periodRows];
 
-  const recordStart =
-    transactions.reduce<DateOnly | null>(
-      (min, t) => (t.amountYen < 0 && (min === null || t.occurredOn < min) ? t.occurredOn : min),
-      null,
-    ) ?? null;
+  const recordStart = continuousRecordStart(transactions, today);
   const dataVersion = `${transactions.length}:${transactions.at(-1)?.occurredOn ?? ''}:${Math.round(
     transactions.reduce((sum, t) => sum + t.amountYen, 0),
   )}`;
-  const bootstrapWeight = BOOTSTRAP_WEIGHT;
 
   // 検証は重い(数秒)ので、明細が変わらない間は結果を使い回す。サーバーのデータキャッシュに
   // 置くので、サーバーが入れ替わっても残る。検証に使うのは完了した月だけなので、鍵も予測の期間に
@@ -85,7 +92,7 @@ export async function loadForecast(args: {
   const completedVersion = `${completed.length}:${completed.at(-1)?.occurredOn ?? ''}:${Math.round(
     completed.reduce((sum, t) => sum + t.amountYen, 0),
   )}`;
-  const cacheKey = `${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${bootstrapWeight}:${[...noForecast].sort().join(',')}`;
+  const cacheKey = `v2:${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${recordStart ?? ''}:${[...noForecast].sort().join(',')}`;
   const verification = await unstable_cache(
     async () =>
       verifyForecast({
@@ -94,7 +101,6 @@ export async function loadForecast(args: {
         today,
         recordStart,
         payday,
-        bootstrapWeight,
         noForecastGenreIds: noForecast,
       }),
     ['forecast-verification', cacheKey],
@@ -112,12 +118,17 @@ export async function loadForecast(args: {
     budgetYen: args.budgetYen ?? null,
     payday,
     dataVersion,
-    bootstrapWeight,
     noForecastGenreIds: noForecast,
     calibration: verification?.calibration ?? null,
-    ...(verification ? { halfLifeDays: verification.halfLifeDays } : {}),
+    ...(verification
+      ? {
+          halfLifeDays: verification.halfLifeDays,
+          monthLevelK: verification.monthLevelK ?? Infinity,
+        }
+      : {}),
     ...(args.scope ? { scope: args.scope } : {}),
     ...(args.categoryTargets ? { categoryTargets: args.categoryTargets } : {}),
+    income: args.scope ? null : periodIncome({ transactions, period: args.period, takeHomeYen }),
   });
   return { forecast, period: args.period, verification, today };
 }

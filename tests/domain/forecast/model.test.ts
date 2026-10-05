@@ -90,18 +90,6 @@ describe('fitModel(M2)', () => {
     expect(Math.exp(rare.amountPosterior.mu)).toBeGreaterThan(400);
   });
 
-  it('dayBundles は日付ごとに全カテゴリの金額を持つ', () => {
-    const days = buildDays('2026-09-25', '2026-09-29', (d) => (d === '2026-09-27' ? 1000 : 0));
-    const fitted = fitModel({
-      variable: [{ categoryId: 'a', categoryName: '外食', days }],
-      today: '2026-09-29',
-      payday: null,
-    });
-    expect(fitted.dayBundles).toHaveLength(5);
-    const day = fitted.dayBundles.find((b) => b.date === '2026-09-27')!;
-    expect(day.amountsByCategory.get('a')).toBe(1000);
-  });
-
   it('記録が一切無ければフォールバック値で破綻しない', () => {
     const fitted = fitModel({ variable: [], today: '2026-09-29', payday: null });
     expect(fitted.categories).toEqual([]);

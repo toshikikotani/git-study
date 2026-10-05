@@ -44,16 +44,25 @@ describe('レポートの着地まわりのカード', () => {
       renderToString(
         h(VerificationCard, {
           verification: {
-            calibration: { widthFactor: 1.15, sampleSize: 24, centerFactor: 1 },
+            calibration: null,
             halfLifeDays: 90,
-            summary: { hitRate80: 0.72, medianAbsErrorRatio: 0.11, pointCount: 24 },
+            monthLevelK: 8,
+            summary: {
+              hitRate80: 0.72,
+              medianAbsErrorRatio: 0.11,
+              pointCount: 24,
+              months: 2,
+              calibratedHitRate80: 0.79,
+              calibratedBias: -0.01,
+            },
           },
         }),
       ),
     );
-    expect(ok).toContain('72%');
-    expect(ok).toContain('過去24回');
-    expect(ok).toContain('1.15倍');
+    expect(ok).toContain('79%');
+    expect(ok).toContain('過去2か月・24');
+    expect(ok).toContain('補正の前は72%');
+    expect(ok).toContain('目安');
     const none = visible(renderToString(h(VerificationCard, { verification: null })));
     expect(none).toContain('記録がまだ足りない');
   });

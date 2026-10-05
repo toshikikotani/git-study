@@ -102,6 +102,8 @@ describe('remainingOfTotal / remainingOfCategory', () => {
     actualYen: 15599,
     committed: { scheduledYen: 5000, fixedYen: 0 },
     total: { p10: 30000, p50: 45000, p70: 50000, p90: 62000, mean: 46000 },
+    path: [{ date: '2026-10-31', p10: 14401, p50: 29401, p90: 46401 }],
+    typicalProfile: [],
     byCategory: [
       {
         categoryId: 'dining',
@@ -113,12 +115,13 @@ describe('remainingOfTotal / remainingOfCategory', () => {
   } as unknown as Forecast;
 
   it('着地から、実績と予定を引いた額(残りの支出)を返す', () => {
-    expect(remainingOfTotal(forecast)).toEqual({
+    expect(remainingOfTotal(forecast)).toMatchObject({
       lowYen: 9401,
       medianYen: 24401,
       highYen: 41401,
+      path: [{ date: '2026-10-31', lowYen: 14401, medianYen: 29401, highYen: 46401 }],
     });
-    expect(remainingOfCategory(forecast, 'dining')).toEqual({
+    expect(remainingOfCategory(forecast, 'dining')).toMatchObject({
       lowYen: 9401,
       medianYen: 24401,
       highYen: 41401,

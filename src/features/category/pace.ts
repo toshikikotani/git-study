@@ -63,7 +63,7 @@ export function goalOverlaps(
 
 // ---- 累計の線(累計モード)---------------------------------------------------------------
 
-/** 予測の帯の幅(直近の日平均の ±20%)。 */
+/** 予測の帯の幅(確率予測が無いときの近似。直近の日平均の ±20%)。 */
 export const FORECAST_BAND = 0.2;
 
 export type CumulativeDay = {
@@ -99,7 +99,22 @@ export type CumulativeChart = {
   recordStartInMonth: boolean;
 };
 
-export type RemainingForecast = { lowYen: number; medianYen: number; highYen: number };
+export type RemainingForecast = {
+  /** 残りの期間の支出(予定を除く)の、下振れ・中央・上振れ(10%・50%・90%)。 */
+  lowYen: number;
+  medianYen: number;
+  highYen: number;
+  /**
+   * 今日より先の各日までに、今日の実績へ足される額(予定・固定費・請求を含む)の分位。
+   * あれば、線と帯はこの値で描く(日数に比例させる近似をしない)。
+   */
+  path?: readonly { date: DateOnly; lowYen: number; medianYen: number; highYen: number }[];
+  /**
+   * 理想の線の形(各日までに決まっている支払いの累計と、いつもの使い方での変動費の累計の割合)。
+   * あれば、目標の理想の線を「決まっている支払い + 残りの予算 × いつもの割合」で引く。
+   */
+  profile?: readonly { date: DateOnly; committedYen: number; share: number }[];
+};
 
 /** 「理想より○円少ない / 多い」。 */
 export function idealDeltaLabel(deltaYen: number): string {
@@ -200,6 +215,21 @@ export function buildCumulative(input: {
   const futureDayCount = hasForecast ? daysBetween(lastActual, monthEnd) : 0;
   const rem = input.remaining ?? null;
 
+  // 日ごとの分位があれば、それで描く(予定・固定費の段差も入っている)。
+  const pathByDate =
+    rem?.path && rem.path.length > 0 ? new Map(rem.path.map((p) => [p.date, p])) : null;
+  let lastPath: NonNullable<RemainingForecast['path']>[number] | undefined;
+  // 理想の形は、予測の期間が目標の期間と同じときだけ使う(形は予測の期間で割合を出しているため)。
+  const profile =
+    rem?.profile &&
+    input.goal &&
+    rem.profile[0]?.date === input.goal.range.from &&
+    rem.profile.at(-1)?.date === input.goal.range.to
+      ? rem.profile
+      : null;
+  const profileByDate = profile ? new Map(profile.map((p) => [p.date, p])) : null;
+  const profileEnd = profile?.at(-1);
+
   let scheduledCum = 0;
   const days: CumulativeDay[] = [];
   for (let i = 0; i < dayCount; i += 1) {
@@ -210,16 +240,30 @@ export function buildCumulative(input: {
     const base = cumAt.get(lastActual) ?? 0;
     const frac = futureDayCount > 0 ? k / futureDayCount : 0;
     const spread = Math.sqrt(frac);
-    const forecastAt = (offset: number) =>
+    const point = pathByDate?.get(date);
+    if (point) lastPath = point;
+    const forecastAt = (band: 'lowYen' | 'medianYen' | 'highYen') =>
       rem === null
         ? null
-        : Math.round(base + rem.medianYen * frac + offset * spread + scheduledCum);
+        : pathByDate !== null
+          ? Math.round(base + (lastPath?.[band] ?? 0))
+          : Math.round(
+              base + rem.medianYen * frac + (rem[band] - rem.medianYen) * spread + scheduledCum,
+            );
     let ideal: number | null = null;
     if (idealKind === 'budget' && goal) {
       if (date >= goal.range.from && date <= goal.range.to) {
         const startBase = cumBefore(goal.range.from);
         const goalDays = daysBetween(goal.range.from, goal.range.to) + 1;
-        ideal = startBase + (goal.budgetYen * (daysBetween(goal.range.from, date) + 1)) / goalDays;
+        const shape = profileByDate?.get(date);
+        // いつもの使い方の形があれば、決まっている支払いの日に段差を付け、残りの予算をいつもの
+        // 割合で配る(休日や給料日のあとに多い人は、その日に理想の線も上がる)。無ければ均等に配る。
+        ideal =
+          shape && profileEnd
+            ? startBase +
+              shape.committedYen +
+              Math.max(0, goal.budgetYen - profileEnd.committedYen) * shape.share
+            : startBase + (goal.budgetYen * (daysBetween(goal.range.from, date) + 1)) / goalDays;
       }
     } else if (idealKind === 'previous') {
       ideal = (prevTotal * (daysBetween(monthStart, date) + 1)) / monthDays;
@@ -233,19 +277,19 @@ export function buildCumulative(input: {
       forecastYen:
         hasForecast && future
           ? rem !== null
-            ? forecastAt(0)
+            ? forecastAt('medianYen')
             : Math.round(base + perDay * k + scheduledCum)
           : null,
       forecastLowYen:
         hasForecast && future
           ? rem !== null
-            ? forecastAt(rem.lowYen - rem.medianYen)
+            ? forecastAt('lowYen')
             : Math.round(base + perDay * (1 - FORECAST_BAND) * k + scheduledCum)
           : null,
       forecastHighYen:
         hasForecast && future
           ? rem !== null
-            ? forecastAt(rem.highYen - rem.medianYen)
+            ? forecastAt('highYen')
             : Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum)
           : null,
     });

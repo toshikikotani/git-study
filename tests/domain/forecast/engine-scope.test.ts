@@ -166,12 +166,23 @@ describe('buildForecast の金額は整数の円(画面の formatYen は小数�
     expect(allAmounts(f).every(ints)).toBe(true);
   });
 
-  it('幅の補正(1以外の係数)があるとき', () => {
+  it('検証の補正(中心と PIT)があるとき', () => {
     const f = buildForecast({
       ...base,
       budgetYen: 40000,
       transactions: data,
-      calibration: { widthFactor: 1.2371, sampleSize: 20, centerFactor: 1.1 },
+      calibration: {
+        centerByPhase: { early: 1.1, mid: 1.07, late: 0.93 },
+        pit: [0.02, 0.05, 0.3, 0.5, 0.71, 0.9, 0.97, 0.99],
+        pitByPhase: {
+          early: [0.02, 0.05, 0.3, 0.5, 0.71, 0.9, 0.97, 0.99],
+          mid: [0.02, 0.05, 0.3, 0.5, 0.71, 0.9, 0.97, 0.99],
+          late: [0.02, 0.05, 0.3, 0.5, 0.71, 0.9, 0.97, 0.99],
+        },
+        pitWeight: 0.5,
+        months: 6,
+        sampleSize: 8,
+      },
     });
     expect(allAmounts(f).every(ints)).toBe(true);
     expect(f.total.p10).toBeLessThanOrEqual(f.total.p50);
