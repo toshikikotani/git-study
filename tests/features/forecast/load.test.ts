@@ -73,7 +73,7 @@ describe('loadForecast(Supabase の読み込みを通した予測)', () => {
       period: { from: '2026-10-01', to: '2026-10-31' },
       now: TODAY,
     });
-    expect(view.forecast.method).toBe('ensemble');
+    expect(view.forecast.method).toBe('bayes');
     expect(view.forecast.visits.merchants.some((m) => m.label === 'スーパーさくら')).toBe(true);
   });
 

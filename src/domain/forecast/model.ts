@@ -31,8 +31,12 @@ export const RECENCY_HALF_LIFE_CANDIDATES = [30, 90, 180] as const;
 const COUNT_PRIOR_DAYS = 7;
 /** 曜日・給料日・祝日係数の事前分布の強さ(日換算)。強いほど1.0に寄る。 */
 const COEF_PRIOR_DAYS = 30;
-/** 金額分布(対数正規)の事前分布の強さ(観測件数換算)。 */
-const AMOUNT_PRIOR_STRENGTH = 10;
+/**
+ * 金額分布(対数正規)の事前分布の強さ(観測件数換算)。カテゴリごとに金額の大きさが大きく違う
+ * (趣味と飲み物など)ので、全カテゴリの平均へ強く引き寄せると高額なカテゴリが系統的に低く出る。
+ * 10だった強さを1にした(ADR-069)。
+ */
+const AMOUNT_PRIOR_STRENGTH = 1;
 const PAYDAY_WINDOW_DAYS = 3;
 const MIN_SAMPLES_FOR_OWN_VARIANCE = 5;
 const FALLBACK_LOG_SIGMA_SQ = 0.7 ** 2;
@@ -277,4 +281,14 @@ export function fitModel(input: {
     monthFactor: season.factors,
     seasonal: season.active,
   };
+}
+
+/**
+ * 支出の水準の不確かさ(対数の標準偏差)。記録が短いほど大きい。30日分で LEVEL_SIGMA_AT_30、
+ * 日数の平方根に反比例して小さくなる(下限・上限あり)。
+ */
+export const LEVEL_SIGMA_AT_30 = 0.15;
+export function levelSigmaFor(dataDays: number): number {
+  const days = Math.max(dataDays, 7);
+  return Math.min(0.6, Math.max(0.05, LEVEL_SIGMA_AT_30 * Math.sqrt(30 / days)));
 }

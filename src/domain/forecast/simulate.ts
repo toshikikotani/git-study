@@ -85,6 +85,12 @@ export type SimulateInput = {
    * 多かった(少なかった)ときの中心の補正(backtest.ts の calibrateCenter)。決まっている額には掛けない。
    */
   remainingScale?: number;
+  /**
+   * 支出の水準そのものの不確かさ(対数の標準偏差)。試行ごとに、全カテゴリの回数の率へ共通の
+   * 倍率 exp(σz − σ²/2) を掛ける(平均は変えず、ばらつきと右の裾を広げる)。記録が短いほど、
+   * 月ごとの季節や生活の変化を学習できていないので大きくする(model.ts の levelSigmaFor)。
+   */
+  levelSigma?: number;
 };
 
 function quantile(sortedAsc: readonly number[], p: number): number {
@@ -193,6 +199,7 @@ function runTrials(input: SimulateInput): TrialRun {
   const trials = trialsFor(input.trials ?? DEFAULT_TRIALS, nAll, futureDates.length);
   const rng = createRng(input.seed);
   const scale = input.remainingScale ?? 1;
+  const levelSigma = input.levelSigma ?? 0;
 
   // 曜日・給料日・祝日・月の係数は日付だけで決まるので、試行の外で1回だけ計算する。
   // ポアソン分布の加法性(独立なポアソンの和は、率の和のポアソンに従う)を使い、
@@ -226,6 +233,8 @@ function runTrials(input: SimulateInput): TrialRun {
   for (let t = 0; t < trials; t += 1) {
     perCategoryTrial.fill(0);
     let variableTotal = 0;
+    const level =
+      levelSigma > 0 ? Math.exp(levelSigma * sampleStandardNormal(rng) - levelSigma ** 2 / 2) : 1;
     const useBootstrap = input.bootstrapWeight > 0 && rng() < input.bootstrapWeight;
 
     if (useBootstrap && dayBundles.length > 0) {
@@ -247,7 +256,7 @@ function runTrials(input: SimulateInput): TrialRun {
             sampleStandardNormal(rng);
         const sigma = Math.sqrt(cat.amountPosterior.sigmaSq);
 
-        const count = samplePoisson(rng, lambda * totalFactorByCategory[c]!);
+        const count = samplePoisson(rng, lambda * level * totalFactorByCategory[c]!);
         let catTotal = 0;
         for (let i = 0; i < count; i += 1) catTotal += sampleLognormal(rng, muTrial, sigma);
         perCategoryTrial[c] = catTotal;
