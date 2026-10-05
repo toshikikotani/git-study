@@ -15,6 +15,7 @@ import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
 import { OverviewChart } from './overview-chart';
+import { OverviewChartSection } from './overview-chart-section';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
 import { ViewSwitch } from './view-switch';
@@ -74,6 +75,17 @@ export default async function SpendingPage() {
     totalBudgetYen: ledger.forecast.totalBudgetYen,
   };
 
+  const overviewProps = {
+    transactions,
+    genreIds: goalGenreIds ?? genres.map((genre) => genre.id),
+    monthStart: ledger.period.from,
+    monthEnd: ledger.period.to,
+    today,
+    budgetYen: goalGenreIds ? goalItems.reduce((sum, item) => sum + item.targetYen, 0) : null,
+    goalFrom: plan?.periodStart ?? null,
+    goalTo: plan?.periodEnd ?? null,
+  };
+
   return (
     <div className="rise space-y-3">
       <SpendingMonthProvider
@@ -95,16 +107,9 @@ export default async function SpendingPage() {
           goal={null}
         />
         <AttentionCard hasGoal={false} />
-        <OverviewChart
-          transactions={transactions}
-          genreIds={goalGenreIds ?? genres.map((genre) => genre.id)}
-          monthStart={ledger.period.from}
-          monthEnd={ledger.period.to}
-          today={today}
-          budgetYen={goalGenreIds ? goalItems.reduce((sum, item) => sum + item.targetYen, 0) : null}
-          goalFrom={plan?.periodStart ?? null}
-          goalTo={plan?.periodEnd ?? null}
-        />
+        <Suspense fallback={<OverviewChart {...overviewProps} holdForecast />}>
+          <OverviewChartSection {...overviewProps} scopeGenreIds={goalGenreIds} />
+        </Suspense>
         <GenreBreakdown goalRows={null} />
         <CalendarHeatmap goal={null} />
         <LedgerList goalRange={null} duplicateCount={duplicates.length} />

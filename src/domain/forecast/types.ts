@@ -174,6 +174,8 @@ export type Forecast = {
   total: Band & { mean: number };
   byCategory: readonly ForecastCategoryBand[];
   committed: { scheduledYen: number; fixedYen: number };
+  /** 今日までの実績(通常の支出)。着地 − 実績 − 予定 が、グラフで残りの期間に足す額になる。 */
+  actualYen: number;
   /** 規則的に通う店の、残り期間の見込み(期待額と店ごとの内訳)。 */
   visits: {
     expectedYen: number;

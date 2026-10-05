@@ -9,7 +9,10 @@ import { listGenres } from '@/features/genre/store';
 
 import { monthRange, type LedgerRange } from '@/domain/ledger';
 import { listAccounts } from '@/features/accounts/store';
+import { remainingOfCategory } from '@/domain/forecast/remaining';
+import { loadForecast } from '@/features/forecast/load';
 import { loadGoalView } from '@/features/goals/loader';
+import type { RemainingForecast } from './pace';
 import type { GoalBreakdownRow } from '@/features/goals/view';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
@@ -28,6 +31,8 @@ export type CategoryDetailData = {
   genreBudgetYen: number | null;
   /** もう使わない。残りの予測に足さない。 */
   forecastClosed: boolean;
+  /** 確率予測の、残りの期間の支出(予定を除く)。今月以外・未分類・予測を止めたジャンルは null。 */
+  remaining: RemainingForecast | null;
   monthKey: string;
   monthStart: string;
   today: string;
@@ -82,14 +87,23 @@ export async function loadCategoryDetail(input: {
   const range = monthRange(monthKey);
   const windowFrom = nthDayOfMonth(addMonths(monthStart, -HISTORY_MONTHS), 1);
 
-  const [loaded, accounts, goalLoaded, genres] = await Promise.all([
+  const genreId = genreIdOfKey(input.genreKey);
+  const [loaded, accounts, goalLoaded, genres, remaining] = await Promise.all([
     loadLedgerTransactions({ from: windowFrom, to: range.to }, today),
     listAccounts(),
     loadGoalView(now).catch(() => null),
     listGenres().catch(() => []),
+    // グラフの予測の線は、レポートと同じ確率予測から描く(日平均の延長はしない)。
+    monthKey === today.slice(0, 7) && genreId !== null
+      ? loadForecast({ period: range, scope: { genreIds: new Set([genreId]) }, now })
+          .then((view) => remainingOfCategory(view.forecast, genreId))
+          .catch((error: unknown) => {
+            console.error('[category] 予測を読み込めませんでした', error);
+            return null;
+          })
+      : Promise.resolve(null),
   ]);
 
-  const genreId = genreIdOfKey(input.genreKey);
   const genre = genreId === null ? null : loaded.genres.find((g) => g.id === genreId);
   if (genreId !== null && !genre) return null;
 
@@ -113,6 +127,7 @@ export async function loadCategoryDetail(input: {
     genreName: genre?.name ?? '未分類',
     genreBudgetYen: genre?.budget_yen ?? null,
     forecastClosed: genres.find((item) => item.id === genreId)?.forecastClosed ?? false,
+    remaining,
     monthKey,
     monthStart,
     today,

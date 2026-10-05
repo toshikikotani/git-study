@@ -3,7 +3,11 @@
 import { useMemo, useState } from 'react';
 
 import { CategoryChart, type ChartMode } from '../spending/category/[genreKey]/category-chart';
-import { buildCumulative, categoryAllowanceYen } from '@/features/category/pace';
+import {
+  buildCumulative,
+  categoryAllowanceYen,
+  type RemainingForecast,
+} from '@/features/category/pace';
 import { scheduledYen, type CategoryLine } from '@/features/category/model';
 import { buildSeries, type ChartUnit } from '@/features/category/series';
 import type { DateOnly } from '@/lib/date';
@@ -17,7 +21,7 @@ export function GoalChart({
   budgetYen,
   goalFrom,
   goalTo,
-  landing,
+  remaining,
 }: {
   genreName: string;
   lines: CategoryLine[];
@@ -27,7 +31,7 @@ export function GoalChart({
   budgetYen: number;
   goalFrom: DateOnly;
   goalTo: DateOnly;
-  landing: { p10: number; p50: number; p90: number };
+  remaining: RemainingForecast;
 }) {
   const [mode, setMode] = useState<ChartMode>('cumulative');
   const [unit, setUnit] = useState<ChartUnit>('day');
@@ -51,6 +55,7 @@ export function GoalChart({
     [lines, unit, monthStart, monthEnd, today, budgetYen, goalFrom, goalTo],
   );
   const cumulative = useMemo(() => {
+    // 予測の線と帯は、確率予測の「残りの支出」から描く(buildCumulative が日数に比例して足す)。
     const chart = buildCumulative({
       lines,
       monthStart,
@@ -58,41 +63,14 @@ export function GoalChart({
       today,
       recordStart: series.recordStart,
       goal: { range: { from: goalFrom, to: goalTo }, budgetYen },
+      remaining,
     });
-    const future = chart.days.filter((day) => day.date > today);
-    const start = chart.days.find((day) => day.date === today)?.actualYen ?? 0;
-    const scheduledTotal = future.reduce((sum, day) => sum + day.scheduledYen, 0);
-    const variable = Math.max(landing.p50 - start - scheduledTotal, 0);
-    const openDays = Math.max(future.filter((day) => day.scheduledYen === 0).length, 1);
-    let scheduled = 0;
-    let varied = 0;
-    const path = new Map<string, number>();
-    for (const day of future) {
-      scheduled += day.scheduledYen;
-      if (day.scheduledYen === 0) varied += variable / openDays;
-      path.set(day.date, start + scheduled + varied);
-    }
-    const end = path.get(future.at(-1)?.date ?? '') ?? start;
-    const lowGap = landing.p10 - landing.p50;
-    const highGap = landing.p90 - landing.p50;
-    return {
-      ...chart,
-      hasForecast: future.length > 0,
-      maxYen: Math.max(landing.p90, landing.p50, end, 1) * 1.08,
-      ticks: [Math.max(landing.p90, end, 1) / 2, Math.max(landing.p90, end, 1)],
-      days: chart.days.map((day) => {
-        const point = path.get(day.date);
-        if (point === undefined) return day;
-        const scale = end === start ? 1 : (point - start) / (end - start);
-        const lastDay = day.date === future.at(-1)?.date;
-        return {
-          ...day,
-          forecastYen: lastDay ? landing.p50 : Math.round(point),
-          forecastLowYen: lastDay ? landing.p10 : Math.round(point + lowGap * scale),
-          forecastHighYen: lastDay ? landing.p90 : Math.round(point + highGap * scale),
-        };
-      }),
-    };
+    // 縦軸は予算ではなく、実績と予測の帯がちょうど収まる高さにする(予算より低い着地を見やすく)。
+    const top = Math.max(
+      1,
+      ...chart.days.map((day) => Math.max(day.actualYen ?? 0, day.forecastHighYen ?? 0)),
+    );
+    return { ...chart, maxYen: top * 1.08, ticks: [top / 2, top] };
   }, [
     lines,
     monthStart,
@@ -102,7 +80,7 @@ export function GoalChart({
     goalFrom,
     goalTo,
     budgetYen,
-    landing,
+    remaining,
   ]);
   return (
     <CategoryChart

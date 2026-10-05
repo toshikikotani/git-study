@@ -99,6 +99,8 @@ export type CumulativeChart = {
   recordStartInMonth: boolean;
 };
 
+export type RemainingForecast = { lowYen: number; medianYen: number; highYen: number };
+
 /** 「理想より○円少ない / 多い」。 */
 export function idealDeltaLabel(deltaYen: number): string {
   if (deltaYen === 0) return '理想どおり';
@@ -132,6 +134,12 @@ export function buildCumulative(input: {
   recordStart: DateOnly;
   goal: { range: { from: DateOnly; to: DateOnly }; budgetYen: number } | null;
   holdForecast?: boolean;
+  /**
+   * 確率予測(domain/forecast)が出した、残りの期間の支出(予定を除く)。10回中8回の下限・中央・上限。
+   * 渡すと、予測の線と帯はこの値で描く(日平均の延長はしない)。渡さなければ、これまでどおり
+   * 記録開始日以降の日平均で延ばす(確率予測を作れない画面・未分類だけ)。
+   */
+  remaining?: RemainingForecast | null;
 }): CumulativeChart {
   const { lines, monthStart, monthEnd, today, recordStart } = input;
   const dayCount = daysBetween(recordStart, monthEnd) + 1;
@@ -188,6 +196,9 @@ export function buildCumulative(input: {
       ? 0
       : (cumAt.get(lastActual) ?? 0) / (daysBetween(recordStart, lastActual) + 1);
   const hasForecast = isThisMonth && started && today < monthEnd;
+  // 確率予測が渡されたら、残りの期間にその額を、日数に比例して足していく(帯は日数の平方根で広げる)。
+  const futureDayCount = hasForecast ? daysBetween(lastActual, monthEnd) : 0;
+  const rem = input.remaining ?? null;
 
   let scheduledCum = 0;
   const days: CumulativeDay[] = [];
@@ -197,6 +208,12 @@ export function buildCumulative(input: {
     scheduledCum += scheduledByDay.get(date) ?? 0;
     const k = hasForecast && future ? daysBetween(lastActual, date) : 0;
     const base = cumAt.get(lastActual) ?? 0;
+    const frac = futureDayCount > 0 ? k / futureDayCount : 0;
+    const spread = Math.sqrt(frac);
+    const forecastAt = (offset: number) =>
+      rem === null
+        ? null
+        : Math.round(base + rem.medianYen * frac + offset * spread + scheduledCum);
     let ideal: number | null = null;
     if (idealKind === 'budget' && goal) {
       if (date >= goal.range.from && date <= goal.range.to) {
@@ -213,14 +230,23 @@ export function buildCumulative(input: {
       actualYen: future ? null : (cumAt.get(date) ?? 0),
       idealYen: ideal === null ? null : Math.round(ideal),
       scheduledYen: scheduledByDay.get(date) ?? 0,
-      forecastYen: hasForecast && future ? Math.round(base + perDay * k + scheduledCum) : null,
+      forecastYen:
+        hasForecast && future
+          ? rem !== null
+            ? forecastAt(0)
+            : Math.round(base + perDay * k + scheduledCum)
+          : null,
       forecastLowYen:
         hasForecast && future
-          ? Math.round(base + perDay * (1 - FORECAST_BAND) * k + scheduledCum)
+          ? rem !== null
+            ? forecastAt(rem.lowYen - rem.medianYen)
+            : Math.round(base + perDay * (1 - FORECAST_BAND) * k + scheduledCum)
           : null,
       forecastHighYen:
         hasForecast && future
-          ? Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum)
+          ? rem !== null
+            ? forecastAt(rem.highYen - rem.medianYen)
+            : Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum)
           : null,
     });
   }

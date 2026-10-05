@@ -5,6 +5,7 @@ import { InsightsList } from './insights-card';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
 import { GoalChart } from './goal-chart';
+import { remainingOfTotal } from '@/domain/forecast/remaining';
 import { reportInsights } from '@/domain/report-insights';
 import { loadForecast } from '@/features/forecast/load';
 import { addDays, addMonths } from '@/lib/date';
@@ -183,7 +184,7 @@ export default async function ReportsPage() {
           </p>
         )}
       </header>
-      {goalPlan && budgetYen !== null && landing ? (
+      {goalPlan && budgetYen !== null && outcome.ok ? (
         <GoalChart
           genreName="全体"
           lines={linesForGoal(
@@ -203,11 +204,7 @@ export default async function ReportsPage() {
           budgetYen={budgetYen}
           goalFrom={goalPlan.periodStart}
           goalTo={goalPlan.periodEnd}
-          landing={{
-            p10: landing.p10,
-            p50: Math.min(landing.p90, Math.max(landing.p10, landing.mean)),
-            p90: landing.p90,
-          }}
+          remaining={remainingOfTotal(outcome.value.forecast)}
         />
       ) : null}
       <Link
