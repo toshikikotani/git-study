@@ -463,6 +463,9 @@ create table public.genres (
   -- ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。
   show_on_home boolean     not null default false,
 
+  -- もう使わないカテゴリ。残りの日の予測に足さない。
+  forecast_closed boolean  not null default false,
+
   -- 見た目(利用者が選ぶ。null は名前からの既定。domain/genre-style.ts)
   icon_key     text,
   color_index  smallint,

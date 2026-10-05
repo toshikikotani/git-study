@@ -12,7 +12,10 @@ const nextConfig: NextConfig = {
   // 常にその場で最新化する。
   experimental: {
     staleTimes: {
+      // タブの prefetch={true} は static を見る。dynamic だけ伸ばしても、
+      // 先読みした画面は既定の5分で捨てられ、再訪のたびに取り直す。
       dynamic: 60 * 60 * 24,
+      static: 60 * 60 * 24,
     },
   },
 };

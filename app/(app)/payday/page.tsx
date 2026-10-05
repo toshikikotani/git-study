@@ -1,31 +1,15 @@
-import { listAccounts } from '@/features/accounts/store';
-import { listCategoryOptions, listTransferRules } from '@/features/transfer-rules/store';
 import { resolvePaydayChecklistState } from '@/features/transfer-runs/store';
 import { todayJst } from '@/lib/date';
-import { withMinDuration } from '@/lib/min-loading-duration';
 import { PaydayAmountForm, PaydayChecklist } from './checklist';
-import { NewRule } from './new-rule';
-import { RuleRow } from './rule-row';
 
 /**
- * 給料日振替ルールの編集(M4-3)とチェックリスト(M4-4、FR-15)。
- *
- * 判断を事前ルールに移す(設計原則4)。給料日当日に「いくら何に回すか」を
- * 考えなくて済むよう、順序とルールを先に決めておく。給料日になったら、
- * その日の入金額を入れるだけでチェックリストへ変わる。
+ * 給料日は入金額だけを聞く。振替ルール(返済へ・投資へ等)は使わない。
  */
 
 export const dynamic = 'force-dynamic';
 
 export default async function PaydayPage() {
-  const [rules, accounts, categories, checklistState] = await withMinDuration(
-    Promise.all([
-      listTransferRules(),
-      listAccounts(),
-      listCategoryOptions(),
-      resolvePaydayChecklistState(todayJst()),
-    ]),
-  );
+  const checklistState = await resolvePaydayChecklistState(todayJst());
 
   return (
     <div className="rise space-y-4">
@@ -34,36 +18,15 @@ export default async function PaydayPage() {
           給料日
         </h1>
       </header>
-
       {checklistState.kind === 'needs_amount' ? (
         <PaydayAmountForm paydayOn={checklistState.paydayOn} />
-      ) : null}
-      {checklistState.kind === 'checklist' ? <PaydayChecklist run={checklistState.run} /> : null}
-
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        給料日に上から順に実行する振替ルールです。
-      </p>
-
-      {rules.length === 0 ? (
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          まだ登録されていません。下のボタンから追加してください。
-        </p>
+      ) : checklistState.kind === 'checklist' ? (
+        <PaydayChecklist run={checklistState.run} />
       ) : (
-        <div className="space-y-3">
-          {rules.map((rule, index) => (
-            <RuleRow
-              key={rule.id}
-              rule={rule}
-              accounts={accounts}
-              categories={categories}
-              isFirst={index === 0}
-              isLast={index === rules.length - 1}
-            />
-          ))}
-        </div>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          給料日になったら、入った額だけ入れます。
+        </p>
       )}
-
-      <NewRule accounts={accounts} categories={categories} />
     </div>
   );
 }

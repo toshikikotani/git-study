@@ -41,7 +41,10 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   // 先月同日比のため、先月の月初まで遡って読む。未来日(予定)も今月末まで読む。
   const lastMonthStart = nthDayOfMonth(addMonths(today, -1), 1);
 
-  const loaded = await loadLedgerTransactions({ from: lastMonthStart, to: thisMonth.to }, today);
+  const [loaded, firstRecordedOn] = await Promise.all([
+    loadLedgerTransactions({ from: lastMonthStart, to: thisMonth.to }, today),
+    loadFirstRecordedOn(today),
+  ]);
   const { genres, transactions } = loaded;
 
   const views = buildLedgerViews({ genres, transactions, range: thisMonth, today });
@@ -63,7 +66,6 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
   ).spentYen;
   const { summary } = views;
 
-  const firstRecordedOn = await loadFirstRecordedOn(today);
   const recordedDaysThisMonth = countRecordedDays(
     [...summary.byDay.keys()].filter((d) => d >= thisMonth.from),
   );
@@ -96,6 +98,10 @@ export async function loadMonthlyLedger(now: Date = new Date()): Promise<Monthly
       lastMonthSameDayYen,
       differenceYen: summary.spentYen - lastMonthSameDayYen,
     },
+    sourceTransactions: transactions,
+    genreNames: new Map(genres.map((g) => [g.id, g.name])),
+    loadedFrom: lastMonthStart,
+    loadedTo: thisMonth.to,
   };
 }
 

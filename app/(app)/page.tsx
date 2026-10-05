@@ -1,17 +1,23 @@
 import { MdLocalFireDepartment } from 'react-icons/md';
 
 import { Button } from '@/components/ui/button';
-import { CountUp } from '@/components/ui/count-up';
 import { ExpandableBudgetTile } from '@/components/ui/expandable-budget-tile';
-import { ProgressGauge } from '@/components/ui/meter';
 import { budgetTone } from '@/domain/budget';
 import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { streakBadgeFor } from '@/domain/streak';
 import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { loadHomeSummary } from '@/features/home/summary';
-import { formatDateJa, formatTimeJa } from '@/lib/date';
-import { withMinDuration } from '@/lib/min-loading-duration';
+import { loadMonthlyLedger } from '@/features/spending/store';
+import {
+  lockedSavingsYen,
+  MISSING_INCOME_NOTE,
+  obligationYen,
+  sinkingFromRules,
+} from '@/domain/locked-savings';
+import { listDebts } from '@/features/debts/store';
+import { getAppSettings } from '@/features/settings/store';
+import { listTransferRules } from '@/features/transfer-rules/store';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
@@ -32,11 +38,31 @@ export default async function HomePage() {
   // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
   // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
   // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
-  const [, summary] = await withMinDuration(
-    Promise.all([recordCheckin().catch(() => undefined), loadHomeSummary()]),
-  );
+  const [, summary, ledger, debts, settings, rules] = await Promise.all([
+    recordCheckin().catch(() => undefined),
+    loadHomeSummary(),
+    loadMonthlyLedger().catch(() => null),
+    listDebts().catch(() => []),
+    getAppSettings().catch(() => null),
+    listTransferRules().catch(() => []),
+  ]);
   const streak = await getCheckinStreak();
-  const { payoff, tiles } = summary;
+  const { tiles } = summary;
+  const obligation = obligationYen(
+    debts.reduce((sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0), 0),
+    settings?.monthlyRepaymentTargetYen ?? 0,
+  );
+  const sinking = sinkingFromRules(rules);
+  const scheduled = ledger?.totals.scheduledYen ?? 0;
+  const savingsYen = ledger
+    ? lockedSavingsYen({
+        incomeYen: ledger.totals.incomeYen,
+        obligationYen: obligation,
+        sinkingYen: sinking,
+        scheduledYen: scheduled,
+        discretionaryCapYen: tiles.reduce((sum, tile) => sum + (tile.budgetYen ?? 0), 0),
+      })
+    : null;
 
   // タイルを押すとその場で内訳を開く(本人発案:遷移せずに見たい)。
   // タイルは高々数枠(FR-61)なので、ここで内訳もまとめて先読みしておく。
@@ -45,8 +71,6 @@ export default async function HomePage() {
   // この関数が実際に実行された時刻(=最後にサーバーへ取りに行った時刻)。
   // ADR-029:画面は pull-to-refresh するまで保持されるため、いつ時点の
   // 数字かを本人が判断できるようにする。
-  const updatedAt = formatTimeJa();
-
   return (
     <div className="space-y-3">
       {/* FR-03:完済カウントダウンは最上部に固定。
@@ -64,101 +88,32 @@ export default async function HomePage() {
 
         <div className="relative">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                className="text-xs font-medium tracking-[0.1em] uppercase"
-                style={{ color: 'var(--ink-muted)' }}
-              >
-                完済まで
-              </span>
-              {/* ADR-006:推定値が1件でも残るあいだ、確定値として見せない */}
-              {payoff.isEstimated ? (
-                <span
-                  className="rounded-full px-2 py-1 text-xs font-medium"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  推定
-                </span>
-              ) : null}
-            </div>
+            <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+              今日残せる
+            </p>
             <StreakBadge streak={streak} />
           </div>
 
-          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            最終更新 {updatedAt}
+          <p
+            className="mt-3 text-5xl leading-none font-semibold tracking-[-0.045em] tabular"
+            style={{ color: 'var(--ink)' }}
+          >
+            {savingsYen === null ? '—' : formatYen(savingsYen)}
           </p>
-
-          {payoff.daysRemaining === null ? (
-            <p
-              className="mt-2 text-4xl leading-none font-semibold tracking-[-0.03em]"
-              style={{ color: 'var(--income)' }}
+          <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            {savingsYen === null
+              ? MISSING_INCOME_NOTE
+              : '撮ると、この数字が減る。残った分が貯蓄になる。'}
+          </p>
+          {savingsYen === null ? (
+            <a
+              href="/payday"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold"
+              style={{ color: 'var(--accent)' }}
             >
-              完済済み
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 flex items-baseline gap-2">
-                <CountUp
-                  value={payoff.daysRemaining}
-                  className="text-4xl leading-[0.88] font-semibold tracking-[-0.05em]"
-                  style={{ color: 'var(--ink)' }}
-                />
-                <span className="text-xl font-medium" style={{ color: 'var(--ink-secondary)' }}>
-                  日
-                </span>
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                <span style={{ color: 'var(--ink-secondary)' }}>
-                  残り
-                  <span className="tabular ml-1 font-semibold" style={{ color: 'var(--ink)' }}>
-                    {formatYen(payoff.remainingYen)}
-                  </span>
-                </span>
-                {payoff.payoffOn ? (
-                  <span style={{ color: 'var(--ink-muted)' }}>
-                    {formatDateJa(payoff.payoffOn)} 完済見込み
-                  </span>
-                ) : null}
-              </div>
-
-              {/* 残高のスナップショットだけでは「進んでいる」ことが伝わらない。
-                  減った分を出すことが、返済アプリの正のフィードバックそのもの。 */}
-              {payoff.reducedThisMonthYen > 0 ? (
-                <p
-                  className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  <span aria-hidden>↓</span>
-                  今月{formatYen(payoff.reducedThisMonthYen)}減らした
-                </p>
-              ) : null}
-            </>
-          )}
-
-          <div className="mt-5">
-            <ProgressGauge
-              ratio={payoff.progressRatio}
-              label="返済済み"
-              nextMilestone={payoff.nextMilestone}
-            />
-          </div>
-
-          {/* リンクを本文に混ぜると行をまたいで割れる。行を分けて動線として立てる。 */}
-          {payoff.isEstimated ? (
-            <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-                残高と金利に推定値が含まれています。正確な値を入れると、この日付が確定します。
-              </p>
-              <a
-                href="/debts"
-                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
-                負債を入力する
-                <span aria-hidden>→</span>
-              </a>
-            </div>
+              手取りを入れる
+              <span aria-hidden>→</span>
+            </a>
           ) : null}
         </div>
       </section>

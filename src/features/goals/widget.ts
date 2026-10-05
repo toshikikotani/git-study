@@ -1,34 +1,37 @@
 /**
- * ウィジェット・ショートカット用の要約(「今日あと○円」と入力待ちの件数)。
- * 数字は目標カードと同じ planGuidance の値(todayAllowanceYen)で、ここで再計算しない。
+ * ロック画面・ウィジェット用。出すのは裁量の自由残と次の予定1件。
+ * 今日あとは出さない。
  */
 
 import type { GoalView } from './view';
 
 export type WidgetSummary = {
-  /** 今日あと使える額。目標が無い/期間外なら null。 */
-  todayAllowanceYen: number | null;
-  /** 入力待ちのレシートの件数(集計に入っていないもの)。 */
+  freeYen: number | null;
   pendingReceipts: number;
-  /** 撮影を直接開く URL(ショートカット・ウィジェットのタップ先)。 */
+  nextScheduled: { label: string; date: string; amountYen: number } | null;
   captureUrl: string;
-  /** 表示用の1行(例:「今日あと 2,300円」)。 */
   label: string;
 };
 
 export function buildWidgetSummary(
-  view: Pick<GoalView, 'active' | 'guidance'> | null,
+  view: Pick<GoalView, 'active' | 'guidance' | 'scheduledItems'> | null,
   pendingReceipts: number,
 ): WidgetSummary {
-  const allowance =
-    view !== null && view.active && view.guidance !== null ? view.guidance.todayAllowanceYen : null;
-  const money = allowance === null ? null : `${allowance.toLocaleString('ja-JP')}円`;
-  const parts = [money === null ? '目標なし' : `今日あと ${money}`];
+  const active = view !== null && view.active && view.guidance !== null;
+  const freeYen = active ? view.guidance.freeYen : null;
+  const next = active ? (view.scheduledItems[0] ?? null) : null;
+  const nextScheduled = next
+    ? { label: next.label, date: next.date, amountYen: next.amountYen }
+    : null;
+  const parts: string[] = [];
+  parts.push(freeYen === null ? '自由残なし' : `自由残 ${freeYen.toLocaleString('ja-JP')}円`);
+  if (nextScheduled) parts.push(`次の予定 ${nextScheduled.label}`);
   if (pendingReceipts > 0) parts.push(`入力待ち ${pendingReceipts}件`);
   return {
-    todayAllowanceYen: allowance,
+    freeYen,
     pendingReceipts,
-    captureUrl: '/spending?capture=1',
+    nextScheduled,
+    captureUrl: '/plan',
     label: parts.join(' ・ '),
   };
 }

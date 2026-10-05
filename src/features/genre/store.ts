@@ -33,6 +33,8 @@ export type Genre = {
   budgetYen: number | null;
   /** ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。 */
   showOnHome: boolean;
+  /** もう使わない。残りの日の予測に足さない。 */
+  forecastClosed: boolean;
 };
 
 /** 選択肢としてだけ使う画面(取り込みプレビュー・明細編集等)向けの最小限の形。 */
@@ -76,6 +78,7 @@ function fromRow(row: {
   sort_order: number;
   budget_yen: number | null;
   show_on_home: boolean;
+  forecast_closed?: boolean;
 }): Genre {
   return {
     id: row.id,
@@ -83,6 +86,7 @@ function fromRow(row: {
     sortOrder: row.sort_order,
     budgetYen: row.budget_yen,
     showOnHome: row.show_on_home,
+    forecastClosed: row.forecast_closed ?? false,
   };
 }
 
@@ -99,7 +103,7 @@ export async function listGenres(): Promise<Genre[]> {
 
   const { data, error } = await supabase
     .from('genres')
-    .select('id, name, sort_order, budget_yen, show_on_home')
+    .select('id, name, sort_order, budget_yen, show_on_home, forecast_closed')
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true });
   if (error) {
@@ -143,7 +147,7 @@ export async function createGenre(name: string): Promise<Genre> {
   const { data, error } = await supabase
     .from('genres')
     .insert({ user_id: auth.user.id, name: trimmed, sort_order: nextSortOrder })
-    .select('id, name, sort_order, budget_yen, show_on_home')
+    .select('id, name, sort_order, budget_yen, show_on_home, forecast_closed')
     .single();
   if (error) {
     if (isMissingTableError(error)) throw new GenreStoreError('ジャンル機能はまだ利用できません');
@@ -164,6 +168,12 @@ export async function updateGenreBudget(id: string, budgetYen: number | null): P
 }
 
 /** ホーム画面に残額を出すか(旧 categories.show_on_home、FR-14, FR-61)。 */
+export async function setGenreForecastClosed(id: string, closed: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from('genres').update({ forecast_closed: closed }).eq('id', id);
+  if (error) throw new GenreStoreError(`予測の停止を保存できませんでした: ${error.message}`);
+}
+
 export async function setGenreShowOnHome(id: string, showOnHome: boolean): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from('genres').update({ show_on_home: showOnHome }).eq('id', id);

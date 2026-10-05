@@ -1,30 +1,25 @@
+import { Suspense } from 'react';
 import { paceComparison, canShowForecast, hasIncome } from '@/domain/summary-rules';
-import { loadAccumulationView } from '@/features/accumulation/store';
 import { listAccounts } from '@/features/accounts/store';
-import { loadGoalView } from '@/features/goals/loader';
-import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
 import { listGenres } from '@/features/genre/store';
 import { listExpenseSubtypesForTransactionIds } from '@/features/receipts/expense-subtype-store';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
-import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
+import { getCurrentPlan } from '@/features/spending-plan/store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { addMonths } from '@/lib/date';
-import { withMinDuration } from '@/lib/min-loading-duration';
 import { AttentionCard } from './attention-card';
 import { CalendarHeatmap } from './calendar-heatmap';
 import { CurrentMonthOnly } from './current-month-only';
 import { toDrilldownTransactions } from './drilldown';
 import { GenreBreakdown } from './genre-breakdown';
-import { GoalCard } from '../plan/goal-card';
-import { buildGoalCard } from '@/features/goals/card';
-import { InsightsCard } from './insights-card';
+import { OverviewChart } from './overview-chart';
 import { LedgerList } from './ledger-list';
 import { PeriodSwitcher } from './period-switcher';
 import { ViewSwitch } from './view-switch';
 import { SpendingMonthProvider } from './spending-month-provider';
-import { SubscriptionsCard } from './subscriptions-card';
+import { LaterCards } from './later-cards';
 import { SummaryCard } from './summary-card';
 
 /**
@@ -45,30 +40,14 @@ import { SummaryCard } from './summary-card';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [
-    ledger,
-    genres,
-    accounts,
-    duplicates,
-    diagnosis,
-    pile,
-    subscriptions,
-    loadedGoal,
-    captures,
-  ] = await withMinDuration(
-    Promise.all([
-      loadMonthlyLedger(),
-      listGenres(),
-      listAccounts(),
-      listDuplicateCandidates(),
-      loadSpendingDiagnosisView(),
-      loadAccumulationView(),
-      loadDetectedSubscriptions(),
-      loadGoalView(),
-      // 読み取れなかったレシート(入力待ち)。取れなくても家計簿は開く。
-      listOpenCaptures().catch(() => []),
-    ]),
-  );
+  const [ledger, genres, accounts, duplicates, captures] = await Promise.all([
+    loadMonthlyLedger(),
+    listGenres(),
+    listAccounts(),
+    listDuplicateCandidates(),
+    listOpenCaptures().catch(() => []),
+  ]);
+  const plan = await getCurrentPlan(ledger.period.to).catch(() => null);
   const ids = ledger.transactions.map((t) => t.id);
   const [items, subtypes] = await Promise.all([
     listReceiptItemsForTransactionIds(ids),
@@ -77,8 +56,6 @@ export default async function SpendingPage() {
   const transactions = toDrilldownTransactions(ledger.transactions, items, subtypes);
 
   const today = ledger.period.to;
-  // 目標期間中だけ、サマリー・内訳・カレンダー・リストを目標と連動させる。
-  const goal = loadedGoal !== null && loadedGoal.view.active ? loadedGoal.view : null;
   const pace = paceComparison({
     today,
     firstRecordedOn: ledger.record.firstRecordedOn,
@@ -112,25 +89,26 @@ export default async function SpendingPage() {
           pace={pace}
           forecast={forecast}
           hasIncomeRegistered={hasIncome(ledger.totals.incomeYen)}
-          goal={
-            goal ? (
-              <GoalCard model={buildGoalCard(goal, today, { pendingCount: captures.length })} />
-            ) : null
-          }
+          goal={null}
         />
-        <AttentionCard hasGoal={goal !== null} />
-        <GenreBreakdown goalRows={goal ? goal.breakdown : null} />
-        <CalendarHeatmap
-          goal={goal ? { range: goal.range, dailyAllowanceYen: goal.dailyAllowanceYen } : null}
+        <AttentionCard hasGoal={false} />
+        <OverviewChart
+          transactions={transactions}
+          genreIds={genres.map((genre) => genre.id)}
+          monthStart={ledger.period.from}
+          monthEnd={ledger.period.to}
+          today={today}
+          budgetYen={plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : null}
+          goalFrom={plan?.periodStart ?? null}
+          goalTo={plan?.periodEnd ?? null}
         />
-        <LedgerList goalRange={goal ? goal.range : null} duplicateCount={duplicates.length} />
+        <GenreBreakdown goalRows={null} />
+        <CalendarHeatmap goal={null} />
+        <LedgerList goalRange={null} duplicateCount={duplicates.length} />
         <CurrentMonthOnly>
-          <InsightsCard
-            view={diagnosis}
-            totalSpentYen={ledger.totals.spentYen}
-            pile={{ thresholdYen: pile.thresholdYen, smallSpendTotalYen: pile.smallSpendTotalYen }}
-          />
-          <SubscriptionsCard subscriptions={subscriptions} />
+          <Suspense fallback={null}>
+            <LaterCards totalSpentYen={ledger.totals.spentYen} />
+          </Suspense>
         </CurrentMonthOnly>
       </SpendingMonthProvider>
     </div>

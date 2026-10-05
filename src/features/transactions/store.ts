@@ -304,7 +304,7 @@ export async function importTransactionsAsAdmin(
 export async function updateTransaction(
   id: string,
   genreId: string,
-  patch?: { amountYen: number; occurredOn: string },
+  patch?: { amountYen: number; occurredOn: string; description?: string },
 ): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase
@@ -314,7 +314,15 @@ export async function updateTransaction(
       classified_by: 'manual',
       review_status: 'corrected',
       reviewed_at: new Date().toISOString(),
-      ...(patch ? { amount_yen: patch.amountYen, occurred_on: patch.occurredOn } : {}),
+      ...(patch
+        ? {
+            amount_yen: patch.amountYen,
+            occurred_on: patch.occurredOn,
+            ...(patch.description
+              ? { description: patch.description, merchant_name: patch.description }
+              : {}),
+          }
+        : {}),
     })
     .eq('id', id);
   if (error) throw new TransactionStoreError(`明細を更新できませんでした: ${error.message}`);

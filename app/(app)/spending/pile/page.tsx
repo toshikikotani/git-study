@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { formatYen } from '@/domain/money';
 import { loadAccumulationView, type AccumulationView } from '@/features/accumulation/store';
 import { formatDateJa } from '@/lib/date';
-import { withMinDuration } from '@/lib/min-loading-duration';
 
 /**
  * 「ちりつも」(本人発案)。
@@ -33,7 +32,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPilePage() {
-  const view = await withMinDuration(loadAccumulationView());
+  const view = await loadAccumulationView();
 
   return (
     <div className="rise space-y-3">

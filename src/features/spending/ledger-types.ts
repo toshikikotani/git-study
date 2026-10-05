@@ -124,4 +124,9 @@ export type MonthlyLedgerView = {
   transactions: readonly LedgerTransaction[];
   forecast: MonthlyForecast;
   pace: MonthlyPace;
+  /** 目標の再取得を避けるための、読み済み明細。画面には出さない。 */
+  sourceTransactions: readonly LedgerTransaction[];
+  genreNames: ReadonlyMap<string, string>;
+  loadedFrom: string;
+  loadedTo: string;
 };

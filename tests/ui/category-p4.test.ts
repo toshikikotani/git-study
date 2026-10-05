@@ -73,6 +73,7 @@ const render = (
         onUnit: () => {},
         onPick: () => {},
         selectedIndex: null,
+        budgetYen: null,
       }),
     ),
   );

@@ -23,6 +23,7 @@ import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
+import { setCategoryForecastClosedAction } from '../actions';
 import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
@@ -166,8 +167,17 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
           data.goal?.active && data.goal.row && data.goal.row.targetYen !== null
             ? { range: data.goal.range, budgetYen: data.goal.row.targetYen }
             : null,
+        holdForecast: data.forecastClosed,
       }),
-    [historyLines, data.monthStart, data.range.to, data.today, series.recordStart, data.goal],
+    [
+      historyLines,
+      data.monthStart,
+      data.range.to,
+      data.today,
+      series.recordStart,
+      data.goal,
+      data.forecastClosed,
+    ],
   );
 
   const currentGenreId = genreIdOfKey(data.genreKey);
@@ -343,6 +353,20 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
             {currentGenreId !== null ? (
               <button
                 type="button"
+                onClick={() =>
+                  void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
+                    () => router.refresh(),
+                  )
+                }
+                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
+                style={{ color: data.forecastClosed ? 'var(--income)' : 'var(--ink)' }}
+              >
+                {data.forecastClosed ? '予測しない' : '予測を止める'}
+              </button>
+            ) : null}
+            {currentGenreId !== null ? (
+              <button
+                type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-label={`${data.genreName}の設定`}
                 className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
@@ -366,6 +390,23 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         </button>
       ) : null}
 
+      {data.genreName.includes('食料')
+        ? lines
+            .filter(
+              (l) => l.status === 'actual' && /ショコラ|菓子|ケーキ|sucr|カフェ/i.test(l.label),
+            )
+            .slice(0, 1)
+            .map((l) => (
+              <p
+                key={l.txId}
+                className="text-sm leading-relaxed"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
+                {l.label} {Math.abs(l.amountYen).toLocaleString('ja-JP')}
+                円は菓子店です。カフェ・飲料へ移すと、食料の注意は消えます。
+              </p>
+            ))
+        : null}
       <SummarySection
         summary={summary}
         goal={data.goal}
@@ -389,6 +430,16 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         onUnit={setUnit}
         onPick={pickBucket}
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
+        budgetYen={data.goal?.row?.targetYen ?? null}
+        holdForecast={data.forecastClosed}
+        {...(currentGenreId
+          ? {
+              onHoldForecast: () =>
+                void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
+                  () => router.refresh(),
+                ),
+            }
+          : {})}
       />
 
       <CategoryTabs

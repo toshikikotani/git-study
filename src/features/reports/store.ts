@@ -18,7 +18,7 @@ import {
 } from '@/domain/spending';
 import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
-import { monthStartJst } from '@/lib/date';
+import { monthStartJst, todayJst } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
@@ -141,7 +141,7 @@ export async function loadIncomeExpenseTrend(now: Date = new Date()): Promise<In
     occurredOn: row.occurred_on,
   }));
 
-  return { monthKeys, rows: summarizeMonthlyIncomeExpense(transactions, monthKeys) };
+  return { monthKeys, rows: summarizeMonthlyIncomeExpense(transactions, monthKeys, todayJst()) };
 }
 
 export type MerchantRanking = {

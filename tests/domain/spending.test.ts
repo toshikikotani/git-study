@@ -119,7 +119,12 @@ describe('summarizeMonthlyIncomeExpense', () => {
       MONTH_KEYS,
     );
     const row = rows.find((r) => r.monthKey === '2026-08');
-    expect(row).toEqual({ monthKey: '2026-08', incomeYen: 250_000, expenseYen: 3_000 });
+    expect(row).toEqual({
+      monthKey: '2026-08',
+      incomeYen: 250_000,
+      expenseYen: 3_000,
+      scheduledYen: 0,
+    });
   });
 
   it('未分類(categoryId: null)の支出も含める(カテゴリ別集計と違い、収支全体には漏らせない)', () => {
@@ -149,38 +154,66 @@ describe('summarizeMonthlyIncomeExpense', () => {
       MONTH_KEYS,
     );
     const row = rows.find((r) => r.monthKey === '2026-08');
-    expect(row).toEqual({ monthKey: '2026-08', incomeYen: 0, expenseYen: 0 });
+    expect(row).toEqual({ monthKey: '2026-08', incomeYen: 0, expenseYen: 0, scheduledYen: 0 });
+  });
+
+  it('今日より先は支出にせず予定にする', () => {
+    const rows = summarizeMonthlyIncomeExpense(
+      [spend('cat-food', -7_339, '2026-10-02'), spend('cat-fun', -51_540, '2026-10-03')],
+      ['2026-10'],
+      '2026-10-02',
+    );
+    expect(rows[0]).toEqual({
+      monthKey: '2026-10',
+      incomeYen: 0,
+      expenseYen: 7_339,
+      scheduledYen: 51_540,
+    });
   });
 
   it('取引が無い月も0円で埋める', () => {
     const rows = summarizeMonthlyIncomeExpense([], MONTH_KEYS);
-    expect(rows).toEqual(MONTH_KEYS.map((monthKey) => ({ monthKey, incomeYen: 0, expenseYen: 0 })));
+    expect(rows).toEqual(
+      MONTH_KEYS.map((monthKey) => ({ monthKey, incomeYen: 0, expenseYen: 0, scheduledYen: 0 })),
+    );
   });
 });
 
 describe('savingsRateOf', () => {
   it('(収入-支出)/収入を返す', () => {
-    expect(savingsRateOf({ monthKey: '2026-08', incomeYen: 200_000, expenseYen: 150_000 })).toBe(
-      0.25,
-    );
+    expect(
+      savingsRateOf({
+        monthKey: '2026-08',
+        incomeYen: 200_000,
+        expenseYen: 150_000,
+        scheduledYen: 0,
+      }),
+    ).toBe(0.25);
   });
 
   it('収入が0円の月は null(0%と誤読させない)', () => {
-    expect(savingsRateOf({ monthKey: '2026-08', incomeYen: 0, expenseYen: 5_000 })).toBeNull();
+    expect(
+      savingsRateOf({ monthKey: '2026-08', incomeYen: 0, expenseYen: 5_000, scheduledYen: 0 }),
+    ).toBeNull();
   });
 
   it('支出が収入を上回れば負の値になる', () => {
-    const rate = savingsRateOf({ monthKey: '2026-08', incomeYen: 100_000, expenseYen: 120_000 });
+    const rate = savingsRateOf({
+      monthKey: '2026-08',
+      incomeYen: 100_000,
+      expenseYen: 120_000,
+      scheduledYen: 0,
+    });
     expect(rate).toBeCloseTo(-0.2);
   });
 });
 
 describe('compareCurrentMonthToTrailingAverage', () => {
   const rows = [
-    { monthKey: '2026-06', incomeYen: 0, expenseYen: 100_000 },
-    { monthKey: '2026-07', incomeYen: 0, expenseYen: 200_000 },
-    { monthKey: '2026-08', incomeYen: 0, expenseYen: 0 },
-    { monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000 },
+    { monthKey: '2026-06', incomeYen: 0, expenseYen: 100_000, scheduledYen: 0 },
+    { monthKey: '2026-07', incomeYen: 0, expenseYen: 200_000, scheduledYen: 0 },
+    { monthKey: '2026-08', incomeYen: 0, expenseYen: 0, scheduledYen: 0 },
+    { monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000, scheduledYen: 0 },
   ];
 
   it('当月を除いた他の月の平均と当月の差を返す', () => {
@@ -204,7 +237,7 @@ describe('compareCurrentMonthToTrailingAverage', () => {
   });
 
   it('他の月が1件も無ければ null(平均を出せない)', () => {
-    const single = [{ monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000 }];
+    const single = [{ monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000, scheduledYen: 0 }];
     expect(compareCurrentMonthToTrailingAverage(single, '2026-09')).toBeNull();
   });
 });

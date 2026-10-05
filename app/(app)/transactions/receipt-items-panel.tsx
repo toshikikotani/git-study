@@ -18,7 +18,6 @@ type EditRowState = {
   name: string;
   amountYen: string;
   genreId: string;
-  /** AIが付けた商品分類(ADR-036)。この手入力フォームでは編集させず、そのまま持ち回す。 */
   productType: string | null;
 };
 
@@ -31,33 +30,6 @@ function toEditRows(items: readonly ReceiptItem[]): EditRowState[] {
   }));
 }
 
-/**
- * レシートの品目表示 + 編集ダイアログ(本人発案、ADR-045)。
- *
- * 元は明細一覧(/transactions)の行(split-editor.tsx、P10-40)専用だったが、
- * 「家計簿(/spending)からもレシートの詳細が見たいし、レシート登録も
- * 家計簿の方の責務だと感じる」という指摘を受け、明細行と家計簿のカテゴリ
- * 別内訳(spending/category-breakdown-chart.tsx)の両方から使う共通部品として
- * 切り出した(ADR-040、ADR-033:同じロジックを複数箇所に書かない)。呼び出し側が
- * 品目・小分類の状態を持ち、更新結果はコールバックで返す(制御コンポーネント)。
- *
- * 家計簿側は「レシートの画像までは要らない、品目の中身が見えればいい」という
- * 要望のため、ここでもレシート画像(receipt_image_path)は扱わない。
- *
- * ── 編集はダイアログに一本化し、レシートの再読み込みもその中に置く
- *    (本人発案、ADR-045)─────────────────────────────────────
- * 「編集が微妙。既に登録したやつも編集すぐできるようにしたい。編集押したら
- * 編集ダイアログ出る。さらに再度レシート読み込みボタンを編集エディタに
- * 設ける」への対応。以前(ADR-041)は行内にインラインで開く編集フォームで、
- * レシートの再読み込みは「品目が無いとき」専用の別ボタンだった。
- * `BottomSheet`(split-editor.tsx の長押しプレビュー・more-menu.tsx が既に
- * 使っている共通のシート、ADR-042)を使ったダイアログへ統合し、品目の
- * 有無に関わらず同じ「編集する」入口から開き、ダイアログの中に「読み込む/
- * 読み込み直す」ボタンを常設した。読み込み直しは(再分類はするが)即座には
- * 保存せず、編集中の行を置き換えるだけ——本人がその場で見直し、必要なら
- * 直してから「保存」を押す1つの流れにまとめた(以前のように読み込み直後に
- * 自動保存してから編集を開く、という二度書きをしない)。
- */
 export function ReceiptItemsPanel({
   transaction,
   categories,
@@ -65,6 +37,8 @@ export function ReceiptItemsPanel({
   onItemsReplaced,
   subtype,
   onSubtypeReplaced,
+  openRequest = 0,
+  summary = true,
 }: {
   transaction: {
     id: string;
@@ -78,16 +52,16 @@ export function ReceiptItemsPanel({
   onItemsReplaced: (items: ReceiptItem[]) => void;
   subtype: string | null;
   onSubtypeReplaced: (subtype: string) => void;
+  openRequest?: number;
+  summary?: boolean;
 }) {
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const [rescanning, setRescanning] = useState(false);
   const [rescanError, setRescanError] = useState<string | null>(null);
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editRows, setEditRows] = useState<EditRowState[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-
   const targetAbsYen = Math.abs(transaction.amountYen);
   const itemsStatus = receiptItemsStatus(items, transaction.amountYen);
 
@@ -97,25 +71,30 @@ export function ReceiptItemsPanel({
     setRescanError(null);
     setDialogOpen(true);
   }
-
   function closeDialog(): void {
     setDialogOpen(false);
   }
 
-  // Escape でも閉じる(more-menu.tsx・split-editor.tsx の BottomSheet と同じ流儀)。
+  const [seenRequest, setSeenRequest] = useState(openRequest);
+  if (openRequest !== seenRequest) {
+    setSeenRequest(openRequest);
+    if (openRequest > 0) {
+      setEditRows(toEditRows(items));
+      setEditError(null);
+      setRescanError(null);
+      setDialogOpen(true);
+    }
+  }
+
   useEffect(() => {
     if (!dialogOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeDialog();
+      if (event.key === 'Escape') setDialogOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [dialogOpen]);
 
-  // レシートを(再)読み込む。品目が既にあってもいつでも呼べる——読み取った
-  // 内容は保存せず、編集中の行(editRows)を置き換えるだけ。本人がその場で
-  // 見直し、「保存」を押すまでDBには反映しない(P10-40の「品目が無ければ
-  // 登録する」とADR-041の再読み込みを、このダイアログひとつに統合した)。
   async function rescanReceipt(file: File): Promise<void> {
     setRescanning(true);
     setRescanError(null);
@@ -136,10 +115,7 @@ export function ReceiptItemsPanel({
         setRescanError('品目を読み取れませんでした。');
         return;
       }
-
       if (receipt.items.length > 0) {
-        // 品目は検知(支払方法のみ、ADR-057)だけ通す。ジャンルは取り込み時には
-        // 確定させない(本人がここで選ぶか、後からAIジャンル分類に任せる)。
         const built = buildPreview(
           receipt.items.map((item) => ({
             occurredOn: transaction.occurredOn,
@@ -160,9 +136,6 @@ export function ReceiptItemsPanel({
           })),
         );
       }
-
-      // 生活費の小分類(ADR-036)は品目の編集行とは別の値のため、読み取れた
-      // 時点でそのまま保存する(こちらに「保存」ボタンでの確定操作は無い)。
       if (receipt.expenseSubtype !== null) {
         const subtypeResult = await setExpenseSubtypeAction(transaction.id, receipt.expenseSubtype);
         if (!subtypeResult.error) onSubtypeReplaced(receipt.expenseSubtype);
@@ -183,8 +156,6 @@ export function ReceiptItemsPanel({
   const canSaveEdit =
     editRows.length > 0 && editRows.every((r) => r.name.trim() !== '' && Number(r.amountYen) > 0);
 
-  // 分割(`assertValidSplits`)と違い、合計が明細の金額と一致することは
-  // 保存の条件にしない(一致しないまま保存してよい設計、本人発案、ADR-035)。
   async function saveEdit(): Promise<void> {
     setEditSaving(true);
     setEditError(null);
@@ -192,8 +163,6 @@ export function ReceiptItemsPanel({
       name: r.name.trim(),
       amountYen: editSign * Number(r.amountYen),
       genreId: r.genreId || null,
-      // 商品分類(AIの自由記述、ADR-036)はこのフォームでは編集させないが、
-      // 保存は全行の置き換えのため、渡さないと消えてしまう。そのまま持ち回す。
       productType: r.productType,
     }));
     const result = await replaceReceiptItemsAction(transaction.id, payload);
@@ -232,86 +201,76 @@ export function ReceiptItemsPanel({
   }
 
   return (
-    <div className="rounded-2xl border p-3" style={{ borderColor: 'var(--hairline)' }}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          レシートの品目
-        </p>
-        <button
-          type="button"
-          onClick={openDialog}
-          className="min-h-11 text-xs font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          {items.length > 0 ? '編集する' : 'レシートを登録する'}
-        </button>
-      </div>
-
-      {items.length > 0 ? (
+    <div
+      className={summary ? 'rounded-2xl border p-3' : undefined}
+      style={summary ? { borderColor: 'var(--hairline)' } : undefined}
+    >
+      {summary ? (
         <>
-          <ul className="mt-2 space-y-1">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-baseline justify-between gap-3 text-xs"
-                style={{ color: 'var(--ink-secondary)' }}
-              >
-                <span className="min-w-0 truncate">
-                  {item.name}
-                  {/* 商品の種類(AIの自由記述、ADR-036)。固定カテゴリのバッジと
-                      混ざらないよう括弧書きの添え字にする。 */}
-                  {item.productType ? (
-                    <span className="ml-1" style={{ color: 'var(--ink-muted)' }}>
-                      ({item.productType})
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+              レシートの品目
+            </p>
+            <button
+              type="button"
+              onClick={openDialog}
+              className="min-h-11 text-xs font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              {items.length > 0 ? '編集する' : 'レシートを登録する'}
+            </button>
+          </div>
+          {items.length > 0 ? (
+            <>
+              <ul className="mt-2 space-y-1">
+                {items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-baseline justify-between gap-3 text-xs"
+                    style={{ color: 'var(--ink-secondary)' }}
+                  >
+                    <span className="min-w-0 truncate">
+                      {item.name}
+                      {item.productType ? (
+                        <span className="ml-1" style={{ color: 'var(--ink-muted)' }}>
+                          ({item.productType})
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </span>
-                <span className="tabular shrink-0">
-                  {formatYen(item.amountYen, { sign: 'never' })}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {/* 品目の合計が明細額と一致しない(ADR-035)。編集は常にできるが、
-              読み取りが不正確だった可能性を控えめに知らせる。 */}
-          {itemsStatus === 'mismatched' ? (
-            <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
-              品目の合計が金額と一致しません
+                    <span className="tabular shrink-0">
+                      {formatYen(item.amountYen, { sign: 'never' })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {itemsStatus === 'mismatched' ? (
+                <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
+                  品目の合計が金額と一致しません
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+              品目の記録はありません
+            </p>
+          )}
+          {subtype ? (
+            <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              生活費の内訳:{subtype}
             </p>
           ) : null}
         </>
-      ) : (
-        <p className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          品目の記録はありません
-        </p>
-      )}
-
-      {/* 生活費の小分類(本人発案、ADR-036)。ADR-057によりジャンルに固定の
-          code は無くなったため、値があるときは常に添える。 */}
-      {subtype ? (
-        <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          生活費の内訳:{subtype}
-        </p>
       ) : null}
-
       <BottomSheet open={dialogOpen} onClose={closeDialog} role="dialog">
         <div className="flex items-center justify-between px-3 pt-1 pb-2">
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             品目を編集
           </h2>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            外側をタップで閉じる
-          </span>
         </div>
-
         <div className="space-y-2 px-3 pb-3">
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
             品目ごとに品名・金額・カテゴリを直せます。合計を一致させる必要はありません。
           </p>
-
-          {/* レシートの(再)読み込み(本人発案、ADR-045)。品目の有無に関わらず
-              いつでも使え、読み取った内容は下の編集行を置き換えるだけで
-              即保存はしない——見直してから「保存」を押す1つの流れにする。 */}
           <input
             ref={receiptInputRef}
             type="file"
@@ -345,7 +304,6 @@ export function ReceiptItemsPanel({
               {rescanError}
             </p>
           ) : null}
-
           {editRows.map((row, index) => (
             <div key={index} className="flex gap-2">
               <input
@@ -394,7 +352,6 @@ export function ReceiptItemsPanel({
               />
             </div>
           ))}
-
           {editRows.length > 0 ? (
             <div className="flex items-center justify-between">
               <span
@@ -408,7 +365,6 @@ export function ReceiptItemsPanel({
               </span>
             </div>
           ) : null}
-
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -429,7 +385,6 @@ export function ReceiptItemsPanel({
               やめる
             </button>
           </div>
-
           {editError ? (
             <p className="text-xs" style={{ color: 'var(--over)' }}>
               {editError}

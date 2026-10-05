@@ -1,7 +1,6 @@
 /**
  * 目標(期間つきの支出目標、ADR-058)を家計簿・目標画面で見せる形に整える純粋関数。
- * 集計は家計簿と同じ domain/ledger.ts の summarizeLedger()(特別費・予定は除いた
- * ペースの値)を使い、画面ごとに足し直さない。DB には触れない。
+ * 集計は家計簿と同じ domain/ledger.ts の summarizeLedger()で、画面ごとに足し直さない。
  */
 
 import { budgetState, type BudgetState } from '@/domain/budget-state';
@@ -12,26 +11,16 @@ import { planGuidance, type PlanGuidance } from '@/domain/spending-plan';
 import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import type { DateOnly } from '@/lib/date';
 
-/** 家計簿のジャンル内訳(目標期間の切り替え)で使う1行。 */
 export type GoalBreakdownRow = {
   genreId: string | null;
   genreName: string;
   spentYen: number;
-  /** 目標額。目標に無いジャンルは null(予算なし)。 */
   targetYen: number | null;
-  /** 今日時点の理想ライン((目標 − 予定)を期間で均等に使った額)。 */
   idealYen: number | null;
-  /** このジャンルの予定の支出(今日より先)。 */
   scheduledYen: number;
-  /** 予定で目標のほぼ全額が確保済みか。 */
   reserved: boolean;
 };
 
-/**
- * カレンダーの各日に付ける、1日の目安に対する状態の点。
- * 目安(1日の目安 = 目標の合計 ÷ 期間の日数)に対して、その日の支出が
- * 80%未満=余裕、100%まで=注意、超えたら=超過。目安が無ければ null(点を付けない)。
- */
 export function dayStatus(spentYen: number, dailyAllowanceYen: number | null): BudgetState | null {
   if (dailyAllowanceYen === null || dailyAllowanceYen <= 0) return null;
   return budgetState({ spentYen, budgetYen: dailyAllowanceYen });
@@ -47,23 +36,15 @@ export type GoalPlanInput = {
 export type GoalView = {
   planId: string;
   range: { from: DateOnly; to: DateOnly };
-  /** 期間中(開始日〜終了日、今日を含む)か。終了後は振り返りを見せる。 */
   active: boolean;
   ended: boolean;
   guidance: PlanGuidance;
-  /** レシート保存時の影響計算に使う、今の目標と実績。 */
   snapshot: GoalSnapshot;
-  /** 家計簿のジャンル内訳(目標期間)の行。目標に無いジャンルは目標なし(予算なし)。 */
   breakdown: GoalBreakdownRow[];
-  /** 目標に入れていないジャンルの実績(折りたたんで見せる)。 */
   noBudget: { genreId: string | null; genreName: string; spentYen: number }[];
-  /** カレンダーの「1日の目安」(目標の合計 ÷ 期間の日数)。 */
   dailyAllowanceYen: number | null;
-  /** 期間が終わっているときだけ。 */
   review: GoalReview | null;
-  /** 未分類の実績(目標に未反映)。 */
   uncategorizedYen: number;
-  /** 予定の支出の一覧(日付順)。目標カードで展開して見せる。 */
   scheduledItems: {
     id: string;
     date: DateOnly;
@@ -73,16 +54,11 @@ export type GoalView = {
   }[];
 };
 
-/**
- * 目標 + 家計簿の明細(分割の子へ展開済み)から、画面に出す形を作る。
- * 実績は特別費・予定を除いたペースの値(byGenrePace)。特別費・予定は別の行で見せる。
- */
 export function buildGoalView(input: {
   plan: GoalPlanInput;
   entries: readonly LedgerEntry[];
   genreNames: ReadonlyMap<string, string>;
   today: DateOnly;
-  /** 予定の一覧(名前・ジャンル)に使う明細。省略すると一覧は空。 */
   transactions?: readonly LedgerTransaction[];
 }): GoalView {
   const { plan, entries, genreNames, today } = input;
@@ -108,7 +84,8 @@ export function buildGoalView(input: {
     uncategorizedTodayYen: todaySummary.byGenrePace.get(null) ?? 0,
   });
 
-  const planned = new Set(plan.items.filter((i) => i.targetYen > 0).map((i) => i.genreId));
+  // 目標行があるジャンルは、金額0でも「この目標では数えない」として未収録に戻さない。
+  const planned = new Set(plan.items.map((i) => i.genreId));
   const breakdown: GoalBreakdownRow[] = guidance.genres
     .filter((g) => g.status !== 'no_budget')
     .map((g) => ({
@@ -166,7 +143,6 @@ export function buildGoalView(input: {
     },
     breakdown,
     noBudget,
-    // カレンダーの点の基準:予定を除いた予算を期間の日数で割った1日の目安。
     dailyAllowanceYen:
       targetTotal > 0 ? Math.floor(Math.max(targetTotal - guidance.scheduledYen, 0) / days) : null,
     review: ended
@@ -199,7 +175,6 @@ export function buildGoalView(input: {
   };
 }
 
-/** 状態(目標画面の行・サマリーで使う)。予算なしはグレー。 */
 export function goalRowState(row: {
   spentYen: number;
   targetYen: number | null;

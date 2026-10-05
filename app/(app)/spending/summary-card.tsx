@@ -156,8 +156,8 @@ function MonthPane({
       className="rounded-3xl p-6"
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
-      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-        {isCurrentMonth ? '今月使った額' : `${year}年${month}月に使った額`}
+      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+        {isCurrentMonth ? '今月つかった' : `${year}年${month}月`}
       </p>
       {waiting && error === null ? (
         <div
@@ -168,7 +168,7 @@ function MonthPane({
         />
       ) : (
         <p
-          className="tabular mt-1 text-4xl leading-none font-semibold tracking-tight"
+          className="tabular mt-3 text-5xl leading-none font-semibold tracking-[-0.045em]"
           style={{ color: waiting ? 'var(--ink-muted)' : 'var(--ink)' }}
         >
           {waiting ? '—' : <Yen value={totals.spentYen} />}
@@ -180,54 +180,23 @@ function MonthPane({
         </p>
       ) : null}
 
-      {!waiting && (totals.specialYen > 0 || totals.scheduledYen > 0) ? (
-        <p className="tabular mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {totals.specialYen > 0 ? `うち特別費 ${formatYen(totals.specialYen)}` : ''}
-          {totals.specialYen > 0 && totals.scheduledYen > 0 ? ' ・ ' : ''}
-          {totals.scheduledYen > 0 ? `このほか予定 ${formatYen(totals.scheduledYen)}` : ''}
+      {!waiting ? (
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          {totals.scheduledYen > 0
+            ? `予定 ${formatYen(totals.scheduledYen)} は入っていない。`
+            : '予定は入っていない。'}
+          {incomeRegistered ? ` 収入との差は ${formatSignedYen(netYen)}。` : ''}
         </p>
       ) : null}
-
-      {!waiting ? (
-        <dl
-          className="mt-4 grid grid-cols-2 gap-3 border-t pt-4"
-          style={{ borderColor: 'var(--hairline)' }}
+      {!waiting && !incomeRegistered ? (
+        <Link
+          href="/transactions/new?type=income"
+          prefetch={false}
+          className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold"
+          style={{ color: 'var(--accent)' }}
         >
-          {incomeRegistered ? (
-            <>
-              <div>
-                <dt className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                  収入
-                </dt>
-                <dd className="tabular text-sm font-semibold" style={{ color: 'var(--income)' }}>
-                  {formatYen(totals.incomeYen, { sign: 'never' })}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                  差額
-                </dt>
-                <dd className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {formatSignedYen(netYen)}
-                </dd>
-              </div>
-            </>
-          ) : (
-            <div className="col-span-2">
-              <Link
-                href="/transactions/new?type=income"
-                prefetch={false}
-                className="min-h-11 inline-flex items-center text-sm font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
-                収入を登録 →
-              </Link>
-              <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-                登録すると、収入との差額が見られます
-              </p>
-            </div>
-          )}
-        </dl>
+          手取りを入れる
+        </Link>
       ) : null}
 
       {isCurrentMonth ? <PaceLine pace={pace} /> : null}

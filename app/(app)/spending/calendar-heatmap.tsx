@@ -3,10 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
-import { STATE_COLOR, STATE_ICON, STATE_LABEL } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
 import { bandInWeek } from '@/features/goals/range-calendar-model';
-import { dayStatus } from '@/features/goals/view';
 import { heatLevel, monthGrid, weekOf } from '@/features/spending/heatmap';
 import { addDays, formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
@@ -136,18 +134,11 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                 const spent = totals.daySpend[date] ?? 0;
                 const scheduled = totals.scheduledDaySpend[date] ?? 0;
                 const level = inMonth ? heatLevel(spent, max) : 0;
-                const inGoal = goal !== null && date >= goal.range.from && date <= goal.range.to;
-                const rawStatus =
-                  inGoal && date <= today ? dayStatus(spent, goal!.dailyAllowanceYen) : null;
-                // 状態の印は注意・超過の日だけ(余裕は何も付けない)。
-                const status = rawStatus === 'caution' || rawStatus === 'over' ? rawStatus : null;
                 const selected = filter.date === date;
                 const [, m, d] = splitDateOnly(date);
                 const label = `${formatDateJa(date)}(${WEEKDAYS[weekdayOf(date)]})、${
                   spent > 0 ? `使った額 ${formatYen(spent, { sign: 'never' })}` : '支出なし'
-                }${scheduled > 0 ? `、予定 ${formatYen(scheduled, { sign: 'never' })}` : ''}${
-                  status ? `、目安に対して${STATE_LABEL[status]}` : ''
-                }${date === today ? '、今日' : ''}`;
+                }${scheduled > 0 ? `、予定 ${formatYen(scheduled, { sign: 'never' })}` : ''}${date === today ? '、今日' : ''}`;
 
                 return (
                   <button
@@ -178,15 +169,6 @@ export function CalendarHeatmap({ goal }: { goal: CalendarGoal | null }) {
                       {d}
                     </span>
 
-                    {status ? (
-                      <span
-                        aria-hidden
-                        className="absolute top-1 right-1 text-xs leading-none font-bold"
-                        style={{ color: STATE_COLOR[status] }}
-                      >
-                        {STATE_ICON[status]}
-                      </span>
-                    ) : null}
                     {scheduled > 0 ? (
                       <svg
                         aria-hidden

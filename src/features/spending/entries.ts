@@ -101,11 +101,16 @@ export async function loadLedgerTransactions(
     string,
     { genreId: string | null; amountYen: number; note: string | null }[]
   >();
+  const splitChunks = [];
   for (let i = 0; i < txRows.length; i += SPLIT_ID_CHUNK) {
-    const chunk = await listSplitsForTransactionIds(
-      supabase,
-      txRows.slice(i, i + SPLIT_ID_CHUNK).map((r) => r.id),
+    splitChunks.push(
+      listSplitsForTransactionIds(
+        supabase,
+        txRows.slice(i, i + SPLIT_ID_CHUNK).map((r) => r.id),
+      ),
     );
+  }
+  for (const chunk of await Promise.all(splitChunks)) {
     for (const [id, list] of chunk) splitsById.set(id, list);
   }
 

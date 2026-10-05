@@ -173,6 +173,7 @@ export function TransactionRowWithSplit({
     String(Math.abs(transaction.amountYen)),
   );
   const [occurredOnInput, setOccurredOnInput] = useState(transaction.occurredOn);
+  const [nameInput, setNameInput] = useState(display?.name ?? transaction.description);
   // 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付とは
   // 独立した操作のため、別の開閉状態・別のServer Actionにした。
   const [memo, setMemo] = useState(transaction.memo);
@@ -207,6 +208,9 @@ export function TransactionRowWithSplit({
   const [viewerOpen, setViewerOpen] = useState(false);
   // 長押しのメニュー(ジャンル変更・分割・複製・削除、レシート付きは画像を見る・もう一度読み取る)。
   const [menuOpen, setMenuOpen] = useState(false);
+  // 行を展開せず、明細から品目編集を開く。増やすたびにダイアログが開く。
+  const [itemEditRequest] = useState(0);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
 
   const isIncome = transaction.amountYen > 0;
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
@@ -227,12 +231,18 @@ export function TransactionRowWithSplit({
   }
 
   const amountAbsYen = Number(amountAbsYenInput);
+  const nameTrimmed = nameInput.trim();
   const simpleEditUnchanged =
     genreId === (transaction.genreId ?? '') &&
     amountAbsYen === targetAbsYen &&
-    occurredOnInput === transaction.occurredOn;
+    occurredOnInput === transaction.occurredOn &&
+    nameTrimmed === (display?.name ?? transaction.description);
   const canSaveSimpleEdit =
-    !!genreId && amountAbsYen > 0 && occurredOnInput !== '' && !simpleEditUnchanged;
+    !!genreId &&
+    amountAbsYen > 0 &&
+    occurredOnInput !== '' &&
+    nameTrimmed !== '' &&
+    !simpleEditUnchanged;
 
   async function saveSimpleEdit(): Promise<void> {
     if (!canSaveSimpleEdit) return;
@@ -242,6 +252,7 @@ export function TransactionRowWithSplit({
       amountAbsYen,
       occurredOn: occurredOnInput,
       isIncome,
+      description: nameTrimmed,
     });
     setSaving(false);
     if (result.error) {
@@ -264,6 +275,7 @@ export function TransactionRowWithSplit({
     }
     setOpen(false);
     setCategoryFormOpen(false);
+    setEditSheetOpen(false);
   }
 
   async function saveMemo(): Promise<void> {
@@ -566,14 +578,7 @@ export function TransactionRowWithSplit({
           <button
             type="button"
             aria-expanded={open}
-            onClick={() => {
-              // 閉じるときはカテゴリ編集フォームの開閉も一緒にリセットする。
-              setOpen((v) => {
-                const next = !v;
-                if (!next) setCategoryFormOpen(false);
-                return next;
-              });
-            }}
+            onClick={() => setEditSheetOpen(true)}
             className="min-h-11 flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
             aria-label={rowAriaLabel}
           >
@@ -615,26 +620,39 @@ export function TransactionRowWithSplit({
                 </p>
               ) : null}
               {shares.length > 0 ? (
-                <div
-                  role="img"
-                  aria-label={`ジャンルの内訳:${shares
-                    .map((sh) => `${sh.genreName ?? '未分類'} ${Math.round(sh.ratio * 100)}%`)
-                    .join('、')}`}
-                  className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
-                >
-                  {shares.map((sh) => (
-                    <span
-                      key={sh.genreId ?? 'none'}
-                      style={{
-                        width: `${sh.ratio * 100}%`,
-                        background: genreBarColor(
-                          sh.genreName,
-                          sh.genreName ? overrides[sh.genreName] : null,
-                        ),
-                      }}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div
+                    role="img"
+                    aria-label={`ジャンルの内訳:${shares
+                      .map(
+                        (sh) =>
+                          `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
+                      )
+                      .join('、')}`}
+                    className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
+                  >
+                    {shares.map((sh) => (
+                      <span
+                        key={sh.genreId ?? 'none'}
+                        style={{
+                          width: `${sh.ratio * 100}%`,
+                          background: genreBarColor(
+                            sh.genreName,
+                            sh.genreName ? overrides[sh.genreName] : null,
+                          ),
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs break-words" style={{ color: 'var(--ink-secondary)' }}>
+                    {shares
+                      .map(
+                        (sh) =>
+                          `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
+                      )
+                      .join(' + ')}
+                  </p>
+                </>
               ) : null}
             </div>
 
@@ -1071,6 +1089,109 @@ export function TransactionRowWithSplit({
         </div>
       </BottomSheet>
 
+      <BottomSheet open={editSheetOpen} onClose={() => setEditSheetOpen(false)} role="dialog">
+        <div className="space-y-3 px-3 pb-3">
+          <div className="flex items-start justify-between gap-3 px-1 pt-1">
+            <h2 className="text-base font-semibold break-words" style={{ color: 'var(--ink)' }}>
+              {display?.name ?? transaction.description}
+            </h2>
+          </div>
+          <input
+            type="text"
+            aria-label="名前"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            className="min-h-11 w-full rounded-xl px-3 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              aria-label="日付"
+              value={occurredOnInput}
+              onChange={(e) => setOccurredOnInput(e.target.value)}
+              className="min-h-11 flex-1 rounded-xl px-3 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label="金額"
+              value={amountAbsYenInput}
+              onChange={(e) => setAmountAbsYenInput(e.target.value.replace(/[^0-9]/g, ''))}
+              className="min-h-11 w-28 rounded-xl px-3 text-sm"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+          </div>
+          <select
+            aria-label="カテゴリ"
+            value={genreId}
+            onChange={(e) => setGenreId(e.target.value)}
+            className="min-h-11 w-full rounded-xl px-3 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            <option value="" disabled>
+              カテゴリを選ぶ
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void saveSimpleEdit()}
+            disabled={saving || !canSaveSimpleEdit}
+            className="min-h-11 w-full rounded-full text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            {saving ? '保存中…' : '保存'}
+          </button>
+          {!canSaveSimpleEdit && !saving ? (
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              名前・日付・金額・カテゴリを変えると保存できます
+            </p>
+          ) : null}
+          {error ? (
+            <p className="text-xs" style={{ color: 'var(--over)' }}>
+              {error}
+            </p>
+          ) : null}
+          <ReceiptItemsPanel
+            transaction={{
+              id: transaction.id,
+              occurredOn: transaction.occurredOn,
+              accountId: transaction.accountId,
+              paymentMethod: transaction.paymentMethod,
+              amountYen: transaction.amountYen,
+            }}
+            categories={categories}
+            items={items}
+            onItemsReplaced={setItems}
+            subtype={subtype}
+            onSubtypeReplaced={setSubtype}
+            openRequest={itemEditRequest}
+          />
+        </div>
+      </BottomSheet>
+
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} role="menu">
         <ul className="px-2 pb-2">
           {[
@@ -1162,9 +1283,6 @@ export function TransactionRowWithSplit({
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             明細のプレビュー
           </h2>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            外側をタップで閉じる
-          </span>
         </div>
 
         <div className="space-y-3 px-3 pb-3">

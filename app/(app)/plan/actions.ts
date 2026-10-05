@@ -1,22 +1,30 @@
 'use server';
 
-/**
- * 支出目標(/plan)の Server Action(本人発案、ADR-058)。
- * AI提案は本人が「AIに目標案を作ってもらう」を押した時だけ呼ぶ。
- */
-
 import { revalidatePath } from 'next/cache';
 
 import type { PlanEvidence } from '@/domain/plan-evidence';
 import { emptyPlanReason, PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
-import { refinePlanAllocation } from '@/features/spending-plan/plan-ai';
-import { deletePlan, savePlan, updatePlanTargets } from '@/features/spending-plan/store';
+import { forecastPlan, savingsAsk, twoMonthTendency } from '@/domain/plan-forecast';
+import { loadScheduledByGenre } from '@/features/spending-plan/scheduled';
+import {
+  deletePlan,
+  savePlan,
+  updatePlanTargets,
+  loadGenreSpend,
+} from '@/features/spending-plan/store';
 import type { GoalSnapshot } from '@/domain/goal-impact';
 import { nextPlanTargets } from '@/domain/goal-review';
 import { loadGoalView } from '@/features/goals/loader';
-import { addDays, assertDateOnly, todayJst } from '@/lib/date';
+import {
+  addDays,
+  addMonths,
+  assertDateOnly,
+  daysBetween,
+  monthStartJst,
+  todayJst,
+} from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
 
@@ -32,7 +40,6 @@ export type SuggestPlanResult =
       lookbackDays: number;
       uncategorizedYen: number;
       evidence: PlanEvidence;
-      /** ジャンルごとの1日あたりの中央値(根拠の表示用)。 */
       medianByGenre: Record<string, number>;
     }
   | { error: string; needsGenres?: boolean };
@@ -121,13 +128,28 @@ export async function deletePlanAction(id: string): Promise<{ error: string | nu
 }
 
 export type RefinePlanResult =
-  | { error: null; items: { genreId: string; targetYen: number }[]; summary: string }
+  | {
+      error: null;
+      summary: string;
+      proposedTotalYen: number | null;
+      forecasts: {
+        genreId: string;
+        genreName: string;
+        spentYen: number;
+        scheduledYen: number;
+        medianYen: number | null;
+        lowYen: number | null;
+        highYen: number | null;
+        recommendedYen: number | null;
+        exceedance: number | null;
+        label: string;
+        advice: string;
+        detail: string;
+      }[];
+    }
   | { error: string };
 
-/**
- * 総額は固定のまま、ジャンルごとの配分をAIと相談して微調整する。実績・必須ラベルは
- * クライアントの値を信用せず、サーバーで期間から集め直す。
- */
+/** 今の支出と残りの予定と直近ペースから、ジャンルごとの着地を返す。 */
 export async function refinePlanAction(input: {
   periodStart: string;
   periodEnd: string;
@@ -139,40 +161,103 @@ export async function refinePlanAction(input: {
     const start = assertDateOnly(input.periodStart);
     const end = assertDateOnly(input.periodEnd);
     if (end < start) return { error: '終了日は開始日以降を選んでください' };
-    if (!Number.isInteger(input.totalYen) || input.totalYen < 0) {
-      return { error: '総額は0円以上の整数で入力してください' };
-    }
-
+    const today = todayJst();
     const context = await loadPlanContext(start, end);
-    const byId = new Map(context.genres.map((g) => [g.genreId, g]));
+    const spentTo = today < end ? today : end;
+    const thisMonth = monthStartJst();
+    const previousStart = addMonths(thisMonth, -1);
+    const priorStart = addMonths(thisMonth, -2);
+    const [spent, scheduled, previousMonth, priorMonth] = await Promise.all([
+      loadGenreSpend(start, spentTo),
+      loadScheduledByGenre(start, end),
+      loadGenreSpend(previousStart, addDays(thisMonth, -1)),
+      loadGenreSpend(priorStart, addDays(previousStart, -1)),
+    ]);
+    const remaining = today >= end ? 0 : daysBetween(today, end);
+    const byId = new Map(context.genres.map((genre) => [genre.genreId, genre]));
     const items = input.items.flatMap((item) => {
       const genre = byId.get(item.genreId);
       if (genre === undefined || !Number.isInteger(item.targetYen) || item.targetYen < 0) return [];
       return [
         {
-          genreId: genre.genreId,
-          genreName: genre.genreName,
-          currentYen: item.targetYen,
-          baselineYen: genre.baselineYen,
-          mustPayShare: genre.mustPayShare,
+          item,
+          genre,
+          spentYen: spent.byGenre.get(item.genreId) ?? 0,
+          scheduledYen: scheduled.get(item.genreId) ?? 0,
         },
       ];
     });
-
-    const result = await refinePlanAllocation(readAnthropicApiKey(), {
-      periodDays: context.periodDays,
-      totalYen: input.totalYen,
-      items,
-      instruction: input.instruction,
+    const plan = forecastPlan({
+      remainingDays: remaining,
+      seed: `${start}:${end}:${today}:${items.map((row) => row.item.genreId).join(',')}`,
+      genres: items.map((row) => ({
+        spentYen: row.spentYen,
+        scheduledYen: row.scheduledYen,
+        meanDailyYen: row.genre.dailyYen,
+        medianDailyYen: row.genre.medianDailyYen,
+        observedDays: context.lookbackDays,
+        targetYen: row.item.targetYen,
+      })),
     });
-    if (!result.ok) return { error: result.message };
+    const yen = (n: number) => n.toLocaleString('ja-JP');
+    const forecasts = items.map((row, index) => {
+      const forecast = plan.genres[index]!;
+      const probability =
+        forecast.exceedance === null
+          ? ''
+          : `今の目標を超える確率は ${Math.round(forecast.exceedance * 100)}%。`;
+      const detail = [
+        `この期間にすでに ${yen(row.spentYen)} 円使っている。`,
+        row.scheduledYen > 0
+          ? `これから日付の入っている予定が ${yen(row.scheduledYen)} 円ある。`
+          : '日付の入っている予定は無い。',
+        forecast.medianYen === null
+          ? '支出のあった日が少なく、残りの着地はまだ置けない。'
+          : `残りの ${remaining} 日を 2,000 回引くと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+      ].join('');
+      const ask = savingsAsk({
+        verdict: forecast.verdict,
+        targetYen: row.item.targetYen,
+        medianYen: forecast.medianYen,
+        lowYen: forecast.lowYen,
+        committedYen: row.spentYen + row.scheduledYen,
+        remainingDays: remaining,
+      });
+      return {
+        genreId: row.item.genreId,
+        genreName: row.genre.genreName,
+        spentYen: row.spentYen,
+        scheduledYen: row.scheduledYen,
+        medianYen: forecast.medianYen,
+        lowYen: forecast.lowYen,
+        highYen: forecast.highYen,
+        recommendedYen: ask.keepUnderYen,
+        exceedance: forecast.exceedance,
+        label: forecast.label,
+        advice: [
+          ask.text,
+          twoMonthTendency({
+            priorYen: priorMonth.byGenre.get(row.item.genreId) ?? 0,
+            previousYen: previousMonth.byGenre.get(row.item.genreId) ?? 0,
+            landingYen: forecast.medianYen,
+          }).text,
+        ]
+          .filter(Boolean)
+          .join(''),
+        detail,
+      };
+    });
+    const known = forecasts.filter((row) => row.recommendedYen !== null);
+    const proposed = known.reduce((sum, row) => sum + (row.recommendedYen ?? 0), 0);
+    const summary =
+      known.length === 0
+        ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
+        : `抑えてほしい額の合計は ${proposed.toLocaleString('ja-JP')} 円。着地ではなく、この額を目標案にする。`;
     return {
       error: null,
-      items: items.map((item) => ({
-        genreId: item.genreId,
-        targetYen: result.amounts.get(item.genreId) ?? item.currentYen,
-      })),
-      summary: result.summary,
+      summary,
+      proposedTotalYen: known.length === 0 ? null : proposed,
+      forecasts,
     };
   } catch (error) {
     return { error: describeUserError(error) };
@@ -192,12 +277,6 @@ export async function updatePlanAllocationAction(
   return { error: null };
 }
 
-/**
- * 「この結果で次の目標を作る」。終わった目標の実績を反映した次の目標を、同じ長さで
- * 終了日の翌日から始まる期間として保存する(超えたジャンルは中間へ、大きく下回った
- * ジャンルは実績に合わせ、他は継続。domain/goal-review.ts の nextPlanTargets)。
- * 保存後は、目標画面で配分を直せる。
- */
 export async function createNextPlanAction(planId: string): Promise<{ error: string | null }> {
   try {
     const loaded = await loadGoalView();
@@ -229,7 +308,6 @@ export async function createNextPlanAction(planId: string): Promise<{ error: str
   return { error: null };
 }
 
-/** レシートの確認画面が、保存前の影響(残り予算の変化)を出すための今の目標と実績。 */
 export async function loadGoalSnapshotAction(): Promise<{
   snapshot: GoalSnapshot | null;
   today: string;

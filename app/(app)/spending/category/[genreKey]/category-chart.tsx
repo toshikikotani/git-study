@@ -69,6 +69,9 @@ export function CategoryChart({
   onUnit,
   onPick,
   selectedIndex,
+  budgetYen,
+  holdForecast,
+  onHoldForecast,
 }: {
   series: Series;
   cumulative: CumulativeChart;
@@ -81,6 +84,10 @@ export function CategoryChart({
   onUnit: (unit: ChartUnit) => void;
   onPick: (bucket: Bucket) => void;
   selectedIndex: number | null;
+  /** このカテゴリの予算。あるときは縦軸の上限。予測の帯では伸ばさない。 */
+  budgetYen: number | null;
+  holdForecast?: boolean;
+  onHoldForecast?: () => void;
 }) {
   const plot = useRef<HTMLDivElement>(null);
   const fontScale = useFontScale();
@@ -96,8 +103,18 @@ export function CategoryChart({
   const override = genreName === '未分類' ? null : overrides[genreName];
   const barColor = genreBarColor(genreName === '未分類' ? null : genreName, override);
   const lineColor = genreColorVar(genreName === '未分類' ? null : genreName, override);
-  const maxYen = isCum ? cumulative.maxYen : series.maxYen;
-  const ticks = isCum ? cumulative.ticks : series.ticks;
+  const forecastEnd = cumulative.days.filter((day) => day.forecastYen !== null).at(-1);
+  const forecastLow = forecastEnd?.forecastLowYen ?? 0;
+  const forecastMid = forecastEnd?.forecastYen ?? 0;
+  const forecastHigh = Math.max(forecastEnd?.forecastHighYen ?? 0, forecastMid);
+  const maxYen = isCum
+    ? Math.max(budgetYen ?? 0, cumulative.maxYen, forecastLow, forecastMid, forecastHigh, 1) * 1.08
+    : series.maxYen;
+  const ticks = isCum
+    ? [...new Set([forecastLow, forecastMid, forecastHigh].filter((yen) => yen > 0))].sort(
+        (a, b) => a - b,
+      )
+    : series.ticks;
 
   // なぞり操作(長押し・なぞる・タップ)の状態機械。DOM に触れない(lib/chart-gesture.ts)。
   const [gesture] = useState(() => new ChartGesture());
@@ -378,6 +395,7 @@ export function CategoryChart({
                 n={n}
                 color={lineColor}
                 dim={tip !== null}
+                budgetYen={budgetYen}
               />
             ) : (
               <>
@@ -602,7 +620,7 @@ export function CategoryChart({
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {isCum
-            ? '実線=実際の累計、点線=理想ペース。長押しでなぞれます'
+            ? '実線=実績の累計、点線=予算までの理想。右は予測の最小・中央・最大'
             : '長押ししてなぞると、日ごとの金額が見られます'}
         </p>
         <button
@@ -614,6 +632,20 @@ export function CategoryChart({
           音で聞く
         </button>
       </div>
+      {onHoldForecast ? (
+        <button
+          type="button"
+          onClick={onHoldForecast}
+          className="min-h-11 w-full rounded-2xl text-sm font-semibold"
+          style={{
+            background: holdForecast ? 'var(--action)' : 'var(--surface-raised)',
+            color: holdForecast ? 'var(--on-action)' : 'var(--ink)',
+            border: '1px solid var(--line)',
+          }}
+        >
+          {holdForecast ? 'これ以上は予測しない' : 'これ以上は使わない'}
+        </button>
+      ) : null}
       {audioNote ? (
         <p role="status" className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {audioNote}
@@ -623,7 +655,36 @@ export function CategoryChart({
   );
 }
 
-/** 累計の線・理想ペース・予測の帯・予定の段差。 */
+/**
+ * 目安(破線・濃い)と平均(点線・薄い)の水平線。線の種類と濃さを変えて見分けられるようにする。
+ * ラベルは右の余白のタグ(描画領域の外)に出すので、データとは重ならない。
+ */
+function Line({
+  kind,
+  ratio,
+  dim,
+}: {
+  kind: 'allowance' | 'average';
+  ratio: number;
+  dim: boolean;
+}) {
+  const allowance = kind === 'allowance';
+  return (
+    <div
+      aria-hidden
+      data-line={kind}
+      className="pointer-events-none absolute inset-x-0"
+      style={{
+        bottom: `${ratio * 100}%`,
+        borderTop: allowance
+          ? '1.5px dashed var(--ink-secondary)'
+          : '1.5px dotted color-mix(in srgb, var(--ink) 40%, transparent)',
+        opacity: dim ? 0.5 : 1,
+      }}
+    />
+  );
+}
+
 function CumulativeLayer({
   chart,
   x,
@@ -631,6 +692,7 @@ function CumulativeLayer({
   n,
   color,
   dim,
+  budgetYen,
 }: {
   chart: CumulativeChart;
   x: (i: number) => number;
@@ -638,7 +700,10 @@ function CumulativeLayer({
   n: number;
   color: string;
   dim: boolean;
+  budgetYen: number | null;
 }) {
+  void budgetYen;
+
   const actual = chart.days.filter((d) => d.actualYen !== null);
   const ideal = chart.days.filter((d) => d.idealYen !== null);
   const fut = chart.days.filter((d) => d.forecastHighYen !== null);
@@ -729,35 +794,5 @@ function CumulativeLayer({
           />
         ))}
     </>
-  );
-}
-
-/**
- * 目安(破線・濃い)と平均(点線・薄い)の水平線。線の種類と濃さを変えて見分けられるようにする。
- * ラベルは右の余白のタグ(描画領域の外)に出すので、データとは重ならない。
- */
-function Line({
-  kind,
-  ratio,
-  dim,
-}: {
-  kind: 'allowance' | 'average';
-  ratio: number;
-  dim: boolean;
-}) {
-  const allowance = kind === 'allowance';
-  return (
-    <div
-      aria-hidden
-      data-line={kind}
-      className="pointer-events-none absolute inset-x-0"
-      style={{
-        bottom: `${ratio * 100}%`,
-        borderTop: allowance
-          ? '1.5px dashed var(--ink-secondary)'
-          : '1.5px dotted color-mix(in srgb, var(--ink) 40%, transparent)',
-        opacity: dim ? 0.5 : 1,
-      }}
-    />
   );
 }

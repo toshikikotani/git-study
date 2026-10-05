@@ -24,7 +24,6 @@ import { formatYen } from '@/domain/money';
 import type { DiagnosedItem, SpendingDiagnosisView } from '@/features/diagnosis/store';
 import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
 import { formatDateJa } from '@/lib/date';
-import { diagnoseSpendingAction } from './actions';
 
 export function InsightsCard({
   view,
@@ -36,13 +35,11 @@ export function InsightsCard({
   totalSpentYen: number;
   pile: { thresholdYen: number; smallSpendTotalYen: number };
 }) {
-  const [current, setCurrent] = useState(view.currentMonth);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  const current = view.currentMonth;
+
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const { summary, wasteItems, necessaryItems, undiagnosedCount } = current;
+  const { summary, wasteItems, necessaryItems } = current;
   const breakdown = diagnosisBreakdown({
     totalSpentYen,
     wasteYen: summary.wasteYen,
@@ -52,23 +49,6 @@ export function InsightsCard({
     monthKey: row.monthKey,
     ratio: wasteRatioOf(row),
   }));
-
-  const run = async () => {
-    setPending(true);
-    setError(null);
-    const result = await diagnoseSpendingAction();
-    setPending(false);
-    setWarnings(result.warnings);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    // props の更新(revalidatePath)を待たずに残り件数だけ先に動かす。
-    setCurrent((prev) => ({
-      ...prev,
-      undiagnosedCount: Math.max(prev.undiagnosedCount - result.diagnosedCount, 0),
-    }));
-  };
 
   return (
     <div
@@ -89,7 +69,7 @@ export function InsightsCard({
 
       {summary.wasteRatio === null ? (
         <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          投資家目線で、今の支出が見直し候補か必要経費かをAIが判断します。
+          小口と予定だけを、画面の数字で書く。
         </p>
       ) : (
         <>
@@ -128,31 +108,10 @@ export function InsightsCard({
         </>
       )}
 
-      {undiagnosedCount > 0 ? (
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={pending}
-          className="min-h-11 mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-        >
-          {pending ? '診断しています…' : `今月の${undiagnosedCount}件をAIで診断する`}
-        </button>
-      ) : null}
-
-      {warnings.length > 0 ? (
-        <ul className="mt-2 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {warnings.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      {error ? (
-        <p role="alert" className="mt-2 text-xs" style={{ color: 'var(--over)' }}>
-          {error}
-        </p>
-      ) : null}
+      <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        今月の小口は {formatYen(pile.smallSpendTotalYen, { sign: 'never' })}。年にすると約{' '}
+        {formatYen(pile.smallSpendTotalYen * 12, { sign: 'never' })}。
+      </p>
 
       {/* ちりつも(小口支出の積み重ね)は補助。要約1行だけ見せて詳細へ */}
       <Link

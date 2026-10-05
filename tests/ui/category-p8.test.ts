@@ -35,7 +35,7 @@ const visible = (html: string) => html.replace(/<!-- -->/g, '');
 const data = {
   genreKey: 'dining',
   genreName: '外食',
-  genreBudgetYen: 30000,
+  genreBudgetYen: 30000, forecastClosed: false,
   genres: [
     { id: 'dining', name: '外食' },
     { id: 'cafe', name: 'カフェ' },

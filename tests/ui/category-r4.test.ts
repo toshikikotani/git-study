@@ -23,7 +23,7 @@ const tx = (o: Parameters<typeof ledgerTx>[0]): CategoryTx => ({ ...ledgerTx(o),
 const base: CategoryDetailData = {
   genreKey: 'dining',
   genreName: '外食',
-  genreBudgetYen: null,
+  genreBudgetYen: null, forecastClosed: false,
   monthKey: '2026-09',
   monthStart: '2026-09-01',
   today: '2026-09-29',

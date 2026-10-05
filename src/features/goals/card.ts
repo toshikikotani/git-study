@@ -55,27 +55,20 @@ const SUMMARY: Record<GuidanceStatus, string> = {
 export function buildGoalCard(
   view: GoalView,
   today: string,
-  options: { pendingCount?: number } = {},
+  options: { pendingCount?: number; savingsYen?: number | null } = {},
 ): GoalCardModel {
   const g = view.guidance;
   const { from, to } = view.range;
 
-  const primaryYen = g.todayAllowanceYen;
   const primary: GoalCardModel['primary'] = {
-    label: '今日あと',
-    amountYen: primaryYen,
+    label: '確保した貯蓄',
+    amountYen: options.savingsYen === undefined ? null : options.savingsYen,
     note:
-      primaryYen === 0 && g.todaySpentYen > 0
-        ? '今日の目安に達しました(明日からまた使えます)'
+      options.savingsYen === undefined || options.savingsYen === null
+        ? '手取りを入れると、ここが埋まる'
         : null,
   };
-
-  const badge: GoalCardModel['badge'] =
-    g.status === 'over' || (g.status === 'over_pace' && g.freeYen < 0)
-      ? { state: 'over', label: '超過' }
-      : g.status === 'watch' || g.status === 'over_pace'
-        ? { state: 'caution', label: '注意' }
-        : null;
+  const badge = null;
 
   // 内訳。上にあるものほど優先し、すでに表示した金額と同じ値は落とす。
   const candidates: GoalCardDetail[] = [];
@@ -119,7 +112,6 @@ export function buildGoalCard(
   const forecast = forecastLine(g);
 
   const seen = new Set<number>();
-  if (primaryYen !== null && primaryYen > 0) seen.add(primaryYen);
   // 結果予想の一言(forecast)に出した金額は、内訳(details)に同じ値を重ねない。
   if (forecast?.amountYen !== null && forecast?.amountYen !== undefined && forecast.amountYen > 0) {
     seen.add(forecast.amountYen);

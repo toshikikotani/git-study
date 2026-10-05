@@ -1,43 +1,5 @@
 'use client';
 
-/**
- * ボトムナビの「その他」— 全画面を網羅するドロップアップメニュー。
- *
- * ── なぜ要るか ──────────────────────────────────────────────
- * ボトムナビ(ホーム/家計簿/明細/給料日)と、レシート撮影の専用ボタンで
- * 主要な動線はカバーできても、それ以外の画面(負債・口座・ルール・AI相談・
- * 投資・副業・転職準備・レポート・朝配信・設定群・メール貼り付け・請求突合・
- * 重複確認)は各画面に散らばった導線からしか辿れず、どこに何があるか
- * 把握しづらい。この一覧をここへ集約する。よく使う画面はここに加えて
- * 元の画面からも辿れるようにしてある(例:ジャンル一覧 → /assistant の
- * ヘッダから)。
- *
- * ── なぜタブから独立した丸ボタンにしたのか(本人発案) ────────────
- * 以前はボトムナビの6つ目のタブだった。本人から「メニューが少し大きくて
- * タップしにくい、pairsみたいにメニュー4つまで」と要望があり、主タブを
- * ホーム・家計簿・明細・給料日の4つに絞った(負債は下記GROUPSへ移動)。
- * その他メニュー自体は6タブ目としてピルに詰め込むのをやめ、ナビの
- * ピル本体の隣に独立した丸いガラス素材ボタンとして置く
- * (app/(app)/layout.tsx)——タブ数を増やさずに済み、押しやすい大きさも
- * 確保できる。
- *
- * ── なぜ Portal で描画するのか(本人からの不具合報告への対応) ──
- * 以前はこのコンポーネントをボトムナビの `<ul>`(`backdrop-blur-xl` を持つ)の
- * 内側にそのまま描画していた。`backdrop-filter` は一部のブラウザで
- * 子孫の `position: fixed` の基準(containing block)になってしまい、
- * 背景タップで閉じるはずのオーバーレイがそのナビバーの小さな矩形内にしか
- * 存在しないことになっていた——「開くと画面のどこを押しても閉じない」という
- * 報告はこれが原因。`createPortal` で `document.body` 直下に描画し、
- * どんな祖先の CSS にも影響されない土台にした。シートの枠自体は
- * `bottom-sheet.tsx`(明細行の長押しプレビューと共有)が担う。
- *
- * ── なぜアンマウントしないのか ──────────────────────────────
- * 開閉のたびに DOM を作り直すと、閉じるときのアニメーションを再生する前に
- * 消えてしまう。常時マウントしたまま transform/opacity と pointer-events を
- * 切り替えることで、開閉どちらの向きも同じ transition で処理する
- * (`bottom-sheet.tsx` も同じ理由でアンマウントしない)。
- */
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -46,14 +8,11 @@ import { MdMoreHoriz } from 'react-icons/md';
 import { signOutAction } from '@/features/auth/actions';
 import { BottomSheet } from './bottom-sheet';
 
-// `as const` にして href をリテラル型のまま保つ。Next の typed routes(next.config.ts)は
-// `<Link href>` に渡る型がリテラルの Route であることを要求するため、途中で
-// `string` に広げると型検査で弾かれる。
 const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/debts', label: '負債' },
+      { href: '/plan', label: '貯蓄', dek: '先に移した分。借金の画面は設定で切り替える' },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',
@@ -104,6 +63,7 @@ const GROUPS = [
   {
     title: '設定',
     items: [
+      { href: '/settings/theme', label: '色', dek: '背景・文字・強調を変える' },
       { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
       { href: '/settings/gmail', label: 'Gmail連携' },
       { href: '/settings/google', label: 'Google連携' },
@@ -113,13 +73,9 @@ const GROUPS = [
   },
 ] as const;
 
-export function MoreMenu() {
+export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-
-  // 画面遷移が起きたら(リンクを踏んだ・戻るボタンなど)必ず閉じる。
-  // useEffect ではなくレンダー中の比較で行う(react-hooks/set-state-in-effect、
-  // M2-3b と同じ理由でカスケードするレンダーを避ける)。
   const [pathAtOpen, setPathAtOpen] = useState(pathname);
   if (pathname !== pathAtOpen) {
     setPathAtOpen(pathname);
@@ -137,9 +93,6 @@ export function MoreMenu() {
 
   return (
     <>
-      {/* ナビのピル本体(app/(app)/layout.tsx)とは別の、独立したガラス素材の
-          丸ボタン。タブの数を増やさずに押しやすい大きさを確保する
-          (本人発案「pairsみたいにメニュー4つまで」)。 */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -162,9 +115,6 @@ export function MoreMenu() {
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             その他の機能
           </h2>
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            外側をタップで閉じる
-          </span>
         </div>
 
         <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
@@ -180,16 +130,23 @@ export function MoreMenu() {
                 className="overflow-hidden"
                 style={{ borderRadius: 'var(--radius-inner)', background: 'var(--surface)' }}
               >
-                {/* prefetch={false}:app/(app)/layout.tsx のナビと同じ理由
-                    (本人からの不具合報告「読み込み中に画面全体にローディング
-                    表示されない」)。 */}
                 {group.items.map((item, i) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     prefetch={false}
                     role="menuitem"
-                    onClick={() => setOpen(false)}
+                    onClick={(e) => {
+                      const scroller = (e.currentTarget as HTMLElement).closest(
+                        '[data-sheet-scroll]',
+                      );
+                      if (scroller instanceof HTMLElement && scroller.dataset.moved === '1') {
+                        e.preventDefault();
+                        return;
+                      }
+                      onNavigate?.(item.href);
+                      setOpen(false);
+                    }}
                     className="min-h-11 flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
                     style={{
                       borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
@@ -217,7 +174,6 @@ export function MoreMenu() {
             </section>
           ))}
 
-          {/* ログアウト。共有の端末で、次の人が自分のアカウントで使えるように */}
           <form
             action={signOutAction}
             onSubmit={() => {

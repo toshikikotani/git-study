@@ -213,21 +213,23 @@ export async function saveImportBatchAction(
 export async function updateTransactionAction(
   id: string,
   genreId: string,
-  patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean },
+  patch?: { amountAbsYen: number; occurredOn: string; isIncome: boolean; description?: string },
 ): Promise<{ error: string | null; previous?: RowFields[] }> {
   let previous: RowFields[] = [];
   try {
     previous = await readRowFields([id]);
-    let storePatch: { amountYen: number; occurredOn: string } | undefined;
+    let storePatch: { amountYen: number; occurredOn: string; description?: string } | undefined;
     if (patch) {
       const amountAbsYen = assertYen(patch.amountAbsYen, '金額');
       if (amountAbsYen <= 0) {
         throw new MoneyError(`金額は正の値で指定してください: ${amountAbsYen}`);
       }
       const occurredOn = assertDateOnly(patch.occurredOn);
+      const description = patch.description?.trim();
       storePatch = {
         amountYen: patch.isIncome ? amountAbsYen : -amountAbsYen,
         occurredOn,
+        ...(description ? { description } : {}),
       };
     }
     await updateTransaction(id, genreId, storePatch);

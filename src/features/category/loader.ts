@@ -1,3 +1,4 @@
+import { listGenres } from '@/features/genre/store';
 /**
  * カテゴリ詳細の読み込み(サーバー)。
  *
@@ -25,6 +26,8 @@ export type CategoryDetailData = {
   genreName: string;
   /** ジャンルの予算(genres.budget_yen)。目標が無い月の目安に使う。 */
   genreBudgetYen: number | null;
+  /** もう使わない。残りの予測に足さない。 */
+  forecastClosed: boolean;
   monthKey: string;
   monthStart: string;
   today: string;
@@ -79,10 +82,11 @@ export async function loadCategoryDetail(input: {
   const range = monthRange(monthKey);
   const windowFrom = nthDayOfMonth(addMonths(monthStart, -HISTORY_MONTHS), 1);
 
-  const [loaded, accounts, goalLoaded] = await Promise.all([
+  const [loaded, accounts, goalLoaded, genres] = await Promise.all([
     loadLedgerTransactions({ from: windowFrom, to: range.to }, today),
     listAccounts(),
     loadGoalView(now).catch(() => null),
+    listGenres().catch(() => []),
   ]);
 
   const genreId = genreIdOfKey(input.genreKey);
@@ -108,6 +112,7 @@ export async function loadCategoryDetail(input: {
     genreKey: input.genreKey,
     genreName: genre?.name ?? '未分類',
     genreBudgetYen: genre?.budget_yen ?? null,
+    forecastClosed: genres.find((item) => item.id === genreId)?.forecastClosed ?? false,
     monthKey,
     monthStart,
     today,
