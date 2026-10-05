@@ -109,6 +109,11 @@ export type CategoryModelParams = {
    * 試行間で mu がばらつく(=帯が広がる)ようにする(M3)。
    */
   amountPosterior: { mu: number; sigmaSq: number; kappa: number };
+  /**
+   * 休み(土日祝)の1回の金額が平日よりどれだけ大きいか(対数の差、0=差なし)と、記録の中で
+   * 休みの日の買い物が占める割合。差は、観測が少ないほど0へ寄せる。
+   */
+  dayOffAmount: { delta: number; share: number };
   /** 曜日係数(0=日〜6=土)。1.0が「効果なし」。 */
   weekdayFactor: readonly number[];
   paydayFactor: number;

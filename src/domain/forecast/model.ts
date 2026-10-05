@@ -16,7 +16,7 @@ import {
   weekdayOf,
   type DateOnly,
 } from '@/lib/date';
-import { isHoliday } from './holidays';
+import { isDayOff, isHoliday } from './holidays';
 import type { CategoryModelParams, DayBundle, FittedModel, VariableTrainingData } from './types';
 
 /** 季節の係数を出すのに必要な、記録のそろった月の数。 */
@@ -37,6 +37,9 @@ const COEF_PRIOR_DAYS = 30;
  * 10だった強さを1にした(ADR-069)。
  */
 const AMOUNT_PRIOR_STRENGTH = 1;
+/** 休みの日と平日で1回の金額が違うか、を信じる強さ(少ない方の観測件数換算)。 */
+const DAY_OFF_AMOUNT_PRIOR = 6;
+const DAY_OFF_DELTA_CLAMP = 1.2;
 const PAYDAY_WINDOW_DAYS = 3;
 const MIN_SAMPLES_FOR_OWN_VARIANCE = 5;
 const FALLBACK_LOG_SIGMA_SQ = 0.7 ** 2;
@@ -137,15 +140,28 @@ export function rateFactorSum(
   payday: number | null,
   monthFactor: readonly number[] = NO_SEASON,
 ): number {
-  let sum = 0;
+  const { dayOff, weekday } = rateFactorSplit(cat, dates, payday, monthFactor);
+  return dayOff + weekday;
+}
+
+/** rateFactorSum を、休みの日(土日祝)と平日に分けた値。休みの日は1回の金額が違う(dayOffAmount)ため。 */
+export function rateFactorSplit(
+  cat: Pick<CategoryModelParams, 'weekdayFactor' | 'paydayFactor' | 'holidayFactor'>,
+  dates: readonly DateOnly[],
+  payday: number | null,
+  monthFactor: readonly number[] = NO_SEASON,
+): { dayOff: number; weekday: number } {
+  let dayOff = 0;
+  let weekday = 0;
   for (const date of dates) {
     let factor = cat.weekdayFactor[weekdayOf(date)] ?? 1;
     if (payday !== null && isPaydayWindow(date, payday)) factor *= cat.paydayFactor;
     if (isHoliday(date)) factor *= cat.holidayFactor;
     factor *= monthFactor[splitDateOnly(date)[1]] ?? 1;
-    sum += Math.max(0, factor);
+    if (isDayOff(date)) dayOff += Math.max(0, factor);
+    else weekday += Math.max(0, factor);
   }
-  return sum;
+  return { dayOff, weekday };
 }
 
 function fitCategory(
@@ -161,6 +177,8 @@ function fitCategory(
   let logSum = 0;
   let logSqSum = 0;
   let logWeight = 0;
+  const off = { logSum: 0, weight: 0 };
+  const on = { logSum: 0, weight: 0 };
   const weekdaySums: WeightedSum[] = Array.from({ length: 7 }, () => ({
     countWeighted: 0,
     dayWeight: 0,
@@ -194,6 +212,9 @@ function fitCategory(
       logSum += w * rec.count * logAmt;
       logSqSum += w * rec.count * logAmt * logAmt;
       logWeight += w * rec.count;
+      const bucket = isDayOff(rec.date) ? off : on;
+      bucket.logSum += w * rec.count * logAmt;
+      bucket.weight += w * rec.count;
     }
   }
 
@@ -204,10 +225,26 @@ function fitCategory(
   const rawMu = logWeight > 0 ? logSum / logWeight : pooledLogMean;
   const amountShrink = logWeight / (logWeight + AMOUNT_PRIOR_STRENGTH);
   const mu = pooledLogMean + amountShrink * (rawMu - pooledLogMean);
-  const sigmaSq =
+  // 休みの日(土日祝)と平日で、1回の金額が違うか。違いは観測が少ないほど0へ寄せる。
+  const smaller = Math.min(off.weight, on.weight);
+  const delta =
+    off.weight > 0 && on.weight > 0
+      ? Math.max(
+          -DAY_OFF_DELTA_CLAMP,
+          Math.min(
+            DAY_OFF_DELTA_CLAMP,
+            (smaller / (smaller + DAY_OFF_AMOUNT_PRIOR)) *
+              (off.logSum / off.weight - on.logSum / on.weight),
+          ),
+        )
+      : 0;
+  const offShare = off.weight + on.weight > 0 ? off.weight / (off.weight + on.weight) : 0;
+  // 休みか平日かで説明できるばらつきは、金額のばらつき(σ²)から除く。
+  const totalSigmaSq =
     logWeight >= MIN_SAMPLES_FOR_OWN_VARIANCE
       ? Math.max(0.05, logSqSum / logWeight - rawMu * rawMu)
       : FALLBACK_LOG_SIGMA_SQ;
+  const sigmaSq = Math.max(0.05, totalSigmaSq - offShare * (1 - offShare) * delta * delta);
 
   const overallRate = weight > 0 ? weightedCount / weight : pooledDailyRate;
 
@@ -216,6 +253,7 @@ function fitCategory(
     categoryName: cat.categoryName,
     countPosterior,
     amountPosterior: { mu, sigmaSq, kappa: logWeight + AMOUNT_PRIOR_STRENGTH },
+    dayOffAmount: { delta, share: offShare },
     weekdayFactor: weekdaySums.map((s) => shrinkToOne(s, overallRate)),
     paydayFactor: shrinkToOne(paydaySums, overallRate),
     holidayFactor: shrinkToOne(holidaySums, overallRate),

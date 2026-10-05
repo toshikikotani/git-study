@@ -119,3 +119,46 @@ describe('levelSigmaFor(支出の水準の不確かさ)', () => {
     expect(levelSigmaFor(100000)).toBeGreaterThanOrEqual(0.05);
   });
 });
+
+describe('休みの日(土日祝)の1回の金額', () => {
+  const dates = eachDay('2026-06-01', '2026-09-28');
+  const weekday = (d: string) => {
+    const w = new Date(d).getUTCDay();
+    return w !== 0 && w !== 6;
+  };
+  const build = (offYen: number): VariableTrainingData[] => [
+    {
+      categoryId: 'dining',
+      categoryName: '外食',
+      days: dates.map((date) => ({ date, count: 1, amountYen: weekday(date) ? 1000 : offYen })),
+    },
+  ];
+
+  it('休みの日の金額が平日の2倍なら、差(対数、2倍はln2≒0.69)をおおむね見つける(縮めるので0.4以上)', () => {
+    const [cat] = fitModel({ variable: build(2000), today: '2026-09-28', payday: null }).categories;
+    expect(cat!.dayOffAmount.delta).toBeGreaterThan(0.4);
+    expect(cat!.dayOffAmount.share).toBeGreaterThan(0.2);
+    expect(cat!.dayOffAmount.share).toBeLessThan(0.5);
+  });
+
+  it('差が無ければ、差はほぼ0', () => {
+    const [cat] = fitModel({ variable: build(1000), today: '2026-09-28', payday: null }).categories;
+    expect(Math.abs(cat!.dayOffAmount.delta)).toBeLessThan(0.05);
+  });
+
+  it('休みの日の観測が少ないときは、差を小さく見る(信じすぎない)', () => {
+    const few: VariableTrainingData[] = [
+      {
+        categoryId: 'dining',
+        categoryName: '外食',
+        days: dates.map((date) => ({
+          date,
+          count: weekday(date) || date === '2026-09-27' ? 1 : 0,
+          amountYen: weekday(date) ? 1000 : date === '2026-09-27' ? 5000 : 0,
+        })),
+      },
+    ];
+    const [cat] = fitModel({ variable: few, today: '2026-09-28', payday: null }).categories;
+    expect(cat!.dayOffAmount.delta).toBeLessThan(0.7);
+  });
+});
