@@ -3,8 +3,9 @@
  * との共役更新)と「1回の金額」(対数正規、全カテゴリの平均へ縮小推定)を別々に
  * 推定する。曜日・給料日直後・祝日の係数も1.0(効果なし)へ縮小推定する。
  *
- * 直近を重く扱う:観測の重みを 0.5^(経過日数 ÷ 30) にする(半減期30日、本人発案の
- * 仕様どおり)。
+ * 直近を重く扱う:観測の重みを 0.5^(経過日数 ÷ 半減期) にする。半減期は当初30日(本人発案の仕様)
+ * だったが、短いと回数の少ないカテゴリの率がぶれて系統的に低く出た(ADR-068)。既定は90日にし、
+ * 本人の過去の月での検証で 30・90・180日から選ぶ。
  */
 
 import {
@@ -23,7 +24,9 @@ const MIN_MONTHS_FOR_SEASON = 12;
 const SEASON_CLAMP = { min: 0.6, max: 1.6 } as const;
 const NO_SEASON: readonly number[] = Array.from({ length: 13 }, () => 1);
 
-const RECENCY_HALF_LIFE_DAYS = 30;
+/** 直近を重く見る重みの半減期(日)の既定値。検証で、本人の記録に合う値を選ぶ(RECENCY_HALF_LIFE_CANDIDATES)。 */
+export const DEFAULT_HALF_LIFE_DAYS = 90;
+export const RECENCY_HALF_LIFE_CANDIDATES = [30, 90, 180] as const;
 /** 回数の事前分布の強さ(本人発案「7日分の観測に相当する程度」)。 */
 const COUNT_PRIOR_DAYS = 7;
 /** 曜日・給料日・祝日係数の事前分布の強さ(日換算)。強いほど1.0に寄る。 */
@@ -44,9 +47,9 @@ const FALLBACK_LOG_SIGMA_SQ = 0.7 ** 2;
 const FALLBACK_DAILY_RATE = 0.1;
 const FALLBACK_LOG_MEAN = Math.log(1500);
 
-function recencyWeight(date: DateOnly, today: DateOnly): number {
+function recencyWeight(date: DateOnly, today: DateOnly, halfLifeDays: number): number {
   const ago = Math.max(0, daysBetween(date, today));
-  return Math.pow(0.5, ago / RECENCY_HALF_LIFE_DAYS);
+  return Math.pow(0.5, ago / halfLifeDays);
 }
 
 export function isPaydayWindow(date: DateOnly, payday: number): boolean {
@@ -221,10 +224,13 @@ export function fitModel(input: {
   today: DateOnly;
   /** 給料日(1〜31)。無ければ給料日係数は常に1.0。 */
   payday: number | null;
+  /** 直近を重く見る重みの半減期(日)。 */
+  halfLifeDays?: number;
 }): FittedModel {
   const { variable, today, payday } = input;
+  const halfLife = input.halfLifeDays ?? DEFAULT_HALF_LIFE_DAYS;
   const dates = variable[0]?.days.map((d) => d.date) ?? [];
-  const weightByDate = new Map(dates.map((d) => [d, recencyWeight(d, today)]));
+  const weightByDate = new Map(dates.map((d) => [d, recencyWeight(d, today, halfLife)]));
 
   let pooledWeightedCount = 0;
   let pooledWeight = 0;

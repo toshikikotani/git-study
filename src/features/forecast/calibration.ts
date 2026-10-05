@@ -6,6 +6,7 @@
  * 使い回しで、ユーザーごとに分ける(他人の結果を返さない)。
  */
 
+import { RECENCY_HALF_LIFE_CANDIDATES } from '@/domain/forecast/model';
 import {
   calibrateWidth,
   runBacktest,
@@ -19,6 +20,8 @@ import { addDays, addMonths, daysBetween, nthDayOfMonth, type DateOnly } from '@
 const MAX_BACKTEST_MONTHS = 6;
 /** 検証の試行回数(本番より少なくして軽くする。幅の補正が目的なので十分)。 */
 const BACKTEST_TRIALS = 600;
+/** 半減期を比べるときの試行回数(さらに軽くする)。 */
+const SELECTION_TRIALS = 300;
 /** 検証する月の前に、最低これだけの記録日数が要る。 */
 const MIN_HISTORY_DAYS = 30;
 const TRAINING_WINDOW_DAYS = 730;
@@ -31,6 +34,8 @@ export function bootstrapWeightFor(dataDays: number): number {
 
 export type Verification = {
   calibration: CalibrationResult;
+  /** 検証で選んだ、直近を重く見る重みの半減期(日)。 */
+  halfLifeDays: number;
   /** 検証した月の数と、80%の幅の的中率・中央値の誤差(補正の前)。 */
   summary: Pick<BacktestSummary, 'hitRate80' | 'medianAbsErrorRatio'> & { pointCount: number };
 };
@@ -67,18 +72,29 @@ export function verifyForecast(input: {
   const periods = backtestMonths(input.today, input.recordStart);
   let result: Verification | null = null;
   if (periods.length > 0) {
-    const backtest = runBacktest({
-      transactions: input.transactions,
-      periods,
-      trainingWindowDays: TRAINING_WINDOW_DAYS,
-      recordStart: input.recordStart,
-      payday: input.payday,
-      bootstrapWeight: input.bootstrapWeight,
-      trials: BACKTEST_TRIALS,
-    });
+    const run = (halfLifeDays: number, trials: number) =>
+      runBacktest({
+        transactions: input.transactions,
+        periods,
+        trainingWindowDays: TRAINING_WINDOW_DAYS,
+        recordStart: input.recordStart,
+        payday: input.payday,
+        halfLifeDays,
+        bootstrapWeight: input.bootstrapWeight,
+        trials,
+      });
+    // 半減期の候補を、軽い試行で比べて(確率予測の誤差 CRPS が最小のもの)選び、
+    // 選んだ値でもう一度、補正用の検証を回す。
+    const scored = RECENCY_HALF_LIFE_CANDIDATES.map((halfLifeDays) => ({
+      halfLifeDays,
+      meanCrps: run(halfLifeDays, SELECTION_TRIALS).meanCrps,
+    }));
+    const best = scored.reduce((a, b) => (b.meanCrps < a.meanCrps ? b : a));
+    const backtest = run(best.halfLifeDays, BACKTEST_TRIALS);
     if (backtest.points.length > 0) {
       result = {
         calibration: calibrateWidth(backtest.points),
+        halfLifeDays: best.halfLifeDays,
         summary: {
           hitRate80: backtest.hitRate80,
           medianAbsErrorRatio: backtest.medianAbsErrorRatio,

@@ -4,9 +4,16 @@ import { richTransactions } from '../../../scripts/forecast-eval/scenarios';
 import { fakeSupabase, type FakeTables } from '../../helpers/fake-supabase';
 
 let current = fakeSupabase({});
+vi.mock('next/cache', () => ({
+  // Next の実行環境が無いので、キャッシュは素通し(関数をそのまま返す)。
+  unstable_cache: (fn: () => unknown) => fn,
+}));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => current.client }));
 
 import { loadForecast } from '@/features/forecast/load';
+
+// 過去の月での検証(半減期の選択を含む)が数秒かかる。
+vi.setConfig({ testTimeout: 60_000 });
 
 const TODAY = new Date('2026-09-30T03:00:00Z'); // JST 2026-09-30 12:00
 
