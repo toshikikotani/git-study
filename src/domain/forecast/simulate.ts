@@ -406,6 +406,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
         meanYen: Math.round(m.meanYen),
       })),
     },
+    pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null }, // engine.ts が埋める
     seasonal: { active: input.fitted.seasonal, periodFactor: null }, // engine.ts が期間の月の係数を入れる
     special: {
       expected: Math.round(sortedSpecial.reduce((a, b) => a + b, 0) / trials),

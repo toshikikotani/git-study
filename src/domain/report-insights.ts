@@ -63,6 +63,23 @@ export function reportInsights(input: {
     }
   }
 
+  // 残りの見込みが妥当か確かめられるように、1日あたりと直近のペースを並べる。
+  const pace = forecast.pace;
+  if (pace.perDayYen !== null && forecast.remainingDays > 0 && pace.remainingYen > 0) {
+    const recent = pace.recentPerDayYen;
+    const lower = recent !== null && recent > 0 && pace.perDayYen < recent * 0.7;
+    out.push({
+      key: 'pace',
+      tone: lower ? 'caution' : 'info',
+      text:
+        `残り${forecast.remainingDays}日は、平均で約${yen(round100(pace.remainingYen))}(1日あたり約${yen(round100(pace.perDayYen))})を見込んでいる。` +
+        (recent !== null ? `直近14日の1日あたりは約${yen(round100(recent))}。` : '') +
+        (lower
+          ? '見込みは直近のペースより低い。まとまった支払いが続いていたなら、上振れしやすい。'
+          : ''),
+    });
+  }
+
   // 先と比べて増える見込みのジャンル(理由は数字で示す)。
   if (input.previousByGenre !== undefined) {
     const label = input.previousLabel ?? '前の期間';

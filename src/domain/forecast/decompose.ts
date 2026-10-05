@@ -6,7 +6,7 @@
  * (domain/budget.ts の isCountable() と同じ考え方)。
  */
 
-import { addMonths, daysBetween, weekdayOf, type DateOnly } from '@/lib/date';
+import { addDays, addMonths, daysBetween, weekdayOf, type DateOnly } from '@/lib/date';
 import { eachDay } from '@/domain/period';
 import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf, type DetectedSubscription } from '@/domain/subscriptions';
@@ -41,6 +41,8 @@ const OUTLIER_PERCENTILE = 0.99;
 /** この割合以上の週で支出があるなら「普段は支出がある曜日」とみなす。 */
 const USUAL_WEEKDAY_RATIO = 0.6;
 const MIN_WEEKS_FOR_MISSING_CHECK = 4;
+/** 直近のペースを見る日数。 */
+const RECENT_PACE_DAYS = 14;
 
 function isCountable(t: ForecastSourceTransaction): boolean {
   return (
@@ -156,6 +158,17 @@ export function decomposeSpending(input: {
     const key = subscriptionKeyOf(t.merchantName, t.description, t.amountYen);
     return !fixedKeySet.has(key);
   });
+
+  // 直近の1日あたりの支出(見込みと比べて確かめるための数字)。直近14日(記録が短ければその日数)の、
+  // 通常の実績のうち固定費と「予測を止める」ジャンルを除いたものの平均。
+  const recentDays = Math.min(RECENT_PACE_DAYS, Math.max(1, dataDays));
+  const recentFrom = addDays(today, -(recentDays - 1));
+  const recentPerDayYen =
+    dataDays > 0 && recordStart !== null
+      ? learnable
+          .filter((t) => t.occurredOn >= recentFrom && t.occurredOn <= today)
+          .reduce((sum, t) => sum + -t.amountYen, 0) / recentDays
+      : null;
 
   // 規則的に通う店は、日ごとの確率で均さず、来店の日付と確率で別に扱う(R3)。
   const regularMerchants = detectRegularMerchants(
@@ -301,6 +314,7 @@ export function decomposeSpending(input: {
     baseByCategory: [...baseMap.values()],
     regularMerchants,
     visits,
+    recentPerDayYen,
     missingRecordDays,
     dataDays,
   };

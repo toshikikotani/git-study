@@ -27,6 +27,7 @@ const forecast = (over: Partial<Forecast> = {}): Forecast => ({
   byCategory: [band()],
   committed: { scheduledYen: 0, fixedYen: 0 },
   visits: { expectedYen: 0, merchants: [] },
+  pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null },
   seasonal: { active: false, periodFactor: null },
   special: { expected: 0, p90: 0 },
   probWithinBudget: null,
@@ -153,5 +154,50 @@ describe('reportInsights', () => {
       previousByGenre: new Map([['dining', 5000]]),
     });
     expect(out.length).toBeLessThanOrEqual(6);
+  });
+});
+
+describe('reportInsights の残りの見込みと直近のペース', () => {
+  it('残りの見込み(合計と1日あたり)と、直近14日の1日あたりを並べて出す', () => {
+    const out = reportInsights({
+      forecast: forecast({
+        remainingDays: 26,
+        pace: { remainingYen: 35000, perDayYen: 1346, recentPerDayYen: 1500 },
+      }),
+      budgetYen: null,
+      periodLabel: '今月',
+    });
+    const pace = out.find((i) => i.key === 'pace')!;
+    expect(pace.tone).toBe('info');
+    expect(pace.text).toContain('残り26日');
+    expect(pace.text).toContain('約35,000円');
+    expect(pace.text).toContain('1日あたり約1,300円');
+    expect(pace.text).toContain('直近14日の1日あたりは約1,500円');
+  });
+
+  it('見込みが直近のペースよりかなり低いときは、上振れしやすいと知らせる', () => {
+    const out = reportInsights({
+      forecast: forecast({
+        remainingDays: 26,
+        pace: { remainingYen: 26000, perDayYen: 1000, recentPerDayYen: 2800 },
+      }),
+      budgetYen: null,
+      periodLabel: '今月',
+    });
+    const pace = out.find((i) => i.key === 'pace')!;
+    expect(pace.tone).toBe('caution');
+    expect(pace.text).toContain('上振れしやすい');
+  });
+
+  it('残りが無い・見込みが0なら出さない', () => {
+    const out = reportInsights({
+      forecast: forecast({
+        remainingDays: 0,
+        pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null },
+      }),
+      budgetYen: null,
+      periodLabel: '今月',
+    });
+    expect(out.find((i) => i.key === 'pace')).toBeUndefined();
   });
 });

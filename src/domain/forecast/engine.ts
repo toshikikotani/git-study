@@ -96,6 +96,21 @@ export function buildForecast(input: BuildForecastInput): Forecast {
       scheduledYen: decomposed.committed.scheduledYen,
       fixedYen: decomposed.committed.fixedYen,
     },
+    pace: {
+      remainingYen: Math.max(
+        0,
+        Math.round(forecast.total.mean - decomposed.actualYen - simulateInput.committedYen),
+      ),
+      perDayYen:
+        forecast.remainingDays > 0
+          ? Math.round(
+              Math.max(0, forecast.total.mean - decomposed.actualYen - simulateInput.committedYen) /
+                forecast.remainingDays,
+            )
+          : null,
+      recentPerDayYen:
+        decomposed.recentPerDayYen === null ? null : Math.round(decomposed.recentPerDayYen),
+    },
     seasonal: {
       active: forecast.seasonal.active,
       periodFactor: forecast.seasonal.active

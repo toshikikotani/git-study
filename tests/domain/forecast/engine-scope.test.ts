@@ -215,3 +215,22 @@ describe('「予測を止める」にしたジャンル', () => {
     expect(stopped.total.p50).toBeLessThan(all.total.p50);
   });
 });
+
+describe('buildForecast の pace(残りの見込みと直近のペース)', () => {
+  it('毎日1,000円の人は、直近14日が1日1,000円で、残りの見込みも1日1,000円前後', () => {
+    const f = buildForecast({
+      ...base,
+      budgetYen: null,
+      transactions: daily('2026-07-01', '2026-10-15', 'dining', '外食', 1000),
+    });
+    expect(f.pace.recentPerDayYen).toBe(1000);
+    expect(f.pace.perDayYen!).toBeGreaterThan(850);
+    expect(f.pace.perDayYen!).toBeLessThan(1200);
+    expect(f.pace.remainingYen).toBeGreaterThan(0);
+  });
+
+  it('記録が無ければ、直近のペースは null', () => {
+    const f = buildForecast({ ...base, transactions: [], recordStart: null });
+    expect(f.pace.recentPerDayYen).toBeNull();
+  });
+});
