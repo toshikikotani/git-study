@@ -72,3 +72,50 @@ describe('rateFactorSum(残り期間の回数の係数)', () => {
     expect(rateFactorSum(flat, ['2026-10-06', '2026-10-07'], null, monthFactor)).toBe(3);
   });
 });
+
+import { fitModel, levelSigmaFor } from '@/domain/forecast/model';
+
+describe('金額の事前分布(カテゴリごとの金額の大きさを、他のカテゴリへ引き寄せない)', () => {
+  /** 毎日 small 円のカテゴリと、6日おきに big 円のカテゴリ(90日分)。 */
+  function twoCategories(small: number, big: number): VariableTrainingData[] {
+    const dates = eachDay('2026-07-01', '2026-09-28');
+    return [
+      {
+        categoryId: 'small',
+        categoryName: '少額',
+        days: dates.map((date) => ({ date, count: 1, amountYen: small })),
+      },
+      {
+        categoryId: 'big',
+        categoryName: '高額',
+        days: dates.map((date, i) => ({
+          date,
+          count: i % 6 === 0 ? 1 : 0,
+          amountYen: i % 6 === 0 ? big : 0,
+        })),
+      },
+    ];
+  }
+
+  it('高額なカテゴリの1回の平均額が、全カテゴリの平均へ大きく引き下げられない', () => {
+    const fitted = fitModel({
+      variable: twoCategories(500, 5000),
+      today: '2026-09-28',
+      payday: null,
+    });
+    const big = fitted.categories.find((c) => c.categoryId === 'big')!;
+    const mean = Math.exp(big.amountPosterior.mu + big.amountPosterior.sigmaSq / 2);
+    // 以前は、金額を全カテゴリの平均へ強く引き寄せ(事前の強さ10)、5,000円が3,000円台になっていた。
+    expect(mean).toBeGreaterThan(4000);
+    expect(mean).toBeLessThan(5500);
+  });
+});
+
+describe('levelSigmaFor(支出の水準の不確かさ)', () => {
+  it('記録が短いほど大きく、長いほど小さい。範囲に収まる', () => {
+    expect(levelSigmaFor(10)).toBeGreaterThan(levelSigmaFor(30));
+    expect(levelSigmaFor(30)).toBeGreaterThan(levelSigmaFor(365));
+    expect(levelSigmaFor(1)).toBeLessThanOrEqual(0.6);
+    expect(levelSigmaFor(100000)).toBeGreaterThanOrEqual(0.05);
+  });
+});

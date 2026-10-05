@@ -17,9 +17,9 @@ import { getAppSettings } from '@/features/settings/store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
-import { addDays, daysBetween, todayJst, type DateOnly } from '@/lib/date';
+import { addDays, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
-import { bootstrapWeightFor, verifyForecast, type Verification } from './calibration';
+import { BOOTSTRAP_WEIGHT, verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
 import { toForecastSource } from './source';
 
@@ -73,8 +73,7 @@ export async function loadForecast(args: {
   const dataVersion = `${transactions.length}:${transactions.at(-1)?.occurredOn ?? ''}:${Math.round(
     transactions.reduce((sum, t) => sum + t.amountYen, 0),
   )}`;
-  const dataDays = recordStart === null ? 0 : Math.max(0, daysBetween(recordStart, today) + 1);
-  const bootstrapWeight = bootstrapWeightFor(dataDays);
+  const bootstrapWeight = BOOTSTRAP_WEIGHT;
 
   // 検証は重い(数秒)ので、明細が変わらない間は結果を使い回す。サーバーのデータキャッシュに
   // 置くので、サーバーが入れ替わっても残る。鍵に本人のIDと明細の版を含める(他人の結果を返さない)。

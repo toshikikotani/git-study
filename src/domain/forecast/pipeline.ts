@@ -8,7 +8,7 @@ import { remainingDays as remainingDaysOf } from '@/domain/period';
 import type { DetectedSubscription } from '@/domain/subscriptions';
 import type { DateOnly } from '@/lib/date';
 import { decomposeSpending, type ForecastSourceTransaction } from './decompose';
-import { fitModel } from './model';
+import { fitModel, levelSigmaFor } from './model';
 import type { CategoryTarget, SimulateInput } from './simulate';
 import type { DecomposedSpending, FittedModel } from './types';
 
@@ -100,6 +100,7 @@ export function prepareSimulation(input: PipelineInput): Prepared {
     visits: decomposed.visits,
     regularMerchants: decomposed.regularMerchants,
     ...(input.categoryTargets !== undefined ? { categoryTargets: input.categoryTargets } : {}),
+    levelSigma: levelSigmaFor(fitted.dataDays),
     ...(input.remainingScale !== undefined ? { remainingScale: input.remainingScale } : {}),
   };
   return { decomposed, fitted, simulateInput };

@@ -27,10 +27,12 @@ const MIN_HISTORY_DAYS = 30;
 const TRAINING_WINDOW_DAYS = 730;
 const CACHE_LIMIT = 20;
 
-/** 記録が90日以上あればアンサンブル(ベイズ+ブートストラップ)、それ未満はベイズのみ。 */
-export function bootstrapWeightFor(dataDays: number): number {
-  return dataDays >= 90 ? 0.5 : 0;
-}
+/**
+ * 方式はベイズモデルのみ。金額の事前分布と水準の不確かさを直したあと(ADR-069)は、合成データで
+ * ベイズのほうがアンサンブル(ブートストラップ混合)より誤差が小さく、記録が短くても使える。
+ * ブートストラップは、記録が短いと再標本化の母集団が小さい。
+ */
+export const BOOTSTRAP_WEIGHT = 0;
 
 export type Verification = {
   calibration: CalibrationResult;

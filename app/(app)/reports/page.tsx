@@ -153,11 +153,14 @@ export default async function ReportsPage() {
         </h1>
         {forecast && landing && forecast.total.p50 > 0 ? (
           <>
+            <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              着地の見込み(平均)
+            </p>
             <p
-              className="tabular mt-3 text-4xl font-semibold tracking-[-0.045em]"
+              className="tabular mt-1 text-4xl font-semibold tracking-[-0.045em]"
               style={{ color: 'var(--ink)' }}
             >
-              {formatYen(round100(landing.p50), { sign: 'never' })}
+              {formatYen(round100(landing.mean), { sign: 'never' })}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
               {endLabel}の着地は、10回中8回 {formatYen(round100(landing.p10), { sign: 'never' })}{' '}
@@ -200,7 +203,11 @@ export default async function ReportsPage() {
           budgetYen={budgetYen}
           goalFrom={goalPlan.periodStart}
           goalTo={goalPlan.periodEnd}
-          landing={landing}
+          landing={{
+            p10: landing.p10,
+            p50: Math.min(landing.p90, Math.max(landing.p10, landing.mean)),
+            p90: landing.p90,
+          }}
         />
       ) : null}
       <Link
