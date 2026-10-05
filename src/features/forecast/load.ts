@@ -12,6 +12,7 @@ import { buildForecast } from '@/domain/forecast/engine';
 import type { ForecastScope } from '@/domain/forecast/pipeline';
 import type { CategoryTarget } from '@/domain/forecast/simulate';
 import type { Forecast } from '@/domain/forecast/types';
+import { listGenres } from '@/features/genre/store';
 import { getAppSettings } from '@/features/settings/store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
@@ -42,12 +43,15 @@ export async function loadForecast(args: {
 }): Promise<ForecastView> {
   const today = todayJst(args.now ?? new Date());
   const supabase = await createClient();
-  const [{ data: auth }, settings, fixedKeys, subscriptions] = await Promise.all([
+  const [{ data: auth }, settings, fixedKeys, subscriptions, genres] = await Promise.all([
     supabase.auth.getUser(),
     getAppSettings().catch(() => null),
     listConfirmedFixedCostKeys().catch(() => new Set<string>()),
     loadDetectedSubscriptions(args.now).catch(() => []),
+    listGenres().catch(() => []),
   ]);
+  // 「予測を止める」にしたジャンルは、残りの変動費を予測しない(実績と日付入りの予定は数える)。
+  const noForecast = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
   const userId = auth.user?.id ?? 'anonymous';
   const payday = settings?.payday ?? null;
 
@@ -74,10 +78,18 @@ export async function loadForecast(args: {
 
   // 検証は重い(数秒)ので、明細が変わらない間は結果を使い回す。サーバーのデータキャッシュに
   // 置くので、サーバーが入れ替わっても残る。鍵に本人のIDと明細の版を含める(他人の結果を返さない)。
-  const cacheKey = `${userId}:${dataVersion}:${today}:${payday ?? 'x'}:${bootstrapWeight}`;
+  const cacheKey = `${userId}:${dataVersion}:${today}:${payday ?? 'x'}:${bootstrapWeight}:${[...noForecast].sort().join(',')}`;
   const verification = await unstable_cache(
     async () =>
-      verifyForecast({ cacheKey, transactions, today, recordStart, payday, bootstrapWeight }),
+      verifyForecast({
+        cacheKey,
+        transactions,
+        today,
+        recordStart,
+        payday,
+        bootstrapWeight,
+        noForecastGenreIds: noForecast,
+      }),
     ['forecast-verification', cacheKey],
     { revalidate: 60 * 60 * 24 },
   )();
@@ -94,6 +106,7 @@ export async function loadForecast(args: {
     payday,
     dataVersion,
     bootstrapWeight,
+    noForecastGenreIds: noForecast,
     calibration: verification?.calibration ?? null,
     ...(verification ? { halfLifeDays: verification.halfLifeDays } : {}),
     ...(args.scope ? { scope: args.scope } : {}),

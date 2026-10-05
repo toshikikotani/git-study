@@ -35,6 +35,8 @@ export type BuildForecastInput = {
   calibration?: CalibrationResult | null;
   /** 直近を重く見る重みの半減期(日)。検証で選んだ値(features/forecast/calibration.ts)。 */
   halfLifeDays?: number;
+  /** 「予測を止める」にしたジャンル。残りの変動費を予測しない(実績・予定は数える)。 */
+  noForecastGenreIds?: ReadonlySet<string>;
   /** 数える範囲(目標のジャンルだけ・特別費を除く、など)。 */
   scope?: ForecastScope;
   /** 目標額のあるカテゴリ。ジャンルごとに「目標を超える確率」を出す。 */
@@ -83,6 +85,7 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     categoryTargets: input.categoryTargets,
     remainingScale: input.calibration?.centerFactor ?? 1,
     halfLifeDays: input.halfLifeDays,
+    noForecastGenreIds: input.noForecastGenreIds,
   });
 
   const forecast = simulateForecast(simulateInput);

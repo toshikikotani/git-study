@@ -67,6 +67,7 @@ export function verifyForecast(input: {
   recordStart: DateOnly | null;
   payday: number | null;
   bootstrapWeight: number;
+  noForecastGenreIds?: ReadonlySet<string>;
 }): Verification | null {
   if (cache.has(input.cacheKey)) return cache.get(input.cacheKey) ?? null;
   const periods = backtestMonths(input.today, input.recordStart);
@@ -80,6 +81,7 @@ export function verifyForecast(input: {
         recordStart: input.recordStart,
         payday: input.payday,
         halfLifeDays,
+        ...(input.noForecastGenreIds ? { noForecastGenreIds: input.noForecastGenreIds } : {}),
         bootstrapWeight: input.bootstrapWeight,
         trials,
       });

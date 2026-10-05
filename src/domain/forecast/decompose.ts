@@ -71,6 +71,8 @@ export function decomposeSpending(input: {
   recordStart: DateOnly | null;
   /** 固定費として確認済みの subscription_key(features/subscriptions/fixed-cost-store.ts)。 */
   confirmedFixedKeys: ReadonlySet<string>;
+  /** 「予測を止める」にしたジャンル。残りの期間の変動費を予測しない(実績・予定は数える)。 */
+  noForecastGenreIds?: ReadonlySet<string> | undefined;
   /** detectSubscriptions() の検知結果(全期間)。確定分の見込み計算に使う。 */
   detectedSubscriptions: readonly DetectedSubscription[];
 }): DecomposedSpending {
@@ -150,6 +152,7 @@ export function decomposeSpending(input: {
   const learnable = countable.filter((t) => {
     if (t.kind !== 'normal' || t.status !== 'actual') return false;
     if (t.occurredOn < trainingWindow.from || t.occurredOn > trainingWindow.to) return false;
+    if (t.genreId !== null && input.noForecastGenreIds?.has(t.genreId)) return false;
     const key = subscriptionKeyOf(t.merchantName, t.description, t.amountYen);
     return !fixedKeySet.has(key);
   });
