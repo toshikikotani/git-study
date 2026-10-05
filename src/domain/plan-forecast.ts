@@ -1,4 +1,10 @@
-import { createRng, sampleStandardNormal } from '@/domain/forecast/rng';
+/**
+ * 目標のジャンルごとの判定と、抑えてほしい額(AIは使わない)。
+ * 着地の分布は確率エンジン(domain/forecast/engine.ts)の1本だけから出し、ここでは
+ * その結果を「届きそうか」の言葉と額に直す。予測の式をこのファイルに持たない。
+ */
+
+import type { Forecast } from '@/domain/forecast/types';
 
 export type ForecastVerdict = 'unknown' | 'unreachable' | 'on_track' | 'tight' | 'over';
 
@@ -15,51 +21,11 @@ export type GenreForecast = {
   dailyCapYen: number | null;
 };
 
-export type GenreForecastInput = {
-  spentYen: number;
-  scheduledYen: number;
-  meanDailyYen: number;
-  medianDailyYen: number;
-  observedDays: number;
-  targetYen: number;
-};
-
-const TRIALS = 2000;
-const AMOUNT_SIGMA = 0.7;
+/** 支出のあった日がこれ未満で、予定も無いジャンルは、着地を置かない(判断できない)。 */
+const MIN_DATA_DAYS = 7;
 
 function round100(yen: number): number {
   return Math.max(0, Math.round(yen / 100) * 100);
-}
-
-function quantile(sorted: readonly number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const index = (sorted.length - 1) * p;
-  const lo = Math.floor(index);
-  const hi = Math.ceil(index);
-  if (lo === hi) return sorted[lo]!;
-  return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (index - lo);
-}
-
-function occurrence(medianDailyYen: number, meanDailyYen: number): number {
-  if (medianDailyYen <= 0 && meanDailyYen <= 0) return 0;
-  return medianDailyYen > 0 ? 0.62 : 0.28;
-}
-
-type DayModel = {
-  known: boolean;
-  committed: number;
-  p: number;
-  mu: number;
-};
-
-function dayModel(input: GenreForecastInput): DayModel {
-  const committed = input.spentYen + input.scheduledYen;
-  const known = input.observedDays >= 7 || input.scheduledYen > 0;
-  const mean = input.meanDailyYen > 0 ? input.meanDailyYen : input.medianDailyYen;
-  const p = occurrence(input.medianDailyYen, mean);
-  const positiveMean = p > 0 && mean > 0 ? mean / p : 0;
-  const mu = positiveMean > 0 ? Math.log(positiveMean) - AMOUNT_SIGMA ** 2 / 2 : 0;
-  return { known, committed, p, mu };
 }
 
 function labelFor(input: {
@@ -86,51 +52,28 @@ function labelFor(input: {
   return `このままだと目標を超える。${rec}${pct}${scheduled}`;
 }
 
-/** カテゴリを同じ日のショックで一緒に引き、着地分布を作る。 */
-export function forecastPlan(input: {
-  genres: readonly GenreForecastInput[];
+/**
+ * 確率エンジンの結果から、目標のあるジャンルごとの判定を作る。
+ * forecast は categoryTargets を渡して作ったもの(ジャンルごとの超過確率を持つ)。
+ */
+export function genreForecastsFrom(input: {
+  forecast: Forecast;
+  genres: readonly { genreId: string; targetYen: number; scheduledYen: number }[];
   remainingDays: number;
-  seed: string;
-  trials?: number;
-}): { genres: GenreForecast[]; totalMedianYen: number | null; totalRecommendedYen: number | null } {
-  const trials = input.trials ?? TRIALS;
+}): GenreForecast[] {
+  const byId = new Map(input.forecast.byCategory.map((c) => [c.categoryId, c]));
   const days = Math.max(input.remainingDays, 0);
-  const models = input.genres.map(dayModel);
-  const rng = createRng(input.seed);
-  const samples = input.genres.map(() => [] as number[]);
-  const totals: number[] = [];
-
-  for (let trial = 0; trial < trials; trial++) {
-    const variable = input.genres.map(() => 0);
-    for (let day = 0; day < days; day++) {
-      const shared = sampleStandardNormal(rng) * 0.35;
-      for (let i = 0; i < models.length; i++) {
-        const model = models[i]!;
-        if (!model.known || model.p <= 0 || model.mu === 0) continue;
-        if (rng() > model.p) continue;
-        const amount = Math.exp(model.mu + shared + sampleStandardNormal(rng) * 0.55);
-        variable[i] = (variable[i] ?? 0) + amount;
-      }
-    }
-    let total = 0;
-    for (let i = 0; i < models.length; i++) {
-      const landing = models[i]!.committed + (variable[i] ?? 0);
-      samples[i]!.push(landing);
-      total += landing;
-    }
-    totals.push(total);
-  }
-
-  const genres = input.genres.map((genre, i) => {
-    const model = models[i]!;
-    if (!model.known) {
+  return input.genres.map((genre): GenreForecast => {
+    const cat = byId.get(genre.genreId);
+    const known = input.forecast.dataDays >= MIN_DATA_DAYS || genre.scheduledYen > 0;
+    if (cat === undefined || !known) {
       return {
         medianYen: null,
         lowYen: null,
         highYen: null,
         recommendedYen: null,
         exceedance: null,
-        verdict: 'unknown' as const,
+        verdict: 'unknown',
         label: labelFor({
           verdict: 'unknown',
           exceedance: null,
@@ -140,48 +83,30 @@ export function forecastPlan(input: {
         dailyCapYen: null,
       };
     }
-    const sorted = [...samples[i]!].sort((a, b) => a - b);
-    const medianYen = round100(quantile(sorted, 0.5));
-    const lowYen = round100(quantile(sorted, 0.1));
-    const highYen = round100(quantile(sorted, 0.9));
-    const recommendedYen = round100(quantile(sorted, 0.7));
-    const exceedance = sorted.filter((yen) => yen > genre.targetYen).length / sorted.length;
+    const exceedance = cat.exceedance ?? 0;
     const verdict: ForecastVerdict =
-      model.committed >= genre.targetYen
+      cat.baseYen >= genre.targetYen
         ? 'unreachable'
         : exceedance <= 0.2
           ? 'on_track'
           : exceedance <= 0.5
             ? 'tight'
             : 'over';
-    const cap =
-      days > 0 && genre.targetYen > model.committed
-        ? round100((genre.targetYen - model.committed) / days)
-        : null;
+    const recommendedYen = round100(cat.landing.p70);
     return {
-      medianYen,
-      lowYen,
-      highYen,
+      medianYen: round100(cat.landing.p50),
+      lowYen: round100(cat.landing.p10),
+      highYen: round100(cat.landing.p90),
       recommendedYen,
       exceedance,
       verdict,
-      label: labelFor({
-        verdict,
-        exceedance,
-        recommendedYen,
-        scheduledYen: genre.scheduledYen,
-      }),
-      dailyCapYen: cap,
+      label: labelFor({ verdict, exceedance, recommendedYen, scheduledYen: genre.scheduledYen }),
+      dailyCapYen:
+        days > 0 && genre.targetYen > cat.baseYen
+          ? round100((genre.targetYen - cat.baseYen) / days)
+          : null,
     };
   });
-
-  const known = genres.some((genre) => genre.recommendedYen !== null);
-  const sortedTotals = [...totals].sort((a, b) => a - b);
-  return {
-    genres,
-    totalMedianYen: known ? round100(quantile(sortedTotals, 0.5)) : null,
-    totalRecommendedYen: known ? round100(quantile(sortedTotals, 0.7)) : null,
-  };
 }
 
 export type SavingsAsk = {
@@ -327,7 +252,7 @@ export function landingReport(input: {
         : '日付の入っている予定は無い。',
       forecast.medianYen === null
         ? '支出のあった日が少なく、残りの着地はまだ置けない。'
-        : `残りの ${remainingDays} 日を ${yen(TRIALS)} 回引くと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
     ].join('');
     const ask = savingsAsk({
       verdict: forecast.verdict,

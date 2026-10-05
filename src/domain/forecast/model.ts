@@ -7,9 +7,21 @@
  * 仕様どおり)。
  */
 
-import { addMonths, daysBetween, nthDayOfMonth, weekdayOf, type DateOnly } from '@/lib/date';
-import { isFixedHoliday } from './holidays';
+import {
+  addMonths,
+  daysBetween,
+  nthDayOfMonth,
+  splitDateOnly,
+  weekdayOf,
+  type DateOnly,
+} from '@/lib/date';
+import { isHoliday } from './holidays';
 import type { CategoryModelParams, DayBundle, FittedModel, VariableTrainingData } from './types';
+
+/** 季節の係数を出すのに必要な、記録のそろった月の数。 */
+const MIN_MONTHS_FOR_SEASON = 12;
+const SEASON_CLAMP = { min: 0.6, max: 1.6 } as const;
+const NO_SEASON: readonly number[] = Array.from({ length: 13 }, () => 1);
 
 const RECENCY_HALF_LIFE_DAYS = 30;
 /** 回数の事前分布の強さ(本人発案「7日分の観測に相当する程度」)。 */
@@ -56,12 +68,86 @@ function shrinkToOne(sub: WeightedSum, overallRate: number): number {
   return 1 + shrink * (raw - 1);
 }
 
+/**
+ * 月ごとの季節の係数(添字1〜12)。記録のそろった月(月初から月末まで学習窓に入っている月)が
+ * 12か月以上あるときだけ出す。月ごとの1日あたりの支出を、全体の平均で割った比を、
+ * 観測した年の数が少ないほど1.0へ寄せる(1年分だけなら半分、2年分なら3分の2だけ信じる)。
+ */
+export function seasonalFactors(
+  variable: readonly VariableTrainingData[],
+  today: DateOnly,
+): { factors: readonly number[]; active: boolean } {
+  const dates = variable[0]?.days.map((d) => d.date) ?? [];
+  if (dates.length === 0) return { factors: NO_SEASON, active: false };
+  const first = dates[0]!;
+  const last = dates[dates.length - 1]! < today ? dates[dates.length - 1]! : today;
+
+  const dailyTotal = new Map<DateOnly, number>();
+  for (const cat of variable) {
+    for (const rec of cat.days) {
+      dailyTotal.set(rec.date, (dailyTotal.get(rec.date) ?? 0) + rec.amountYen);
+    }
+  }
+  const monthSum = new Map<string, { sum: number; days: number }>();
+  for (const date of dates) {
+    if (date > last) continue;
+    const key = date.slice(0, 7);
+    const acc = monthSum.get(key) ?? { sum: 0, days: 0 };
+    acc.sum += dailyTotal.get(date) ?? 0;
+    acc.days += 1;
+    monthSum.set(key, acc);
+  }
+  const instances: { month: number; mean: number }[] = [];
+  for (const [key, acc] of monthSum) {
+    const monthStart = `${key}-01`;
+    const nextMonthStart = addMonths(monthStart, 1);
+    const daysInMonth = daysBetween(monthStart, nextMonthStart);
+    const complete = acc.days === daysInMonth && monthStart >= first && acc.days > 0;
+    if (complete) instances.push({ month: splitDateOnly(monthStart)[1], mean: acc.sum / acc.days });
+  }
+  if (instances.length < MIN_MONTHS_FOR_SEASON) return { factors: NO_SEASON, active: false };
+  const overall = instances.reduce((a, b) => a + b.mean, 0) / instances.length;
+  if (overall <= 0) return { factors: NO_SEASON, active: false };
+
+  const factors = [1, ...Array.from({ length: 12 }, () => 1)];
+  for (let month = 1; month <= 12; month += 1) {
+    const own = instances.filter((i) => i.month === month);
+    if (own.length === 0) continue;
+    const raw = own.reduce((a, b) => a + b.mean, 0) / own.length / overall;
+    const weight = own.length / (own.length + 1);
+    factors[month] = Math.min(SEASON_CLAMP.max, Math.max(SEASON_CLAMP.min, 1 + weight * (raw - 1)));
+  }
+  return { factors, active: true };
+}
+
+/**
+ * 残り期間の各日の回数の係数(曜日・給料日・祝日・月の季節)を足した値。
+ * 回数の率 λ に掛けると、その期間の期待回数になる。試行によらないので、試行の外で1回だけ呼ぶ。
+ */
+export function rateFactorSum(
+  cat: Pick<CategoryModelParams, 'weekdayFactor' | 'paydayFactor' | 'holidayFactor'>,
+  dates: readonly DateOnly[],
+  payday: number | null,
+  monthFactor: readonly number[] = NO_SEASON,
+): number {
+  let sum = 0;
+  for (const date of dates) {
+    let factor = cat.weekdayFactor[weekdayOf(date)] ?? 1;
+    if (payday !== null && isPaydayWindow(date, payday)) factor *= cat.paydayFactor;
+    if (isHoliday(date)) factor *= cat.holidayFactor;
+    factor *= monthFactor[splitDateOnly(date)[1]] ?? 1;
+    sum += Math.max(0, factor);
+  }
+  return sum;
+}
+
 function fitCategory(
   cat: VariableTrainingData,
   weightByDate: ReadonlyMap<DateOnly, number>,
   pooledDailyRate: number,
   pooledLogMean: number,
   payday: number | null,
+  monthFactor: readonly number[],
 ): CategoryModelParams {
   let weightedCount = 0;
   let weight = 0;
@@ -77,19 +163,21 @@ function fitCategory(
 
   for (const rec of cat.days) {
     const w = weightByDate.get(rec.date) ?? 0;
-    weightedCount += w * rec.count;
+    // 季節の係数がある月は、その分を取り除いた回数で学習する(夏に多い分を平常の率に混ぜない)。
+    const count = rec.count / (monthFactor[splitDateOnly(rec.date)[1]] || 1);
+    weightedCount += w * count;
     weight += w;
 
     const wd = weekdayOf(rec.date);
-    weekdaySums[wd]!.countWeighted += w * rec.count;
+    weekdaySums[wd]!.countWeighted += w * count;
     weekdaySums[wd]!.dayWeight += w;
 
     if (payday !== null && isPaydayWindow(rec.date, payday)) {
-      paydaySums.countWeighted += w * rec.count;
+      paydaySums.countWeighted += w * count;
       paydaySums.dayWeight += w;
     }
-    if (isFixedHoliday(rec.date)) {
-      holidaySums.countWeighted += w * rec.count;
+    if (isHoliday(rec.date)) {
+      holidaySums.countWeighted += w * count;
       holidaySums.dayWeight += w;
     }
 
@@ -159,8 +247,9 @@ export function fitModel(input: {
     pooledWeight > 0 ? pooledWeightedCount / pooledWeight : FALLBACK_DAILY_RATE;
   const pooledLogMean = pooledLogWeight > 0 ? pooledLogSum / pooledLogWeight : FALLBACK_LOG_MEAN;
 
+  const season = seasonalFactors(variable, today);
   const categories = variable.map((cat) =>
-    fitCategory(cat, weightByDate, pooledDailyRate, pooledLogMean, payday),
+    fitCategory(cat, weightByDate, pooledDailyRate, pooledLogMean, payday, season.factors),
   );
 
   const recordsByCategory = new Map(
@@ -174,5 +263,12 @@ export function fitModel(input: {
     return { date, weight: weightByDate.get(date) ?? 0, amountsByCategory };
   });
 
-  return { categories, dayBundles, pooledDailyRate, dataDays: dates.length };
+  return {
+    categories,
+    dayBundles,
+    pooledDailyRate,
+    dataDays: dates.length,
+    monthFactor: season.factors,
+    seasonal: season.active,
+  };
 }

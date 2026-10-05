@@ -13,11 +13,17 @@
  *     足りないことが多いため)。
  */
 
-import { addDays, daysBetween, type DateOnly } from '@/lib/date';
+import { addDays, type DateOnly } from '@/lib/date';
 import { periodDays } from '@/domain/period';
-import { decomposeSpending, type ForecastSourceTransaction } from './decompose';
-import { fitModel } from './model';
-import { DEFAULT_TRIALS, simulateForecast, simulateTotalSamples } from './simulate';
+import type { ForecastSourceTransaction } from './decompose';
+import { prepareSimulation } from './pipeline';
+import { DEFAULT_TRIALS, simulateTotalSamples } from './simulate';
+
+function quantile(sortedAsc: readonly number[], p: number): number {
+  if (sortedAsc.length === 0) return 0;
+  const idx = Math.min(sortedAsc.length - 1, Math.max(0, Math.round(p * (sortedAsc.length - 1))));
+  return sortedAsc[idx]!;
+}
 
 /** バックテストで見る時点(期間の経過割合)。本人要件の「1日目・3日目・半分・残り2日」に対応。 */
 export function backtestCheckpoints(periodFromDays: number): readonly number[] {
@@ -95,6 +101,8 @@ export function runBacktest(input: {
   periods: readonly { from: DateOnly; to: DateOnly }[];
   trainingWindowDays: number;
   recordStart: DateOnly | null;
+  /** 給料日(1〜31)。本番と同じ設定で検証する。 */
+  payday?: number | null;
   bootstrapWeight: number;
   trials?: number;
 }): BacktestSummary {
@@ -114,7 +122,9 @@ export function runBacktest(input: {
       // asOf 時点で知り得た明細だけを使う(未来のデータを混ぜない)。
       const knownTransactions = input.transactions.filter((t) => t.occurredOn <= asOf);
 
-      const decomposed = decomposeSpending({
+      const periodId = `${period.from}_${period.to}`;
+      // 本番と同じ手順(pipeline.ts)で入力を作る。検証が本番と違うと当たり率が意味を持たない。
+      const { simulateInput } = prepareSimulation({
         transactions: knownTransactions,
         period,
         today: asOf,
@@ -122,47 +132,21 @@ export function runBacktest(input: {
         recordStart: input.recordStart,
         confirmedFixedKeys: new Set(),
         detectedSubscriptions: [],
-      });
-      const fitted = fitModel({ variable: decomposed.variable, today: asOf, payday: null });
-      const periodId = `${period.from}_${period.to}`;
-      const seed = `backtest:${periodId}:${asOf}`;
-
-      const forecast = simulateForecast({
-        periodId,
-        today: asOf,
-        periodTo: period.to,
-        remainingDays: daysBetween(asOf, period.to) + 1,
-        fitted,
-        committedYen: decomposed.committed.scheduledYen + decomposed.committed.fixedYen,
-        actualYen: decomposed.actualYen,
-        specialHistoricalAmounts: decomposed.special.historicalAmounts,
-        specialOccurrencesPerDay: decomposed.special.occurrencesPerDay,
         budgetYen: null,
-        payday: null,
+        payday: input.payday ?? null,
         bootstrapWeight: input.bootstrapWeight,
         trials,
-        seed,
+        seed: `backtest:${periodId}:${asOf}`,
       });
-
-      // CRPS用に、公開APIとは別に生の試行サンプルが要る。simulateForecast と
-      // 同じシード・同じ入力で simulateTotalSamples() を呼び直す(決定論なので
-      // 同じ乱数列になり、simulateForecast が返した p10/p50/p90 と整合する)。
-      const rawSamples = simulateTotalSamples({
-        periodId,
-        today: asOf,
-        periodTo: period.to,
-        remainingDays: daysBetween(asOf, period.to) + 1,
-        fitted,
-        committedYen: decomposed.committed.scheduledYen + decomposed.committed.fixedYen,
-        actualYen: decomposed.actualYen,
-        specialHistoricalAmounts: decomposed.special.historicalAmounts,
-        specialOccurrencesPerDay: decomposed.special.occurrencesPerDay,
-        bootstrapWeight: input.bootstrapWeight,
-        budgetYen: null,
-        payday: null,
-        trials,
-        seed,
-      });
+      const rawSamples = simulateTotalSamples(simulateInput);
+      const sorted = Array.from(rawSamples).sort((a, b) => a - b);
+      const forecast = {
+        total: {
+          p10: quantile(sorted, 0.1),
+          p50: quantile(sorted, 0.5),
+          p90: quantile(sorted, 0.9),
+        },
+      };
 
       points.push({
         periodFrom: period.from,
@@ -259,6 +243,7 @@ export function selectModel(input: {
   periods: readonly { from: DateOnly; to: DateOnly }[];
   trainingWindowDays: number;
   recordStart: DateOnly | null;
+  payday?: number | null;
   trials?: number;
 }): ModelSelection {
   const bayes = runBacktest({ ...input, bootstrapWeight: 0 });

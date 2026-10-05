@@ -8,8 +8,11 @@
 
 import { addMonths, daysBetween, weekdayOf, type DateOnly } from '@/lib/date';
 import { eachDay } from '@/domain/period';
+import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf, type DetectedSubscription } from '@/domain/subscriptions';
+import { detectRegularMerchants, projectVisits, type VisitSourceTransaction } from './visits';
 import type {
+  CategoryBase,
   CategoryDayRecord,
   DecomposedSpending,
   MissingRecordDay,
@@ -120,6 +123,8 @@ export function decomposeSpending(input: {
     }
   }
   const fixedKeySet = new Set(fixedItems.map((f) => f.key));
+  const merchantKey = (t: ForecastSourceTransaction) =>
+    comparableKey(t.merchantName ?? t.description);
 
   // 特別:special kind の実績・予定(期間内のみ)。
   const specialActualYen = countable
@@ -141,13 +146,35 @@ export function decomposeSpending(input: {
     )
     .reduce((sum, t) => sum + -t.amountYen, 0);
 
-  // 変動費の学習対象:通常・実績・確定済み固定費でないもの。学習窓全体から取る。
-  const variableSource = countable.filter((t) => {
+  // 変動費の学習対象の候補:通常・実績・確定済み固定費でないもの。学習窓全体から取る。
+  const learnable = countable.filter((t) => {
     if (t.kind !== 'normal' || t.status !== 'actual') return false;
     if (t.occurredOn < trainingWindow.from || t.occurredOn > trainingWindow.to) return false;
     const key = subscriptionKeyOf(t.merchantName, t.description, t.amountYen);
     return !fixedKeySet.has(key);
   });
+
+  // 規則的に通う店は、日ごとの確率で均さず、来店の日付と確率で別に扱う(R3)。
+  const regularMerchants = detectRegularMerchants(
+    learnable.map((t): VisitSourceTransaction => ({
+      key: merchantKey(t),
+      label: (t.merchantName ?? t.description).trim(),
+      categoryId: t.genreId ?? UNCATEGORIZED_ID,
+      categoryName: t.genreName ?? '未分類',
+      occurredOn: t.occurredOn,
+      amountYen: -t.amountYen,
+    })),
+  );
+  const regularKeys = new Set(regularMerchants.map((m) => m.key));
+  const visits = projectVisits({
+    merchants: regularMerchants,
+    today,
+    periodTo: period.to,
+    scheduled: countable
+      .filter((t) => t.status === 'scheduled')
+      .map((t) => ({ key: merchantKey(t), date: t.occurredOn })),
+  }).filter((v) => v.date >= period.from);
+  const variableSource = learnable.filter((t) => !regularKeys.has(merchantKey(t)));
 
   const byCategory = new Map<string, { name: string; txs: ForecastSourceTransaction[] }>();
   for (const t of variableSource) {
@@ -227,6 +254,33 @@ export function decomposeSpending(input: {
   const specialHistoricalAmounts = [...specialFromKind, ...specialExcluded.map((e) => e.amountYen)];
   const specialOccurrencesPerDay = dataDays > 0 ? specialHistoricalAmounts.length / dataDays : 0;
 
+  // カテゴリごとの、すでに決まっている額。固定費は、同じ店の明細のジャンルに寄せる。
+  const baseMap = new Map<string, CategoryBase>();
+  const baseOf = (id: string, name: string): CategoryBase => {
+    const found = baseMap.get(id) ?? {
+      categoryId: id,
+      categoryName: name,
+      actualYen: 0,
+      scheduledYen: 0,
+      fixedYen: 0,
+    };
+    baseMap.set(id, found);
+    return found;
+  };
+  for (const t of countable) {
+    if (t.kind !== 'normal' || t.occurredOn < period.from || t.occurredOn > period.to) continue;
+    const base = baseOf(t.genreId ?? UNCATEGORIZED_ID, t.genreName ?? '未分類');
+    if (t.status === 'actual') base.actualYen += -t.amountYen;
+    else if (t.occurredOn > today) base.scheduledYen += -t.amountYen;
+  }
+  for (const item of fixedItems) {
+    const match = countable.find(
+      (t) => subscriptionKeyOf(t.merchantName, t.description, t.amountYen) === item.key,
+    );
+    const base = baseOf(match?.genreId ?? UNCATEGORIZED_ID, match?.genreName ?? '未分類');
+    base.fixedYen += item.amountYen * item.occurrences;
+  }
+
   return {
     trainingWindow,
     period,
@@ -241,6 +295,9 @@ export function decomposeSpending(input: {
       occurrencesPerDay: specialOccurrencesPerDay,
     },
     variable,
+    baseByCategory: [...baseMap.values()],
+    regularMerchants,
+    visits,
     missingRecordDays,
     dataDays,
   };

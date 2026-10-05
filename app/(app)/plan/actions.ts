@@ -6,8 +6,9 @@ import type { PlanEvidence } from '@/domain/plan-evidence';
 import { emptyPlanReason, PLAN_STEP_OPTIONS, planPeriodDays } from '@/domain/spending-plan';
 import { loadPlanContext } from '@/features/spending-plan/context';
 import { suggestPlanTargets, type PlanSuggestionItem } from '@/features/spending-plan/plan-ai';
-import { forecastPlan, landingReport, type LandingReport } from '@/domain/plan-forecast';
-import { loadForecastRows } from '@/features/spending-plan/forecast-rows';
+import { genreForecastsFrom, landingReport, type LandingReport } from '@/domain/plan-forecast';
+import { loadForecast } from '@/features/forecast/load';
+import { listGenres } from '@/features/genre/store';
 import {
   deletePlan,
   savePlan,
@@ -17,7 +18,14 @@ import {
 import type { GoalSnapshot } from '@/domain/goal-impact';
 import { nextPlanTargets } from '@/domain/goal-review';
 import { loadGoalView } from '@/features/goals/loader';
-import { addDays, addMonths, assertDateOnly, monthStartJst, todayJst } from '@/lib/date';
+import {
+  addDays,
+  addMonths,
+  assertDateOnly,
+  daysBetween,
+  monthStartJst,
+  todayJst,
+} from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
 
@@ -122,7 +130,10 @@ export async function deletePlanAction(id: string): Promise<{ error: string | nu
 
 export type PlanLandingResult = ({ error: null } & LandingReport) | { error: string };
 
-/** 今の支出と残りの予定と直近ペースから、ジャンルごとの着地を返す。 */
+/**
+ * 今の支出と残りの予定と過去の傾向から、ジャンルごとの着地を返す。着地は確率エンジンの
+ * 1本の予測から出す(レポートの着地と同じ予測)。
+ */
 export async function planLandingAction(input: {
   periodStart: string;
   periodEnd: string;
@@ -139,30 +150,42 @@ export async function planLandingAction(input: {
     const validItems = input.items.filter(
       (item) => Number.isInteger(item.targetYen) && item.targetYen >= 0,
     );
-    const [{ remainingDays, rows }, previousMonth, priorMonth] = await Promise.all([
-      loadForecastRows({ start, end, items: validItems, today }),
+    const genreNames = new Map((await listGenres()).map((genre) => [genre.id, genre.name]));
+    const known = validItems.filter((item) => genreNames.has(item.genreId));
+    const [{ forecast }, previousMonth, priorMonth] = await Promise.all([
+      loadForecast({
+        period: { from: start, to: end },
+        budgetYen: known.reduce((sum, item) => sum + item.targetYen, 0),
+        scope: { genreIds: new Set(known.map((item) => item.genreId)), excludeSpecial: true },
+        categoryTargets: known.map((item) => ({
+          categoryId: item.genreId,
+          categoryName: genreNames.get(item.genreId) ?? '',
+          targetYen: item.targetYen,
+        })),
+      }),
       loadGenreSpend(previousStart, addDays(thisMonth, -1)),
       loadGenreSpend(priorStart, addDays(previousStart, -1)),
     ]);
-    const forecast = forecastPlan({
-      remainingDays,
-      seed: `${start}:${end}:${today}:${rows.map((row) => row.genreId).join(',')}`,
-      genres: rows.map((row) => row.input),
+    const remainingDays = today >= end ? 0 : daysBetween(today, end);
+    const byCategory = new Map(forecast.byCategory.map((c) => [c.categoryId, c]));
+    const rows = known.map((item) => {
+      const cat = byCategory.get(item.genreId);
+      return {
+        genreId: item.genreId,
+        genreName: genreNames.get(item.genreId) ?? '',
+        targetYen: item.targetYen,
+        spentYen: cat?.actualYen ?? 0,
+        scheduledYen: (cat?.scheduledYen ?? 0) + (cat?.fixedYen ?? 0),
+        priorMonthYen: priorMonth.byGenre.get(item.genreId) ?? 0,
+        previousMonthYen: previousMonth.byGenre.get(item.genreId) ?? 0,
+      };
     });
     return {
       error: null,
       ...landingReport({
         remainingDays,
-        rows: rows.map((row) => ({
-          genreId: row.genreId,
-          genreName: row.genreName,
-          targetYen: row.input.targetYen,
-          spentYen: row.spentYen,
-          scheduledYen: row.scheduledYen,
-          priorMonthYen: priorMonth.byGenre.get(row.genreId) ?? 0,
-          previousMonthYen: previousMonth.byGenre.get(row.genreId) ?? 0,
-        })),
-        forecasts: forecast.genres,
+        rows,
+        forecasts: genreForecastsFrom({ forecast, genres: rows, remainingDays }),
       }),
     };
   } catch (error) {

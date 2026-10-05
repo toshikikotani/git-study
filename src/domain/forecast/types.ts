@@ -23,6 +23,44 @@ export type MissingRecordDay = {
   categoryName: string;
 };
 
+/** カテゴリごとの、予測の前から決まっている額(実績・予定・固定費)。 */
+export type CategoryBase = {
+  categoryId: string;
+  categoryName: string;
+  actualYen: number;
+  scheduledYen: number;
+  fixedYen: number;
+};
+
+/** 規則的に通う店(同じ店に、ほぼ決まった間隔で来店する)。変動費の学習からは外す。 */
+export type RegularMerchant = {
+  key: string;
+  label: string;
+  categoryId: string;
+  categoryName: string;
+  /** 来店の間隔(日、中央値)。 */
+  everyDays: number;
+  visitCount: number;
+  lastVisit: DateOnly;
+  meanYen: number;
+  /** 1回の金額の対数正規(平均・標準偏差)。 */
+  logMu: number;
+  logSigma: number;
+  /** 次回以降の来店が来る確率(間隔がそろっているほど高い)。 */
+  probability: number;
+};
+
+/** 残り期間に見込まれる来店。日付ごとに、来る確率と金額の分布を持つ。 */
+export type VisitEvent = {
+  key: string;
+  label: string;
+  categoryId: string;
+  date: DateOnly;
+  probability: number;
+  logMu: number;
+  logSigma: number;
+};
+
 export type DecomposedSpending = {
   trainingWindow: { from: DateOnly; to: DateOnly };
   period: { from: DateOnly; to: DateOnly };
@@ -47,6 +85,11 @@ export type DecomposedSpending = {
   };
   /** 変動費のカテゴリ×日学習データ。 */
   variable: readonly VariableTrainingData[];
+  /** カテゴリごとの、すでに決まっている額(実績・予定・固定費)。 */
+  baseByCategory: readonly CategoryBase[];
+  /** 規則的に通う店と、残り期間の来店の見込み。 */
+  regularMerchants: readonly RegularMerchant[];
+  visits: readonly VisitEvent[];
   missingRecordDays: readonly MissingRecordDay[];
   /** 学習に使えた実際の日数(記録開始日・学習窓の短い方)。 */
   dataDays: number;
@@ -82,17 +125,37 @@ export type DayBundle = {
 export type FittedModel = {
   categories: readonly CategoryModelParams[];
   dayBundles: readonly DayBundle[];
+  /**
+   * 月ごとの季節の係数(添字1〜12。1.0が平年並み)。12か月以上の記録があるときだけ
+   * 1.0以外になり、残り期間の各日の回数に掛ける。
+   */
+  monthFactor: readonly number[];
+  /** 季節の係数を使えたか(記録が12か月に満たなければ false)。 */
+  seasonal: boolean;
   /** 全体で見た1日あたりの回数(カテゴリ横断の事前分布の中心)。 */
   pooledDailyRate: number;
   dataDays: number;
 };
 
+export type Band = { p10: number; p50: number; p70: number; p90: number };
+
 export type ForecastCategoryBand = {
   categoryId: string;
   categoryName: string;
+  /** 残り期間の変動費だけの幅。 */
   p10: number;
   p50: number;
   p90: number;
+  /** 期間全体の着地(実績 + 予定 + 固定費 + 残りの変動費)の幅。 */
+  landing: Band;
+  /** 予測の前から決まっている額(実績・予定・固定費)と、その内訳。 */
+  baseYen: number;
+  actualYen: number;
+  scheduledYen: number;
+  fixedYen: number;
+  /** 目標額と、それを超える確率(目標が無ければ null)。 */
+  targetYen: number | null;
+  exceedance: number | null;
 };
 
 export type ForecastDriver = { categoryId: string; categoryName: string; shareOfRisk: number };
@@ -101,9 +164,21 @@ export type Forecast = {
   periodId: string;
   asOf: DateOnly;
   remainingDays: number;
-  total: { p10: number; p50: number; p90: number; mean: number };
+  total: Band & { mean: number };
   byCategory: readonly ForecastCategoryBand[];
   committed: { scheduledYen: number; fixedYen: number };
+  /** 規則的に通う店の、残り期間の見込み(期待額と店ごとの内訳)。 */
+  visits: {
+    expectedYen: number;
+    merchants: readonly {
+      label: string;
+      everyDays: number;
+      probability: number;
+      meanYen: number;
+    }[];
+  };
+  /** 季節の係数を使ったか、期間の月の係数。 */
+  seasonal: { active: boolean; periodFactor: number | null };
   special: { expected: number; p90: number };
   probWithinBudget: number | null;
   expectedOvershoot: number;

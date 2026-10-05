@@ -1,11 +1,12 @@
 import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
-import { ForecastGraphic } from './forecast-graphic';
+import { InsightsList } from './insights-card';
+import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
+import { VerificationCard } from './verification-card';
 import { GoalChart } from './goal-chart';
-import { buildForecast } from '@/domain/forecast/engine';
-import { forecastPlan } from '@/domain/plan-forecast';
-import { loadForecastRows } from '@/features/spending-plan/forecast-rows';
+import { reportInsights } from '@/domain/report-insights';
+import { loadForecast } from '@/features/forecast/load';
 import { addDays, addMonths } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
@@ -17,7 +18,6 @@ import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
 import { formatYen } from '@/domain/money';
-import { forecastReport } from '@/domain/report-forecast';
 import {
   loadAccountBalanceByPurpose,
   loadCategorySpendingTrend,
@@ -29,7 +29,7 @@ import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { buildCategoryLines } from '@/features/category/model';
 import { linesForGoal } from '@/features/category/pace';
-import { todayJst } from '@/lib/date';
+import { formatDateJa, todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
   loadFixedVariableSplit,
@@ -40,6 +40,8 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 // 直近6ヶ月の集計は都度 transactions から出す(スナップショットの保存機構が無い)。
 // キャッシュに乗せると取り込み直後の反映が遅れる(ADR-001と同じ考え方)。
 export const dynamic = 'force-dynamic';
+// 着地の予測は過去2年ぶんの学習と、過去の月での検証(初回だけ)を含むため、余裕を持たせる。
+export const maxDuration = 60;
 
 export default async function ReportsPage() {
   const [
@@ -70,71 +72,71 @@ export default async function ReportsPage() {
   );
   const monthKey = ledger.period.from.slice(0, 7);
 
-  const scheduledByGenre: Record<string, number> = {};
-  for (const tx of ledger.transactions) {
-    if (tx.status !== 'scheduled' || tx.isTransfer || tx.needsInput || !tx.genreId) continue;
-    scheduledByGenre[tx.genreId] = (scheduledByGenre[tx.genreId] ?? 0) + Math.abs(tx.amountYen);
-  }
-  const forecast = forecastReport({ ...trend, currentMonthKey: monthKey, scheduledByGenre });
   const today = todayJst();
   const plan = await getCurrentPlan(today);
-  // 総予算は目標の期間の額。月の実績・日数と組み合わせて着地を出さない(期間は月と一致しない)。
-  const budgetYen = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : null;
-  const monthEnd = plan?.periodEnd ?? addDays(addMonths(ledger.period.from, 1), -1);
-  const engine = buildForecast({
-    transactions: ledger.transactions.map((tx) => ({
-      occurredOn: tx.occurredOn,
-      genreId: tx.genreId,
-      genreName: tx.genreName,
-      amountYen: tx.amountYen,
-      status: tx.status,
-      kind: tx.kind,
-      isTransfer: tx.isTransfer,
-      reviewStatus: tx.reviewStatus,
-      needsInput: tx.needsInput,
-      merchantName: tx.label,
-      description: tx.description,
-    })),
-    period: { from: ledger.period.from, to: monthEnd },
-    today,
-    trainingFrom: addDays(today, -90),
-    recordStart: ledger.record.firstRecordedOn,
-    confirmedFixedKeys: confirmedKeys,
-    detectedSubscriptions: subscriptionCandidates,
-    budgetYen: budgetYen !== null && budgetYen > 0 ? budgetYen : null,
-    payday: null,
-    dataVersion: `${ledger.transactions.length}:${ledger.transactions.at(-1)?.occurredOn ?? ''}`,
+  // 目標があれば目標の期間・目標のジャンルで、なければ今月の全ジャンルで着地を出す。
+  // 総予算は目標の期間の額なので、月の実績と混ぜない。
+  const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
+  const goalPlan = plan !== null && budgetTotal > 0 ? plan : null;
+  const period = goalPlan
+    ? { from: goalPlan.periodStart, to: goalPlan.periodEnd }
+    : { from: ledger.period.from, to: addDays(addMonths(ledger.period.from, 1), -1) };
+  const goalItems = goalPlan ? goalPlan.items.filter((item) => item.targetYen > 0) : [];
+  const { forecast, verification } = await loadForecast({
+    period,
+    budgetYen: goalPlan ? budgetTotal : null,
+    ...(goalPlan
+      ? {
+          scope: { genreIds: new Set(goalItems.map((item) => item.genreId)), excludeSpecial: true },
+          categoryTargets: goalItems.map((item) => ({
+            categoryId: item.genreId,
+            categoryName: item.genreName,
+            targetYen: item.targetYen,
+          })),
+        }
+      : {}),
   });
+  const budgetYen = goalPlan ? budgetTotal : null;
+  const periodLabel = goalPlan ? 'この目標の期間' : '今月';
+  const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
 
-  const planLanding = plan
-    ? await (async () => {
-        const { remainingDays, rows } = await loadForecastRows({
-          start: plan.periodStart,
-          end: plan.periodEnd,
-          items: plan.items,
-          today,
-        });
-        return forecastPlan({
-          remainingDays,
-          seed: `${plan.periodStart}:${plan.periodEnd}:${today}`,
-          genres: rows.map((row) => row.input),
-        });
-      })()
-    : null;
-  const landing = {
-    p10:
-      planLanding?.genres.reduce((sum, genre) => sum + (genre.lowYen ?? 0), 0) || engine.total.p10,
-    p50: planLanding?.totalMedianYen ?? engine.total.p50,
-    p90:
-      planLanding?.genres.reduce((sum, genre) => sum + (genre.highYen ?? 0), 0) || engine.total.p90,
-  };
+  const previousMonthKey = trend.monthKeys.filter((key) => key < monthKey).at(-1);
+  const previousByGenre =
+    !goalPlan && previousMonthKey !== undefined
+      ? new Map(
+          trend.rows
+            .filter((row) => row.monthKey === previousMonthKey)
+            .map((row) => [row.categoryId, row.spentYen] as const),
+        )
+      : undefined;
+  const insights = reportInsights({
+    forecast,
+    budgetYen,
+    periodLabel,
+    ...(previousByGenre ? { previousByGenre, previousLabel: '先月' } : {}),
+  });
+  const landing = forecast.total;
+  const rangeRows: LandingRow[] = forecast.byCategory
+    .filter((c) => c.landing.p90 > 0)
+    .sort((a, b) => b.landing.p50 - a.landing.p50)
+    .slice(0, 8)
+    .map((c) => ({
+      genreId: c.categoryId,
+      name: c.categoryName,
+      baseYen: c.baseYen,
+      p10: c.landing.p10,
+      p50: c.landing.p50,
+      p90: c.landing.p90,
+      targetYen: c.targetYen,
+      exceedance: c.exceedance,
+    }));
   return (
     <div className="rise space-y-4">
       <header>
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
-        {engine ? (
+        {forecast.total.p50 > 0 ? (
           <>
             <p
               className="tabular mt-3 text-4xl font-semibold tracking-[-0.045em]"
@@ -143,15 +145,15 @@ export default async function ReportsPage() {
               {formatYen(round100(landing.p50), { sign: 'never' })}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              月末の着地は、10回中8回 {formatYen(round100(landing.p10), { sign: 'never' })} から{' '}
-              {formatYen(round100(landing.p90), { sign: 'never' })}。
-              {budgetYen !== null && budgetYen > 0
-                ? landing.p50 > budgetYen
-                  ? `予算 ${formatYen(budgetYen, { sign: 'never' })} を ${formatYen(round100(landing.p50 - budgetYen), { sign: 'never' })} 超えそう。`
-                  : `予算 ${formatYen(budgetYen, { sign: 'never' })} には収まりそう。`
+              {endLabel}の着地は、10回中8回 {formatYen(round100(landing.p10), { sign: 'never' })}{' '}
+              から {formatYen(round100(landing.p90), { sign: 'never' })}。
+              {budgetYen !== null
+                ? forecast.probWithinBudget !== null
+                  ? `予算 ${formatYen(budgetYen, { sign: 'never' })} に収まる確率は${Math.round(forecast.probWithinBudget * 100)}%。`
+                  : ''
                 : '目標の予算がないので、収まるかどうかは出していない。'}
-              {engine.drivers[0]
-                ? ` 増えるとしたら、大きいのは${engine.drivers[0].categoryName}。`
+              {forecast.drivers[0]
+                ? ` 増えるとしたら、大きいのは${forecast.drivers[0].categoryName}。`
                 : ''}
             </p>
           </>
@@ -161,28 +163,26 @@ export default async function ReportsPage() {
           </p>
         )}
       </header>
-      {plan && budgetYen !== null && budgetYen > 0 ? (
+      {goalPlan && budgetYen !== null ? (
         <GoalChart
           genreName="全体"
           lines={linesForGoal(
-            plan.items
-              .filter((item) => item.targetYen > 0)
-              .flatMap((item) =>
-                buildCategoryLines(
-                  ledger.transactions.map((tx) => ({ ...tx, items: [] })),
-                  item.genreId,
-                  { from: ledger.period.from, to: monthEnd },
-                  today,
-                ),
+            goalItems.flatMap((item) =>
+              buildCategoryLines(
+                ledger.transactions.map((tx) => ({ ...tx, items: [] })),
+                item.genreId,
+                { from: ledger.period.from, to: period.to },
+                today,
               ),
-            { from: plan.periodStart, to: plan.periodEnd },
+            ),
+            { from: goalPlan.periodStart, to: goalPlan.periodEnd },
           )}
           monthStart={ledger.period.from}
-          monthEnd={monthEnd}
+          monthEnd={period.to}
           today={today}
           budgetYen={budgetYen}
-          goalFrom={plan.periodStart}
-          goalTo={plan.periodEnd}
+          goalFrom={goalPlan.periodStart}
+          goalTo={goalPlan.periodEnd}
           landing={landing}
         />
       ) : null}
@@ -193,7 +193,9 @@ export default async function ReportsPage() {
       >
         AIに見てもらう
       </Link>
-      <ForecastGraphic {...forecast} />
+      <InsightsList insights={insights} />
+      <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
+      <VerificationCard verification={verification} />
 
       <MonthSummaryRow
         spentYen={ledger.totalSpentYen}
