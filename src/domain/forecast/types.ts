@@ -90,6 +90,8 @@ export type DecomposedSpending = {
   /** 規則的に通う店と、残り期間の来店の見込み。 */
   regularMerchants: readonly RegularMerchant[];
   visits: readonly VisitEvent[];
+  /** 直近14日の1日あたりの支出(固定費・予測を止めたジャンルを除く)。記録が無ければ null。 */
+  recentPerDayYen: number | null;
   missingRecordDays: readonly MissingRecordDay[];
   /** 学習に使えた実際の日数(記録開始日・学習窓の短い方)。 */
   dataDays: number;
@@ -107,6 +109,11 @@ export type CategoryModelParams = {
    * 試行間で mu がばらつく(=帯が広がる)ようにする(M3)。
    */
   amountPosterior: { mu: number; sigmaSq: number; kappa: number };
+  /**
+   * 休み(土日祝)の1回の金額が平日よりどれだけ大きいか(対数の差、0=差なし)と、記録の中で
+   * 休みの日の買い物が占める割合。差は、観測が少ないほど0へ寄せる。
+   */
+  dayOffAmount: { delta: number; share: number };
   /** 曜日係数(0=日〜6=土)。1.0が「効果なし」。 */
   weekdayFactor: readonly number[];
   paydayFactor: number;
@@ -177,6 +184,8 @@ export type Forecast = {
       meanYen: number;
     }[];
   };
+  /** 残りの期間の見込み(平均)と1日あたり、直近のペース。見込みが妥当か本人が確かめるための数字。 */
+  pace: { remainingYen: number; perDayYen: number | null; recentPerDayYen: number | null };
   /** 季節の係数を使ったか、期間の月の係数。 */
   seasonal: { active: boolean; periodFactor: number | null };
   special: { expected: number; p90: number };

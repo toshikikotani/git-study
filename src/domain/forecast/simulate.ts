@@ -24,7 +24,7 @@
 
 import { eachDay } from '@/domain/period';
 import type { DateOnly } from '@/lib/date';
-import { rateFactorSum } from './model';
+import { rateFactorSplit } from './model';
 import {
   createRng,
   pickOne,
@@ -205,8 +205,8 @@ function runTrials(input: SimulateInput): TrialRun {
   // ポアソン分布の加法性(独立なポアソンの和は、率の和のポアソンに従う)を使い、
   // 「日ごとに回数を引く」のではなく「残り期間の合計回数を1回で引く」ことで、
   // 試行ループの内側から日数ぶんのループを無くす。結果の分布は数学的に同一。
-  const totalFactorByCategory: number[] = fittedCats.map((cat) =>
-    rateFactorSum(cat, futureDates, input.payday, input.fitted.monthFactor),
+  const factorByCategory = fittedCats.map((cat) =>
+    rateFactorSplit(cat, futureDates, input.payday, input.fitted.monthFactor),
   );
 
   const totalSamples = new Float64Array(trials);
@@ -256,9 +256,16 @@ function runTrials(input: SimulateInput): TrialRun {
             sampleStandardNormal(rng);
         const sigma = Math.sqrt(cat.amountPosterior.sigmaSq);
 
-        const count = samplePoisson(rng, lambda * level * totalFactorByCategory[c]!);
+        // 休みの日(土日祝)と平日は、回数の率も1回の金額も別に引く(居酒屋は休みの日に多く、高い)。
+        const { delta, share } = cat.dayOffAmount;
+        const factor = factorByCategory[c]!;
+        const countOff = samplePoisson(rng, lambda * level * factor.dayOff);
+        const countOn = samplePoisson(rng, lambda * level * factor.weekday);
         let catTotal = 0;
-        for (let i = 0; i < count; i += 1) catTotal += sampleLognormal(rng, muTrial, sigma);
+        const muOff = muTrial + (1 - share) * delta;
+        const muOn = muTrial - share * delta;
+        for (let i = 0; i < countOff; i += 1) catTotal += sampleLognormal(rng, muOff, sigma);
+        for (let i = 0; i < countOn; i += 1) catTotal += sampleLognormal(rng, muOn, sigma);
         perCategoryTrial[c] = catTotal;
         variableTotal += catTotal;
       }
@@ -406,6 +413,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
         meanYen: Math.round(m.meanYen),
       })),
     },
+    pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null }, // engine.ts が埋める
     seasonal: { active: input.fitted.seasonal, periodFactor: null }, // engine.ts が期間の月の係数を入れる
     special: {
       expected: Math.round(sortedSpecial.reduce((a, b) => a + b, 0) / trials),

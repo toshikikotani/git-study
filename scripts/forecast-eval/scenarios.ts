@@ -70,7 +70,7 @@ function daily(
   mean: number,
   amount: number,
   spread: number,
-  opts: { weekend: number; payday: number; weekdaysOnly?: boolean },
+  opts: { weekend: number; payday: number; weekdaysOnly?: boolean; weekendAmount?: number },
   seed: number,
 ): ForecastSourceTransaction[] {
   const rng = mulberry32(seed);
@@ -79,7 +79,9 @@ function daily(
     if (opts.weekdaysOnly && [0, 6].includes(weekdayOf(d))) continue;
     const count = poissonish(rng, mean * dayMultiplier(d, opts));
     for (let i = 0; i < count; i += 1) {
-      const yen = Math.max(100, Math.round(amount + (rng() * 2 - 1) * spread));
+      const dayOff = weekdayOf(d) === 0 || weekdayOf(d) === 6 || isHoliday(d);
+      const scale = dayOff ? (opts.weekendAmount ?? 1) : 1;
+      const yen = Math.max(100, Math.round((amount + (rng() * 2 - 1) * spread) * scale));
       out.push(tx({ occurredOn: d, amountYen: -yen, genreId: id, genreName: name }));
     }
   }
@@ -131,10 +133,27 @@ function rareLarge(seed: number): ForecastSourceTransaction[] {
 
 export function richTransactions(): ForecastSourceTransaction[] {
   return [
-    ...daily('dining', '外食', 0.55, 1100, 500, { weekend: 1.6, payday: 1.5 }, 1),
+    // 外食は休日に回数が増え、1回の金額も大きい(居酒屋など)。
+    ...daily(
+      'dining',
+      '外食',
+      0.55,
+      1100,
+      500,
+      { weekend: 1.6, payday: 1.5, weekendAmount: 1.9 },
+      1,
+    ),
     ...daily('conv', 'コンビニ', 0.45, 520, 220, { weekend: 1.1, payday: 1.1 }, 2),
     ...daily('transit', '交通費', 0.9, 420, 40, { weekend: 0, payday: 1, weekdaysOnly: true }, 3),
-    ...daily('hobby', '娯楽・趣味', 1 / 6, 4000, 3000, { weekend: 1.8, payday: 1.7 }, 4),
+    ...daily(
+      'hobby',
+      '娯楽・趣味',
+      1 / 6,
+      4000,
+      3000,
+      { weekend: 1.8, payday: 1.7, weekendAmount: 1.4 },
+      4,
+    ),
     ...weeklyStore(5),
     ...rareLarge(6),
   ];
