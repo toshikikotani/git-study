@@ -97,12 +97,13 @@ function BudgetRows({ plan, today }: { plan: SpendingPlan | null; today: string 
 }
 
 async function SpentRows({ today }: { today: string }) {
-  const [loaded, ledger, debts, settings, rules] = await Promise.all([
+  const [loaded, ledger, debts, settings, rules, captures] = await Promise.all([
     loadGoalView(),
     loadMonthlyLedger().catch(() => null),
     listDebts().catch(() => []),
     getAppSettings().catch(() => null),
     listTransferRules().catch(() => []),
+    listOpenCaptures().catch(() => []),
   ]);
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
@@ -119,14 +120,18 @@ async function SpentRows({ today }: { today: string }) {
           settings?.monthlyRepaymentTargetYen ?? 0,
         ),
         sinkingYen: sinkingFromRules(rules),
-        scheduledYen: ledger.totals.scheduledYen,
+        scheduledYen: view.guidance.scheduledYen,
         discretionaryCapYen: view.guidance.targetYen,
       })
     : null;
   return (
     <>
       {view.review ? <ReviewCard planId={plan.id} review={view.review} /> : null}
-      {!view.ended ? <GoalCard model={buildGoalCard(view, today, { savingsYen })} /> : null}
+      {!view.ended ? (
+        <GoalCard
+          model={buildGoalCard(view, today, { savingsYen, pendingCount: captures.length })}
+        />
+      ) : null}
       <section
         aria-label="今の目標"
         className="rounded-2xl p-4"

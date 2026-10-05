@@ -59,32 +59,3 @@ export async function addPlanGenre(
   });
   if (error) throw new PlanMembershipError(`目標に追加できませんでした: ${error.message}`);
 }
-
-/** この目標では数えない。支出は家計簿に残し、残り円と未収録の両方から外す。 */
-export async function excludePlanGenre(planId: string, genreId: string): Promise<void> {
-  const { supabase, userId: uid } = await userId();
-  const { data: existing, error: readError } = await supabase
-    .from('spending_plan_items')
-    .select('id')
-    .eq('plan_id', planId)
-    .eq('genre_id', genreId)
-    .maybeSingle();
-  if (readError) throw new PlanMembershipError(`目標を確認できませんでした: ${readError.message}`);
-  if (existing) {
-    const { error } = await supabase
-      .from('spending_plan_items')
-      .update({ target_yen: 0, reason: 'この目標では数えない' })
-      .eq('id', existing.id);
-    if (error) throw new PlanMembershipError(`目標から外せませんでした: ${error.message}`);
-    return;
-  }
-  const { error } = await supabase.from('spending_plan_items').insert({
-    plan_id: planId,
-    user_id: uid,
-    genre_id: genreId,
-    target_yen: 0,
-    ai_suggested_yen: null,
-    reason: 'この目標では数えない',
-  });
-  if (error) throw new PlanMembershipError(`目標から外せませんでした: ${error.message}`);
-}

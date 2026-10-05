@@ -95,7 +95,7 @@ export default async function HomePage() {
           </div>
 
           <p
-            className="mt-3 text-5xl leading-none font-semibold tracking-[-0.045em] tabular"
+            className="mt-3 text-4xl leading-none font-semibold tracking-[-0.045em] tabular"
             style={{ color: 'var(--ink)' }}
           >
             {savingsYen === null ? '—' : formatYen(savingsYen)}

@@ -1,3 +1,5 @@
+import { createRng, sampleStandardNormal } from '@/domain/forecast/rng';
+
 export type ForecastVerdict = 'unknown' | 'unreachable' | 'on_track' | 'tight' | 'over';
 
 export type GenreForecast = {
@@ -27,32 +29,6 @@ const AMOUNT_SIGMA = 0.7;
 
 function round100(yen: number): number {
   return Math.max(0, Math.round(yen / 100) * 100);
-}
-
-function hashSeed(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed: number): () => number {
-  let a = seed || 1;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function normal(rng: () => number): number {
-  const u = Math.max(rng(), 1e-12);
-  const v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
 function quantile(sorted: readonly number[], p: number): number {
@@ -120,19 +96,19 @@ export function forecastPlan(input: {
   const trials = input.trials ?? TRIALS;
   const days = Math.max(input.remainingDays, 0);
   const models = input.genres.map(dayModel);
-  const rng = mulberry32(hashSeed(input.seed));
+  const rng = createRng(input.seed);
   const samples = input.genres.map(() => [] as number[]);
   const totals: number[] = [];
 
   for (let trial = 0; trial < trials; trial++) {
     const variable = input.genres.map(() => 0);
     for (let day = 0; day < days; day++) {
-      const shared = normal(rng) * 0.35;
+      const shared = sampleStandardNormal(rng) * 0.35;
       for (let i = 0; i < models.length; i++) {
         const model = models[i]!;
         if (!model.known || model.p <= 0 || model.mu === 0) continue;
         if (rng() > model.p) continue;
-        const amount = Math.exp(model.mu + shared + normal(rng) * 0.55);
+        const amount = Math.exp(model.mu + shared + sampleStandardNormal(rng) * 0.55);
         variable[i] = (variable[i] ?? 0) + amount;
       }
     }
@@ -294,5 +270,105 @@ export function twoMonthTendency(input: {
   return {
     savedYen: saved,
     text: `先々月 ${yen(input.priorYen)} 円、先月 ${yen(input.previousYen)} 円。${direction}${outcome}`,
+  };
+}
+
+export type GenreLanding = {
+  genreId: string;
+  genreName: string;
+  spentYen: number;
+  scheduledYen: number;
+  medianYen: number | null;
+  lowYen: number | null;
+  highYen: number | null;
+  /** 抑えてほしい額(目標案にする額)。判断できなければ null。 */
+  recommendedYen: number | null;
+  exceedance: number | null;
+  label: string;
+  advice: string;
+  detail: string;
+};
+
+export type LandingReport = {
+  summary: string;
+  proposedTotalYen: number | null;
+  forecasts: GenreLanding[];
+};
+
+/**
+ * 着地の予測(forecastPlan)を、ジャンルごとの説明と「抑えてほしい額」にまとめる。
+ * rows と forecasts は同じ順(forecastPlan に rows の入力を同じ順で渡した結果)。
+ */
+export function landingReport(input: {
+  remainingDays: number;
+  rows: readonly {
+    genreId: string;
+    genreName: string;
+    targetYen: number;
+    spentYen: number;
+    scheduledYen: number;
+    priorMonthYen: number;
+    previousMonthYen: number;
+  }[];
+  forecasts: readonly GenreForecast[];
+}): LandingReport {
+  const yen = (n: number) => n.toLocaleString('ja-JP');
+  const { remainingDays } = input;
+  const forecasts = input.rows.map((row, index): GenreLanding => {
+    const forecast = input.forecasts[index]!;
+    const probability =
+      forecast.exceedance === null
+        ? ''
+        : `今の目標を超える確率は ${Math.round(forecast.exceedance * 100)}%。`;
+    const detail = [
+      `この期間にすでに ${yen(row.spentYen)} 円使っている。`,
+      row.scheduledYen > 0
+        ? `これから日付の入っている予定が ${yen(row.scheduledYen)} 円ある。`
+        : '日付の入っている予定は無い。',
+      forecast.medianYen === null
+        ? '支出のあった日が少なく、残りの着地はまだ置けない。'
+        : `残りの ${remainingDays} 日を ${yen(TRIALS)} 回引くと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+    ].join('');
+    const ask = savingsAsk({
+      verdict: forecast.verdict,
+      targetYen: row.targetYen,
+      medianYen: forecast.medianYen,
+      lowYen: forecast.lowYen,
+      committedYen: row.spentYen + row.scheduledYen,
+      remainingDays,
+    });
+    return {
+      genreId: row.genreId,
+      genreName: row.genreName,
+      spentYen: row.spentYen,
+      scheduledYen: row.scheduledYen,
+      medianYen: forecast.medianYen,
+      lowYen: forecast.lowYen,
+      highYen: forecast.highYen,
+      recommendedYen: ask.keepUnderYen,
+      exceedance: forecast.exceedance,
+      label: forecast.label,
+      advice: [
+        ask.text,
+        twoMonthTendency({
+          priorYen: row.priorMonthYen,
+          previousYen: row.previousMonthYen,
+          landingYen: forecast.medianYen,
+        }).text,
+      ]
+        .filter(Boolean)
+        .join(''),
+      detail,
+    };
+  });
+  const known = forecasts.filter((row) => row.recommendedYen !== null);
+  const proposed = known.reduce((sum, row) => sum + (row.recommendedYen ?? 0), 0);
+  return {
+    summary:
+      known.length === 0
+        ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
+        : `抑えてほしい額の合計は ${yen(proposed)} 円。着地ではなく、この額を目標案にする。`,
+    proposedTotalYen: known.length === 0 ? null : proposed,
+    forecasts,
   };
 }

@@ -37,6 +37,21 @@ export function categoryAllowanceYen(input: {
   return Math.max(0, Math.round(left / remaining));
 }
 
+/**
+ * 目標と照らすときの行。予定(今日より先)は目標の期間内のものだけ残す。
+ * 期間の外の予定は、目標の予算から引かず、累計・予測の段差にも載せない。
+ * 実績は日付に関わらず残す(目標が始まる前の実績は、累計の起点に使う)。
+ */
+export function linesForGoal(
+  lines: readonly CategoryLine[],
+  goalRange: { from: DateOnly; to: DateOnly },
+): CategoryLine[] {
+  return lines.filter(
+    (l) =>
+      l.status !== 'scheduled' || (l.occurredOn >= goalRange.from && l.occurredOn <= goalRange.to),
+  );
+}
+
 /** 表示中の期間(from〜to)が目標期間と重なるか。 */
 export function goalOverlaps(
   goalRange: { from: DateOnly; to: DateOnly },

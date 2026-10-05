@@ -168,7 +168,7 @@ function MonthPane({
         />
       ) : (
         <p
-          className="tabular mt-3 text-5xl leading-none font-semibold tracking-[-0.045em]"
+          className="tabular mt-3 text-4xl leading-none font-semibold tracking-[-0.045em]"
           style={{ color: waiting ? 'var(--ink-muted)' : 'var(--ink)' }}
         >
           {waiting ? '—' : <Yen value={totals.spentYen} />}

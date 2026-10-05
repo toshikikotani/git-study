@@ -44,7 +44,14 @@ const TRANSACTION: StoredTransaction = {
   memo: null,
 };
 
-const GENRE: Genre = { id: 'g1', name: '浪費', sortOrder: 0, budgetYen: 20_000, showOnHome: true, forecastClosed: false };
+const GENRE: Genre = {
+  id: 'g1',
+  name: '浪費',
+  sortOrder: 0,
+  budgetYen: 20_000,
+  showOnHome: true,
+  forecastClosed: false,
+};
 
 describe('buildAssistantSystemPrompt', () => {
   it('各ドメインのセクションをすべて含める', () => {

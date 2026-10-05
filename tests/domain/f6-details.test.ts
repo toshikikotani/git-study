@@ -1,6 +1,6 @@
 import { createElement as h } from 'react';
 import { renderToString } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { genreBarColor, genreColorVar } from '../../src/domain/genre-style';
 import { consumeJustSaved, markJustSaved } from '../../src/lib/just-saved';
@@ -29,6 +29,9 @@ describe('F6 動きと細部', () => {
         },
       });
     });
+
+    // window を差し替えたまま次のテストへ持ち越さない(ほかの描画が window を見る)。
+    afterEach(() => vi.unstubAllGlobals());
 
     it('保存した id を一度だけ読み出せる', () => {
       markJustSaved(['a', 'b']);

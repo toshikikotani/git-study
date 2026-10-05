@@ -48,6 +48,9 @@ export default async function SpendingPage() {
     listOpenCaptures().catch(() => []),
   ]);
   const plan = await getCurrentPlan(ledger.period.to).catch(() => null);
+  // 目標があるときは目標のジャンルだけを全体の累計に入れる(総予算と同じ範囲)。
+  const goalItems = plan ? plan.items.filter((item) => item.targetYen > 0) : [];
+  const goalGenreIds = goalItems.length > 0 ? goalItems.map((item) => item.genreId) : null;
   const ids = ledger.transactions.map((t) => t.id);
   const [items, subtypes] = await Promise.all([
     listReceiptItemsForTransactionIds(ids),
@@ -94,11 +97,11 @@ export default async function SpendingPage() {
         <AttentionCard hasGoal={false} />
         <OverviewChart
           transactions={transactions}
-          genreIds={genres.map((genre) => genre.id)}
+          genreIds={goalGenreIds ?? genres.map((genre) => genre.id)}
           monthStart={ledger.period.from}
           monthEnd={ledger.period.to}
           today={today}
-          budgetYen={plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : null}
+          budgetYen={goalGenreIds ? goalItems.reduce((sum, item) => sum + item.targetYen, 0) : null}
           goalFrom={plan?.periodStart ?? null}
           goalTo={plan?.periodEnd ?? null}
         />

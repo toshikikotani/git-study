@@ -56,7 +56,7 @@ describe('R5 スクロールでタブバーが縮む', () => {
 
   it('スクロール領域の下端に、タブバー+安全領域ぶんの余白がある(どの要素も隠れない)', () => {
     const shell = readFileSync('app/(app)/app-shell.tsx', 'utf8');
-    expect(shell).toContain('pb-[calc(9rem+env(safe-area-inset-bottom))]');
+    expect(shell).toContain('pb-[calc(11rem+env(safe-area-inset-bottom))]');
     // 9rem = 144px。タブバー(44pt のタブ+余白+浮く撮影ボタン)より大きい。
     expect(9 * 16).toBeGreaterThanOrEqual(44 + 16 + 16 + 56);
   });
@@ -66,7 +66,8 @@ describe('R5 「取引 / 品目 / 店」はヘッダーの直下に固定され�
   const base: CategoryDetailData = {
     genreKey: 'dining',
     genreName: '外食',
-    genreBudgetYen: null, forecastClosed: false,
+    genreBudgetYen: null,
+    forecastClosed: false,
     monthKey: '2026-09',
     monthStart: '2026-09-01',
     today: '2026-09-29',

@@ -31,7 +31,6 @@ export type GoalCardModel = {
   periodLabel: string;
   remainingLabel: string;
   primary: { label: string; amountYen: number | null; note: string | null };
-  badge: { state: 'caution' | 'over'; label: string } | null;
   summary: string;
   /** 結果予想の一言(N5)。今日あと使える額の下に出す。予算なし・未開始は null。 */
   forecast: Forecast | null;
@@ -68,7 +67,6 @@ export function buildGoalCard(
         ? '手取りを入れると、ここが埋まる'
         : null,
   };
-  const badge = null;
 
   // 内訳。上にあるものほど優先し、すでに表示した金額と同じ値は落とす。
   const candidates: GoalCardDetail[] = [];
@@ -128,7 +126,6 @@ export function buildGoalCard(
     periodLabel: `${from.slice(5).replace('-', '/')}〜${to.slice(5).replace('-', '/')}`,
     remainingLabel: formatRemainingDays(from, to, today),
     primary,
-    badge,
     summary: SUMMARY[g.status],
     forecast,
     details,

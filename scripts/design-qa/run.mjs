@@ -381,9 +381,6 @@ const NAV_CHECKS = () => {
   // 一番下までスクロールしたとき、最後の内容がタブバーに隠れない
   window.scrollTo(0, document.documentElement.scrollHeight);
   const main = document.querySelector('main');
-  const last = [...main.querySelectorAll('section,div')]
-    .filter((e) => e.parentElement === main.firstElementChild || e.parentElement === main)
-    .pop();
   const content = main.firstElementChild ?? main;
   const kids = [...content.children].filter((e) => rect(e).height > 0);
   const lastKid = kids[kids.length - 1];

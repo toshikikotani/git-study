@@ -4,24 +4,18 @@ import { describe, expect, it } from 'vitest';
 const sheet = readFileSync('src/components/ui/bottom-sheet.tsx', 'utf8');
 
 describe('閉じたシートを載せ続けない(iPhone で家計簿がメモリ不足で落ちた不具合)', () => {
-  it('閉じているあいだは何も描かない(mounted でないときは null)', () => {
-    expect(sheet).toMatch(/if \(!isClient \|\| !mounted\) return null/);
+  it('開閉は open で制御し、閉じたままの描画を強制しない(vaul は閉じている間 中身を描かない)', () => {
+    expect(sheet).toContain('<Drawer.Root');
+    expect(sheet).toMatch(/open=\{open\}/);
+    expect(sheet).not.toContain('forceMount');
   });
 
-  it('開いた見た目(shown)は、描いた直後ではなく次のフレームで付ける(スライドが動く)', () => {
-    expect(sheet).toContain('requestAnimationFrame');
-    expect(sheet).toMatch(/shown: open && entered/);
+  it('シートの背景は不透明の面で、常時ぼかす面(backdrop-filter)を増やさない', () => {
+    expect(sheet).not.toMatch(/backdropFilter|backdrop-filter|backdrop-blur/);
   });
 
-  it('閉じる動きが終わってから外す(閉じる動きより長く待つ)', () => {
-    const exit = Number(/SHEET_EXIT_MS = (\d+)/.exec(sheet)![1]);
-    expect(exit).toBeGreaterThanOrEqual(400);
-  });
-
-  it('シートの背景(backdrop-filter)は、開いているときにだけ存在する(常時の面を増やさない)', () => {
-    // backdropFilter を持つ要素は、return の中(mounted のときだけ描かれる部分)にだけある。
-    const before = sheet.slice(0, sheet.indexOf('return createPortal('));
-    expect(before).not.toContain('backdropFilter');
+  it('読み上げ用の名前を持つ(Radix は Title が無いと警告する)', () => {
+    expect(sheet).toContain('<Drawer.Title');
   });
 
   it('明細の行ごとにシートを持つ部品が、閉じたまま背景をぼかす面を増やさない(行のシートの数の上限)', () => {

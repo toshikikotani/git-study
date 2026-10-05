@@ -4,17 +4,20 @@ import { Drawer } from 'vaul';
 
 /**
  * 下から出るシート。開閉の追従と下引きは vaul に任せる。
- * 呼び出し側の props は変えない。
+ * 閉じているあいだは vaul(Radix)が中身を描かない。
  */
 export function BottomSheet({
   open,
   onClose,
   role,
+  label = 'シート',
   children,
 }: {
   open: boolean;
   onClose: () => void;
   role?: string;
+  /** 読み上げ用の名前(画面には出さない)。 */
+  label?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -41,6 +44,7 @@ export function BottomSheet({
               boxShadow: 'var(--glass-shadow-float)',
             }}
           >
+            <Drawer.Title className="sr-only">{label}</Drawer.Title>
             <Drawer.Handle className="mx-auto mt-2 mb-1 block h-1.5 w-10 rounded-full bg-[var(--hairline)]" />
             {children}
           </div>
@@ -49,5 +53,3 @@ export function BottomSheet({
     </Drawer.Root>
   );
 }
-
-export const SHEET_EXIT_MS = 500;

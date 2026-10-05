@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { forecastPlan } from '@/domain/plan-forecast';
+import { forecastPlan, landingReport } from '@/domain/plan-forecast';
 
 const base = {
   spentYen: 8000,
@@ -92,5 +92,54 @@ describe('過去2ヶ月の傾向', () => {
     expect(result.savedYen).toBe(8400);
     expect(result.text).toContain('増えている');
     expect(result.text).toContain('8,400 円残る');
+  });
+});
+
+describe('landingReport', () => {
+  const row = {
+    genreId: 'g1',
+    genreName: '外食',
+    targetYen: 20000,
+    spentYen: 8000,
+    scheduledYen: 3000,
+    priorMonthYen: 18000,
+    previousMonthYen: 21000,
+  };
+  const forecasts = forecastPlan({
+    genres: [{ ...base, scheduledYen: 3000 }],
+    remainingDays: 10,
+    seed: 'report',
+    trials: 400,
+  }).genres;
+
+  it('ジャンルごとの説明に、使った額と予定を目標の期間の数字で書く', () => {
+    const report = landingReport({ remainingDays: 10, rows: [row], forecasts });
+    const detail = report.forecasts[0]!.detail;
+    expect(detail).toContain('8,000 円使っている');
+    expect(detail).toContain('予定が 3,000 円');
+    expect(report.forecasts[0]!.advice).toContain('先々月 18,000 円、先月 21,000 円');
+  });
+
+  it('抑えてほしい額の合計は、判断できたジャンルの額を足した値', () => {
+    const report = landingReport({ remainingDays: 10, rows: [row], forecasts });
+    const own = report.forecasts[0]!.recommendedYen;
+    expect(own).not.toBeNull();
+    expect(report.proposedTotalYen).toBe(own);
+  });
+
+  it('判断できるジャンルが無ければ合計は出さない', () => {
+    const unknown = forecastPlan({
+      genres: [{ ...base, observedDays: 3, scheduledYen: 0 }],
+      remainingDays: 10,
+      seed: 'unknown',
+      trials: 400,
+    }).genres;
+    const report = landingReport({
+      remainingDays: 10,
+      rows: [{ ...row, scheduledYen: 0 }],
+      forecasts: unknown,
+    });
+    expect(report.proposedTotalYen).toBeNull();
+    expect(report.summary).toContain('まだ判断できるジャンルがありません');
   });
 });

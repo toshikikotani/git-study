@@ -147,9 +147,10 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     expect([...order].sort((x, y) => x - y)).toEqual(order);
   });
 
-  it('前月データが無いときは「記録開始からN日」、収入未登録は「収入を登録」で、赤字の差額は出ない', () => {
+  it('前月データが無いときは「記録開始からN日」、収入未登録は「手取りを入れる」で、赤字の差額は出ない', () => {
     expect(html).toContain('記録開始から9日');
-    expect(html).toContain('収入を登録');
+    expect(html).toContain('手取りを入れる');
+    expect(html).toContain('href="/transactions/new?type=income"');
     expect(html).not.toContain('先月の29日時点');
     expect(html).not.toMatch(/円 (多い|少ない)/);
     expect(html).not.toContain('このペースが続くと');
@@ -164,7 +165,7 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
   });
 
   it('分割した明細は、子の羅列ではなく比率のバー(role=img)', () => {
-    expect(html).toContain('ジャンルの内訳:カフェ・飲料 67%、外食 33%');
+    expect(html).toContain('ジャンルの内訳:カフェ・飲料 2,000円、外食 1,000円');
     expect(html).toContain('阪神大阪梅田駅店');
   });
 

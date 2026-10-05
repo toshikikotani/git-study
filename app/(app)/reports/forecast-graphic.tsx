@@ -77,7 +77,7 @@ export function ForecastGraphic({
           }}
         />
         <span
-          className="absolute text-[11px] whitespace-nowrap"
+          className="absolute text-xs whitespace-nowrap"
           style={{
             left: `${Math.min(x(points.length - 1) + 3, 62)}%`,
             top: `${y(last.yen)}%`,
