@@ -22,10 +22,9 @@
  * Date を作り直すと極端に遅くなることを実測で確認した)。
  */
 
-import { weekdayOf, type DateOnly } from '@/lib/date';
 import { eachDay } from '@/domain/period';
-import { isFixedHoliday } from './holidays';
-import { isPaydayWindow } from './model';
+import type { DateOnly } from '@/lib/date';
+import { rateFactorSum } from './model';
 import {
   createRng,
   pickOne,
@@ -36,7 +35,16 @@ import {
   sampleStandardNormal,
   type Rng,
 } from './rng';
-import type { FittedModel, Forecast, ForecastDriver } from './types';
+import type {
+  Band,
+  CategoryBase,
+  FittedModel,
+  Forecast,
+  ForecastCategoryBand,
+  ForecastDriver,
+  RegularMerchant,
+  VisitEvent,
+} from './types';
 
 export const DEFAULT_TRIALS = 10_000;
 export const MIN_TRIALS = 2_000;
@@ -44,6 +52,8 @@ export const MIN_TRIALS = 2_000;
 export const LEARNING_DATA_DAYS = 14;
 /** 安全に使える1日の額が守るべき、予算内に収まる確率の目標。 */
 const SAFE_ALLOWANCE_TARGET_PROB = 0.8;
+
+export type CategoryTarget = { categoryId: string; categoryName: string; targetYen: number };
 
 export type SimulateInput = {
   periodId: string;
@@ -63,12 +73,28 @@ export type SimulateInput = {
   bootstrapWeight: number;
   trials?: number;
   seed: string;
+  /** カテゴリごとの、予測の前から決まっている額(実績・予定・固定費)。 */
+  baseByCategory?: readonly CategoryBase[];
+  /** 規則的に通う店の、残り期間の来店の見込み。 */
+  visits?: readonly VisitEvent[];
+  regularMerchants?: readonly RegularMerchant[];
+  /** 目標額のあるカテゴリ。着地がそれを超える確率を出す。 */
+  categoryTargets?: readonly CategoryTarget[];
 };
 
 function quantile(sortedAsc: readonly number[], p: number): number {
   if (sortedAsc.length === 0) return 0;
   const idx = Math.min(sortedAsc.length - 1, Math.max(0, Math.round(p * (sortedAsc.length - 1))));
   return sortedAsc[idx]!;
+}
+
+function bandOf(sortedAsc: readonly number[]): Band {
+  return {
+    p10: quantile(sortedAsc, 0.1),
+    p50: quantile(sortedAsc, 0.5),
+    p70: quantile(sortedAsc, 0.7),
+    p90: quantile(sortedAsc, 0.9),
+  };
 }
 
 function sampleSpecial(
@@ -100,45 +126,95 @@ function trialsFor(requested: number, categoryCount: number, remainingDayCount: 
   return Math.max(MIN_TRIALS, Math.min(requested, scaled));
 }
 
-export function simulateForecast(input: SimulateInput): Forecast {
+type TrialRun = {
+  trials: number;
+  futureDayCount: number;
+  /** 予測に出てくるカテゴリ(学習できたもの + 決まっている額・来店・目標だけのもの)。 */
+  categories: { id: string; name: string; base: number; target: number | null }[];
+  totalSamples: Float64Array;
+  specialSamples: Float64Array;
+  variableSamples: Float64Array;
+  categorySamples: Float64Array[];
+  categoryMedian: number[];
+};
+
+/** 試行を回す本体。simulateForecast と simulateTotalSamples が共有する(式を2か所に持たない)。 */
+function runTrials(input: SimulateInput): TrialRun {
   const futureDates = eachDay(input.today, input.periodTo).filter((d) => d > input.today);
-  const categories = input.fitted.categories;
-  const nCat = categories.length;
-  const trials = trialsFor(input.trials ?? DEFAULT_TRIALS, nCat, futureDates.length);
+  const fittedCats = input.fitted.categories;
+  const nFit = fittedCats.length;
+
+  const extra = new Map<string, { name: string; base: number; target: number | null }>();
+  const fittedIds = new Set(fittedCats.map((c) => c.categoryId));
+  const touch = (id: string, name: string) => {
+    if (fittedIds.has(id)) return undefined;
+    const found = extra.get(id) ?? { name, base: 0, target: null };
+    extra.set(id, found);
+    return found;
+  };
+  const baseById = new Map<string, number>();
+  for (const b of input.baseByCategory ?? []) {
+    const yen = b.actualYen + b.scheduledYen + b.fixedYen;
+    baseById.set(b.categoryId, (baseById.get(b.categoryId) ?? 0) + yen);
+    const e = touch(b.categoryId, b.categoryName);
+    if (e) e.base += yen;
+  }
+  const targetById = new Map<string, number>();
+  for (const t of input.categoryTargets ?? []) {
+    targetById.set(t.categoryId, t.targetYen);
+    const e = touch(t.categoryId, t.categoryName);
+    if (e) e.target = t.targetYen;
+  }
+  for (const v of input.visits ?? []) touch(v.categoryId, v.label);
+
+  const categories = [
+    ...fittedCats.map((c) => ({
+      id: c.categoryId,
+      name: c.categoryName,
+      base: baseById.get(c.categoryId) ?? 0,
+      target: targetById.get(c.categoryId) ?? null,
+    })),
+    ...[...extra.entries()].map(([id, e]) => ({
+      id,
+      name: e.name,
+      base: e.base,
+      target: e.target,
+    })),
+  ];
+  const nAll = categories.length;
+  const indexById = new Map(categories.map((c, i) => [c.id, i]));
+
+  const trials = trialsFor(input.trials ?? DEFAULT_TRIALS, nAll, futureDates.length);
   const rng = createRng(input.seed);
 
-  // 曜日・給料日・祝日の係数は日付だけで決まるので、試行の外で1回だけ計算する。
+  // 曜日・給料日・祝日・月の係数は日付だけで決まるので、試行の外で1回だけ計算する。
   // ポアソン分布の加法性(独立なポアソンの和は、率の和のポアソンに従う)を使い、
   // 「日ごとに回数を引く」のではなく「残り期間の合計回数を1回で引く」ことで、
-  // 試行ループの内側から日数ぶんのループを無くす(1万試行×12カテゴリ×31日の
-  // 3重ループが遅すぎた実測を踏まえた最適化。結果の分布は数学的に同一)。
-  const totalFactorByCategory: number[] = categories.map((cat) =>
-    futureDates.reduce((sum, date) => {
-      const wd = weekdayOf(date);
-      let factor = cat.weekdayFactor[wd] ?? 1;
-      if (input.payday !== null && isPaydayWindow(date, input.payday)) factor *= cat.paydayFactor;
-      if (isFixedHoliday(date)) factor *= cat.holidayFactor;
-      return sum + Math.max(0, factor);
-    }, 0),
+  // 試行ループの内側から日数ぶんのループを無くす。結果の分布は数学的に同一。
+  const totalFactorByCategory: number[] = fittedCats.map((cat) =>
+    rateFactorSum(cat, futureDates, input.payday, input.fitted.monthFactor),
   );
 
   const totalSamples = new Float64Array(trials);
   const specialSamples = new Float64Array(trials);
   const variableSamples = new Float64Array(trials);
   const categorySamples: Float64Array[] = categories.map(() => new Float64Array(trials));
-  const perCategoryTrial = new Float64Array(nCat);
+  const perCategoryTrial = new Float64Array(nAll);
 
   // drivers用:各カテゴリの点推定中央値(軽量近似、試行ごとに計算し直さない)。
-  const categoryMedian = categories.map((c) => {
+  const categoryMedian = categories.map((_, i) => {
+    const c = fittedCats[i];
+    if (c === undefined) return 0;
     const lambdaMean = c.countPosterior.alpha / c.countPosterior.beta;
     const expectedAmount = Math.exp(c.amountPosterior.mu + c.amountPosterior.sigmaSq / 2);
     return lambdaMean * futureDates.length * expectedAmount;
   });
-  const overshootByCategory = new Float64Array(nCat);
-  let overshootTrialCount = 0;
 
   const dayBundles = input.fitted.dayBundles;
-  const categoryIds = categories.map((c) => c.categoryId);
+  const categoryIds = fittedCats.map((c) => c.categoryId);
+  const visits = (input.visits ?? [])
+    .map((v) => ({ v, index: indexById.get(v.categoryId) }))
+    .filter((x): x is { v: VisitEvent; index: number } => x.index !== undefined);
 
   for (let t = 0; t < trials; t += 1) {
     perCategoryTrial.fill(0);
@@ -148,15 +224,15 @@ export function simulateForecast(input: SimulateInput): Forecast {
     if (useBootstrap && dayBundles.length > 0) {
       for (let d = 0; d < futureDates.length; d += 1) {
         const bundle = pickWeighted(rng, dayBundles, (b) => b.weight);
-        for (let c = 0; c < nCat; c += 1) {
+        for (let c = 0; c < nFit; c += 1) {
           const amount = bundle.amountsByCategory.get(categoryIds[c]!) ?? 0;
           perCategoryTrial[c]! += amount;
           variableTotal += amount;
         }
       }
     } else {
-      for (let c = 0; c < nCat; c += 1) {
-        const cat = categories[c]!;
+      for (let c = 0; c < nFit; c += 1) {
+        const cat = fittedCats[c]!;
         const lambda = sampleGamma(rng, cat.countPosterior.alpha, 1 / cat.countPosterior.beta);
         const muTrial =
           cat.amountPosterior.mu +
@@ -172,6 +248,14 @@ export function simulateForecast(input: SimulateInput): Forecast {
       }
     }
 
+    // 規則的に通う店:来店の日ごとに、来るかどうかと金額を引く。
+    for (const { v, index } of visits) {
+      if (rng() >= v.probability) continue;
+      const amount = sampleLognormal(rng, v.logMu, v.logSigma);
+      perCategoryTrial[index]! += amount;
+      variableTotal += amount;
+    }
+
     const specialTotal = sampleSpecial(
       rng,
       input.specialHistoricalAmounts,
@@ -179,17 +263,39 @@ export function simulateForecast(input: SimulateInput): Forecast {
       input.remainingDays,
     );
 
-    const total = input.actualYen + input.committedYen + variableTotal + specialTotal;
-    totalSamples[t] = total;
+    totalSamples[t] = input.actualYen + input.committedYen + variableTotal + specialTotal;
     specialSamples[t] = specialTotal;
     variableSamples[t] = variableTotal;
-    for (let c = 0; c < nCat; c += 1) categorySamples[c]![t] = perCategoryTrial[c]!;
+    for (let c = 0; c < nAll; c += 1) categorySamples[c]![t] = perCategoryTrial[c]!;
+  }
 
-    if (input.budgetYen !== null && total > input.budgetYen) {
+  return {
+    trials,
+    futureDayCount: futureDates.length,
+    categories,
+    totalSamples,
+    specialSamples,
+    variableSamples,
+    categorySamples,
+    categoryMedian,
+  };
+}
+
+export function simulateForecast(input: SimulateInput): Forecast {
+  const run = runTrials(input);
+  const { trials, categories, totalSamples, specialSamples, variableSamples, categorySamples } =
+    run;
+  const nAll = categories.length;
+
+  // 予算を超えた試行での、各カテゴリの「ふだんより多い分」(原因の割り当て)。
+  const overshootByCategory = new Float64Array(nAll);
+  let overshootTrialCount = 0;
+  if (input.budgetYen !== null) {
+    for (let t = 0; t < trials; t += 1) {
+      if (totalSamples[t]! <= input.budgetYen) continue;
       overshootTrialCount += 1;
-      for (let c = 0; c < nCat; c += 1) {
-        const over = Math.max(0, perCategoryTrial[c]! - categoryMedian[c]!);
-        overshootByCategory[c]! += over;
+      for (let c = 0; c < nAll; c += 1) {
+        overshootByCategory[c]! += Math.max(0, categorySamples[c]![t]! - run.categoryMedian[c]!);
       }
     }
   }
@@ -198,16 +304,37 @@ export function simulateForecast(input: SimulateInput): Forecast {
   const sortedSpecial = Array.from(specialSamples).sort((a, b) => a - b);
   let sumTotal = 0;
   for (let t = 0; t < trials; t += 1) sumTotal += totalSamples[t]!;
-  const mean = sumTotal / trials;
 
-  const byCategory = categories.map((cat, c) => {
-    const sorted = Array.from(categorySamples[c]!).sort((a, b) => a - b);
+  const baseDetail = new Map<string, { actual: number; scheduled: number; fixed: number }>();
+  for (const b of input.baseByCategory ?? []) {
+    const d = baseDetail.get(b.categoryId) ?? { actual: 0, scheduled: 0, fixed: 0 };
+    d.actual += b.actualYen;
+    d.scheduled += b.scheduledYen;
+    d.fixed += b.fixedYen;
+    baseDetail.set(b.categoryId, d);
+  }
+  const byCategory: ForecastCategoryBand[] = categories.map((cat, c) => {
+    const detail = baseDetail.get(cat.id) ?? { actual: 0, scheduled: 0, fixed: 0 };
+    const variableSorted = Array.from(categorySamples[c]!).sort((a, b) => a - b);
+    const landingSorted = variableSorted.map((v) => v + cat.base);
+    let over = 0;
+    if (cat.target !== null) {
+      for (let t = 0; t < trials; t += 1)
+        if (cat.base + categorySamples[c]![t]! > cat.target) over += 1;
+    }
     return {
-      categoryId: cat.categoryId,
-      categoryName: cat.categoryName,
-      p10: quantile(sorted, 0.1),
-      p50: quantile(sorted, 0.5),
-      p90: quantile(sorted, 0.9),
+      categoryId: cat.id,
+      categoryName: cat.name,
+      p10: quantile(variableSorted, 0.1),
+      p50: quantile(variableSorted, 0.5),
+      p90: quantile(variableSorted, 0.9),
+      landing: bandOf(landingSorted),
+      baseYen: cat.base,
+      actualYen: detail.actual,
+      scheduledYen: detail.scheduled,
+      fixedYen: detail.fixed,
+      targetYen: cat.target,
+      exceedance: cat.target === null ? null : over / trials,
     };
   });
 
@@ -224,8 +351,8 @@ export function simulateForecast(input: SimulateInput): Forecast {
     totalOvershootRisk > 0
       ? categories
           .map((cat, c) => ({
-            categoryId: cat.categoryId,
-            categoryName: cat.categoryName,
+            categoryId: cat.id,
+            categoryName: cat.name,
             shareOfRisk: overshootByCategory[c]! / totalOvershootRisk,
           }))
           .filter((d) => d.shareOfRisk > 0)
@@ -233,27 +360,37 @@ export function simulateForecast(input: SimulateInput): Forecast {
       : [];
 
   const safeDailyAllowance =
-    input.budgetYen !== null && futureDates.length > 0
+    input.budgetYen !== null && run.futureDayCount > 0
       ? findSafeDailyAllowance({
           budgetYen: input.budgetYen,
           fixedPart: (i: number) => input.actualYen + input.committedYen + specialSamples[i]!,
           variableSamples,
-          remainingDays: futureDates.length,
+          remainingDays: run.futureDayCount,
         })
       : null;
+
+  const visitExpected = (input.visits ?? []).reduce(
+    (sum, v) => sum + v.probability * Math.exp(v.logMu + v.logSigma ** 2 / 2),
+    0,
+  );
 
   return {
     periodId: input.periodId,
     asOf: input.today,
     remainingDays: input.remainingDays,
-    total: {
-      p10: quantile(sortedTotal, 0.1),
-      p50: quantile(sortedTotal, 0.5),
-      p90: quantile(sortedTotal, 0.9),
-      mean,
-    },
+    total: { ...bandOf(sortedTotal), mean: sumTotal / trials },
     byCategory,
     committed: { scheduledYen: 0, fixedYen: 0 }, // 呼び出し側(engine.ts)が上書きする
+    visits: {
+      expectedYen: Math.round(visitExpected),
+      merchants: (input.regularMerchants ?? []).map((m) => ({
+        label: m.label,
+        everyDays: m.everyDays,
+        probability: m.probability,
+        meanYen: Math.round(m.meanYen),
+      })),
+    },
+    seasonal: { active: input.fitted.seasonal, periodFactor: null }, // engine.ts が期間の月の係数を入れる
     special: {
       expected: sortedSpecial.reduce((a, b) => a + b, 0) / trials,
       p90: quantile(sortedSpecial, 0.9),
@@ -271,66 +408,12 @@ export function simulateForecast(input: SimulateInput): Forecast {
 }
 
 /**
- * simulateForecast() と同じ計算のうち、合計額の生の試行サンプルだけを返す
- * 軽量版(M4のバックテストで CRPS を計算するために使う。カテゴリ別内訳・
- * drivers・安全額は使わないため省く)。同じ seed・同じ入力なら
- * simulateForecast() の total.p10/p50/p90 と整合する値になる。
+ * simulateForecast() と同じ試行のうち、合計額の生のサンプルだけを返す
+ * (M4のバックテストで CRPS を計算するために使う)。同じ seed・同じ入力なら
+ * simulateForecast() の total と整合する。
  */
 export function simulateTotalSamples(input: SimulateInput): Float64Array {
-  const futureDates = eachDay(input.today, input.periodTo).filter((d) => d > input.today);
-  const categories = input.fitted.categories;
-  const nCat = categories.length;
-  const trials = trialsFor(input.trials ?? DEFAULT_TRIALS, nCat, futureDates.length);
-  const rng = createRng(input.seed);
-
-  const totalFactorByCategory: number[] = categories.map((cat) =>
-    futureDates.reduce((sum, date) => {
-      const wd = weekdayOf(date);
-      let factor = cat.weekdayFactor[wd] ?? 1;
-      if (input.payday !== null && isPaydayWindow(date, input.payday)) factor *= cat.paydayFactor;
-      if (isFixedHoliday(date)) factor *= cat.holidayFactor;
-      return sum + Math.max(0, factor);
-    }, 0),
-  );
-
-  const dayBundles = input.fitted.dayBundles;
-  const categoryIds = categories.map((c) => c.categoryId);
-  const totalSamples = new Float64Array(trials);
-
-  for (let t = 0; t < trials; t += 1) {
-    let variableTotal = 0;
-    const useBootstrap = input.bootstrapWeight > 0 && rng() < input.bootstrapWeight;
-
-    if (useBootstrap && dayBundles.length > 0) {
-      for (let d = 0; d < futureDates.length; d += 1) {
-        const bundle = pickWeighted(rng, dayBundles, (b) => b.weight);
-        for (let c = 0; c < nCat; c += 1)
-          variableTotal += bundle.amountsByCategory.get(categoryIds[c]!) ?? 0;
-      }
-    } else {
-      for (let c = 0; c < nCat; c += 1) {
-        const cat = categories[c]!;
-        const lambda = sampleGamma(rng, cat.countPosterior.alpha, 1 / cat.countPosterior.beta);
-        const muTrial =
-          cat.amountPosterior.mu +
-          Math.sqrt(cat.amountPosterior.sigmaSq / Math.max(cat.amountPosterior.kappa, 0.01)) *
-            sampleStandardNormal(rng);
-        const sigma = Math.sqrt(cat.amountPosterior.sigmaSq);
-        const count = samplePoisson(rng, lambda * totalFactorByCategory[c]!);
-        for (let i = 0; i < count; i += 1) variableTotal += sampleLognormal(rng, muTrial, sigma);
-      }
-    }
-
-    const specialTotal = sampleSpecial(
-      rng,
-      input.specialHistoricalAmounts,
-      input.specialOccurrencesPerDay,
-      input.remainingDays,
-    );
-    totalSamples[t] = input.actualYen + input.committedYen + variableTotal + specialTotal;
-  }
-
-  return totalSamples;
+  return runTrials(input).totalSamples;
 }
 
 /**

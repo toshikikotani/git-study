@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { CategoryChart, type ChartMode } from '../spending/category/[genreKey]/category-chart';
 import { buildCumulative, categoryAllowanceYen } from '@/features/category/pace';
-import type { CategoryLine } from '@/features/category/model';
+import { scheduledYen, type CategoryLine } from '@/features/category/model';
 import { buildSeries, type ChartUnit } from '@/features/category/series';
 import type { DateOnly } from '@/lib/date';
 
@@ -42,7 +42,7 @@ export function GoalChart({
         today,
         dailyAllowanceYen: categoryAllowanceYen({
           budgetYen,
-          scheduledYen: 0,
+          scheduledYen: scheduledYen(lines),
           lines,
           goalRange: { from: goalFrom, to: goalTo },
           today,

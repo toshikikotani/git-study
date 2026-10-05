@@ -1,97 +1,102 @@
 import { describe, expect, it } from 'vitest';
 
-import { forecastPlan, landingReport } from '@/domain/plan-forecast';
+import type { Forecast, ForecastCategoryBand } from '@/domain/forecast/types';
+import { genreForecastsFrom, landingReport } from '@/domain/plan-forecast';
 
-const base = {
-  spentYen: 8000,
-  scheduledYen: 0,
-  meanDailyYen: 500,
-  medianDailyYen: 400,
-  observedDays: 20,
+const cat = (over: Partial<ForecastCategoryBand> = {}): ForecastCategoryBand => ({
+  categoryId: 'g1',
+  categoryName: '外食',
+  p10: 0,
+  p50: 0,
+  p90: 0,
+  landing: { p10: 16000, p50: 19000, p70: 21000, p90: 25000 },
+  baseYen: 11000,
+  actualYen: 8000,
+  scheduledYen: 3000,
+  fixedYen: 0,
   targetYen: 20000,
-};
-
-describe('forecastPlan', () => {
-  it('同じ入力なら着地は一致する', () => {
-    const input = { genres: [base], remainingDays: 10, seed: 'period', trials: 400 };
-    const a = forecastPlan(input);
-    const b = forecastPlan(input);
-    expect(a.genres[0]?.recommendedYen).toBe(b.genres[0]?.recommendedYen);
-    expect(a.totalRecommendedYen).toBe(b.totalRecommendedYen);
-  });
-
-  it('予定を足すと中央値は予定額以上増える', () => {
-    const plain = forecastPlan({ genres: [base], remainingDays: 10, seed: 's', trials: 400 });
-    const withPlan = forecastPlan({
-      genres: [{ ...base, scheduledYen: 3000 }],
-      remainingDays: 10,
-      seed: 's',
-      trials: 400,
-    });
-    expect(withPlan.genres[0]!.medianYen! - plain.genres[0]!.medianYen!).toBeGreaterThanOrEqual(
-      3000,
-    );
-  });
-
-  it('支出日が少なく予定も無いときは目標を出さない', () => {
-    const result = forecastPlan({
-      genres: [{ ...base, observedDays: 3, scheduledYen: 0 }],
-      remainingDays: 10,
-      seed: 'early',
-    });
-    expect(result.genres[0]?.recommendedYen).toBeNull();
-    expect(result.genres[0]?.verdict).toBe('unknown');
-  });
-
-  it('使った額と予定だけで目標以上なら届かない', () => {
-    const result = forecastPlan({
-      genres: [{ ...base, spentYen: 12000, scheduledYen: 9000, targetYen: 20000 }],
-      remainingDays: 10,
-      seed: 'over',
-    });
-    expect(result.genres[0]?.verdict).toBe('unreachable');
-  });
+  exceedance: 0.1,
+  ...over,
 });
 
-import { savingsAsk } from '@/domain/plan-forecast';
+const forecast = (c: ForecastCategoryBand, over: Partial<Forecast> = {}): Forecast => ({
+  periodId: 'p',
+  asOf: '2026-10-10',
+  remainingDays: 10,
+  total: { p10: 0, p50: 0, p70: 0, p90: 0, mean: 0 },
+  byCategory: [c],
+  committed: { scheduledYen: 0, fixedYen: 0 },
+  visits: { expectedYen: 0, merchants: [] },
+  seasonal: { active: false, periodFactor: null },
+  special: { expected: 0, p90: 0 },
+  probWithinBudget: null,
+  expectedOvershoot: 0,
+  drivers: [],
+  safeDailyAllowance: null,
+  status: 'ready',
+  dataDays: 60,
+  method: 'ensemble',
+  calibration: null,
+  ...over,
+});
 
-describe('抑えてほしい額', () => {
-  it('着地より下に抑える。予算に届くことは成功にしない', () => {
-    const ask = savingsAsk({
-      verdict: 'on_track',
-      targetYen: 40000,
-      medianYen: 26400,
-      lowYen: 20500,
-      committedYen: 2600,
-      remainingDays: 29,
-    });
-    expect(ask.keepUnderYen).toBe(20500);
-    expect(ask.saveYen).toBe(5900);
-    expect(ask.text).toContain('届かせない方が貯蓄になる');
-    expect(ask.text).not.toContain('目標に届く');
+const genre = { genreId: 'g1', targetYen: 20000, scheduledYen: 3000 };
+
+describe('genreForecastsFrom(確率エンジンの結果から判定)', () => {
+  it('超える確率が低ければ「届きそう」、中くらいなら「ぎりぎり」、高ければ「超える」', () => {
+    const verdict = (exceedance: number) =>
+      genreForecastsFrom({
+        forecast: forecast(cat({ exceedance })),
+        genres: [genre],
+        remainingDays: 10,
+      })[0]!.verdict;
+    expect(verdict(0.1)).toBe('on_track');
+    expect(verdict(0.35)).toBe('tight');
+    expect(verdict(0.7)).toBe('over');
   });
 
-  it('上限を超えている自由な支出は 0 円', () => {
-    const ask = savingsAsk({
-      verdict: 'unreachable',
-      targetYen: 10500,
-      medianYen: 18000,
+  it('使った額と予定だけで目標を超えているなら「届かない」', () => {
+    const [g] = genreForecastsFrom({
+      forecast: forecast(cat({ baseYen: 21000, exceedance: 1 })),
+      genres: [genre],
+      remainingDays: 10,
+    });
+    expect(g!.verdict).toBe('unreachable');
+    expect(g!.dailyCapYen).toBeNull();
+  });
+
+  it('着地は100円単位。70%で収まる額を「抑えてほしい額」の元にする', () => {
+    const [g] = genreForecastsFrom({
+      forecast: forecast(cat()),
+      genres: [genre],
+      remainingDays: 10,
+    });
+    expect(g).toMatchObject({
+      medianYen: 19000,
       lowYen: 16000,
-      committedYen: 12000,
-      remainingDays: 29,
+      highYen: 25000,
+      recommendedYen: 21000,
     });
-    expect(ask.keepDailyYen).toBe(0);
+    expect(g!.dailyCapYen).toBe(900);
   });
-});
 
-import { twoMonthTendency } from '@/domain/plan-forecast';
+  it('記録が7日未満で予定も無ければ、判断しない', () => {
+    const [g] = genreForecastsFrom({
+      forecast: forecast(cat(), { dataDays: 3 }),
+      genres: [{ ...genre, scheduledYen: 0 }],
+      remainingDays: 10,
+    });
+    expect(g!.verdict).toBe('unknown');
+    expect(g!.recommendedYen).toBeNull();
+  });
 
-describe('過去2ヶ月の傾向', () => {
-  it('増えているときは低い月に抑えた差を出す', () => {
-    const result = twoMonthTendency({ priorYen: 18000, previousYen: 24000, landingYen: 26400 });
-    expect(result.savedYen).toBe(8400);
-    expect(result.text).toContain('増えている');
-    expect(result.text).toContain('8,400 円残る');
+  it('予定があれば、記録が短くても判断する', () => {
+    const [g] = genreForecastsFrom({
+      forecast: forecast(cat(), { dataDays: 3 }),
+      genres: [genre],
+      remainingDays: 10,
+    });
+    expect(g!.verdict).not.toBe('unknown');
   });
 });
 
@@ -105,12 +110,11 @@ describe('landingReport', () => {
     priorMonthYen: 18000,
     previousMonthYen: 21000,
   };
-  const forecasts = forecastPlan({
-    genres: [{ ...base, scheduledYen: 3000 }],
+  const forecasts = genreForecastsFrom({
+    forecast: forecast(cat()),
+    genres: [genre],
     remainingDays: 10,
-    seed: 'report',
-    trials: 400,
-  }).genres;
+  });
 
   it('ジャンルごとの説明に、使った額と予定を目標の期間の数字で書く', () => {
     const report = landingReport({ remainingDays: 10, rows: [row], forecasts });
@@ -128,12 +132,11 @@ describe('landingReport', () => {
   });
 
   it('判断できるジャンルが無ければ合計は出さない', () => {
-    const unknown = forecastPlan({
-      genres: [{ ...base, observedDays: 3, scheduledYen: 0 }],
+    const unknown = genreForecastsFrom({
+      forecast: forecast(cat(), { dataDays: 3 }),
+      genres: [{ ...genre, scheduledYen: 0 }],
       remainingDays: 10,
-      seed: 'unknown',
-      trials: 400,
-    }).genres;
+    });
     const report = landingReport({
       remainingDays: 10,
       rows: [{ ...row, scheduledYen: 0 }],

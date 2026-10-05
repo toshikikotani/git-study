@@ -14,126 +14,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 import { calibrateWidth, runBacktest, selectModel } from '../../src/domain/forecast/backtest';
-import type { ForecastSourceTransaction } from '../../src/domain/forecast/decompose';
-import { eachDay } from '../../src/domain/period';
-import { weekdayOf, type DateOnly } from '../../src/lib/date';
+import { FROM, lastMonths, PAYDAY, richTransactions, TO } from './scenarios';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_PATH = resolve(__dirname, '../../docs/FORECAST_EVAL.md');
 
-function tx(
-  o: Partial<ForecastSourceTransaction> & { occurredOn: DateOnly; amountYen: number },
-): ForecastSourceTransaction {
-  return {
-    genreId: 'g',
-    genreName: '',
-    status: 'actual',
-    kind: 'normal',
-    isTransfer: false,
-    reviewStatus: 'auto_ok',
-    needsInput: false,
-    merchantName: null,
-    description: 'x',
-    ...o,
-  };
-}
+const transactions = richTransactions();
+// 直近8ヶ月の完了済み月。
+const PERIODS = lastMonths(8);
 
-/** 決定論的な疑似乱数(このスクリプト専用、シミュレーション本体とは無関係)。 */
-function mulberry32(seed: number) {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function poissonish(rng: () => number, mean: number): number {
-  // 簡易近似:平均mean・分散mean程度になる非負整数(評価データ生成専用)。
-  let count = 0;
-  let acc = -Math.log(rng());
-  while (acc < mean) {
-    count += 1;
-    acc += -Math.log(rng());
-  }
-  return count;
-}
-
-function buildScenario(
-  categoryId: string,
-  categoryName: string,
-  from: DateOnly,
-  to: DateOnly,
-  daily: number,
-  amountMean: number,
-  amountSpread: number,
-  weekdaysOnly: boolean,
-  seed: number,
-): ForecastSourceTransaction[] {
-  const rng = mulberry32(seed);
-  const out: ForecastSourceTransaction[] = [];
-  for (const d of eachDay(from, to)) {
-    if (weekdaysOnly && [0, 6].includes(weekdayOf(d))) continue;
-    const count = poissonish(rng, daily);
-    for (let i = 0; i < count; i += 1) {
-      const amount = Math.max(100, Math.round(amountMean + (rng() * 2 - 1) * amountSpread));
-      out.push(
-        tx({ occurredOn: d, amountYen: -amount, genreId: categoryId, genreName: categoryName }),
-      );
-    }
-  }
-  return out;
-}
-
-function buildOutlierScenario(
-  categoryId: string,
-  categoryName: string,
-  from: DateOnly,
-  to: DateOnly,
-  seed: number,
-): ForecastSourceTransaction[] {
-  // 稀に高額(医療費のような)。月1回あるかないか。
-  const rng = mulberry32(seed);
-  const out: ForecastSourceTransaction[] = [];
-  for (const d of eachDay(from, to)) {
-    if (rng() < 1 / 45) {
-      out.push(
-        tx({
-          occurredOn: d,
-          amountYen: -Math.round(3000 + rng() * 15000),
-          genreId: categoryId,
-          genreName: categoryName,
-        }),
-      );
-    }
-  }
-  return out;
-}
-
-const FROM: DateOnly = '2024-10-01';
-const TO: DateOnly = '2026-09-30';
-
-const transactions: ForecastSourceTransaction[] = [
-  ...buildScenario('dining', '外食', FROM, TO, 0.8, 1200, 500, false, 1),
-  ...buildScenario('grocery', '日用品', FROM, TO, 1 / 3, 3500, 1200, false, 2),
-  ...buildScenario('transit', '交通費', FROM, TO, 0.9, 420, 40, true, 3),
-  ...buildScenario('hobby', '娯楽・趣味', FROM, TO, 1 / 6, 4000, 3000, false, 4),
-  ...buildOutlierScenario('medical', '医療', FROM, TO, 5),
-];
-
-// 直近6ヶ月の完了済み月(給料日等は考えず、暦月で単純化)。
-const PERIODS: { from: DateOnly; to: DateOnly }[] = [
-  { from: '2026-02-01', to: '2026-02-28' },
-  { from: '2026-03-01', to: '2026-03-31' },
-  { from: '2026-04-01', to: '2026-04-30' },
-  { from: '2026-05-01', to: '2026-05-31' },
-  { from: '2026-06-01', to: '2026-06-30' },
-  { from: '2026-07-01', to: '2026-07-31' },
-];
-
-const TRAINING_WINDOW_DAYS = 180;
+const TRAINING_WINDOW_DAYS = 730;
 const TRIALS = 2000;
 
 console.log('モデル選択(ベイズ/ブートストラップ/アンサンブル)を評価中...');
@@ -142,6 +32,7 @@ const selection = selectModel({
   periods: PERIODS,
   trainingWindowDays: TRAINING_WINDOW_DAYS,
   recordStart: FROM,
+  payday: PAYDAY,
   trials: TRIALS,
 });
 console.log('選ばれたモデル:', selection.method, selection.crpsByMethod);
@@ -152,6 +43,7 @@ const backtest = runBacktest({
   periods: PERIODS,
   trainingWindowDays: TRAINING_WINDOW_DAYS,
   recordStart: FROM,
+  payday: PAYDAY,
   bootstrapWeight: selection.bootstrapWeight,
   trials: TRIALS,
 });
@@ -176,9 +68,10 @@ const md = `# 予測エンジンの評価(M4、ADR-065)
 ## データについて
 
 このセッションには本番 Supabase・実際の利用者の明細へのアクセス手段が無いため、
-5種類の支出パターン(毎日の外食、週1回ペースの日用品、平日だけの交通費、
-不定期な娯楽、月1回あるかないかの医療費)を持つ合成データ(${FROM}〜${TO}、
-5,000件超)で代用した。**本番データでの再評価は残課題**(下記参照)。
+実際の家計に近い構造を入れた合成データ(\`scripts/forecast-eval/scenarios.ts\`、${FROM}〜${TO})で
+代用した。入れてある構造:休日・祝日・給料日(${PAYDAY}日)の増減、月ごとの季節(夏と12月が多い)、
+毎週土曜の決まった買い出し、2年で約2割の増加、稀に高額の支出。**本番データでの再評価は残課題**
+(下記参照。アプリのレポート画面には、本人の記録での検証が毎回出る)。
 
 ## モデル選択
 
@@ -193,7 +86,7 @@ const md = `# 予測エンジンの評価(M4、ADR-065)
 
 ## バックテスト結果(受け入れ基準8)
 
-- 対象:直近6ヶ月分、各月4時点(1日目・3日目・半分・残り2日)= ${backtest.points.length}件
+- 対象:直近8ヶ月分、各月4時点(1日目・3日目・半分・残り2日)= ${backtest.points.length}件
 - **80%の幅の的中率:${(backtest.hitRate80 * 100).toFixed(1)}%**(目標75〜85%) → ${withinTarget ? '✅ 目標内' : '⚠️ 目標外(下記「目標を外れた場合」参照)'}
 - 中央値(p50)の誤差率(平均):${(backtest.medianAbsErrorRatio * 100).toFixed(1)}%
 - 平均CRPS:${Math.round(backtest.meanCrps).toLocaleString('ja-JP')}円
@@ -231,6 +124,24 @@ ${
 の事前分布の強さを本番データに合わせて調整する。
 `
 }
+
+## 改善の記録(R0〜R3、同じ合成データ・同じ8か月・同じ時点で比較)
+
+\`scripts/forecast-eval/compare.ts\` で、改善の前後のエンジンを比べた結果。
+
+| 設定 | 的中率(80%の幅) | 中央値の誤差 | 平均CRPS |
+|---|---|---|---|
+| 改善前・窓90日・ベイズ(本番の設定) | 43.8% | 16.0% | 12,905 |
+| 改善前・窓400日・アンサンブル | 84.4% | 12.2% | 8,295 |
+| 改善後・窓90日・ベイズ | 53.1% | 12.7% | 9,503 |
+| 改善後・窓730日・ベイズ | 50.0% | 11.1% | 8,435 |
+| **改善後・窓730日・アンサンブル(本番の設定)** | 78.1% | **9.8%** | **6,658** |
+
+- 祝日の完全版(振替休日・ハッピーマンデー・春分秋分)と、規則的に通う店の別扱いで、同じ条件(窓90日・ベイズ)の
+  誤差が 16.0% → 12.7%、CRPS が 12,905 → 9,503。
+- 学習の窓を2年にすると、月の季節の係数が使えて、さらに CRPS が下がる(9,503 → 8,435 → アンサンブルで 6,658)。
+- ベイズのみは幅が狭すぎる(的中率50%前後)。本番では記録が90日以上あればアンサンブルを使い、
+  さらに本人の過去の月での検証から幅を補正する(レポート画面に的中率が出る)。
 
 ## 残課題
 

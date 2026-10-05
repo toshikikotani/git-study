@@ -15,7 +15,7 @@
 
 import { weekdayOf, type DateOnly } from '@/lib/date';
 import { eachDay } from '@/domain/period';
-import { isFixedHoliday } from './holidays';
+import { isHoliday } from './holidays';
 import { isPaydayWindow } from './model';
 import {
   createRng,
@@ -109,7 +109,7 @@ function totalFactorFor(
     const wd = weekdayOf(date);
     let factor = cat.weekdayFactor[wd] ?? 1;
     if (payday !== null && isPaydayWindow(date, payday)) factor *= cat.paydayFactor;
-    if (isFixedHoliday(date)) factor *= cat.holidayFactor;
+    if (isHoliday(date)) factor *= cat.holidayFactor;
     sum += Math.max(0, factor);
   }
   return sum;
