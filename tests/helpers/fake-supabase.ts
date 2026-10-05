@@ -10,7 +10,12 @@ type Op = (rows: Row[]) => Row[];
 
 export type FakeTables = Record<string, Row[]>;
 
-export function fakeSupabase(tables: FakeTables, user = { id: 'user-1' }) {
+export function fakeSupabase(
+  tables: FakeTables,
+  user = { id: 'user-1' },
+  /** 指定したテーブルの読み込みを、この error で失敗させる(いつでも差し替えられる)。 */
+  failures: Record<string, { code?: string; message: string }> = {},
+) {
   const calls: { table: string; select: string }[] = [];
 
   function from(table: string) {
@@ -58,6 +63,8 @@ export function fakeSupabase(tables: FakeTables, user = { id: 'user-1' }) {
         return builder;
       },
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => {
+        const failure = failures[table];
+        if (failure) return Promise.resolve({ data: null, error: failure }).then(resolve, reject);
         try {
           let rows = [...(tables[table] ?? [])];
           for (const op of ops) rows = op(rows);
