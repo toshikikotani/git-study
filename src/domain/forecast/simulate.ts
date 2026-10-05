@@ -404,6 +404,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
     total: { ...bandOf(sortedTotal), mean: Math.round(sumTotal / trials) },
     byCategory,
     committed: { scheduledYen: 0, fixedYen: 0 }, // 呼び出し側(engine.ts)が上書きする
+    actualYen: input.actualYen,
     visits: {
       expectedYen: Math.round(visitExpected),
       merchants: (input.regularMerchants ?? []).map((m) => ({

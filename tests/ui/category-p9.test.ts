@@ -38,6 +38,7 @@ const base: CategoryDetailData = {
   genreName: '外食',
   genreBudgetYen: null,
   forecastClosed: false,
+  remaining: null,
   monthKey: '2026-09',
   monthStart: '2026-09-01',
   today: '2026-09-29',

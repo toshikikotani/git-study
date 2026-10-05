@@ -26,6 +26,7 @@ const forecast = (c: ForecastCategoryBand, over: Partial<Forecast> = {}): Foreca
   total: { p10: 0, p50: 0, p70: 0, p90: 0, mean: 0 },
   byCategory: [c],
   committed: { scheduledYen: 0, fixedYen: 0 },
+  actualYen: 0,
   visits: { expectedYen: 0, merchants: [] },
   pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null },
   seasonal: { active: false, periodFactor: null },

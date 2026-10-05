@@ -168,6 +168,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
             ? { range: data.goal.range, budgetYen: data.goal.row.targetYen }
             : null,
         holdForecast: data.forecastClosed,
+        remaining: data.remaining,
       }),
     [
       historyLines,
@@ -177,6 +178,7 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
       series.recordStart,
       data.goal,
       data.forecastClosed,
+      data.remaining,
     ],
   );
 

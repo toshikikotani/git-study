@@ -26,6 +26,7 @@ const forecast = (over: Partial<Forecast> = {}): Forecast => ({
   total: { p10: 80000, p50: 100000, p70: 108000, p90: 120000, mean: 100000 },
   byCategory: [band()],
   committed: { scheduledYen: 0, fixedYen: 0 },
+  actualYen: 0,
   visits: { expectedYen: 0, merchants: [] },
   pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null },
   seasonal: { active: false, periodFactor: null },

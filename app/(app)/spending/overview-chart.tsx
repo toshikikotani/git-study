@@ -10,6 +10,7 @@ import {
   categoryAllowanceYen,
   idealDeltaLabel,
   linesForGoal,
+  type RemainingForecast,
 } from '@/features/category/pace';
 import { buildSeries, type ChartUnit } from '@/features/category/series';
 import type { DateOnly } from '@/lib/date';
@@ -18,6 +19,17 @@ import type { DateOnly } from '@/lib/date';
  * 家計簿の全体の累計。目標があるときは、目標のジャンルだけを数える
  * (総予算は目標のジャンルの合計なので、目標にないジャンルを混ぜると食い違う)。
  */
+export type OverviewChartProps = {
+  transactions: CategoryTx[];
+  genreIds: readonly string[];
+  monthStart: DateOnly;
+  monthEnd: DateOnly;
+  today: DateOnly;
+  budgetYen: number | null;
+  goalFrom: DateOnly | null;
+  goalTo: DateOnly | null;
+};
+
 export function OverviewChart({
   transactions,
   genreIds,
@@ -27,6 +39,8 @@ export function OverviewChart({
   budgetYen,
   goalFrom,
   goalTo,
+  remaining = null,
+  holdForecast = false,
 }: {
   transactions: CategoryTx[];
   genreIds: readonly string[];
@@ -36,6 +50,10 @@ export function OverviewChart({
   budgetYen: number | null;
   goalFrom: DateOnly | null;
   goalTo: DateOnly | null;
+  /** 確率予測の、残りの期間の支出。渡さなければ日平均の延長で描く。 */
+  remaining?: RemainingForecast | null;
+  /** 予測を読み込む間は、予測の線を出さない。 */
+  holdForecast?: boolean;
 }) {
   const [mode, setMode] = useState<ChartMode>('cumulative');
   const [unit, setUnit] = useState<ChartUnit>('day');
@@ -81,8 +99,20 @@ export function OverviewChart({
         today,
         recordStart: series.recordStart,
         goal: budgetYen !== null && goalRange !== null ? { range: goalRange, budgetYen } : null,
+        holdForecast,
+        remaining,
       }),
-    [lines, monthStart, monthEnd, today, series.recordStart, budgetYen, goalRange],
+    [
+      lines,
+      monthStart,
+      monthEnd,
+      today,
+      series.recordStart,
+      budgetYen,
+      goalRange,
+      holdForecast,
+      remaining,
+    ],
   );
   const over = (cumulative.deltaYen ?? 0) > 0;
   const tone = over ? 'var(--over)' : 'var(--income)';

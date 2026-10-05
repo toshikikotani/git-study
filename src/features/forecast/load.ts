@@ -17,7 +17,7 @@ import { getAppSettings } from '@/features/settings/store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
-import { addDays, todayJst, type DateOnly } from '@/lib/date';
+import { addDays, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import { BOOTSTRAP_WEIGHT, verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
@@ -76,13 +76,21 @@ export async function loadForecast(args: {
   const bootstrapWeight = BOOTSTRAP_WEIGHT;
 
   // 検証は重い(数秒)ので、明細が変わらない間は結果を使い回す。サーバーのデータキャッシュに
-  // 置くので、サーバーが入れ替わっても残る。鍵に本人のIDと明細の版を含める(他人の結果を返さない)。
-  const cacheKey = `${userId}:${dataVersion}:${today}:${payday ?? 'x'}:${bootstrapWeight}:${[...noForecast].sort().join(',')}`;
+  // 置くので、サーバーが入れ替わっても残る。検証に使うのは完了した月だけなので、鍵も予測の期間に
+  // よらない(レポート・目標・カテゴリ画面のどこから呼んでも同じ検証結果を使う)。
+  // 鍵に本人のIDと明細の版を含める(他人の結果を返さない)。
+  const completed = transactions.filter(
+    (t) => t.occurredOn < monthStartJst(0, args.now ?? new Date()),
+  );
+  const completedVersion = `${completed.length}:${completed.at(-1)?.occurredOn ?? ''}:${Math.round(
+    completed.reduce((sum, t) => sum + t.amountYen, 0),
+  )}`;
+  const cacheKey = `${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${bootstrapWeight}:${[...noForecast].sort().join(',')}`;
   const verification = await unstable_cache(
     async () =>
       verifyForecast({
         cacheKey,
-        transactions,
+        transactions: completed,
         today,
         recordStart,
         payday,
