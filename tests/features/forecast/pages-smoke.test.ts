@@ -1,12 +1,13 @@
 import { createElement as h } from 'react';
-import { renderToString } from 'react-dom/server';
+import { PassThrough } from 'node:stream';
+import { renderToPipeableStream } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { richTransactions } from '../../../scripts/forecast-eval/scenarios';
 import { fakeSupabase } from '../../helpers/fake-supabase';
 
 const rich = richTransactions();
-const fake = fakeSupabase({
+const tables: Record<string, Record<string, unknown>[]> = {
   genres: [
     { id: 'dining', name: '外食', budget_yen: 30000, sort_order: 1, show_on_home: true },
     { id: 'conv', name: 'コンビニ', budget_yen: null, sort_order: 2, show_on_home: false },
@@ -63,7 +64,9 @@ const fake = fakeSupabase({
     reconcile_diff_yen: null,
     status: 'actual',
   })),
-});
+};
+const failures: Record<string, { code?: string; message: string }> = {};
+const fake = fakeSupabase(tables, { id: 'user-1' }, failures);
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => fake.client }));
 vi.mock('next/navigation', () => ({
@@ -92,10 +95,26 @@ beforeAll(() => {
   vi.setSystemTime(new Date('2026-10-05T03:00:00Z'));
 });
 
+/** Suspense の中の非同期コンポーネントも待って描画する。描画中の例外は集めて、あれば失敗にする。 */
 async function render(load: () => Promise<{ default: () => Promise<React.ReactElement> }>) {
   const page = await load();
   const element = await page.default();
-  return renderToString(element);
+  const errors: unknown[] = [];
+  const html = await new Promise<string>((resolve, reject) => {
+    const sink = new PassThrough();
+    const chunks: Buffer[] = [];
+    sink.on('data', (c: Buffer) => chunks.push(c));
+    sink.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    const stream = renderToPipeableStream(element, {
+      onError: (error) => {
+        errors.push(error);
+      },
+      onAllReady: () => stream.pipe(sink),
+      onShellError: reject,
+    });
+  });
+  if (errors.length > 0) throw errors[0];
+  return html;
 }
 
 describe('主要ページがサーバー描画でエラーにならない(Supabase を代用)', () => {
@@ -107,6 +126,72 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
   it('目標', async () => {
     const html = await render(() => import('../../../app/(app)/plan/page'));
     expect(html.length).toBeGreaterThan(100);
+  }, 60000);
+
+  const planRow = () => tables.spending_plans![0]!;
+  const original = { start: '2026-09-25', end: '2026-10-24' };
+  const variants: [string, () => void][] = [
+    [
+      'これから始まる目標(10/7〜11/5)',
+      () => {
+        planRow().period_start = '2026-10-07';
+        planRow().period_end = '2026-11-05';
+      },
+    ],
+    [
+      '終わった目標',
+      () => {
+        planRow().period_start = '2026-09-01';
+        planRow().period_end = '2026-09-30';
+      },
+    ],
+    [
+      '目標0円のジャンルがある',
+      () => {
+        tables.spending_plan_items![1]!.target_yen = 0;
+      },
+    ],
+    [
+      '存在しないジャンルの目標行がある',
+      () => {
+        tables.spending_plan_items![1]!.genre_id = 'gone';
+      },
+    ],
+    [
+      '予測を止めたジャンルがある',
+      () => {
+        tables.genres![3]!.forecast_closed = true;
+      },
+    ],
+  ];
+  for (const [name, apply] of variants) {
+    it(`目標:${name}`, async () => {
+      planRow().period_start = original.start;
+      planRow().period_end = original.end;
+      apply();
+      const html = await render(() => import('../../../app/(app)/plan/page'));
+      expect(html).toContain('今の目標');
+    }, 60000);
+  }
+
+  it('目標:明細の読み込みが失敗しても、ページは落ちず、原因を見せる', async () => {
+    planRow().period_start = original.start;
+    planRow().period_end = original.end;
+    failures.transactions = {
+      code: '57014',
+      message: 'canceling statement due to statement timeout',
+    };
+    try {
+      const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
+        /<!-- -->/g,
+        '',
+      );
+      expect(html).toContain('今の目標を読み込めませんでした');
+      expect(html).toContain('statement timeout');
+      expect(html).toMatch(/新しい目標を立てる|次の目標を予約/);
+    } finally {
+      delete failures.transactions;
+    }
   }, 60000);
 
   it('家計簿', async () => {

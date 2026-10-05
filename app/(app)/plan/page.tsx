@@ -22,6 +22,9 @@ import { PlanBuilder } from './plan-builder';
 import { ReviewCard } from './review-card';
 import { UnrecordedSheet } from './unrecorded-sheet';
 
+/** 設定が読めないときの給料日(期間のプリセットの起点にだけ使う)。 */
+const DEFAULT_PAYDAY = 25;
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
@@ -96,15 +99,36 @@ function BudgetRows({ plan, today }: { plan: SpendingPlan | null; today: string 
   );
 }
 
+/** 読み込みに失敗したときの表示。ページ全体は落とさず、原因を見せて、ほかの部分は使えるようにする。 */
+function LoadError({ what, error }: { what: string; error: unknown }) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    <p role="alert" className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+      {what}を読み込めませんでした。しばらくしてからもう一度開いてください。
+      <span className="tabular mt-1 block text-xs" style={{ color: 'var(--ink-muted)' }}>
+        {message}
+      </span>
+    </p>
+  );
+}
+
 async function SpentRows({ today }: { today: string }) {
-  const [loaded, ledger, debts, settings, rules, captures] = await Promise.all([
-    loadGoalView(),
+  const [goal, ledger, debts, settings, rules, captures] = await Promise.all([
+    loadGoalView().then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => {
+        console.error('[plan] 目標を読み込めませんでした', error);
+        return { ok: false as const, error };
+      },
+    ),
     loadMonthlyLedger().catch(() => null),
     listDebts().catch(() => []),
     getAppSettings().catch(() => null),
     listTransferRules().catch(() => []),
     listOpenCaptures().catch(() => []),
   ]);
+  if (!goal.ok) return <LoadError what="今の目標" error={goal.error} />;
+  const loaded = goal.value;
   const plan = loaded?.plan ?? null;
   const view = loaded?.view ?? null;
   const guidance = view?.guidance ?? null;
@@ -197,8 +221,8 @@ async function SpentRows({ today }: { today: string }) {
 
 async function PlanExtras({ today, activeEnd }: { today: string; activeEnd: string | null }) {
   const [settings, ranges, captures, genres, loaded] = await Promise.all([
-    getAppSettings(),
-    listPlanRanges(),
+    getAppSettings().catch(() => null),
+    listPlanRanges().catch(() => []),
     listOpenCaptures().catch(() => []),
     listGenreOptions().catch(() => []),
     loadGoalView().catch(() => null),
@@ -213,7 +237,12 @@ async function PlanExtras({ today, activeEnd }: { today: string; activeEnd: stri
       {plan && loaded?.view && !loaded.view.ended ? (
         <UnrecordedSheet planId={plan.id} rows={loaded.view.noBudget} addable={addable} />
       ) : null}
-      <PlanBuilder today={today} payday={settings.payday} ranges={ranges} activeEnd={activeEnd} />
+      <PlanBuilder
+        today={today}
+        payday={settings?.payday ?? DEFAULT_PAYDAY}
+        ranges={ranges}
+        activeEnd={activeEnd}
+      />
       {captures.length > 0 ? (
         <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           入力待ち {captures.length}件

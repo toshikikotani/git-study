@@ -83,7 +83,7 @@ export default async function ReportsPage() {
     : { from: ledger.period.from, to: addDays(addMonths(ledger.period.from, 1), -1) };
   const goalItems = goalPlan ? goalPlan.items.filter((item) => item.targetYen > 0) : [];
   // 予測が失敗しても、ほかの集計(下のカード)は見られるようにする。
-  const view = await loadForecast({
+  const outcome = await loadForecast({
     period,
     budgetYen: goalPlan ? budgetTotal : null,
     ...(goalPlan
@@ -96,12 +96,19 @@ export default async function ReportsPage() {
           })),
         }
       : {}),
-  }).catch((error: unknown) => {
-    console.error('[reports] 着地の予測を読み込めませんでした', error);
-    return null;
-  });
-  const forecast = view?.forecast ?? null;
-  const verification = view?.verification ?? null;
+  }).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => {
+      console.error('[reports] 着地の予測を読み込めませんでした', error);
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    },
+  );
+  const forecast = outcome.ok ? outcome.value.forecast : null;
+  const verification = outcome.ok ? outcome.value.verification : null;
+  const forecastError = outcome.ok ? null : outcome.message;
   const budgetYen = goalPlan ? budgetTotal : null;
   const periodLabel = goalPlan ? 'この目標の期間' : '今月';
   const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
@@ -168,7 +175,7 @@ export default async function ReportsPage() {
         ) : (
           <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
             {forecast === null
-              ? '着地の予測を計算できませんでした。ほかの集計は下に出ています。'
+              ? `着地の予測を計算できませんでした。ほかの集計は下に出ています。${forecastError ? `(${forecastError})` : ''}`
               : '予測に足る記録がまだない。'}
           </p>
         )}
