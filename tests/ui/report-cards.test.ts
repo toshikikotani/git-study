@@ -44,7 +44,8 @@ describe('レポートの着地まわりのカード', () => {
       renderToString(
         h(VerificationCard, {
           verification: {
-            calibration: { widthFactor: 1.15, sampleSize: 24 },
+            calibration: { widthFactor: 1.15, sampleSize: 24, centerFactor: 1 },
+            halfLifeDays: 90,
             summary: { hitRate80: 0.72, medianAbsErrorRatio: 0.11, pointCount: 24 },
           },
         }),

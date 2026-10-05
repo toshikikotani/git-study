@@ -80,6 +80,11 @@ export type SimulateInput = {
   regularMerchants?: readonly RegularMerchant[];
   /** 目標額のあるカテゴリ。着地がそれを超える確率を出す。 */
   categoryTargets?: readonly CategoryTarget[];
+  /**
+   * 残りの支出(変動費・規則的な来店・特別費)に掛ける係数。検証で、残りが予測より系統的に
+   * 多かった(少なかった)ときの中心の補正(backtest.ts の calibrateCenter)。決まっている額には掛けない。
+   */
+  remainingScale?: number;
 };
 
 function quantile(sortedAsc: readonly number[], p: number): number {
@@ -187,6 +192,7 @@ function runTrials(input: SimulateInput): TrialRun {
 
   const trials = trialsFor(input.trials ?? DEFAULT_TRIALS, nAll, futureDates.length);
   const rng = createRng(input.seed);
+  const scale = input.remainingScale ?? 1;
 
   // 曜日・給料日・祝日・月の係数は日付だけで決まるので、試行の外で1回だけ計算する。
   // ポアソン分布の加法性(独立なポアソンの和は、率の和のポアソンに従う)を使い、
@@ -264,10 +270,10 @@ function runTrials(input: SimulateInput): TrialRun {
       input.remainingDays,
     );
 
-    totalSamples[t] = input.actualYen + input.committedYen + variableTotal + specialTotal;
-    specialSamples[t] = specialTotal;
-    variableSamples[t] = variableTotal;
-    for (let c = 0; c < nAll; c += 1) categorySamples[c]![t] = perCategoryTrial[c]!;
+    totalSamples[t] = input.actualYen + input.committedYen + (variableTotal + specialTotal) * scale;
+    specialSamples[t] = specialTotal * scale;
+    variableSamples[t] = variableTotal * scale;
+    for (let c = 0; c < nAll; c += 1) categorySamples[c]![t] = perCategoryTrial[c]! * scale;
   }
 
   return {

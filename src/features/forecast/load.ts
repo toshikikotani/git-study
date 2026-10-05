@@ -6,6 +6,8 @@
  * 読み方(entries.ts)を使う。給料日・確認済みの固定費・検知したサブスク・記録開始日も渡す。
  */
 
+import { unstable_cache } from 'next/cache';
+
 import { buildForecast } from '@/domain/forecast/engine';
 import type { ForecastScope } from '@/domain/forecast/pipeline';
 import type { CategoryTarget } from '@/domain/forecast/simulate';
@@ -70,14 +72,15 @@ export async function loadForecast(args: {
   const dataDays = recordStart === null ? 0 : Math.max(0, daysBetween(recordStart, today) + 1);
   const bootstrapWeight = bootstrapWeightFor(dataDays);
 
-  const verification = verifyForecast({
-    cacheKey: `${userId}:${dataVersion}:${payday ?? 'x'}:${bootstrapWeight}`,
-    transactions,
-    today,
-    recordStart,
-    payday,
-    bootstrapWeight,
-  });
+  // 検証は重い(数秒)ので、明細が変わらない間は結果を使い回す。サーバーのデータキャッシュに
+  // 置くので、サーバーが入れ替わっても残る。鍵に本人のIDと明細の版を含める(他人の結果を返さない)。
+  const cacheKey = `${userId}:${dataVersion}:${today}:${payday ?? 'x'}:${bootstrapWeight}`;
+  const verification = await unstable_cache(
+    async () =>
+      verifyForecast({ cacheKey, transactions, today, recordStart, payday, bootstrapWeight }),
+    ['forecast-verification', cacheKey],
+    { revalidate: 60 * 60 * 24 },
+  )();
 
   const forecast = buildForecast({
     transactions,
@@ -92,6 +95,7 @@ export async function loadForecast(args: {
     dataVersion,
     bootstrapWeight,
     calibration: verification?.calibration ?? null,
+    ...(verification ? { halfLifeDays: verification.halfLifeDays } : {}),
     ...(args.scope ? { scope: args.scope } : {}),
     ...(args.categoryTargets ? { categoryTargets: args.categoryTargets } : {}),
   });

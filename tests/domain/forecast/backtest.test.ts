@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   applyWidthFactor,
   backtestCheckpoints,
+  calibrateCenter,
   calibrateWidth,
   empiricalCrps,
   runBacktest,
   selectModel,
+  shiftRemaining,
   type BacktestPoint,
 } from '@/domain/forecast/backtest';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
@@ -97,6 +99,7 @@ describe('calibrateWidth(コンフォーマル補正)', () => {
       periodTo: '2026-06-30',
       asOf: '2026-06-15',
       actualTotal,
+      knownYen: 0,
       p10,
       p50,
       p90,
@@ -146,5 +149,48 @@ describe('selectModel(M4)', () => {
     });
     expect(selection.method).toBe('bayes');
     expect(selection.bootstrapWeight).toBe(0);
+  });
+});
+
+describe('calibrateCenter(中心の補正)', () => {
+  const pt = (actualTotal: number, p50: number, knownYen: number): BacktestPoint => ({
+    periodFrom: '2026-06-01',
+    periodTo: '2026-06-30',
+    asOf: '2026-06-15',
+    actualTotal,
+    knownYen,
+    p10: p50 * 0.8,
+    p50,
+    p90: p50 * 1.2,
+    hitWithin80: true,
+    crps: 0,
+  });
+
+  it('残りの実際が予測の中央値より系統的に多いなら、1より大きい係数で上げる', () => {
+    // 決まっている額5万円、予測の残り5万円(p50=10万円)、実際の残り6万円(実績11万円)
+    const points = Array.from({ length: 12 }, () => pt(110000, 100000, 50000));
+    const factor = calibrateCenter(points);
+    expect(factor).toBeGreaterThan(1.05);
+    expect(factor).toBeLessThan(1.2);
+  });
+
+  it('系統的な偏りが無ければ、ほぼ1', () => {
+    const points = Array.from({ length: 12 }, () => pt(100000, 100000, 50000));
+    expect(calibrateCenter(points)).toBeCloseTo(1, 5);
+  });
+
+  it('検証の件数が少なければ補正しない(1)', () => {
+    expect(calibrateCenter([pt(150000, 100000, 50000)])).toBe(1);
+  });
+
+  it('係数は0.75〜1.4の範囲に収まる', () => {
+    const high = Array.from({ length: 40 }, () => pt(900000, 100000, 50000));
+    const low = Array.from({ length: 40 }, () => pt(50000, 100000, 50000));
+    expect(calibrateCenter(high)).toBeLessThanOrEqual(1.4);
+    expect(calibrateCenter(low)).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it('決まっている額は動かさず、残りの部分だけに掛ける', () => {
+    expect(shiftRemaining(100000, 50000, 1.2)).toBe(110000);
   });
 });

@@ -171,7 +171,7 @@ describe('buildForecast の金額は整数の円(画面の formatYen は小数�
       ...base,
       budgetYen: 40000,
       transactions: data,
-      calibration: { widthFactor: 1.2371, sampleSize: 20 },
+      calibration: { widthFactor: 1.2371, sampleSize: 20, centerFactor: 1.1 },
     });
     expect(allAmounts(f).every(ints)).toBe(true);
     expect(f.total.p10).toBeLessThanOrEqual(f.total.p50);

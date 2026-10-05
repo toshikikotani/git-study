@@ -35,6 +35,10 @@ export type PipelineInput = {
   seed: string;
   scope?: ForecastScope | undefined;
   categoryTargets?: readonly CategoryTarget[] | undefined;
+  /** 残りの支出に掛ける中心の補正係数(検証で求めたもの)。 */
+  remainingScale?: number | undefined;
+  /** 直近を重く見る重みの半減期(日)。 */
+  halfLifeDays?: number | undefined;
 };
 
 export type Prepared = {
@@ -71,6 +75,7 @@ export function prepareSimulation(input: PipelineInput): Prepared {
     variable: decomposed.variable,
     today: input.today,
     payday: input.payday,
+    ...(input.halfLifeDays !== undefined ? { halfLifeDays: input.halfLifeDays } : {}),
   });
   const periodId = `${input.period.from}_${input.period.to}`;
   const simulateInput: SimulateInput = {
@@ -92,6 +97,7 @@ export function prepareSimulation(input: PipelineInput): Prepared {
     visits: decomposed.visits,
     regularMerchants: decomposed.regularMerchants,
     ...(input.categoryTargets !== undefined ? { categoryTargets: input.categoryTargets } : {}),
+    ...(input.remainingScale !== undefined ? { remainingScale: input.remainingScale } : {}),
   };
   return { decomposed, fitted, simulateInput };
 }

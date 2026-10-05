@@ -117,7 +117,7 @@ export type CategoryModelParams = {
 /** ブロック・ブートストラップ用の「1日ぶんの全カテゴリの実績」(M2)。 */
 export type DayBundle = {
   date: DateOnly;
-  /** 直近ほど大きい重み(半減期30日)。ブートストラップの再標本化確率に使う。 */
+  /** 直近ほど大きい重み(半減期は学習時に決める)。ブートストラップの再標本化確率に使う。 */
   weight: number;
   amountsByCategory: ReadonlyMap<string, number>;
 };
@@ -187,5 +187,5 @@ export type Forecast = {
   status: 'learning' | 'ready';
   dataDays: number;
   method: 'bayes' | 'bootstrap' | 'ensemble' | 'mixed';
-  calibration: { widthFactor: number; sampleSize: number } | null;
+  calibration: { widthFactor: number; sampleSize: number; centerFactor: number } | null;
 };

@@ -43,6 +43,8 @@ export type BacktestPoint = {
   periodTo: DateOnly;
   asOf: DateOnly;
   actualTotal: number;
+  /** その時点ですでに決まっている額(実績 + 予定 + 固定費)。残りの予測の誤差を測る起点。 */
+  knownYen: number;
   p10: number;
   p50: number;
   p90: number;
@@ -103,6 +105,8 @@ export function runBacktest(input: {
   recordStart: DateOnly | null;
   /** 給料日(1〜31)。本番と同じ設定で検証する。 */
   payday?: number | null;
+  /** 直近を重く見る重みの半減期(日)。 */
+  halfLifeDays?: number;
   bootstrapWeight: number;
   trials?: number;
 }): BacktestSummary {
@@ -134,6 +138,7 @@ export function runBacktest(input: {
         detectedSubscriptions: [],
         budgetYen: null,
         payday: input.payday ?? null,
+        halfLifeDays: input.halfLifeDays,
         bootstrapWeight: input.bootstrapWeight,
         trials,
         seed: `backtest:${periodId}:${asOf}`,
@@ -153,6 +158,7 @@ export function runBacktest(input: {
         periodTo: period.to,
         asOf,
         actualTotal,
+        knownYen: simulateInput.actualYen + simulateInput.committedYen,
         p10: forecast.total.p10,
         p50: forecast.total.p50,
         p90: forecast.total.p90,
@@ -177,30 +183,71 @@ export function runBacktest(input: {
   return { points, hitRate80, medianAbsErrorRatio, meanCrps };
 }
 
-export type CalibrationResult = { widthFactor: number; sampleSize: number };
+export type CalibrationResult = {
+  widthFactor: number;
+  sampleSize: number;
+  /**
+   * 残りの予測の中心を動かす係数(1=そのまま)。検証で、残りの実際の支出が予測の中央値より
+   * 系統的に多かった(少なかった)ときに、その比で残りの部分を補正する。
+   */
+  centerFactor: number;
+};
 
-/** コンフォーマル予測による幅の補正(M4)を、必要な最小件数が無ければ既定値(1=補正なし)にする。 */
+/** コンフォーマル予測による補正(M4)を、必要な最小件数が無ければ既定値(1=補正なし)にする。 */
 export const MIN_BACKTEST_POINTS_FOR_CALIBRATION = 6;
 const MIN_WIDTH_FACTOR = 0.5;
 const MAX_WIDTH_FACTOR = 3;
+const MIN_CENTER_FACTOR = 0.75;
+const MAX_CENTER_FACTOR = 1.4;
+/** 中心の補正は、検証の件数が少ないほど1に寄せる(この件数ぶんの事前の確信)。 */
+const CENTER_PRIOR_POINTS = 8;
 
 /**
- * バックテストの外れ方から、幅の広さを調整する係数を求める(split conformal
- * prediction と同じ考え方)。実際の着地が p50 から何「半分の帯幅」ぶん外れて
- * いたか(deviation)を集め、目標カバレッジ(80%)に対応する分位点を widthFactor
- * とする。1より大きければ元の帯は狭すぎた(広げる)、小さければ広すぎた(狭める)。
+ * 残りの予測(p50 − 決まっている額)に対する、実際の残り(実績 − 決まっている額)の比。
+ * 件数が少ないほど1へ寄せ、極端な係数にならないよう範囲に収める。
+ */
+export function calibrateCenter(points: readonly BacktestPoint[]): number {
+  if (points.length < MIN_BACKTEST_POINTS_FOR_CALIBRATION) return 1;
+  let actualSum = 0;
+  let predictedSum = 0;
+  for (const p of points) {
+    const predicted = p.p50 - p.knownYen;
+    if (predicted <= 0) continue;
+    actualSum += Math.max(0, p.actualTotal - p.knownYen);
+    predictedSum += predicted;
+  }
+  if (predictedSum <= 0) return 1;
+  const raw = actualSum / predictedSum;
+  const weight = points.length / (points.length + CENTER_PRIOR_POINTS);
+  return Math.min(MAX_CENTER_FACTOR, Math.max(MIN_CENTER_FACTOR, 1 + weight * (raw - 1)));
+}
+
+/** 残りの部分だけを係数で動かす(決まっている額 known はそのまま)。 */
+export function shiftRemaining(value: number, known: number, factor: number): number {
+  return known + (value - known) * factor;
+}
+
+/**
+ * バックテストの外れ方から、中心(残りの係数)と幅の広さを補正する係数を求める
+ * (split conformal prediction と同じ考え方)。先に中心を補正し、補正後の外れ方で幅を決める。
+ * 幅は、実際の着地が p50 から何「半分の帯幅」ぶん外れていたか(deviation)の、目標
+ * カバレッジ(80%)に対応する分位点。1より大きければ元の帯は狭すぎた(広げる)。
  */
 export function calibrateWidth(
   points: readonly BacktestPoint[],
   targetCoverage = 0.8,
 ): CalibrationResult {
   if (points.length < MIN_BACKTEST_POINTS_FOR_CALIBRATION) {
-    return { widthFactor: 1, sampleSize: points.length };
+    return { widthFactor: 1, sampleSize: points.length, centerFactor: 1 };
   }
+  const centerFactor = calibrateCenter(points);
   const deviations = points
     .map((p) => {
-      const halfWidth = Math.max(1, (p.p90 - p.p10) / 2);
-      return Math.abs(p.actualTotal - p.p50) / halfWidth;
+      const p10 = shiftRemaining(p.p10, p.knownYen, centerFactor);
+      const p50 = shiftRemaining(p.p50, p.knownYen, centerFactor);
+      const p90 = shiftRemaining(p.p90, p.knownYen, centerFactor);
+      const halfWidth = Math.max(1, (p90 - p10) / 2);
+      return Math.abs(p.actualTotal - p50) / halfWidth;
     })
     .sort((a, b) => a - b);
   const idx = Math.min(
@@ -208,7 +255,7 @@ export function calibrateWidth(
     Math.max(0, Math.ceil(targetCoverage * deviations.length) - 1),
   );
   const widthFactor = Math.min(MAX_WIDTH_FACTOR, Math.max(MIN_WIDTH_FACTOR, deviations[idx]!));
-  return { widthFactor, sampleSize: points.length };
+  return { widthFactor, sampleSize: points.length, centerFactor };
 }
 
 /** widthFactor を p10/p50/p90 に適用する(p50 を中心に、片側ずつ伸縮させる)。 */

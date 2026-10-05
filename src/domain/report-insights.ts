@@ -131,6 +131,20 @@ export function reportInsights(input: {
     });
   }
 
+  // 検証の結果、中心を動かしているとき(残りの支出が予測より系統的に多かった・少なかった)。
+  const center = forecast.calibration?.centerFactor ?? 1;
+  if (Math.abs(center - 1) >= 0.05) {
+    const pct = Math.round(Math.abs(center - 1) * 100);
+    out.push({
+      key: 'center',
+      tone: 'info',
+      text:
+        center > 1
+          ? `過去の月では、残りの支出が予測より${pct}%ほど多かった。その分を上乗せして出している。`
+          : `過去の月では、残りの支出が予測より${pct}%ほど少なかった。その分を下げて出している。`,
+    });
+  }
+
   // 検証の結果、帯を広げているとき。
   if (forecast.calibration !== null && forecast.calibration.widthFactor >= 1.2) {
     out.push({
