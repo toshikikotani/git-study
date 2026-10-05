@@ -8,7 +8,7 @@
  */
 
 import { addDays, daysBetween, type DateOnly } from '@/lib/date';
-import type { RegularMerchant, VisitEvent } from './types';
+import type { ProbableEvent, RegularMerchant } from './types';
 
 /** 規則的とみなす最小の来店回数(日付単位)。 */
 const MIN_VISITS = 5;
@@ -36,6 +36,30 @@ function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+/** 直近を重く見る半減期(日)。物価や暮らしの変化で、昔の金額ほど今の金額から離れるため。 */
+const AMOUNT_HALF_LIFE_DAYS = 90;
+
+/**
+ * 金額の対数正規(平均・標準偏差)を、最後の日に近いほど重く(半減期90日)して求める。
+ * 来店・請求の金額が、2年前の金額に引っ張られて低く出ないようにする。
+ */
+export function recencyWeightedAmounts(
+  dates: readonly DateOnly[],
+  amounts: readonly number[],
+  minSigma: number,
+): { meanYen: number; logMu: number; logSigma: number } {
+  const last = dates[dates.length - 1]!;
+  const weights = dates.map((d) => Math.pow(0.5, daysBetween(d, last) / AMOUNT_HALF_LIFE_DAYS));
+  const total = weights.reduce((a, b) => a + b, 0);
+  const logs = amounts.map((a) => Math.log(Math.max(1, a)));
+  const logMu = logs.reduce((acc, l, i) => acc + weights[i]! * l, 0) / total;
+  const meanYen = amounts.reduce((acc, a, i) => acc + weights[i]! * a, 0) / total;
+  // ばらつきは件数で測る(重みを掛けると、件数が少ないときに小さく出すぎる)。
+  const plainMu = logs.reduce((a, b) => a + b, 0) / logs.length;
+  const variance = logs.reduce((a, l) => a + (l - plainMu) ** 2, 0) / Math.max(1, logs.length - 1);
+  return { meanYen, logMu, logSigma: Math.max(minSigma, Math.sqrt(variance)) };
 }
 
 function mostCommon<T>(values: readonly T[]): T {
@@ -69,13 +93,7 @@ export function detectRegularMerchants(
     if (spread > MAX_RELATIVE_SPREAD) continue;
 
     const amounts = dates.map((d) => byDate.get(d)!);
-    const meanYen = amounts.reduce((a, b) => a + b, 0) / amounts.length;
-    const logs = amounts.map((a) => Math.log(Math.max(1, a)));
-    const logMu = logs.reduce((a, b) => a + b, 0) / logs.length;
-    const logSigma = Math.max(
-      0.1,
-      Math.sqrt(logs.reduce((a, l) => a + (l - logMu) ** 2, 0) / Math.max(1, logs.length - 1)),
-    );
+    const { meanYen, logMu, logSigma } = recencyWeightedAmounts(dates, amounts, 0.1);
     const probability = Math.min(
       MAX_PROBABILITY,
       Math.max(MIN_PROBABILITY, MAX_PROBABILITY - 1.2 * spread),
@@ -99,43 +117,50 @@ export function detectRegularMerchants(
 }
 
 /**
- * 残り期間(today の翌日〜periodTo)の来店の見込み。
- * 次回は「最後の来店 + 間隔」。すでに過ぎていて間隔の半分以内なら明日に置き、
- * それ以上過ぎていれば周期が崩れたとみなして、間隔の倍数ぶん先へ送る。
- * 日付入りの予定(scheduledKeys に同じ店の予定がある日の前後1日)と重なる来店は数えない。
+ * 残り期間(today の翌日〜periodTo)の来店の見込み。期間の終わりまで、すべての回を置く。
+ * 次回は「最後の来店 + 間隔」。すでに過ぎていれば(間隔1回ぶん以内)、明日に「来る確率を半分」で
+ * 置く(来るかもしれないし、周期が崩れたのかもしれない)。それ以降の回は、明日から間隔ごと。
+ * 間隔1回ぶんより長く過ぎていれば、周期が崩れたとみなし、過ぎた回は置かない。
+ * 日付入りの予定(同じ店の予定がある日の前後1日)と重なる来店は数えない。
  */
 export function projectVisits(input: {
   merchants: readonly RegularMerchant[];
   today: DateOnly;
   periodTo: DateOnly;
   scheduled: readonly { key: string; date: DateOnly }[];
-}): VisitEvent[] {
-  const events: VisitEvent[] = [];
+}): ProbableEvent[] {
+  const events: ProbableEvent[] = [];
   const tomorrow = addDays(input.today, 1);
   for (const m of input.merchants) {
     let next = addDays(m.lastVisit, m.everyDays);
+    let probability = m.probability;
     if (next <= input.today) {
       const overdue = daysBetween(next, input.today);
-      next =
-        overdue <= m.everyDays / 2
-          ? tomorrow
-          : addDays(next, Math.ceil(overdue / m.everyDays) * m.everyDays);
+      if (overdue < m.everyDays) {
+        next = tomorrow;
+        probability = m.probability / 2;
+      } else {
+        next = addDays(next, Math.ceil((overdue + 1) / m.everyDays) * m.everyDays);
+      }
     }
-    for (let guard = 0; guard < 60 && next <= input.periodTo; guard += 1) {
+    for (let guard = 0; guard < 400 && next <= input.periodTo; guard += 1) {
+      const date = next;
       const covered = input.scheduled.some(
-        (s) => s.key === m.key && Math.abs(daysBetween(s.date, next)) <= 1,
+        (s) => s.key === m.key && Math.abs(daysBetween(s.date, date)) <= 1,
       );
-      if (!covered && next > input.today) {
+      if (!covered && date > input.today) {
         events.push({
           key: m.key,
           label: m.label,
           categoryId: m.categoryId,
-          date: next,
-          probability: m.probability,
+          date,
+          probability,
           logMu: m.logMu,
           logSigma: m.logSigma,
+          fixedYen: null,
         });
       }
+      probability = m.probability;
       next = addDays(next, m.everyDays);
     }
   }

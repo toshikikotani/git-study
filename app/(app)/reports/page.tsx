@@ -5,6 +5,7 @@ import { InsightsList } from './insights-card';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
 import { GoalChart } from './goal-chart';
+import { formatProbability } from '@/domain/forecast/format';
 import { remainingOfTotal } from '@/domain/forecast/remaining';
 import { reportInsights } from '@/domain/report-insights';
 import { loadForecast } from '@/features/forecast/load';
@@ -155,26 +156,35 @@ export default async function ReportsPage() {
         {forecast && landing && forecast.total.p50 > 0 ? (
           <>
             <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              着地の見込み(平均)
+              着地の見込み(中央){forecast.provisional ? ' ・ 目安' : ''}
             </p>
             <p
               className="tabular mt-1 text-4xl font-semibold tracking-[-0.045em]"
               style={{ color: 'var(--ink)' }}
             >
-              {formatYen(round100(landing.mean), { sign: 'never' })}
+              {formatYen(round100(landing.p50), { sign: 'never' })}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              {endLabel}の着地は、10回中8回 {formatYen(round100(landing.p10), { sign: 'never' })}{' '}
-              から {formatYen(round100(landing.p90), { sign: 'never' })}。
+              {endLabel}の着地は、下振れ {formatYen(round100(landing.p10), { sign: 'never' })} 〜
+              上振れ {formatYen(round100(landing.p90), { sign: 'never' })}(10回中8回)。
               {budgetYen !== null
                 ? forecast.probWithinBudget !== null
-                  ? `予算 ${formatYen(budgetYen, { sign: 'never' })} に収まる確率は${Math.round(forecast.probWithinBudget * 100)}%。`
+                  ? `予算 ${formatYen(budgetYen, { sign: 'never' })} に収まる確率は${formatProbability(forecast.probWithinBudget)}。`
                   : ''
                 : '目標の予算がないので、収まるかどうかは出していない。'}
               {forecast.drivers[0]
                 ? ` 増えるとしたら、大きいのは${forecast.drivers[0].categoryName}。`
                 : ''}
             </p>
+            {forecast.balance ? (
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                収入 {formatYen(round100(forecast.balance.incomeYen), { sign: 'never' })}
+                {forecast.balance.source === 'salary' ? '(直近の給料から)' : ''}
+                から着地を引いた残りは、中央 {formatYen(round100(forecast.balance.p50))}(
+                {formatYen(round100(forecast.balance.p10))} 〜{' '}
+                {formatYen(round100(forecast.balance.p90))})。
+              </p>
+            ) : null}
           </>
         ) : (
           <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -190,7 +200,10 @@ export default async function ReportsPage() {
           lines={linesForGoal(
             goalItems.flatMap((item) =>
               buildCategoryLines(
-                ledger.transactions.map((tx) => ({ ...tx, items: [] })),
+                // 目標のペースは特別費を数えない(予測も同じ範囲で出している)。
+                ledger.transactions
+                  .filter((tx) => tx.kind !== 'special')
+                  .map((tx) => ({ ...tx, items: [] })),
                 item.genreId,
                 { from: ledger.period.from, to: period.to },
                 today,

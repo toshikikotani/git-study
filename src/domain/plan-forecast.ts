@@ -4,6 +4,7 @@
  * その結果を「届きそうか」の言葉と額に直す。予測の式をこのファイルに持たない。
  */
 
+import { formatProbability } from '@/domain/forecast/format';
 import type { Forecast } from '@/domain/forecast/types';
 
 export type ForecastVerdict = 'unknown' | 'unreachable' | 'on_track' | 'tight' | 'over';
@@ -41,7 +42,7 @@ function labelFor(input: {
     return `届かない。使った額と予定だけで目標を超える。${scheduled}`;
   }
   const pct =
-    input.exceedance === null ? '' : `超える確率は${Math.round(input.exceedance * 100)}%。`;
+    input.exceedance === null ? '' : `超える確率は${formatProbability(input.exceedance)}。`;
   const rec =
     input.recommendedYen === null
       ? ''
@@ -244,7 +245,7 @@ export function landingReport(input: {
     const probability =
       forecast.exceedance === null
         ? ''
-        : `今の目標を超える確率は ${Math.round(forecast.exceedance * 100)}%。`;
+        : `今の目標を超える確率は ${formatProbability(forecast.exceedance)}。`;
     const detail = [
       `この期間にすでに ${yen(row.spentYen)} 円使っている。`,
       row.scheduledYen > 0
@@ -252,7 +253,7 @@ export function landingReport(input: {
         : '日付の入っている予定は無い。',
       forecast.medianYen === null
         ? '支出のあった日が少なく、残りの着地はまだ置けない。'
-        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)} 円、10%から90%は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)} 円、下振れ〜上振れ(10回中8回)は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
     ].join('');
     const ask = savingsAsk({
       verdict: forecast.verdict,

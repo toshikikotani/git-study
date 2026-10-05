@@ -14,7 +14,7 @@ import { todayJst, type DateOnly } from '@/lib/date';
 
 const PAGE = 1000;
 const COLUMNS =
-  'occurred_on, amount_yen, genre_id, is_transfer, review_status, merchant_name, description';
+  'occurred_on, amount_yen, genre_id, is_transfer, review_status, merchant_name, description, created_at';
 
 export class ForecastHistoryError extends Error {}
 
@@ -61,11 +61,13 @@ export async function loadForecastHistory(range: {
       review_status: ForecastSourceTransaction['reviewStatus'];
       merchant_name: string | null;
       description: string;
+      created_at?: string | null;
       kind?: string | null;
     }[];
     for (const row of rows) {
       out.push({
         occurredOn: row.occurred_on,
+        ...(row.created_at ? { createdOn: todayJst(new Date(row.created_at)) } : {}),
         genreId: row.genre_id,
         genreName: row.genre_id === null ? null : (nameById.get(row.genre_id) ?? null),
         amountYen: row.amount_yen,

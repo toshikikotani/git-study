@@ -1,7 +1,16 @@
 import type { DateOnly } from '@/lib/date';
 
-/** カテゴリ×日の学習データ1行。支出が無い日も count=0, amountYen=0 で持つ(M1)。 */
-export type CategoryDayRecord = { date: DateOnly; count: number; amountYen: number };
+/**
+ * カテゴリ×日の学習データ1行。支出が無い日も count=0, amountYen=0 で持つ。
+ * logSum・logSqSum は1回ごとの金額の対数の和と二乗和(無ければ、その日の平均額から近似する)。
+ */
+export type CategoryDayRecord = {
+  date: DateOnly;
+  count: number;
+  amountYen: number;
+  logSum?: number;
+  logSqSum?: number;
+};
 
 export type VariableTrainingData = {
   categoryId: string;
@@ -23,13 +32,20 @@ export type MissingRecordDay = {
   categoryName: string;
 };
 
-/** カテゴリごとの、予測の前から決まっている額(実績・予定・固定費)。 */
+/** カテゴリごとの、予測の前から決まっている額(実績・予定・固定費)。特別費も含む。 */
 export type CategoryBase = {
   categoryId: string;
   categoryName: string;
   actualYen: number;
   scheduledYen: number;
   fixedYen: number;
+};
+
+/** 日付の決まった支払い(予定・確認済みの固定費)。試行によらず、その日に足す。 */
+export type DatedEvent = {
+  date: DateOnly;
+  categoryId: string;
+  amountYen: number;
 };
 
 /** 規則的に通う店(同じ店に、ほぼ決まった間隔で来店する)。変動費の学習からは外す。 */
@@ -50,8 +66,11 @@ export type RegularMerchant = {
   probability: number;
 };
 
-/** 残り期間に見込まれる来店。日付ごとに、来る確率と金額の分布を持つ。 */
-export type VisitEvent = {
+/**
+ * 残り期間に見込まれる、確率つきの支払い(規則的な来店・月払いの請求)。
+ * fixedYen があれば金額はその値(毎回ほぼ同じ請求)、無ければ対数正規から引く。
+ */
+export type ProbableEvent = {
   key: string;
   label: string;
   categoryId: string;
@@ -59,28 +78,54 @@ export type VisitEvent = {
   probability: number;
   logMu: number;
   logSigma: number;
+  fixedYen: number | null;
+};
+
+/** @deprecated 名前の互換。ProbableEvent と同じ。 */
+export type VisitEvent = ProbableEvent;
+
+/** 月払いの請求(電気・ガス・カードの年会費の月割りなど、ほぼ毎月同じ日ごろに来る支払い)。 */
+export type MonthlyBill = {
+  key: string;
+  label: string;
+  categoryId: string;
+  categoryName: string;
+  lastPaid: DateOnly;
+  occurrences: number;
+  meanYen: number;
+  probability: number;
+  fixedYen: number | null;
+};
+
+/** 期間に入ってから今日までに記録された変動費(今月の水準と金額の更新に使う)。 */
+export type PeriodObservation = {
+  categoryId: string;
+  count: number;
+  /** 1回ごとの金額の対数。 */
+  logAmounts: readonly number[];
 };
 
 export type DecomposedSpending = {
   trainingWindow: { from: DateOnly; to: DateOnly };
   period: { from: DateOnly; to: DateOnly };
   today: DateOnly;
-  /** 実績:今日までに記録された通常支出(入力待ちは含めない)。 */
+  /** 実績:期間内の今日までに記録された支出(特別費も含む)。 */
   actualYen: number;
-  /** 確定:予定支出 + 残り期間に見込まれる固定費。 */
+  /** 確定:予定支出(特別費も含む) + 残り期間に見込まれる固定費。日付ごとの内訳も持つ。 */
   committed: {
     scheduledYen: number;
     fixedYen: number;
     fixedItems: readonly { key: string; label: string; amountYen: number; occurrences: number }[];
+    events: readonly DatedEvent[];
   };
   /** 特別:特別費(kind='special')の実績・予定と、外れ値として除外した候補。 */
   special: {
     actualYen: number;
     scheduledYen: number;
     excluded: readonly OutlierExclusion[];
-    /** 学習窓内の特別費(kind='special' + 外れ値)の金額一覧(再標本化の母集団、M2)。 */
+    /** 学習窓内の特別費(kind='special' + 外れ値)の金額一覧(再標本化の母集団)。 */
     historicalAmounts: readonly number[];
-    /** 学習窓の1日あたりの発生回数(ポアソン分布のλ、M2)。 */
+    /** 学習窓の1日あたりの発生回数(ポアソン分布のλ)。 */
     occurrencesPerDay: number;
   };
   /** 変動費のカテゴリ×日学習データ。 */
@@ -89,7 +134,23 @@ export type DecomposedSpending = {
   baseByCategory: readonly CategoryBase[];
   /** 規則的に通う店と、残り期間の来店の見込み。 */
   regularMerchants: readonly RegularMerchant[];
-  visits: readonly VisitEvent[];
+  visits: readonly ProbableEvent[];
+  /** 月払いの請求と、残り期間の見込み。 */
+  bills: readonly MonthlyBill[];
+  billEvents: readonly ProbableEvent[];
+  /**
+   * 期間の学習を、期間の前の記録だけで行ったか(true)。そのとき期間に入ってからの記録は
+   * periodObservations として、今月の水準と金額の更新にだけ使う(二重に数えない)。
+   */
+  separatedPeriod: boolean;
+  periodObservations: readonly PeriodObservation[];
+  /** 期間の初日〜今日のうち、記録のある期間に入る日(水準の更新の分母)。 */
+  elapsedDates: readonly DateOnly[];
+  /**
+   * 入力の遅れ:使った日から j 日後までに記録された割合 D(j)(j=0..30)。記録日時が
+   * 足りなければ null(遅れなしとみなす)。
+   */
+  entryLag: readonly number[] | null;
   /** 直近14日の1日あたりの支出(固定費・予測を止めたジャンルを除く)。記録が無ければ null。 */
   recentPerDayYen: number | null;
   missingRecordDays: readonly MissingRecordDay[];
@@ -97,18 +158,22 @@ export type DecomposedSpending = {
   dataDays: number;
 };
 
-/** M2: カテゴリごとに推定したモデルのパラメータ。 */
+/** 給料日からの日数の区分(0〜2・3〜6・7〜13・14〜20・21日以上)の数。 */
+export const PAY_CYCLE_BUCKETS = 5;
+
+/** カテゴリごとに推定したモデルのパラメータ。 */
 export type CategoryModelParams = {
   categoryId: string;
   categoryName: string;
-  /** ガンマ・ポアソン事後分布(回数)。lambda ~ Gamma(alphaPost, betaPost)(rateパラメータ化)。 */
+  /** ガンマ・ポアソン事後分布(回数)。lambda ~ Gamma(alpha, beta)(rateパラメータ化)。 */
   countPosterior: { alpha: number; beta: number };
   /**
    * 対数正規の事後平均・分散(金額)。kappa は mu の確からしさ(相当する観測件数)。
-   * 試行ごとに mu ~ Normal(mu, sigmaSq/kappa) を引き直し、データが少ないほど
-   * 試行間で mu がばらつく(=帯が広がる)ようにする(M3)。
+   * 試行ごとに mu を引き直し、データが少ないほど試行間で mu がばらつくようにする。
    */
   amountPosterior: { mu: number; sigmaSq: number; kappa: number };
+  /** 月ごとの1回の金額(対数の平均)の揺れの大きさ τ²(今月の金額の更新に使う)。 */
+  monthTauSq: number;
   /**
    * 休み(土日祝)の1回の金額が平日よりどれだけ大きいか(対数の差、0=差なし)と、記録の中で
    * 休みの日の買い物が占める割合。差は、観測が少ないほど0へ寄せる。
@@ -116,22 +181,14 @@ export type CategoryModelParams = {
   dayOffAmount: { delta: number; share: number };
   /** 曜日係数(0=日〜6=土)。1.0が「効果なし」。 */
   weekdayFactor: readonly number[];
-  paydayFactor: number;
+  /** 給料日からの日数の区分ごとの係数(PAY_CYCLE_BUCKETS 個)。給料日が無ければすべて1。 */
+  payCycleFactor: readonly number[];
   holidayFactor: number;
   dataDays: number;
 };
 
-/** ブロック・ブートストラップ用の「1日ぶんの全カテゴリの実績」(M2)。 */
-export type DayBundle = {
-  date: DateOnly;
-  /** 直近ほど大きい重み(半減期は学習時に決める)。ブートストラップの再標本化確率に使う。 */
-  weight: number;
-  amountsByCategory: ReadonlyMap<string, number>;
-};
-
 export type FittedModel = {
   categories: readonly CategoryModelParams[];
-  dayBundles: readonly DayBundle[];
   /**
    * 月ごとの季節の係数(添字1〜12。1.0が平年並み)。12か月以上の記録があるときだけ
    * 1.0以外になり、残り期間の各日の回数に掛ける。
@@ -146,14 +203,23 @@ export type FittedModel = {
 
 export type Band = { p10: number; p50: number; p70: number; p90: number };
 
+/** グラフの予測の線:今日より先の各日までに、今日の実績へ足される額(予定・固定費・請求を含む)。 */
+export type PathPoint = { date: DateOnly; p10: number; p50: number; p90: number };
+
+/**
+ * 理想の線の形:各日までに決まっている支払い(予定・固定費・請求の見込み)の累計と、
+ * いつもの使い方での変動費の累計の割合(期間の初日0 → 最終日1)。
+ */
+export type TypicalProfilePoint = { date: DateOnly; committedYen: number; share: number };
+
 export type ForecastCategoryBand = {
   categoryId: string;
   categoryName: string;
-  /** 残り期間の変動費だけの幅。 */
+  /** 残り期間の変動する部分(変動費・来店・請求・特別費・未記録)だけの幅。 */
   p10: number;
   p50: number;
   p90: number;
-  /** 期間全体の着地(実績 + 予定 + 固定費 + 残りの変動費)の幅。 */
+  /** 期間全体の着地(実績 + 予定 + 固定費 + 残り)の幅。 */
   landing: Band;
   /** 予測の前から決まっている額(実績・予定・固定費)と、その内訳。 */
   baseYen: number;
@@ -167,14 +233,37 @@ export type ForecastCategoryBand = {
 
 export type ForecastDriver = { categoryId: string; categoryName: string; shareOfRisk: number };
 
+/** 検証で求めた補正(中心は期間の時点帯ごと、幅は PIT の分布)。 */
+export type ForecastCalibration = {
+  /** 時点帯(序盤・中盤・終盤)ごとの、残りの支出に掛ける係数。 */
+  centerByPhase: { early: number; mid: number; late: number };
+  /** 検証の各時点で、実際の着地が予測分布のどこに入ったか(0〜1、昇順)。 */
+  pit: readonly number[];
+  /**
+   * 時点帯ごとの PIT(序盤は広すぎ、中盤は狭すぎ、のように時点で外れ方が違うため)。
+   * 点が少ない帯は、全体の pit と同じ。
+   */
+  pitByPhase: { early: readonly number[]; mid: readonly number[]; late: readonly number[] };
+  /** PIT をどれだけ信じるか a = 月数 ÷ (月数 + 6)。 */
+  pitWeight: number;
+  /** 検証に使えた完了月の数。 */
+  months: number;
+  sampleSize: number;
+};
+
 export type Forecast = {
   periodId: string;
   asOf: DateOnly;
   remainingDays: number;
+  /** 着地。p10〜p90 と中央値は補正後の分位(見出しは中央値)。mean は補正後の試行の平均。 */
   total: Band & { mean: number };
+  /** グラフの線と帯(同じ試行の、日ごとの分位)。最終日の値 + 実績 = total。 */
+  path: readonly PathPoint[];
+  /** 理想の線の形(期間全体)。 */
+  typicalProfile: readonly TypicalProfilePoint[];
   byCategory: readonly ForecastCategoryBand[];
   committed: { scheduledYen: number; fixedYen: number };
-  /** 今日までの実績(通常の支出)。着地 − 実績 − 予定 が、グラフで残りの期間に足す額になる。 */
+  /** 今日までの実績(特別費も含む)。 */
   actualYen: number;
   /** 規則的に通う店の、残り期間の見込み(期待額と店ごとの内訳)。 */
   visits: {
@@ -186,7 +275,11 @@ export type Forecast = {
       meanYen: number;
     }[];
   };
-  /** 残りの期間の見込み(平均)と1日あたり、直近のペース。見込みが妥当か本人が確かめるための数字。 */
+  /** 月払いの請求の、残り期間の見込み。 */
+  bills: { expectedYen: number; items: readonly { label: string; meanYen: number }[] };
+  /** まだ記録されていない支出の見込み(入力の遅れから)。 */
+  unrecordedYen: number;
+  /** 残りの期間の見込み(中央)と1日あたり、直近のペース。 */
   pace: { remainingYen: number; perDayYen: number | null; recentPerDayYen: number | null };
   /** 季節の係数を使ったか、期間の月の係数。 */
   seasonal: { active: boolean; periodFactor: number | null };
@@ -197,6 +290,19 @@ export type Forecast = {
   safeDailyAllowance: number | null;
   status: 'learning' | 'ready';
   dataDays: number;
-  method: 'bayes' | 'bootstrap' | 'ensemble' | 'mixed';
-  calibration: { widthFactor: number; sampleSize: number; centerFactor: number } | null;
+  /** 今日が期間のどの時点帯か(中心の補正に使った帯)。 */
+  phase: ForecastPhase;
+  calibration: ForecastCalibration | null;
+  /** 検証できた月が3か月未満なら true(画面に「目安」と出す)。 */
+  provisional: boolean;
+  /** 収入と収支(収入が分かるときだけ)。収支 = 収入 − 着地。 */
+  balance: {
+    incomeYen: number;
+    source: 'setting' | 'salary' | 'none';
+    p10: number;
+    p50: number;
+    p90: number;
+  } | null;
 };
+
+export type ForecastPhase = 'early' | 'mid' | 'late';

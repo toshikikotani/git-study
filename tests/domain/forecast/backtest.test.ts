@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  applyWidthFactor,
-  backtestCheckpoints,
-  calibrateCenter,
-  calibrateWidth,
+  actualTotalForPeriod,
+  calibrateFromBacktest,
+  checkpointsFor,
+  crpsSorted,
   empiricalCrps,
+  knownTransactionsAt,
   runBacktest,
-  selectModel,
   shiftRemaining,
   type BacktestPoint,
 } from '@/domain/forecast/backtest';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
+import { calibratedProbability, rawLevelFor } from '@/domain/forecast/pit';
 import { eachDay } from '@/domain/period';
 
 function tx(
@@ -31,166 +32,162 @@ function tx(
   };
 }
 
-describe('backtestCheckpoints', () => {
-  it('1日目・3日目・半分・残り2日に対応する経過割合を返す(30日期間)', () => {
-    const fractions = backtestCheckpoints(30);
-    expect(fractions.length).toBeGreaterThanOrEqual(3);
-    expect(fractions[0]!).toBeCloseTo(1 / 30, 2);
-    expect(fractions).toContain(0.5);
-    expect(fractions[fractions.length - 1]!).toBeCloseTo(28 / 30, 2);
+describe('checkpointsFor(検証の時点)', () => {
+  it('2日おきに、最終日の前まで。序盤・中盤・終盤に分ける', () => {
+    const points = checkpointsFor({ from: '2026-06-01', to: '2026-06-30' });
+    expect(points[0]).toEqual({ asOf: '2026-06-02', phase: 'early' });
+    expect(points.at(-1)!.asOf).toBe('2026-06-28');
+    expect(points).toHaveLength(14);
+    expect(new Set(points.map((p) => p.phase))).toEqual(new Set(['early', 'mid', 'late']));
   });
 });
 
-describe('empiricalCrps', () => {
-  it('全試行が実際の値と一致するなら0(完璧な予測)', () => {
-    const samples = new Float64Array(200).fill(1000);
-    expect(empiricalCrps(samples, 1000)).toBeCloseTo(0, 5);
+describe('knownTransactionsAt(その時点で知り得た明細)', () => {
+  const late = tx({ occurredOn: '2026-06-03', createdOn: '2026-06-10', amountYen: -500 });
+  const backfill = tx({ occurredOn: '2026-03-01', createdOn: '2026-06-10', amountYen: -500 });
+  const planned = tx({ occurredOn: '2026-06-25', createdOn: '2026-06-01', amountYen: -9000 });
+
+  it('記録した日より前の時点からは見えない(入力の遅れ)', () => {
+    expect(knownTransactionsAt([late], '2026-06-05')).toHaveLength(0);
+    expect(knownTransactionsAt([late], '2026-06-10')).toHaveLength(1);
   });
 
-  it('試行が実際の値から離れているほど大きくなる', () => {
-    const near = new Float64Array(200).fill(1000);
-    const far = new Float64Array(200).fill(1000);
-    expect(empiricalCrps(near, 1100)).toBeLessThan(empiricalCrps(far, 5000));
+  it('45日より遅い記録は、あとからまとめて入れた過去の記録として、使った日で判断する', () => {
+    expect(knownTransactionsAt([backfill], '2026-04-01')).toHaveLength(1);
+  });
+
+  it('先の日付で入れた予定は、その時点から見て予定になる', () => {
+    const [known] = knownTransactionsAt([planned], '2026-06-05');
+    expect(known!.status).toBe('scheduled');
   });
 });
 
-describe('runBacktest(M4)', () => {
-  it('毎日ちょうど1,000円使う定常データなら、実際の着地は80%の幅に収まりやすい', () => {
-    // 半年分の定常データを2期間ぶん用意する
+describe('actualTotalForPeriod(検証の正解)', () => {
+  it('特別費を含み、返金を差し引き、振替は数えない', () => {
+    const period = { from: '2026-06-01', to: '2026-06-30' };
+    const total = actualTotalForPeriod(
+      [
+        tx({ occurredOn: '2026-06-02', amountYen: -1000 }),
+        tx({ occurredOn: '2026-06-03', amountYen: -5000, kind: 'special' }),
+        tx({ occurredOn: '2026-06-04', amountYen: 300, kind: 'refund' }),
+        tx({ occurredOn: '2026-06-05', amountYen: -9999, isTransfer: true }),
+        tx({ occurredOn: '2026-07-01', amountYen: -1000 }),
+      ],
+      period,
+    );
+    expect(total).toBe(5700);
+  });
+});
+
+describe('CRPS', () => {
+  it('全試行が実際の値と一致するなら0', () => {
+    expect(empiricalCrps(new Float64Array(200).fill(1000), 1000)).toBeCloseTo(0, 5);
+  });
+
+  it('離れているほど大きい。並べ替え済みの計算と一致する', () => {
+    const samples = Float64Array.from([1, 2, 3, 4, 10]);
+    expect(empiricalCrps(samples, 3)).toBeCloseTo(crpsSorted(samples, 3), 10);
+    expect(empiricalCrps(samples, 3)).toBeLessThan(empiricalCrps(samples, 30));
+  });
+});
+
+describe('runBacktest', () => {
+  it('毎日ちょうど1,000円使う定常データなら、着地はほぼ当たる', () => {
     const transactions = eachDay('2026-01-01', '2026-08-31').map((d) =>
       tx({ occurredOn: d, amountYen: -1000 }),
     );
-    const periods = [
-      { from: '2026-06-01', to: '2026-06-30' },
-      { from: '2026-07-01', to: '2026-07-31' },
-      { from: '2026-08-01', to: '2026-08-31' },
-    ];
     const summary = runBacktest({
       transactions,
-      periods,
+      periods: [
+        { from: '2026-07-01', to: '2026-07-31' },
+        { from: '2026-08-01', to: '2026-08-31' },
+      ],
       trainingWindowDays: 150,
       recordStart: '2026-01-01',
-      bootstrapWeight: 0,
-      trials: 1000,
+      trials: 400,
     });
-    expect(summary.points.length).toBeGreaterThan(0);
-    expect(summary.hitRate80).toBeGreaterThan(0.5);
-    expect(summary.medianAbsErrorRatio).toBeLessThan(0.3);
+    expect(summary.points.length).toBe(30);
+    expect(summary.medianAbsErrorRatio).toBeLessThan(0.15);
+    for (const p of summary.points) expect(p.samples.length).toBeGreaterThan(0);
   });
 
-  it('明細が無ければ空の結果になる(破綻しない)', () => {
+  it('明細が無くても破綻しない', () => {
     const summary = runBacktest({
       transactions: [],
       periods: [{ from: '2026-06-01', to: '2026-06-30' }],
       trainingWindowDays: 150,
       recordStart: null,
-      bootstrapWeight: 0,
-      trials: 500,
+      trials: 200,
     });
-    expect(summary.points.length).toBeGreaterThan(0);
     expect(Number.isFinite(summary.hitRate80)).toBe(true);
   });
 });
 
-describe('calibrateWidth(コンフォーマル補正)', () => {
-  function point(actualTotal: number, p10: number, p50: number, p90: number): BacktestPoint {
+describe('calibrateFromBacktest(時点帯ごとの中心と PIT)', () => {
+  /** 試行は 0〜(2×中央) の一様。knownYen=0。 */
+  function point(
+    phase: BacktestPoint['phase'],
+    actualTotal: number,
+    median: number,
+  ): BacktestPoint {
+    const samples = Float64Array.from({ length: 101 }, (_, i) => (2 * median * i) / 100);
     return {
       periodFrom: '2026-06-01',
       periodTo: '2026-06-30',
-      asOf: '2026-06-15',
+      asOf: '2026-06-10',
+      phase,
       actualTotal,
       knownYen: 0,
-      p10,
-      p50,
-      p90,
-      hitWithin80: actualTotal >= p10 && actualTotal <= p90,
+      samples,
+      p10: samples[10]!,
+      p50: median,
+      p90: samples[90]!,
+      hitWithin80: true,
       crps: 0,
     };
   }
 
-  it('点数が少なければ補正しない(widthFactor=1)', () => {
-    const result = calibrateWidth([point(1000, 900, 1000, 1100)]);
-    expect(result.widthFactor).toBe(1);
+  it('点が少なければ補正しない(null)', () => {
+    expect(calibrateFromBacktest([point('early', 100, 100)], 3)).toBeNull();
   });
 
-  it('実際の値が帯の外に出やすい(狭すぎる)なら、widthFactorは1より大きくなる', () => {
-    const points = Array.from({ length: 10 }, (_, i) => point(1500 + i, 900, 1000, 1100));
-    const result = calibrateWidth(points);
-    expect(result.widthFactor).toBeGreaterThan(1);
+  it('序盤だけ実際が多いなら、序盤の中心だけ上げる', () => {
+    const points = [
+      ...Array.from({ length: 6 }, () => point('early', 130, 100)),
+      ...Array.from({ length: 6 }, () => point('late', 100, 100)),
+    ];
+    const cal = calibrateFromBacktest(points, 6)!;
+    expect(cal.centerByPhase.early).toBeGreaterThan(1.05);
+    expect(cal.centerByPhase.late).toBeCloseTo(1, 5);
+    expect(cal.pitWeight).toBeCloseTo(6 / 12, 5);
+    expect(cal.pit).toHaveLength(12);
   });
 
-  it('実際の値がいつも帯の中心近くに収まる(広すぎる)なら、widthFactorは1より小さくなる', () => {
-    const points = Array.from({ length: 10 }, (_, i) => point(995 + i, 500, 1000, 1500));
-    const result = calibrateWidth(points);
-    expect(result.widthFactor).toBeLessThan(1);
-  });
-});
-
-describe('applyWidthFactor', () => {
-  it('中央値はそのまま、片側ずつ帯を伸縮する', () => {
-    const result = applyWidthFactor({ p10: 800, p50: 1000, p90: 1300 }, 2);
-    expect(result.p50).toBe(1000);
-    expect(result.p10).toBe(600); // 1000-(1000-800)*2
-    expect(result.p90).toBe(1600); // 1000+(1300-1000)*2
-  });
-});
-
-describe('selectModel(M4)', () => {
-  it('検証に足るバックテストの点数が無ければベイズモデルにフォールバックする', () => {
-    const transactions = eachDay('2026-06-01', '2026-06-20').map((d) =>
-      tx({ occurredOn: d, amountYen: -1000 }),
-    );
-    const selection = selectModel({
-      transactions,
-      periods: [{ from: '2026-06-01', to: '2026-06-30' }],
-      trainingWindowDays: 60,
-      recordStart: '2026-06-01',
-      trials: 500,
-    });
-    expect(selection.method).toBe('bayes');
-    expect(selection.bootstrapWeight).toBe(0);
-  });
-});
-
-describe('calibrateCenter(中心の補正)', () => {
-  const pt = (actualTotal: number, p50: number, knownYen: number): BacktestPoint => ({
-    periodFrom: '2026-06-01',
-    periodTo: '2026-06-30',
-    asOf: '2026-06-15',
-    actualTotal,
-    knownYen,
-    p10: p50 * 0.8,
-    p50,
-    p90: p50 * 1.2,
-    hitWithin80: true,
-    crps: 0,
-  });
-
-  it('残りの実際が予測の中央値より系統的に多いなら、1より大きい係数で上げる', () => {
-    // 決まっている額5万円、予測の残り5万円(p50=10万円)、実際の残り6万円(実績11万円)
-    const points = Array.from({ length: 12 }, () => pt(110000, 100000, 50000));
-    const factor = calibrateCenter(points);
-    expect(factor).toBeGreaterThan(1.05);
-    expect(factor).toBeLessThan(1.2);
-  });
-
-  it('系統的な偏りが無ければ、ほぼ1', () => {
-    const points = Array.from({ length: 12 }, () => pt(100000, 100000, 50000));
-    expect(calibrateCenter(points)).toBeCloseTo(1, 5);
-  });
-
-  it('検証の件数が少なければ補正しない(1)', () => {
-    expect(calibrateCenter([pt(150000, 100000, 50000)])).toBe(1);
-  });
-
-  it('係数は0.75〜1.4の範囲に収まる', () => {
-    const high = Array.from({ length: 40 }, () => pt(900000, 100000, 50000));
-    const low = Array.from({ length: 40 }, () => pt(50000, 100000, 50000));
-    expect(calibrateCenter(high)).toBeLessThanOrEqual(1.4);
-    expect(calibrateCenter(low)).toBeGreaterThanOrEqual(0.75);
+  it('中心の係数は 0.75〜1.4 に収まる', () => {
+    const high = Array.from({ length: 12 }, () => point('mid', 1000, 100));
+    expect(calibrateFromBacktest(high, 100)!.centerByPhase.mid).toBeLessThanOrEqual(1.4);
   });
 
   it('決まっている額は動かさず、残りの部分だけに掛ける', () => {
     expect(shiftRemaining(100000, 50000, 1.2)).toBe(110000);
+  });
+});
+
+describe('PIT による確率の補正', () => {
+  it('補正が無ければ、確率も分位もそのまま', () => {
+    expect(calibratedProbability(null, 0.3)).toBe(0.3);
+    expect(rawLevelFor(null, 0.9)).toBe(0.9);
+  });
+
+  it('過去に実際が分布の外側(0や1の近く)ばかりなら、幅を外側へ広げる', () => {
+    const pit = [
+      ...Array.from({ length: 10 }, () => 0.01),
+      ...Array.from({ length: 10 }, () => 0.99),
+    ];
+    const cal = { pit, pitWeight: 0.5 };
+    expect(rawLevelFor(cal, 0.9)).toBeGreaterThan(0.9);
+    expect(rawLevelFor(cal, 0.1)).toBeLessThan(0.1);
+    // 確率と分位は互いに逆の関係。
+    expect(calibratedProbability(cal, rawLevelFor(cal, 0.7))).toBeGreaterThanOrEqual(0.7 - 1e-6);
   });
 });

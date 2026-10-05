@@ -3,6 +3,7 @@
  * 叱らず、事実→次の一手の順に短く書く(docs/WRITING.md)。数字には単位と期間を添える。
  */
 
+import { CAUTION_EXCEEDANCE, formatProbability } from '@/domain/forecast/format';
 import type { Forecast } from '@/domain/forecast/types';
 
 export type Insight = {
@@ -43,12 +44,13 @@ export function reportInsights(input: {
 
   // 予算に収まる確率と、次の一手(1日の上限)。
   if (budgetYen !== null && forecast.probWithinBudget !== null) {
-    const pct = Math.round(forecast.probWithinBudget * 100);
-    if (pct >= 80) {
+    const within = forecast.probWithinBudget;
+    const pct = formatProbability(within);
+    if (1 - within < CAUTION_EXCEEDANCE) {
       out.push({
         key: 'budget',
         tone: 'info',
-        text: `予算 ${yen(budgetYen)} に収まる確率は${pct}%。このペースで足りる。`,
+        text: `予算 ${yen(budgetYen)} に収まる確率は${pct}。このペースで足りる。`,
       });
     } else {
       const allowance =
@@ -58,7 +60,7 @@ export function reportInsights(input: {
       out.push({
         key: 'budget',
         tone: 'caution',
-        text: `予算 ${yen(budgetYen)} に収まる確率は${pct}%。超えるときは平均で ${yen(round100(forecast.expectedOvershoot))} 超える。${allowance}`,
+        text: `予算 ${yen(budgetYen)} に収まる確率は${pct}。超えるときは平均で ${yen(round100(forecast.expectedOvershoot))} 超える。${allowance}`,
       });
     }
   }
@@ -72,7 +74,7 @@ export function reportInsights(input: {
       key: 'pace',
       tone: lower ? 'caution' : 'info',
       text:
-        `残り${forecast.remainingDays}日は、平均で約${yen(round100(pace.remainingYen))}(1日あたり約${yen(round100(pace.perDayYen))})を見込んでいる。` +
+        `残り${forecast.remainingDays}日は、中央で約${yen(round100(pace.remainingYen))}(1日あたり約${yen(round100(pace.perDayYen))})を見込んでいる。` +
         (recent !== null ? `直近14日の1日あたりは約${yen(round100(recent))}。` : '') +
         (lower
           ? '見込みは直近のペースより低い。まとまった支払いが続いていたなら、上振れしやすい。'
@@ -148,8 +150,25 @@ export function reportInsights(input: {
     });
   }
 
+  // まだ記録されていない支出(記録の遅れ)と、月払いの請求。
+  if (forecast.unrecordedYen >= 1000) {
+    out.push({
+      key: 'unrecorded',
+      tone: 'info',
+      text: `いつもの記録のタイミングから、まだ記録されていない支出を約${yen(round100(forecast.unrecordedYen))}見込んでいる。記録すると、この分は実績に変わる。`,
+    });
+  }
+  const bill = [...forecast.bills.items].sort((a, b) => b.meanYen - a.meanYen)[0];
+  if (bill && forecast.bills.expectedYen > 0) {
+    out.push({
+      key: 'bills',
+      tone: 'info',
+      text: `${bill.label}など毎月の請求を、残りの期間に約${yen(round100(forecast.bills.expectedYen))}見込んでいる。`,
+    });
+  }
+
   // 検証の結果、中心を動かしているとき(残りの支出が予測より系統的に多かった・少なかった)。
-  const center = forecast.calibration?.centerFactor ?? 1;
+  const center = forecast.calibration?.centerByPhase[forecast.phase] ?? 1;
   if (Math.abs(center - 1) >= 0.05) {
     const pct = Math.round(Math.abs(center - 1) * 100);
     out.push({
@@ -157,17 +176,17 @@ export function reportInsights(input: {
       tone: 'info',
       text:
         center > 1
-          ? `過去の月では、残りの支出が予測より${pct}%ほど多かった。その分を上乗せして出している。`
-          : `過去の月では、残りの支出が予測より${pct}%ほど少なかった。その分を下げて出している。`,
+          ? `過去の月の同じ時期では、残りの支出が予測より${pct}%ほど多かった。その分を上乗せして出している。`
+          : `過去の月の同じ時期では、残りの支出が予測より${pct}%ほど少なかった。その分を下げて出している。`,
     });
   }
 
-  // 検証の結果、帯を広げているとき。
-  if (forecast.calibration !== null && forecast.calibration.widthFactor >= 1.2) {
+  // 検証できた月が少ないときは、数字が目安であることを伝える。
+  if (forecast.provisional && forecast.status !== 'learning') {
     out.push({
-      key: 'calibration',
+      key: 'provisional',
       tone: 'info',
-      text: `過去の月では、着地が幅の外に出ることが多かったので、幅を${forecast.calibration.widthFactor.toFixed(1)}倍に広げて出している。`,
+      text: '過去の月で確かめられたのが3か月未満なので、幅と確率は目安。月がたまるほど、本人の記録に合わせて直る。',
     });
   }
 

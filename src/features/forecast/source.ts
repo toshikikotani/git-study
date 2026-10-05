@@ -12,6 +12,7 @@ export function toForecastSource(
   return transactions.flatMap((t): ForecastSourceTransaction[] => {
     const base = {
       occurredOn: t.occurredOn,
+      ...(t.createdOn ? { createdOn: t.createdOn } : {}),
       status: t.status,
       kind: t.kind,
       isTransfer: t.isTransfer,

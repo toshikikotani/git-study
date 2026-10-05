@@ -37,7 +37,13 @@ const forecast = (over: Partial<Forecast> = {}): Forecast => ({
   safeDailyAllowance: null,
   status: 'ready',
   dataDays: 120,
-  method: 'ensemble',
+  path: [],
+  typicalProfile: [],
+  bills: { expectedYen: 0, items: [] },
+  unrecordedYen: 0,
+  phase: 'mid',
+  provisional: false,
+  balance: null,
   calibration: null,
   ...over,
 });
@@ -105,7 +111,7 @@ describe('reportInsights', () => {
     expect(out.find((i) => i.key === 'committed')!.text).toContain('着地の50%');
   });
 
-  it('規則的に通う店と、季節と、幅の補正を知らせる', () => {
+  it('規則的に通う店と、季節と、中心の補正を知らせる', () => {
     const out = reportInsights({
       forecast: forecast({
         visits: {
@@ -113,14 +119,21 @@ describe('reportInsights', () => {
           merchants: [{ label: 'スーパーさくら', everyDays: 7, probability: 0.88, meanYen: 4800 }],
         },
         seasonal: { active: true, periodFactor: 1.25 },
-        calibration: { widthFactor: 1.4, sampleSize: 12, centerFactor: 1 },
+        calibration: {
+          centerByPhase: { early: 1, mid: 1.12, late: 1 },
+          pit: [],
+          pitByPhase: { early: [], mid: [], late: [] },
+          pitWeight: 0.5,
+          months: 6,
+          sampleSize: 12,
+        },
       }),
       budgetYen: null,
       periodLabel: '今月',
     });
     expect(out.find((i) => i.key === 'visits')!.text).toContain('約7日おき');
     expect(out.find((i) => i.key === 'season')!.text).toContain('25%多い');
-    expect(out.find((i) => i.key === 'calibration')!.text).toContain('1.4倍');
+    expect(out.find((i) => i.key === 'center')!.text).toContain('12%ほど多かった');
   });
 
   it('記録が短いときは、幅が広い理由を最初に伝える', () => {
@@ -131,6 +144,33 @@ describe('reportInsights', () => {
     });
     expect(out[0]!.key).toBe('learning');
     expect(out[0]!.text).toContain('6日');
+  });
+
+  it('記録の遅れと、月払いの請求と、検証の月が少ないときの目安を知らせる', () => {
+    const out = reportInsights({
+      forecast: forecast({
+        unrecordedYen: 4300,
+        bills: { expectedYen: 7200, items: [{ label: 'でんき', meanYen: 7200 }] },
+        provisional: true,
+      }),
+      budgetYen: null,
+      periodLabel: '今月',
+    });
+    expect(out.find((i) => i.key === 'unrecorded')!.text).toContain('4,300円');
+    expect(out.find((i) => i.key === 'bills')!.text).toContain('でんき');
+    expect(out.find((i) => i.key === 'provisional')!.text).toContain('目安');
+  });
+
+  it('予算に収まる確率は、99%以上・1%未満と言い切らずに出す', () => {
+    const text = (p: number) =>
+      reportInsights({
+        forecast: forecast({ probWithinBudget: p, expectedOvershoot: 1000 }),
+        budgetYen: 50000,
+        periodLabel: '今月',
+      }).find((i) => i.key === 'budget')!.text;
+    expect(text(0.999)).toContain('99%以上');
+    expect(text(0.001)).toContain('1%未満');
+    expect(text(0.85)).toContain('85%');
   });
 
   it('多くても6件まで', () => {
@@ -148,7 +188,14 @@ describe('reportInsights', () => {
         },
         seasonal: { active: true, periodFactor: 1.3 },
         drivers: [{ categoryId: 'dining', categoryName: '外食', shareOfRisk: 0.8 }],
-        calibration: { widthFactor: 1.5, sampleSize: 10, centerFactor: 1 },
+        calibration: {
+          centerByPhase: { early: 1, mid: 1, late: 1 },
+          pit: [],
+          pitByPhase: { early: [], mid: [], late: [] },
+          pitWeight: 0.5,
+          months: 6,
+          sampleSize: 12,
+        },
       }),
       budgetYen: 50000,
       periodLabel: '今月',

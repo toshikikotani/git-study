@@ -21,15 +21,14 @@ export function VerificationCard({ verification }: { verification: Verification 
             className="tabular mt-2 text-4xl leading-none font-semibold tracking-[-0.045em]"
             style={{ color: 'var(--ink)' }}
           >
-            {Math.round(verification.summary.hitRate80 * 100)}%
+            {Math.round(verification.summary.calibratedHitRate80 * 100)}%
           </p>
           <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            過去{verification.summary.pointCount}回の予測のうち、実際の着地が「10回中8回の幅」に
-            入った割合(目安は80%)。中央値のずれは平均{' '}
-            {Math.round(verification.summary.medianAbsErrorRatio * 100)}%。
-            {verification.calibration.widthFactor !== 1
-              ? ` 幅は${verification.calibration.widthFactor.toFixed(2)}倍に補正している。`
-              : ''}
+            過去{verification.summary.months}か月・{verification.summary.pointCount}
+            回の予測(2日おき)を、補正したうえで実際と比べたとき、着地が「10回中8回の幅」に入った割合
+            (目安は80%)。補正の前は{Math.round(verification.summary.hitRate80 * 100)}
+            %、中央値のずれは平均 {Math.round(verification.summary.medianAbsErrorRatio * 100)}%。
+            {verification.summary.months < 3 ? ' 確かめられた月がまだ少ないので、目安。' : ''}
           </p>
         </>
       )}

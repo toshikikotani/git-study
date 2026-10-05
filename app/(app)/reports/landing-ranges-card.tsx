@@ -1,3 +1,4 @@
+import { CAUTION_EXCEEDANCE, formatProbability } from '@/domain/forecast/format';
 import { formatYen } from '@/domain/money';
 
 export type LandingRow = {
@@ -43,6 +44,14 @@ export function LandingRangesCard({
                 {row.name}
               </span>
               <span className="tabular shrink-0 text-sm" style={{ color: 'var(--ink)' }}>
+                {row.exceedance !== null && row.exceedance >= CAUTION_EXCEEDANCE ? (
+                  <span
+                    className="mr-2 text-xs font-semibold"
+                    style={{ color: 'var(--state-caution)' }}
+                  >
+                    注意
+                  </span>
+                ) : null}
                 {formatYen(row.p50, { sign: 'never' })}
               </span>
             </div>
@@ -83,14 +92,14 @@ export function LandingRangesCard({
             <p className="tabular mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
               {formatYen(row.p10, { sign: 'never' })} 〜 {formatYen(row.p90, { sign: 'never' })}
               {row.exceedance !== null && row.targetYen !== null
-                ? ` ・ 目標 ${formatYen(row.targetYen, { sign: 'never' })} を超える確率 ${Math.round(row.exceedance * 100)}%`
+                ? ` ・ 目標 ${formatYen(row.targetYen, { sign: 'never' })} を超える確率 ${formatProbability(row.exceedance)}`
                 : ''}
             </p>
           </li>
         ))}
       </ul>
       <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        濃い部分はもう決まっている額、帯は10回中8回の範囲、縦線は中央値。
+        濃い部分はもう決まっている額、帯は下振れ〜上振れ(10回中8回の範囲)、縦線は中央。超える確率が20%以上のジャンルに「注意」。
       </p>
     </section>
   );

@@ -13,7 +13,7 @@ import { entryStatus, type EntryKind } from '@/domain/ledger';
 import { resolveItemGenres } from '@/features/genre/item-genres';
 import type { PaymentMethod } from '@/features/import/adapters';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
-import type { DateOnly } from '@/lib/date';
+import { todayJst, type DateOnly } from '@/lib/date';
 import { isMissingColumnError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { LedgerSplit, LedgerTransaction } from './ledger-types';
@@ -21,7 +21,7 @@ import type { LedgerSplit, LedgerTransaction } from './ledger-types';
 export class LedgerLoadError extends Error {}
 
 const BASE_COLUMNS =
-  'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method, must_pay, note, import_batch_id';
+  'id, occurred_on, description, merchant_name, amount_yen, genre_id, is_transfer, review_status, account_id, payment_method, must_pay, note, import_batch_id, created_at';
 const SPLIT_ID_CHUNK = 50;
 
 export type LedgerGenre = { id: string; name: string; budget_yen: number | null };
@@ -50,6 +50,7 @@ type RawRow = {
   must_pay: boolean;
   note: string | null;
   import_batch_id: string | null;
+  created_at?: string | null;
   kind?: string | null;
   branch_name?: string | null;
   reconcile_diff_yen?: number | null;
@@ -150,6 +151,7 @@ export async function loadLedgerTransactions(
       reconcileDiffYen: row.reconcile_diff_yen ?? null,
       mustPay: row.must_pay,
       needsInput: false,
+      ...(row.created_at ? { createdOn: todayJst(new Date(row.created_at)) } : {}),
       isTransfer: row.is_transfer,
       reviewStatus: row.review_status,
       status: entryStatus(row.occurred_on, today),
