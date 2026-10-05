@@ -274,6 +274,42 @@ create policy "own_rows" on public.fixed_cost_confirmations
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 10. ai_forecast_reads — AIの読み(着地の見込みへのAIの補正、ADR-072)
+-- -----------------------------------------------------------------------------
+-- 月次レポートを作るたびに1行足す(上書きしない)。月が終わったら、その月の実際の着地と
+-- 比べて「AIの読みが統計より当たったか」を数え、次からの補正の効かせ方に使う。
+create table if not exists public.ai_forecast_reads (
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  month            date        not null,
+  as_of            date        not null,
+  known_yen        integer     not null,
+  stat_p10_yen     integer     not null,
+  stat_p50_yen     integer     not null,
+  stat_p90_yen     integer     not null,
+  ai_percent       integer     not null,
+  trust            numeric     not null,
+  adjusted_p50_yen integer     not null,
+  reason           text        not null,
+  evidence         text[]      not null default '{}',
+  created_at       timestamptz not null default now(),
+
+  constraint ck_ai_forecast_reads_percent check (ai_percent between -20 and 30),
+  constraint ck_ai_forecast_reads_trust check (trust >= 0 and trust <= 1)
+);
+
+create index if not exists ai_forecast_reads_user_month_idx on public.ai_forecast_reads (user_id, month);
+
+alter table public.ai_forecast_reads enable row level security;
+alter table public.ai_forecast_reads force row level security;
+
+drop policy if exists "own_rows" on public.ai_forecast_reads;
+create policy "own_rows" on public.ai_forecast_reads
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -350,4 +386,11 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'fixed_cost_confirmations'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'ai_forecast_reads',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'ai_forecast_reads'
   ) then 'ok' else 'NG: テーブルが無い' end;

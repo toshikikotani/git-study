@@ -1750,6 +1750,33 @@ create table public.fixed_cost_confirmations (
 );
 
 
+-- 3.34 ai_forecast_reads — AIの読み(着地の見込みへのAIの補正、本人発案、ADR-072)
+-- 月次レポートを作るたびに1行足す(上書きしない)。月が終わったら、その月の実際の着地と
+-- 比べて「AIの読みが統計より当たったか」を数え、次からの補正の効かせ方に使う。
+-- AIは補正の%を選ぶだけで、金額はアプリが計算する(N1)。
+create table public.ai_forecast_reads (
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  month            date        not null,
+  as_of            date        not null,
+  known_yen        integer     not null,
+  stat_p10_yen     integer     not null,
+  stat_p50_yen     integer     not null,
+  stat_p90_yen     integer     not null,
+  ai_percent       integer     not null,
+  trust            numeric     not null,
+  adjusted_p50_yen integer     not null,
+  reason           text        not null,
+  evidence         text[]      not null default '{}',
+  created_at       timestamptz not null default now(),
+
+  constraint ck_ai_forecast_reads_percent check (ai_percent between -20 and 30),
+  constraint ck_ai_forecast_reads_trust check (trust >= 0 and trust <= 1)
+);
+
+create index ai_forecast_reads_user_month_idx on public.ai_forecast_reads (user_id, month);
+
+
 
 
 -- =============================================================================
@@ -2092,7 +2119,8 @@ begin
     'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
     'ai_monthly_reports','ai_daily_reports','receipt_items',
     'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
-    'genre_memory','receipt_captures','ai_cache','fixed_cost_confirmations'
+    'genre_memory','receipt_captures','ai_cache','fixed_cost_confirmations',
+    'ai_forecast_reads'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -2285,4 +2313,5 @@ commit;
 --   genres                  → ADR-056/ADR-057。唯一の分類(旧 categories を置換)
 --   spending_plans          → ADR-058。カレンダーで選んだ期間のジャンル別支出目標
 --   spending_plan_items     → ADR-058。目標の明細(AI提案額と本人の目標額)
+--   ai_forecast_reads       → ADR-072。AIの読み(着地の見込みへの補正と、その当たり具合)
 -- =============================================================================

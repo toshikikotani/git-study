@@ -18,6 +18,8 @@ import { MonthlyReportCard } from './report-view';
  * (見た目・判断ロジックを二重に持たない)。絞り込みは /spending 側で行う。
  */
 export const dynamic = 'force-dynamic';
+// 着地の見込み(確率予測)と、初回だけ過去の月での検証を含むため、余裕を持たせる。
+export const maxDuration = 60;
 
 export default async function AiReportPage() {
   const [dailyView, monthlyView, ledger] = await withMinDuration(

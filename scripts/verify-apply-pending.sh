@@ -40,6 +40,8 @@ PENDING=(
   20260930000800_genre_quick_entry.sql
   20260930000900_fixed_cost_confirmations.sql
   20260930001000_fixed_cost_confirmations_rls.sql
+  20261006000100_ai_forecast_reads.sql
+  20261006000200_ai_forecast_reads_rls.sql
 )
 
 WORK="$(mktemp -d)"
