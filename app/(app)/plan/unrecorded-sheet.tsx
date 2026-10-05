@@ -55,12 +55,9 @@ export function UnrecordedSheet({
         onClick={() => setOpen(true)}
         className="min-h-11 flex w-full items-center justify-between px-4 py-3 text-sm font-semibold"
         style={{
-          borderRadius: 40,
-          background: 'rgba(255, 255, 255, 0.38)',
-          backdropFilter: 'blur(34px) saturate(190%)',
-          WebkitBackdropFilter: 'blur(34px) saturate(190%)',
-          border: '1px solid rgba(255, 255, 255, 0.72)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.92), 0 10px 24px rgba(16,24,40,0.08)',
+          borderRadius: 'var(--radius-full)',
+          background: 'var(--surface)',
+          boxShadow: 'var(--card-shadow)',
           color: 'var(--ink)',
         }}
       >

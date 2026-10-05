@@ -84,8 +84,8 @@ export function buildGoalView(input: {
     uncategorizedTodayYen: todaySummary.byGenrePace.get(null) ?? 0,
   });
 
-  // 目標行があるジャンルは、金額0でも「この目標では数えない」として未収録に戻さない。
-  const planned = new Set(plan.items.map((i) => i.genreId));
+  // 目標が0円のジャンルは「予算なし」。実績があれば未収録に出し、見えなくしない。
+  const planned = new Set(plan.items.filter((i) => i.targetYen > 0).map((i) => i.genreId));
   const breakdown: GoalBreakdownRow[] = guidance.genres
     .filter((g) => g.status !== 'no_budget')
     .map((g) => ({

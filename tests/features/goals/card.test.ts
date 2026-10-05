@@ -74,11 +74,13 @@ function amountsIn(text: string): number[] {
 }
 
 describe('F2 目標カード(受け入れ基準2)', () => {
-  it('主役は「今日あと○円」1つ。理想ペースとの差は内訳に入る', () => {
-    const m = buildGoalCard(view(base), '2026-09-29');
-    // 予定 31,540 を引いた 18,460 ÷ 8 = 2,307 / 今日 936円(未分類300含む)
-    expect(m.primary).toMatchObject({ label: '今日あと', amountYen: 2307 - 936 });
-    expect(m.details.map((d) => d.key)).toContain('pace');
+  it('第一行は確保した貯蓄1つ。手取りが無ければ空欄で、理由を添える', () => {
+    const empty = buildGoalCard(view(base), '2026-09-29');
+    expect(empty.primary).toMatchObject({ label: '確保した貯蓄', amountYen: null });
+    expect(empty.primary.note).not.toBeNull();
+    const filled = buildGoalCard(view(base), '2026-09-29', { savingsYen: 52000 });
+    expect(filled.primary).toMatchObject({ label: '確保した貯蓄', amountYen: 52000, note: null });
+    expect(filled.details.map((d) => d.key)).toContain('pace');
   });
 
   it('1日の目安(2,307円)は結果予想(N5)の一言に出るため、内訳からは落ちる(同じ数値を二重に出さない)', () => {
@@ -99,12 +101,6 @@ describe('F2 目標カード(受け入れ基準2)', () => {
     expect(amountsIn(html).length).toBeGreaterThan(3);
   });
 
-  it('今日まだ使っていないとき、1日の目安=今日あと が同じ値になるので内訳から落とす', () => {
-    const m = buildGoalCard(view([base[1]!, base[2]!]), '2026-09-29');
-    expect(m.primary.amountYen).toBe(2307);
-    expect(m.details.some((d) => d.key === 'daily')).toBe(false);
-  });
-
   it('差は符号ではなく言葉(「理想より○円多い/少ない」)', () => {
     const m = buildGoalCard(view(base), '2026-09-29');
     const pace = m.details.find((d) => d.key === 'pace')!;
@@ -112,12 +108,7 @@ describe('F2 目標カード(受け入れ基準2)', () => {
     expect(pace.text).not.toMatch(/[+−-]\d/);
   });
 
-  it('状態バッジは注意・超過のときだけ(余裕のときは出さない)', () => {
-    const ok = buildGoalCard(view([base[0]!]), '2026-09-29');
-    expect(ok.badge).toBeNull();
-    const html = renderToString(h(GoalCard, { model: ok }));
-    expect(html).not.toContain('余裕');
-    // 予定込みで予算を超える → 超過
+  it('状態バッジは出さない(超過は文章の一言で伝える)', () => {
     const over = buildGoalCard(
       view([
         ...base,
@@ -131,7 +122,9 @@ describe('F2 目標カード(受け入れ基準2)', () => {
       ]),
       '2026-09-29',
     );
-    expect(over.badge).toMatchObject({ state: 'over' });
+    const html = renderToString(h(GoalCard, { model: over })).replace(/<!-- -->/g, '');
+    expect(html).not.toContain('余裕');
+    expect(html).toContain(over.summary);
   });
 
   it('予定の行は展開でき、日付・名前・金額・ジャンルを一覧で見せる', () => {

@@ -48,6 +48,6 @@ describe('デザイントークン', () => {
     expect(css).toContain('env(safe-area-inset-top');
     const layout = readFileSync(new URL('../../app/(app)/app-shell.tsx', import.meta.url), 'utf8');
     expect(layout).toContain('status-blur');
-    expect(layout).toMatch(/pb-\[calc\(9rem\+env\(safe-area-inset-bottom\)\)\]/);
+    expect(layout).toMatch(/pb-\[calc\(11rem\+env\(safe-area-inset-bottom\)\)\]/);
   });
 });

@@ -21,7 +21,7 @@ vi.mock('../../app/(app)/spending/category/actions', () => ({
 }));
 vi.mock('../../app/(app)/plan/actions', () => ({
   updatePlanAllocationAction: vi.fn(),
-  refinePlanAction: vi.fn(),
+  planLandingAction: vi.fn(),
 }));
 
 import { SettingsBody } from '../../app/(app)/spending/category/[genreKey]/category-settings';
@@ -35,7 +35,8 @@ const visible = (html: string) => html.replace(/<!-- -->/g, '');
 const data = {
   genreKey: 'dining',
   genreName: '外食',
-  genreBudgetYen: 30000, forecastClosed: false,
+  genreBudgetYen: 30000,
+  forecastClosed: false,
   genres: [
     { id: 'dining', name: '外食' },
     { id: 'cafe', name: 'カフェ' },

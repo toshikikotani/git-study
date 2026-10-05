@@ -40,22 +40,6 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
                 {primary.amountYen === null ? '—' : <Yen value={primary.amountYen} />}
               </p>
             </div>
-            {model.badge ? (
-              <span
-                className="rounded-full px-2 py-1 text-xs font-semibold"
-                style={{
-                  background:
-                    model.badge.state === 'over'
-                      ? 'var(--state-over-track)'
-                      : 'var(--state-caution-track)',
-                  color:
-                    model.badge.state === 'over' ? 'var(--state-over)' : 'var(--state-caution)',
-                }}
-              >
-                <span aria-hidden>{model.badge.state === 'over' ? '! ' : '▲ '}</span>
-                {model.badge.label}
-              </span>
-            ) : null}
           </div>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
             {model.summary}
@@ -131,6 +115,15 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
           </span>
           <span style={{ color: 'var(--ink)' }}>分類する →</span>
         </Link>
+      ) : null}
+
+      {model.pending ? (
+        <p
+          className="mt-3 border-t pt-3 text-sm"
+          style={{ borderColor: 'var(--hairline)', color: 'var(--ink-secondary)' }}
+        >
+          入力待ちのレシート {model.pending.count}件(目標に未反映)
+        </p>
       ) : null}
     </section>
   );

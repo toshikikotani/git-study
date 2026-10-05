@@ -76,6 +76,7 @@ export function PlanBuilder({
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [busy, setBusy] = useState<'suggest' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsGenres, setNeedsGenres] = useState(false);
 
   const conflict = start !== null && end !== null ? findOverlap(ranges, { start, end }) : null;
   const overlapError = conflict === null ? null : overlapMessage(conflict);
@@ -91,10 +92,12 @@ export function PlanBuilder({
     if (start === null || end === null || overlapError !== null) return;
     setBusy('suggest');
     setError(null);
+    setNeedsGenres(false);
     const result = await suggestPlanAction(start, end, step);
     setBusy(null);
     if (result.error !== null) {
       setError(result.error);
+      setNeedsGenres(result.needsGenres === true);
       return;
     }
     setSuggestion({
@@ -331,6 +334,15 @@ export function PlanBuilder({
       {error ? (
         <p className="mt-3 text-xs" style={{ color: 'var(--over)' }}>
           {error}
+          {needsGenres ? (
+            <Link
+              href="/reports/genres"
+              className="min-h-11 ml-1 inline-flex items-center font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              ジャンル分類へ
+            </Link>
+          ) : null}
         </p>
       ) : null}
     </details>

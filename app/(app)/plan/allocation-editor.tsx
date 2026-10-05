@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatYen } from '@/domain/money';
 import { rebalanceToTotal } from '@/domain/spending-plan';
-import { refinePlanAction } from './actions';
+import { planLandingAction } from './actions';
 import { ForecastReport, type ForecastRow } from './forecast-report';
 
 export type AllocationRow = {
@@ -47,7 +47,6 @@ export function AllocationEditor({
     Object.fromEntries(rows.map((r) => [r.genreId, String(r.yen)])),
   );
   const [pinned, setPinned] = useState<ReadonlySet<string>>(new Set());
-  const [instruction, setInstruction] = useState('');
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<ForecastRow[]>([]);
   const [proposedTotal, setProposedTotal] = useState<number | null>(null);
@@ -100,16 +99,14 @@ export function AllocationEditor({
     setTotalDraft(null);
   };
 
-  const consultAi = async () => {
-    if (total === null || !allValid) return;
+  const showLanding = async () => {
+    if (!allValid) return;
     setBusy('ai');
     setError(null);
-    const result = await refinePlanAction({
+    const result = await planLandingAction({
       periodStart,
       periodEnd,
-      totalYen: total,
       items: rows.map((r, i) => ({ genreId: r.genreId, targetYen: parsed[i]! })),
-      instruction,
     });
     setBusy(null);
     if (result.error !== null) {
@@ -303,24 +300,11 @@ export function AllocationEditor({
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
           このままだと、いくらで着きそうか
         </p>
-        <textarea
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          maxLength={200}
-          rows={2}
-          placeholder="メモ。着地の計算には使いません"
-          className="mt-2 w-full rounded-lg px-2 py-2 text-xs"
-          style={{
-            background: 'var(--surface)',
-            color: 'var(--ink)',
-            border: '1px solid var(--hairline)',
-          }}
-        />
         <Button
           variant="outlined"
           className="mt-2 w-full"
           disabled={total === null || !allValid || busy !== null}
-          onClick={() => void consultAi()}
+          onClick={() => void showLanding()}
         >
           {busy === 'ai' ? '計算しています…' : '着地を見る'}
         </Button>

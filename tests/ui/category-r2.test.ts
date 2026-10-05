@@ -141,7 +141,8 @@ describe('R2 画面の初期表示は「累計」', () => {
     const data = {
       genreKey: 'transport',
       genreName: '交通・車両',
-      genreBudgetYen: null, forecastClosed: false,
+      genreBudgetYen: null,
+      forecastClosed: false,
       monthKey: '2026-09',
       monthStart: '2026-09-01',
       today: TODAY,

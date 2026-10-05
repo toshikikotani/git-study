@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('../../../app/(app)/plan/actions', () => ({
   savePlanAction: vi.fn(),
   suggestPlanAction: vi.fn(),
-  refinePlanAction: vi.fn(),
+  planLandingAction: vi.fn(),
 }));
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
