@@ -36,7 +36,13 @@ import {
   sampleStandardNormal,
   type Rng,
 } from './rng';
-import type { FittedModel, Forecast, ForecastDriver } from './types';
+import type {
+  CategoryPeriodBase,
+  FittedModel,
+  Forecast,
+  ForecastCategoryBand,
+  ForecastDriver,
+} from './types';
 
 export const DEFAULT_TRIALS = 10_000;
 export const MIN_TRIALS = 2_000;
@@ -63,6 +69,10 @@ export type SimulateInput = {
   bootstrapWeight: number;
   trials?: number;
   seed: string;
+  /** カテゴリ別の期間内の実績・予定(着地額の土台)。 */
+  categoryBases?: readonly CategoryPeriodBase[];
+  /** カテゴリ別の目標(予算)。目標超えの確率に使う。 */
+  categoryTargets?: ReadonlyMap<string, number>;
 };
 
 function quantile(sortedAsc: readonly number[], p: number): number {
@@ -200,16 +210,50 @@ export function simulateForecast(input: SimulateInput): Forecast {
   for (let t = 0; t < trials; t += 1) sumTotal += totalSamples[t]!;
   const mean = sumTotal / trials;
 
-  const byCategory = categories.map((cat, c) => {
-    const sorted = Array.from(categorySamples[c]!).sort((a, b) => a - b);
+  const baseById = new Map((input.categoryBases ?? []).map((b) => [b.categoryId, b]));
+  const bandFor = (
+    categoryId: string,
+    categoryName: string,
+    samples: Float64Array | null,
+  ): ForecastCategoryBand => {
+    const sorted = samples ? Array.from(samples).sort((a, b) => a - b) : [0];
+    const base = baseById.get(categoryId);
+    const actualYen = base?.actualYen ?? 0;
+    const scheduledYen = base?.scheduledYen ?? 0;
+    const offset = actualYen + scheduledYen;
+    const targetYen = input.categoryTargets?.get(categoryId) ?? null;
+    let probOverTarget: number | null = null;
+    if (targetYen !== null) {
+      let over = 0;
+      for (const v of sorted) if (offset + v > targetYen) over += 1;
+      probOverTarget = over / sorted.length;
+    }
+    const p10 = quantile(sorted, 0.1);
+    const p50 = quantile(sorted, 0.5);
+    const p90 = quantile(sorted, 0.9);
     return {
-      categoryId: cat.categoryId,
-      categoryName: cat.categoryName,
-      p10: quantile(sorted, 0.1),
-      p50: quantile(sorted, 0.5),
-      p90: quantile(sorted, 0.9),
+      categoryId,
+      categoryName,
+      p10,
+      p50,
+      p90,
+      actualYen,
+      scheduledYen,
+      landing: { p10: offset + p10, p50: offset + p50, p90: offset + p90 },
+      targetYen,
+      probOverTarget,
     };
-  });
+  };
+  const byCategory = categories.map((cat, c) =>
+    bandFor(cat.categoryId, cat.categoryName, categorySamples[c]!),
+  );
+  // 学習データに無く、今期の予定だけがあるカテゴリも着地額に含める。
+  const modeled = new Set(categories.map((c) => c.categoryId));
+  for (const base of input.categoryBases ?? []) {
+    if (!modeled.has(base.categoryId)) {
+      byCategory.push(bandFor(base.categoryId, base.categoryName, null));
+    }
+  }
 
   const probWithinBudget = input.budgetYen !== null ? 1 - overshootTrialCount / trials : null;
   const expectedOvershoot =

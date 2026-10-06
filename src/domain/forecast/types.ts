@@ -23,6 +23,13 @@ export type MissingRecordDay = {
   categoryName: string;
 };
 
+export type CategoryPeriodBase = {
+  categoryId: string;
+  categoryName: string;
+  actualYen: number;
+  scheduledYen: number;
+};
+
 export type DecomposedSpending = {
   trainingWindow: { from: DateOnly; to: DateOnly };
   period: { from: DateOnly; to: DateOnly };
@@ -47,6 +54,8 @@ export type DecomposedSpending = {
   };
   /** 変動費のカテゴリ×日学習データ。 */
   variable: readonly VariableTrainingData[];
+  /** 期間内のカテゴリ別の実績(今日まで)と予定(明日以降)。 */
+  periodByCategory: readonly CategoryPeriodBase[];
   missingRecordDays: readonly MissingRecordDay[];
   /** 学習に使えた実際の日数(記録開始日・学習窓の短い方)。 */
   dataDays: number;
@@ -87,12 +96,23 @@ export type FittedModel = {
   dataDays: number;
 };
 
+/**
+ * カテゴリ別の予測。p10/p50/p90 は残り期間の変動費だけ(累計グラフの帯の
+ * 上乗せ分)。landing は実績+予定+変動費の着地額。
+ */
 export type ForecastCategoryBand = {
   categoryId: string;
   categoryName: string;
   p10: number;
   p50: number;
   p90: number;
+  actualYen: number;
+  scheduledYen: number;
+  landing: { p10: number; p50: number; p90: number };
+  /** カテゴリの目標(予算)。無ければ null。 */
+  targetYen: number | null;
+  /** 着地額が目標を超える確率。目標が無ければ null。 */
+  probOverTarget: number | null;
 };
 
 export type ForecastDriver = { categoryId: string; categoryName: string; shareOfRisk: number };

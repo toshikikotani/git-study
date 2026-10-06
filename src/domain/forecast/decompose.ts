@@ -218,6 +218,28 @@ export function decomposeSpending(input: {
     }
   }
 
+  // カテゴリ別の、期間内の実績と予定(カテゴリ別の着地額・目標超えの確率に使う)。
+  const periodByCategoryMap = new Map<
+    string,
+    { categoryId: string; categoryName: string; actualYen: number; scheduledYen: number }
+  >();
+  for (const t of countable) {
+    if (t.kind !== 'normal' || t.occurredOn < period.from || t.occurredOn > period.to) continue;
+    const isActual = t.status === 'actual';
+    const isScheduled = t.status === 'scheduled' && t.occurredOn > today;
+    if (!isActual && !isScheduled) continue;
+    const id = t.genreId ?? UNCATEGORIZED_ID;
+    const row = periodByCategoryMap.get(id) ?? {
+      categoryId: id,
+      categoryName: t.genreName ?? '未分類',
+      actualYen: 0,
+      scheduledYen: 0,
+    };
+    if (isActual) row.actualYen += -t.amountYen;
+    else row.scheduledYen += -t.amountYen;
+    periodByCategoryMap.set(id, row);
+  }
+
   // 特別費の再標本化の母集団:学習窓内の special kind 実績 + 外れ値として除外した候補。
   const specialFromKind = countable
     .filter(
@@ -241,6 +263,7 @@ export function decomposeSpending(input: {
       occurrencesPerDay: specialOccurrencesPerDay,
     },
     variable,
+    periodByCategory: [...periodByCategoryMap.values()],
     missingRecordDays,
     dataDays,
   };

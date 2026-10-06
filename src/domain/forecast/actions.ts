@@ -1,5 +1,5 @@
 /**
- * M5:打ち手の試算。「外食をあと1回減らす」のようなカテゴリ単位の打ち手を、
+ * M5:打ち手の試算。「外食を週1回へらす」のようなカテゴリ単位の打ち手を、
  * 元の予測と同じ乱数(共通乱数法)でシミュレーションし直し、予算内に収まる
  * 確率・着地額がどう変わるかを出す。
  *
@@ -25,17 +25,24 @@ import {
   samplePoisson,
   sampleStandardNormal,
 } from './rng';
-import type { CategoryModelParams, FittedModel, ForecastDriver } from './types';
+import type { CategoryModelParams, CategoryPeriodBase, FittedModel, ForecastDriver } from './types';
 
-export type ActionKind = 'reduce_count' | 'every_other_day';
+/**
+ * 打ち手の効き方。
+ *   reduce_count:残り期間の期待回数から count 回を引く(下限あり)
+ *   scale_rate  :残り期間の回数の率に factor を掛ける
+ */
+export type ActionEffect =
+  { type: 'reduce_count'; count: number } | { type: 'scale_rate'; factor: number };
 
 export type ActionCandidate = {
   categoryId: string;
   categoryName: string;
-  kind: ActionKind;
+  /** 画面のチップ・選択肢に出す短い名前(例:「週1回へらす」)。 */
+  label: string;
+  /** 文として出す名前(例:「外食を週1回へらす」)。 */
   description: string;
-  /** そのカテゴリの回数の率(λ×曜日等係数の合計)に掛ける倍率。 */
-  rateMultiplier: number;
+  effect: ActionEffect;
 };
 
 export type ActionResult = {
@@ -47,6 +54,12 @@ export type ActionResult = {
   newP50: number;
   /** 着地額の変化(負なら改善=減る)。 */
   totalDelta: number;
+  /** 対象カテゴリの着地額(中央・10回中8回の幅)。 */
+  category: {
+    landing: { p10: number; p50: number; p90: number };
+    targetYen: number | null;
+    probOverTarget: number | null;
+  };
 };
 
 export type ActionSimulationInput = {
@@ -63,37 +76,73 @@ export type ActionSimulationInput = {
   payday: number | null;
   dataVersion: string;
   trials?: number;
+  categoryBases?: readonly CategoryPeriodBase[];
+  categoryTargets?: ReadonlyMap<string, number>;
 };
 
 const DEFAULT_ACTION_TRIALS = 2000;
-/** 「あと1回減らす」の1回を、残り期間の期待回数から差し引くための下限。 */
-const MIN_EXPECTED_COUNT_FOR_REDUCE = 0.2;
+/** 回数を減らしても、期待回数はこれより下げない(0回の約束は現実的でないため)。 */
+const MIN_EXPECTED_COUNT = 0.2;
 
-/** drivers(超過リスクの主な原因、上位カテゴリ)から打ち手の候補を作る(M5)。 */
+/** 「いつも通り」(何も変えない)。比較の基準として選択肢に並べる。 */
+export function keepAsIs(categoryId: string, categoryName: string): ActionCandidate {
+  return {
+    categoryId,
+    categoryName,
+    label: 'いつも通り',
+    description: `${categoryName}はいつも通り`,
+    effect: { type: 'scale_rate', factor: 1 },
+  };
+}
+
+/** 1カテゴリの打ち手の選択肢(週1回へらす・週2回へらす)。 */
+export function weeklyReductionCandidates(
+  categoryId: string,
+  categoryName: string,
+  remainingDays: number,
+): ActionCandidate[] {
+  const weeks = Math.max(0, remainingDays) / 7;
+  return [1, 2].map((perWeek) => ({
+    categoryId,
+    categoryName,
+    label: `週${perWeek}回へらす`,
+    description: `${categoryName}を週${perWeek}回へらす`,
+    effect: { type: 'reduce_count', count: perWeek * weeks },
+  }));
+}
+
+/**
+ * drivers(超過リスクの上位カテゴリ)から打ち手の候補を作る(M5)。
+ * 各カテゴリに「あと1回へらす」「週1回へらす」「1日おきにする」を用意する。
+ */
 export function buildActionCandidates(
   drivers: readonly ForecastDriver[],
   categories: readonly CategoryModelParams[],
+  remainingDays: number,
   maxCategories = 3,
 ): ActionCandidate[] {
   const byId = new Map(categories.map((c) => [c.categoryId, c]));
-  const targets = drivers.slice(0, maxCategories);
   const candidates: ActionCandidate[] = [];
-  for (const driver of targets) {
+  for (const driver of drivers.slice(0, maxCategories)) {
     const cat = byId.get(driver.categoryId);
     if (cat === undefined) continue;
+    const name = cat.categoryName;
     candidates.push({
       categoryId: cat.categoryId,
-      categoryName: cat.categoryName,
-      kind: 'reduce_count',
-      description: `${cat.categoryName}をあと1回減らす`,
-      rateMultiplier: -1, // simulateAction 側で「1回ぶん減らす」専用の扱いをする目印
+      categoryName: name,
+      label: 'あと1回へらす',
+      description: `${name}をあと1回へらす`,
+      effect: { type: 'reduce_count', count: 1 },
     });
+    if (remainingDays >= 7) {
+      candidates.push(weeklyReductionCandidates(cat.categoryId, name, remainingDays)[0]!);
+    }
     candidates.push({
       categoryId: cat.categoryId,
-      categoryName: cat.categoryName,
-      kind: 'every_other_day',
-      description: `${cat.categoryName}を1日おきにする`,
-      rateMultiplier: 0.5,
+      categoryName: name,
+      label: '1日おきにする',
+      description: `${name}を1日おきにする`,
+      effect: { type: 'scale_rate', factor: 0.5 },
     });
   }
   return candidates;
@@ -115,16 +164,13 @@ function totalFactorFor(
   return sum;
 }
 
-/**
- * 1カテゴリぶんの、残り期間の変動費を試行回ぶん計算する。rateMultiplier=-1 は
- * 「あと1回減らす」(期待回数から1を引く、下限あり)、それ以外は率への倍率。
- */
+/** 1カテゴリぶんの、残り期間の変動費を試行回ぶん計算する。 */
 function simulateCategoryTrials(
   seed: string,
   cat: CategoryModelParams,
   totalFactor: number,
   trials: number,
-  rateMultiplier: number | null,
+  effect: ActionEffect | null,
 ): Float64Array {
   const rng = createRng(seed);
   const out = new Float64Array(trials);
@@ -137,10 +183,13 @@ function simulateCategoryTrials(
     const sigma = Math.sqrt(cat.amountPosterior.sigmaSq);
 
     let expectedCount = lambda * totalFactor;
-    if (rateMultiplier === -1) {
-      expectedCount = Math.max(MIN_EXPECTED_COUNT_FOR_REDUCE, expectedCount - 1);
-    } else if (rateMultiplier !== null) {
-      expectedCount *= rateMultiplier;
+    if (effect?.type === 'reduce_count') {
+      expectedCount = Math.max(
+        Math.min(expectedCount, MIN_EXPECTED_COUNT),
+        expectedCount - effect.count,
+      );
+    } else if (effect?.type === 'scale_rate') {
+      expectedCount *= effect.factor;
     }
 
     const count = samplePoisson(rng, expectedCount);
@@ -163,8 +212,9 @@ function simulateSpecialTrials(
   for (let t = 0; t < trials; t += 1) {
     const count = samplePoisson(rng, occurrencesPerDay * remainingDays);
     let total = 0;
-    for (let i = 0; i < count && historicalAmounts.length > 0; i += 1)
+    for (let i = 0; i < count && historicalAmounts.length > 0; i += 1) {
       total += pickOne(rng, historicalAmounts);
+    }
     out[t] = total;
   }
   return out;
@@ -187,15 +237,15 @@ export function simulateActions(
 ): ActionResult[] {
   const trials = input.trials ?? DEFAULT_ACTION_TRIALS;
   const futureDates = eachDay(input.today, input.periodTo).filter((d) => d > input.today);
-  const periodId = input.periodId;
-  const baseSeed = `${periodId}:${input.dataVersion}:actions`;
+  const baseSeed = `${input.periodId}:${input.dataVersion}:actions`;
+  const baseById = new Map((input.categoryBases ?? []).map((b) => [b.categoryId, b]));
 
-  const categoryTrialsByIdBaseline = new Map<string, Float64Array>();
+  const baselineByCategory = new Map<string, Float64Array>();
   const totalFactorById = new Map<string, number>();
   for (const cat of input.fitted.categories) {
     const totalFactor = totalFactorFor(cat, futureDates, input.payday);
     totalFactorById.set(cat.categoryId, totalFactor);
-    categoryTrialsByIdBaseline.set(
+    baselineByCategory.set(
       cat.categoryId,
       simulateCategoryTrials(`${baseSeed}:cat:${cat.categoryId}`, cat, totalFactor, trials, null),
     );
@@ -217,14 +267,19 @@ export function simulateActions(
     }
     return total;
   };
+  const probWithin = (totals: Float64Array): number | null => {
+    if (input.budgetYen === null) return null;
+    let within = 0;
+    for (const v of totals) if (v <= input.budgetYen) within += 1;
+    return within / trials;
+  };
 
-  const baselineTotal = sumAcross(categoryTrialsByIdBaseline);
-  const baselineSorted = Array.from(baselineTotal).sort((a, b) => a - b);
-  const baselineP50 = quantile(baselineSorted, 0.5);
-  const baselineProbWithinBudget =
-    input.budgetYen !== null
-      ? baselineTotal.reduce((n, v) => n + (v <= input.budgetYen! ? 1 : 0), 0) / trials
-      : null;
+  const baselineTotal = sumAcross(baselineByCategory);
+  const baselineP50 = quantile(
+    Array.from(baselineTotal).sort((a, b) => a - b),
+    0.5,
+  );
+  const baselineProbWithinBudget = probWithin(baselineTotal);
 
   const results: ActionResult[] = [];
   for (const action of candidates) {
@@ -232,22 +287,32 @@ export function simulateActions(
     const totalFactor = totalFactorById.get(action.categoryId);
     if (cat === undefined || totalFactor === undefined) continue;
 
-    const modifiedCategoryTrials = simulateCategoryTrials(
+    const modified = simulateCategoryTrials(
       `${baseSeed}:cat:${action.categoryId}`,
       cat,
       totalFactor,
       trials,
-      action.rateMultiplier,
+      action.effect,
     );
-    const perCategory = new Map(categoryTrialsByIdBaseline);
-    perCategory.set(action.categoryId, modifiedCategoryTrials);
+    const perCategory = new Map(baselineByCategory);
+    perCategory.set(action.categoryId, modified);
     const newTotal = sumAcross(perCategory);
-    const newSorted = Array.from(newTotal).sort((a, b) => a - b);
-    const newP50 = quantile(newSorted, 0.5);
-    const newProbWithinBudget =
-      input.budgetYen !== null
-        ? newTotal.reduce((n, v) => n + (v <= input.budgetYen! ? 1 : 0), 0) / trials
-        : null;
+    const newP50 = quantile(
+      Array.from(newTotal).sort((a, b) => a - b),
+      0.5,
+    );
+    const newProbWithinBudget = probWithin(newTotal);
+
+    const base = baseById.get(action.categoryId);
+    const offset = (base?.actualYen ?? 0) + (base?.scheduledYen ?? 0);
+    const catSorted = Array.from(modified).sort((a, b) => a - b);
+    const targetYen = input.categoryTargets?.get(action.categoryId) ?? null;
+    let probOverTarget: number | null = null;
+    if (targetYen !== null) {
+      let over = 0;
+      for (const v of catSorted) if (offset + v > targetYen) over += 1;
+      probOverTarget = over / trials;
+    }
 
     results.push({
       action,
@@ -260,6 +325,15 @@ export function simulateActions(
       baselineP50,
       newP50,
       totalDelta: newP50 - baselineP50,
+      category: {
+        landing: {
+          p10: offset + quantile(catSorted, 0.1),
+          p50: offset + quantile(catSorted, 0.5),
+          p90: offset + quantile(catSorted, 0.9),
+        },
+        targetYen,
+        probOverTarget,
+      },
     });
   }
 
@@ -269,8 +343,11 @@ export function simulateActions(
 /** 効果(確率の改善、無ければ着地額の減り)が大きい順に並べ、最大2件を返す(M5)。 */
 export function topActions(results: readonly ActionResult[], max = 2): ActionResult[] {
   return [...results]
+    .filter((r) => r.totalDelta < 0 || (r.probDelta ?? 0) > 0)
     .sort((a, b) => {
-      if (a.probDelta !== null && b.probDelta !== null) return b.probDelta - a.probDelta;
+      if (a.probDelta !== null && b.probDelta !== null && a.probDelta !== b.probDelta) {
+        return b.probDelta - a.probDelta;
+      }
       return a.totalDelta - b.totalDelta;
     })
     .slice(0, max);

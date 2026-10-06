@@ -9,8 +9,8 @@ import type { DateOnly } from '@/lib/date';
 import { applyWidthFactor, type CalibrationResult } from './backtest';
 import { decomposeSpending, type ForecastSourceTransaction } from './decompose';
 import { fitModel } from './model';
-import { DEFAULT_TRIALS, simulateForecast } from './simulate';
-import type { Forecast } from './types';
+import { DEFAULT_TRIALS, simulateForecast, type SimulateInput } from './simulate';
+import type { DecomposedSpending, FittedModel, Forecast } from './types';
 
 export type BuildForecastInput = {
   transactions: readonly ForecastSourceTransaction[];
@@ -33,9 +33,24 @@ export type BuildForecastInput = {
    * 渡す形にした。無ければ補正なし(widthFactor=1相当)で返す。
    */
   calibration?: CalibrationResult | null;
+  /** カテゴリ別の目標(予算)。目標超えの確率に使う。 */
+  categoryTargets?: ReadonlyMap<string, number>;
 };
 
 export function buildForecast(input: BuildForecastInput): Forecast {
+  return buildForecastDetailed(input).forecast;
+}
+
+/**
+ * 画面(M6)向け。予測結果に加えて、内訳の表示と打ち手の試算(M5)に使う
+ * 分解結果・推定済みモデル・シミュレーションの入力も返す。
+ */
+export function buildForecastDetailed(input: BuildForecastInput): {
+  forecast: Forecast;
+  decomposed: DecomposedSpending;
+  fitted: FittedModel;
+  simulateInput: SimulateInput;
+} {
   const decomposed = decomposeSpending({
     transactions: input.transactions,
     period: input.period,
@@ -56,7 +71,7 @@ export function buildForecast(input: BuildForecastInput): Forecast {
   const seed = `${periodId}:${input.dataVersion}`;
   const remaining = remainingDaysOf(input.period.from, input.period.to, input.today);
 
-  const forecast = simulateForecast({
+  const simulateInput: SimulateInput = {
     periodId,
     today: input.today,
     periodTo: input.period.to,
@@ -71,28 +86,37 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     bootstrapWeight: input.bootstrapWeight ?? 0,
     trials: input.trials ?? DEFAULT_TRIALS,
     seed,
-  });
+    categoryBases: decomposed.periodByCategory,
+    ...(input.categoryTargets ? { categoryTargets: input.categoryTargets } : {}),
+  };
+  const raw = simulateForecast(simulateInput);
 
   const withCommitted: Forecast = {
-    ...forecast,
+    ...raw,
     committed: {
       scheduledYen: decomposed.committed.scheduledYen,
       fixedYen: decomposed.committed.fixedYen,
     },
   };
 
+  const result = { decomposed, fitted, simulateInput };
   if (!input.calibration || input.calibration.widthFactor === 1) {
-    return { ...withCommitted, calibration: input.calibration ?? null };
+    return { ...result, forecast: { ...withCommitted, calibration: input.calibration ?? null } };
   }
 
-  const totalBand = applyWidthFactor(withCommitted.total, input.calibration.widthFactor);
+  const factor = input.calibration.widthFactor;
+  const totalBand = applyWidthFactor(withCommitted.total, factor);
   return {
-    ...withCommitted,
-    total: { ...withCommitted.total, p10: totalBand.p10, p90: totalBand.p90 },
-    byCategory: withCommitted.byCategory.map((c) => ({
-      ...c,
-      ...applyWidthFactor(c, input.calibration!.widthFactor),
-    })),
-    calibration: input.calibration,
+    ...result,
+    forecast: {
+      ...withCommitted,
+      total: { ...withCommitted.total, p10: totalBand.p10, p90: totalBand.p90 },
+      byCategory: withCommitted.byCategory.map((c) => ({
+        ...c,
+        ...applyWidthFactor(c, factor),
+        landing: applyWidthFactor(c.landing, factor),
+      })),
+      calibration: input.calibration,
+    },
   };
 }
