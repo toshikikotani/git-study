@@ -288,8 +288,10 @@ export type ForecastWhatIf = {
   categoryName: string;
   /** 1回あたりの見込みの額(残りの見込みの額 ÷ 見込みの回数)。 */
   perVisitYen: number;
-  /** 残りの週数(残りの日数 ÷ 7)。 */
+  /** 月末までの週数(今日の翌日から月末までの日数 ÷ 7)。 */
   weeks: number;
+  /** 本人が決めた約束(週に何回へらすか)。無ければ null。 */
+  promisedPerWeek: number | null;
   options: readonly ForecastWhatIfOption[];
 };
 

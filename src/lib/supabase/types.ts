@@ -1850,6 +1850,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      spending_promises: {
+        Row: {
+          created_at: string;
+          genre_id: string;
+          id: string;
+          limit_yen: number;
+          month: string;
+          per_week: number;
+          promised_on: string;
+          usual_yen: number;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          genre_id: string;
+          id?: string;
+          limit_yen: number;
+          month: string;
+          per_week: number;
+          promised_on: string;
+          usual_yen: number;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          genre_id?: string;
+          id?: string;
+          limit_yen?: number;
+          month?: string;
+          per_week?: number;
+          promised_on?: string;
+          usual_yen?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       receipt_items: {
         Row: {
           amount_yen: number;

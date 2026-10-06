@@ -10,7 +10,7 @@ import type { DateOnly } from '@/lib/date';
 import { decomposeSpending, type ForecastSourceTransaction } from './decompose';
 import { DEFAULT_MONTH_LEVEL_K, fitModel } from './model';
 import type { PitCalibration } from './pit';
-import type { CategoryTarget, SimulateInput } from './simulate';
+import type { CategoryTarget, ForecastPromise, SimulateInput } from './simulate';
 import type { DecomposedSpending, FittedModel } from './types';
 
 /** 予測に数える範囲。目標のジャンルだけ・特別費を除く、などに絞る。 */
@@ -48,6 +48,8 @@ export type ModelInput = {
   halfLifeDays?: number | undefined;
   calibration?: PitCalibration | null | undefined;
   mode?: 'paths' | 'totals' | undefined;
+  /** 本人が決めた約束(本番の予測だけ。検証には渡さない)。 */
+  promises?: readonly ForecastPromise[] | undefined;
 };
 
 export type PipelineInput = DecomposeInput & ModelInput;
@@ -137,6 +139,9 @@ export function simulateInputFor(
     calibration: input.calibration ?? null,
     mode: input.mode ?? 'paths',
     categoryTypes: decomposed.categoryTypes,
+    ...(input.promises !== undefined && input.promises.length > 0
+      ? { promises: input.promises }
+      : {}),
   };
 }
 

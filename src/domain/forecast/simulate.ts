@@ -104,7 +104,14 @@ export type SimulateInput = {
   mode?: 'paths' | 'totals';
   /** カテゴリごとの支出の型(設計書 v3 4.1)。無いカテゴリは定常型。 */
   categoryTypes?: Readonly<Record<string, SpendingType>>;
+  /**
+   * 本人が決めた約束(「外食を週1回へらす」)。今日の月の終わりまで、そのカテゴリの回数を
+   * 週に perWeek 回へらしたとして見込む(ジャンル画面の「決める」、ADR-075)。
+   */
+  promises?: readonly ForecastPromise[];
 };
+
+export type ForecastPromise = { categoryId: string; perWeek: number };
 
 function quantileAt(sortedAsc: ArrayLike<number>, p: number): number {
   const n = sortedAsc.length;
@@ -482,6 +489,7 @@ function typicalProfile(input: SimulateInput): TypicalProfilePoint[] {
 
 export function simulateForecast(input: SimulateInput): Forecast {
   const run = runTrials({ ...input, mode: input.mode ?? 'paths' });
+  const promised = applyPromises(input, run);
   const { trials, categories, totalSamples, specialSamples, variableSamples, categorySamples } =
     run;
   const nAll = categories.length;
@@ -623,7 +631,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
   );
   const sortedSpecial = sortedCopy(specialSamples);
   const suggestion = suggestCut({ input, run, byCategory, cal });
-  const whatIf = whatIfOf({ input, run, byCategory, cal });
+  const whatIf = whatIfOf({ input, run, byCategory, cal, promised });
   const breakdown = breakdownOf({ input, run, total, byCategory });
 
   return {
@@ -731,8 +739,11 @@ function suggestCut(args: {
     return calibratedProbability(cal, n / run.trials);
   };
   const probBefore = within(() => 0);
+  // 約束したジャンルは、もう決めてあるので重ねて勧めない(ADR-075)。
+  const promised = new Set((input.promises ?? []).map((p) => p.categoryId));
   let best: ForecastSuggestion | null = null;
   byCategory.forEach((cat, c) => {
+    if (promised.has(cat.categoryId)) return;
     if (cat.type !== 'steady' || cat.expectedCount < weeks * 1.5) return;
     const cut = Math.min(1, weeks / cat.expectedCount);
     const samples = run.categorySamples[c]!;
@@ -756,38 +767,117 @@ function suggestCut(args: {
 /** 「もし、へらしたら」の選択肢(週に何回へらすか)。 */
 const WHAT_IF_PER_WEEK = [0, 1, 2] as const;
 
+/** 今日の月の終わり(約束と「もし」は、その月の終わりまでの回数で数える)。 */
+function monthEndOf(date: DateOnly): DateOnly {
+  const [y, m] = date.split('-').map(Number) as [number, number];
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${date.slice(0, 8)}${String(last).padStart(2, '0')}`;
+}
+
+/** 今日の翌日から月末(期間の終わりが先ならそこ)までの日数。 */
+function actionDays(input: SimulateInput, run: TrialRun): number {
+  const until = monthEndOf(input.today);
+  return run.futureDates.filter((d) => d <= until).length;
+}
+
+/** 約束を入れる前の、約束したカテゴリの試行の額と回数(「もし」を約束の前から数えるため)。 */
+type PromiseState = {
+  /** カテゴリの添字 → 約束を入れる前の試行の額。 */
+  before: Map<number, Float64Array>;
+  /** カテゴリの添字 → 約束で減らした割合。 */
+  cut: Map<number, number>;
+  /** 約束を入れる前の、カテゴリごとの見込みの回数。 */
+  countBefore: Float64Array;
+};
+
+/**
+ * 約束を試行に入れる:約束したカテゴリの各試行の額に (1 − 週の回数 × 月末までの週数 ÷ 見込みの回数) を
+ * 掛け、減らした分を着地・変動費・グラフの累計から引く(グラフは月末までに均等に減らす)。
+ * 提案・「もし」と同じ数え方なので、「もし」の選んだ選択肢と、約束を入れた後の数字が一致する。
+ */
+function applyPromises(input: SimulateInput, run: TrialRun): PromiseState {
+  const state: PromiseState = {
+    before: new Map(),
+    cut: new Map(),
+    countBefore: Float64Array.from(run.categoryCountMean),
+  };
+  const promises = input.promises ?? [];
+  if (promises.length === 0) return state;
+  const Dm = actionDays(input, run);
+  const D = run.futureDates.length;
+  if (Dm <= 0) return state;
+  const weeks = Dm / 7;
+  for (const p of promises) {
+    const c = run.categories.findIndex((cat) => cat.id === p.categoryId);
+    if (c < 0 || c >= run.categoryCountMean.length) continue;
+    const count = run.categoryCountMean[c]!;
+    if (count <= 0 || p.perWeek <= 0) continue;
+    const cut = Math.min(1, (p.perWeek * weeks) / count);
+    const samples = run.categorySamples[c]!;
+    state.before.set(c, Float64Array.from(samples));
+    state.cut.set(c, cut);
+    for (let t = 0; t < run.trials; t += 1) {
+      const removed = samples[t]! * cut;
+      samples[t] = samples[t]! - removed;
+      run.totalSamples[t] = run.totalSamples[t]! - removed;
+      run.variableSamples[t] = Math.max(0, run.variableSamples[t]! - removed);
+      if (run.pathIncrements !== null) {
+        for (let d = 0; d < D; d += 1) {
+          run.pathIncrements[t * D + d] =
+            run.pathIncrements[t * D + d]! - removed * Math.min(1, (d + 1) / Dm);
+        }
+      }
+    }
+    run.categoryCountMean[c] = count * (1 - cut);
+    run.categoryVariableMean[c] = run.categoryVariableMean[c]! * (1 - cut);
+  }
+  return state;
+}
+
 /**
  * ジャンル画面の「もし、へらしたら」:提案(suggestCut)と同じ対象・同じ数え方で、
  * いつも通り・週1回・週2回へらしたときのジャンルの着地・目標を超える確率・全体で予算に
- * 収まる確率を出す。「いつも通り」は byCategory・probWithinBudget と同じ数字になる。
+ * 収まる確率を出す。回数は今日の月の終わりまでで数える。約束したジャンルは、約束を入れる前の
+ * 試行から数えるので、約束した選択肢が byCategory・probWithinBudget と同じ数字になる
+ * (約束が無ければ「いつも通り」が同じ数字になる)。
  */
 function whatIfOf(args: {
   input: SimulateInput;
   run: TrialRun;
   byCategory: readonly ForecastCategoryBand[];
   cal: PitCalibration | null;
+  promised: PromiseState;
 }): ForecastWhatIf[] {
-  const { input, run, byCategory, cal } = args;
+  const { input, run, byCategory, cal, promised } = args;
   const budget = input.budgetYen;
-  const D = run.futureDates.length;
-  if (D < 7) return [];
-  const weeks = D / 7;
+  const Dm = actionDays(input, run);
+  if (Dm < 7) return [];
+  const weeks = Dm / 7;
+  const promiseOf = new Map((input.promises ?? []).map((p) => [p.categoryId, p.perWeek]));
   const out: ForecastWhatIf[] = [];
   byCategory.forEach((cat, c) => {
-    if (cat.type !== 'steady' || cat.expectedCount < weeks * 1.5) return;
-    const samples = run.categorySamples[c]!;
+    const expectedCount = c < promised.countBefore.length ? promised.countBefore[c]! : 0;
+    if (cat.type !== 'steady' || expectedCount < weeks * 1.5) return;
+    const samples = promised.before.get(c) ?? run.categorySamples[c]!;
+    // 約束で減らした分を足し戻した着地(他のカテゴリの約束は入ったまま)。
+    const promisedCut = promised.cut.get(c) ?? 0;
     const meanYen = mean(samples);
     if (meanYen <= 0) return;
     const scaled = new Float64Array(run.trials);
     const options = WHAT_IF_PER_WEEK.map((perWeek) => {
-      const cut = Math.min(1, (perWeek * weeks) / cat.expectedCount);
+      const cut = Math.min(1, (perWeek * weeks) / expectedCount);
       let over = 0;
       let within = 0;
       for (let t = 0; t < run.trials; t += 1) {
         const removed = samples[t]! * cut;
         scaled[t] = samples[t]! - removed;
         if (cat.targetYen !== null && cat.baseYen + scaled[t]! > cat.targetYen) over += 1;
-        if (budget !== null && run.totalSamples[t]! - removed <= budget) within += 1;
+        // 約束した選択肢は、約束を入れた後の着地そのもの(足し引きの丸めの差も出さない)。
+        const total =
+          cut === promisedCut
+            ? run.totalSamples[t]!
+            : run.totalSamples[t]! + samples[t]! * promisedCut - removed;
+        if (budget !== null && total <= budget) within += 1;
       }
       scaled.sort();
       const p10 = Math.max(0, Math.round(cat.baseYen + quantileAt(scaled, 0.1)));
@@ -806,8 +896,9 @@ function whatIfOf(args: {
     out.push({
       categoryId: cat.categoryId,
       categoryName: cat.categoryName,
-      perVisitYen: Math.round(meanYen / cat.expectedCount),
+      perVisitYen: Math.round(meanYen / expectedCount),
       weeks,
+      promisedPerWeek: promiseOf.get(cat.categoryId) ?? null,
       options: distinct,
     });
   });

@@ -1777,6 +1777,27 @@ create table public.ai_forecast_reads (
 create index ai_forecast_reads_user_month_idx on public.ai_forecast_reads (user_id, month);
 
 
+-- 3.35 spending_promises — ジャンルの約束(「外食を週1回へらす」、ADR-075)
+-- ジャンル画面の「決める」で、月ごと・ジャンルごとに1行。決めた回数は予測に入り、
+-- 月が終わったら、使った額が「約束どおりの見込み」に収まったか(守れたか)を見せる。
+create table public.spending_promises (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users(id) on delete cascade,
+  genre_id    uuid        not null references public.genres(id) on delete cascade,
+  month       date        not null,
+  per_week    smallint    not null,
+  promised_on date        not null,
+  usual_yen   integer     not null,
+  limit_yen   integer     not null,
+  created_at  timestamptz not null default now(),
+
+  constraint uq_spending_promises_genre_month unique (user_id, genre_id, month),
+  constraint ck_spending_promises_month check (extract(day from month) = 1),
+  constraint ck_spending_promises_per_week check (per_week between 1 and 7),
+  constraint ck_spending_promises_yen check (usual_yen >= 0 and limit_yen >= 0)
+);
+
+
 
 
 -- =============================================================================
@@ -2120,7 +2141,7 @@ begin
     'ai_monthly_reports','ai_daily_reports','receipt_items',
     'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
     'genre_memory','receipt_captures','ai_cache','fixed_cost_confirmations',
-    'ai_forecast_reads'
+    'ai_forecast_reads','spending_promises'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -2314,4 +2335,5 @@ commit;
 --   spending_plans          → ADR-058。カレンダーで選んだ期間のジャンル別支出目標
 --   spending_plan_items     → ADR-058。目標の明細(AI提案額と本人の目標額)
 --   ai_forecast_reads       → ADR-072。AIの読み(着地の見込みへの補正と、その当たり具合)
+--   spending_promises       → ADR-075。ジャンルの約束(週に何回へらすか)と、守れたか
 -- =============================================================================
