@@ -9,6 +9,7 @@
 import {
   DEFAULT_HALF_LIFE_DAYS,
   DEFAULT_MONTH_LEVEL_K,
+  GENRE_LEVEL_K_CANDIDATES,
   MONTH_LEVEL_K_CANDIDATES,
   RECENCY_HALF_LIFE_CANDIDATES,
 } from '@/domain/forecast/model';
@@ -53,6 +54,8 @@ export type Verification = {
   halfLifeDays: number;
   /** null は「今月の水準を見ない」(k=∞)。サーバーのキャッシュ(JSON)に Infinity を置けないため。 */
   monthLevelK: number | null;
+  /** ジャンルごとの水準の強さ k_g(設計書 v3 4.2)。null は使わない(∞)。 */
+  genreLevelK: number | null;
   summary: VerificationSummary;
 };
 
@@ -133,11 +136,33 @@ export function verifyForecast(input: {
     const best = grid.reduce<(typeof grid)[number] | null>(
       (a, b) => (a === null || b.meanCrps < a.meanCrps ? b : a),
       null,
-    ) ?? { halfLifeDays: DEFAULT_HALF_LIFE_DAYS, monthLevelK: DEFAULT_MONTH_LEVEL_K, meanCrps: 0 };
+    ) ?? {
+      halfLifeDays: DEFAULT_HALF_LIFE_DAYS,
+      monthLevelK: DEFAULT_MONTH_LEVEL_K,
+      genreLevelK: Infinity,
+      meanCrps: 0,
+    };
+    // ジャンルごとの水準 k_g は、選んだ半減期 × k のうえで比べる(全部の組み合わせは重い)。
+    const genreGrid = Number.isFinite(best.monthLevelK)
+      ? backtestGrid({
+          ...base,
+          halfLives: [best.halfLifeDays],
+          monthLevelKs: [best.monthLevelK],
+          genreLevelKs: GENRE_LEVEL_K_CANDIDATES,
+          trials: SELECTION_TRIALS,
+          stepDays: SELECTION_STEP_DAYS,
+        })
+      : [];
+    const bestGenre = genreGrid.reduce<(typeof genreGrid)[number] | null>(
+      (a, b) => (a === null || b.meanCrps < a.meanCrps ? b : a),
+      null,
+    );
+    const genreLevelK = bestGenre?.genreLevelK ?? Infinity;
     const backtest = runBacktest({
       ...base,
       halfLifeDays: best.halfLifeDays,
       monthLevelK: best.monthLevelK,
+      genreLevelK,
       trials: BACKTEST_TRIALS,
       stepDays: 2,
     });
@@ -148,6 +173,7 @@ export function verifyForecast(input: {
         calibration,
         halfLifeDays: best.halfLifeDays,
         monthLevelK: Number.isFinite(best.monthLevelK) ? best.monthLevelK : null,
+        genreLevelK: Number.isFinite(genreLevelK) ? genreLevelK : null,
         summary: {
           pointCount: backtest.points.length,
           months: periods.length,
@@ -200,6 +226,7 @@ export function verifyCautions(input: {
       monthLevelK: input.verification
         ? (input.verification.monthLevelK ?? Infinity)
         : DEFAULT_MONTH_LEVEL_K,
+      genreLevelK: input.verification?.genreLevelK ?? Infinity,
       trials: CAUTION_TRIALS,
       stepDays: CAUTION_STEP_DAYS,
       cautionTargets: input.targets,

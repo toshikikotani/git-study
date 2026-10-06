@@ -116,6 +116,34 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).not.toContain('36,940円〜36,940円');
   });
 
+  it('「これ以上は使わない」のジャンルは、守れたら・いつもの守り方なら の2つを出す(設計書 v3 4.7)', () => {
+    const html = visible(
+      renderToString(
+        h(LandingRangesCard, {
+          periodLabel: '今月',
+          rows: [
+            {
+              ...base,
+              genreId: 'hobby',
+              name: '娯楽・趣味',
+              baseYen: 33940,
+              p10: 33940,
+              p50: 36000,
+              p90: 40000,
+              targetYen: null,
+              exceedance: null,
+              status: 'closed',
+              type: 'fixed',
+              group: 'fixed',
+            },
+          ],
+        }),
+      ),
+    );
+    expect(html).toContain('予測を止めています');
+    expect(html).toContain('守れたら 33,940円、いつもの守り方なら 約3.6万円');
+  });
+
   it('行が無ければ何も出さない', () => {
     expect(renderToString(h(LandingRangesCard, { periodLabel: '今月', rows: [] }))).toBe('');
   });
@@ -128,6 +156,7 @@ describe('レポートの着地まわりのカード', () => {
             calibration: null,
             halfLifeDays: 90,
             monthLevelK: 8,
+            genreLevelK: null,
             summary: {
               hitRate80: 0.72,
               medianAbsErrorRatio: 0.11,

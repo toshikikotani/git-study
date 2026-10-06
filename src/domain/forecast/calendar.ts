@@ -82,3 +82,21 @@ export function calendarContext(
     seasons: SEASONS.filter((s) => dates.some((d) => inSeason(d, s))).map((s) => s.name),
   };
 }
+
+/**
+ * いつもの1日の使い方で、その時刻までに使う割合(0時〜24時、1時間ごと。設計書 v3 4.9)。
+ * 本人の記録に時刻が無いので、家計の一般的な形を既定にする(朝は少なく、昼と夕方に多い)。
+ */
+const DAY_SPENT_SHARE_BY_HOUR = [
+  0, 0.005, 0.01, 0.01, 0.01, 0.015, 0.02, 0.04, 0.08, 0.12, 0.17, 0.24, 0.33, 0.42, 0.48, 0.54,
+  0.59, 0.65, 0.73, 0.81, 0.87, 0.92, 0.96, 0.99, 1,
+];
+
+/** JST の時刻(時・分)から、今日のうちもう過ぎた割合。 */
+export function daySpentShareAt(now: Date): number {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const hour = jst.getUTCHours() + jst.getUTCMinutes() / 60;
+  const lo = Math.floor(hour);
+  const f = hour - lo;
+  return DAY_SPENT_SHARE_BY_HOUR[lo]! * (1 - f) + DAY_SPENT_SHARE_BY_HOUR[lo + 1]! * f;
+}

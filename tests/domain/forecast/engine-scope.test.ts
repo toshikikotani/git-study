@@ -201,17 +201,27 @@ describe('「予測を止める」にしたジャンル', () => {
     ],
   };
 
-  it('残りの変動費は予測しない。実績は数え、着地の幅は実績のまま動かない', () => {
+  it('残りは、いつもの見込みに守られ方(既定 0.3)を掛けて出す(設計書 v3 4.7)。実績は数える', () => {
+    const open = buildForecast(input).byCategory.find((c) => c.categoryId === 'tax')!;
     const f = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
     const tax = f.byCategory.find((c) => c.categoryId === 'tax')!;
     expect(tax.actualYen).toBe(800 * 15);
-    expect(tax.landing.p10).toBe(tax.baseYen);
-    expect(tax.landing.p90).toBe(tax.baseYen);
+    expect(tax.landing.p10).toBeGreaterThanOrEqual(tax.baseYen);
+    const ratio = tax.meanYen / open.meanYen;
+    expect(ratio).toBeGreaterThan(0.2);
+    expect(ratio).toBeLessThan(0.4);
   });
 
-  it('超過の原因(drivers)に出てこない', () => {
-    const f = buildForecast({ ...input, budgetYen: 30000, noForecastGenreIds: new Set(['tax']) });
-    expect(f.drivers.map((d) => d.categoryId)).not.toContain('tax');
+  it('超過の原因(drivers)での重みは、止めないときより小さい', () => {
+    const share = (f: ReturnType<typeof buildForecast>) =>
+      f.drivers.find((d) => d.categoryId === 'tax')?.shareOfRisk ?? 0;
+    const open = buildForecast({ ...input, budgetYen: 30000 });
+    const stopped = buildForecast({
+      ...input,
+      budgetYen: 30000,
+      noForecastGenreIds: new Set(['tax']),
+    });
+    expect(share(stopped)).toBeLessThan(share(open));
   });
 
   it('止めていないジャンルの予測は、そのまま出る', () => {

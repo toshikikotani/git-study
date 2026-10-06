@@ -245,7 +245,7 @@ function FixedRow({ row }: { row: LandingRow }) {
           {row.name}
         </span>
         <span className="tabular shrink-0" style={{ color: 'var(--ink)' }}>
-          {row.status === 'forecast'
+          {row.status === 'forecast' || (row.status === 'closed' && row.p50 > row.baseYen)
             ? formatEstimate(row.p50)
             : formatYen(row.p50, { sign: 'never' })}
         </span>
@@ -254,6 +254,12 @@ function FixedRow({ row }: { row: LandingRow }) {
         {statusText}
         {row.targetYen !== null ? ` ・ 目標 ${formatYen(row.targetYen, { sign: 'never' })}` : ''}
       </p>
+      {row.status === 'closed' && row.p50 > row.baseYen ? (
+        <p className="tabular mt-1" style={{ color: 'var(--ink-secondary)' }}>
+          守れたら {formatYen(row.baseYen, { sign: 'never' })}、いつもの守り方なら{' '}
+          {formatEstimate(row.p50)}
+        </p>
+      ) : null}
       {row.caution ? (
         <p className="mt-1 font-semibold" style={{ color: 'var(--state-over)' }}>
           <span aria-hidden>● </span>
