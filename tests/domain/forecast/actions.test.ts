@@ -170,6 +170,7 @@ describe('topActions', () => {
       baselineP50: 100,
       newP50: 100 + totalDelta,
       totalDelta,
+      newTotal: { p10: 0, p50: 100 + totalDelta, p90: 0 },
       category: { landing: { p10: 0, p50: 0, p90: 0 }, targetYen: null, probOverTarget: null },
     };
   }

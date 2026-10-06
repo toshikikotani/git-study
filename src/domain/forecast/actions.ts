@@ -54,6 +54,8 @@ export type ActionResult = {
   newP50: number;
   /** 着地額の変化(負なら改善=減る)。 */
   totalDelta: number;
+  /** 打ち手を反映した全体の着地額(扇形グラフの切り替えに使う)。 */
+  newTotal: { p10: number; p50: number; p90: number };
   /** 対象カテゴリの着地額(中央・10回中8回の幅)。 */
   category: {
     landing: { p10: number; p50: number; p90: number };
@@ -297,10 +299,8 @@ export function simulateActions(
     const perCategory = new Map(baselineByCategory);
     perCategory.set(action.categoryId, modified);
     const newTotal = sumAcross(perCategory);
-    const newP50 = quantile(
-      Array.from(newTotal).sort((a, b) => a - b),
-      0.5,
-    );
+    const newSorted = Array.from(newTotal).sort((a, b) => a - b);
+    const newP50 = quantile(newSorted, 0.5);
     const newProbWithinBudget = probWithin(newTotal);
 
     const base = baseById.get(action.categoryId);
@@ -325,6 +325,11 @@ export function simulateActions(
       baselineP50,
       newP50,
       totalDelta: newP50 - baselineP50,
+      newTotal: {
+        p10: quantile(newSorted, 0.1),
+        p50: newP50,
+        p90: quantile(newSorted, 0.9),
+      },
       category: {
         landing: {
           p10: offset + quantile(catSorted, 0.1),
