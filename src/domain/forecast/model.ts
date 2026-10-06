@@ -22,6 +22,8 @@ import {
   PAY_CYCLE_BUCKETS,
   type CategoryDayRecord,
   type CategoryModelParams,
+  type StoreMixture,
+  type StoreRecord,
   type FittedModel,
   type VariableTrainingData,
 } from './types';
@@ -465,6 +467,7 @@ function fitCategory(
   const mu = amountPrior.mean + ownWeight * (rawMu - amountPrior.mean);
 
   const coefficients = coefficientsOf(sums);
+  const stores = storeMixtureOf(cat.stores ?? [], mu, sigmaSq);
 
   return {
     categoryId: cat.categoryId,
@@ -476,7 +479,61 @@ function fitCategory(
     weekdayFactor: coefficients.weekday,
     payCycleFactor: payday === null ? NO_PAY_CYCLE : coefficients.pay,
     holidayFactor: coefficients.holiday,
+    stores,
     dataDays: cat.days.length,
+  };
+}
+
+/** 店ごとの混合を使うのに要る、5回以上買った店の数。 */
+const MIN_STORES_FOR_MIXTURE = 2;
+const MIN_PURCHASES_PER_STORE = 5;
+/** 店の平均をジャンルの平均へ寄せる強さ(回数換算)と、選ばれ方を全体の割合へ寄せる強さ。 */
+const STORE_MEAN_PRIOR = 3;
+const STORE_SHARE_PRIOR = 2;
+
+/**
+ * 店ごとの金額の混合(設計書 v3 4.3)。ランチ 1,000円と居酒屋 4,000円が1つの山に混ざらないよう、
+ * 店を選んでからその店の金額を引く。店の平均はジャンルの平均へ回数が少ないほど寄せ、ばらつきは
+ * 店の中のばらつき(全店でまとめる)。選ばれ方は休みの日と平日で分け、全体の割合へ寄せる。
+ * 1回しか行っていない店の割合(Good–Turing)を「新しい店」に回し、ジャンル全体の金額で引く。
+ */
+export function storeMixtureOf(
+  stores: readonly StoreRecord[],
+  categoryMu: number,
+  categorySigmaSq: number,
+): StoreMixture | undefined {
+  const regular = stores.filter((s) => s.offCount + s.onCount >= MIN_PURCHASES_PER_STORE);
+  if (regular.length < MIN_STORES_FOR_MIXTURE) return undefined;
+  const total = stores.reduce((a, s) => a + s.offCount + s.onCount, 0);
+  const singles = stores.filter((s) => s.offCount + s.onCount === 1).length;
+  const newShare = Math.min(0.5, Math.max(0.02, singles / Math.max(1, total)));
+  let withinSum = 0;
+  let withinDf = 0;
+  const mu = regular.map((s) => {
+    const n = s.offCount + s.onCount;
+    const mean = s.logSum / n;
+    withinSum += Math.max(0, s.logSqSum - n * mean * mean);
+    withinDf += n - 1;
+    return (n * mean + STORE_MEAN_PRIOR * categoryMu) / (n + STORE_MEAN_PRIOR);
+  });
+  const within = Math.sqrt(Math.max(0.05, withinDf > 0 ? withinSum / withinDf : categorySigmaSq));
+  const shares = (count: (s: StoreRecord) => number) => {
+    const all = regular.reduce((a, s) => a + s.offCount + s.onCount, 0);
+    const side = regular.reduce((a, s) => a + count(s), 0);
+    const raw = regular.map(
+      (s) =>
+        (count(s) + (STORE_SHARE_PRIOR * (s.offCount + s.onCount)) / all) /
+        (side + STORE_SHARE_PRIOR),
+    );
+    const sum = raw.reduce((a, b) => a + b, 0);
+    return [...raw.map((r) => (r / sum) * (1 - newShare)), newShare];
+  };
+  // 新しい店は、ジャンル全体の金額(シミュレーションで休みの日と平日の差を足す)。
+  return {
+    shareOff: shares((s) => s.offCount),
+    shareOn: shares((s) => s.onCount),
+    mu: [...mu, categoryMu],
+    sigma: [...mu.map(() => within), Math.sqrt(categorySigmaSq)],
   };
 }
 
@@ -569,6 +626,50 @@ export function fitModel(input: {
     dataDays: dates.length,
     monthFactor: season.factors,
     seasonal: season.active,
+    outingShock: outingShockOf(variable),
+  };
+}
+
+/** 外出のジャンル(同じ日に重なりやすい):外食・酒・カフェ・交通。 */
+const OUTING_NAME = /外食|酒|飲み|居酒屋|カフェ|喫茶|交通|タクシー/;
+/** 日ごとのゆらぎの形 a の範囲(a が小さいほど揺れが大きい)。これより弱い揺れは入れない。 */
+const OUTING_SHAPE_RANGE = { min: 3, max: 50 } as const;
+const MIN_DAYS_FOR_OUTING_SHOCK = 56;
+
+/**
+ * 外出のジャンルの、日ごとの回数の合計のばらつきから、共通のゆらぎの大きさを求める。
+ * 曜日ごとの平均 m を期待値とし、φ = Σ((X − m)² − m) ÷ Σm²(ポアソンより大きい分)、a = 1/φ。
+ */
+export function outingShockOf(
+  variable: readonly VariableTrainingData[],
+): FittedModel['outingShock'] {
+  const outing = variable.filter((c) => OUTING_NAME.test(c.categoryName));
+  if (outing.length === 0) return null;
+  const totals = new Map<DateOnly, number>();
+  for (const cat of outing) {
+    for (const rec of cat.days) totals.set(rec.date, (totals.get(rec.date) ?? 0) + rec.count);
+  }
+  if (totals.size < MIN_DAYS_FOR_OUTING_SHOCK) return null;
+  const byWeekday = Array.from({ length: 7 }, () => ({ sum: 0, n: 0 }));
+  for (const [date, x] of totals) {
+    const w = byWeekday[weekdayOf(date)]!;
+    w.sum += x;
+    w.n += 1;
+  }
+  let excess = 0;
+  let meanSq = 0;
+  for (const [date, x] of totals) {
+    const w = byWeekday[weekdayOf(date)]!;
+    const m = w.n > 0 ? w.sum / w.n : 0;
+    excess += (x - m) ** 2 - m;
+    meanSq += m * m;
+  }
+  if (meanSq <= 0 || excess <= 0) return null;
+  const shape = meanSq / excess;
+  if (shape > OUTING_SHAPE_RANGE.max) return null;
+  return {
+    categoryIds: outing.map((c) => c.categoryId),
+    shape: Math.max(OUTING_SHAPE_RANGE.min, shape),
   };
 }
 
@@ -577,4 +678,6 @@ export function fitModel(input: {
  * 回数 n と期待回数 E で Gamma(k + n, k + E) に更新する。k=∞ は「今月の水準を見ない」(L=1)。
  */
 export const MONTH_LEVEL_K_CANDIDATES = [3, 8, 20, Infinity] as const;
+/** ジャンルごとの今月の水準 M_g の強さ k_g の候補(設計書 v3 4.2)。∞ は全体の水準だけ。 */
+export const GENRE_LEVEL_K_CANDIDATES = [3, 8, 20, Infinity] as const;
 export const DEFAULT_MONTH_LEVEL_K = 8;

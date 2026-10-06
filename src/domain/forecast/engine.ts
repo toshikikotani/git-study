@@ -9,6 +9,14 @@ import { periodDays } from '@/domain/period';
 import type { DetectedSubscription } from '@/domain/subscriptions';
 import type { ForecastSourceTransaction } from './decompose';
 import { prepareSimulation, type ForecastScope } from './pipeline';
+import { daySpentShareAt } from './calendar';
+import { CENTER_PRIOR_MONTHS } from './pit';
+import { populationPriorFor, type PopulationPrior } from './population-prior';
+
+const NO_PRIOR: PopulationPrior = {
+  centerByPhase: { early: 1, mid: 1, late: 1 },
+  pitByPhase: { early: [], mid: [], late: [] },
+};
 import {
   DEFAULT_TRIALS,
   simulateForecast,
@@ -39,12 +47,21 @@ export type BuildForecastInput = {
   halfLifeDays?: number;
   /** 今月の水準の強さ k。検証で選んだ値。 */
   monthLevelK?: number;
+  /** ジャンルごとの今月の水準の強さ k_g(設計書 v3 4.2)。検証で選んだ値。 */
+  genreLevelK?: number;
   /** 「予測を止める」にしたジャンル。残りの変動費を予測しない(実績・予定は数える)。 */
   noForecastGenreIds?: ReadonlySet<string>;
   /** 数える範囲(目標のジャンルだけ・特別費を除く、など)。 */
   scope?: ForecastScope;
   /** 目標額のあるカテゴリ。ジャンルごとに「目標を超える確率」を出す。 */
   categoryTargets?: readonly CategoryTarget[];
+  /**
+   * 今の時刻(設計書 v3 4.9)。渡すと、今日の残りの時間に使う見込みを足す(朝なら多め、夜なら少なめ)。
+   * 渡さなければ(検証・評価)、今日は終わったものとして扱う。
+   */
+  now?: Date;
+  /** 母集団の補正を使うか(既定は使う)。母集団の補正そのものを作るときだけ false。 */
+  usePopulationPrior?: boolean;
   /** 期間の収入(手取りの設定、または直近の給料の中央値 + 予定の収入)。収支を出す。 */
   income?: { yen: number; source: 'setting' | 'salary' } | null;
   /** 本人が決めた約束(「外食を週1回へらす」)。今日の月の終わりまで見込みに入れる。 */
@@ -65,6 +82,16 @@ export function buildForecast(input: BuildForecastInput): Forecast {
   const periodId = `${input.period.from}_${input.period.to}`;
   const phase = phaseOf(input.period, input.today);
   const calibration = input.calibration ?? null;
+  // 母集団の補正(設計書 v3 4.5):本人の月が少ない分だけ、中心と PIT を母集団の値へ寄せる。
+  const recordDays =
+    input.recordStart === null ? 0 : Math.max(0, daysBetween(input.recordStart, input.today) + 1);
+  const prior = input.usePopulationPrior === false ? NO_PRIOR : populationPriorFor(recordDays);
+  const months = calibration?.months ?? 0;
+  const ownCenterWeight = months / (months + CENTER_PRIOR_MONTHS);
+  const center =
+    (calibration?.centerByPhase[phase] ?? 1) +
+    (1 - ownCenterWeight) * (prior.centerByPhase[phase] - 1);
+  const pitPrior = prior.pitByPhase[phase];
   const { decomposed, simulateInput } = prepareSimulation({
     transactions: input.transactions,
     period: input.period,
@@ -79,12 +106,16 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     seed: `${periodId}:${input.dataVersion}`,
     scope: input.scope,
     categoryTargets: input.categoryTargets,
-    remainingScale: calibration?.centerByPhase[phase] ?? 1,
-    calibration: calibration
-      ? { pit: calibration.pitByPhase[phase], pitWeight: calibration.pitWeight }
-      : null,
+    remainingScale: center,
+    calibration: {
+      pit: calibration?.pitByPhase[phase] ?? [],
+      pitWeight: calibration?.pitWeight ?? 0,
+      prior: pitPrior,
+    },
     halfLifeDays: input.halfLifeDays,
     monthLevelK: input.monthLevelK,
+    genreLevelK: input.genreLevelK,
+    todayElapsedShare: input.now ? daySpentShareAt(input.now) : undefined,
     noForecastGenreIds: input.noForecastGenreIds,
     promises: input.promises,
     mode: 'paths',
@@ -95,8 +126,13 @@ export function buildForecast(input: BuildForecastInput): Forecast {
   const remainingYen = Math.max(0, forecast.total.p50 - decomposed.actualYen - committedYen);
   const periodMonth = splitDateOnly(input.period.from)[1];
   const income = input.income ?? null;
+  // 期ごと・年ごとの支払いのうち、残りの期間に来るものも、請求の内訳として見せる。
+  const periodicItems = decomposed.periodic
+    .filter((p) => decomposed.billEvents.some((e) => e.key === p.key))
+    .map((p) => ({ label: `${p.label}(${p.periodLabel})`, meanYen: p.meanYen }));
   return {
     ...forecast,
+    bills: { ...forecast.bills, items: [...forecast.bills.items, ...periodicItems] },
     committed: {
       scheduledYen: decomposed.committed.scheduledYen,
       fixedYen: decomposed.committed.fixedYen,

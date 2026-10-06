@@ -12,7 +12,7 @@ import {
 } from '../../src/domain/forecast/backtest';
 import type { ForecastSourceTransaction } from '../../src/domain/forecast/decompose';
 import { periodDays } from '../../src/domain/period';
-import { addDays, daysBetween, type DateOnly } from '../../src/lib/date';
+import { addDays, addMonths, daysBetween, type DateOnly } from '../../src/lib/date';
 
 /** 時点の間隔(日)。仕様は2日おき。評価を軽くしたいときは環境変数 EVAL_STEP で広げる。 */
 const STEP_DAYS = Number(process.env.EVAL_STEP ?? 2);
@@ -35,7 +35,11 @@ export type EvalEngine<State> = {
     today: DateOnly;
     payday: number;
     state: State;
-  }): Quantiles & { cautions?: readonly IssuedCaution[] };
+  }): Quantiles & {
+    /** 着地の分位 5%〜95%(19点)。無ければ p10・p50・p90 だけで測る。 */
+    quantiles?: readonly number[];
+    cautions?: readonly IssuedCaution[];
+  };
 };
 
 export type Scenario = {
@@ -50,6 +54,11 @@ export type EvalPoint = Quantiles & {
   asOf: DateOnly;
   phase: 'early' | 'mid' | 'late';
   actual: number;
+  /** 着地の分位(19点。無ければ p10・p50・p90 の3点)と、その分位の水準。 */
+  quantiles: readonly number[];
+  levels: readonly number[];
+  /** 単純な予想:「このペースのまま」(使った額 ÷ 経過日数 × 日数)と「先月と同じ」。 */
+  naive: { pace: number; lastMonth: number };
   /** 出した注意の数と、実際に目標を超えた数(月末に、ジャンルの支出が目標より多かった)。 */
   cautions: { issued: number; hits: number };
 };
@@ -81,15 +90,23 @@ export function evaluate<State>(
       for (let elapsed = 2; elapsed <= days - 1; elapsed += STEP_DAYS) {
         const asOf = addDays(period.from, elapsed - 1);
         const known = knownTransactionsAt(scenario.transactions, asOf);
-        const { cautions = [], ...q } = engine.forecast({
+        const {
+          cautions = [],
+          quantiles,
+          ...q
+        } = engine.forecast({
           known,
           period,
           today: asOf,
           payday,
           state,
         });
+        const levels = quantiles ? QUANTILE_LEVELS : [0.1, 0.5, 0.9];
         points.push({
           ...q,
+          quantiles: quantiles ?? [q.p10, q.p50, q.p90],
+          levels,
+          naive: naiveOf(known, period, asOf),
           cautions: {
             issued: cautions.length,
             hits: cautions.filter((c) => (actualByCategory.get(c.categoryId) ?? 0) > c.targetYen)
@@ -108,11 +125,69 @@ export function evaluate<State>(
   return points;
 }
 
-/** 分位スコア(p10・p50・p90 のピンボール損失の平均 × 2)。CRPS の近似で、小さいほど良い。 */
+export const QUANTILE_LEVELS: readonly number[] = Array.from(
+  { length: 19 },
+  (_, i) => (i + 1) / 20,
+);
+
+/**
+ * 単純な予想2つ(設計書 v3 5)。その時点で記録済みの明細だけで出す。
+ * 先月の記録が無ければ「このままのペース」で代える。
+ */
+function naiveOf(
+  known: readonly ForecastSourceTransaction[],
+  period: Period,
+  asOf: DateOnly,
+): { pace: number; lastMonth: number } {
+  const spent = actualTotalForPeriod(known, { from: period.from, to: asOf });
+  const elapsed = daysBetween(period.from, asOf) + 1;
+  const pace = (spent / Math.max(1, elapsed)) * periodDays(period.from, period.to);
+  const prevFrom = addMonths(period.from, -1);
+  const prevTo = addDays(period.from, -1);
+  const hasPrev = known.some((t) => t.occurredOn >= prevFrom && t.occurredOn <= prevTo);
+  const lastMonth = hasPrev ? actualTotalForPeriod(known, { from: prevFrom, to: prevTo }) : pace;
+  return { pace, lastMonth };
+}
+
+/**
+ * CRPS の近似:分位のピンボール損失の平均 × 2(分位が細かいほど CRPS に近い)。
+ * 点の予想(全部の分位が同じ値)では、絶対誤差と同じになる。
+ */
+export function quantileCrps(
+  quantiles: readonly number[],
+  levels: readonly number[],
+  y: number,
+): number {
+  let sum = 0;
+  for (let i = 0; i < quantiles.length; i += 1) {
+    const q = quantiles[i]!;
+    const tau = levels[i]!;
+    sum += y >= q ? tau * (y - q) : (1 - tau) * (q - y);
+  }
+  // 水準の和で割って2倍にする(点の予想で |誤差| になるように)。
+  const tauMean = levels.reduce((a, b) => a + b, 0) / levels.length;
+  return sum / quantiles.length / tauMean;
+}
+
+/** PIT:実際の値が、予測の分布のどの位置か(分位の間を線形に補う)。 */
+export function pitOf(quantiles: readonly number[], levels: readonly number[], y: number): number {
+  const n = quantiles.length;
+  if (n === 0) return 0.5;
+  if (y <= quantiles[0]!) return levels[0]! / 2;
+  if (y >= quantiles[n - 1]!) return (1 + levels[n - 1]!) / 2;
+  for (let i = 1; i < n; i += 1) {
+    if (y <= quantiles[i]!) {
+      const lo = quantiles[i - 1]!;
+      const hi = quantiles[i]!;
+      const f = hi > lo ? (y - lo) / (hi - lo) : 0.5;
+      return levels[i - 1]! + f * (levels[i]! - levels[i - 1]!);
+    }
+  }
+  return levels[n - 1]!;
+}
+
 function quantileScore(p: EvalPoint): number {
-  const loss = (q: number, tau: number) =>
-    p.actual >= q ? tau * (p.actual - q) : (1 - tau) * (q - p.actual);
-  return ((loss(p.p10, 0.1) + loss(p.p50, 0.5) + loss(p.p90, 0.9)) * 2) / 3;
+  return quantileCrps(p.quantiles, p.levels, p.actual);
 }
 
 export type EvalMetrics = {
@@ -123,6 +198,13 @@ export type EvalMetrics = {
   bias: number;
   absError: number;
   score: number;
+  /** 単純な予想2つの CRPS(点の予想なので絶対誤差)。 */
+  naivePaceScore: number;
+  naiveLastMonthScore: number;
+  /** 設計書 v3 5.1 の偏り:Σ(実際 − 中央値) ÷ Σ実際。正は低く出ている。 */
+  sumBias: number;
+  /** PIT を10等分した各区間の割合(目標は各 7〜13%)。 */
+  pitDeciles: number[];
   /** 注意の精度(出したうち、実際に超えた割合)と出した数。出していなければ null。 */
   cautionPrecision: number | null;
   cautionsIssued: number;
@@ -140,8 +222,26 @@ export function metricsOf(points: readonly EvalPoint[]): EvalMetrics {
     absError:
       points.reduce((s, p) => s + Math.abs(p.p50 - p.actual) / Math.max(1, p.actual), 0) / n,
     score: points.reduce((s, p) => s + quantileScore(p), 0) / n,
+    naivePaceScore: points.reduce((s, p) => s + Math.abs(p.naive.pace - p.actual), 0) / n,
+    naiveLastMonthScore: points.reduce((s, p) => s + Math.abs(p.naive.lastMonth - p.actual), 0) / n,
+    sumBias:
+      points.reduce((s, p) => s + (p.actual - p.p50), 0) /
+      Math.max(
+        1,
+        points.reduce((s, p) => s + p.actual, 0),
+      ),
+    pitDeciles: pitDecilesOf(points),
     ...cautionStats(points),
   };
+}
+
+function pitDecilesOf(points: readonly EvalPoint[]): number[] {
+  const bins = Array.from({ length: 10 }, () => 0);
+  for (const p of points) {
+    const u = pitOf(p.quantiles, p.levels, p.actual);
+    bins[Math.min(9, Math.floor(u * 10))]! += 1;
+  }
+  return bins.map((b) => b / Math.max(1, points.length));
 }
 
 function cautionStats(points: readonly EvalPoint[]): {

@@ -152,7 +152,7 @@ export function reportInsights(input: {
     out.push({
       key: 'bills',
       tone: 'info',
-      text: `${bill.label}など毎月の請求を、残りの期間に約${est(forecast.bills.expectedYen)}見込んでいる。`,
+      text: `${bill.label}など請求・期ごとの支払いを、残りの期間に約${est(forecast.bills.expectedYen)}見込んでいる。`,
     });
   }
 

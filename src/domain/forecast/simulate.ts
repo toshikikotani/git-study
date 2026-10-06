@@ -41,6 +41,7 @@ import type {
   ProbableEvent,
   RegularMerchant,
   SpendingType,
+  LumpyCategory,
   TypicalProfilePoint,
   ForecastBreakdown,
   ForecastSuggestion,
@@ -53,6 +54,11 @@ export const MIN_TRIALS = 2_000;
 export const LEARNING_DATA_DAYS = 14;
 /** 安全に使える1日の額が守るべき、予算内に収まる確率の目標。 */
 const SAFE_ALLOWANCE_TARGET_PROB = 0.8;
+/** totalQuantiles の分位(5%〜95%、5% きざみ)。 */
+export const TOTAL_QUANTILE_LEVELS: readonly number[] = Array.from(
+  { length: 19 },
+  (_, i) => (i + 1) / 20,
+);
 
 export type CategoryTarget = { categoryId: string; categoryName: string; targetYen: number };
 
@@ -91,6 +97,11 @@ export type SimulateInput = {
   monthLevelK?: number;
   /** 期間に入ってからの記録で今月の水準を更新するか(false なら事前分布 Gamma(k, k) のまま)。 */
   levelUpdate?: boolean;
+  /**
+   * ジャンルごとの今月の水準 M_g の強さ k_g(設計書 v3 4.2)。λ_g = λ'_g · L · M_g、
+   * M_g | L ~ Gamma(k_g + n_g, k_g + L λ'_g S_g)。Infinity(既定)なら M_g = 1(全体の水準だけ)。
+   */
+  genreLevelK?: number;
   /** 目標額のあるカテゴリ。着地がそれを超える確率を出す。 */
   categoryTargets?: readonly CategoryTarget[];
   /**
@@ -104,12 +115,35 @@ export type SimulateInput = {
   mode?: 'paths' | 'totals';
   /** カテゴリごとの支出の型(設計書 v3 4.1)。無いカテゴリは定常型。 */
   categoryTypes?: Readonly<Record<string, SpendingType>>;
+  /** まとまり型のジャンル(出来事の回数 × 大きさで予測する)。 */
+  lumpy?: readonly LumpyCategory[];
+  /** 「これ以上は使わない」にしたジャンルの守られ方(いつもの見込みに掛ける。設計書 v3 4.7)。 */
+  keepRates?: Readonly<Record<string, number>>;
+  /**
+   * 今日のうち、もう過ぎた割合(いつもの1日の使い方で、今の時刻までに使う割合。設計書 v3 4.9)。
+   * 1(既定)なら今日は終わったものとして扱う。1未満なら、今日の残りの見込みを足す。
+   */
+  todayElapsedShare?: number;
   /**
    * 本人が決めた約束(「外食を週1回へらす」)。今日の月の終わりまで、そのカテゴリの回数を
    * 週に perWeek 回へらしたとして見込む(ジャンル画面の「決める」、ADR-075)。
    */
   promises?: readonly ForecastPromise[];
 };
+
+/**
+ * まとまり型の出来事の率の事前分布:Gamma(1, 90日)(90日に1回ほど。まとまり型は月2回未満なので、
+ * 記録の短い人の「60日に1回の旅行」を「2か月ごとに旅行」と読みすぎない)。出来事の間隔はワイブル分布(形 β、
+ * 平均 = 1 ÷ 率)とみなし、前回からの日数 s から s+1 日の間に起きる確率を
+ * 1 − exp((s/λ)^β − ((s+1)/λ)^β)、λ = 平均間隔 ÷ Γ(1 + 1/β) にする。β=1 なら日数によらず、
+ * β が大きいほど前回の直後は起きにくい。
+ */
+const LUMPY_PRIOR = { events: 1, days: 90 } as const;
+/** 残りの期間に予定があるとき、別の出来事の起きやすさに掛ける倍率(予定が主役)。 */
+const LUMPY_SCHEDULED_FACTOR = 0.2;
+/** 出来事の金額の、記録が少ないときの対数のばらつき。 */
+const LUMPY_FALLBACK_SIGMA = 0.6;
+const LUMPY_MIN_SIGMA = 0.25;
 
 export type ForecastPromise = { categoryId: string; perWeek: number };
 
@@ -189,6 +223,7 @@ export function runTrials(input: SimulateInput): TrialRun {
   }
   for (const v of [...(input.visits ?? []), ...(input.billEvents ?? [])])
     touch(v.categoryId, v.label);
+  for (const l of input.lumpy ?? []) touch(l.categoryId, l.categoryName);
 
   const categories: CategoryRow[] = [
     ...fittedCats.map((c) => ({
@@ -210,6 +245,11 @@ export function runTrials(input: SimulateInput): TrialRun {
   const elapsed = input.elapsedDates ?? [];
   const obsById = new Map((input.periodObservations ?? []).map((o) => [o.categoryId, o]));
   const levelUpdate = input.levelUpdate ?? true;
+  const kg = input.genreLevelK ?? Infinity;
+  const keep = input.keepRates ?? {};
+  const todayDone = Math.min(1, Math.max(0, input.todayElapsedShare ?? 1));
+  const todayOff = dayFeature(input.today, input.payday).dayOff;
+  const genreLevel = levelUpdate && Number.isFinite(kg) && kg > 0;
   let observedCount = 0;
   if (levelUpdate) for (const o of obsById.values()) observedCount += o.count;
 
@@ -229,12 +269,16 @@ export function runTrials(input: SimulateInput): TrialRun {
     let exposure = 0;
     let unrecorded = 0;
     let unrecordedOff = 0;
+    let todayRest = 0;
     for (const date of elapsed) {
+      // 今日は、もう過ぎた割合の分だけ「使った(記録済み・未記録)」とみなし、残りは今日のこれから。
+      const done = date === input.today ? todayDone : 1;
       const f = rateFactor(cat, date, input.payday, input.fitted.monthFactor);
       const share = recordedShare(lag, daysBetween(date, input.today));
-      exposure += f * share;
-      unrecorded += f * (1 - share);
-      if (dayFeature(date, input.payday).dayOff) unrecordedOff += f * (1 - share);
+      exposure += f * share * done;
+      unrecorded += f * (1 - share) * done;
+      if (dayFeature(date, input.payday).dayOff) unrecordedOff += f * (1 - share) * done;
+      if (date === input.today) todayRest = f * (1 - done);
     }
     // 今月の金額の中心:μ_今月 = μ + v(今月の平均 − μ)、v = mτ² ÷ (mτ² + σ²_月内)。
     const { mu, sigmaSq, kappa } = cat.amountPosterior;
@@ -251,6 +295,7 @@ export function runTrials(input: SimulateInput): TrialRun {
       exposure,
       unrecorded,
       unrecordedOff,
+      todayRest,
       muMonth: mu + v * (meanLog - mu),
       muSd: Math.sqrt(sigmaSq / Math.max(kappa, 0.01) + (1 - v) * tauSq),
       sigmaWithin: Math.sqrt(withinSq),
@@ -293,14 +338,34 @@ export function runTrials(input: SimulateInput): TrialRun {
   const specialSamples = new Float64Array(trials);
   const variableSamples = new Float64Array(trials);
   const unrecordedSamples = new Float64Array(trials);
-  const countSum = new Float64Array(nFit);
-  const variableSum = new Float64Array(nFit);
+  const countSum = new Float64Array(nAll);
+  const variableSum = new Float64Array(nAll);
+  const lumpy = (input.lumpy ?? [])
+    .map((l) => {
+      const n = l.eventLogAmounts.length;
+      const mu = n > 0 ? l.eventLogAmounts.reduce((a, b) => a + b, 0) / n : 0;
+      const sd =
+        n >= 3
+          ? Math.sqrt(l.eventLogAmounts.reduce((a, v) => a + (v - mu) ** 2, 0) / (n - 1))
+          : LUMPY_FALLBACK_SIGMA;
+      const sigma = Math.max(LUMPY_MIN_SIGMA, sd);
+      return { l, n, mu, sigma, index: indexById.get(l.categoryId) };
+    })
+    .filter((x): x is typeof x & { index: number } => x.index !== undefined && x.n > 0);
   let visitSum = 0;
   let billSum = 0;
   const categorySamples: Float64Array[] = categories.map(() => new Float64Array(trials));
   const pathIncrements = mode === 'paths' && D > 0 ? new Float64Array(trials * D) : null;
   const dayTotals = new Float64Array(Math.max(1, D));
   const lambdas = new Float64Array(nFit);
+  // 外出のジャンルに日ごとに共通して掛かるゆらぎ(設計書 v3 4.2)。
+  const shock = input.fitted.outingShock ?? null;
+  const outing = new Uint8Array(nFit);
+  if (shock) {
+    const ids = new Set(shock.categoryIds);
+    for (let c = 0; c < nFit; c += 1) if (ids.has(fittedCats[c]!.categoryId)) outing[c] = 1;
+  }
+  const dayShock = new Float64Array(Math.max(1, D)).fill(1);
 
   for (let t = 0; t < trials; t += 1) {
     dayTotals.set(eventsByDay);
@@ -312,6 +377,15 @@ export function runTrials(input: SimulateInput): TrialRun {
       const post = fittedCats[c]!.countPosterior;
       lambdas[c] = sampleGamma(rng, post.alpha, 1 / post.beta);
     }
+    // 'paths' は日ごとに引く。'totals' は残りの日数で平均したゆらぎ(形 a × 日数)を1つ引く。
+    let totalShock = 1;
+    if (shock) {
+      if (pathIncrements !== null) {
+        for (let d = 0; d < D; d += 1) dayShock[d] = sampleGamma(rng, shock.shape, 1 / shock.shape);
+      } else if (D > 0) {
+        totalShock = sampleGamma(rng, shock.shape * D, 1 / (shock.shape * D));
+      }
+    }
     let level = 1;
     if (Number.isFinite(k) && k > 0) {
       let expected = 0;
@@ -322,31 +396,52 @@ export function runTrials(input: SimulateInput): TrialRun {
     for (let c = 0; c < nFit; c += 1) {
       const cat = fittedCats[c]!;
       const p = pre[c]!;
-      const rate = lambdas[c]! * level;
+      let rate = lambdas[c]! * level * (keep[cat.categoryId] ?? 1);
+      if (genreLevel) {
+        const n = obsById.get(cat.categoryId)?.count ?? 0;
+        rate *= sampleGamma(rng, kg + n, 1 / (kg + rate * p.exposure));
+      }
       const muTrial = p.muMonth + p.muSd * sampleStandardNormal(rng);
       const sigma = p.sigmaWithin;
       // 休みの日(土日祝)と平日で、1回の金額が違う(居酒屋は休みの日に多く、高い)。
       const { delta, share } = cat.dayOffAmount;
       const muOff = muTrial + (1 - share) * delta;
       const muOn = muTrial - share * delta;
+      // 1回の金額。店ごとの混合があれば店を選んでから引く(最後の成分は新しい店 = ジャンル全体)。
+      const mix = cat.stores;
+      const shift = muTrial - cat.amountPosterior.mu;
+      const draw = (off: boolean): number => {
+        if (!mix) return sampleLognormal(rng, off ? muOff : muOn, sigma);
+        const shares = off ? mix.shareOff : mix.shareOn;
+        let u = rng();
+        let i = 0;
+        while (i < shares.length - 1 && u >= shares[i]!) {
+          u -= shares[i]!;
+          i += 1;
+        }
+        if (i === shares.length - 1) return sampleLognormal(rng, off ? muOff : muOn, sigma);
+        return sampleLognormal(rng, mix.mu[i]! + shift, mix.sigma[i]!);
+      };
       let catTotal = 0;
       if (pathIncrements !== null) {
+        const shocked = outing[c] === 1;
         for (let d = 0; d < D; d += 1) {
-          const count = samplePoisson(rng, rate * p.factors[d]!);
+          const count = samplePoisson(rng, rate * p.factors[d]! * (shocked ? dayShock[d]! : 1));
           if (count === 0) continue;
           countSum[c]! += count;
-          const mu = futureOff[d] ? muOff : muOn;
+          const off = futureOff[d]!;
           let dayYen = 0;
-          for (let i = 0; i < count; i += 1) dayYen += sampleLognormal(rng, mu, sigma);
+          for (let i = 0; i < count; i += 1) dayYen += draw(off);
           dayTotals[d]! += dayYen * scale;
           catTotal += dayYen;
         }
       } else {
-        const countOff = samplePoisson(rng, rate * p.sumOff);
-        const countOn = samplePoisson(rng, rate * p.sumOn);
+        const s = outing[c] === 1 ? totalShock : 1;
+        const countOff = samplePoisson(rng, rate * p.sumOff * s);
+        const countOn = samplePoisson(rng, rate * p.sumOn * s);
         countSum[c]! += countOff + countOn;
-        for (let i = 0; i < countOff; i += 1) catTotal += sampleLognormal(rng, muOff, sigma);
-        for (let i = 0; i < countOn; i += 1) catTotal += sampleLognormal(rng, muOn, sigma);
+        for (let i = 0; i < countOff; i += 1) catTotal += draw(true);
+        for (let i = 0; i < countOn; i += 1) catTotal += draw(false);
       }
       variableTotal += catTotal;
       // まだ記録されていない、今日までの支出。グラフでは明日の分に足す。
@@ -354,20 +449,58 @@ export function runTrials(input: SimulateInput): TrialRun {
       if (p.unrecorded > 0) {
         const offCount = samplePoisson(rng, rate * p.unrecordedOff);
         const onCount = samplePoisson(rng, rate * (p.unrecorded - p.unrecordedOff));
-        for (let i = 0; i < offCount; i += 1) missing += sampleLognormal(rng, muOff, sigma);
-        for (let i = 0; i < onCount; i += 1) missing += sampleLognormal(rng, muOn, sigma);
+        for (let i = 0; i < offCount; i += 1) missing += draw(true);
+        for (let i = 0; i < onCount; i += 1) missing += draw(false);
         if (D > 0) dayTotals[0]! += missing * scale;
         unrecordedTotal += missing;
+      }
+      // 今日のこれから(時刻で縮めた今日の見込み)。グラフでは明日の分に足す。
+      if (p.todayRest > 0) {
+        const count = samplePoisson(rng, rate * p.todayRest);
+        let rest = 0;
+        for (let i = 0; i < count; i += 1) rest += draw(todayOff);
+        if (D > 0) dayTotals[0]! += rest * scale;
+        catTotal += rest;
+        variableTotal += rest;
       }
       categorySamples[c]![t] = (catTotal + missing) * scale;
       variableSum[c]! += catTotal * scale;
     }
     for (let c = nFit; c < nAll; c += 1) categorySamples[c]![t] = 0;
 
+    // まとまり型:出来事が起きる日と大きさを引く(前回からの日数で起きやすさが変わる)。
+    for (const { l, n, mu, sigma, index } of lumpy) {
+      const rate = sampleGamma(
+        rng,
+        n + LUMPY_PRIOR.events,
+        1 / (l.exposureDays + LUMPY_PRIOR.days),
+      );
+      const beta = l.gapShape;
+      const lambda = 1 / Math.max(rate, 1e-6) / gammaFunction(1 + 1 / beta);
+      const factor = l.hasScheduled ? LUMPY_SCHEDULED_FACTOR : 1;
+      const muTrial = mu + (sigma / Math.sqrt(n)) * sampleStandardNormal(rng);
+      let since = l.daysSinceLast;
+      let catTotal = 0;
+      for (let d = 0; d < D; d += 1) {
+        const hazard = (((since + 1) / lambda) ** beta - (since / lambda) ** beta) * factor;
+        since += 1;
+        if (rng() >= 1 - Math.exp(-hazard)) continue;
+        const yen = sampleLognormal(rng, muTrial, sigma);
+        catTotal += yen;
+        countSum[index]! += 1;
+        dayTotals[d]! += yen * scale;
+        since = 0;
+      }
+      categorySamples[index]![t]! += catTotal * scale;
+      variableSum[index]! += catTotal * scale;
+      variableTotal += catTotal;
+    }
+
     // 規則的な来店と月払いの請求:その日に来るかどうかと金額を引く。
     let visitTotal = 0;
     for (const { e, day, index, scaled } of probableEvents) {
-      if (rng() >= e.probability) continue;
+      // 来店は、守られ方を掛けた確率で来る(請求は決まった支払いなので掛けない)。
+      if (rng() >= e.probability * (scaled ? (keep[e.categoryId] ?? 1) : 1)) continue;
       const amount = e.fixedYen ?? sampleLognormal(rng, e.logMu, e.logSigma);
       const yen = scaled ? amount * scale : amount;
       dayTotals[day]! += yen;
@@ -429,6 +562,22 @@ export function runTrials(input: SimulateInput): TrialRun {
     visitMean: visitSum / trials,
     billMean: billSum / trials,
   };
+}
+
+/** ガンマ関数 Γ(x)(x > 0、Lanczos 近似)。 */
+export function gammaFunction(x: number): number {
+  if (x < 0.5) return Math.PI / (Math.sin(Math.PI * x) * gammaFunction(1 - x));
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+    1.5056327351493116e-7,
+  ];
+  const z = x - 1;
+  let a = c[0]!;
+  const t = z + g + 0.5;
+  for (let i = 1; i < g + 2; i += 1) a += c[i]! / (z + i);
+  return Math.sqrt(2 * Math.PI) * t ** (z + 0.5) * Math.exp(-t) * a;
 }
 
 function sortedCopy(samples: Float64Array): Float64Array {
@@ -639,6 +788,9 @@ export function simulateForecast(input: SimulateInput): Forecast {
     asOf: input.today,
     remainingDays: input.remainingDays,
     total: { ...total, mean: Math.round(mean(totalSamples)) },
+    totalQuantiles: TOTAL_QUANTILE_LEVELS.map((p) =>
+      Math.round(quantileAt(sortedTotal, rawLevelFor(cal, p))),
+    ),
     path,
     typicalProfile: typicalProfile(input),
     byCategory,

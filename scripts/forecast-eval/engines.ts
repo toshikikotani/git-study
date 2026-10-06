@@ -104,6 +104,7 @@ export const v2Engine: EvalEngine<State> = {
         ? {
             halfLifeDays: verification.halfLifeDays,
             monthLevelK: verification.monthLevelK ?? Infinity,
+            genreLevelK: verification.genreLevelK ?? Infinity,
           }
         : {}),
       ...(process.env.EVAL_K ? { monthLevelK: Number(process.env.EVAL_K) } : {}),
@@ -125,6 +126,12 @@ export const v2Engine: EvalEngine<State> = {
     })
       .filter((row) => row.caution?.kind === 'likely' && row.targetYen !== null)
       .map((row) => ({ categoryId: row.genreId, targetYen: row.targetYen! }));
-    return { p10: f.total.p10, p50: f.total.p50, p90: f.total.p90, cautions };
+    return {
+      p10: f.total.p10,
+      p50: f.total.p50,
+      p90: f.total.p90,
+      quantiles: f.totalQuantiles,
+      cautions,
+    };
   },
 };

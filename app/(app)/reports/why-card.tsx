@@ -18,7 +18,7 @@ export function WhyCard({ forecast, endLabel }: { forecast: Forecast; endLabel: 
     { key: 'actual', label: '使った額', yen: b.actualYen, fact: true },
     { key: 'committed', label: '決まっている額(予定・固定費)', yen: b.committedYen, fact: true },
     { key: 'visits', label: '規則的な来店', yen: b.visitsYen, fact: false },
-    { key: 'bills', label: '毎月の請求', yen: b.billsYen, fact: false },
+    { key: 'bills', label: '請求・期ごとの支払い', yen: b.billsYen, fact: false },
     { key: 'unrecorded', label: 'まだ記録していない分', yen: b.unrecordedYen, fact: false },
     { key: 'special', label: '特別費', yen: b.specialYen, fact: false },
     { key: 'variable', label: '残りの変動費', yen: b.variableYen, fact: false },
