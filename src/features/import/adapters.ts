@@ -10,6 +10,7 @@
 
 import { parseYen } from '@/domain/money';
 import type { DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { parseDateOnly } from './date-parse';
 import { decodeCsv, type CsvEncoding } from './encoding';
 import { parseCsv } from './csv';
@@ -82,12 +83,7 @@ export type ImportResult = {
   encoding: Exclude<CsvEncoding, 'auto'>;
 };
 
-export class AdapterError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AdapterError';
-  }
-}
+export class AdapterError extends AppError {}
 
 /** 何も設定されていない状態からの出発点。UI の初期値に使う。 */
 export const GENERIC_ADAPTER: ImportAdapter = {

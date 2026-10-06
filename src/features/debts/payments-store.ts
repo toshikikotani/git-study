@@ -12,6 +12,7 @@
 
 import { monthlyInterest } from '@/domain/money';
 import type { DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -32,12 +33,7 @@ export type DebtPaymentInput = {
   note: string | null;
 };
 
-export class DebtPaymentStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DebtPaymentStoreError';
-  }
-}
+export class DebtPaymentStoreError extends AppError {}
 
 type DebtPaymentRow = Database['public']['Tables']['debt_payments']['Row'];
 

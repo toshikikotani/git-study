@@ -54,11 +54,64 @@ export function summarizeMonthlySpendByCategory(
   );
 }
 
+export type PeriodSpend = {
+  /** 'YYYY' | 'YYYY-MM' | 'YYYY-MM-DD'(呼び出し側が periodKeyLength を揃える)。 */
+  period: string;
+  /** 正の数。 */
+  spentYen: number;
+};
+
+/**
+ * 指定した期間キー(年'YYYY'・月'YYYY-MM'・日'YYYY-MM-DD')ごとに支出を合算する
+ * (カテゴリ別ページの年→月→日ドリルダウン、本人発案)。
+ *
+ * summarizeMonthlySpendByCategory() と違い、呼び出し側が既に1カテゴリへ
+ * 絞り込んだ取引を渡す前提でカテゴリの判定はしない——年・月・日のどの粒度でも
+ * 同じ関数で集計できるよう、期間キーの桁数(periodKeyLength)だけをパラメータに
+ * した。periodKeys に無い実績は無視し、periodKeys にある期間は実績が無くても
+ * 0円で埋める(「記録が無い」と「使っていない」を画面で区別できるようにする、
+ * summarizeMonthlySpendByCategory と同じ考え方)。
+ */
+export function summarizeSpendByPeriod(
+  transactions: readonly SpendingTransaction[],
+  periodKeys: readonly string[],
+  periodKeyLength: 4 | 7 | 10,
+): PeriodSpend[] {
+  const spentByPeriod = new Map<string, number>();
+
+  for (const tx of transactions) {
+    if (!isCountable(tx) || tx.amountYen >= 0) continue;
+    const period = tx.occurredOn.slice(0, periodKeyLength);
+    spentByPeriod.set(period, (spentByPeriod.get(period) ?? 0) - tx.amountYen);
+  }
+
+  return periodKeys.map((period) => ({ period, spentYen: spentByPeriod.get(period) ?? 0 }));
+}
+
+/**
+ * 支出の記録がある年の一覧、新しい順(カテゴリ別ページのドリルダウン最初の
+ * 階層、本人発案)。
+ *
+ * 「何年分のデータがあるか」は本人ごとに違い、固定の開始年を持たないため、
+ * 実際の取引から年を導く(月・日と違い、無い年を0円で埋める対象にはしない
+ * ——そのカテゴリがまだ存在しなかった年まで並べても情報にならない)。
+ */
+export function distinctYearsWithSpend(transactions: readonly SpendingTransaction[]): string[] {
+  const years = new Set<string>();
+  for (const tx of transactions) {
+    if (!isCountable(tx) || tx.amountYen >= 0) continue;
+    years.add(tx.occurredOn.slice(0, 4));
+  }
+  return [...years].sort((a, b) => b.localeCompare(a));
+}
+
 export type MonthlyIncomeExpense = {
   monthKey: string;
   incomeYen: number;
-  /** 正の数。 */
+  /** 記帳済みの実績。正の数。予定は含めない。 */
   expenseYen: number;
+  /** 今日より先の予定。正の数。支出とは呼ばない。 */
+  scheduledYen: number;
 };
 
 /**
@@ -71,15 +124,21 @@ export type MonthlyIncomeExpense = {
 export function summarizeMonthlyIncomeExpense(
   transactions: readonly SpendingTransaction[],
   monthKeys: readonly string[],
+  today?: string,
 ): MonthlyIncomeExpense[] {
-  const byMonth = new Map<string, { incomeYen: number; expenseYen: number }>();
+  const byMonth = new Map<
+    string,
+    { incomeYen: number; expenseYen: number; scheduledYen: number }
+  >();
 
   for (const tx of transactions) {
     if (!isCountable(tx)) continue;
     const monthKey = tx.occurredOn.slice(0, 7);
-    const current = byMonth.get(monthKey) ?? { incomeYen: 0, expenseYen: 0 };
+    const current = byMonth.get(monthKey) ?? { incomeYen: 0, expenseYen: 0, scheduledYen: 0 };
     if (tx.amountYen > 0) {
       current.incomeYen += tx.amountYen;
+    } else if (today !== undefined && tx.occurredOn > today) {
+      current.scheduledYen += -tx.amountYen;
     } else {
       current.expenseYen += -tx.amountYen;
     }
@@ -90,6 +149,7 @@ export function summarizeMonthlyIncomeExpense(
     monthKey,
     incomeYen: byMonth.get(monthKey)?.incomeYen ?? 0,
     expenseYen: byMonth.get(monthKey)?.expenseYen ?? 0,
+    scheduledYen: byMonth.get(monthKey)?.scheduledYen ?? 0,
   }));
 }
 
@@ -97,6 +157,41 @@ export function summarizeMonthlyIncomeExpense(
 export function savingsRateOf(entry: MonthlyIncomeExpense): number | null {
   if (entry.incomeYen <= 0) return null;
   return (entry.incomeYen - entry.expenseYen) / entry.incomeYen;
+}
+
+export type SpendingPaceVsAverage = {
+  currentMonthExpenseYen: number;
+  /** 当月を除いた他の月の平均支出。 */
+  trailingAverageExpenseYen: number;
+  /** currentMonthExpenseYen - trailingAverageExpenseYen。正なら平均より多い。 */
+  differenceYen: number;
+};
+
+/**
+ * 当月の支出が、直近の他の月の平均と比べて多いか少ないか(MoneyForward ME
+ * との機能比較調査、issue #97「12ヵ月の平均額も出せるため、使い過ぎかどうか
+ * が一目瞭然」)。
+ *
+ * 既存の summarizeMonthlyIncomeExpense() が返す直近12ヶ月分(/reports が
+ * 既に取得済み)をそのまま使う——新しいクエリは増やさない。平均の対象は
+ * 「当月を除く」他の月に限る(当月はまだ集計途中のため、含めると月初ほど
+ * 平均が不当に引き下げられ「使いすぎ」の判定が歪む)。
+ */
+export function compareCurrentMonthToTrailingAverage(
+  rows: readonly MonthlyIncomeExpense[],
+  currentMonthKey: string,
+): SpendingPaceVsAverage | null {
+  const current = rows.find((r) => r.monthKey === currentMonthKey);
+  const priorMonths = rows.filter((r) => r.monthKey !== currentMonthKey);
+  if (!current || priorMonths.length === 0) return null;
+
+  const totalPriorExpenseYen = priorMonths.reduce((acc, r) => acc + r.expenseYen, 0);
+  const trailingAverageExpenseYen = Math.round(totalPriorExpenseYen / priorMonths.length);
+  return {
+    currentMonthExpenseYen: current.expenseYen,
+    trailingAverageExpenseYen,
+    differenceYen: current.expenseYen - trailingAverageExpenseYen,
+  };
 }
 
 export type MerchantSpend = {
@@ -143,4 +238,33 @@ export function rankMerchantsBySpend(
 
 function normalizeLabel(label: string): string {
   return label.replace(/[\s　]/g, '').toLowerCase();
+}
+
+/**
+ * 今のペースが続いた場合の、今月の着地見込み額(家計簿の「予測」、本人発案)。
+ *
+ * domain/accumulation.ts の annualizedPaceYen() と同じ考え方(1日あたりに
+ * 均してから日数を掛ける)だが、あちらは「1年続いたら」、こちらは
+ * 「今月の残り日数まで」を見積もる——月初の数日だけで年換算すると
+ * 大きく振れるのに対し、月内の着地予測は経過日数の割合がそのまま効くため
+ * 実用上はこちらの方が早い時期から参考になる。
+ */
+export function projectedMonthTotalYen(
+  spentSoFarYen: number,
+  elapsedDays: number,
+  totalDaysInMonth: number,
+): number {
+  if (elapsedDays <= 0) return spentSoFarYen;
+  return Math.round((spentSoFarYen / elapsedDays) * totalDaysInMonth);
+}
+
+/**
+ * 1日あたりの平均支出(日次レポートで今日の額と比べる基準、ADR-032)。
+ *
+ * 割り算の結果を必ず整数の円に丸める——円は整数で扱う約束(ADR-008)で、
+ * formatYen() は小数を受け取ると例外にする。
+ */
+export function averageDailySpendYen(spentSoFarYen: number, elapsedDays: number): number {
+  if (elapsedDays <= 0) return 0;
+  return Math.round(spentSoFarYen / elapsedDays);
 }

@@ -2,16 +2,16 @@
  * ホーム画面に出す3つの数字(FR-03, FR-14, FR-61)。
  *
  *   1. 完済まで残り日数 / 残り金額
- *   2〜3. 本人が選んだカテゴリの残額(初期値は生活費と聖域)
+ *   2〜3. 本人が選んだジャンルの残額(初期値は無し。本人が show_on_home を立てる)
  *
  * 数字は3個までに絞る。増やしたくなったら下層画面へ置くこと。
  * 「見るべきものが3つしかない」ことが、開き続けられる条件になる(FR-61)。
  *
- * ── 表示名をここに書かないこと(ADR-016)────────────────────────
- * どの枠を出すか(categories.show_on_home)も、何という名前で出すか
- * (categories.name)も、本人が変更できる。コードに日本語ラベルを
+ * ── 表示名をここに書かないこと(ADR-016、ADR-057でジャンルへ)──────────
+ * どの枠を出すか(genres.show_on_home)も、何という名前で出すか
+ * (genres.name)も、本人が変更できる。コードに日本語ラベルを
  * 直書きすると、本人が改名しても画面が変わらない。
- * ラベルは必ずデータから来る。分岐が要るときは code か kind を見る。
+ * ラベルは必ずデータから来る。
  *
  * ── データ源について(M0-3 以降)────────────────────────────
  * Supabase から実データを読む。RLS が本人の行だけに絞るので、
@@ -20,12 +20,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { budgetStatusFor, type BudgetTransaction, type CategoryBudget } from '@/domain/budget';
 import {
-  expandMergedCategoryIds,
-  resolveCategoryRoot,
-  type CategoryMergeNode,
-} from '@/domain/category';
+  budgetStatusFor,
+  nextMilestone,
+  type BudgetTransaction,
+  type CategoryBudget,
+} from '@/domain/budget';
 import { simulateTotalPayoff, summarizePayoff, type Debt } from '@/domain/payoff';
 import { listDebtsAsAdmin, toPayoffDebt } from '@/features/debts/store';
 import { getAppSettingsAsAdmin } from '@/features/settings/store';
@@ -35,10 +35,8 @@ import type { Database } from '@/lib/supabase/types';
 
 /** ホームに並ぶ残額タイル1枚分。 */
 export type HomeBudgetTile = {
-  categoryId: string;
-  /** 分岐に使う不変の識別子。表示には使わない。 */
-  code: string;
-  /** 画面に出す名前。本人が変更できる(categories.name)。 */
+  genreId: string;
+  /** 画面に出す名前。本人が変更できる(genres.name)。 */
   label: string;
   budgetYen: number | null;
   spentYen: number;
@@ -73,42 +71,40 @@ export type HomeSummary = {
     /** 次に到達するマイルストーン(0.25 / 0.5 / 0.75 / 1)。達成済みなら null。 */
     nextMilestone: number | null;
   };
-  /** show_on_home が立っているカテゴリ。FR-61 のため最大2件に切る。 */
+  /** show_on_home が立っているジャンル。FR-61 のため最大2件に切る。 */
   tiles: HomeBudgetTile[];
 };
 
 /** ホームに出す枠の上限。完済カウントダウンと合わせて数字3個(FR-61)。 */
 export const MAX_HOME_TILES = 2;
 
-/** categories の1行のうち、ホーム表示に必要な部分。 */
-export type HomeCategory = CategoryBudget & {
+/** genres の1行のうち、ホーム表示に必要な部分。 */
+export type HomeGenre = CategoryBudget & {
   name: string;
   sortOrder: number;
   showOnHome: boolean;
-  isActive: boolean;
 };
 
 /**
  * ホームに出す残額タイルを組み立てる。
  *
  * 対象と並び順は本人の設定(show_on_home / sort_order)で決まる。
- * ここでカテゴリを名指ししないことが、本人が枠を選び直せることの実体。
+ * ここでジャンルを名指ししないことが、本人が枠を選び直せることの実体。
  */
 export function buildHomeTiles(
-  categories: readonly HomeCategory[],
+  genres: readonly HomeGenre[],
   transactions: readonly BudgetTransaction[],
   limit: number = MAX_HOME_TILES,
 ): HomeBudgetTile[] {
-  return categories
-    .filter((category) => category.showOnHome && category.isActive)
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code))
+  return genres
+    .filter((genre) => genre.showOnHome)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
     .slice(0, limit)
-    .map((category) => {
-      const status = budgetStatusFor(category, transactions);
+    .map((genre) => {
+      const status = budgetStatusFor(genre, transactions);
       return {
-        categoryId: category.categoryId,
-        code: category.code,
-        label: category.name,
+        genreId: genre.categoryId,
+        label: genre.name,
         budgetYen: status.budgetYen,
         spentYen: status.spentYen,
         remainingYen: status.remainingYen,
@@ -126,14 +122,6 @@ export type PayoffInput = {
   /** 今月これまでの返済実績(円、正の数)。 */
   reducedThisMonthYen: number;
 };
-
-/** 進捗ゲージに刻むマイルストーン。到達を祝うための節目。 */
-export const MILESTONES = [0.25, 0.5, 0.75, 1] as const;
-
-/** まだ到達していない最初のマイルストーン。全て達成済みなら null。 */
-export function nextMilestone(progressRatio: number): number | null {
-  return MILESTONES.find((m) => progressRatio < m) ?? null;
-}
 
 export function computePayoffSummary(
   input: PayoffInput,
@@ -185,22 +173,20 @@ export async function loadHomeSummaryAsAdmin(
   userId: string,
   now: Date = new Date(),
 ): Promise<HomeSummary> {
-  const [payoffInput, categories, mergeNodes] = await Promise.all([
+  const [payoffInput, genres] = await Promise.all([
     loadPayoffInput(client, userId, now),
-    listHomeCategories(client, userId, now),
-    listCategoryMergeNodes(client, userId),
+    listHomeGenres(client, userId),
   ]);
   const transactions = await listMonthTransactions(
     client,
     userId,
-    categories.map((c) => c.categoryId),
-    mergeNodes,
+    genres.map((g) => g.categoryId),
     now,
   );
 
   return {
     payoff: computePayoffSummary(payoffInput, now),
-    tiles: buildHomeTiles(categories, transactions),
+    tiles: buildHomeTiles(genres, transactions),
   };
 }
 
@@ -211,22 +197,6 @@ export async function loadHomeSummary(now: Date = new Date()): Promise<HomeSumma
     throw new Error('ログイン状態を確認できませんでした');
   }
   return loadHomeSummaryAsAdmin(supabase, auth.user.id, now);
-}
-
-/**
- * 統廃合(merged_into_id、M2-6)を辿るための全カテゴリの最小情報。
- * 無効化済み(統合済み)のカテゴリも対象に含める必要があるため is_active では絞らない。
- */
-async function listCategoryMergeNodes(
-  client: SupabaseClient<Database>,
-  userId: string,
-): Promise<CategoryMergeNode[]> {
-  const { data, error } = await client
-    .from('categories')
-    .select('id, merged_into_id')
-    .eq('user_id', userId);
-  if (error) throw new Error(`カテゴリを取得できませんでした: ${error.message}`);
-  return data.map((c) => ({ id: c.id, mergedIntoId: c.merged_into_id }));
 }
 
 /** 完済シミュレーションの入力を組み立てる。debts / app_settings / debt_payments を読む。 */
@@ -271,84 +241,49 @@ async function loadReducedThisMonthYen(
   return data.reduce((acc, p) => acc + (p.principal_yen ?? p.amount_yen), 0);
 }
 
-/**
- * ホームに出す候補カテゴリ(show_on_home = true)と、当月の予算額を組み立てる。
- * budgets に当月の行が無いカテゴリは、categories.default_monthly_budget_yen を使う
- * (毎月の予算行を作る仕組みはまだ無いため)。
- */
-async function listHomeCategories(
+/** ホームに出す候補ジャンル(show_on_home = true)と、当月の予算額を組み立てる。 */
+async function listHomeGenres(
   client: SupabaseClient<Database>,
   userId: string,
-  now: Date,
-): Promise<HomeCategory[]> {
-  const { data: categories, error } = await client
-    .from('categories')
-    .select('id, code, name, default_monthly_budget_yen, sort_order, show_on_home, is_active')
+): Promise<HomeGenre[]> {
+  const { data: genres, error } = await client
+    .from('genres')
+    .select('id, name, budget_yen, sort_order, show_on_home')
     .eq('user_id', userId)
     .eq('show_on_home', true)
-    .eq('is_active', true)
     .order('sort_order');
-  if (error) throw new Error(`カテゴリを取得できませんでした: ${error.message}`);
-  if (categories.length === 0) return [];
+  if (error) throw new Error(`ジャンルを取得できませんでした: ${error.message}`);
 
-  const categoryIds = categories.map((c) => c.id);
-  const { data: budgets, error: budgetError } = await client
-    .from('budgets')
-    .select('category_id, amount_yen, carry_over_yen')
-    .eq('user_id', userId)
-    .eq('month', monthStartJst(0, now))
-    .in('category_id', categoryIds);
-  if (budgetError) throw new Error(`予算を取得できませんでした: ${budgetError.message}`);
-
-  const budgetByCategory = new Map(budgets.map((b) => [b.category_id, b]));
-
-  return categories.map((c) => {
-    const budget = budgetByCategory.get(c.id);
-    return {
-      categoryId: c.id,
-      code: c.code,
-      name: c.name,
-      budgetYen: budget?.amount_yen ?? c.default_monthly_budget_yen,
-      carryOverYen: budget?.carry_over_yen ?? 0,
-      sortOrder: c.sort_order,
-      showOnHome: c.show_on_home,
-      isActive: c.is_active,
-    };
-  });
+  return genres.map((g) => ({
+    categoryId: g.id,
+    name: g.name,
+    budgetYen: g.budget_yen,
+    carryOverYen: 0,
+    sortOrder: g.sort_order,
+    showOnHome: g.show_on_home,
+  }));
 }
 
-/**
- * 当月・指定カテゴリの明細。集計から外すもの(振替・対象外)は domain/budget.ts 側で判定する。
- *
- * ── 統廃合されたカテゴリの明細も含める(FR-13, M2-6)────────────────
- * カテゴリを統合しても transactions.category_id は書き換えないため、
- * `categoryIds`(統合先=表示対象)をそのまま条件にすると旧カテゴリの明細が
- * 抜け落ちる。`expandMergedCategoryIds()` で旧カテゴリの id も条件へ足し、
- * 取得後は `resolveCategoryRoot()` で明細側の categoryId を統合先へ
- * 揃え直してから `summarizeBudgets`/`budgetStatusFor` に渡す。
- */
+/** 当月・指定ジャンルの明細。集計から外すもの(振替・対象外)は domain/budget.ts 側で判定する。 */
 async function listMonthTransactions(
   client: SupabaseClient<Database>,
   userId: string,
-  categoryIds: readonly string[],
-  mergeNodes: readonly CategoryMergeNode[],
+  genreIds: readonly string[],
   now: Date,
 ): Promise<BudgetTransaction[]> {
-  if (categoryIds.length === 0) return [];
-
-  const expandedIds = expandMergedCategoryIds(mergeNodes, categoryIds);
+  if (genreIds.length === 0) return [];
 
   const { data, error } = await client
     .from('transactions')
-    .select('category_id, amount_yen, is_transfer, review_status')
+    .select('genre_id, amount_yen, is_transfer, review_status')
     .eq('user_id', userId)
-    .in('category_id', expandedIds)
+    .in('genre_id', genreIds)
     .gte('occurred_on', monthStartJst(0, now))
     .lt('occurred_on', monthStartJst(1, now));
   if (error) throw new Error(`明細を取得できませんでした: ${error.message}`);
 
   return data.map((t) => ({
-    categoryId: t.category_id === null ? null : resolveCategoryRoot(t.category_id, mergeNodes),
+    categoryId: t.genre_id,
     amountYen: t.amount_yen,
     isTransfer: t.is_transfer,
     reviewStatus: t.review_status,

@@ -7,14 +7,36 @@ import {
   assertDateOnly,
   billingCycleStartFor,
   daysBetween,
+  dateOnlyToLocalDate,
+  localDateToDateOnly,
   formatDateJa,
+  hourJst,
   monthStartJst,
   mostRecentClosingOnOrBefore,
   nthDayOfMonth,
+  parseDateOnlyOr,
   paydayCycleFor,
   splitDateOnly,
   todayJst,
+  weekdayOf,
 } from '@/lib/date';
+
+describe('hourJst', () => {
+  it('UTCの時刻ではなくJSTの時を返す(サーバーはUTCで動くため)', () => {
+    // 2026-09-07T16:00:00Z は JST 2026-09-08 01:00 → 1時
+    expect(hourJst(new Date('2026-09-07T16:00:00Z'))).toBe(1);
+  });
+
+  it('JSTの正午', () => {
+    // 2026-09-07T03:00:00Z は JST 2026-09-07 12:00
+    expect(hourJst(new Date('2026-09-07T03:00:00Z'))).toBe(12);
+  });
+
+  it('JSTの深夜0時は24ではなく0を返す', () => {
+    // 2026-09-07T15:00:00Z は JST 2026-09-08 00:00
+    expect(hourJst(new Date('2026-09-07T15:00:00Z'))).toBe(0);
+  });
+});
 
 describe('todayJst(ADR-015)', () => {
   it('UTC の日付ではなく JST の日付を返す', () => {
@@ -103,6 +125,14 @@ describe('assertDateOnly / splitDateOnly', () => {
   });
 });
 
+describe('weekdayOf(ADR-043)', () => {
+  it('日曜=0〜土曜=6で返す', () => {
+    expect(weekdayOf('2026-09-01')).toBe(2); // 火曜
+    expect(weekdayOf('2026-09-08')).toBe(2); // 火曜
+    expect(weekdayOf('2026-01-01')).toBe(4); // 木曜
+  });
+});
+
 describe('formatDateJa', () => {
   it('日本語表記にする', () => {
     expect(formatDateJa('2026-09-08')).toBe('2026年9月8日');
@@ -177,5 +207,31 @@ describe('mostRecentClosingOnOrBefore(FR-18, M6-4)', () => {
 
   it('締め日当日は当日を返す', () => {
     expect(mostRecentClosingOnOrBefore('2026-09-10', 10)).toBe('2026-09-10');
+  });
+});
+
+describe('parseDateOnlyOr', () => {
+  it('正しい日付はそのまま返す', () => {
+    expect(parseDateOnlyOr('2026-09-20', '2026-01-01')).toBe('2026-09-20');
+  });
+
+  it('形式が正しくない・存在しない日付・文字列でない値は fallback', () => {
+    expect(parseDateOnlyOr('2026/09/20', '2026-01-01')).toBe('2026-01-01');
+    expect(parseDateOnlyOr('2026-02-31', '2026-01-01')).toBe('2026-01-01');
+    expect(parseDateOnlyOr(undefined, '2026-01-01')).toBe('2026-01-01');
+    expect(parseDateOnlyOr(['2026-09-20'], '2026-01-01')).toBe('2026-01-01');
+  });
+});
+
+describe('dateOnlyToLocalDate / localDateToDateOnly', () => {
+  it('往復しても同じ日になる(月末・年末・うるう日を含む)', () => {
+    for (const d of ['2026-09-29', '2026-01-01', '2026-12-31', '2028-02-29', '2026-03-01']) {
+      expect(localDateToDateOnly(dateOnlyToLocalDate(d))).toBe(d);
+    }
+  });
+
+  it('ローカルの年月日を持つ(UTC にずれない)', () => {
+    const date = dateOnlyToLocalDate('2026-10-05');
+    expect([date.getFullYear(), date.getMonth() + 1, date.getDate()]).toEqual([2026, 10, 5]);
   });
 });

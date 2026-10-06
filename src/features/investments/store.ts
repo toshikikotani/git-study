@@ -9,16 +9,12 @@
 import { isFullyPaidOff } from '@/domain/investment';
 import { recordAlerts } from '@/features/alerts/store';
 import { getAppSettings } from '@/features/settings/store';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { DateOnly } from '@/lib/date';
 import type { Database } from '@/lib/supabase/types';
 
-export class InvestmentStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InvestmentStoreError';
-  }
-}
+export class InvestmentStoreError extends AppError {}
 
 /**
  * 全負債の完済を検知し、まだ解禁されていなければ

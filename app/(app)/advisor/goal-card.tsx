@@ -63,7 +63,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
       {goal.targetAmountYen !== null ? (
         <>
           <div
-            className="mt-3 h-2.5 w-full overflow-hidden rounded-full"
+            className="mt-3 h-3 w-full overflow-hidden rounded-full"
             style={{ background: 'var(--accent-track)' }}
           >
             <div
@@ -93,7 +93,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
           inputMode="numeric"
           value={amountInput}
           onChange={(e) => setAmountInput(e.target.value)}
-          className="w-28 rounded-full px-3 py-1.5 text-xs"
+          className="w-28 rounded-full px-3 py-2 text-xs"
           style={{ background: 'var(--plane)', color: 'var(--ink)' }}
           aria-label="進捗額(円)"
         />
@@ -101,7 +101,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
           type="button"
           onClick={handleUpdateProgress}
           disabled={isPending}
-          className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+          className="rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50"
           style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
         >
           進捗を更新

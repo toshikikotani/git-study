@@ -22,16 +22,12 @@ import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { loadDetectedSubscriptionsAsAdmin } from '@/features/subscriptions/store';
 import type { GoogleEnv } from '@/lib/env';
 import { todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { refreshGoogleAccessToken } from '@/lib/google-auth';
 import { upsertCalendarEvent } from '@/lib/google-calendar';
 import type { Database } from '@/lib/supabase/types';
 
-export class GoogleCalendarSyncError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoogleCalendarSyncError';
-  }
-}
+export class GoogleCalendarSyncError extends AppError {}
 
 /**
  * `key`(人間が読める識別子)を Calendar のイベントID(base32hex:

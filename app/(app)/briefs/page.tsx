@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
 import { listDailyBriefs } from '@/features/briefs/store';
 import { formatDateJa } from '@/lib/date';
+import { withMinDuration } from '@/lib/min-loading-duration';
 
 /**
  * 配信アーカイブ(M5-3、FR-32)。
@@ -16,7 +17,7 @@ import { formatDateJa } from '@/lib/date';
 export const dynamic = 'force-dynamic';
 
 export default async function BriefsPage() {
-  const briefs = await listDailyBriefs();
+  const briefs = await withMinDuration(listDailyBriefs());
 
   return (
     <div className="rise space-y-4">

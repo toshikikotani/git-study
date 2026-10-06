@@ -82,6 +82,15 @@ export function AccountForm({
         </select>
       </Field>
 
+      <Field label="現在残高(円)" hint="クレジットカードは未払い残高をマイナスで入力してください">
+        <TextInput
+          name="currentBalanceYen"
+          inputMode="numeric"
+          defaultValue={initial ? String(initial.currentBalanceYen) : '0'}
+          required
+        />
+      </Field>
+
       <Field
         label="締め日(1〜31・任意)"
         hint="クレジットカードのみ。銀行口座・現金は空欄で構いません"
@@ -133,8 +142,8 @@ export function AccountForm({
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '保存中…' : submitLabel}
         </button>
@@ -142,7 +151,7 @@ export function AccountForm({
           <button
             type="button"
             onClick={onDone}
-            className="rounded-full px-4 py-2.5 text-sm font-medium"
+            className="rounded-full px-4 py-3 text-sm font-medium"
             style={{ color: 'var(--ink-muted)' }}
           >
             やめる
@@ -169,7 +178,7 @@ function Field({
       </span>
       <div className="mt-1">{children}</div>
       {hint ? (
-        <span className="mt-1 block text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        <span className="mt-1 block text-xs" style={{ color: 'var(--ink-muted)' }}>
           {hint}
         </span>
       ) : null}

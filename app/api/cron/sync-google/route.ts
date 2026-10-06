@@ -7,6 +7,7 @@ import { syncCalendarAsAdmin } from '@/features/google/calendar-store';
 import { backupTransactionsToSheetAsAdmin } from '@/features/google/sheets-store';
 import { getCronSecret, getGoogleEnv } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { findOwner } from '@/lib/supabase/owner';
 
 /**
  * Google連携ジョブ(本人発案、①③)。毎日1回このルートを叩くだけで:
@@ -54,11 +55,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const admin = createAdminClient();
-  const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
+  const { user, error: usersError } = await findOwner(admin);
   if (usersError) {
     return NextResponse.json({ error: usersError.message }, { status: 500 });
   }
-  const user = usersPage.users[0];
   if (!user) {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
   }

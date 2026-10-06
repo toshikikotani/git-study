@@ -24,8 +24,7 @@ export type BudgetTransaction = {
 
 export type CategoryBudget = {
   categoryId: string;
-  code: string;
-  /** 予算未設定なら null。上限のないカテゴリ(返済・投資など)がある。 */
+  /** 予算未設定なら null。上限のないジャンルもある。 */
   budgetYen: number | null;
   /** 前月からの繰越(±)。 */
   carryOverYen: number;
@@ -33,7 +32,6 @@ export type CategoryBudget = {
 
 export type BudgetStatus = {
   categoryId: string;
-  code: string;
   budgetYen: number | null;
   carryOverYen: number;
   /** 使った額。正の数で返す(表示のたびに符号を反転させないため)。 */
@@ -74,7 +72,6 @@ export function summarizeBudgets(
     const spentYen = found?.spentYen ?? 0;
     return {
       categoryId: budget.categoryId,
-      code: budget.code,
       budgetYen: budget.budgetYen,
       carryOverYen: budget.carryOverYen,
       spentYen,
@@ -115,30 +112,18 @@ export function hasReachedAlertThreshold(status: BudgetStatus, threshold: number
  *   normal    まだ余裕がある
  *   attention 閾値に達した(FR-20。既定 70%)
  *   over      予算を超えた
+ *
+ * ADR-057より前は「聖域カテゴリ」だけ70%到達の警告色を出さない例外が
+ * あったが、category_kind(生活費・浪費・聖域…)の廃止に伴い削除した。
+ * 全てのジャンルを同列に扱う(本人が特定のジャンルに警告を出したくなければ、
+ * そのジャンルの予算を未設定のままにすればよい——予算が無ければ
+ * usageRatio 自体が null になり、attention にはならない)。
  */
 export type BudgetTone = 'normal' | 'attention' | 'over';
 
-/**
- * 枠の状態を判定する。
- *
- * ── 聖域カテゴリを警告色にしない理由 ──────────────────────────
- * 設計原則5「欲を敵にしない」と FR-64(残額は肯定形で表示)により、
- * 聖域支出は削減対象ではない。使うために確保した枠であって、
- * 70% 到達を咎める対象ではない。ここで警告色を出すと、
- * 本システムが最も避けたい「叱る家計簿」になる。
- *
- * FR-20 の 70% 通知は浪費カテゴリを対象とした要件であり、聖域には及ばない。
- *
- * 超過だけは聖域でも隠さない。設計原則3は「叱らず見せる」であって、
- * 「見せない」ではない。事実は出し、文言で咎めない(formatSpendable)。
- */
-export function budgetTone(
-  status: BudgetStatus,
-  kind: 'sanctuary' | 'other',
-  threshold = 0.7,
-): BudgetTone {
+/** 枠の状態を判定する。超過は常に表示する(設計原則3「叱らず見せる」)。 */
+export function budgetTone(status: BudgetStatus, threshold = 0.7): BudgetTone {
   if (status.remainingYen !== null && status.remainingYen < 0) return 'over';
-  if (kind === 'sanctuary') return 'normal';
   if (status.usageRatio !== null && status.usageRatio >= threshold) return 'attention';
   return 'normal';
 }
@@ -171,4 +156,20 @@ export function totalSpentYen(transactions: readonly BudgetTransaction[]): numbe
  */
 export function isCountable(tx: BudgetTransaction): boolean {
   return !tx.isTransfer && tx.reviewStatus !== 'ignored';
+}
+
+/**
+ * 進捗ゲージ(完済・予算)に刻むマイルストーン。到達を祝うための節目。
+ *
+ * `features/home/summary.ts` は `next/headers` に依存する `createClient()` を
+ * 使うため、そこにこの定数を置くと `Meter`(Client Component)がそれを
+ * import した時点でクライアントバンドルに `next/headers` が引き込まれてしまう
+ * (T-7 で発見した同種の問題)。ここ(DB にもネットワークにも触れない
+ * domain 層)に置くことで、サーバー・クライアントどちらからも安全に使える。
+ */
+export const MILESTONES = [0.25, 0.5, 0.75, 1] as const;
+
+/** まだ到達していない最初のマイルストーン。全て達成済みなら null。 */
+export function nextMilestone(progressRatio: number): number | null {
+  return MILESTONES.find((m) => progressRatio < m) ?? null;
 }

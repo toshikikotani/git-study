@@ -7,27 +7,12 @@
 import { revalidatePath } from 'next/cache';
 
 import { MoneyError, assertYen, parseYen } from '@/domain/money';
-import { TransferRuleError } from '@/domain/transfer-rule';
-import {
-  createPaydayRun,
-  setTransferRunItemDone,
-  TransferRunStoreError,
-} from '@/features/transfer-runs/store';
+import { createPaydayRun, setTransferRunItemDone } from '@/features/transfer-runs/store';
+import { describeUserError } from '@/lib/errors';
 
 export type PaydayChecklistFormState = {
   error: string | null;
 };
-
-function describeError(error: unknown): string {
-  if (
-    error instanceof MoneyError ||
-    error instanceof TransferRuleError ||
-    error instanceof TransferRunStoreError
-  ) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
 
 export async function createPaydayRunAction(
   paydayOn: string,
@@ -41,7 +26,7 @@ export async function createPaydayRunAction(
     }
     await createPaydayRun(amount, paydayOn);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/payday');
   return { error: null };

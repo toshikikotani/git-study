@@ -5,14 +5,11 @@
  * ここは Calendar API を叩くだけ(lib/discord.ts と同じ役割分担)。
  */
 
+import { AppError } from '@/lib/errors';
+
 const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 
-export class GoogleCalendarError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoogleCalendarError';
-  }
-}
+export class GoogleCalendarError extends AppError {}
 
 export type CalendarEventInput = {
   /** Calendar のイベントID(base32hex: 小文字 a-v と数字、5〜1024文字)。 */

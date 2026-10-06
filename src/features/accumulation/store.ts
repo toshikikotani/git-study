@@ -22,14 +22,10 @@ import { payoffImpactOfExtraPayment } from '@/domain/payoff';
 import { listDebts, toPayoffDebt } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { addMonths, nthDayOfMonth, todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class AccumulationStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AccumulationStoreError';
-  }
-}
+export class AccumulationStoreError extends AppError {}
 
 /** 小口の山に並べる店の数。多すぎると「山」に見えない。 */
 const SMALL_SPEND_LIMIT = 8;

@@ -5,12 +5,9 @@
  * 最低限の形式チェックだけを行う。
  */
 
-export class AuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AuthError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class AuthError extends AppError {}
 
 export const MIN_PASSWORD_LENGTH = 8;
 
@@ -28,4 +25,13 @@ export function assertPasswordConfirmed(value: string, confirmation: string): st
     throw new AuthError('パスワードが一致しません');
   }
   return value;
+}
+
+/** 形式だけの確認(実在の確認はしない)。前後の空白は取り、小文字にそろえる。 */
+export function assertEmail(value: string): string {
+  const email = value.trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new AuthError('メールアドレスの形式が正しくありません');
+  }
+  return email;
 }

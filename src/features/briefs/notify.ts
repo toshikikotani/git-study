@@ -13,16 +13,12 @@ import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { postDiscordEmbed } from '@/lib/discord';
 import { todayJst } from '@/lib/date';
 import type { NotificationChannels } from '@/lib/env';
+import { AppError } from '@/lib/errors';
 import { postLineMessage, postLineTextWithImage } from '@/lib/line';
 import { buildPayoffProgressChartUrl } from '@/lib/quickchart';
 import type { Database } from '@/lib/supabase/types';
 
-export class BriefNotifyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'BriefNotifyError';
-  }
-}
+export class BriefNotifyError extends AppError {}
 
 export type DeliverDailyBriefResult =
   'delivered' | 'already_delivered' | 'failed' | 'not_generated';

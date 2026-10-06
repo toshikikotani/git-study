@@ -11,11 +11,11 @@ import {
   recordJobFailureAlertAsAdmin,
 } from '@/features/alerts/store';
 import { sendPendingAlerts } from '@/features/alerts/notify';
-import { detectAndDeactivateMisfiringRulesAsAdmin } from '@/features/classification/store';
 import { recordNetWorthSnapshotAsAdmin } from '@/features/net-worth/store';
 import { detectAndRecordNewSubscriptionAlertsAsAdmin } from '@/features/subscriptions/store';
 import { getCronSecret, getLineEnv, getOptionalDiscordWebhookUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { findOwner } from '@/lib/supabase/owner';
 
 /**
  * アラートジョブ(毎時、M3-3)。
@@ -23,9 +23,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * `keepalive`/`import-gmail` と同じく本人のセッションが無い経路のため、
  * `createAdminClient()` + 明示的な user_id で検知・送信を行う。
  *
- * 流れ:検知(FR-20 浪費70%・FR-21 リボ等・FR-22 未取込・FR-23 返済日前日・
- * P5-2 誤爆気味の学習ルールの無効化・P6-1 月末の月次振り返り・新しく検知した
- * 定期支払い)→ alerts に記録
+ * 流れ:検知(FR-20 ジャンル予算70%・FR-21 リボ等・FR-22 未取込・FR-23 返済日前日・
+ * P6-1 月末の月次振り返り・新しく検知した定期支払い)→ alerts に記録
  * (重複は DB の一意制約が防ぐ)→ status='pending' の分を Discord・LINE へ送信
  * (どちらか設定されている分だけ。両方でも片方でもよい)。どちらも未設定
  * (B-3 待ち)の間は検知だけ行い、送信はスキップする(alerts には積み上がる
@@ -58,11 +57,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const admin = createAdminClient();
-  const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers();
+  const { user, error: usersError } = await findOwner(admin);
   if (usersError) {
     return NextResponse.json({ error: usersError.message }, { status: 500 });
   }
-  const user = usersPage.users[0];
   if (!user) {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
   }
@@ -73,7 +71,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       inactivityCount,
       riskyCount,
       wastefulCount,
-      misfireCount,
       recapCount,
       subscriptionCount,
     ] = await Promise.all([
@@ -81,7 +78,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       detectAndRecordInactivityAlertAsAdmin(admin, user.id),
       detectAndRecordRiskyTransactionAlertsAsAdmin(admin, user.id),
       detectAndRecordWastefulBudgetAlertsAsAdmin(admin, user.id),
-      detectAndDeactivateMisfiringRulesAsAdmin(admin, user.id),
       detectAndRecordMonthlyRecapAlertAsAdmin(admin, user.id),
       detectAndRecordNewSubscriptionAlertsAsAdmin(admin, user.id),
     ]);
@@ -90,7 +86,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       inactivityCount +
       riskyCount +
       wastefulCount +
-      misfireCount +
       recapCount +
       subscriptionCount;
 

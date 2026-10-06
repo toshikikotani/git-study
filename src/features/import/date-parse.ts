@@ -6,6 +6,7 @@
  */
 
 import { assertDateOnly, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 
 /** アダプタが指定できる日付形式の名前。DB の import_adapters.date_formats に入る値。 */
 export const DATE_FORMATS = [
@@ -18,12 +19,7 @@ export const DATE_FORMATS = [
 
 export type DateFormatName = (typeof DATE_FORMATS)[number];
 
-export class DateParseError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DateParseError';
-  }
-}
+export class DateParseError extends AppError {}
 
 /** 和暦の元号と、その元年に対応する西暦。 */
 const ERAS: Record<string, number> = {

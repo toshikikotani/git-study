@@ -7,6 +7,8 @@
  * 必要がある(RLS の WITH CHECK は自動補完してくれない)。
  */
 
+import { todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -24,6 +26,10 @@ export type Account = {
   closingDay: number | null;
   /** 支払日(1〜31)。 */
   paymentDay: number | null;
+  /** 現在残高。クレジットカードは未払い残高をマイナスで持つ(issue #98)。 */
+  currentBalanceYen: number;
+  /** 残高を最後に本人が入力・更新した日。まだ一度も入力していなければ null。 */
+  balanceUpdatedOn: DateOnly | null;
   isActive: boolean;
   note: string | null;
 };
@@ -36,15 +42,11 @@ export type AccountInput = {
   purpose: AccountPurpose;
   closingDay: number | null;
   paymentDay: number | null;
+  currentBalanceYen: number;
   note: string | null;
 };
 
-export class AccountStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AccountStoreError';
-  }
-}
+export class AccountStoreError extends AppError {}
 
 type AccountRow = Database['public']['Tables']['accounts']['Row'];
 
@@ -57,6 +59,8 @@ function fromRow(row: AccountRow): Account {
     purpose: row.purpose,
     closingDay: row.closing_day,
     paymentDay: row.payment_day,
+    currentBalanceYen: row.current_balance_yen,
+    balanceUpdatedOn: row.balance_updated_on,
     isActive: row.is_active,
     note: row.note,
   };
@@ -93,6 +97,8 @@ export async function createAccount(input: AccountInput): Promise<Account> {
       purpose: input.purpose,
       closing_day: input.closingDay,
       payment_day: input.paymentDay,
+      current_balance_yen: input.currentBalanceYen,
+      balance_updated_on: todayJst(),
       note: input.note,
     })
     .select('*')
@@ -100,6 +106,45 @@ export async function createAccount(input: AccountInput): Promise<Account> {
 
   if (error) throw new AccountStoreError(`口座を登録できませんでした: ${error.message}`);
   return fromRow(data);
+}
+
+/**
+ * レシート取り込み用に、口座を1件だけ選び出す(本人発案:「口座って何のために
+ * 追加するん？これいらなくない？普通に家計簿に登録して欲しいだけなんだけど」)。
+ *
+ * transactions.account_id は NOT NULL(現金・電子マネー払いの記録先を
+ * 区別するための設計、account_kind に 'cash'/'e_money' があるのはそのため)
+ * なので、口座という概念自体は無くせない。ただし「レシートを撮るだけの
+ * ために先に /accounts で口座を作ってこい」は設計原則2(記録の手間を
+ * 最小化)に反する——現金払いの主経路であるレシート取り込みが、まさに
+ * その手前で詰まっていた。
+ *
+ * 既に口座があれば、現金払い・電子マネー払いの記録先として最も自然な
+ * kind='cash' を優先し、無ければ kind='e_money'、それも無ければ先頭
+ * (=本人が最初に登録した口座)を使う。口座が1件も無い場合だけ「現金」を
+ * 自動で作る(呼び出し側が選び直すことも編集することもできる、あくまで
+ * 初期値)。
+ */
+export async function getOrCreateDefaultAccount(): Promise<Account> {
+  const accounts = await listAccounts();
+  if (accounts.length > 0) {
+    const preferred =
+      accounts.find((a) => a.kind === 'cash') ??
+      accounts.find((a) => a.kind === 'e_money') ??
+      accounts[0]!;
+    return preferred;
+  }
+
+  return createAccount({
+    name: '現金',
+    institutionName: null,
+    kind: 'cash',
+    purpose: 'other',
+    closingDay: null,
+    paymentDay: null,
+    currentBalanceYen: 0,
+    note: null,
+  });
 }
 
 export async function updateAccount(id: string, input: AccountInput): Promise<Account> {
@@ -113,6 +158,8 @@ export async function updateAccount(id: string, input: AccountInput): Promise<Ac
       purpose: input.purpose,
       closing_day: input.closingDay,
       payment_day: input.paymentDay,
+      current_balance_yen: input.currentBalanceYen,
+      balance_updated_on: todayJst(),
       note: input.note,
     })
     .eq('id', id)

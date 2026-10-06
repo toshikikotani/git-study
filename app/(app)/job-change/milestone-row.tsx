@@ -43,7 +43,7 @@ export function MilestoneRow({ milestone }: { milestone: Milestone }) {
             {milestone.title}
           </p>
           {milestone.dueOn ? (
-            <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
               期限 {formatDateJa(milestone.dueOn)}
             </p>
           ) : null}

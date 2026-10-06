@@ -1,32 +1,23 @@
 'use client';
 
-/**
- * ボトムナビの「もっと」— 全画面を網羅するドロップアップメニュー(新機能)。
- *
- * ── なぜ要るか ──────────────────────────────────────────────
- * ボトムナビ(ホーム/家計簿/明細/負債/給料日)と、レシート撮影の専用ボタンで
- * 主要な動線はカバーできても、それ以外の画面(口座・ルール・AI相談・投資・
- * 副業・転職準備・レポート・朝配信・設定群・メール貼り付け・請求突合・重複
- * 確認)は各画面に散らばった導線からしか辿れず、どこに何があるか把握しづらい。
- * この一覧をここへ集約する。
- *
- * ── なぜアンマウントしないのか ──────────────────────────────
- * 開閉のたびに DOM を作り直すと、閉じるときのアニメーションを再生する前に
- * 消えてしまう。常時マウントしたまま transform/opacity と pointer-events を
- * 切り替えることで、開閉どちらの向きも同じ transition で処理する。
- */
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { MdMoreHoriz } from 'react-icons/md';
 
-// `as const` にして href をリテラル型のまま保つ。Next の typed routes(next.config.ts)は
-// `<Link href>` に渡る型がリテラルの Route であることを要求するため、途中で
-// `string` に広げると型検査で弾かれる。
+import { signOutAction } from '@/features/auth/actions';
+import { BottomSheet } from './bottom-sheet';
+
 const GROUPS = [
   {
-    title: '記録を増やす',
+    title: '記録する',
     items: [
+      { href: '/plan', label: '貯蓄', dek: '先に移した分。借金の画面は設定で切り替える' },
+      {
+        href: '/transactions/new',
+        label: '明細を手で登録する',
+        dek: '現金払いなど、取り込みに乗らない明細を1件だけ記録',
+      },
       {
         href: '/transactions/paste',
         label: 'メールを貼り付ける',
@@ -40,13 +31,13 @@ const GROUPS = [
   {
     title: '相談する',
     items: [
-      { href: '/advisor', label: 'AI相談', dek: '目標設定・買う前相談' },
-      { href: '/rules/chat', label: 'ルールをAIに相談する', dek: '会話でルールを変更' },
+      {
+        href: '/assistant',
+        label: 'AIに相談',
+        dek: '意見を話すと、設定・予算・目標をまとめて変更案に',
+      },
+      { href: '/advisor', label: '目標', dek: '進行中の目標と進捗' },
     ],
-  },
-  {
-    title: '分類を育てる',
-    items: [{ href: '/rules', label: 'カテゴリと分類ルール' }],
   },
   {
     title: 'この先に向けて',
@@ -60,12 +51,20 @@ const GROUPS = [
     title: '振り返る',
     items: [
       { href: '/reports', label: 'レポート' },
+      { href: '/reports/ai', label: 'AIレポート', dek: '日次・月次の気づき・アドバイス' },
+      {
+        href: '/reports/genres',
+        label: 'ジャンル管理・分析',
+        dek: 'ジャンルの追加削除・予算設定、AIによる客観的な支出分類',
+      },
       { href: '/briefs', label: '朝配信' },
     ],
   },
   {
     title: '設定',
     items: [
+      { href: '/settings/theme', label: '色', dek: '背景・文字・強調を変える' },
+      { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
       { href: '/settings/gmail', label: 'Gmail連携' },
       { href: '/settings/google', label: 'Google連携' },
       { href: '/settings/password', label: 'パスワード' },
@@ -74,13 +73,9 @@ const GROUPS = [
   },
 ] as const;
 
-export function MoreMenu() {
+export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-
-  // 画面遷移が起きたら(リンクを踏んだ・戻るボタンなど)必ず閉じる。
-  // useEffect ではなくレンダー中の比較で行う(react-hooks/set-state-in-effect、
-  // M2-3b と同じ理由でカスケードするレンダーを避ける)。
   const [pathAtOpen, setPathAtOpen] = useState(pathname);
   if (pathname !== pathAtOpen) {
     setPathAtOpen(pathname);
@@ -98,118 +93,107 @@ export function MoreMenu() {
 
   return (
     <>
-      <li className="flex-1">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-haspopup="menu"
-          className="block w-full rounded-full py-2.5 text-center text-[13px] font-medium transition-colors"
-          style={
-            open
-              ? { background: 'var(--accent)', color: '#ffffff' }
-              : { color: 'var(--ink-secondary)' }
-          }
-        >
-          もっと
-        </button>
-      </li>
-
-      {/* 背景。フェードのみ、動きは付けない(方向感が要らない) */}
-      <div
-        aria-hidden={!open}
-        onClick={() => setOpen(false)}
-        className="fixed inset-0 z-40 transition-opacity duration-200 ease-out motion-reduce:transition-none"
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="その他の機能"
+        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"
         style={{
-          background: 'rgba(10, 16, 32, 0.45)',
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? 'auto' : 'none',
-        }}
-      />
-
-      {/* シート本体。iOS の sheet と同じ曲線(0.32,0.72,0,1)で「行き過ぎてから収まる」動きにする */}
-      <div
-        role="menu"
-        aria-hidden={!open}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-[360ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none"
-        style={{
-          transform: open ? 'translateY(0)' : 'translateY(110%)',
-          pointerEvents: open ? 'auto' : 'none',
+          borderRadius: 'var(--radius-full)',
+          background: open ? 'var(--accent-track)' : 'transparent',
+          color: open ? 'var(--accent)' : 'var(--ink-secondary)',
+          transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)`,
         }}
       >
-        <div
-          className="max-h-[75dvh] overflow-y-auto rounded-[28px] p-2"
-          style={{
-            background: 'var(--surface-raised)',
-            boxShadow: '0 -4px 32px -4px rgba(10,16,32,0.35)',
-          }}
-        >
-          <div className="flex justify-center pt-2 pb-1">
-            <span className="h-1.5 w-10 rounded-full" style={{ background: 'var(--hairline)' }} />
-          </div>
+        <MdMoreHoriz aria-hidden size={22} />
+      </button>
 
-          <div className="flex items-center justify-between px-3 pt-1 pb-2">
-            <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
-              メニュー
-            </h2>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-[12px]"
-              style={{ color: 'var(--ink-muted)' }}
-            >
-              閉じる
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
-            {GROUPS.map((group) => (
-              <section key={group.title}>
-                <h3
-                  className="px-2 pb-1.5 text-[11px] font-medium tracking-[0.06em] uppercase"
-                  style={{ color: 'var(--ink-muted)' }}
-                >
-                  {group.title}
-                </h3>
-                <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--plane)' }}>
-                  {group.items.map((item, i) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      role="menuitem"
-                      onClick={() => setOpen(false)}
-                      className="flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
-                      style={{
-                        borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
-                      }}
-                    >
-                      <span>
-                        <span
-                          className="block text-[14px] font-medium"
-                          style={{ color: 'var(--ink)' }}
-                        >
-                          {item.label}
-                        </span>
-                        {'dek' in item ? (
-                          <span
-                            className="mt-0.5 block text-[11.5px]"
-                            style={{ color: 'var(--ink-muted)' }}
-                          >
-                            {item.dek}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
-                        →
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+      <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">
+        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+          <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+            その他の機能
+          </h2>
         </div>
-      </div>
+
+        <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
+          {GROUPS.map((group) => (
+            <section key={group.title}>
+              <h3
+                className="px-2 pb-2 text-xs font-medium tracking-[0.06em] uppercase"
+                style={{ color: 'var(--ink-muted)' }}
+              >
+                {group.title}
+              </h3>
+              <div
+                className="overflow-hidden"
+                style={{ borderRadius: 'var(--radius-inner)', background: 'var(--surface)' }}
+              >
+                {group.items.map((item, i) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={false}
+                    role="menuitem"
+                    onClick={(e) => {
+                      const scroller = (e.currentTarget as HTMLElement).closest(
+                        '[data-sheet-scroll]',
+                      );
+                      if (scroller instanceof HTMLElement && scroller.dataset.moved === '1') {
+                        e.preventDefault();
+                        return;
+                      }
+                      onNavigate?.(item.href);
+                      setOpen(false);
+                    }}
+                    className="min-h-11 flex items-center justify-between gap-3 px-4 py-3 active:opacity-60"
+                    style={{
+                      borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
+                    }}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                        {item.label}
+                      </span>
+                      {'dek' in item ? (
+                        <span
+                          className="mt-1 block text-[11.5px]"
+                          style={{ color: 'var(--ink-muted)' }}
+                        >
+                          {item.dek}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+                      →
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ))}
+
+          <form
+            action={signOutAction}
+            onSubmit={() => {
+              try {
+                window.sessionStorage.clear();
+              } catch {
+                // 消せなくてもログアウトは続ける
+              }
+            }}
+          >
+            <button
+              type="submit"
+              className="min-h-11 w-full rounded-2xl px-4 py-3 text-left text-sm font-medium"
+              style={{ background: 'var(--surface)', color: 'var(--over)' }}
+            >
+              ログアウト
+            </button>
+          </form>
+        </div>
+      </BottomSheet>
     </>
   );
 }

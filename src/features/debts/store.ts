@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { DateOnly } from '@/lib/date';
 import type { Database } from '@/lib/supabase/types';
@@ -48,12 +49,7 @@ export type DebtInput = {
   note: string | null;
 };
 
-export class DebtStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DebtStoreError';
-  }
-}
+export class DebtStoreError extends AppError {}
 
 type DebtRow = Database['public']['Tables']['debts']['Row'];
 

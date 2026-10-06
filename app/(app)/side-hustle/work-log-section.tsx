@@ -39,7 +39,7 @@ export function WorkLogSection({
                   <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                     {projectName(log.projectId)}
                   </p>
-                  <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {formatDateJa(log.workedOn)}
                     {log.summary ? ` ・ ${log.summary}` : ''}
                   </p>
@@ -165,15 +165,15 @@ function WorkLogForm({
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
           {pending ? '保存中…' : '記録する'}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-full px-4 py-2.5 text-sm font-medium"
+          className="rounded-full px-4 py-3 text-sm font-medium"
           style={{ color: 'var(--ink-muted)' }}
         >
           やめる

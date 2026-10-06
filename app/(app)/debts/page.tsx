@@ -73,7 +73,7 @@ export default async function DebtsPage() {
 
       <Link
         href="/investments"
-        className="block text-center text-[13px] font-medium"
+        className="block text-center text-xs font-medium"
         style={{ color: 'var(--accent)' }}
       >
         返済と並走する投資額を見る →

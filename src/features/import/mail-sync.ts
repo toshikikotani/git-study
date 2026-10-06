@@ -20,7 +20,6 @@
  * 通知メールと月次 CSV には必ず重なりが出る。片方だけでは支出が倍になる。
  */
 
-import type { ClassificationRule } from '@/features/classification/rules';
 import { buildPreview } from '@/features/transactions/import-pipeline';
 import type { StoredTransaction } from '@/features/transactions/store';
 import type { AiEmailExtractor } from './email-ai';
@@ -32,7 +31,6 @@ export type SyncInput = {
   /** 取り込み先の口座(M6-2。accountId は実在する accounts.id である必要がある)。 */
   accountId: string;
   query: MailQuery;
-  rules: readonly ClassificationRule[];
   /** 既に取り込み済みのメール ID。再実行で二重に読まないため。 */
   knownMessageIds: ReadonlySet<string>;
   /** 既に取り込み済みの明細キー。CSV との重複を防ぐため。 */
@@ -96,8 +94,6 @@ export async function syncFromMailbox(input: SyncInput): Promise<SyncResult> {
       parsed.transactions,
       input.accountId,
       (index) => `${message.messageId}-${index}`,
-      input.rules,
-      new Map(),
       'gmail',
     );
     built.forEach((tx, index) => {

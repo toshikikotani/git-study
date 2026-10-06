@@ -85,20 +85,6 @@ create type debt_status as enum (
   'closed'        -- 誤登録などによる無効化
 );
 
--- カテゴリの性質。予算・残額計算・アラート判定の分岐がこれに依存する(FR-11)
-create type category_kind as enum (
-  'fixed_cost',           -- 固定費
-  'living',               -- 生活費
-  'sanctuary',            -- 聖域(女遊び) — 削減対象外、肯定形で残額表示(FR-64)
-  'waste',                -- 浪費 — 70%到達でアラート(FR-20)
-  'investment_spending',  -- 投資的支出(書籍・学習など)
-  'repayment',            -- 返済
-  'investment',           -- 投資
-  'income',               -- 収入
-  'transfer',             -- 口座間振替(収支に計上しない)
-  'other'
-);
-
 -- 明細の取り込み元(FR-10)
 create type transaction_source as enum (
   'csv',
@@ -121,8 +107,10 @@ create type payment_method as enum (
 -- 誰が分類したか(FR-12)
 create type classified_by as enum (
   'unclassified',
-  'rule',    -- classification_rules によるマッチ
-  'ai',      -- Claude による分類
+  'rule',    -- ADR-057でパターンルール(classification_rules)は廃止した。
+             -- 値そのものは既存データ・DBの enum 定義として残すが、
+             -- 現在このアプリが新規に書き込むことはない。
+  'ai',      -- Claude によるジャンル分類(/reports/genres)
   'manual'   -- 本人による指定・修正
 );
 
@@ -237,6 +225,19 @@ create type repayment_strategy as enum (
 -- 目標(AI相談で決めた目標、本人発案)
 create type goal_status as enum ('active', 'achieved', 'abandoned');
 
+-- 明細ごとの浪費/必要経費診断(本人発案、ADR-030)
+create type spending_verdict as enum ('waste', 'necessary');
+
+-- 固定6分類のみ。AIに自由記述させない(ADR-031)。「一般的にこういうタイプ」
+-- という要望に応えつつ、根拠の無い性格診断・医学的な断定に踏み込ませない歯止め。
+create type spending_persona_type as enum (
+  'impulsive',
+  'steady',
+  'social',
+  'goal_oriented',
+  'frugal',
+  'balanced'
+);
 
 -- =============================================================================
 --  2. 共通関数
@@ -298,8 +299,8 @@ create table public.app_settings (
   payday                              smallint     not null default 25,
   timezone                            text         not null default 'Asia/Tokyo',
 
-  -- カテゴリ別の月次予算はここに置かない。categories.default_monthly_budget_yen と
-  -- budgets テーブルが正(ADR-016)。設定側にも金額を持つと二重定義になり、
+  -- ジャンル別の月次予算はここに置かない。genres.budget_yen が正
+  -- (ADR-016/ADR-057)。設定側にも金額を持つと二重定義になり、
   -- 本人が片方だけ直したときに残額表示が静かにずれる。
 
   -- 返済・投資のルール(ADR-003, ADR-013)
@@ -320,6 +321,10 @@ create table public.app_settings (
   -- AI 分類(ADR-010)
   classification_confidence_threshold numeric(4,3) not null default 0.800,
   classification_model                text         not null default 'claude-haiku-4-5',
+
+  -- AIゲートウェイ(N1)。全AI機能の一括オフ。オフでも基本機能はすべて使える。
+  -- gmail_enabled と同じ、設定は残したまま条件だけ切り替える方式。
+  ai_enabled                           boolean      not null default true,
 
   -- 朝配信(FR-30)
   brief_send_at                       time         not null default '07:00',
@@ -424,93 +429,64 @@ comment on column public.accounts.is_frozen is
   'リボ・キャッシングの再発防止として停止・解約したカード。凍結済みカードに新規明細が発生した場合はアラート対象(13章)。';
 
 
--- -----------------------------------------------------------------------------
--- 3.3 categories — カテゴリ(FR-11, FR-13)
+-- categories・budgets は ADR-057 で廃止した(本人発案、生活費・浪費などの
+-- 主観的なカテゴリ分けの廃止)。旧 categories の役割(名前・予算・ホーム表示枠)
+-- は genres(このすぐ下)が引き継ぎ、budgets(コードのどこからも書き込みが
+-- 無い死んだ仕組みだった)は genres.budget_yen という単一の値に統合した。
+-- 旧定義は supabase/migrations/20260929000100_retire_categories.sql が
+-- 本番のテーブルを退役させる形で反映する。
 --
---   本人が自由に追加・変更・統廃合できることが要件(FR-13)。
---   統廃合を安全にするため、削除ではなく merged_into_id での付け替えを推奨する。
+-- 3.3 genres — 支出の唯一の分類(本人発案、ADR-056/ADR-057)
 -- -----------------------------------------------------------------------------
-create table public.categories (
-  id                 uuid primary key default gen_random_uuid(),
-  user_id            uuid          not null references auth.users(id) on delete cascade,
+-- 当初は固定enum(spending_genre)として設計し、本人からの「dbに保存して
+-- enumじゃなくて、自由に変更できる仕組みに」という指摘でDBテーブルへ変更した
+-- (ADR-056)。さらにADR-057で「生活費・浪費などの主観的なカテゴリ分けを
+-- 完全に廃止し、ジャンルを唯一のカテゴリにする」という決定により、旧
+-- categories の役割(予算設定・ホーム表示枠)を丸ごと引き継いだ。kind・
+-- is_system・統合(merged_into_id)は引き継がない——ジャンルは本人が自由に
+-- 追加・削除できる対象で、削除は統合を経由せず即座に行える(参照側の
+-- genre_id を on delete set null/cascade にする)。
+--
+-- transactions・transfer_rules・transaction_splits・receipt_items・alerts が
+-- genre_id で直接参照するため、それらより前に定義する必要がある(当初は
+-- 旧セクション番号 3.30 に置いていたが、参照元より後ろにあると `create table`
+-- の順序でエラーになるため、旧 categories と同じこの位置へ移した)。
+create table public.genres (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references auth.users(id) on delete cascade,
+  name         text        not null,
+  sort_order   integer     not null default 0,
 
-  -- 安定した識別子。コード・ルール・シードから参照する。画面には出さない。
-  code               text          not null,
-  -- 表示名。画面に出るのは常にこの値で、本人が自由に変更してよい(FR-13, ADR-016)。
-  -- アプリ側は名前で分岐してはならない。分岐は code と kind だけを見ること。
-  name               text          not null,
-  kind               category_kind not null,
-  parent_id          uuid          references public.categories(id) on delete set null,
+  -- 月次予算(本人発案「カテゴリのそれぞれの値段設定」)。未設定なら無制限。
+  budget_yen   bigint,
 
-  -- 既定の月次予算。月ごとの上書きは budgets テーブル
-  default_monthly_budget_yen bigint,
+  -- ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。
+  show_on_home boolean     not null default false,
 
-  color              text,
-  sort_order         smallint      not null default 100,
-  is_active          boolean       not null default true,
+  -- もう使わないカテゴリ。残りの日の予測に足さない。
+  forecast_closed boolean  not null default false,
 
-  -- ホーム画面に残額を出すカテゴリ(FR-14, FR-61)。
-  -- どの枠を最上位に置くかは本人が決める。表示は sort_order の先頭2件まで。
-  show_on_home       boolean       not null default false,
+  -- 見た目(利用者が選ぶ。null は名前からの既定。domain/genre-style.ts)
+  icon_key     text,
+  color_index  smallint,
 
-  -- 統廃合(FR-13):消さずに移行先を指す
-  merged_into_id     uuid          references public.categories(id) on delete set null,
+  -- 手入力のカテゴリ格子(N2)。null のあいだは使用頻度で自動的に並ぶ。値が
+  -- 入ると(長押しで手動並べ替え)その値の昇順を頻度より優先する。
+  quick_entry_order     integer,
+  -- 手入力のカテゴリ格子からだけ隠す(ジャンル自体・他の画面には影響しない)。
+  hidden_in_quick_entry boolean     not null default false,
 
-  -- システムが分岐に使うカテゴリ。削除・kind 変更を UI 側で抑止する目印
-  is_system          boolean       not null default false,
+  created_at   timestamptz not null default now(),
 
-  created_at         timestamptz   not null default now(),
-  updated_at         timestamptz   not null default now(),
-
-  constraint ck_categories_code       check (code ~ '^[a-z0-9_]{1,40}$'),
-  constraint ck_categories_name       check (btrim(name) <> ''),
-  constraint ck_categories_budget     check (default_monthly_budget_yen is null
-                                             or default_monthly_budget_yen >= 0),
-  constraint ck_categories_not_self_parent check (parent_id is null or parent_id <> id),
-  constraint ck_categories_not_self_merge  check (merged_into_id is null or merged_into_id <> id),
-  -- 統合先が指定されたカテゴリは新規割り当ての対象外にする
-  constraint ck_categories_merged_inactive check (merged_into_id is null or not is_active)
+  constraint ck_genres_color_index check (color_index is null or color_index between 1 and 10),
+  constraint ck_genres_name_not_blank check (btrim(name) <> ''),
+  constraint ck_genres_budget check (budget_yen is null or budget_yen >= 0)
 );
 
-create unique index ux_categories_user_code on public.categories (user_id, code);
-create index ix_categories_user_active      on public.categories (user_id, is_active, sort_order);
-create index ix_categories_user_kind        on public.categories (user_id, kind);
-create index ix_categories_parent           on public.categories (parent_id) where parent_id is not null;
--- ホームは毎回開かれる画面。表示対象だけを引く部分索引で小さく保つ。
-create index ix_categories_show_on_home     on public.categories (user_id, sort_order)
-  where show_on_home and is_active;
-
-comment on column public.categories.name is
-  '画面に出る表示名。本人がいつでも変更できる(FR-13)。アプリ側はこの値で分岐してはならない。';
-comment on column public.categories.code is
-  'コードとルールが参照する不変の識別子。画面には出さないため、表示名を変えてもここは変わらない。';
-comment on column public.categories.show_on_home is
-  'ホーム最上部に残額を出すか。どの枠を見たいかは本人が決める(FR-14, FR-61)。';
-
-
--- -----------------------------------------------------------------------------
--- 3.4 budgets — 月次予算(カテゴリ × 月)
--- -----------------------------------------------------------------------------
-create table public.budgets (
-  id             uuid primary key default gen_random_uuid(),
-  user_id        uuid        not null references auth.users(id) on delete cascade,
-  category_id    uuid        not null references public.categories(id) on delete cascade,
-
-  month          date        not null,  -- 必ず月初日(暦月:ADR-015)
-  amount_yen     bigint      not null,
-  carry_over_yen bigint      not null default 0,  -- 前月からの繰越(±)
-  note           text,
-
-  created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now(),
-
-  constraint ck_budgets_month_is_first_day check (extract(day from month) = 1),
-  constraint ck_budgets_amount             check (amount_yen >= 0)
-);
-
-create unique index ux_budgets_user_category_month
-  on public.budgets (user_id, category_id, month);
-create index ix_budgets_user_month on public.budgets (user_id, month desc);
+create unique index ux_genres_user_name on public.genres (user_id, name);
+create index ix_genres_user on public.genres (user_id, sort_order);
+create index ix_genres_show_on_home on public.genres (user_id, sort_order)
+  where show_on_home;
 
 
 -- -----------------------------------------------------------------------------
@@ -714,11 +690,10 @@ create table public.transactions (
   -- 重複排除キー。トリガで自動生成する(ADR-007)
   fingerprint       text               not null,
 
-  -- 分類(FR-11, FR-12)
-  category_id       uuid               references public.categories(id) on delete set null,
+  -- 分類(ADR-057:唯一のカテゴリである genres への分類)
+  genre_id          uuid               references public.genres(id) on delete set null,
   classified_by     classified_by      not null default 'unclassified',
   confidence        numeric(4,3),
-  matched_rule_id   uuid,                          -- FK は classification_rules 定義後に追加
   review_status     review_status      not null default 'pending',
   reviewed_at       timestamptz,
 
@@ -728,6 +703,21 @@ create table public.transactions (
   -- 口座間振替は収支に計上しない
   is_transfer       boolean            not null default false,
   counter_transaction_id uuid          references public.transactions(id) on delete set null,
+
+  -- 本人発案「絶対払わざるを得ないもの」に明細1件ごとに付けるラベル
+  -- (ジャンルとは独立した軸。ADR-057)。裁量的な支出と分けてグラフ表示する。
+  must_pay          boolean            not null default false,
+
+  -- 実績/予定(今日より未来は予定として実績の集計から外す)と、通常/特別費
+  -- (特別費は目標のペース計算から除く)。返品・返金('refund')は金額が正で、そのジャンルの
+  -- 支出から差し引く。domain/ledger.ts 参照。
+  status            text               not null default 'actual',
+  kind              text               not null default 'normal',
+
+  -- 店名を正規化して分けた支店名(merchant_name は店名のみ)と、レシートの照合で
+  -- 解消していない差額(0/null なら一致)。要確認カードの「金額不一致」に使う。
+  branch_name        text,
+  reconcile_diff_yen integer,
 
   note              text,
   created_at        timestamptz        not null default now(),
@@ -741,16 +731,18 @@ create table public.transactions (
   -- AI が分類したなら確信度が必ずある。無いまま閾値判定に流れる事故を防ぐ
   constraint ck_transactions_ai_needs_confidence
     check (classified_by <> 'ai' or confidence is not null),
-  -- 分類済みならカテゴリがある
-  constraint ck_transactions_classified_has_category
-    check (classified_by = 'unclassified' or category_id is not null),
+  -- 分類済みならジャンルがある
+  constraint ck_transactions_classified_has_genre
+    check (classified_by = 'unclassified' or genre_id is not null),
   -- 本人が確認・修正したなら日時が残る(学習データの根拠)
   constraint ck_transactions_reviewed_at
     check (review_status not in ('confirmed','corrected') or reviewed_at is not null),
   constraint ck_transactions_not_self_counter
     check (counter_transaction_id is null or counter_transaction_id <> id),
   constraint ck_transactions_posted_after_occurred
-    check (posted_on is null or posted_on >= occurred_on)
+    check (posted_on is null or posted_on >= occurred_on),
+  constraint ck_transactions_status check (status in ('actual', 'scheduled')),
+  constraint ck_transactions_kind   check (kind in ('normal', 'special', 'refund'))
 );
 
 -- 重複排除:同一ファイルを別名で取り込んでも同じ明細は入らない
@@ -765,8 +757,8 @@ create unique index ux_transactions_source_ref
 -- 一覧・月次集計の主経路
 create index ix_transactions_user_occurred
   on public.transactions (user_id, occurred_on desc);
-create index ix_transactions_user_category_occurred
-  on public.transactions (user_id, category_id, occurred_on desc);
+create index ix_transactions_user_genre_occurred
+  on public.transactions (user_id, genre_id, occurred_on desc);
 create index ix_transactions_account_occurred
   on public.transactions (account_id, occurred_on desc);
 
@@ -792,8 +784,8 @@ create index ix_transactions_description_trgm
 comment on column public.transactions.amount_yen is
   '符号付きの円。支出が負、収入が正。SUM() だけで収支が出る。集計時に CASE を書かせない(ADR-008)。';
 comment on column public.transactions.classified_by is
-  '「カテゴリを誰が決めたか」を表す。支払方法だけを設定するルール(リボ検知など)は
-   カテゴリを付けないため、この列を変更しない。unclassified 以外はカテゴリ必須。';
+  '「ジャンルを誰が決めたか」を表す。支払方法だけを設定するルール(リボ検知など)は
+   ジャンルを付けないため、この列を変更しない。unclassified 以外はジャンル必須。';
 comment on column public.transactions.fingerprint is
   '口座・日付・金額・正規化した摘要から生成する重複排除キー。トリガ trg_transactions_fingerprint が自動設定する。';
 
@@ -821,78 +813,12 @@ create trigger trg_transactions_fingerprint
   for each row execute function public.set_transaction_fingerprint();
 
 
--- -----------------------------------------------------------------------------
--- 3.9 classification_rules — 分類ルール(FR-12, FR-13)
---
---   本人の修正結果をルールとして蓄積する。ルールが増えるほど AI 呼び出しが減り、
---   ランニングコストが逓減する(ADR-010)。
--- -----------------------------------------------------------------------------
-create table public.classification_rules (
-  id                uuid primary key default gen_random_uuid(),
-  user_id           uuid            not null references auth.users(id) on delete cascade,
-
-  name              text            not null,
-  priority          smallint        not null default 100,  -- 小さいほど先に評価
-  match_type        rule_match_type not null,
-  pattern           text,
-
-  -- 適用範囲の絞り込み
-  account_id        uuid            references public.accounts(id) on delete cascade,
-  min_amount_yen    bigint,
-  max_amount_yen    bigint,
-
-  -- 付与する値
-  category_id       uuid            references public.categories(id) on delete cascade,
-  set_payment_method payment_method,
-  set_merchant_name text,
-
-  -- 由来(FR-12:本人の修正結果を学習データとして保持する)
-  is_learned        boolean         not null default false,
-  learned_from_transaction_id uuid  references public.transactions(id) on delete set null,
-
-  hit_count         integer         not null default 0,
-  last_hit_at       timestamptz,
-  is_active         boolean         not null default true,
-
-  created_at        timestamptz     not null default now(),
-  updated_at        timestamptz     not null default now(),
-
-  constraint ck_rules_name check (btrim(name) <> ''),
-  -- 金額範囲のみのルール以外はパターンが必須
-  constraint ck_rules_pattern_required
-    check (match_type = 'amount_range' or (pattern is not null and btrim(pattern) <> '')),
-  -- 金額範囲ルールは範囲が必須
-  constraint ck_rules_amount_range_required
-    check (match_type <> 'amount_range'
-           or min_amount_yen is not null or max_amount_yen is not null),
-  constraint ck_rules_amount_order
-    check (min_amount_yen is null or max_amount_yen is null
-           or min_amount_yen <= max_amount_yen),
-  -- 何も設定しないルールは無意味
-  constraint ck_rules_has_effect
-    check (category_id is not null
-           or set_payment_method is not null
-           or set_merchant_name is not null),
-  constraint ck_rules_hit_count check (hit_count >= 0)
-);
-
--- 評価順に引く主経路
-create index ix_rules_user_priority
-  on public.classification_rules (user_id, priority, id)
-  where is_active;
-create index ix_rules_category on public.classification_rules (category_id);
--- 初期ルールの再投入を冪等にする(seed_defaults の ON CONFLICT 対象)
-create unique index ux_rules_user_name on public.classification_rules (user_id, name);
-
--- 循環参照のため、transactions 側の FK はここで追加する
-alter table public.transactions
-  add constraint fk_transactions_matched_rule
-  foreign key (matched_rule_id)
-  references public.classification_rules(id) on delete set null;
-
-create index ix_transactions_matched_rule
-  on public.transactions (matched_rule_id)
-  where matched_rule_id is not null;
+-- classification_rules(パターンによるカテゴリの自動判定、FR-12/FR-13)は
+-- ADR-057で廃止した。本人が「このパターンはこのカテゴリ」と決めるパターン
+-- ルールも、結局は生活費・浪費のカテゴリ分けと同じ主観であるため。
+-- リボ払い等の危険検知(FR-21)はこのテーブルとは独立に、TS側の
+-- `DEFAULT_DETECTION_RULES`(features/classification/rules.ts)として
+-- 最初からDBに保存されない形で持っていたため、この廃止の影響を受けない。
 
 
 -- -----------------------------------------------------------------------------
@@ -994,7 +920,7 @@ create table public.transfer_rules (
   from_account_id  uuid                 references public.accounts(id) on delete set null,
   to_account_id    uuid                 references public.accounts(id) on delete set null,
   debt_id          uuid                 references public.debts(id) on delete set null,
-  category_id      uuid                 references public.categories(id) on delete set null,
+  genre_id         uuid                 references public.genres(id) on delete set null,
 
   amount_type      transfer_amount_type not null,
   amount_yen       bigint,
@@ -1387,7 +1313,7 @@ create table public.alerts (
   -- 関連レコード(どれか、または無し)
   transaction_id uuid                 references public.transactions(id) on delete cascade,
   debt_id        uuid                 references public.debts(id) on delete cascade,
-  category_id    uuid                 references public.categories(id) on delete set null,
+  genre_id       uuid                 references public.genres(id) on delete set null,
   job_run_id     uuid                 references public.job_runs(id) on delete set null,
 
   -- 再送防止キー(例:'waste_budget_70:2026-09')
@@ -1485,9 +1411,9 @@ create index ix_net_worth_snapshots_user_as_of_desc
 
 
 -- -----------------------------------------------------------------------------
--- 3.23 transaction_splits — 明細の複数カテゴリ分割
+-- 3.23 transaction_splits — 明細の複数ジャンル分割
 --
---   1件の明細を複数のカテゴリに配分できるようにする。transactions.category_id
+--   1件の明細を複数のジャンルに配分できるようにする。transactions.genre_id
 --   はそのまま残し、分割がある明細だけこの表の行の合計で amount_yen を
 --   置き換える(合計が一致することの保証はアプリ側、domain/transaction-splits.ts
 --   の assertValidSplits() が正。複数行にまたがる合計チェックは CHECK 制約
@@ -1497,7 +1423,7 @@ create table public.transaction_splits (
   id             uuid        primary key default gen_random_uuid(),
   user_id        uuid        not null references auth.users(id) on delete cascade,
   transaction_id uuid        not null references public.transactions(id) on delete cascade,
-  category_id    uuid        references public.categories(id) on delete set null,
+  genre_id       uuid        references public.genres(id) on delete set null,
 
   amount_yen     bigint      not null,
   note           text,
@@ -1548,6 +1474,311 @@ create trigger trg_goals_updated_at
   for each row execute function public.set_updated_at();
 
 
+-- 3.25 transaction_diagnoses — 明細ごとの浪費/必要経費診断(本人発案、ADR-030)
+--
+--   category_kind(浪費/生活費/聖域...)はカテゴリ単位の静的な分類で、同じ
+--   カテゴリでも1件ごとの事情までは表さない(例:「外食」でも仕事の会食と
+--   気晴らしの外食では意味が違う)。ここでは明細1件ごとに投資家目線でAIが
+--   下した動的な評定を保存する。1明細につき1行(再診断は upsert で上書き、
+--   過去の評定を履歴として重ねて残す機能ではない)。月ごとの浪費傾向の推移は
+--   この表と transactions.occurred_on を突き合わせて都度集計する
+--   (features/diagnosis/store.ts、新しいスナップショットテーブルは持たない)。
+-- -----------------------------------------------------------------------------
+create table public.transaction_diagnoses (
+  id             uuid             primary key default gen_random_uuid(),
+  user_id        uuid             not null references auth.users(id) on delete cascade,
+  transaction_id uuid             not null references public.transactions(id) on delete cascade,
+
+  verdict        spending_verdict not null,
+  -- 投資家目線での判断理由。本人発案「客観視した分析」の要——ラベルだけでなく
+  -- 理由が見えることで、本人が納得したり反論したりできる。
+  reasoning      text             not null,
+
+  created_at     timestamptz      not null default now(),
+
+  constraint ck_transaction_diagnoses_reasoning_not_blank check (btrim(reasoning) <> '')
+);
+
+create unique index ux_transaction_diagnoses_transaction on public.transaction_diagnoses (transaction_id);
+create index ix_transaction_diagnoses_user on public.transaction_diagnoses (user_id);
+
+-- 3.26 ai_monthly_reports — AI月次レポート(本人発案「AI関連もっと増やしたい。
+-- もっと画期的な機能ない?」、ADR-031)
+--
+--   家計簿・診断(transaction_diagnoses)の蓄積データを1ヶ月分まとめて
+--   AIに渡し、①浪費傾向のタイプ(固定6分類、persona_type)、②実データに
+--   基づく気づき、③行動面の一般的なアドバイスを生成する。1ヶ月につき1行
+--   (再生成は upsert で上書き、過去のレポートを履歴として重ねて残す機能
+--   ではない——transaction_diagnoses と同じ考え方)。医学的な性格診断や
+--   ホルモン等の身体的な断定はさせない(ADR-031、本人の明示的な要望で除外)。
+-- -----------------------------------------------------------------------------
+create table public.ai_monthly_reports (
+  id                uuid                  primary key default gen_random_uuid(),
+  user_id           uuid                  not null references auth.users(id) on delete cascade,
+  month             date                  not null,
+
+  persona_type      spending_persona_type not null,
+  -- なぜそのタイプと判断したか。ラベルだけでなく理由が見えることで、
+  -- 本人が納得したり反論したりできる(transaction_diagnoses.reasoning と同じ考え方)。
+  persona_reasoning text                  not null,
+  -- 実データに基づく気づき(複数件)。数値を独自に作らせず、渡した実際の
+  -- 集計値だけを根拠にさせる(features/ai-report/monthly-report-ai.ts 参照)。
+  insights          text[]                not null default '{}',
+  -- 行動面の一般的なアドバイス(複数件)。食事・体質等、金融データから
+  -- 導けない領域には踏み込ませない。
+  advice            text[]                not null default '{}',
+
+  created_at        timestamptz           not null default now(),
+
+  constraint ck_ai_monthly_reports_month_is_first_day check (extract(day from month) = 1),
+  constraint ck_ai_monthly_reports_persona_reasoning_not_blank check (btrim(persona_reasoning) <> ''),
+  constraint ck_ai_monthly_reports_insights_not_empty check (array_length(insights, 1) > 0),
+  constraint ck_ai_monthly_reports_advice_not_empty check (array_length(advice, 1) > 0)
+);
+
+create unique index ux_ai_monthly_reports_user_month on public.ai_monthly_reports (user_id, month);
+
+-- 3.27 ai_daily_reports — AI日次レポート(本人発案「日次レポートと月次
+-- レポートどっちも出力できるように」、ADR-032)
+--
+--   今日1日分の実データ(支出・カテゴリ・診断結果)をAIに渡し、気づきと
+--   アドバイスを生成する。ai_monthly_reports と異なり persona_type を持たない
+--   ——1日分のデータでは浪費傾向のタイプ判定にノイズが大きすぎるため、
+--   タイプ判定は月次レポートに一本化する(ADR-032)。1日につき1行(再生成は
+--   upsert で上書き、過去のレポートを履歴として重ねて残す機能ではない)。
+-- -----------------------------------------------------------------------------
+create table public.ai_daily_reports (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users(id) on delete cascade,
+  report_date date        not null,
+
+  insights    text[]      not null default '{}',
+  advice      text[]      not null default '{}',
+
+  created_at  timestamptz not null default now(),
+
+  constraint ck_ai_daily_reports_insights_not_empty check (array_length(insights, 1) > 0),
+  constraint ck_ai_daily_reports_advice_not_empty check (array_length(advice, 1) > 0)
+);
+
+create unique index ux_ai_daily_reports_user_date on public.ai_daily_reports (user_id, report_date);
+
+-- 3.28 receipt_items — レシートの品目(本人発案、ADR-034)
+--
+--   「レシートというのは店と品目を全て合わせた概念」という指摘への対応。
+--   transaction_splits(カテゴリ分割、2件以上・合計一致が必須)とは別物——
+--   こちらは「何を買ったか」を常に残す記録で、1点だけの買い物でも、内訳の
+--   合計が支払額と一致しなくても保存する。カテゴリ分割の対象になるかどうかに
+--   関わらず、レシートに商品行が写っていた明細には必ず付く。
+-- -----------------------------------------------------------------------------
+create table public.receipt_items (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  transaction_id uuid        not null references public.transactions(id) on delete cascade,
+
+  name           text        not null,
+  amount_yen     bigint      not null,
+  sort_order     smallint    not null default 0,
+  -- ジャンル分割(transaction_splits)の対象かどうかに関わらず品目単体にも
+  -- 付けられる。null は分類できなかった・分類前(ADR-035)
+  genre_id       uuid        references public.genres(id) on delete set null,
+  -- 固定カテゴリとは別の、商品の種類そのもののAI自由記述(ADR-036)。
+  -- 例:飲料・調味料・菓子。固定語彙を与えないため enum ではなく text
+  product_type   text,
+
+  created_at     timestamptz not null default now(),
+
+  constraint ck_receipt_items_name_not_blank check (btrim(name) <> ''),
+  constraint ck_receipt_items_amount_nonzero check (amount_yen <> 0)
+);
+
+create index ix_receipt_items_transaction on public.receipt_items (transaction_id, sort_order);
+create index ix_receipt_items_user on public.receipt_items (user_id);
+
+
+-- -----------------------------------------------------------------------------
+-- 3.29 transaction_expense_subtypes — 生活費の小分類(本人発案、ADR-036)
+--
+--   「生活費」カテゴリの明細が具体的に何系の生活費か(食費・日用品・外食
+--   など)をAIの自由記述で持たせる。receipt_items・transaction_splits と
+--   同じく、この値は今のところレシート取り込みという1つの経路からしか
+--   生まれない(通常の CSV・メール取り込みでは値が無い)ため、transactions
+--   本体に列を足すのではなく別テーブルにした。1明細につき最大1行。
+-- -----------------------------------------------------------------------------
+create table public.transaction_expense_subtypes (
+  transaction_id uuid        primary key references public.transactions(id) on delete cascade,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  subtype        text        not null,
+  created_at     timestamptz not null default now(),
+
+  constraint ck_transaction_expense_subtypes_not_blank check (btrim(subtype) <> '')
+);
+
+create index ix_transaction_expense_subtypes_user on public.transaction_expense_subtypes (user_id);
+-- 3.31 spending_plans / spending_plan_items — 期間つきの支出目標(本人発案、ADR-058)
+--
+--   カレンダーで選んだ期間(period_start〜period_end)について、ジャンルごとの
+--   支出目標を持つ。AIが過去の支出と課題(予算超過・増加傾向・浪費判定・
+--   必須ラベル)から目安を提案し(ai_suggested_yen、reason)、本人が
+--   target_yen へ直す。step_percent は提案時の「改善の強さ」で、1回の
+--   目標で削る幅の上限(徐々に改善するための歯止め)。ジャンルの恒常的な
+--   月次予算(genres.budget_yen)とは別物で、期間ごとに立て直していく。
+-- -----------------------------------------------------------------------------
+create table public.spending_plans (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references auth.users(id) on delete cascade,
+  period_start date        not null,
+  period_end   date        not null,
+  step_percent integer     not null default 10,
+  created_at   timestamptz not null default now(),
+
+  constraint ck_spending_plans_period check (period_end >= period_start),
+  constraint ck_spending_plans_step   check (step_percent between 0 and 50)
+);
+
+create index ix_spending_plans_user on public.spending_plans (user_id, created_at desc);
+
+create table public.spending_plan_items (
+  id               uuid   primary key default gen_random_uuid(),
+  plan_id          uuid   not null references public.spending_plans(id) on delete cascade,
+  user_id          uuid   not null references auth.users(id) on delete cascade,
+  genre_id         uuid   not null references public.genres(id) on delete cascade,
+  target_yen       bigint not null,
+  ai_suggested_yen bigint,
+  reason           text,
+
+  constraint ck_spending_plan_items_target check (target_yen >= 0),
+  constraint ck_spending_plan_items_ai     check (ai_suggested_yen is null or ai_suggested_yen >= 0)
+);
+
+create unique index ux_spending_plan_items_plan_genre
+  on public.spending_plan_items (plan_id, genre_id);
+create index ix_spending_plan_items_user on public.spending_plan_items (user_id);
+
+-- 3.32 genre_memory — 分類パイプラインの記憶(個人の履歴・利用者のルール)
+--   分類は 利用者のルール → 個人の履歴(店×品目)→ 品目辞書 → AI の順に当てる。
+--   前半 2 段の元データがここ。store_key='' は「どの店でも」。pinned=true が
+--   利用者のルール。利用者が直した内容は即座にここへ反映する。
+-- -----------------------------------------------------------------------------
+create table public.genre_memory (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  store_key  text        not null default '',
+  item_key   text        not null,
+  genre_id   uuid        not null references public.genres(id) on delete cascade,
+  pinned     boolean     not null default false,
+  hits       integer     not null default 1,
+  updated_at timestamptz not null default now(),
+
+  constraint ck_genre_memory_item_not_blank check (btrim(item_key) <> ''),
+  constraint ck_genre_memory_hits check (hits >= 1)
+);
+
+create unique index ux_genre_memory_key
+  on public.genre_memory (user_id, store_key, item_key);
+create index ix_genre_memory_user on public.genre_memory (user_id);
+
+-- -----------------------------------------------------------------------------
+-- 3.33 receipt_captures — 読み取りに失敗したレシートの「入力待ち」(F7)
+--   撮影した画像とAIの生の読み取り結果を残し、手で入力して明細にするまでの記録。
+--   transactions とは別に持つので、入力が終わるまで集計・目標には入らない。
+--   元の画像は破棄しても消さない(status='discarded' にするだけ。Undo できる)。
+-- -----------------------------------------------------------------------------
+create table public.receipt_captures (
+  id                uuid        primary key default gen_random_uuid(),
+  user_id           uuid        not null references auth.users(id) on delete cascade,
+
+  -- needs_input: 手で入力する必要がある(明細・要確認に「入力待ち」と出る)
+  -- resolved   : 明細として保存済み(transaction_id が入る)
+  -- discarded  : 破棄した(Undo できるよう行は消さず、画像も残す)
+  status            text        not null default 'needs_input',
+  -- 読み取りの結果: parsed(全部読めた)/ partial(一部だけ)/ failed(読めない)/ manual(最初から手入力)
+  receipt_status    text        not null default 'failed',
+
+  -- 元の画像は消さない。補正(切り抜き・回転・明るさ)した画像は別のパスで持つ。
+  image_path        text        not null,
+  edited_image_path text,
+
+  -- AI の生の読み取り結果(warnings・部分的に読めた値)。再読み取りの比較に使う。
+  ocr_raw           jsonb,
+  -- 読み取れた項目({amountYen, occurredOn, storeName, ...})と読めなかった項目の名前。
+  read_fields       jsonb       not null default '{}'::jsonb,
+  unread_fields     text[]      not null default '{}',
+  -- 入力途中の内容(下書き)。離れても消えない。
+  draft             jsonb,
+  draft_updated_at  timestamptz,
+
+  transaction_id    uuid        references public.transactions(id) on delete set null,
+  captured_on       date        not null default (now() at time zone 'Asia/Tokyo')::date,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  resolved_at       timestamptz,
+  discarded_at      timestamptz,
+
+  constraint ck_receipt_captures_status
+    check (status in ('needs_input', 'resolved', 'discarded')),
+  constraint ck_receipt_captures_receipt_status
+    check (receipt_status in ('parsed', 'partial', 'failed', 'manual'))
+);
+
+create index ix_receipt_captures_user_status
+  on public.receipt_captures (user_id, status, created_at desc);
+
+
+-- AIゲートウェイ(N1):同一入力に対するAI応答のキャッシュ。キーは呼び出し側が
+-- 「機能名+入力の決定的な文字列」から作るハッシュ(src/lib/ai-gateway/cache.ts)。
+create table public.ai_cache (
+  cache_key      text        primary key,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  feature        text        not null,
+  response_json  jsonb       not null,
+  created_at     timestamptz not null default now(),
+  expires_at     timestamptz not null
+);
+
+create index ai_cache_user_id_idx on public.ai_cache (user_id);
+create index ai_cache_expires_at_idx on public.ai_cache (expires_at);
+
+
+-- 固定費の確認(N4)。domain/subscriptions.ts の subscriptionKeyOf() と同じ規則の
+-- キー(正規化した店名/摘要 + 金額)。detectSubscriptions() の検知結果と1対1対応。
+create table public.fixed_cost_confirmations (
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  subscription_key text        not null,
+  confirmed_at     timestamptz not null default now(),
+  primary key (user_id, subscription_key)
+);
+
+
+-- 3.34 ai_forecast_reads — AIの読み(着地の見込みへのAIの補正、本人発案、ADR-072)
+-- 月次レポートを作るたびに1行足す(上書きしない)。月が終わったら、その月の実際の着地と
+-- 比べて「AIの読みが統計より当たったか」を数え、次からの補正の効かせ方に使う。
+-- AIは補正の%を選ぶだけで、金額はアプリが計算する(N1)。
+create table public.ai_forecast_reads (
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  month            date        not null,
+  as_of            date        not null,
+  known_yen        integer     not null,
+  stat_p10_yen     integer     not null,
+  stat_p50_yen     integer     not null,
+  stat_p90_yen     integer     not null,
+  ai_percent       integer     not null,
+  trust            numeric     not null,
+  adjusted_p50_yen integer     not null,
+  reason           text        not null,
+  evidence         text[]      not null default '{}',
+  created_at       timestamptz not null default now(),
+
+  constraint ck_ai_forecast_reads_percent check (ai_percent between -20 and 30),
+  constraint ck_ai_forecast_reads_trust check (trust >= 0 and trust <= 1)
+);
+
+create index ai_forecast_reads_user_month_idx on public.ai_forecast_reads (user_id, month);
+
+
+
+
 -- =============================================================================
 --  4. updated_at トリガの一括適用
 -- =============================================================================
@@ -1557,8 +1788,8 @@ declare
   t text;
 begin
   foreach t in array array[
-    'app_settings','accounts','categories','budgets','debts','import_adapters',
-    'transactions','classification_rules','debt_payments','repayment_scenarios',
+    'app_settings','accounts','debts','import_adapters',
+    'transactions','debt_payments','repayment_scenarios',
     'transfer_rules','transfer_runs','transfer_run_items','side_projects',
     'side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','daily_briefs','alerts'
@@ -1834,69 +2065,11 @@ comment on view public.v_debt_overview is
   'has_estimated_values が true のあいだ、完済予定日を確定値として表示してはならない(ADR-006)。';
 
 
--- 当月のカテゴリ別支出。FR-14 / FR-20 の元データ
-create view public.v_monthly_category_spend
-with (security_invoker = true) as
-select
-  t.user_id,
-  date_trunc('month', t.occurred_on)::date              as month,
-  t.category_id,
-  c.code                                                as category_code,
-  c.name                                                as category_name,
-  c.kind                                                as category_kind,
-  -- 支出は負で入っているので、正の「使った額」に反転して返す
-  sum(case when t.amount_yen < 0 then -t.amount_yen else 0 end) as spent_yen,
-  sum(case when t.amount_yen > 0 then  t.amount_yen else 0 end) as received_yen,
-  count(*)::integer                                     as transaction_count
-from public.transactions t
-left join public.categories c on c.id = t.category_id
-where not t.is_transfer
-  and t.review_status <> 'ignored'
-group by t.user_id, date_trunc('month', t.occurred_on)::date,
-         t.category_id, c.code, c.name, c.kind;
-
-
--- 当月の予算消化状況。FR-14「使える残額」/ FR-20 の 70% 判定
-create view public.v_current_month_budget_status
-with (security_invoker = true) as
-with base as (
-  select
-    c.user_id,
-    c.id                as category_id,
-    c.code,
-    c.name,
-    c.kind,
-    coalesce(b.amount_yen, c.default_monthly_budget_yen) as budget_yen,
-    coalesce(b.carry_over_yen, 0)                        as carry_over_yen
-  from public.categories c
-  left join public.budgets b
-    on  b.category_id = c.id
-    and b.month = public.month_start_jst()
-  where c.is_active
-)
-select
-  base.user_id,
-  base.category_id,
-  base.code,
-  base.name,
-  base.kind,
-  base.budget_yen,
-  base.carry_over_yen,
-  coalesce(s.spent_yen, 0)                               as spent_yen,
-  case when base.budget_yen is not null
-       then base.budget_yen + base.carry_over_yen - coalesce(s.spent_yen, 0)
-  end                                                    as remaining_yen,
-  case when coalesce(base.budget_yen, 0) > 0
-       then round(coalesce(s.spent_yen, 0)::numeric / base.budget_yen, 3)
-  end                                                    as usage_ratio
-from base
-left join public.v_monthly_category_spend s
-  on  s.user_id     = base.user_id
-  and s.category_id = base.category_id
-  and s.month       = public.month_start_jst();
-
-comment on view public.v_current_month_budget_status is
-  'FR-14:remaining_yen を「あと〇円使える」と肯定形で表示する。FR-20:usage_ratio >= 0.7 でアラート。';
+-- v_monthly_category_spend・v_current_month_budget_status(カテゴリ別支出・
+-- 予算消化状況)は、どちらもアプリのどこからも実際に問い合わせていない
+-- ドキュメント用のビューだった(実装は domain/budget.ts に相当ロジックを
+-- 持つ)。ADR-057 でカテゴリ(categories)を廃止したのに伴い、書き直すより
+-- 削除する方が実態に合う(使われていないSQLを保守し続けない、ADR-033)。
 
 
 -- 連続確認日数(FR-62)。途切れても責めず、再開だけを提示するための素材
@@ -1937,13 +2110,17 @@ declare
   t text;
 begin
   foreach t in array array[
-    'app_settings','accounts','categories','budgets','debts','import_adapters',
-    'import_batches','transactions','classification_rules','debt_payments',
+    'app_settings','accounts','debts','import_adapters',
+    'import_batches','transactions','debt_payments',
     'repayment_scenarios','transfer_rules','transfer_runs','transfer_run_items',
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
-    'net_worth_snapshots','transaction_splits','goals'
+    'net_worth_snapshots','transaction_splits','goals','transaction_diagnoses',
+    'ai_monthly_reports','ai_daily_reports','receipt_items',
+    'transaction_expense_subtypes','genres','spending_plans','spending_plan_items',
+    'genre_memory','receipt_captures','ai_cache','fixed_cost_confirmations',
+    'ai_forecast_reads'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -2008,63 +2185,44 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
-declare
-  v_cat_sanctuary uuid;
-  v_cat_living    uuid;
 begin
   -- 設定(ADR-003〜005 の初期値は列 DEFAULT に持たせてある)
   insert into public.app_settings (user_id)
   values (p_user_id)
   on conflict (user_id) do nothing;
 
-  -- カテゴリ(FR-11 の初期値)。
-  --
-  -- name はあくまで初期値であり、本人がいつでも変更できる(FR-13, ADR-016)。
-  -- 変えても壊れないのは、コードとルールが参照するのが code と kind だけだからである。
-  -- 予算額もここに置く。app_settings 側には持たない(二重定義を避ける)。
-  -- show_on_home はホーム最上部に残額を出す枠。これも本人が選び直せる(FR-61)。
-  insert into public.categories
-    (user_id, code, name, kind, default_monthly_budget_yen, sort_order, is_system, show_on_home)
+  -- ジャンル(ADR-057)。本人がいつでも自由に追加・削除できる一覧で、
+  -- ここでの初期値は最初の目安に過ぎない(features/genre/store.ts の
+  -- DEFAULT_GENRE_NAMES と同じ一覧)。
+  insert into public.genres (user_id, name, sort_order)
   values
-    (p_user_id, 'fixed_cost',          '固定費',       'fixed_cost',          100000, 10, true, false),
-    (p_user_id, 'living',              '生活費',       'living',               60000, 20, true, true),
-    (p_user_id, 'sanctuary',           '聖域',         'sanctuary',            40000, 30, true, true),
-    (p_user_id, 'waste',               '浪費',         'waste',                20000, 40, true, false),
-    (p_user_id, 'investment_spending', '投資的支出',   'investment_spending',  10000, 50, true, false),
-    (p_user_id, 'repayment',           '返済',         'repayment',              null, 60, true, false),
-    (p_user_id, 'investment',          '投資',         'investment',             null, 70, true, false),
-    (p_user_id, 'income',              '収入',         'income',                 null, 80, true, false),
-    (p_user_id, 'transfer',            '口座間振替',   'transfer',               null, 90, true, false)
-  on conflict (user_id, code) do nothing;
-
-  select id into v_cat_sanctuary from public.categories
-    where user_id = p_user_id and code = 'sanctuary';
-  select id into v_cat_living from public.categories
-    where user_id = p_user_id and code = 'living';
-
-  -- FR-21:リボ・キャッシング・分割の検知ルール。
-  -- AI ではなく決定的な正規表現で判定する(ADR-010)。見逃しが致命的なため
-  -- priority を最上位に置き、他のどのルールより先に評価させる。
-  insert into public.classification_rules
-    (user_id, name, priority, match_type, pattern, set_payment_method, is_active)
-  values
-    (p_user_id, 'リボ払いの検知',       1, 'regex',
-     '(リボ|ﾘﾎﾞ|revolving|リボルビング)',            'revolving',   true),
-    (p_user_id, 'キャッシングの検知',   2, 'regex',
-     '(キャッシング|ｷｬｯｼﾝｸﾞ|CASHING|カードローン|ATM借入)', 'cashing',     true),
-    (p_user_id, '分割払いの検知',       3, 'regex',
-     '(分割|[0-9]+回払|ボーナス払)',                  'installment', true)
+    (p_user_id, '食料品', 10), (p_user_id, '外食', 20),
+    (p_user_id, 'カフェ・飲料', 30), (p_user_id, '酒', 40),
+    (p_user_id, '日用品', 50), (p_user_id, '衣服・ファッション', 60),
+    (p_user_id, '美容', 70), (p_user_id, '医療・健康', 80),
+    (p_user_id, '住居費', 90), (p_user_id, '光熱費', 100),
+    (p_user_id, '通信費', 110), (p_user_id, '交通・車両', 120),
+    (p_user_id, '娯楽・趣味', 130), (p_user_id, '書籍・学習', 140),
+    (p_user_id, 'サブスクリプション・会費', 150), (p_user_id, '交際費・贈答', 160),
+    (p_user_id, 'こども・教育', 170), (p_user_id, 'ペット', 180),
+    (p_user_id, '家電・家具', 190), (p_user_id, '旅行', 200),
+    (p_user_id, '保険・税金・手数料', 210), (p_user_id, 'その他', 220)
   on conflict (user_id, name) do nothing;
 
+  -- FR-21:リボ・キャッシング・分割の検知は、AI にもDBにも頼らず
+  -- `DEFAULT_DETECTION_RULES`(features/classification/rules.ts)として
+  -- TS側に固定してある(ADR-010・ADR-057)。ここでは何も投入しない。
+
   -- FR-15:給料日振替の既定順序(返済 → 投資 → 女遊び → 生活費)。
-  -- 金額は本人が設定画面で調整する前提の初期値。
+  -- 金額は本人が設定画面で調整する前提の初期値。ジャンルは本人が後から
+  -- 選び直せるよう、ここでは未設定のままにする(ADR-057)。
   insert into public.transfer_rules
-    (user_id, name, trigger, execution_order, amount_type, amount_yen, category_id)
+    (user_id, name, trigger, execution_order, amount_type, amount_yen, genre_id)
   values
     (p_user_id, '返済へ',       'payday', 1, 'fixed',     100000, null),
     (p_user_id, '投資へ',       'payday', 2, 'fixed',      20000, null),
-    (p_user_id, '聖域枠へ',     'payday', 3, 'fixed',      40000, v_cat_sanctuary),
-    (p_user_id, '生活費へ',     'payday', 4, 'remainder',   null, v_cat_living)
+    (p_user_id, '聖域枠へ',     'payday', 3, 'fixed',      40000, null),
+    (p_user_id, '生活費へ',     'payday', 4, 'remainder',   null, null)
   on conflict (user_id, name) do nothing;
 
   -- FR-02:比較の基準となる「最低返済のみ」シナリオ
@@ -2094,7 +2252,7 @@ end;
 $$;
 
 comment on function public.seed_defaults(uuid) is
-  'カテゴリ・検知ルール・振替ルール・比較シナリオ・負債の初期値を投入する。ユーザー作成直後に一度だけ実行する。';
+  'ジャンル・振替ルール・比較シナリオ・負債の初期値を投入する。ユーザー作成直後に一度だけ実行する。';
 
 
 -- =============================================================================
@@ -2131,10 +2289,12 @@ commit;
 --   debts                   → debts
 --   debt_payments           → debt_payments
 --   transactions            → transactions(+ import_batches, import_adapters)
---   categories              → categories
---   classification_rules    → classification_rules
+--   categories              → genres に統合(ADR-057。classification_rules・budgets
+--                             も同時に廃止し、genre_id/budget_yen/must_pay へ集約)
+--   classification_rules    → 廃止(ADR-057)。FR-21の危険検知だけ
+--                             features/classification/rules.ts に固定で残る
 --   transfer_rules          → transfer_rules(+ transfer_runs, transfer_run_items)
---   budgets                 → budgets
+--   budgets                 → 廃止(ADR-057)。genres.budget_yen に統合
 --   side_income_logs        → side_projects, side_work_logs, side_incomes に分割
 --                             (時給換算 FR-40 のため作業時間と入金を分離)
 --   job_change_milestones   → job_change_milestones
@@ -2150,4 +2310,8 @@ commit;
 --   import_adapters         → ADR-007(CSV フォーマット差異の吸収)
 --   import_batches          → FR-10 の冪等な取り込み
 --   app_checkins            → FR-62 のストリーク算出
+--   genres                  → ADR-056/ADR-057。唯一の分類(旧 categories を置換)
+--   spending_plans          → ADR-058。カレンダーで選んだ期間のジャンル別支出目標
+--   spending_plan_items     → ADR-058。目標の明細(AI提案額と本人の目標額)
+--   ai_forecast_reads       → ADR-072。AIの読み(着地の見込みへの補正と、その当たり具合)
 -- =============================================================================

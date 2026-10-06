@@ -9,17 +9,13 @@
 
 import { redirect } from 'next/navigation';
 
-import { AuthError, assertPassword, assertPasswordConfirmed } from '@/domain/auth';
+import { assertPassword, assertPasswordConfirmed } from '@/domain/auth';
+import { describeUserError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
 export type PasswordFormState = {
   error: string | null;
 };
-
-function describeError(error: unknown): string {
-  if (error instanceof AuthError) return error.message;
-  return 'パスワードを設定できませんでした。入力内容を確認してください。';
-}
 
 export async function setPasswordAction(
   _prev: PasswordFormState,
@@ -30,7 +26,12 @@ export async function setPasswordAction(
     password = assertPassword(String(formData.get('password') ?? ''));
     assertPasswordConfirmed(password, String(formData.get('passwordConfirmation') ?? ''));
   } catch (error) {
-    return { error: describeError(error) };
+    return {
+      error: describeUserError(
+        error,
+        'パスワードを設定できませんでした。入力内容を確認してください。',
+      ),
+    };
   }
 
   const supabase = await createClient();

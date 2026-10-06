@@ -1,10 +1,10 @@
 /**
- * AI相談へ渡す「今の状況」のコンテキスト文(本人発案)。
+ * AIの窓口(/assistant)へ渡す「今の状況」のコンテキスト文(本人発案)。
  *
  * ここで組み立てる数字は既存のドメイン計算(features/home/summary.ts の
  * loadHomeSummary、domain/goals.ts の goalProgressRatio)そのものであり、
- * AI に新しく計算させない。AI はこの文章を読んで会話するだけ(chat.ts の
- * システムプロンプト参照)。
+ * AI に新しく計算させない。AI はこの文章を読んで会話するだけ
+ * (features/assistant/chat-tools.ts のシステムプロンプト参照)。
  */
 
 import { goalProgressRatio } from '@/domain/goals';

@@ -24,6 +24,13 @@ const jstFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+const jstTimeFormatter = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
 export function assertDateOnly(value: string): DateOnly {
   if (!DATE_ONLY_PATTERN.test(value)) {
     throw new Error(`日付は YYYY-MM-DD 形式である必要があります: ${value}`);
@@ -126,6 +133,12 @@ export function mostRecentClosingOnOrBefore(today: DateOnly, closingDay: number)
     : nthDayOfMonth(addMonths(today, -1), closingDay);
 }
 
+/** 曜日(0=日〜6=土)。カレンダーのグリッド組みに使う(本人発案、ADR-043)。 */
+export function weekdayOf(date: DateOnly): number {
+  const [y, m, d] = splitDateOnly(date);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
 /** DateOnly に日を足す。 */
 export function addDays(date: DateOnly, days: number): DateOnly {
   const [y, m, d] = splitDateOnly(date);
@@ -150,6 +163,37 @@ export function formatDateJa(date: DateOnly): string {
   return `${y}年${m}月${d}日`;
 }
 
+/** グラフの軸ラベル用。'2026-09' → 「9月」 */
+export function formatMonthJa(monthKey: string): string {
+  return `${Number(monthKey.slice(5, 7))}月`;
+}
+
+/**
+ * 表示用の時刻(JST、'13:40')。ADR-029:画面は一度読み込んだ内容を
+ * そのまま保持し、pull-to-refresh でしか最新化しないため、
+ * 「いつ時点の数字か」を示す最終更新時刻の表示に使う。
+ */
+export function formatTimeJa(now: Date = new Date()): string {
+  return jstTimeFormatter.format(now);
+}
+
+const jstHourFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: TIMEZONE,
+  hour: 'numeric',
+  hour12: false,
+});
+
+/**
+ * JST の時(0〜23)。サーバーは UTC で動くため(Vercel)、`new Date().getHours()`
+ * のような素の Date メソッドはサーバー環境のタイムゾーンに依存してしまう
+ * ——「いつもの」予測(N2)の時間帯判定など、JST の時刻そのものが要る場面で使う。
+ */
+export function hourJst(now: Date = new Date()): number {
+  const formatted = jstHourFormatter.format(now);
+  // hour12: false でも en-US ロケールは深夜0時を "24" と表す実装があるため丸める。
+  return Number(formatted) % 24;
+}
+
 /**
  * 「何日」という日にち番号(1〜31)として妥当か。
  * DateOnly ではなく、返済日・締め日のような整数入力の検証に使う
@@ -161,4 +205,36 @@ export function isValidDayOfMonth(value: number): boolean {
 
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0');
+}
+
+/**
+ * URL などの外から来た値を日付として読む。形式が正しくない・存在しない日付・文字列でない
+ * 値は fallback にする(URL は本人が書き換えられるため信用しない)。
+ */
+export function parseDateOnlyOr(value: unknown, fallback: DateOnly): DateOnly {
+  if (typeof value !== 'string' || !DATE_ONLY_PATTERN.test(value)) return fallback;
+  // 形式が合っていても 2026-02-31 のような存在しない日付があるため、暦として確かめる。
+  const [year, month, day] = value.split('-').map(Number) as [number, number, number];
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const exists =
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day;
+  return exists ? value : fallback;
+}
+
+/**
+ * 'YYYY-MM-DD' を、その日のローカル正午の Date にする(カレンダー部品向け)。
+ * UTC 0時で作ると、UTC より西のタイムゾーンでは前日に見えるため使わない。
+ */
+export function dateOnlyToLocalDate(date: DateOnly): Date {
+  const [year, month, day] = splitDateOnly(date);
+  return new Date(year, month - 1, day, 12);
+}
+
+/** ローカルの Date が指す日を 'YYYY-MM-DD' にする(toISOString は UTC になるため使わない)。 */
+export function localDateToDateOnly(date: Date): DateOnly {
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mm}-${dd}`;
 }

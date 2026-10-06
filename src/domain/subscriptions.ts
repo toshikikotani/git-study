@@ -96,3 +96,46 @@ function isMonthlyInterval(a: DateOnly, b: DateOnly): boolean {
 function normalizeLabel(label: string): string {
   return label.replace(/[\s　]/g, '').toLowerCase();
 }
+
+/**
+ * 明細1件に対する検知グループの key を、detectSubscriptions() と同じ規則で
+ * 計算する(N4「固定費として確定」)。検知の対象外(振替・ignored・収入)の
+ * 明細には使わない前提(呼び出し側で isCountable 等により絞り込む)。
+ */
+export function subscriptionKeyOf(
+  merchantName: string | null,
+  description: string,
+  amountYen: number,
+): string {
+  const label = (merchantName ?? description).trim();
+  return `${normalizeLabel(label)}:${amountYen}`;
+}
+
+export type FixedVariableSplit<T> = {
+  fixedYen: number;
+  variableYen: number;
+  fixed: T[];
+  variable: T[];
+};
+
+/**
+ * 支出を固定費/変動費に分ける(N4「固定費として本人が確認したものだけを
+ * 固定費として集計する」)。confirmedKeys に無いものはすべて変動費。
+ */
+export function splitFixedVariable<
+  T extends { merchantName: string | null; description: string; amountYen: number },
+>(transactions: readonly T[], confirmedKeys: ReadonlySet<string>): FixedVariableSplit<T> {
+  const fixed: T[] = [];
+  const variable: T[] = [];
+  for (const t of transactions) {
+    if (t.amountYen >= 0) continue;
+    const key = subscriptionKeyOf(t.merchantName, t.description, t.amountYen);
+    (confirmedKeys.has(key) ? fixed : variable).push(t);
+  }
+  return {
+    fixedYen: fixed.reduce((sum, t) => sum - t.amountYen, 0),
+    variableYen: variable.reduce((sum, t) => sum - t.amountYen, 0),
+    fixed,
+    variable,
+  };
+}

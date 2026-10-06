@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md';
 
 import { formatYen } from '@/domain/money';
 import type { PlanActualDelta } from '@/domain/debt-payment';
@@ -32,15 +33,16 @@ export function PaymentHistory({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="text-xs font-medium"
+          className="inline-flex items-center text-xs font-medium"
           style={{ color: 'var(--ink-secondary)' }}
         >
-          返済実績({payments.length}件){open ? ' ▲' : ' ▼'}
+          返済実績({payments.length}件)
+          {open ? <MdKeyboardArrowUp aria-hidden /> : <MdKeyboardArrowDown aria-hidden />}
         </button>
       </div>
 
       {planActualDelta ? (
-        <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
           計画との差:
           {planActualDelta.deltaYen === 0
             ? '計画どおり'
@@ -99,7 +101,7 @@ export function PaymentHistory({
               type="submit"
               disabled={pending}
               className="w-full rounded-full py-2 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               {pending ? '記録中…' : '返済を記録する'}
             </button>

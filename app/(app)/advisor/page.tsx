@@ -1,29 +1,30 @@
 import Link from 'next/link';
 
 import { listActiveGoals } from '@/features/goals/store';
-import { ChatPanel } from './chat-panel';
+import { withMinDuration } from '@/lib/min-loading-duration';
 import { GoalCard } from './goal-card';
 
 /**
- * AI相談(目標設定・買う前相談、本人発案)。
+ * 目標(進行中の目標と進捗、本人発案)。
  *
- * 「1、2、3いいねやろう」等の外部連携と違い、本人と直接対話する機能
- * のため、費用より対話の質を優先している(features/advisor/chat.ts 参照)。
+ * 以前はここに「AI相談」のチャットがあったが、AIの窓口を1つにするため
+ * /assistant へ統合した(ADR-059)。目標の作成・進捗の更新もそこの会話から
+ * 変更案として行える。ここは進行中の目標を見て、手で進捗を直す画面として残す。
  */
 
 // 目標の進捗・保存直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
 export default async function AdvisorPage() {
-  const goals = await listActiveGoals();
+  const goals = await withMinDuration(listActiveGoals());
 
   return (
     <div className="rise space-y-4">
       <header className="flex items-baseline justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          AI相談
+          目標
         </h1>
-        <Link href="/" className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
           ホームへ戻る
         </Link>
       </header>
@@ -36,7 +37,19 @@ export default async function AdvisorPage() {
         </div>
       ) : null}
 
-      <ChatPanel />
+      {goals.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+          進行中の目標はまだありません。
+        </p>
+      ) : null}
+
+      <Link
+        href="/assistant"
+        className="block text-xs font-medium"
+        style={{ color: 'var(--accent)' }}
+      >
+        AIに相談して目標を立てる →
+      </Link>
     </div>
   );
 }

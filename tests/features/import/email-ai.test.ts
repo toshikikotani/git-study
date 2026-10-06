@@ -4,7 +4,6 @@ import { buildFromAiRows, type AiEmailExtractor } from '@/features/import/email-
 import { StaticMailSource, syncFromMailbox } from '@/features/import/mail-sync';
 import type { RawMessage } from '@/features/import/mailbox';
 import type { EmailParseResult } from '@/features/import/email';
-import type { ClassificationRule } from '@/features/classification/rules';
 
 /**
  * AI 抽出の後段(ADR-019)。
@@ -150,18 +149,6 @@ describe('buildFromAiRows — モデルの出力を信用しきらない', () =>
 });
 
 describe('syncFromMailbox — AI は読めなかったときだけ呼ぶ', () => {
-  const RULES: ClassificationRule[] = [
-    {
-      id: 'd1',
-      name: 'リボ払いの検知',
-      priority: 1,
-      matchType: 'regex',
-      pattern: '(リボ|ﾘﾎﾞ)',
-      setPaymentMethod: 'revolving',
-      isActive: true,
-    },
-  ];
-
   /** 辞書が知っている書式。AI に回るべきではない。 */
   const KNOWN: RawMessage = {
     messageId: 'known',
@@ -193,7 +180,6 @@ describe('syncFromMailbox — AI は読めなかったときだけ呼ぶ', () =>
 
   const base = {
     accountId: 'acc-1',
-    rules: RULES,
     knownMessageIds: new Set<string>(),
     knownFingerprints: new Set<string>(),
     batchId: 'b1',
@@ -377,6 +363,7 @@ describe('ClaudeEmailExtractor — 失敗を握り潰さない', () => {
       messages: {
         parse: vi.fn().mockResolvedValue({
           stop_reason: 'end_turn',
+          usage: { input_tokens: 0, output_tokens: 0 },
           parsed_output: { is_card_notification: false, transactions: [] },
         }),
       },
@@ -392,7 +379,11 @@ describe('ClaudeEmailExtractor — 失敗を握り潰さない', () => {
     const { ClaudeEmailExtractor } = await import('@/features/import/email-ai');
     const client = {
       messages: {
-        parse: vi.fn().mockResolvedValue({ stop_reason: 'max_tokens', parsed_output: null }),
+        parse: vi.fn().mockResolvedValue({
+          stop_reason: 'max_tokens',
+          parsed_output: null,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        }),
       },
     };
     const extractor = new ClaudeEmailExtractor('sk-ant-test', client as never);

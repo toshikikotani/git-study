@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md';
 
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
@@ -62,7 +63,7 @@ export function RuleRow({
             <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               {rule.name}
             </h3>
-            <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
               {describeAmount(rule)}
               {toAccountName ? ` ・ ${toAccountName}へ` : ''}
               {categoryName ? ` ・ ${categoryName}` : ''}
@@ -93,20 +94,20 @@ export function RuleRow({
           <button
             type="submit"
             disabled={isFirst}
-            className="text-xs font-medium disabled:opacity-30"
+            className="inline-flex items-center text-xs font-medium disabled:opacity-30"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            ↑ 上へ
+            <MdKeyboardArrowUp aria-hidden /> 上へ
           </button>
         </form>
         <form action={moveTransferRuleDownAction.bind(null, rule.id)}>
           <button
             type="submit"
             disabled={isLast}
-            className="text-xs font-medium disabled:opacity-30"
+            className="inline-flex items-center text-xs font-medium disabled:opacity-30"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            ↓ 下へ
+            <MdKeyboardArrowDown aria-hidden /> 下へ
           </button>
         </form>
         <form action={deleteTransferRuleAction.bind(null, rule.id)} className="ml-auto">

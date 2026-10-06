@@ -8,14 +8,10 @@
  */
 
 import { todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class CheckinStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CheckinStoreError';
-  }
-}
+export class CheckinStoreError extends AppError {}
 
 export type CheckinStreak = {
   currentStreakDays: number;

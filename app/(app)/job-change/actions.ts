@@ -6,15 +6,15 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { assertMilestoneTitle, JobChangeError } from '@/domain/job-change';
+import { assertMilestoneTitle } from '@/domain/job-change';
 import {
   createMilestone,
   deleteMilestone,
-  JobChangeStoreError,
   setMilestoneStatus,
   type MilestonePhase,
   type MilestoneStatus,
 } from '@/features/job-change/store';
+import { describeUserError } from '@/lib/errors';
 
 export type MilestoneFormState = {
   error: string | null;
@@ -22,13 +22,6 @@ export type MilestoneFormState = {
 
 const PHASES: readonly MilestonePhase[] = ['research', 'resume', 'apply', 'interview', 'offer'];
 const STATUSES: readonly MilestoneStatus[] = ['todo', 'doing', 'done', 'dropped'];
-
-function describeError(error: unknown): string {
-  if (error instanceof JobChangeError || error instanceof JobChangeStoreError) {
-    return error.message;
-  }
-  return error instanceof Error ? error.message : String(error);
-}
 
 export async function createMilestoneAction(
   _prev: MilestoneFormState,
@@ -50,7 +43,7 @@ export async function createMilestoneAction(
       note: noteRaw === '' ? null : noteRaw,
     });
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
 
   revalidatePath('/job-change');
@@ -66,7 +59,7 @@ export async function setMilestoneStatusAction(
   try {
     await setMilestoneStatus(id, matched);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/job-change');
   return { error: null };
@@ -76,7 +69,7 @@ export async function deleteMilestoneAction(id: string): Promise<{ error: string
   try {
     await deleteMilestone(id);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/job-change');
   return { error: null };

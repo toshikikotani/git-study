@@ -29,9 +29,9 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
+import { parseStructured } from '@/lib/anthropic';
 import type { DateOnly } from '@/lib/date';
 import { readPaymentMethod } from './adapters';
 import { parseDateOnly } from './date-parse';
@@ -121,34 +121,25 @@ export class ClaudeEmailExtractor implements AiEmailExtractor {
   async extract(input: AiExtractInput): Promise<EmailParseResult> {
     const body = input.body.slice(0, MAX_BODY_CHARS);
 
-    let parsed: z.infer<typeof extractionSchema> | null;
-    try {
-      const response = await this.client.messages.parse({
-        model: EMAIL_EXTRACTION_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: [input.subject === undefined ? null : `件名: ${input.subject}`, '本文:', body]
-              .filter((line): line is string => line !== null)
-              .join('\n'),
-          },
-        ],
-        output_config: { format: zodOutputFormat(extractionSchema) },
-      });
+    const result = await parseStructured({
+      client: this.client,
+      model: EMAIL_EXTRACTION_MODEL,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [input.subject === undefined ? null : `件名: ${input.subject}`, '本文:', body]
+            .filter((line): line is string => line !== null)
+            .join('\n'),
+        },
+      ],
+      schema: extractionSchema,
+      hints: { rateLimit: '次回の取り込みで再試行します。' },
+    });
+    if (!result.ok) return { transactions: [], warnings: [result.message] };
 
-      if (response.stop_reason === 'max_tokens') {
-        return { transactions: [], warnings: ['AI の出力が長すぎて途中で切れました。'] };
-      }
-      parsed = response.parsed_output;
-    } catch (error) {
-      return { transactions: [], warnings: [describeError(error)] };
-    }
-
-    if (parsed === null) {
-      return { transactions: [], warnings: ['AI の返答を解釈できませんでした。'] };
-    }
+    const parsed = result.value;
     if (!parsed.is_card_notification) {
       return { transactions: [], warnings: ['AI もカードの利用通知とは判断しませんでした。'] };
     }
@@ -206,24 +197,4 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): EmailParseResul
   }
 
   return { transactions, warnings };
-}
-
-/**
- * 失敗の理由を本人に見える言葉にする。
- * 取り込みジョブ全体を落とさず、そのメールだけを飛ばして続ける。
- */
-function describeError(error: unknown): string {
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';
-  }
-  if (error instanceof Anthropic.RateLimitError) {
-    return 'AI の利用上限に達しました。次回の取り込みで再試行します。';
-  }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
-  }
-  return `AI の呼び出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
 }

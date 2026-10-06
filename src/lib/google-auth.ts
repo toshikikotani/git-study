@@ -12,6 +12,8 @@
  * 呼び出し側(app/api/auth/google・features/google/*)の責務。
  */
 
+import { AppError } from '@/lib/errors';
+
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
@@ -21,12 +23,7 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
 ] as const;
 
-export class GoogleAuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoogleAuthError';
-  }
-}
+export class GoogleAuthError extends AppError {}
 
 /**
  * 同意画面への URL。state は CSRF 対策(呼び出し側が短命 cookie 等で

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { parseNotificationEmail } from '@/features/import/email';
 import { buildSourceRef, StaticMailSource, syncFromMailbox } from '@/features/import/mail-sync';
 import { buildImapSearch, type RawMessage } from '@/features/import/mailbox';
-import type { ClassificationRule } from '@/features/classification/rules';
 
 /**
  * カード利用通知メールの解析(FR-10, 仕様書 9.2)。
@@ -149,18 +148,6 @@ describe('buildImapSearch', () => {
 });
 
 describe('syncFromMailbox — 自動取り込み', () => {
-  const RULES: ClassificationRule[] = [
-    {
-      id: 'd1',
-      name: 'リボ払いの検知',
-      priority: 1,
-      matchType: 'regex',
-      pattern: '(リボ|ﾘﾎﾞ)',
-      setPaymentMethod: 'revolving',
-      isActive: true,
-    },
-  ];
-
   const messages: RawMessage[] = [
     {
       messageId: 'm1',
@@ -188,7 +175,6 @@ describe('syncFromMailbox — 自動取り込み', () => {
   const base = {
     source: new StaticMailSource(messages),
     accountId: 'acc-1',
-    rules: RULES,
     knownMessageIds: new Set<string>(),
     knownFingerprints: new Set<string>(),
     batchId: 'b1',
@@ -247,9 +233,10 @@ describe('syncFromMailbox — 自動取り込み', () => {
     expect(result.scannedMessageCount).toBe(2);
   });
 
-  it('分類できない明細は本人の確認へ回す(FR-12)', async () => {
+  it('分類できない明細は未分類のまま取り込む。確認待ちキューは撤廃済み(ADR-045)', async () => {
     const result = await syncFromMailbox({ ...base, query: { since: '2026-09-01' } });
-    expect(result.transactions.every((t) => t.reviewStatus === 'pending')).toBe(true);
+    expect(result.transactions.every((t) => t.classifiedBy === 'unclassified')).toBe(true);
+    expect(result.transactions.every((t) => t.reviewStatus === 'auto_ok')).toBe(true);
   });
 
   it('source_ref に messageId を入れる(M2-7c)', async () => {

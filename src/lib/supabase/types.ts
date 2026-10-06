@@ -82,11 +82,38 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_cache: {
+        Row: {
+          cache_key: string;
+          created_at: string;
+          expires_at: string;
+          feature: string;
+          response_json: Json;
+          user_id: string;
+        };
+        Insert: {
+          cache_key: string;
+          created_at?: string;
+          expires_at: string;
+          feature: string;
+          response_json: Json;
+          user_id: string;
+        };
+        Update: {
+          cache_key?: string;
+          created_at?: string;
+          expires_at?: string;
+          feature?: string;
+          response_json?: Json;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       alerts: {
         Row: {
           acknowledged_at: string | null;
           body: string | null;
-          category_id: string | null;
+          genre_id: string | null;
           channel: Database['public']['Enums']['notification_channel'];
           created_at: string;
           debt_id: string | null;
@@ -107,7 +134,7 @@ export type Database = {
         Insert: {
           acknowledged_at?: string | null;
           body?: string | null;
-          category_id?: string | null;
+          genre_id?: string | null;
           channel?: Database['public']['Enums']['notification_channel'];
           created_at?: string;
           debt_id?: string | null;
@@ -128,7 +155,7 @@ export type Database = {
         Update: {
           acknowledged_at?: string | null;
           body?: string | null;
-          category_id?: string | null;
+          genre_id?: string | null;
           channel?: Database['public']['Enums']['notification_channel'];
           created_at?: string;
           debt_id?: string | null;
@@ -148,18 +175,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: 'alerts_category_id_fkey';
-            columns: ['category_id'];
+            foreignKeyName: 'alerts_genre_id_fkey';
+            columns: ['genre_id'];
             isOneToOne: false;
-            referencedRelation: 'categories';
+            referencedRelation: 'genres';
             referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'alerts_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
           },
           {
             foreignKeyName: 'alerts_debt_id_fkey';
@@ -207,6 +227,7 @@ export type Database = {
       };
       app_settings: {
         Row: {
+          ai_enabled: boolean;
           brief_channel: Database['public']['Enums']['notification_channel'];
           brief_send_at: string;
           classification_confidence_threshold: number;
@@ -237,6 +258,7 @@ export type Database = {
           waste_alert_threshold: number;
         };
         Insert: {
+          ai_enabled?: boolean;
           brief_channel?: Database['public']['Enums']['notification_channel'];
           brief_send_at?: string;
           classification_confidence_threshold?: number;
@@ -267,6 +289,7 @@ export type Database = {
           waste_alert_threshold?: number;
         };
         Update: {
+          ai_enabled?: boolean;
           brief_channel?: Database['public']['Enums']['notification_channel'];
           brief_send_at?: string;
           classification_confidence_threshold?: number;
@@ -397,235 +420,6 @@ export type Database = {
             columns: ['brief_id'];
             isOneToOne: false;
             referencedRelation: 'daily_briefs';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      budgets: {
-        Row: {
-          amount_yen: number;
-          carry_over_yen: number;
-          category_id: string;
-          created_at: string;
-          id: string;
-          month: string;
-          note: string | null;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          amount_yen: number;
-          carry_over_yen?: number;
-          category_id: string;
-          created_at?: string;
-          id?: string;
-          month: string;
-          note?: string | null;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          amount_yen?: number;
-          carry_over_yen?: number;
-          category_id?: string;
-          created_at?: string;
-          id?: string;
-          month?: string;
-          note?: string | null;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'budgets_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'categories';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'budgets_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
-          },
-        ];
-      };
-      categories: {
-        Row: {
-          code: string;
-          color: string | null;
-          created_at: string;
-          default_monthly_budget_yen: number | null;
-          id: string;
-          is_active: boolean;
-          is_system: boolean;
-          kind: Database['public']['Enums']['category_kind'];
-          merged_into_id: string | null;
-          name: string;
-          parent_id: string | null;
-          show_on_home: boolean;
-          sort_order: number;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          code: string;
-          color?: string | null;
-          created_at?: string;
-          default_monthly_budget_yen?: number | null;
-          id?: string;
-          is_active?: boolean;
-          is_system?: boolean;
-          kind: Database['public']['Enums']['category_kind'];
-          merged_into_id?: string | null;
-          name: string;
-          parent_id?: string | null;
-          show_on_home?: boolean;
-          sort_order?: number;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          code?: string;
-          color?: string | null;
-          created_at?: string;
-          default_monthly_budget_yen?: number | null;
-          id?: string;
-          is_active?: boolean;
-          is_system?: boolean;
-          kind?: Database['public']['Enums']['category_kind'];
-          merged_into_id?: string | null;
-          name?: string;
-          parent_id?: string | null;
-          show_on_home?: boolean;
-          sort_order?: number;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'categories_merged_into_id_fkey';
-            columns: ['merged_into_id'];
-            isOneToOne: false;
-            referencedRelation: 'categories';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'categories_merged_into_id_fkey';
-            columns: ['merged_into_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
-          },
-          {
-            foreignKeyName: 'categories_parent_id_fkey';
-            columns: ['parent_id'];
-            isOneToOne: false;
-            referencedRelation: 'categories';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'categories_parent_id_fkey';
-            columns: ['parent_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
-          },
-        ];
-      };
-      classification_rules: {
-        Row: {
-          account_id: string | null;
-          category_id: string | null;
-          created_at: string;
-          hit_count: number;
-          id: string;
-          is_active: boolean;
-          is_learned: boolean;
-          last_hit_at: string | null;
-          learned_from_transaction_id: string | null;
-          match_type: Database['public']['Enums']['rule_match_type'];
-          max_amount_yen: number | null;
-          min_amount_yen: number | null;
-          name: string;
-          pattern: string | null;
-          priority: number;
-          set_merchant_name: string | null;
-          set_payment_method: Database['public']['Enums']['payment_method'] | null;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          account_id?: string | null;
-          category_id?: string | null;
-          created_at?: string;
-          hit_count?: number;
-          id?: string;
-          is_active?: boolean;
-          is_learned?: boolean;
-          last_hit_at?: string | null;
-          learned_from_transaction_id?: string | null;
-          match_type: Database['public']['Enums']['rule_match_type'];
-          max_amount_yen?: number | null;
-          min_amount_yen?: number | null;
-          name: string;
-          pattern?: string | null;
-          priority?: number;
-          set_merchant_name?: string | null;
-          set_payment_method?: Database['public']['Enums']['payment_method'] | null;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          account_id?: string | null;
-          category_id?: string | null;
-          created_at?: string;
-          hit_count?: number;
-          id?: string;
-          is_active?: boolean;
-          is_learned?: boolean;
-          last_hit_at?: string | null;
-          learned_from_transaction_id?: string | null;
-          match_type?: Database['public']['Enums']['rule_match_type'];
-          max_amount_yen?: number | null;
-          min_amount_yen?: number | null;
-          name?: string;
-          pattern?: string | null;
-          priority?: number;
-          set_merchant_name?: string | null;
-          set_payment_method?: Database['public']['Enums']['payment_method'] | null;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'classification_rules_account_id_fkey';
-            columns: ['account_id'];
-            isOneToOne: false;
-            referencedRelation: 'accounts';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'classification_rules_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'categories';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'classification_rules_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
-          },
-          {
-            foreignKeyName: 'classification_rules_learned_from_transaction_id_fkey';
-            columns: ['learned_from_transaction_id'];
-            isOneToOne: false;
-            referencedRelation: 'transactions';
             referencedColumns: ['id'];
           },
         ];
@@ -1505,7 +1299,7 @@ export type Database = {
         Row: {
           account_id: string;
           amount_yen: number;
-          category_id: string | null;
+          genre_id: string | null;
           classified_by: Database['public']['Enums']['classified_by'];
           confidence: number | null;
           counter_transaction_id: string | null;
@@ -1516,7 +1310,11 @@ export type Database = {
           import_batch_id: string | null;
           is_expense: boolean | null;
           is_transfer: boolean;
-          matched_rule_id: string | null;
+          must_pay: boolean;
+          status: string;
+          kind: string;
+          branch_name: string | null;
+          reconcile_diff_yen: number | null;
           merchant_name: string | null;
           note: string | null;
           occurred_on: string;
@@ -1533,7 +1331,7 @@ export type Database = {
         Insert: {
           account_id: string;
           amount_yen: number;
-          category_id?: string | null;
+          genre_id?: string | null;
           classified_by?: Database['public']['Enums']['classified_by'];
           confidence?: number | null;
           counter_transaction_id?: string | null;
@@ -1544,7 +1342,11 @@ export type Database = {
           import_batch_id?: string | null;
           is_expense?: boolean | null;
           is_transfer?: boolean;
-          matched_rule_id?: string | null;
+          must_pay?: boolean;
+          status?: string;
+          kind?: string;
+          branch_name?: string | null;
+          reconcile_diff_yen?: number | null;
           merchant_name?: string | null;
           note?: string | null;
           occurred_on: string;
@@ -1561,7 +1363,7 @@ export type Database = {
         Update: {
           account_id?: string;
           amount_yen?: number;
-          category_id?: string | null;
+          genre_id?: string | null;
           classified_by?: Database['public']['Enums']['classified_by'];
           confidence?: number | null;
           counter_transaction_id?: string | null;
@@ -1572,7 +1374,11 @@ export type Database = {
           import_batch_id?: string | null;
           is_expense?: boolean | null;
           is_transfer?: boolean;
-          matched_rule_id?: string | null;
+          must_pay?: boolean;
+          status?: string;
+          kind?: string;
+          branch_name?: string | null;
+          reconcile_diff_yen?: number | null;
           merchant_name?: string | null;
           note?: string | null;
           occurred_on?: string;
@@ -1588,13 +1394,6 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: 'fk_transactions_matched_rule';
-            columns: ['matched_rule_id'];
-            isOneToOne: false;
-            referencedRelation: 'classification_rules';
-            referencedColumns: ['id'];
-          },
-          {
             foreignKeyName: 'transactions_account_id_fkey';
             columns: ['account_id'];
             isOneToOne: false;
@@ -1602,18 +1401,11 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'transactions_category_id_fkey';
-            columns: ['category_id'];
+            foreignKeyName: 'transactions_genre_id_fkey';
+            columns: ['genre_id'];
             isOneToOne: false;
-            referencedRelation: 'categories';
+            referencedRelation: 'genres';
             referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'transactions_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
           },
           {
             foreignKeyName: 'transactions_counter_transaction_id_fkey';
@@ -1634,7 +1426,7 @@ export type Database = {
       transaction_splits: {
         Row: {
           amount_yen: number;
-          category_id: string | null;
+          genre_id: string | null;
           created_at: string;
           id: string;
           note: string | null;
@@ -1643,7 +1435,7 @@ export type Database = {
         };
         Insert: {
           amount_yen: number;
-          category_id?: string | null;
+          genre_id?: string | null;
           created_at?: string;
           id?: string;
           note?: string | null;
@@ -1652,7 +1444,7 @@ export type Database = {
         };
         Update: {
           amount_yen?: number;
-          category_id?: string | null;
+          genre_id?: string | null;
           created_at?: string;
           id?: string;
           note?: string | null;
@@ -1661,10 +1453,10 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: 'transaction_splits_category_id_fkey';
-            columns: ['category_id'];
+            foreignKeyName: 'transaction_splits_genre_id_fkey';
+            columns: ['genre_id'];
             isOneToOne: false;
-            referencedRelation: 'categories';
+            referencedRelation: 'genres';
             referencedColumns: ['id'];
           },
           {
@@ -1676,11 +1468,473 @@ export type Database = {
           },
         ];
       };
+      spending_plan_items: {
+        Row: {
+          ai_suggested_yen: number | null;
+          genre_id: string;
+          id: string;
+          plan_id: string;
+          reason: string | null;
+          target_yen: number;
+          user_id: string;
+        };
+        Insert: {
+          ai_suggested_yen?: number | null;
+          genre_id: string;
+          id?: string;
+          plan_id: string;
+          reason?: string | null;
+          target_yen: number;
+          user_id: string;
+        };
+        Update: {
+          ai_suggested_yen?: number | null;
+          genre_id?: string;
+          id?: string;
+          plan_id?: string;
+          reason?: string | null;
+          target_yen?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'spending_plan_items_genre_id_fkey';
+            columns: ['genre_id'];
+            isOneToOne: false;
+            referencedRelation: 'genres';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'spending_plan_items_plan_id_fkey';
+            columns: ['plan_id'];
+            isOneToOne: false;
+            referencedRelation: 'spending_plans';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      spending_plans: {
+        Row: {
+          created_at: string;
+          id: string;
+          period_end: string;
+          period_start: string;
+          step_percent: number;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          period_end: string;
+          period_start: string;
+          step_percent?: number;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          period_end?: string;
+          period_start?: string;
+          step_percent?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      transaction_diagnoses: {
+        Row: {
+          created_at: string;
+          id: string;
+          reasoning: string;
+          transaction_id: string;
+          user_id: string;
+          verdict: Database['public']['Enums']['spending_verdict'];
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          reasoning: string;
+          transaction_id: string;
+          user_id: string;
+          verdict: Database['public']['Enums']['spending_verdict'];
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          reasoning?: string;
+          transaction_id?: string;
+          user_id?: string;
+          verdict?: Database['public']['Enums']['spending_verdict'];
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_diagnoses_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: true;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      genre_memory: {
+        Row: {
+          genre_id: string;
+          hits: number;
+          id: string;
+          item_key: string;
+          pinned: boolean;
+          store_key: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          genre_id: string;
+          hits?: number;
+          id?: string;
+          item_key: string;
+          pinned?: boolean;
+          store_key?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          genre_id?: string;
+          hits?: number;
+          id?: string;
+          item_key?: string;
+          pinned?: boolean;
+          store_key?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      receipt_captures: {
+        Row: {
+          captured_on: string;
+          created_at: string;
+          discarded_at: string | null;
+          draft: Json | null;
+          draft_updated_at: string | null;
+          edited_image_path: string | null;
+          id: string;
+          image_path: string;
+          ocr_raw: Json | null;
+          read_fields: Json;
+          receipt_status: string;
+          resolved_at: string | null;
+          status: string;
+          transaction_id: string | null;
+          unread_fields: string[];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          captured_on?: string;
+          created_at?: string;
+          discarded_at?: string | null;
+          draft?: Json | null;
+          draft_updated_at?: string | null;
+          edited_image_path?: string | null;
+          id?: string;
+          image_path: string;
+          ocr_raw?: Json | null;
+          read_fields?: Json;
+          receipt_status?: string;
+          resolved_at?: string | null;
+          status?: string;
+          transaction_id?: string | null;
+          unread_fields?: string[];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          captured_on?: string;
+          created_at?: string;
+          discarded_at?: string | null;
+          draft?: Json | null;
+          draft_updated_at?: string | null;
+          edited_image_path?: string | null;
+          id?: string;
+          image_path?: string;
+          ocr_raw?: Json | null;
+          read_fields?: Json;
+          receipt_status?: string;
+          resolved_at?: string | null;
+          status?: string;
+          transaction_id?: string | null;
+          unread_fields?: string[];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'receipt_captures_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      fixed_cost_confirmations: {
+        Row: {
+          confirmed_at: string;
+          subscription_key: string;
+          user_id: string;
+        };
+        Insert: {
+          confirmed_at?: string;
+          subscription_key: string;
+          user_id: string;
+        };
+        Update: {
+          confirmed_at?: string;
+          subscription_key?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      genres: {
+        Row: {
+          budget_yen: number | null;
+          color_index: number | null;
+          created_at: string;
+          hidden_in_quick_entry: boolean;
+          icon_key: string | null;
+          id: string;
+          name: string;
+          quick_entry_order: number | null;
+          show_on_home: boolean;
+          forecast_closed: boolean;
+          sort_order: number;
+          user_id: string;
+        };
+        Insert: {
+          budget_yen?: number | null;
+          color_index?: number | null;
+          created_at?: string;
+          hidden_in_quick_entry?: boolean;
+          icon_key?: string | null;
+          id?: string;
+          name: string;
+          quick_entry_order?: number | null;
+          show_on_home?: boolean;
+          forecast_closed?: boolean;
+          sort_order?: number;
+          user_id: string;
+        };
+        Update: {
+          budget_yen?: number | null;
+          color_index?: number | null;
+          created_at?: string;
+          hidden_in_quick_entry?: boolean;
+          icon_key?: string | null;
+          id?: string;
+          name?: string;
+          quick_entry_order?: number | null;
+          show_on_home?: boolean;
+          forecast_closed?: boolean;
+          sort_order?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      ai_monthly_reports: {
+        Row: {
+          advice: string[];
+          created_at: string;
+          id: string;
+          insights: string[];
+          month: string;
+          persona_reasoning: string;
+          persona_type: Database['public']['Enums']['spending_persona_type'];
+          user_id: string;
+        };
+        Insert: {
+          advice: string[];
+          created_at?: string;
+          id?: string;
+          insights: string[];
+          month: string;
+          persona_reasoning: string;
+          persona_type: Database['public']['Enums']['spending_persona_type'];
+          user_id: string;
+        };
+        Update: {
+          advice?: string[];
+          created_at?: string;
+          id?: string;
+          insights?: string[];
+          month?: string;
+          persona_reasoning?: string;
+          persona_type?: Database['public']['Enums']['spending_persona_type'];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      ai_daily_reports: {
+        Row: {
+          advice: string[];
+          created_at: string;
+          id: string;
+          insights: string[];
+          report_date: string;
+          user_id: string;
+        };
+        Insert: {
+          advice: string[];
+          created_at?: string;
+          id?: string;
+          insights: string[];
+          report_date: string;
+          user_id: string;
+        };
+        Update: {
+          advice?: string[];
+          created_at?: string;
+          id?: string;
+          insights?: string[];
+          report_date?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      ai_forecast_reads: {
+        Row: {
+          adjusted_p50_yen: number;
+          ai_percent: number;
+          as_of: string;
+          created_at: string;
+          evidence: string[];
+          id: string;
+          known_yen: number;
+          month: string;
+          reason: string;
+          stat_p10_yen: number;
+          stat_p50_yen: number;
+          stat_p90_yen: number;
+          trust: number;
+          user_id: string;
+        };
+        Insert: {
+          adjusted_p50_yen: number;
+          ai_percent: number;
+          as_of: string;
+          created_at?: string;
+          evidence?: string[];
+          id?: string;
+          known_yen: number;
+          month: string;
+          reason: string;
+          stat_p10_yen: number;
+          stat_p50_yen: number;
+          stat_p90_yen: number;
+          trust: number;
+          user_id: string;
+        };
+        Update: {
+          adjusted_p50_yen?: number;
+          ai_percent?: number;
+          as_of?: string;
+          created_at?: string;
+          evidence?: string[];
+          id?: string;
+          known_yen?: number;
+          month?: string;
+          reason?: string;
+          stat_p10_yen?: number;
+          stat_p50_yen?: number;
+          stat_p90_yen?: number;
+          trust?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      receipt_items: {
+        Row: {
+          amount_yen: number;
+          genre_id: string | null;
+          created_at: string;
+          id: string;
+          name: string;
+          product_type: string | null;
+          sort_order: number;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          amount_yen: number;
+          genre_id?: string | null;
+          created_at?: string;
+          id?: string;
+          name: string;
+          product_type?: string | null;
+          sort_order?: number;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          amount_yen?: number;
+          genre_id?: string | null;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          product_type?: string | null;
+          sort_order?: number;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'receipt_items_genre_id_fkey';
+            columns: ['genre_id'];
+            isOneToOne: false;
+            referencedRelation: 'genres';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'receipt_items_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      transaction_expense_subtypes: {
+        Row: {
+          created_at: string;
+          subtype: string;
+          transaction_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          subtype: string;
+          transaction_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          subtype?: string;
+          transaction_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'transaction_expense_subtypes_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: true;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       transfer_rules: {
         Row: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];
           amount_yen: number | null;
-          category_id: string | null;
+          genre_id: string | null;
           created_at: string;
           debt_id: string | null;
           execution_order: number;
@@ -1698,7 +1952,7 @@ export type Database = {
         Insert: {
           amount_type: Database['public']['Enums']['transfer_amount_type'];
           amount_yen?: number | null;
-          category_id?: string | null;
+          genre_id?: string | null;
           created_at?: string;
           debt_id?: string | null;
           execution_order: number;
@@ -1716,7 +1970,7 @@ export type Database = {
         Update: {
           amount_type?: Database['public']['Enums']['transfer_amount_type'];
           amount_yen?: number | null;
-          category_id?: string | null;
+          genre_id?: string | null;
           created_at?: string;
           debt_id?: string | null;
           execution_order?: number;
@@ -1733,18 +1987,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: 'transfer_rules_category_id_fkey';
-            columns: ['category_id'];
+            foreignKeyName: 'transfer_rules_genre_id_fkey';
+            columns: ['genre_id'];
             isOneToOne: false;
-            referencedRelation: 'categories';
+            referencedRelation: 'genres';
             referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'transfer_rules_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
           },
           {
             foreignKeyName: 'transfer_rules_debt_id_fkey';
@@ -1886,21 +2133,6 @@ export type Database = {
         };
         Relationships: [];
       };
-      v_current_month_budget_status: {
-        Row: {
-          budget_yen: number | null;
-          carry_over_yen: number | null;
-          category_id: string | null;
-          code: string | null;
-          kind: Database['public']['Enums']['category_kind'] | null;
-          name: string | null;
-          remaining_yen: number | null;
-          spent_yen: number | null;
-          usage_ratio: number | null;
-          user_id: string | null;
-        };
-        Relationships: [];
-      };
       v_debt_overview: {
         Row: {
           active_debt_count: number | null;
@@ -1913,35 +2145,6 @@ export type Database = {
           weighted_annual_rate: number | null;
         };
         Relationships: [];
-      };
-      v_monthly_category_spend: {
-        Row: {
-          category_code: string | null;
-          category_id: string | null;
-          category_kind: Database['public']['Enums']['category_kind'] | null;
-          category_name: string | null;
-          month: string | null;
-          received_yen: number | null;
-          spent_yen: number | null;
-          transaction_count: number | null;
-          user_id: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'transactions_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'categories';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'transactions_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'v_current_month_budget_status';
-            referencedColumns: ['category_id'];
-          },
-        ];
       };
     };
     Functions: {
@@ -2013,17 +2216,6 @@ export type Database = {
         | 'other';
       brief_item_kind: 'headline' | 'income_tip' | 'market' | 'campaign';
       brief_status: 'pending' | 'generated' | 'delivered' | 'failed';
-      category_kind:
-        | 'fixed_cost'
-        | 'living'
-        | 'sanctuary'
-        | 'waste'
-        | 'investment_spending'
-        | 'repayment'
-        | 'investment'
-        | 'income'
-        | 'transfer'
-        | 'other';
       classified_by: 'unclassified' | 'rule' | 'ai' | 'manual';
       debt_kind:
         | 'revolving'
@@ -2046,6 +2238,9 @@ export type Database = {
       repayment_strategy: 'avalanche' | 'snowball' | 'minimum' | 'custom';
       review_status: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
       rule_match_type: 'keyword' | 'regex' | 'exact' | 'amount_range' | 'merchant';
+      spending_persona_type:
+        'impulsive' | 'steady' | 'social' | 'goal_oriented' | 'frugal' | 'balanced';
+      spending_verdict: 'waste' | 'necessary';
       transaction_source: 'csv' | 'gmail' | 'manual' | 'api';
       transfer_amount_type: 'fixed' | 'percentage' | 'remainder';
       transfer_run_status: 'pending' | 'completed' | 'skipped';
@@ -2209,18 +2404,6 @@ export const Constants = {
       ],
       brief_item_kind: ['headline', 'income_tip', 'market', 'campaign'],
       brief_status: ['pending', 'generated', 'delivered', 'failed'],
-      category_kind: [
-        'fixed_cost',
-        'living',
-        'sanctuary',
-        'waste',
-        'investment_spending',
-        'repayment',
-        'investment',
-        'income',
-        'transfer',
-        'other',
-      ],
       classified_by: ['unclassified', 'rule', 'ai', 'manual'],
       debt_kind: [
         'revolving',
@@ -2251,6 +2434,15 @@ export const Constants = {
       repayment_strategy: ['avalanche', 'snowball', 'minimum', 'custom'],
       review_status: ['auto_ok', 'pending', 'confirmed', 'corrected', 'ignored'],
       rule_match_type: ['keyword', 'regex', 'exact', 'amount_range', 'merchant'],
+      spending_persona_type: [
+        'impulsive',
+        'steady',
+        'social',
+        'goal_oriented',
+        'frugal',
+        'balanced',
+      ],
+      spending_verdict: ['waste', 'necessary'],
       transaction_source: ['csv', 'gmail', 'manual', 'api'],
       transfer_amount_type: ['fixed', 'percentage', 'remainder'],
       transfer_run_status: ['pending', 'completed', 'skipped'],

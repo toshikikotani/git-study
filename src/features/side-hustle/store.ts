@@ -10,14 +10,10 @@
 import { computeIncomeAllocation } from '@/domain/side-hustle';
 import { getAppSettings } from '@/features/settings/store';
 import type { DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class SideHustleStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SideHustleStoreError';
-  }
-}
+export class SideHustleStoreError extends AppError {}
 
 export type SideProject = {
   id: string;

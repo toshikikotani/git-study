@@ -20,6 +20,6 @@ export async function ignoreTransactionAction(id: string): Promise<{ error: stri
   }
 
   revalidatePath('/transactions/duplicates');
-  revalidatePath('/transactions');
+  revalidatePath('/spending');
   return { error: null };
 }

@@ -1,20 +1,9 @@
 /**
- * 目標(goals)のデータアクセス(本人発案:AI相談で決めた目標)。
+ * 目標(goals)のデータアクセス。命名は docs/glossary.md に従う。
  *
- * 命名は docs/glossary.md の「レイヤーの命名」に従う(list/create/update)。
- * RLS が本人の行だけに絞る(ADR-011)ので、SELECT 側で user_id を意識する
- * 必要はない。INSERT だけは呼び出し側の user_id を明示する必要がある。
- *
- * `goals` は本番 Supabase へのマイグレーション適用手段がこのセッションに無く
- * (T-25/T-26/B-7/B-9 と同じ制約)未適用のため、毎回の画面表示・AI相談への
- * コンテキスト組み立てで無条件に読む listActiveGoals() はテーブル未作成の
- * エラー(PGRST205)を「目標はまだ無い」として握り潰す(transaction_splits と
- * 同じ考え方。適用後は自動的に効き始める)。一方 createGoal/updateGoalProgress/
- * abandonGoal は本人の明示的な操作なので握り潰さず、分かりやすいメッセージに
- * してそのままエラーとして返す。
+ * RLS が本人の行だけに絞る(ADR-011)ため SELECT は user_id を意識しない。
+ * `goals` は本番未適用(B-10)。未適用時の扱いは lib/supabase/errors.ts。
  */
-
-import type { PostgrestError } from '@supabase/supabase-js';
 
 import {
   assertGoalCurrentAmountYen,
@@ -22,6 +11,8 @@ import {
   assertGoalTitle,
 } from '@/domain/goals';
 import type { DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
+import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -47,16 +38,7 @@ export type GoalInput = {
   note: string | null;
 };
 
-export class GoalStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoalStoreError';
-  }
-}
-
-function isMissingTableError(error: Pick<PostgrestError, 'code'>): boolean {
-  return error.code === 'PGRST205';
-}
+export class GoalStoreError extends AppError {}
 
 type GoalRow = Database['public']['Tables']['goals']['Row'];
 

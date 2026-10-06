@@ -5,14 +5,11 @@
  * ここは Sheets API を叩くだけ(lib/discord.ts と同じ役割分担)。
  */
 
+import { AppError } from '@/lib/errors';
+
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
-export class GoogleSheetsError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GoogleSheetsError';
-  }
-}
+export class GoogleSheetsError extends AppError {}
 
 export type CreatedSpreadsheet = { spreadsheetId: string; url: string };
 

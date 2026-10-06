@@ -15,15 +15,11 @@
 
 import { GENERIC_ADAPTER, type AmountSign, type ImportAdapter } from '@/features/import/adapters';
 import type { CsvEncoding } from '@/features/import/encoding';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class ImportAdapterStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ImportAdapterStoreError';
-  }
-}
+export class ImportAdapterStoreError extends AppError {}
 
 type ImportAdapterRow = Database['public']['Tables']['import_adapters']['Row'];
 

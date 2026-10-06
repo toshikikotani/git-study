@@ -3,13 +3,9 @@
  */
 
 import { isValidDayOfMonth } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 
-export class AccountError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AccountError';
-  }
-}
+export class AccountError extends AppError {}
 
 /** 口座名。空文字・空白のみは拒否する。 */
 export function assertAccountName(value: string): string {
@@ -36,4 +32,38 @@ export function assertPaymentDay(value: number | null): number | null {
     throw new AccountError(`支払日は1〜31の整数で指定してください: ${value}`);
   }
   return value;
+}
+
+/** 用途別の残高集計1件分。 */
+export type PurposeBalance = {
+  purpose: string;
+  totalYen: number;
+  accountCount: number;
+};
+
+/**
+ * 口座の残高を用途(accounts.purpose)ごとに合算する(MoneyForward MEとの
+ * 機能比較調査、issue #98)。
+ *
+ * クレジットカードは残高がマイナス(未払い残高)になりうるため、合計もマイナスを
+ * そのまま許容する。並び順は合計額の大きい順(資産寄りの用途が先、負債寄りの
+ * 用途は後ろに来る)。
+ */
+export function summarizeBalanceByPurpose(
+  accounts: readonly { purpose: string; currentBalanceYen: number }[],
+): PurposeBalance[] {
+  const byPurpose = new Map<string, PurposeBalance>();
+
+  for (const account of accounts) {
+    const current = byPurpose.get(account.purpose) ?? {
+      purpose: account.purpose,
+      totalYen: 0,
+      accountCount: 0,
+    };
+    current.totalYen += account.currentBalanceYen;
+    current.accountCount += 1;
+    byPurpose.set(account.purpose, current);
+  }
+
+  return [...byPurpose.values()].sort((a, b) => b.totalYen - a.totalYen);
 }

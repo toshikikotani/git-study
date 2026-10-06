@@ -6,12 +6,9 @@
  * 値、つまり「有効にするか」「差出人を絞るか」「1回の取得件数上限」だけ。
  */
 
-export class GmailSettingsError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GmailSettingsError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class GmailSettingsError extends AppError {}
 
 /**
  * 差出人の絞り込みリスト。前後の空白を取り除き、空文字の要素は拒否する。

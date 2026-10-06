@@ -47,15 +47,11 @@ import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
 import { addDays, daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class AlertStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AlertStoreError';
-  }
-}
+export class AlertStoreError extends AppError {}
 
 /**
  * 候補を alerts へ積む(admin client 版)。重複(同じ dedup_key)は静かに無視する。
@@ -191,43 +187,34 @@ export async function detectAndRecordRiskyTransactionAlertsAsAdmin(
 }
 
 /**
- * 浪費カテゴリ(categories.kind='waste')の当月消化状況を読む。
+ * 予算を設定したジャンル(genres.budget_yen is not null)の当月消化状況を読む。
  *
  * FR-20 の70%到達判定(下記)と P6-1 の月次振り返りの両方が同じ
- * 「浪費カテゴリの当月ステータス」を必要とするため共通化する
- * (categories/budgets/transactions の3クエリを2箇所で重複させない)。
+ * 「予算設定済みジャンルの当月ステータス」を必要とするため共通化する
+ * (genres/transactions の2クエリを2箇所で重複させない)。ADR-057より前は
+ * categories.kind='waste' のカテゴリだけが対象だったが、category_kind の
+ * 廃止に伴い「予算を設定した全ジャンル」に一般化した(本人の提案)。
  */
-async function loadWasteCategoryStatuses(
+async function loadBudgetedGenreStatuses(
   client: SupabaseClient<Database>,
   userId: string,
   now: Date,
 ): Promise<{ id: string; name: string; status: BudgetStatus }[]> {
-  const { data: categories, error } = await client
-    .from('categories')
-    .select('id, name, default_monthly_budget_yen')
+  const { data: genres, error } = await client
+    .from('genres')
+    .select('id, name, budget_yen')
     .eq('user_id', userId)
-    .eq('kind', 'waste')
-    .eq('is_active', true);
-  if (error) throw new AlertStoreError(`カテゴリを取得できませんでした: ${error.message}`);
-  if (categories.length === 0) return [];
+    .not('budget_yen', 'is', null);
+  if (error) throw new AlertStoreError(`ジャンルを取得できませんでした: ${error.message}`);
+  if (genres.length === 0) return [];
 
   const monthStart = monthStartJst(0, now);
-  const categoryIds = categories.map((c) => c.id);
 
-  const { data: budgets, error: budgetError } = await client
-    .from('budgets')
-    .select('category_id, amount_yen, carry_over_yen')
-    .eq('user_id', userId)
-    .eq('month', monthStart)
-    .in('category_id', categoryIds);
-  if (budgetError) throw new AlertStoreError(`予算を取得できませんでした: ${budgetError.message}`);
-  const budgetByCategory = new Map(budgets.map((b) => [b.category_id, b]));
-
-  // category_id で絞らず当月分すべてを読む。分割(本人発案)がある明細は
-  // 主カテゴリが浪費カテゴリでなくても、分割先が浪費カテゴリのことがあるため。
+  // genre_id で絞らず当月分すべてを読む。分割(本人発案)がある明細は
+  // 主ジャンルが予算設定済みでなくても、分割先が予算設定済みのことがあるため。
   const { data: transactions, error: txError } = await client
     .from('transactions')
-    .select('id, category_id, amount_yen, is_transfer, review_status')
+    .select('id, genre_id, amount_yen, is_transfer, review_status')
     .eq('user_id', userId)
     .gte('occurred_on', monthStart)
     .lt('occurred_on', monthStartJst(1, now));
@@ -240,7 +227,7 @@ async function loadWasteCategoryStatuses(
   const expanded = expandTransactionsWithSplits(
     transactions.map((t) => ({
       id: t.id,
-      categoryId: t.category_id,
+      genreId: t.genre_id,
       amountYen: t.amount_yen,
       isTransfer: t.is_transfer,
       reviewStatus: t.review_status,
@@ -249,26 +236,24 @@ async function loadWasteCategoryStatuses(
   );
 
   const budgetTransactions: BudgetTransaction[] = expanded.map((t) => ({
-    categoryId: t.categoryId,
+    categoryId: t.genreId,
     amountYen: t.amountYen,
     isTransfer: t.isTransfer,
     reviewStatus: t.reviewStatus,
   }));
 
-  return categories.map((c) => {
-    const budget = budgetByCategory.get(c.id);
-    const categoryBudget: CategoryBudget = {
-      categoryId: c.id,
-      code: c.id,
-      budgetYen: budget?.amount_yen ?? c.default_monthly_budget_yen,
-      carryOverYen: budget?.carry_over_yen ?? 0,
+  return genres.map((g) => {
+    const genreBudget: CategoryBudget = {
+      categoryId: g.id,
+      budgetYen: g.budget_yen,
+      carryOverYen: 0,
     };
-    return { id: c.id, name: c.name, status: budgetStatusFor(categoryBudget, budgetTransactions) };
+    return { id: g.id, name: g.name, status: budgetStatusFor(genreBudget, budgetTransactions) };
   });
 }
 
 /**
- * FR-20:浪費カテゴリが月予算の70%に達したら知らせる。
+ * FR-20:予算を設定したジャンルが月予算の70%に達したら知らせる。
  * 70%未満でも、経過日数に対して消化ペースが速ければ先回りで知らせる
  * (P5-3)。判定そのものは domain/alerts.ts の
  * detectWastefulBudget()/isAheadOfPace() が正。
@@ -278,15 +263,15 @@ export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
   userId: string,
   now: Date = new Date(),
 ): Promise<number> {
-  const wasteCategories = await loadWasteCategoryStatuses(client, userId, now);
-  if (wasteCategories.length === 0) return 0;
+  const budgetedGenres = await loadBudgetedGenreStatuses(client, userId, now);
+  if (budgetedGenres.length === 0) return 0;
 
   const monthStart = monthStartJst(0, now);
   const monthKey = monthStart.slice(0, 7);
   const elapsedDays = daysBetween(monthStart, todayJst(now)) + 1;
   const totalDaysInMonth = daysBetween(monthStart, monthStartJst(1, now));
 
-  const candidates = wasteCategories.flatMap(({ id, name, status }) => {
+  const candidates = budgetedGenres.flatMap(({ id, name, status }) => {
     const reached = detectWastefulBudget({ id, name }, status, monthKey);
     if (reached) return [reached];
 
@@ -325,7 +310,7 @@ export async function detectAndRecordMonthlyRecapAlertAsAdmin(
   const [
     { data: payments, error: paymentsError },
     { data: incomes, error: incomesError },
-    wasteCategories,
+    budgetedGenres,
   ] = await Promise.all([
     client
       .from('debt_payments')
@@ -339,7 +324,7 @@ export async function detectAndRecordMonthlyRecapAlertAsAdmin(
       .eq('user_id', userId)
       .gte('received_on', monthStart)
       .lt('received_on', nextMonthStart),
-    loadWasteCategoryStatuses(client, userId, now),
+    loadBudgetedGenreStatuses(client, userId, now),
   ]);
   if (paymentsError) {
     throw new AlertStoreError(`返済実績を取得できませんでした: ${paymentsError.message}`);
@@ -352,7 +337,7 @@ export async function detectAndRecordMonthlyRecapAlertAsAdmin(
     monthKey,
     totalPaidYen: payments.reduce((sum, p) => sum + p.amount_yen, 0),
     totalSideIncomeYen: incomes.reduce((sum, i) => sum + i.amount_yen, 0),
-    wasteCategories: wasteCategories.map(({ name, status }): RecapWasteCategory => ({
+    wasteCategories: budgetedGenres.map(({ name, status }): RecapWasteCategory => ({
       name,
       status,
     })),

@@ -1,5 +1,4 @@
-import type { BudgetTone } from '@/domain/budget';
-import { MILESTONES } from '@/features/home/summary';
+import { MILESTONES, type BudgetTone } from '@/domain/budget';
 
 /**
  * 予算の消化を示すメーター。
@@ -27,7 +26,7 @@ export function Meter({
   if (ratio === null) {
     return (
       <div
-        className="h-1.5 w-full rounded-full"
+        className="h-2 w-full rounded-full"
         style={{ background: 'var(--hairline)' }}
         aria-hidden
       />
@@ -39,7 +38,7 @@ export function Meter({
 
   return (
     <div
-      className="h-1.5 w-full overflow-hidden rounded-full"
+      className="h-2 w-full overflow-hidden rounded-full"
       style={{ background: isOver ? 'var(--over-track)' : 'var(--accent-track)' }}
       role="progressbar"
       aria-valuenow={Math.round(ratio * 100)}
@@ -81,7 +80,7 @@ export function ProgressGauge({
   return (
     <div>
       <div
-        className="relative h-2.5 w-full overflow-hidden rounded-full"
+        className="relative h-3 w-full overflow-hidden rounded-full"
         style={{ background: 'var(--accent-track)' }}
         role="progressbar"
         aria-valuenow={percent}

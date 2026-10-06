@@ -13,15 +13,11 @@ import { buildNewSubscriptionAlert } from '@/domain/alerts';
 import { detectSubscriptions, type DetectedSubscription } from '@/domain/subscriptions';
 import { recordAlertsAsAdmin } from '@/features/alerts/store';
 import { addMonths, todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class SubscriptionStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SubscriptionStoreError';
-  }
-}
+export class SubscriptionStoreError extends AppError {}
 
 /** 検知の対象期間。これより古い明細は「もう続いていない」可能性が高いため見ない。 */
 const LOOKBACK_MONTHS = 12;

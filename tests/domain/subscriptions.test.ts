@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectSubscriptions, type SubscriptionTransaction } from '@/domain/subscriptions';
+import {
+  detectSubscriptions,
+  splitFixedVariable,
+  subscriptionKeyOf,
+  type SubscriptionTransaction,
+} from '@/domain/subscriptions';
 
 function tx(
   overrides: Partial<SubscriptionTransaction> & { occurredOn: string },
@@ -115,5 +120,64 @@ describe('detectSubscriptions', () => {
       tx({ occurredOn: '2026-09-01', merchantName: 'New', amountYen: -700 }),
     ]);
     expect(result.map((r) => r.label)).toEqual(['New', 'Old']);
+  });
+});
+
+describe('subscriptionKeyOf', () => {
+  it('店名・金額が同じなら同じキーになる', () => {
+    expect(subscriptionKeyOf('Netflix', 'NETFLIX.COM', -1980)).toBe(
+      subscriptionKeyOf('Netflix', '違う摘要', -1980),
+    );
+  });
+
+  it('金額が違えば違うキーになる', () => {
+    expect(subscriptionKeyOf('Netflix', '', -1980)).not.toBe(
+      subscriptionKeyOf('Netflix', '', -2480),
+    );
+  });
+
+  it('空白・大文字小文字の違いを無視する', () => {
+    expect(subscriptionKeyOf('Netflix Japan', '', -100)).toBe(
+      subscriptionKeyOf('netflixjapan', '', -100),
+    );
+  });
+
+  it('merchantNameが無ければdescriptionを使う', () => {
+    expect(subscriptionKeyOf(null, 'NETFLIX.COM', -1980)).toBe(
+      subscriptionKeyOf('NETFLIX.COM', '別の摘要', -1980),
+    );
+  });
+});
+
+describe('splitFixedVariable(N4「固定費/変動費」)', () => {
+  it('確認済みキーに一致する明細だけが固定費になる', () => {
+    const netflix = { merchantName: 'Netflix', description: '', amountYen: -1980 };
+    const lawson = { merchantName: 'ローソン', description: '', amountYen: -500 };
+    const confirmedKeys = new Set([subscriptionKeyOf('Netflix', '', -1980)]);
+
+    const result = splitFixedVariable([netflix, lawson], confirmedKeys);
+
+    expect(result.fixedYen).toBe(1980);
+    expect(result.variableYen).toBe(500);
+    expect(result.fixed).toEqual([netflix]);
+    expect(result.variable).toEqual([lawson]);
+  });
+
+  it('確認済みキーが無ければすべて変動費', () => {
+    const result = splitFixedVariable(
+      [{ merchantName: 'A', description: '', amountYen: -100 }],
+      new Set(),
+    );
+    expect(result.fixedYen).toBe(0);
+    expect(result.variableYen).toBe(100);
+  });
+
+  it('収入(正の金額)は対象外', () => {
+    const result = splitFixedVariable(
+      [{ merchantName: '給与', description: '', amountYen: 300000 }],
+      new Set(),
+    );
+    expect(result.fixedYen).toBe(0);
+    expect(result.variableYen).toBe(0);
   });
 });

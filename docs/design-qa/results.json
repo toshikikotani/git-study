@@ -1,0 +1,117 @@
+[
+  {
+    "id": "01-empty",
+    "label": "取引0件",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "02-one",
+    "label": "1件(記録初日)",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "03-sparse",
+    "label": "飛び飛び(交通費)・前月あり・目標なし",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "04-daily-goal",
+    "label": "毎日・目標あり(全期間)・前月あり",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "05-tenk",
+    "label": "1万件",
+    "cumulative": [
+      {
+        "check": "重なり",
+        "detail": "span[delta]「理想より668,325円多い」 が理想の線と重なる"
+      }
+    ],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "06-goal-partial",
+    "label": "月と目標期間が一部だけ重なる",
+    "cumulative": [
+      {
+        "check": "重なり",
+        "detail": "span[delta]「理想より1,260円少ない」 が予測の線と重なる"
+      },
+      {
+        "check": "重なり",
+        "detail": "span[delta]「理想より1,260円少ない」 が累計の線と重なる"
+      }
+    ],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "07-no-goal-no-prev",
+    "label": "目標なし・前月なし",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "08-over",
+    "label": "予定あり・目安超過・予算超過",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "09-maxtext",
+    "label": "文字サイズ最大",
+    "cumulative": [],
+    "daily": [
+      {
+        "check": "重なり",
+        "detail": "span[gutter]「平均799」 と span[gutter]「目安176」"
+      }
+    ],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "10-dark",
+    "label": "ダークモード",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "11-reduced-transparency",
+    "label": "「透明度を下げる」オン",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  },
+  {
+    "id": "12-dark-maxtext-over",
+    "label": "ダーク+文字サイズ最大+超過",
+    "cumulative": [],
+    "daily": [],
+    "nav": [],
+    "errors": []
+  }
+]

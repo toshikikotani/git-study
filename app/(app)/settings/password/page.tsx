@@ -4,9 +4,9 @@ import { PasswordForm } from './password-form';
 /**
  * パスワード変更(ADR-011改定)。
  *
- * ログイン中に自分でパスワードを変更するための画面。初回設定・
- * 失念時の復旧は /login の「新規登録」タブ(actions.ts の
- * `registerPasswordAction`)が担う。
+ * ログイン中に自分でパスワードを変更するための画面。アカウントの作成は
+ * /login の「新規登録」タブ(actions.ts の `signUpAction`)が担う。
+ * パスワードを忘れた場合の復旧は、いまは管理者(Supabase のダッシュボード)が行う。
  */
 export default function PasswordSettingsPage() {
   return (

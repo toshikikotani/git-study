@@ -1,5 +1,6 @@
 import { formatYen } from '@/domain/money';
-import { savingsRateOf } from '@/domain/spending';
+import { formatMonthJa } from '@/lib/date';
+import { compareCurrentMonthToTrailingAverage, savingsRateOf } from '@/domain/spending';
 import type { IncomeExpenseTrend } from '@/features/reports/store';
 
 /**
@@ -59,6 +60,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
 
   const latest = rows[rows.length - 1]!;
   const latestRate = savingsRateOf(latest);
+  const pace = compareCurrentMonthToTrailingAverage(rows, monthKeys[monthKeys.length - 1]!);
 
   return (
     <div
@@ -70,16 +72,38 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
           年間収支サマリー
         </h2>
         <span className="tabular text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {monthLabel(monthKeys[monthKeys.length - 1]!)}の貯蓄率{' '}
+          {formatMonthJa(monthKeys[monthKeys.length - 1]!)}の貯蓄率{' '}
           {latestRate === null ? '—' : `${Math.round(latestRate * 100)}%`}
         </span>
       </div>
+
+      {/* 直近の他の月の平均と比べて多いか少ないか(MoneyForward MEとの機能
+          比較調査、issue #97)。当月分のデータが無い(初回等)場合は出さない。 */}
+      {pace ? (
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          今月の支出は直近の月平均(
+          {formatYen(pace.trailingAverageExpenseYen, { sign: 'never' })})より
+          {pace.differenceYen === 0 ? (
+            '同じくらいです'
+          ) : (
+            <>
+              <span
+                className="tabular font-semibold"
+                style={{ color: pace.differenceYen > 0 ? 'var(--over)' : 'var(--income)' }}
+              >
+                {formatYen(Math.abs(pace.differenceYen), { sign: 'never' })}
+              </span>
+              {pace.differenceYen > 0 ? '多いです' : '少ないです'}
+            </>
+          )}
+        </p>
+      ) : null}
 
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mt-3 w-full"
         role="img"
-        aria-label={`${monthLabel(monthKeys[monthKeys.length - 1]!)}時点:収入${formatYen(latest.incomeYen)}、支出${formatYen(latest.expenseYen)}`}
+        aria-label={`${formatMonthJa(monthKeys[monthKeys.length - 1]!)}時点:収入${formatYen(latest.incomeYen)}、支出${formatYen(latest.expenseYen)}、予定${formatYen(latest.scheduledYen)}`}
       >
         <path
           d={linePath(rows.map((r) => r.incomeYen))}
@@ -101,10 +125,10 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
           return (
             <g key={row.monthKey}>
               <circle cx={incomePoint.x} cy={incomePoint.y} r={3} fill="var(--income)">
-                <title>{`${monthLabel(row.monthKey)}: 収入 ${formatYen(row.incomeYen)}`}</title>
+                <title>{`${formatMonthJa(row.monthKey)}: 収入 ${formatYen(row.incomeYen)}`}</title>
               </circle>
               <circle cx={expensePoint.x} cy={expensePoint.y} r={3} fill="var(--over)">
-                <title>{`${monthLabel(row.monthKey)}: 支出 ${formatYen(row.expenseYen)}`}</title>
+                <title>{`${formatMonthJa(row.monthKey)}: 支出 ${formatYen(row.expenseYen)}、予定 ${formatYen(row.scheduledYen)}`}</title>
               </circle>
             </g>
           );
@@ -114,6 +138,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <Legend color="var(--income)" label={`収入 ${formatYen(latest.incomeYen)}`} />
         <Legend color="var(--over)" label={`支出 ${formatYen(latest.expenseYen)}`} />
+        <Legend color="var(--ink-muted)" label={`予定 ${formatYen(latest.scheduledYen)}`} />
       </div>
 
       <IncomeExpenseTable trend={trend} />
@@ -123,7 +148,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
 
 function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-2">
       <span className="size-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
       <span className="tabular" style={{ color: 'var(--ink-secondary)' }}>
         {label}
@@ -150,6 +175,9 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
               支出
             </th>
             <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+              予定
+            </th>
+            <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
               貯蓄率
             </th>
           </tr>
@@ -160,13 +188,16 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
             return (
               <tr key={row.monthKey} style={{ borderBottom: '1px solid var(--hairline)' }}>
                 <td className="p-2" style={{ color: 'var(--ink)' }}>
-                  {monthLabel(row.monthKey)}
+                  {formatMonthJa(row.monthKey)}
                 </td>
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {formatYen(row.incomeYen)}
                 </td>
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {formatYen(row.expenseYen)}
+                </td>
+                <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
+                  {formatYen(row.scheduledYen)}
                 </td>
                 <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                   {rate === null ? '—' : `${Math.round(rate * 100)}%`}
@@ -178,8 +209,4 @@ function IncomeExpenseTable({ trend }: { trend: IncomeExpenseTrend }) {
       </table>
     </div>
   );
-}
-
-function monthLabel(monthKey: string): string {
-  return `${Number(monthKey.slice(5, 7))}月`;
 }

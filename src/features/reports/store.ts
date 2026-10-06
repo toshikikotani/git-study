@@ -7,6 +7,7 @@
  */
 
 import type { AccumulationTransaction } from '@/domain/accumulation';
+import { summarizeBalanceByPurpose, type PurposeBalance } from '@/domain/account';
 import {
   rankMerchantsBySpend,
   summarizeMonthlyIncomeExpense,
@@ -17,15 +18,11 @@ import {
 } from '@/domain/spending';
 import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
-import { monthStartJst } from '@/lib/date';
+import { monthStartJst, todayJst } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-export class ReportStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ReportStoreError';
-  }
-}
+export class ReportStoreError extends AppError {}
 
 const MONTHS_BACK = 6;
 const INCOME_EXPENSE_MONTHS_BACK = 12;
@@ -35,7 +32,7 @@ const MERCHANT_RANKING_LIMIT = 10;
 export type CategorySpendingTrend = {
   /** 古い→新しいの順、'YYYY-MM' が6つ。 */
   monthKeys: readonly string[];
-  /** 期間中に一度でも支出があったカテゴリのみ(全月0円の枠は並べても情報が無い)。 */
+  /** 期間中に一度でも支出があったジャンルのみ(全月0円の枠は並べても情報が無い)。 */
   categories: readonly { id: string; name: string }[];
   rows: readonly { monthKey: string; categoryId: string; categoryName: string; spentYen: number }[];
 };
@@ -50,25 +47,21 @@ export async function loadCategorySpendingTrend(
   const rangeEnd = monthStartJst(1, now);
 
   const supabase = await createClient();
-  const [{ data: categories, error: categoriesError }, { data: rows, error: rowsError }] =
+  const [{ data: genres, error: genresError }, { data: rows, error: rowsError }] =
     await Promise.all([
-      supabase
-        .from('categories')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true }),
+      supabase.from('genres').select('id, name').order('sort_order', { ascending: true }),
       supabase
         .from('transactions')
-        .select('id, category_id, amount_yen, is_transfer, review_status, occurred_on')
+        .select('id, genre_id, amount_yen, is_transfer, review_status, occurred_on')
         .gte('occurred_on', rangeStart)
         .lt('occurred_on', rangeEnd),
     ]);
-  if (categoriesError) {
-    throw new ReportStoreError(`カテゴリを取得できませんでした: ${categoriesError.message}`);
+  if (genresError) {
+    throw new ReportStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
   }
   if (rowsError) throw new ReportStoreError(`明細を取得できませんでした: ${rowsError.message}`);
 
-  // 分割(本人発案)がある明細は、集計の前に分割先のカテゴリ・金額へ展開する。
+  // 分割(本人発案)がある明細は、集計の前に分割先のジャンル・金額へ展開する。
   const splitsByTransactionId = await listSplitsForTransactionIds(
     supabase,
     rows.map((r) => r.id),
@@ -76,7 +69,7 @@ export async function loadCategorySpendingTrend(
   const expandedRows = expandTransactionsWithSplits(
     rows.map((row) => ({
       id: row.id,
-      categoryId: row.category_id,
+      genreId: row.genre_id,
       amountYen: row.amount_yen,
       isTransfer: row.is_transfer,
       reviewStatus: row.review_status,
@@ -86,14 +79,14 @@ export async function loadCategorySpendingTrend(
   );
 
   const transactions: SpendingTransaction[] = expandedRows.map((row) => ({
-    categoryId: row.categoryId,
+    categoryId: row.genreId,
     amountYen: row.amountYen,
     isTransfer: row.isTransfer,
     reviewStatus: row.reviewStatus,
     occurredOn: row.occurredOn,
   }));
 
-  const allRows = summarizeMonthlySpendByCategory(categories, transactions, monthKeys);
+  const allRows = summarizeMonthlySpendByCategory(genres, transactions, monthKeys);
 
   const totalByCategory = new Map<string, number>();
   for (const row of allRows) {
@@ -105,7 +98,7 @@ export async function loadCategorySpendingTrend(
 
   return {
     monthKeys,
-    categories: categories
+    categories: genres
       .filter((c) => activeCategoryIds.has(c.id))
       .sort((a, b) => (totalByCategory.get(b.id) ?? 0) - (totalByCategory.get(a.id) ?? 0)),
     rows: allRows.filter((row) => activeCategoryIds.has(row.categoryId)),
@@ -135,20 +128,20 @@ export async function loadIncomeExpenseTrend(now: Date = new Date()): Promise<In
   const supabase = await createClient();
   const { data: rows, error } = await supabase
     .from('transactions')
-    .select('category_id, amount_yen, is_transfer, review_status, occurred_on')
+    .select('genre_id, amount_yen, is_transfer, review_status, occurred_on')
     .gte('occurred_on', rangeStart)
     .lt('occurred_on', rangeEnd);
   if (error) throw new ReportStoreError(`明細を取得できませんでした: ${error.message}`);
 
   const transactions: SpendingTransaction[] = rows.map((row) => ({
-    categoryId: row.category_id,
+    categoryId: row.genre_id,
     amountYen: row.amount_yen,
     isTransfer: row.is_transfer,
     reviewStatus: row.review_status,
     occurredOn: row.occurred_on,
   }));
 
-  return { monthKeys, rows: summarizeMonthlyIncomeExpense(transactions, monthKeys) };
+  return { monthKeys, rows: summarizeMonthlyIncomeExpense(transactions, monthKeys, todayJst()) };
 }
 
 export type MerchantRanking = {
@@ -173,14 +166,14 @@ export async function loadMerchantSpendingRanking(
   const { data: rows, error } = await supabase
     .from('transactions')
     .select(
-      'category_id, amount_yen, is_transfer, review_status, occurred_on, merchant_name, description',
+      'genre_id, amount_yen, is_transfer, review_status, occurred_on, merchant_name, description',
     )
     .gte('occurred_on', rangeStart)
     .lt('occurred_on', rangeEnd);
   if (error) throw new ReportStoreError(`明細を取得できませんでした: ${error.message}`);
 
   const transactions: AccumulationTransaction[] = rows.map((row) => ({
-    categoryId: row.category_id,
+    categoryId: row.genre_id,
     amountYen: row.amount_yen,
     isTransfer: row.is_transfer,
     reviewStatus: row.review_status,
@@ -192,4 +185,25 @@ export async function loadMerchantSpendingRanking(
     monthsBack: MERCHANT_RANKING_MONTHS_BACK,
     merchants: rankMerchantsBySpend(transactions, MERCHANT_RANKING_LIMIT),
   };
+}
+
+/**
+ * 有効な口座の残高を用途(accounts.purpose)ごとに合算する(MoneyForward ME
+ * との機能比較調査、issue #98)。
+ *
+ * 資産推移(net-worth-chart.tsx、debts/investments のスナップショット)とは
+ * 別の切り口——あちらは月末の推移、こちらは「今この瞬間、用途別にいくら
+ * あるか」の内訳。既存のグラフには影響を与えない、追加の表示にとどめる。
+ */
+export async function loadAccountBalanceByPurpose(): Promise<readonly PurposeBalance[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('purpose, current_balance_yen')
+    .eq('is_active', true);
+  if (error) throw new ReportStoreError(`口座を取得できませんでした: ${error.message}`);
+
+  return summarizeBalanceByPurpose(
+    data.map((row) => ({ purpose: row.purpose, currentBalanceYen: row.current_balance_yen })),
+  );
 }

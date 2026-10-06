@@ -69,6 +69,11 @@ jobs:
       - name: Verify migrations match docs/schema.sql
         run: ./scripts/verify-migrations.sh
 
+      # 本人が SQL Editor へ貼る supabase/apply-pending.sql は migrations/ の写し。
+      # 写しは放っておけばずれるため、同じスキーマを作ることを毎回確かめる。
+      - name: Verify apply-pending.sql matches the pending migrations
+        run: ./scripts/verify-apply-pending.sh
+
       # SQL 版と TypeScript 版の完済シミュレーションが乖離していないかを見る。
       # fixture に差分が出るなら、どちらかの実装が変わったということ。
       - uses: actions/setup-node@v5

@@ -12,29 +12,14 @@ import {
   assertWorkMinutes,
   SideHustleError,
 } from '@/domain/side-hustle';
-import { MoneyError, parseYen } from '@/domain/money';
-import {
-  createIncome,
-  createProject,
-  createWorkLog,
-  SideHustleStoreError,
-} from '@/features/side-hustle/store';
+import { parseYen } from '@/domain/money';
+import { createIncome, createProject, createWorkLog } from '@/features/side-hustle/store';
 import { assertDateOnly } from '@/lib/date';
+import { describeUserError } from '@/lib/errors';
 
 export type SideHustleFormState = {
   error: string | null;
 };
-
-function describeError(error: unknown): string {
-  if (
-    error instanceof SideHustleError ||
-    error instanceof SideHustleStoreError ||
-    error instanceof MoneyError
-  ) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
-}
 
 export async function createProjectAction(
   _prev: SideHustleFormState,
@@ -52,7 +37,7 @@ export async function createProjectAction(
       note: null,
     });
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/side-hustle');
   return { error: null };
@@ -76,7 +61,7 @@ export async function createWorkLogAction(
       summary: summaryRaw === '' ? null : summaryRaw,
     });
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/side-hustle');
   return { error: null };
@@ -99,7 +84,7 @@ export async function createIncomeAction(
       note: noteRaw === '' ? null : noteRaw,
     });
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/side-hustle');
   return { error: null };

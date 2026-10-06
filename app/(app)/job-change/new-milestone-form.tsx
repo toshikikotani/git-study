@@ -70,8 +70,8 @@ export function NewMilestoneForm({ defaultPhase }: { defaultPhase: MilestonePhas
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-50"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        className="w-full rounded-full py-3 text-sm font-semibold disabled:opacity-50"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
         {pending ? '追加しています…' : '追加する'}
       </button>

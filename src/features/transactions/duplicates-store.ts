@@ -11,17 +11,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { findDuplicateCandidates, type MatchableTransaction } from '@/domain/duplicate-match';
 import { createReceiptImageSignedUrl } from '@/features/import/receipt-storage';
 import { addDays, todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
 import type { TransactionSource } from './types';
 
-export class DuplicateStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DuplicateStoreError';
-  }
-}
+export class DuplicateStoreError extends AppError {}
 
 /**
  * 遡る日数。取り込みは月次(CSV)と日次(メール・レシート)が混ざるため、
@@ -68,7 +64,7 @@ export async function listDuplicateCandidates(
     supabase
       .from('transactions')
       .select(
-        'id, account_id, occurred_on, amount_yen, merchant_name, description, source, is_transfer, review_status, category_id, import_batch_id',
+        'id, account_id, occurred_on, amount_yen, merchant_name, description, source, is_transfer, review_status, genre_id, import_batch_id',
       )
       .gte('occurred_on', rangeStart),
     supabase.from('accounts').select('id, name'),
@@ -84,7 +80,7 @@ export async function listDuplicateCandidates(
     accountId: row.account_id,
     occurredOn: row.occurred_on,
     amountYen: row.amount_yen,
-    categoryId: row.category_id,
+    categoryId: row.genre_id,
     isTransfer: row.is_transfer,
     reviewStatus: row.review_status,
     source: row.source,

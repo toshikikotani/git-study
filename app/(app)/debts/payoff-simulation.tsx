@@ -75,16 +75,16 @@ export function PayoffSimulation({
         最低返済のみを続けた場合と比べて、どれだけ早く・安く終えられるかを見る
       </p>
 
-      <div className="mt-4 flex gap-1.5">
+      <div className="mt-4 flex gap-2">
         {(Object.keys(STRATEGY_LABELS) as ToggleableStrategy[]).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setStrategy(s)}
-            className="rounded-full px-3 py-1.5 text-xs font-medium"
+            className="rounded-full px-3 py-2 text-xs font-medium"
             style={
               strategy === s
-                ? { background: 'var(--accent)', color: '#fff' }
+                ? { background: 'var(--accent)', color: 'var(--on-accent)' }
                 : { background: 'var(--plane)', color: 'var(--ink-secondary)' }
             }
           >
@@ -112,10 +112,7 @@ export function PayoffSimulation({
           className="mt-2 w-full accent-[var(--accent)]"
           aria-label="毎月の返済額"
         />
-        <div
-          className="mt-1 flex justify-between text-[11px]"
-          style={{ color: 'var(--ink-muted)' }}
-        >
+        <div className="mt-1 flex justify-between text-xs" style={{ color: 'var(--ink-muted)' }}>
           <span>{formatYen(minYen, { sign: 'never' })}</span>
           <span>{formatYen(maxYen, { sign: 'never' })}</span>
         </div>
@@ -174,7 +171,7 @@ function ComparisonTable({
           <p className="tabular mt-1 font-semibold" style={{ color: 'var(--ink)' }}>
             {baselineMonths}ヶ月
           </p>
-          <p className="tabular mt-0.5" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="tabular mt-1" style={{ color: 'var(--ink-secondary)' }}>
             利息 {formatYen(baselineInterestYen, { sign: 'never' })}
           </p>
         </div>
@@ -183,7 +180,7 @@ function ComparisonTable({
           <p className="tabular mt-1 font-semibold" style={{ color: 'var(--ink)' }}>
             {proposedMonths}ヶ月
           </p>
-          <p className="tabular mt-0.5" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="tabular mt-1" style={{ color: 'var(--ink-secondary)' }}>
             利息 {formatYen(proposedInterestYen, { sign: 'never' })}
           </p>
         </div>

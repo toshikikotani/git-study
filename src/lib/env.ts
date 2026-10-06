@@ -147,9 +147,13 @@ export function getCronSecret(): string {
   return parseOrThrow(cronSecretSchema, process.env.CRON_SECRET, 'CRON_SECRET');
 }
 
-/** 明細分類・朝配信の生成(ADR-010)。 */
-export function getAnthropicApiKey(): string {
-  return parseOrThrow(anthropicApiKeySchema, process.env.ANTHROPIC_API_KEY, 'ANTHROPIC_API_KEY');
+/**
+ * 明細分類・レシート読取・相談・診断・レポートの生成(ADR-010)。
+ * 未設定でもアプリは動く(AI機能だけ無効)ため、投げずに null を返す。
+ */
+export function readAnthropicApiKey(): string | null {
+  const value = process.env.ANTHROPIC_API_KEY;
+  return value === undefined || value === '' ? null : value;
 }
 
 /** 通知・朝配信の送信先(ADR-002)。 */
@@ -203,6 +207,36 @@ export function getLineEnv(): LineEnv | null {
     lineSchema,
     { LINE_CHANNEL_ACCESS_TOKEN: token, LINE_USER_ID: userId },
     'LINE 連携の設定',
+  );
+}
+
+/**
+ * LINE Webhook(レシート画像の受信、本人発案)の署名検証に使う。
+ * `getLineEnv()`(送信専用の既存設定)とは別の任意項目にする——既に
+ * LINE_CHANNEL_ACCESS_TOKEN/LINE_USER_ID だけを設定済みの本人の環境を、
+ * この列を必須化することで壊さないため。
+ */
+export function getLineChannelSecret(): string | null {
+  const value = process.env.LINE_CHANNEL_SECRET;
+  if (!value) return null;
+  return parseOrThrow(
+    z.string().min(1, 'LINE_CHANNEL_SECRET が空です'),
+    value,
+    'LINE_CHANNEL_SECRET',
+  );
+}
+
+/**
+ * LINEで送られたレシート画像の取り込み先口座(GMAIL_IMPORT_ACCOUNT_ID と同じ
+ * 考え方)。
+ */
+export function getLineReceiptAccountId(): string | null {
+  const value = process.env.LINE_RECEIPT_ACCOUNT_ID;
+  if (!value) return null;
+  return parseOrThrow(
+    z.uuid({ error: 'accounts.id の形式(uuid)ではありません' }),
+    value,
+    'LINE_RECEIPT_ACCOUNT_ID',
   );
 }
 
@@ -278,3 +312,26 @@ export const schemas = {
   lineSchema,
   googleSchema,
 };
+
+/**
+ * 新規登録を受け付けるか。既定は受け付ける。`REGISTRATION_OPEN=false` で止められる
+ * (荒らされたときの非常口。ログインは影響を受けない)。
+ */
+export function isRegistrationOpen(): boolean {
+  return process.env.REGISTRATION_OPEN?.trim().toLowerCase() !== 'false';
+}
+
+/** 登録できるユーザー数の上限(荒らし・使いすぎの歯止め)。既定は 200。 */
+export function getRegistrationMaxUsers(): number {
+  const n = Number(process.env.REGISTRATION_MAX_USERS);
+  return Number.isInteger(n) && n > 0 ? n : 200;
+}
+
+/**
+ * 本人(オーナー)のメールアドレス。cron・LINE・Gmail・Google のように、環境変数で1人分の
+ * 資格情報を持つ連携は、このユーザーのものとして動く。未設定なら最初に作ったユーザー。
+ */
+export function getOwnerEmail(): string | null {
+  const v = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  return v ? v : null;
+}

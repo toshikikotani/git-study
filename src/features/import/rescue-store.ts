@@ -11,15 +11,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class RescuedEmailStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RescuedEmailStoreError';
-  }
-}
+export class RescuedEmailStoreError extends AppError {}
 
 export type RescuedEmailSource = Database['public']['Enums']['transaction_source'];
 

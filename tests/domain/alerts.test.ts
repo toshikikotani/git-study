@@ -5,14 +5,12 @@ import {
   buildJobFailureAlert,
   buildMonthlyRecapAlert,
   buildNewSubscriptionAlert,
-  buildRuleMisfireAlert,
   detectInactivity,
   detectPaymentDueTomorrow,
   detectRiskyTransaction,
   detectWastefulBudget,
   isAheadOfPace,
   isLastDayOfMonth,
-  isMisfiringRule,
 } from '@/domain/alerts';
 import type { BudgetStatus } from '@/domain/budget';
 import type { DetectedSubscription } from '@/domain/subscriptions';
@@ -143,8 +141,7 @@ describe('detectRiskyTransaction(FR-21)', () => {
 
 function status(overrides: Partial<BudgetStatus>): BudgetStatus {
   return {
-    categoryId: 'c1',
-    code: 'waste',
+    categoryId: 'g1',
     budgetYen: 10000,
     carryOverYen: 0,
     spentYen: 0,
@@ -213,44 +210,6 @@ describe('buildJobFailureAlert(NFR-06)', () => {
   it('同じ日の別ジョブは dedup_key が異なる', () => {
     const a = buildJobFailureAlert('detect-alerts', 'x', '2026-09-12');
     const b = buildJobFailureAlert('morning-brief', 'x', '2026-09-12');
-    expect(a.dedupKey).not.toBe(b.dedupKey);
-  });
-});
-
-describe('isMisfiringRule(P5-2)', () => {
-  it('母数が最低件数(既定3件)に満たなければ判定しない', () => {
-    expect(isMisfiringRule({ hitCount: 2, correctedCount: 2 })).toBe(false);
-  });
-
-  it('修正率が閾値(既定50%)以上なら誤爆と判定する', () => {
-    expect(isMisfiringRule({ hitCount: 4, correctedCount: 2 })).toBe(true);
-  });
-
-  it('修正率が閾値未満なら誤爆と判定しない', () => {
-    expect(isMisfiringRule({ hitCount: 10, correctedCount: 2 })).toBe(false);
-  });
-
-  it('閾値・最低件数はオプションで上書きできる', () => {
-    expect(isMisfiringRule({ hitCount: 5, correctedCount: 1 }, { minHits: 5 })).toBe(false);
-    expect(
-      isMisfiringRule({ hitCount: 5, correctedCount: 1 }, { correctionRateThreshold: 0.2 }),
-    ).toBe(true);
-  });
-});
-
-describe('buildRuleMisfireAlert(P5-2)', () => {
-  it('ルール名・件数から候補を組み立てる', () => {
-    const alert = buildRuleMisfireAlert('r1', 'ローソンを浪費に分類', 3, 5);
-    expect(alert.kind).toBe('other');
-    expect(alert.severity).toBe('warn');
-    expect(alert.title).toBe('ルール「ローソンを浪費に分類」を無効化しました');
-    expect(alert.body).toMatch(/5件中3件/);
-    expect(alert.dedupKey).toBe('rule_misfire:r1');
-  });
-
-  it('ルールごとに dedup_key が異なる', () => {
-    const a = buildRuleMisfireAlert('r1', 'x', 3, 5);
-    const b = buildRuleMisfireAlert('r2', 'x', 3, 5);
     expect(a.dedupKey).not.toBe(b.dedupKey);
   });
 });

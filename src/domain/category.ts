@@ -2,12 +2,9 @@
  * カテゴリの入力値検証と、統廃合(merged_into_id)の解決(FR-13, M2-6)。
  */
 
-export class CategoryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CategoryError';
-  }
-}
+import { AppError } from '@/lib/errors';
+
+export class CategoryError extends AppError {}
 
 /** カテゴリ名。空文字・空白のみは拒否する(ADR-016、本人がいつでも改名できる)。 */
 export function assertCategoryName(value: string): string {

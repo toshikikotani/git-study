@@ -11,6 +11,13 @@
  * 頼らない)。
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import { entryStatus } from '@/domain/ledger';
+import { resolveItemGenres } from '@/features/genre/item-genres';
+import { todayJst } from '@/lib/date';
+import { isMissingColumnError } from '@/lib/supabase/errors';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -29,18 +36,13 @@ import type {
   TransactionSource,
 } from './types';
 
-export class TransactionStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TransactionStoreError';
-  }
-}
+export class TransactionStoreError extends AppError {}
 
 type TransactionRow = Database['public']['Tables']['transactions']['Row'];
 
 function fromRow(
   row: TransactionRow,
-  categoryNameById: ReadonlyMap<string, string>,
+  genreNameById: ReadonlyMap<string, string>,
 ): StoredTransaction {
   return {
     id: row.id,
@@ -50,39 +52,44 @@ function fromRow(
     merchantName: row.merchant_name,
     amountYen: row.amount_yen,
     paymentMethod: row.payment_method,
-    categoryId: row.category_id,
-    categoryName: row.category_id ? (categoryNameById.get(row.category_id) ?? null) : null,
-    matchedRuleId: row.matched_rule_id,
+    genreId: row.genre_id,
+    genreName: row.genre_id ? (genreNameById.get(row.genre_id) ?? null) : null,
     classifiedBy: row.classified_by,
     confidence: row.confidence,
     reviewStatus: row.review_status,
+    mustPay: row.must_pay,
     source: row.source,
     fingerprint: row.fingerprint,
     batchId: row.import_batch_id,
     sourceRef: row.source_ref,
+    memo: row.note,
   };
 }
 
 /** 明細の一覧。新しい日付が先頭。 */
 export async function listTransactions(): Promise<StoredTransaction[]> {
   const supabase = await createClient();
-  const [{ data: rows, error: rowsError }, { data: categories, error: categoriesError }] =
+  const [{ data: rows, error: rowsError }, { data: genres, error: genresError }] =
     await Promise.all([
       supabase
         .from('transactions')
         .select('*')
         .order('occurred_on', { ascending: false })
         .order('description', { ascending: true }),
-      supabase.from('categories').select('id, name'),
+      supabase.from('genres').select('id, name'),
     ]);
   if (rowsError)
     throw new TransactionStoreError(`明細を取得できませんでした: ${rowsError.message}`);
-  if (categoriesError) {
-    throw new TransactionStoreError(`カテゴリを取得できませんでした: ${categoriesError.message}`);
+  if (genresError) {
+    throw new TransactionStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
   }
 
-  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
-  return rows.map((row) => fromRow(row, categoryNameById));
+  const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
+  const itemGenreByTransactionId = await resolveItemGenres(rows);
+  return rows.map((row) => {
+    const inherited = itemGenreByTransactionId.get(row.id);
+    return fromRow(inherited ? { ...row, genre_id: inherited } : row, genreNameById);
+  });
 }
 
 export async function listImportBatches(): Promise<ImportBatchSummary[]> {
@@ -129,9 +136,30 @@ export async function importTransactions(
   if (authError || !auth.user) {
     throw new TransactionStoreError('ログイン状態を確認できませんでした');
   }
+  return importTransactionsAsAdmin(supabase, auth.user.id, transactions, meta);
+}
 
+/**
+ * 本人のセッション(cookie)が無い経路(LINE の受信 Webhook、Gmail 自動取り込み
+ * 相当)向け。管理クライアント + 明示的な user_id で書く
+ * (`app/api/cron/keepalive/route.ts` と同じ考え方)。ロジック本体はここに
+ * 集約し、`importTransactions()` は本人のセッションから user_id を取り出す
+ * だけの薄いラッパーにする(2箇所に同じ取り込みロジックを持たない)。
+ */
+export async function importTransactionsAsAdmin(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  transactions: readonly StoredTransaction[],
+  meta: {
+    fileName: string | null;
+    source: TransactionSource;
+    accountId: string;
+    failedCount: number;
+    receiptImagePath?: string | null;
+  },
+): Promise<ImportResult> {
   const batchBase = {
-    user_id: auth.user.id,
+    user_id: userId,
     source: meta.source,
     account_id: meta.accountId,
     file_name: meta.fileName,
@@ -180,34 +208,50 @@ export async function importTransactions(
     return { importedCount: 0, duplicateCount: 0, insertedTransactions: [] };
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('transactions')
-    .upsert(
-      transactions.map((t) => ({
-        user_id: auth.user.id,
-        account_id: meta.accountId,
-        occurred_on: t.occurredOn,
-        description: t.description,
-        merchant_name: t.merchantName,
-        amount_yen: t.amountYen,
-        payment_method: t.paymentMethod,
-        category_id: t.categoryId,
-        matched_rule_id: t.matchedRuleId,
-        classified_by: t.classifiedBy,
-        confidence: t.confidence,
-        review_status: t.reviewStatus,
-        source: meta.source,
-        import_batch_id: batch.id,
-        fingerprint: t.fingerprint,
-        source_ref: t.sourceRef,
-      })),
-      { onConflict: 'user_id,fingerprint', ignoreDuplicates: true },
-    )
-    // fingerprint はトリガが上書きする値なので、渡した行との対応付けには使えない
-    // (types.ts の fingerprintOf() のコメント参照)。source_ref はトリガが
-    // 触らずそのまま入るため、こちらで対応付ける(レシート商品行の自動分割、
-    // 本人発案)。
-    .select('id, source_ref');
+  const rows = transactions.map((t) => ({
+    user_id: userId,
+    account_id: meta.accountId,
+    occurred_on: t.occurredOn,
+    description: t.description,
+    merchant_name: t.merchantName,
+    amount_yen: t.amountYen,
+    payment_method: t.paymentMethod,
+    genre_id: t.genreId,
+    classified_by: t.classifiedBy,
+    confidence: t.confidence,
+    review_status: t.reviewStatus,
+    must_pay: t.mustPay,
+    source: meta.source,
+    import_batch_id: batch.id,
+    fingerprint: t.fingerprint,
+    source_ref: t.sourceRef,
+    note: t.memo ?? null,
+  }));
+  const insertRows = (values: readonly Record<string, unknown>[]) =>
+    supabase
+      .from('transactions')
+      .upsert(values as typeof rows, { onConflict: 'user_id,fingerprint', ignoreDuplicates: true })
+      // fingerprint はトリガが上書きする値なので、渡した行との対応付けには使えない
+      // (types.ts の fingerprintOf() のコメント参照)。source_ref はトリガが
+      // 触らずそのまま入るため、こちらで対応付ける(レシート商品行の自動分割、
+      // 本人発案)。
+      .select('id, source_ref');
+
+  // status / kind は本番未適用の間は列が無い(supabase/apply-pending.sql)。
+  // 列付きで失敗したら外して入れ直し、取り込み自体は止めない。
+  const today = todayJst();
+  let { data: inserted, error: insertError } = await insertRows(
+    rows.map((row, i) => ({
+      ...row,
+      status: entryStatus(row.occurred_on, today),
+      kind: transactions[i]!.kind ?? 'normal',
+      branch_name: transactions[i]!.branchName ?? null,
+      reconcile_diff_yen: transactions[i]!.reconcileDiffYen ?? null,
+    })),
+  );
+  if (insertError && isMissingColumnError(insertError)) {
+    ({ data: inserted, error: insertError } = await insertRows(rows));
+  }
 
   if (insertError) {
     await supabase
@@ -221,7 +265,7 @@ export async function importTransactions(
     throw new TransactionStoreError(`明細を保存できませんでした: ${insertError.message}`);
   }
 
-  const importedCount = inserted.length;
+  const importedCount = inserted?.length ?? 0;
   const duplicateCount = transactions.length - importedCount;
 
   await supabase
@@ -237,27 +281,81 @@ export async function importTransactions(
   return {
     importedCount,
     duplicateCount,
-    insertedTransactions: inserted.map((row) => ({ id: row.id, sourceRef: row.source_ref })),
+    insertedTransactions: (inserted ?? []).map((row) => ({
+      id: row.id,
+      sourceRef: row.source_ref,
+    })),
   };
 }
 
 /**
- * 確認待ちキューでの1件修正(M2-5)。分類の確定は常にこの形(本人が選んだ
- * categoryId、classified_by='manual'、review_status='corrected')なので、
- * 汎用の補正オブジェクトではなく categoryId だけを受け取る。
+ * 本人がジャンルを直接直す(M2-5、ADR-057)。分類の確定は常にこの形
+ * (本人が選んだ genreId、classified_by='manual'、review_status='corrected')
+ * なので、genreId は必須のまま受け取る。
+ *
+ * 金額・日付は本人発案(「今金額と日付が一切編集できない」、ADR-048)で
+ * 追加した任意の補正(`patch`)——/transactions の明細行(split-editor.tsx
+ * の単純なジャンル変更フォーム)だけが渡す。家計簿カレンダー
+ * (calendar.tsx)はジャンルのみを直す入口のため渡さない。amountYen は
+ * 呼び出し側が符号(ADR-008、支出=負・収入=正)を掛けた最終値を渡す——
+ * 本人には常に正の大きさだけ入力させ、元の収入/支出の種別は変えさせない
+ * 設計(split-editor.tsx のコメント参照)。
  */
-export async function updateTransaction(id: string, categoryId: string): Promise<void> {
+export async function updateTransaction(
+  id: string,
+  genreId: string,
+  patch?: { amountYen: number; occurredOn: string; description?: string },
+): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase
     .from('transactions')
     .update({
-      category_id: categoryId,
+      genre_id: genreId,
       classified_by: 'manual',
       review_status: 'corrected',
       reviewed_at: new Date().toISOString(),
+      ...(patch
+        ? {
+            amount_yen: patch.amountYen,
+            occurred_on: patch.occurredOn,
+            ...(patch.description
+              ? { description: patch.description, merchant_name: patch.description }
+              : {}),
+          }
+        : {}),
     })
     .eq('id', id);
   if (error) throw new TransactionStoreError(`明細を更新できませんでした: ${error.message}`);
+}
+
+/**
+ * 本人発案「絶対払わざるを得ないもの」のラベルを付け外しする(ADR-057)。
+ * ジャンルとは独立した軸のため、分類関連の列には一切触れない
+ * (updateTransactionMemo() と同じ考え方)。
+ */
+export async function setTransactionMustPay(id: string, mustPay: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from('transactions').update({ must_pay: mustPay }).eq('id', id);
+  if (error) throw new TransactionStoreError(`ラベルを保存できませんでした: ${error.message}`);
+}
+
+/**
+ * 明細に自由記述のメモを付ける(本人発案、issue #95)。カテゴリ変更とは
+ * 独立した操作のため専用の関数にした——`classified_by`/`review_status`等の
+ * 分類関連の列には一切触れない。空文字・空白のみは null として保存する
+ * (「メモを消す」操作を、値の有無だけで表現する)。
+ *
+ * DB の `note` 列はスキーマの初期定義(20260908000300_transactions.sql)に
+ * 元から存在していたが、アプリのどこからも読み書きされていなかった。
+ */
+export async function updateTransactionMemo(id: string, memo: string): Promise<void> {
+  const trimmed = memo.trim();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('transactions')
+    .update({ note: trimmed === '' ? null : trimmed })
+    .eq('id', id);
+  if (error) throw new TransactionStoreError(`メモを保存できませんでした: ${error.message}`);
 }
 
 /**

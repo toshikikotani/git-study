@@ -5,6 +5,14 @@ import {
   SUPPORTED_RECEIPT_MEDIA_TYPES,
   type ReceiptMediaType,
 } from '@/features/import/receipt-ai';
+import { listGenres } from '@/features/genre/store';
+import {
+  classifyReceiptPipeline,
+  type PipelineClassification,
+} from '@/features/genre/receipt-classify';
+import { loadClassificationMemory } from '@/features/genre/memory-store';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 
 /**
  * レシート画像を解析する(新機能、ADR-021)。
@@ -21,6 +29,8 @@ import {
  */
 
 export const runtime = 'nodejs';
+// 読み取り(Sonnet)に続けてジャンル分類(Haiku)も同じ呼び出しで行うため。
+export const maxDuration = 60;
 
 /**
  * base64 文字列の上限(約 4.5MB の画像相当)。スマートフォンの写真を
@@ -77,11 +87,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return NextResponse.json({
       transactions: [],
-      warnings: ['AI による読み取りは設定されていません(ANTHROPIC_API_KEY が未設定)。'],
+      warnings: [apiKeyMissingMessage('AI による読み取り')],
     });
   }
 
@@ -97,5 +107,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     mediaType: payload.mediaType,
   });
 
-  return NextResponse.json({ transactions: result.transactions, warnings: result.warnings });
+  // ジャンル分類:利用者のルール → 個人の履歴 → 品目辞書 → AI(決まらなかったものだけ)。
+  // 失敗しても読み取り結果は返す(分類は保存前に本人が選び直せる補助のため)。
+  let classifications: PipelineClassification[] = [];
+  let parentGenreIds: Record<number, string> = {};
+  const warnings = [...result.warnings];
+  if (result.transactions.length > 0) {
+    try {
+      const [genres, memory] = await Promise.all([listGenres(), loadClassificationMemory()]);
+      const outcome = await classifyReceiptPipeline(apiKey, result.transactions, genres, memory);
+      classifications = outcome.classifications;
+      parentGenreIds = Object.fromEntries(outcome.parentGenreIds);
+      warnings.push(...outcome.warnings);
+    } catch {
+      warnings.push('ジャンルを自動で付けられませんでした。「編集する」から選べます。');
+    }
+  }
+
+  return NextResponse.json({
+    transactions: result.transactions,
+    warnings,
+    classifications,
+    parentGenreIds,
+  });
 }

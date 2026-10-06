@@ -16,14 +16,17 @@ import {
   assertPaymentDay,
   AccountError,
 } from '@/domain/account';
+import { assertYen, parseYen } from '@/domain/money';
 import {
   createAccount,
+  getOrCreateDefaultAccount,
   updateAccount,
   AccountStoreError,
   type AccountInput,
   type AccountKind,
   type AccountPurpose,
 } from '@/features/accounts/store';
+import { describeUserError } from '@/lib/errors';
 
 export type AccountFormState = {
   error: string | null;
@@ -69,6 +72,11 @@ function parseAccountInput(formData: FormData): AccountInput {
   const closingDay = assertClosingDay(parseDayField(formData, 'closingDay'));
   const paymentDay = assertPaymentDay(parseDayField(formData, 'paymentDay'));
 
+  const currentBalanceYen = assertYen(
+    parseYen(String(formData.get('currentBalanceYen') ?? '')),
+    '残高',
+  );
+
   const institutionNameRaw = String(formData.get('institutionName') ?? '').trim();
   const noteRaw = String(formData.get('note') ?? '').trim();
 
@@ -79,15 +87,9 @@ function parseAccountInput(formData: FormData): AccountInput {
     purpose: purposeRaw as AccountPurpose,
     closingDay,
     paymentDay,
+    currentBalanceYen,
     note: noteRaw === '' ? null : noteRaw,
   };
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof AccountError || error instanceof AccountStoreError) {
-    return error.message;
-  }
-  return '保存に失敗しました。入力内容を確認してください。';
 }
 
 export async function createAccountAction(
@@ -98,7 +100,7 @@ export async function createAccountAction(
     const input = parseAccountInput(formData);
     await createAccount(input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/accounts');
   return { error: null };
@@ -113,8 +115,27 @@ export async function updateAccountAction(
     const input = parseAccountInput(formData);
     await updateAccount(id, input);
   } catch (error) {
-    return { error: describeError(error) };
+    return { error: describeUserError(error) };
   }
   revalidatePath('/accounts');
   return { error: null };
+}
+
+export type DefaultAccountResult =
+  { account: { id: string; name: string; closingDay: number | null } } | { error: string };
+
+/**
+ * レシート取り込み(/transactions/receipt)向け。口座が1件も無ければ
+ * 「現金」を自動で作る(getOrCreateDefaultAccount() 参照)。/accounts への
+ * 事前登録を必須にしないための入り口。
+ */
+export async function ensureDefaultAccountAction(): Promise<DefaultAccountResult> {
+  try {
+    const account = await getOrCreateDefaultAccount();
+    return { account: { id: account.id, name: account.name, closingDay: account.closingDay } };
+  } catch (error) {
+    return {
+      error: error instanceof AccountStoreError ? error.message : '口座を用意できませんでした',
+    };
+  }
 }

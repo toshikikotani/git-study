@@ -16,15 +16,11 @@ import { INCOME_TIP_BANK } from '@/features/briefs/tips';
 import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { formatYen } from '@/domain/money';
 import { todayJst, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
-export class BriefStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'BriefStoreError';
-  }
-}
+export class BriefStoreError extends AppError {}
 
 export type GenerateDailyBriefResult = {
   briefId: string;
@@ -60,8 +56,11 @@ export async function generateDailyBriefAsAdmin(
   }
 
   const summary = await loadHomeSummaryAsAdmin(client, userId, now);
-  const livingTile = summary.tiles.find((tile) => tile.code === 'living');
-  const sanctuaryTile = summary.tiles.find((tile) => tile.code === 'sanctuary');
+  // ADR-057によりホームの枠は固定の code(living/sanctuary)を持たない
+  // 自由なジャンルになったため、本人が show_on_home で選んだ順(=ホームに
+  // 出る順そのもの)で先頭2件をそのまま使う。ラベルもジャンル名をそのまま
+  // 使う(ADR-016、コードに日本語ラベルを直書きしない)。
+  const [firstTile, secondTile] = summary.tiles;
 
   const topic = pickDailyTopic(INCOME_TIP_BANK, briefOn);
   const { included, excluded } = filterBriefTopics([topic]);
@@ -72,8 +71,7 @@ export async function generateDailyBriefAsAdmin(
   );
   const bodyMd = buildBodyMd({
     headlineTitle,
-    livingRemainingYen: livingTile?.remainingYen ?? null,
-    sanctuaryRemainingYen: sanctuaryTile?.remainingYen ?? null,
+    tiles: [firstTile, secondTile].filter((tile) => tile !== undefined),
     tip: included[0] ?? null,
   });
 
@@ -85,8 +83,8 @@ export async function generateDailyBriefAsAdmin(
       status: 'generated',
       days_to_payoff: summary.payoff.daysRemaining,
       remaining_debt_yen: summary.payoff.remainingYen,
-      spendable_living_yen: livingTile?.remainingYen ?? null,
-      spendable_sanctuary_yen: sanctuaryTile?.remainingYen ?? null,
+      spendable_living_yen: firstTile?.remainingYen ?? null,
+      spendable_sanctuary_yen: secondTile?.remainingYen ?? null,
       body_md: bodyMd,
       generated_at: new Date(now).toISOString(),
     })
@@ -263,16 +261,13 @@ function buildHeadlineTitle(daysRemaining: number | null, remainingYen: number):
 
 function buildBodyMd(input: {
   headlineTitle: string;
-  livingRemainingYen: number | null;
-  sanctuaryRemainingYen: number | null;
+  tiles: readonly { label: string; remainingYen: number | null }[];
   tip: { title: string; summary: string | null } | null;
 }): string {
   const lines = [`## ${input.headlineTitle}`];
-  if (input.livingRemainingYen !== null) {
-    lines.push(`生活費: あと${formatYen(input.livingRemainingYen, { sign: 'never' })}使えます`);
-  }
-  if (input.sanctuaryRemainingYen !== null) {
-    lines.push(`聖域: あと${formatYen(input.sanctuaryRemainingYen, { sign: 'never' })}使えます`);
+  for (const tile of input.tiles) {
+    if (tile.remainingYen === null) continue;
+    lines.push(`${tile.label}: あと${formatYen(tile.remainingYen, { sign: 'never' })}使えます`);
   }
   if (input.tip) {
     lines.push('', `### ${input.tip.title}`);

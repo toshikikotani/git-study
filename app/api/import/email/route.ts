@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { ClaudeEmailExtractor } from '@/features/import/email-ai';
 import { parseNotificationEmail, type EmailParseResult } from '@/features/import/email';
 import { recordRescuedEmailAsAdmin } from '@/features/import/rescue-store';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -68,16 +70,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(toResponse(byLabels, false));
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey === undefined || apiKey === '') {
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) {
     return NextResponse.json(
       toResponse(
         {
           transactions: [],
-          warnings: [
-            ...byLabels.warnings,
-            'AI による読み取りは設定されていません(ANTHROPIC_API_KEY が未設定)。',
-          ],
+          warnings: [...byLabels.warnings, apiKeyMissingMessage('AI による読み取り')],
         },
         false,
       ),

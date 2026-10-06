@@ -21,6 +21,7 @@
 
 import { monthlyInterest, assertYen } from './money';
 import { addMonthsToParts, monthStartJst, splitDateOnly, type DateOnly } from '@/lib/date';
+import { AppError } from '@/lib/errors';
 
 export const DEFAULT_MAX_MONTHS = 600;
 
@@ -62,12 +63,7 @@ export type PayoffSummary = {
   totalPaidYen: number;
 };
 
-export class PayoffError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PayoffError';
-  }
-}
+export class PayoffError extends AppError {}
 
 type SimulateOptions = {
   /** 基準となる月初日。省略時は JST の当月。テストではここを固定する。 */
