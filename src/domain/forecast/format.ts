@@ -61,3 +61,14 @@ export function formatTimesInTen(p: number): string {
   if (times === 0) return '10回中1回もない';
   return `10回中${times}回`;
 }
+
+/**
+ * 見込みを大きく見せるための分割(「約」「17.8」「万円」/「約」「3,800」「円」)。
+ * デザインの見出し(数字だけ大きく、単位は小さく)に使う。丸めは formatEstimate と同じ。
+ */
+export function estimateParts(yen: number): { number: string; unit: string } {
+  const body = estimateBody(yen);
+  return body.endsWith('万')
+    ? { number: body.slice(0, -1), unit: '万円' }
+    : { number: body, unit: '円' };
+}
