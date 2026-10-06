@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import { Segmented } from '@/components/ui/segmented';
 import { CategoryChart, type ChartMode } from '../spending/category/[genreKey]/category-chart';
 import {
   buildCumulative,
@@ -11,6 +12,12 @@ import {
 import { scheduledYen, type CategoryLine } from '@/features/category/model';
 import { buildSeries, type ChartUnit } from '@/features/category/series';
 import type { DateOnly } from '@/lib/date';
+
+/** 「全体」と「変えられる支出だけ」(決まった支払いを除く)の切り替え(デザインの月末の見込み)。 */
+const SCOPES = [
+  { value: 'all', label: '全体' },
+  { value: 'changeable', label: '変えられる支出だけ' },
+] as const;
 
 export function GoalChart({
   genreName,
@@ -47,18 +54,13 @@ export function GoalChart({
   return (
     <div className="space-y-2">
       {changeable ? (
-        <label
-          className="flex min-h-11 items-center gap-2 text-xs"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
-          <input
-            type="checkbox"
-            checked={onlyChangeable}
-            onChange={(e) => setOnlyChangeable(e.target.checked)}
-            className="size-5"
-          />
-          <span>変えられる支出だけ(決まった支払いを除く)</span>
-        </label>
+        <Segmented
+          value={onlyChangeable ? 'changeable' : 'all'}
+          options={SCOPES}
+          onChange={(v) => setOnlyChangeable(v === 'changeable')}
+          label="グラフの範囲"
+          className="flex w-full [&>button]:flex-1"
+        />
       ) : null}
       <GoalChartView
         genreName={onlyChangeable && changeable ? '変えられる支出' : genreName}

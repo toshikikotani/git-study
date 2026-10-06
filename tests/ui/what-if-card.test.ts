@@ -12,6 +12,8 @@ const view: CategoryWhatIfView = {
   categoryName: '外食',
   promise: null,
   spentThisMonthYen: 16019,
+  spentYen: 16019,
+  scheduledYen: 5000,
   lastMonth: null,
   perVisitYen: 3100,
   weeks: 3.7,
@@ -50,9 +52,15 @@ describe('ジャンル画面の「もし、へらしたら」', () => {
     expect(html).toContain('もし、外食をへらしたら');
     expect(html).toContain('目安');
     for (const label of ['いつも通り', '週1回へらす', '週2回へらす']) expect(html).toContain(label);
-    expect(html).toContain('約5.0万円');
+    expect(html).toContain('5.0</span><span class="text-xl font-semibold">万円');
+    // 上のカード:使った・予定・自由に使える残り(目標 − 使った − 予定)
+    expect(html).toContain('使った');
+    expect(html).toContain('16,019円');
+    expect(html).toContain('5,000円');
+    expect(html).toContain('自由に使える残り');
+    expect(html).toContain('20,481円');
     expect(html).toContain('10回中8回は 3.8万〜6.4万円');
-    expect(html).toContain('目標を 約8,800円超えそう');
+    expect(html).toContain('このままだと 約8,800円オーバー');
     expect(html).toContain('外食が目標を超える');
     expect(html).toContain('10回中7回');
     expect(html).toContain('全体で予算に収まる');

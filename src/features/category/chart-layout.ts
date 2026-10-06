@@ -93,8 +93,9 @@ export function gutterIsValid(placed: readonly GutterPlacement[], plotPx: number
  */
 export function formatAxisYen(yen: number): string {
   if (yen < 10000) return yen.toLocaleString('ja-JP');
+  // 見込みの見せ方(formatEstimate)と同じく、万円は小数1桁まで(「22.1万」「17.0万」)。
   const man = yen / 10000;
-  const text = Number.isInteger(man) ? String(man) : String(Math.round(man * 100) / 100);
+  const text = Number.isInteger(man) ? String(man) : man.toFixed(1);
   return `${text}万`;
 }
 
