@@ -44,6 +44,7 @@ import type {
   TypicalProfilePoint,
   ForecastBreakdown,
   ForecastSuggestion,
+  ForecastWhatIf,
 } from './types';
 
 export const DEFAULT_TRIALS = 10_000;
@@ -622,6 +623,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
   );
   const sortedSpecial = sortedCopy(specialSamples);
   const suggestion = suggestCut({ input, run, byCategory, cal });
+  const whatIf = whatIfOf({ input, run, byCategory, cal });
   const breakdown = breakdownOf({ input, run, total, byCategory });
 
   return {
@@ -659,6 +661,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
     drivers,
     safeDailyAllowance,
     suggestion,
+    whatIf,
     breakdown,
     status: input.fitted.dataDays < LEARNING_DATA_DAYS ? 'learning' : 'ready',
     dataDays: input.fitted.dataDays,
@@ -748,6 +751,67 @@ function suggestCut(args: {
     }
   });
   return best;
+}
+
+/** 「もし、へらしたら」の選択肢(週に何回へらすか)。 */
+const WHAT_IF_PER_WEEK = [0, 1, 2] as const;
+
+/**
+ * ジャンル画面の「もし、へらしたら」:提案(suggestCut)と同じ対象・同じ数え方で、
+ * いつも通り・週1回・週2回へらしたときのジャンルの着地・目標を超える確率・全体で予算に
+ * 収まる確率を出す。「いつも通り」は byCategory・probWithinBudget と同じ数字になる。
+ */
+function whatIfOf(args: {
+  input: SimulateInput;
+  run: TrialRun;
+  byCategory: readonly ForecastCategoryBand[];
+  cal: PitCalibration | null;
+}): ForecastWhatIf[] {
+  const { input, run, byCategory, cal } = args;
+  const budget = input.budgetYen;
+  const D = run.futureDates.length;
+  if (D < 7) return [];
+  const weeks = D / 7;
+  const out: ForecastWhatIf[] = [];
+  byCategory.forEach((cat, c) => {
+    if (cat.type !== 'steady' || cat.expectedCount < weeks * 1.5) return;
+    const samples = run.categorySamples[c]!;
+    const meanYen = mean(samples);
+    if (meanYen <= 0) return;
+    const scaled = new Float64Array(run.trials);
+    const options = WHAT_IF_PER_WEEK.map((perWeek) => {
+      const cut = Math.min(1, (perWeek * weeks) / cat.expectedCount);
+      let over = 0;
+      let within = 0;
+      for (let t = 0; t < run.trials; t += 1) {
+        const removed = samples[t]! * cut;
+        scaled[t] = samples[t]! - removed;
+        if (cat.targetYen !== null && cat.baseYen + scaled[t]! > cat.targetYen) over += 1;
+        if (budget !== null && run.totalSamples[t]! - removed <= budget) within += 1;
+      }
+      scaled.sort();
+      const p10 = Math.max(0, Math.round(cat.baseYen + quantileAt(scaled, 0.1)));
+      const p50 = Math.max(p10, Math.round(cat.baseYen + quantileAt(scaled, 0.5)));
+      const p90 = Math.max(p50, Math.round(cat.baseYen + quantileAt(scaled, 0.9)));
+      return {
+        perWeek,
+        landing: { p10, p50, p90 },
+        exceedance: cat.targetYen === null ? null : over / run.trials,
+        probWithinBudget: budget === null ? null : calibratedProbability(cal, within / run.trials),
+        savedYen: Math.round(meanYen * cut),
+      };
+    });
+    // 週1回へらすだけで残りが無くなるなら、週2回は出さない(同じ数字が並ぶため)。
+    const distinct = options.filter((o, i) => i === 0 || o.savedYen !== options[i - 1]!.savedYen);
+    out.push({
+      categoryId: cat.categoryId,
+      categoryName: cat.categoryName,
+      perVisitYen: Math.round(meanYen / cat.expectedCount),
+      weeks,
+      options: distinct,
+    });
+  });
+  return out;
 }
 
 /**

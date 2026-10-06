@@ -267,6 +267,33 @@ export type ForecastSuggestion = {
 };
 
 /**
+ * ジャンルの「もし、へらしたら」(ジャンル画面)。いつも通り・週1回・週2回へらす、の選択肢ごとに、
+ * 同じ試行のそのジャンルの額に倍率を掛けて数え直す(提案と同じ目安の出し方)。
+ */
+export type ForecastWhatIfOption = {
+  /** 週に何回へらすか(0 = いつも通り)。 */
+  perWeek: number;
+  /** そのジャンルの期間全体の着地。 */
+  landing: { p10: number; p50: number; p90: number };
+  /** ジャンルの目標を超える確率(目標が無ければ null)。 */
+  exceedance: number | null;
+  /** 全体で予算に収まる確率(予算が無ければ null)。 */
+  probWithinBudget: number | null;
+  /** へらしたぶん、全体の支出が少なくなる額(平均)。 */
+  savedYen: number;
+};
+
+export type ForecastWhatIf = {
+  categoryId: string;
+  categoryName: string;
+  /** 1回あたりの見込みの額(残りの見込みの額 ÷ 見込みの回数)。 */
+  perVisitYen: number;
+  /** 残りの週数(残りの日数 ÷ 7)。 */
+  weeks: number;
+  options: readonly ForecastWhatIfOption[];
+};
+
+/**
  * 着地の積み上げ(設計書 v3 3.5)。中央値どうしは足し算にならないので、残り全体は中央値で、
  * その内訳は平均の比で配る。合計は必ず total.p50 と同じ。
  */
@@ -341,6 +368,8 @@ export type Forecast = {
   drivers: readonly ForecastDriver[];
   safeDailyAllowance: number | null;
   suggestion: ForecastSuggestion | null;
+  /** 定常型のジャンルの「もし、へらしたら」(残りが1週間未満なら空)。 */
+  whatIf: readonly ForecastWhatIf[];
   breakdown: ForecastBreakdown;
   status: 'learning' | 'ready';
   dataDays: number;
