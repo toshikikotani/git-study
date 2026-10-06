@@ -5,11 +5,14 @@
 export function TenDots({
   probability,
   color = 'var(--action)',
+  ring = 'var(--ink-muted)',
   size = 'md',
 }: {
   /** 0〜1。10回中の回数に丸める。 */
   probability: number;
   color?: string;
+  /** 塗らない点の点線の色(濃い面の上では明るい色に)。 */
+  ring?: string;
   size?: 'sm' | 'md';
 }) {
   const filled = Math.min(10, Math.max(0, Math.round(probability * 10)));
@@ -24,7 +27,7 @@ export function TenDots({
           style={
             i < filled
               ? { background: color }
-              : { border: '1.5px dashed var(--ink-muted)', boxSizing: 'border-box' }
+              : { border: `1.5px dashed ${ring}`, boxSizing: 'border-box' }
           }
         />
       ))}

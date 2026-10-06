@@ -38,6 +38,9 @@ export type CategoryWhatIfView = {
   balanceP50: number | null;
   options: readonly ForecastWhatIfOption[];
   provisional: boolean;
+  /** 予測の範囲での、このジャンルの使った額と、予定・固定費(ジャンル画面の「使った」「予定」)。 */
+  spentYen: number;
+  scheduledYen: number;
   /** 今月の約束(無ければ null)と、今月このジャンルで使った額。 */
   promise: SpendingPromise | null;
   spentThisMonthYen: number;
@@ -151,6 +154,8 @@ async function load(input: {
       balanceP50: balance === null ? null : balance.p50 - promisedSaved,
       options: whatIf.options,
       provisional: source.forecast.provisional,
+      spentYen: row?.actualYen ?? 0,
+      scheduledYen: (row?.scheduledYen ?? 0) + (row?.fixedYen ?? 0),
       promise,
       spentThisMonthYen: monthRow?.actualYen ?? 0,
       lastMonth,
