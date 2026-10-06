@@ -8,6 +8,7 @@
 
 import { unstable_cache } from 'next/cache';
 
+import type { CautionPrecision } from '@/domain/forecast/caution';
 import { buildForecast } from '@/domain/forecast/engine';
 import type { ForecastScope } from '@/domain/forecast/pipeline';
 import type { CategoryTarget } from '@/domain/forecast/simulate';
@@ -18,9 +19,11 @@ import { loadLedgerTransactions } from '@/features/spending/entries';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { addDays, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
+import { periodDays } from '@/domain/period';
 import { createClient } from '@/lib/supabase/server';
+import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
 import { continuousRecordStart, periodIncome } from '@/domain/forecast/record';
-import { verifyForecast, type Verification } from './calibration';
+import { verifyCautions, verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
 import { toForecastSource } from './source';
 
@@ -32,7 +35,53 @@ export type ForecastView = {
   /** 過去の月での検証(記録が短くて検証できなければ null)。 */
   verification: Verification | null;
   today: DateOnly;
+  /**
+   * 範囲(scope)から外した、範囲内のジャンルの支出(特別費)。ジャンルごと、期間内の実績と予定。
+   * 画面で「うち ○円は目標の対象外」と出し、ジャンルの着地が使った額を下回って見えないようにする。
+   */
+  excludedByCategory: ReadonlyMap<string, number>;
+  /** 目標があるとき:過去の月で測った、時点帯ごとの注意の精度(設計書 v3 3.2)。 */
+  cautionPrecision: CautionPrecision | null;
+  /** 範囲の、今日の支出(今日あと使える額に使う。設計書 v3 3.1)。 */
+  todaySpentYen: number;
 };
+
+/** 範囲の、ある日の支出(実績。返金は差し引く。特別費を外す範囲なら外す)。 */
+export function spentOn(
+  transactions: readonly ForecastSourceTransaction[],
+  date: DateOnly,
+  scope: ForecastScope | undefined,
+): number {
+  let yen = 0;
+  for (const t of transactions) {
+    if (t.occurredOn !== date || t.status !== 'actual') continue;
+    if (t.isTransfer || t.reviewStatus === 'ignored') continue;
+    if (scope?.excludeSpecial && t.kind === 'special') continue;
+    if (scope?.genreIds !== undefined && (t.genreId === null || !scope.genreIds.has(t.genreId)))
+      continue;
+    if (t.amountYen < 0) yen -= t.amountYen;
+    else if (t.kind === 'refund') yen -= t.amountYen;
+  }
+  return Math.max(0, yen);
+}
+
+/** 範囲から外した特別費(範囲のジャンルの、期間内の実績と予定)。 */
+export function excludedSpend(
+  transactions: readonly ForecastSourceTransaction[],
+  period: { from: DateOnly; to: DateOnly },
+  scope: ForecastScope | undefined,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!scope?.excludeSpecial) return out;
+  for (const t of transactions) {
+    if (t.kind !== 'special' || t.isTransfer || t.reviewStatus === 'ignored') continue;
+    if (t.amountYen >= 0 || t.genreId === null) continue;
+    if (t.occurredOn < period.from || t.occurredOn > period.to) continue;
+    if (scope.genreIds !== undefined && !scope.genreIds.has(t.genreId)) continue;
+    out.set(t.genreId, (out.get(t.genreId) ?? 0) - t.amountYen);
+  }
+  return out;
+}
 
 async function loadTakeHomeYen(): Promise<number | null> {
   const supabase = await createClient();
@@ -107,6 +156,36 @@ export async function loadForecast(args: {
     { revalidate: 60 * 60 * 24 },
   )();
 
+  // 注意の精度は目標のジャンルごとに測る(目標は30日あたりに直して、過去の月の長さに合わせる)。
+  const cautionTargets = (args.categoryTargets ?? [])
+    .filter((t) => t.targetYen > 0)
+    .map((t) => ({
+      categoryId: t.categoryId,
+      targetYen: Math.round((t.targetYen * 30) / periodDays(args.period.from, args.period.to)),
+    }));
+  const cautionKey = `${cacheKey}:${verification?.halfLifeDays ?? ''}:${verification?.monthLevelK ?? ''}:${cautionTargets
+    .map((t) => `${t.categoryId}=${t.targetYen}`)
+    .sort()
+    .join(',')}`;
+  const cautionPrecision =
+    cautionTargets.length > 0
+      ? await unstable_cache(
+          async () =>
+            verifyCautions({
+              cacheKey: cautionKey,
+              transactions: completed,
+              today,
+              recordStart,
+              payday,
+              noForecastGenreIds: noForecast,
+              verification,
+              targets: cautionTargets,
+            }),
+          ['forecast-cautions', cautionKey],
+          { revalidate: 60 * 60 * 24 },
+        )()
+      : null;
+
   const forecast = buildForecast({
     transactions,
     period: args.period,
@@ -130,5 +209,13 @@ export async function loadForecast(args: {
     ...(args.categoryTargets ? { categoryTargets: args.categoryTargets } : {}),
     income: args.scope ? null : periodIncome({ transactions, period: args.period, takeHomeYen }),
   });
-  return { forecast, period: args.period, verification, today };
+  return {
+    forecast,
+    period: args.period,
+    verification,
+    today,
+    excludedByCategory: excludedSpend(transactions, args.period, args.scope),
+    cautionPrecision,
+    todaySpentYen: spentOn(periodRows, today, args.scope),
+  };
 }

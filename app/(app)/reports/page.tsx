@@ -4,11 +4,15 @@ import { CategoryTrendChart } from './category-trend-chart';
 import { InsightsList } from './insights-card';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
+import { WhyCard } from './why-card';
 import { GoalChart } from './goal-chart';
-import { formatProbability } from '@/domain/forecast/format';
+import { formatEstimate, formatProbability, formatTimesInTen } from '@/domain/forecast/format';
+import { landingRowsFrom } from '@/domain/forecast/landing-rows';
+import { listGenres } from '@/features/genre/store';
 import { loadLatestRead } from '@/features/ai-report/forecast-read';
 import { remainingOfTotal } from '@/domain/forecast/remaining';
 import { reportInsights } from '@/domain/report-insights';
+import { goalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast } from '@/features/forecast/load';
 import { addDays, addMonths } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
@@ -31,7 +35,7 @@ import { loadNetWorthTrend } from '@/features/net-worth/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { buildCategoryLines } from '@/features/category/model';
-import { linesForGoal } from '@/features/category/pace';
+import { linesForGoal, withoutScheduled } from '@/features/category/pace';
 import { formatDateJa, todayJst } from '@/lib/date';
 import {
   listConfirmedFixedCostKeys,
@@ -46,7 +50,12 @@ export const dynamic = 'force-dynamic';
 // 着地の予測は過去2年ぶんの学習と、過去の月での検証(初回だけ)を含むため、余裕を持たせる。
 export const maxDuration = 60;
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { scope: scopeParam } = await searchParams;
   const [
     trend,
     netWorthPoints,
@@ -76,40 +85,43 @@ export default async function ReportsPage() {
   const monthKey = ledger.period.from.slice(0, 7);
 
   const today = todayJst();
-  const plan = await getCurrentPlan(today);
-  // 目標があれば目標の期間・目標のジャンルで、なければ今月の全ジャンルで着地を出す。
-  // 総予算は目標の期間の額なので、月の実績と混ぜない。
+  const [plan, genres] = await Promise.all([getCurrentPlan(today), listGenres().catch(() => [])]);
+  const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
+  // 目標があれば、既定は目標の期間・目標のジャンル(特別費を除く)。「全部」に切り替えると、
+  // 今月のすべての支出で出す。どちらの範囲かは、画面の上に名前で出す(設計書 v3 2.2 の2)。
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
-  const goalPlan = plan !== null && budgetTotal > 0 ? plan : null;
-  const period = goalPlan
-    ? { from: goalPlan.periodStart, to: goalPlan.periodEnd }
-    : { from: ledger.period.from, to: addDays(addMonths(ledger.period.from, 1), -1) };
+  const hasGoal = plan !== null && budgetTotal > 0;
+  const goalPlan = hasGoal && scopeParam !== 'all' ? plan : null;
+  const monthPeriod = {
+    from: ledger.period.from,
+    to: addDays(addMonths(ledger.period.from, 1), -1),
+  };
+  const period = goalPlan ? { from: goalPlan.periodStart, to: goalPlan.periodEnd } : monthPeriod;
   const goalItems = goalPlan ? goalPlan.items.filter((item) => item.targetYen > 0) : [];
-  // 予測が失敗しても、ほかの集計(下のカード)は見られるようにする。
-  const outcome = await loadForecast({
-    period,
-    budgetYen: goalPlan ? budgetTotal : null,
-    ...(goalPlan
-      ? {
-          scope: { genreIds: new Set(goalItems.map((item) => item.genreId)), excludeSpecial: true },
-          categoryTargets: goalItems.map((item) => ({
-            categoryId: item.genreId,
-            categoryName: item.genreName,
-            targetYen: item.targetYen,
-          })),
-        }
-      : {}),
-  }).then(
-    (value) => ({ ok: true as const, value }),
-    (error: unknown) => {
-      console.error('[reports] 着地の予測を読み込めませんでした', error);
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    },
-  );
+  const goalArgs = goalForecastArgs(goalPlan);
+  const settle = <T,>(promise: Promise<T>) =>
+    promise.then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => {
+        console.error('[reports] 着地の予測を読み込めませんでした', error);
+        return {
+          ok: false as const,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      },
+    );
+  // 予測が失敗しても、ほかの集計(下のカード)は見られるようにする。月末の収支は、目標の範囲では
+  // なく今月の全部で出す(収入は1か月分なので)。目標の範囲のときは、全部の予測も並べて読む。
+  const [outcome, monthOutcome] = await Promise.all([
+    settle(loadForecast(goalArgs ?? { period })),
+    goalPlan ? settle(loadForecast({ period: monthPeriod })) : Promise.resolve(null),
+  ]);
   const forecast = outcome.ok ? outcome.value.forecast : null;
+  const monthForecast = goalPlan
+    ? monthOutcome?.ok
+      ? monthOutcome.value.forecast
+      : null
+    : forecast;
   // AIの読み(AIレポートで作ったもの)。今月の全体の見込みのときだけ並べる(目標の範囲とは違うため)。
   const aiRead = goalPlan ? null : await loadLatestRead(ledger.period.from).catch(() => null);
   const verification = outcome.ok ? outcome.value.verification : null;
@@ -117,6 +129,9 @@ export default async function ReportsPage() {
   const budgetYen = goalPlan ? budgetTotal : null;
   const periodLabel = goalPlan ? 'この目標の期間' : '今月';
   const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
+  const scopeLabel = goalPlan
+    ? `範囲:目標のジャンル${goalItems.length}つ(特別費を除く)・${formatDateJa(period.from)}〜${formatDateJa(period.to)}`
+    : '範囲:今月のすべての支出';
 
   const previousMonthKey = trend.monthKeys.filter((key) => key < monthKey).at(-1);
   const previousByGenre =
@@ -136,62 +151,115 @@ export default async function ReportsPage() {
       })
     : [];
   const landing = forecast?.total ?? null;
-  const rangeRows: LandingRow[] = (forecast?.byCategory ?? [])
-    .filter((c) => c.landing.p90 > 0)
-    .sort((a, b) => b.landing.p50 - a.landing.p50)
-    .slice(0, 8)
-    .map((c) => ({
-      genreId: c.categoryId,
-      name: c.categoryName,
-      baseYen: c.baseYen,
-      p10: c.landing.p10,
-      p50: c.landing.p50,
-      p90: c.landing.p90,
-      targetYen: c.targetYen,
-      exceedance: c.exceedance,
-    }));
+  const rangeRows: LandingRow[] = forecast
+    ? landingRowsFrom({
+        forecast,
+        excludedByCategory: outcome.ok ? outcome.value.excludedByCategory : new Map(),
+        closedGenreIds,
+        cautionPrecision: outcome.ok ? outcome.value.cautionPrecision : null,
+      })
+    : [];
+  // グラフ(設計書 v3 3.4)。目標のジャンルの行と、「変えられる支出だけ」の行・予算・予測。
+  const goalLines = (genreIds: readonly string[]) =>
+    linesForGoal(
+      genreIds.flatMap((genreId) =>
+        buildCategoryLines(
+          // 目標のペースは特別費を数えない(予測も同じ範囲で出している)。
+          ledger.transactions
+            .filter((tx) => tx.kind !== 'special')
+            .map((tx) => ({ ...tx, items: [] })),
+          genreId,
+          { from: ledger.period.from, to: period.to },
+          today,
+        ),
+      ),
+      period,
+    );
+  const fixedGenreIds = new Set(
+    forecast
+      ? landingRowsFrom({ forecast, closedGenreIds, limit: Number.MAX_SAFE_INTEGER })
+          .filter((row) => row.group === 'fixed')
+          .map((row) => row.genreId)
+      : [],
+  );
+  const changeableItems = goalItems.filter((item) => !fixedGenreIds.has(item.genreId));
+  const chart =
+    goalPlan && budgetYen !== null && outcome.ok
+      ? {
+          lines: goalLines(goalItems.map((item) => item.genreId)),
+          remaining: remainingOfTotal(outcome.value.forecast),
+          changeable:
+            fixedGenreIds.size > 0 && changeableItems.length > 0
+              ? {
+                  lines: goalLines(changeableItems.map((item) => item.genreId)),
+                  budgetYen: changeableItems.reduce((sum, item) => sum + item.targetYen, 0),
+                  remaining: withoutScheduled(
+                    remainingOfTotal(outcome.value.forecast),
+                    goalLines([...fixedGenreIds]),
+                  ),
+                }
+              : null,
+        }
+      : null;
+  const suggestion = forecast?.suggestion ?? null;
   return (
     <div className="rise space-y-4">
       <header>
         <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           レポート
         </h1>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            {scopeLabel}
+          </p>
+          {hasGoal ? <ScopeSwitch current={goalPlan ? 'goal' : 'all'} /> : null}
+        </div>
         {forecast && landing && forecast.total.p50 > 0 ? (
           <>
             <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              着地の見込み(中央){forecast.provisional ? ' ・ 目安' : ''}
+              {endLabel}の見込み(中央){forecast.provisional ? ' ・ 目安' : ''}
             </p>
             <p
               className="tabular mt-1 text-4xl font-semibold tracking-[-0.045em]"
               style={{ color: 'var(--ink)' }}
             >
-              {formatYen(round100(landing.p50), { sign: 'never' })}
+              {formatEstimate(landing.p50)}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              {endLabel}の着地は、下振れ {formatYen(round100(landing.p10), { sign: 'never' })} 〜
-              上振れ {formatYen(round100(landing.p90), { sign: 'never' })}(10回中8回)。
-              {budgetYen !== null
-                ? forecast.probWithinBudget !== null
-                  ? `予算 ${formatYen(budgetYen, { sign: 'never' })} に収まる確率は${formatProbability(forecast.probWithinBudget)}。`
-                  : ''
-                : '目標の予算がないので、収まるかどうかは出していない。'}
+              10回中8回は、少なくて {formatEstimate(landing.p10)}、多くて{' '}
+              {formatEstimate(landing.p90)}。
+              {budgetYen !== null ? (
+                forecast.probWithinBudget !== null ? (
+                  <>
+                    予算 {formatYen(budgetYen, { sign: 'never' })} に収まるのは
+                    {formatTimesInTen(forecast.probWithinBudget)}
+                    <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                      ({formatProbability(forecast.probWithinBudget)})
+                    </span>
+                    。
+                  </>
+                ) : null
+              ) : (
+                '目標の予算がないので、収まるかどうかは出していない。'
+              )}
               {forecast.drivers[0]
                 ? ` 増えるとしたら、大きいのは${forecast.drivers[0].categoryName}。`
                 : ''}
             </p>
-            {aiRead ? (
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                AIの読み({formatDateJa(aiRead.asOf)}時点):中央{' '}
-                {formatYen(round100(aiRead.adjusted.p50), { sign: 'never' })}。{aiRead.reason}
+            {suggestion && suggestion.probAfter - suggestion.probBefore >= 0.01 ? (
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+                {suggestion.categoryName}を週1回減らすと、収まる確率{' '}
+                {formatProbability(suggestion.probBefore)} →{' '}
+                {formatProbability(suggestion.probAfter)}
+                <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  (約{formatEstimate(suggestion.savedYen, { approx: false })}少なくなる目安)
+                </span>
               </p>
             ) : null}
-            {forecast.balance ? (
+            {aiRead ? (
               <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                収入 {formatYen(round100(forecast.balance.incomeYen), { sign: 'never' })}
-                {forecast.balance.source === 'salary' ? '(直近の給料から)' : ''}
-                から着地を引いた残りは、中央 {formatYen(round100(forecast.balance.p50))}(
-                {formatYen(round100(forecast.balance.p10))} 〜{' '}
-                {formatYen(round100(forecast.balance.p90))})。
+                AIの読み({formatDateJa(aiRead.asOf)}時点):中央 {formatEstimate(aiRead.adjusted.p50)}
+                。{aiRead.reason}
               </p>
             ) : null}
           </>
@@ -203,30 +271,18 @@ export default async function ReportsPage() {
           </p>
         )}
       </header>
-      {goalPlan && budgetYen !== null && outcome.ok ? (
+      {goalPlan && budgetYen !== null && chart ? (
         <GoalChart
           genreName="全体"
-          lines={linesForGoal(
-            goalItems.flatMap((item) =>
-              buildCategoryLines(
-                // 目標のペースは特別費を数えない(予測も同じ範囲で出している)。
-                ledger.transactions
-                  .filter((tx) => tx.kind !== 'special')
-                  .map((tx) => ({ ...tx, items: [] })),
-                item.genreId,
-                { from: ledger.period.from, to: period.to },
-                today,
-              ),
-            ),
-            { from: goalPlan.periodStart, to: goalPlan.periodEnd },
-          )}
+          lines={chart.lines}
           monthStart={ledger.period.from}
           monthEnd={period.to}
           today={today}
           budgetYen={budgetYen}
           goalFrom={goalPlan.periodStart}
           goalTo={goalPlan.periodEnd}
-          remaining={remainingOfTotal(outcome.value.forecast)}
+          remaining={chart.remaining}
+          changeable={chart.changeable}
         />
       ) : null}
       <Link
@@ -237,13 +293,19 @@ export default async function ReportsPage() {
         AIに見てもらう
       </Link>
       <InsightsList insights={insights} />
+      {forecast && forecast.total.p50 > 0 ? (
+        <WhyCard forecast={forecast} endLabel={endLabel} />
+      ) : null}
       <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
-      {forecast ? <VerificationCard verification={verification} /> : null}
+      {forecast ? (
+        <VerificationCard verification={verification} monthStart={ledger.period.from} />
+      ) : null}
 
       <MonthSummaryRow
         spentYen={ledger.totalSpentYen}
         incomeYen={ledger.totalIncomeYen}
         incomeRegistered={hasIncome(ledger.totalIncomeYen)}
+        balance={monthForecast?.balance ?? null}
       />
 
       <GenreDonutChart
@@ -291,6 +353,29 @@ export default async function ReportsPage() {
   );
 }
 
-function round100(yen: number): number {
-  return Math.round(yen / 100) * 100;
+/** 「目標の範囲」と「全部」の切り替え(目標があるときだけ)。 */
+function ScopeSwitch({ current }: { current: 'goal' | 'all' }) {
+  const item = (key: 'goal' | 'all', label: string) => (
+    <Link
+      href={key === 'all' ? { pathname: '/reports', query: { scope: 'all' } } : '/reports'}
+      aria-current={current === key ? 'page' : undefined}
+      className="flex min-h-11 items-center rounded-full px-3 text-xs font-semibold"
+      style={{
+        background: current === key ? 'var(--action)' : 'transparent',
+        color: current === key ? 'var(--on-action)' : 'var(--ink-secondary)',
+      }}
+    >
+      {label}
+    </Link>
+  );
+  return (
+    <nav
+      aria-label="レポートの範囲"
+      className="flex rounded-full"
+      style={{ background: 'var(--surface)' }}
+    >
+      {item('goal', '目標の範囲')}
+      {item('all', '全部')}
+    </nav>
+  );
 }

@@ -49,7 +49,7 @@ function labelFor(input: {
       : `70%で収まる額は ${input.recommendedYen.toLocaleString('ja-JP')} 円。`;
   if (input.verdict === 'on_track') return `このままで届きそう。${rec}${pct}${scheduled}`;
   if (input.verdict === 'tight')
-    return `中央では届く。上振れすると超える。${rec}${pct}${scheduled}`;
+    return `中央では届く。多めに使うと超える。${rec}${pct}${scheduled}`;
   return `このままだと目標を超える。${rec}${pct}${scheduled}`;
 }
 
@@ -253,7 +253,7 @@ export function landingReport(input: {
         : '日付の入っている予定は無い。',
       forecast.medianYen === null
         ? '支出のあった日が少なく、残りの着地はまだ置けない。'
-        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)} 円、下振れ〜上振れ(10回中8回)は ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)} 円、10回中8回は少なくて〜多くて ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
     ].join('');
     const ask = savingsAsk({
       verdict: forecast.verdict,

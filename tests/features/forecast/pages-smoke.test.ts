@@ -96,9 +96,14 @@ beforeAll(() => {
 });
 
 /** Suspense の中の非同期コンポーネントも待って描画する。描画中の例外は集めて、あれば失敗にする。 */
-async function render(load: () => Promise<{ default: () => Promise<React.ReactElement> }>) {
+type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+async function render(
+  load: () => Promise<{ default: (props: PageProps) => Promise<React.ReactElement> }>,
+  searchParams: Record<string, string> = {},
+) {
   const page = await load();
-  const element = await page.default();
+  const element = await page.default({ searchParams: Promise.resolve(searchParams) });
   const errors: unknown[] = [];
   const html = await new Promise<string>((resolve, reject) => {
     const sink = new PassThrough();
@@ -119,8 +124,22 @@ async function render(load: () => Promise<{ default: () => Promise<React.ReactEl
 
 describe('主要ページがサーバー描画でエラーにならない(Supabase を代用)', () => {
   it('レポート', async () => {
-    const html = await render(() => import('../../../app/(app)/reports/page'));
+    const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
+      /<!-- -->/g,
+      '',
+    );
     expect(html).toContain('着地');
+    // どの範囲の数字かを、画面の上に名前で出す。目標があれば「全部」へ切り替えられる。
+    expect(html).toContain('範囲:目標のジャンル');
+    expect(html).toContain('全部');
+    expect(html).toContain('今月(すべての支出)');
+  }, 60000);
+
+  it('レポート(全部)', async () => {
+    const html = (
+      await render(() => import('../../../app/(app)/reports/page'), { scope: 'all' })
+    ).replace(/<!-- -->/g, '');
+    expect(html).toContain('範囲:今月のすべての支出');
   }, 60000);
 
   it('目標', async () => {

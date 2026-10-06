@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { Segmented } from '@/components/ui/segmented';
+import { formatEstimate } from '@/domain/forecast/format';
 import { genreBarColor, genreColorVar } from '@/domain/genre-style';
 import { pickAxisLabels } from '@/features/category/axis';
 import {
@@ -107,6 +108,14 @@ export function CategoryChart({
   const forecastLow = forecastEnd?.forecastLowYen ?? 0;
   const forecastMid = forecastEnd?.forecastYen ?? 0;
   const forecastHigh = Math.max(forecastEnd?.forecastHighYen ?? 0, forecastMid);
+  // 注釈(設計書 v3 3.4):予測があれば「月末 約17.8万円・予算 17.0万円」。理想との差は下の小さな文字へ。
+  const budgetLine = isCum && budgetYen !== null && budgetYen > 0 ? budgetYen : null;
+  const endNote =
+    isCum && forecastEnd
+      ? `月末 ${formatEstimate(forecastMid)}${
+          budgetLine !== null ? `・予算 ${formatEstimate(budgetLine, { approx: false })}` : ''
+        }`
+      : null;
   const maxYen = isCum
     ? Math.max(budgetYen ?? 0, cumulative.maxYen, forecastLow, forecastMid, forecastHigh, 1) * 1.08
     : series.maxYen;
@@ -162,7 +171,9 @@ export function CategoryChart({
         cumulative.endIndex !== null
           ? `${cumulative.days[cumulative.endIndex]!.actualYen!.toLocaleString('ja-JP')}円`
           : '支出はありません'
-      }${cumulative.deltaYen !== null ? `。${idealDeltaLabel(cumulative.deltaYen)}` : ''}`
+      }${endNote !== null ? `。${endNote}` : ''}${
+        cumulative.deltaYen !== null ? `。${idealDeltaLabel(cumulative.deltaYen)}` : ''
+      }`
     : summarizeSeries(series, genreName, monthLabel);
 
   let tipText: string | null = null;
@@ -272,6 +283,16 @@ export function CategoryChart({
           },
         ]
       : []),
+    ...(budgetLine !== null
+      ? [
+          {
+            key: 'budget',
+            kind: 'tag' as const,
+            ratio: budgetLine / maxYen,
+            height: TAG_HEIGHT * fontScale,
+          },
+        ]
+      : []),
     ...(!isCum && series.averageLineYen !== null
       ? [
           {
@@ -331,7 +352,7 @@ export function CategoryChart({
       <div role="group" aria-label={summary}>
         {/* なぞっている間の吹き出し。位置は動かさず、グラフの上部に固定する(データと重ならない) */}
         <div className="flex min-h-8 items-center" style={{ paddingRight: GUTTER_W }}>
-          {!tipText && bigText && isCum && cumulative.deltaYen !== null ? (
+          {!tipText && bigText && isCum && (endNote ?? cumulative.deltaYen) !== null ? (
             <p
               data-chart-label="delta"
               data-may-wrap
@@ -341,7 +362,7 @@ export function CategoryChart({
               <span aria-hidden style={{ color: lineColor }}>
                 ●{' '}
               </span>
-              {idealDeltaLabel(cumulative.deltaYen)}
+              {endNote ?? idealDeltaLabel(cumulative.deltaYen!)}
             </p>
           ) : null}
           {tipText ? (
@@ -387,6 +408,36 @@ export function CategoryChart({
               style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 22%, transparent)' }}
             />
 
+            {budgetLine !== null ? (
+              <div
+                aria-hidden
+                data-line="budget"
+                className="pointer-events-none absolute inset-x-0"
+                style={{
+                  bottom: `${(budgetLine / maxYen) * 100}%`,
+                  borderTop: '1.5px dashed var(--ink-secondary)',
+                  opacity: tip !== null ? 0.5 : 1,
+                }}
+              />
+            ) : null}
+            {isCum && end && cumulative.hasForecast ? (
+              <div
+                aria-hidden
+                data-line="today"
+                className="pointer-events-none absolute inset-y-0"
+                style={{
+                  left: `${x(end.index)}%`,
+                  borderLeft: '1px dashed color-mix(in srgb, var(--ink) 35%, transparent)',
+                }}
+              >
+                <span
+                  className="absolute -top-4 left-1/2 -translate-x-1/2 text-xs leading-none whitespace-nowrap"
+                  style={{ color: 'var(--ink-secondary)' }}
+                >
+                  今日
+                </span>
+              </div>
+            ) : null}
             {isCum ? (
               <CumulativeLayer
                 chart={cumulative}
@@ -514,9 +565,9 @@ export function CategoryChart({
                     boxShadow: '0 0 0 2px var(--surface)',
                   }}
                 />
-                {cumulative.deltaYen !== null && deltaGeometry && !bigText ? (
+                {(endNote ?? cumulative.deltaYen) !== null && deltaGeometry && !bigText ? (
                   <DeltaLabel
-                    text={idealDeltaLabel(cumulative.deltaYen)}
+                    text={endNote ?? idealDeltaLabel(cumulative.deltaYen!)}
                     geometry={deltaGeometry}
                   />
                 ) : null}
@@ -544,10 +595,16 @@ export function CategoryChart({
               >
                 {p.kind === 'tag' ? (
                   <>
-                    <span className="block">{p.key === 'allowance' ? '目安' : '平均'}</span>
+                    <span className="block">
+                      {p.key === 'allowance' ? '目安' : p.key === 'budget' ? '予算' : '平均'}
+                    </span>
                     <span className="block">
                       {formatAxisYen(
-                        (p.key === 'allowance' ? series.allowanceYen : series.averageLineYen)!,
+                        (p.key === 'allowance'
+                          ? series.allowanceYen
+                          : p.key === 'budget'
+                            ? budgetLine
+                            : series.averageLineYen)!,
                       )}
                     </span>
                   </>
@@ -618,11 +675,20 @@ export function CategoryChart({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          {isCum
-            ? '実線=実績の累計、点線=予算までの理想。右は予測の下振れ・中央・上振れ(10回中8回)'
-            : '長押ししてなぞると、日ごとの金額が見られます'}
-        </p>
+        <div className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          <p>
+            {isCum
+              ? cumulative.hasForecast
+                ? `実線=実績の累計、点線=予算までの理想${budgetLine !== null ? '、破線=予算' : ''}。右の帯は、濃い=10回中5回、薄い=10回中8回`
+                : '実線=実績の累計、点線=予算までの理想'
+              : '長押ししてなぞると、日ごとの金額が見られます'}
+          </p>
+          {isCum && endNote !== null && cumulative.deltaYen !== null ? (
+            <p className="tabular mt-1" style={{ color: 'var(--ink-muted)' }}>
+              今日までは{idealDeltaLabel(cumulative.deltaYen)}
+            </p>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={playAudio}
@@ -720,6 +786,19 @@ function CumulativeLayer({
             .map((d) => `${x(d.index).toFixed(2)},${y(d.forecastLowYen!).toFixed(2)}`),
         ].join(' ')
       : null;
+  const inner = fut.filter(
+    (d) => d.forecastInnerLowYen !== null && d.forecastInnerHighYen !== null,
+  );
+  const innerBand =
+    end && end.actualYen !== null && inner.length > 0
+      ? [
+          `${x(end.index).toFixed(2)},${y(end.actualYen).toFixed(2)}`,
+          ...inner.map((d) => `${x(d.index).toFixed(2)},${y(d.forecastInnerHighYen!).toFixed(2)}`),
+          ...[...inner]
+            .reverse()
+            .map((d) => `${x(d.index).toFixed(2)},${y(d.forecastInnerLowYen!).toFixed(2)}`),
+        ].join(' ')
+      : null;
   return (
     <>
       <svg
@@ -729,7 +808,15 @@ function CumulativeLayer({
         className="pointer-events-none absolute inset-0 size-full overflow-visible"
       >
         {band ? (
-          <polygon points={band} fill={color} fillOpacity={dim ? 0.07 : 0.14} data-forecast-band />
+          <polygon points={band} fill={color} fillOpacity={dim ? 0.06 : 0.12} data-forecast-band />
+        ) : null}
+        {innerBand ? (
+          <polygon
+            points={innerBand}
+            fill={color}
+            fillOpacity={dim ? 0.1 : 0.22}
+            data-forecast-band-inner
+          />
         ) : null}
         {ideal.length > 1 ? (
           <polyline

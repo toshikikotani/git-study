@@ -16,6 +16,7 @@ import { addDays, type DateOnly } from '@/lib/date';
 import { periodDays } from '@/domain/period';
 import type { ForecastSourceTransaction } from './decompose';
 import { phaseOf } from './engine';
+import { cautionsFor, type CautionPrecision } from './caution';
 import { knownAt } from './lag';
 import { DEFAULT_MONTH_LEVEL_K } from './model';
 import { decomposeFor, fitFor, simulateInputFor } from './pipeline';
@@ -37,6 +38,8 @@ export type BacktestPoint = {
   p90: number;
   hitWithin80: boolean;
   crps: number;
+  /** 目標があるとき:この時点で出した注意(このままだと超える)の数と、実際に超えた数。 */
+  cautions: { issued: number; hits: number };
 };
 
 export type BacktestSummary = {
@@ -46,7 +49,29 @@ export type BacktestSummary = {
   /** 符号つきの誤差 (中央値 − 実際) ÷ 実際 の平均。負なら低く出ている。 */
   medianBias: number;
   meanCrps: number;
+  /** 時点帯ごとの、注意の精度(設計書 v3 3.2)。 */
+  cautionPrecision: CautionPrecision;
 };
+
+/**
+ * ジャンルごとの実際の支出(期間全体。返金を差し引く)。目標と同じく特別費は数えない
+ * (目標の対象は特別費を除いた支出。ジャンル別の着地も特別費を含まない)。
+ */
+export function actualByCategoryForPeriod(
+  transactions: readonly ForecastSourceTransaction[],
+  period: { from: DateOnly; to: DateOnly },
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.isTransfer || t.reviewStatus === 'ignored') continue;
+    if (t.occurredOn < period.from || t.occurredOn > period.to) continue;
+    if (t.kind === 'special') continue;
+    const id = t.genreId ?? 'none';
+    if (t.amountYen < 0) out.set(id, (out.get(id) ?? 0) - t.amountYen);
+    else if (t.kind === 'refund') out.set(id, (out.get(id) ?? 0) - t.amountYen);
+  }
+  return out;
+}
 
 /** 実際の着地(期間全体の支出。特別費を含み、返金を差し引く)。検証の正解に使う。 */
 export function actualTotalForPeriod(
@@ -127,6 +152,11 @@ export type BacktestInput = {
   trials?: number;
   /** 時点の間隔(日)。 */
   stepDays?: number;
+  /**
+   * 注意の精度を測るときの、ジャンルごとの目標(30日あたり)。検証する月の日数に合わせて伸ばす。
+   * 本番では今の目標を、過去の月にもあったものとして当てる。
+   */
+  cautionTargets?: readonly { categoryId: string; targetYen: number }[];
 };
 
 type Checkpoint = {
@@ -134,6 +164,7 @@ type Checkpoint = {
   asOf: DateOnly;
   phase: ForecastPhase;
   actualTotal: number;
+  actualByCategory: ReadonlyMap<string, number>;
   /** 期間の記録を分けたとき(k が有限)と、分けないとき(k=∞)の分解。 */
   decomposed: (separate: boolean) => DecomposedSpending;
 };
@@ -143,6 +174,9 @@ function checkpointsOf(input: BacktestInput): Checkpoint[] {
   for (const period of input.periods) {
     if (periodDays(period.from, period.to) < 5) continue;
     const actualTotal = actualTotalForPeriod(input.transactions, period);
+    const actualByCategory = input.cautionTargets
+      ? actualByCategoryForPeriod(input.transactions, period)
+      : new Map<string, number>();
     for (const { asOf, phase } of checkpointsFor(period, input.stepDays ?? 2)) {
       const known = knownTransactionsAt(input.transactions, asOf);
       const cache = new Map<boolean, DecomposedSpending>();
@@ -151,6 +185,7 @@ function checkpointsOf(input: BacktestInput): Checkpoint[] {
         asOf,
         phase,
         actualTotal,
+        actualByCategory,
         decomposed: (separate) => {
           const hit = cache.get(separate);
           if (hit) return hit;
@@ -209,12 +244,67 @@ function pointFor(
     p90,
     hitWithin80: cp.actualTotal >= p10 && cp.actualTotal <= p90,
     crps: crpsSorted(samples, cp.actualTotal),
+    cautions: cautionHits(cp, input, run, decomposed),
   };
+}
+
+/** この時点で、本番と同じ規則で出す注意と、それが当たったか(月末に実際に目標を超えたか)。 */
+function cautionHits(
+  cp: Checkpoint,
+  input: BacktestInput,
+  run: ReturnType<typeof runTrials>,
+  decomposed: DecomposedSpending,
+): { issued: number; hits: number } {
+  if (!input.cautionTargets || input.cautionTargets.length === 0) return { issued: 0, hits: 0 };
+  const scale = periodDays(cp.period.from, cp.period.to) / 30;
+  const rows = input.cautionTargets.map((t) => {
+    const index = run.categories.findIndex((c) => c.id === t.categoryId);
+    const base = index >= 0 ? run.categories[index]!.base : 0;
+    const target = Math.round(t.targetYen * scale);
+    const remaining = index >= 0 ? Float64Array.from(run.categorySamples[index]!).sort() : null;
+    let over = 0;
+    if (remaining) for (const v of remaining) if (base + v > target) over += 1;
+    return {
+      categoryId: t.categoryId,
+      type: decomposed.categoryTypes[t.categoryId] ?? 'steady',
+      targetYen: target,
+      medianYen: base + (remaining ? quantile(remaining, 0.5) : 0),
+      baseYen: base,
+      exceedance:
+        remaining && remaining.length > 0 ? over / remaining.length : base > target ? 1 : 0,
+    };
+  });
+  const likely = cautionsFor(rows).filter((c) => c.kind === 'likely');
+  const targetById = new Map(rows.map((r) => [r.categoryId, r.targetYen]));
+  let hits = 0;
+  for (const c of likely) {
+    if ((cp.actualByCategory.get(c.categoryId) ?? 0) > (targetById.get(c.categoryId) ?? Infinity)) {
+      hits += 1;
+    }
+  }
+  return { issued: likely.length, hits };
 }
 
 export function summarize(points: readonly BacktestPoint[]): BacktestSummary {
   const n = points.length;
-  if (n === 0) return { points, hitRate80: 0, medianAbsErrorRatio: 0, medianBias: 0, meanCrps: 0 };
+  const cautionPrecision: CautionPrecision = {};
+  for (const p of points) {
+    if (p.cautions.issued === 0) continue;
+    const acc = cautionPrecision[p.phase] ?? { issued: 0, hits: 0 };
+    acc.issued += p.cautions.issued;
+    acc.hits += p.cautions.hits;
+    cautionPrecision[p.phase] = acc;
+  }
+  if (n === 0) {
+    return {
+      points,
+      hitRate80: 0,
+      medianAbsErrorRatio: 0,
+      medianBias: 0,
+      meanCrps: 0,
+      cautionPrecision,
+    };
+  }
   let hits = 0;
   let absErr = 0;
   let bias = 0;
@@ -232,6 +322,7 @@ export function summarize(points: readonly BacktestPoint[]): BacktestSummary {
     medianAbsErrorRatio: absErr / n,
     medianBias: bias / n,
     meanCrps: crps / n,
+    cautionPrecision,
   };
 }
 

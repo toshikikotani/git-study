@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { reportInsights } from '@/domain/report-insights';
+import { paceReason, reportInsights } from '@/domain/report-insights';
 import type { Forecast, ForecastCategoryBand } from '@/domain/forecast/types';
 
 const band = (over: Partial<ForecastCategoryBand> = {}): ForecastCategoryBand => ({
@@ -16,6 +16,9 @@ const band = (over: Partial<ForecastCategoryBand> = {}): ForecastCategoryBand =>
   fixedYen: 0,
   targetYen: null,
   exceedance: null,
+  meanYen: 0,
+  expectedCount: 0,
+  type: 'steady',
   ...over,
 });
 
@@ -45,6 +48,18 @@ const forecast = (over: Partial<Forecast> = {}): Forecast => ({
   provisional: false,
   balance: null,
   calibration: null,
+  suggestion: null,
+  breakdown: {
+    actualYen: 0,
+    committedYen: 0,
+    visitsYen: 0,
+    billsYen: 0,
+    unrecordedYen: 0,
+    specialYen: 0,
+    variableYen: 0,
+    totalYen: 0,
+    variableByCategory: [],
+  },
   ...over,
 });
 
@@ -73,8 +88,8 @@ describe('reportInsights', () => {
     const budget = out.find((i) => i.key === 'budget')!;
     expect(budget.tone).toBe('caution');
     expect(budget.text).toContain('35%');
-    expect(budget.text).toContain('12,300円');
-    expect(budget.text).toContain('1日 2,500円');
+    expect(budget.text).toContain('約1.2万円');
+    expect(budget.text).toContain('1日 約2,500円');
     expect(budget.text).not.toMatch(/ダメ|失敗|使いすぎ/);
   });
 
@@ -87,8 +102,8 @@ describe('reportInsights', () => {
       previousLabel: '先月',
     });
     const inc = out.find((i) => i.key === 'increase')!;
-    expect(inc.text).toContain('外食は先月より 10,000円 増える見込み');
-    expect(inc.text).toContain('20,000円 → 30,000円');
+    expect(inc.text).toContain('外食は先月より 約1.0万円 増える見込み');
+    expect(inc.text).toContain('20,000円 → 約3.0万円');
   });
 
   it('増え方が小さいジャンルは出さない', () => {
@@ -205,43 +220,46 @@ describe('reportInsights', () => {
   });
 });
 
-describe('reportInsights の残りの見込みと直近のペース', () => {
+describe('paceReason(なぜこの見込み?の一文)', () => {
   it('残りの見込み(合計と1日あたり)と、直近14日の1日あたりを並べて出す', () => {
+    const pace = paceReason(
+      forecast({
+        remainingDays: 26,
+        pace: { remainingYen: 35000, perDayYen: 1346, recentPerDayYen: 1500 },
+      }),
+    )!;
+    expect(pace.tone).toBe('info');
+    expect(pace.text).toContain('残り26日');
+    expect(pace.text).toContain('約3.5万円');
+    expect(pace.text).toContain('この先の見込みは1日 約1,300円');
+    expect(pace.text).toContain('直近14日は1日 約1,500円');
+  });
+
+  it('見込みが直近のペースよりかなり低いときは、多くなりやすいと知らせる', () => {
+    const pace = paceReason(
+      forecast({
+        remainingDays: 26,
+        pace: { remainingYen: 26000, perDayYen: 1000, recentPerDayYen: 2800 },
+      }),
+    )!;
+    expect(pace.tone).toBe('caution');
+    expect(pace.text).toContain('多くなりやすい');
+  });
+
+  it('残りが無い・見込みが0なら出さない', () => {
+    expect(
+      paceReason(
+        forecast({
+          remainingDays: 0,
+          pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null },
+        }),
+      ),
+    ).toBeNull();
+    // 気づきの一覧には出さない(なぜこの見込み?へ移した)。
     const out = reportInsights({
       forecast: forecast({
         remainingDays: 26,
         pace: { remainingYen: 35000, perDayYen: 1346, recentPerDayYen: 1500 },
-      }),
-      budgetYen: null,
-      periodLabel: '今月',
-    });
-    const pace = out.find((i) => i.key === 'pace')!;
-    expect(pace.tone).toBe('info');
-    expect(pace.text).toContain('残り26日');
-    expect(pace.text).toContain('約35,000円');
-    expect(pace.text).toContain('1日あたり約1,300円');
-    expect(pace.text).toContain('直近14日の1日あたりは約1,500円');
-  });
-
-  it('見込みが直近のペースよりかなり低いときは、上振れしやすいと知らせる', () => {
-    const out = reportInsights({
-      forecast: forecast({
-        remainingDays: 26,
-        pace: { remainingYen: 26000, perDayYen: 1000, recentPerDayYen: 2800 },
-      }),
-      budgetYen: null,
-      periodLabel: '今月',
-    });
-    const pace = out.find((i) => i.key === 'pace')!;
-    expect(pace.tone).toBe('caution');
-    expect(pace.text).toContain('上振れしやすい');
-  });
-
-  it('残りが無い・見込みが0なら出さない', () => {
-    const out = reportInsights({
-      forecast: forecast({
-        remainingDays: 0,
-        pace: { remainingYen: 0, perDayYen: null, recentPerDayYen: null },
       }),
       budgetYen: null,
       periodLabel: '今月',

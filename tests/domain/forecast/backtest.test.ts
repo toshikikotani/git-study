@@ -144,6 +144,7 @@ describe('calibrateFromBacktest(時点帯ごとの中心と PIT)', () => {
       p90: samples[90]!,
       hitWithin80: true,
       crps: 0,
+      cautions: { issued: 0, hits: 0 },
     };
   }
 

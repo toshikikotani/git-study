@@ -11,6 +11,7 @@ import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf, type DetectedSubscription } from '@/domain/subscriptions';
 import { detectMonthlyBills, projectBills } from './bills';
 import { entryLagProfile } from './lag';
+import { classifySpending } from './spending-type';
 import { detectRegularMerchants, projectVisits, type VisitSourceTransaction } from './visits';
 import type {
   CategoryBase,
@@ -20,6 +21,7 @@ import type {
   MissingRecordDay,
   OutlierExclusion,
   PeriodObservation,
+  SpendingType,
   VariableTrainingData,
 } from './types';
 
@@ -358,11 +360,45 @@ export function decomposeSpending(input: {
     }
   }
 
+  // 支出の型(定常・まとまり・決まった)。変動費の明細の日付と、来店・請求の有無から決める。
+  const eventDatesById = new Map<string, DateOnly[]>();
+  for (const t of variableAll) {
+    const id = t.genreId ?? UNCATEGORIZED_ID;
+    const list = eventDatesById.get(id) ?? [];
+    list.push(t.occurredOn);
+    eventDatesById.set(id, list);
+  }
+  const categoryTypes: Record<string, SpendingType> = {};
+  const typeIds = new Set([
+    ...baseMap.keys(),
+    ...eventDatesById.keys(),
+    ...regularMerchants.map((m) => m.categoryId),
+    ...billCandidates.map((b) => b.categoryId),
+  ]);
+  for (const id of typeIds) {
+    const name =
+      baseMap.get(id)?.categoryName ??
+      byCategory.get(id)?.name ??
+      regularMerchants.find((m) => m.categoryId === id)?.categoryName ??
+      billCandidates.find((b) => b.categoryId === id)?.categoryName ??
+      '';
+    categoryTypes[id] = classifySpending({
+      name,
+      eventDates: eventDatesById.get(id) ?? [],
+      recordDays: recordDays,
+      hasRegularMerchant: regularMerchants.some((m) => m.categoryId === id),
+      hasBills:
+        billCandidates.some((b) => b.categoryId === id) || (baseMap.get(id)?.fixedYen ?? 0) > 0,
+      closed: input.noForecastGenreIds?.has(id) ?? false,
+    });
+  }
+
   return {
     trainingWindow,
     period,
     today,
     actualYen,
+    categoryTypes,
     committed: { scheduledYen, fixedYen, fixedItems, events },
     special: {
       actualYen: specialActualYen,

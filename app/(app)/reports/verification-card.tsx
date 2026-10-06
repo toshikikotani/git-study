@@ -1,7 +1,15 @@
 import type { Verification } from '@/features/forecast/calibration';
+import type { DateOnly } from '@/lib/date';
 
 /** この予測が過去の月でどれだけ当たったか(自分の記録での検証)。 */
-export function VerificationCard({ verification }: { verification: Verification | null }) {
+export function VerificationCard({
+  verification,
+  monthStart,
+}: {
+  verification: Verification | null;
+  /** 今の月の初日。検証が無いとき「○月が終わると」に使う。 */
+  monthStart?: DateOnly;
+}) {
   return (
     <section
       aria-label="予測の検証"
@@ -13,7 +21,9 @@ export function VerificationCard({ verification }: { verification: Verification 
       </p>
       {verification === null ? (
         <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          過去の月で試すには、記録がまだ足りない。1か月以上たまると、予測が当たったかを出す。
+          {monthStart
+            ? `${Number(monthStart.slice(5, 7))}月が終わると、予測が当たったかを出せます。`
+            : '月が1つ終わると、予測が当たったかを出せます。'}
         </p>
       ) : (
         <>

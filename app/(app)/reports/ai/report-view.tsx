@@ -168,7 +168,7 @@ function ForecastReadSection({
           <dd className="tabular text-right" style={{ color: 'var(--ink)' }}>
             中央 {yen(stat.p50)}
             <span className="block text-xs" style={{ color: 'var(--ink-muted)' }}>
-              下振れ {yen(stat.p10)} 〜 上振れ {yen(stat.p90)}
+              少なくて {yen(stat.p10)} 〜 多くて {yen(stat.p90)}
             </span>
           </dd>
         </div>

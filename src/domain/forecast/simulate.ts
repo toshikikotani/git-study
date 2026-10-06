@@ -40,7 +40,10 @@ import type {
   PeriodObservation,
   ProbableEvent,
   RegularMerchant,
+  SpendingType,
   TypicalProfilePoint,
+  ForecastBreakdown,
+  ForecastSuggestion,
 } from './types';
 
 export const DEFAULT_TRIALS = 10_000;
@@ -98,6 +101,8 @@ export type SimulateInput = {
   calibration?: PitCalibration | null;
   /** 'paths' は日ごとに引く(グラフの線と帯を出す)。'totals' は合計だけ(検証用、速い)。 */
   mode?: 'paths' | 'totals';
+  /** カテゴリごとの支出の型(設計書 v3 4.1)。無いカテゴリは定常型。 */
+  categoryTypes?: Readonly<Record<string, SpendingType>>;
 };
 
 function quantileAt(sortedAsc: ArrayLike<number>, p: number): number {
@@ -134,6 +139,11 @@ export type TrialRun = {
   categorySamples: Float64Array[];
   unrecordedSamples: Float64Array;
   eventsYen: number;
+  /** 学習できたカテゴリの、残りの回数の平均と、変動費だけの額の平均(来店・未記録を除く)。 */
+  categoryCountMean: Float64Array;
+  categoryVariableMean: Float64Array;
+  visitMean: number;
+  billMean: number;
 };
 
 /** 試行を回す本体。本番(simulateForecast)と検証(simulateTotalSamples)が共有する。 */
@@ -275,6 +285,10 @@ export function runTrials(input: SimulateInput): TrialRun {
   const specialSamples = new Float64Array(trials);
   const variableSamples = new Float64Array(trials);
   const unrecordedSamples = new Float64Array(trials);
+  const countSum = new Float64Array(nFit);
+  const variableSum = new Float64Array(nFit);
+  let visitSum = 0;
+  let billSum = 0;
   const categorySamples: Float64Array[] = categories.map(() => new Float64Array(trials));
   const pathIncrements = mode === 'paths' && D > 0 ? new Float64Array(trials * D) : null;
   const dayTotals = new Float64Array(Math.max(1, D));
@@ -312,6 +326,7 @@ export function runTrials(input: SimulateInput): TrialRun {
         for (let d = 0; d < D; d += 1) {
           const count = samplePoisson(rng, rate * p.factors[d]!);
           if (count === 0) continue;
+          countSum[c]! += count;
           const mu = futureOff[d] ? muOff : muOn;
           let dayYen = 0;
           for (let i = 0; i < count; i += 1) dayYen += sampleLognormal(rng, mu, sigma);
@@ -321,6 +336,7 @@ export function runTrials(input: SimulateInput): TrialRun {
       } else {
         const countOff = samplePoisson(rng, rate * p.sumOff);
         const countOn = samplePoisson(rng, rate * p.sumOn);
+        countSum[c]! += countOff + countOn;
         for (let i = 0; i < countOff; i += 1) catTotal += sampleLognormal(rng, muOff, sigma);
         for (let i = 0; i < countOn; i += 1) catTotal += sampleLognormal(rng, muOn, sigma);
       }
@@ -336,6 +352,7 @@ export function runTrials(input: SimulateInput): TrialRun {
         unrecordedTotal += missing;
       }
       categorySamples[c]![t] = (catTotal + missing) * scale;
+      variableSum[c]! += catTotal * scale;
     }
     for (let c = nFit; c < nAll; c += 1) categorySamples[c]![t] = 0;
 
@@ -349,6 +366,8 @@ export function runTrials(input: SimulateInput): TrialRun {
       categorySamples[index]![t]! += yen;
       if (scaled) visitTotal += amount;
       else billTotal += amount;
+      if (scaled) visitSum += yen;
+      else billSum += yen;
     }
 
     for (const { m, expected, index } of unrecordedVisits) {
@@ -397,6 +416,10 @@ export function runTrials(input: SimulateInput): TrialRun {
     categorySamples,
     unrecordedSamples,
     eventsYen,
+    categoryCountMean: countSum.map((v) => v / trials),
+    categoryVariableMean: variableSum.map((v) => v / trials),
+    visitMean: visitSum / trials,
+    billMean: billSum / trials,
   };
 }
 
@@ -518,6 +541,9 @@ export function simulateForecast(input: SimulateInput): Forecast {
       fixedYen: detail.fixed,
       targetYen: cat.target,
       exceedance: cat.target === null ? null : over / trials,
+      meanYen: Math.round(mean(categorySamples[c]!)),
+      expectedCount: c < run.categoryCountMean.length ? run.categoryCountMean[c]! : 0,
+      type: input.categoryTypes?.[cat.id] ?? 'steady',
     };
   });
 
@@ -551,20 +577,38 @@ export function simulateForecast(input: SimulateInput): Forecast {
 
   // グラフの線と帯:日ごとの累計の増分の分位(着地と同じ分位の位置)。最終日 + 実績 = 着地。
   const path: PathPoint[] = [];
+  const inner = { p25: rawLevelFor(cal, 0.25), p75: rawLevelFor(cal, 0.75) };
   if (run.pathIncrements !== null) {
     const column = new Float64Array(trials);
     for (let d = 0; d < D; d += 1) {
       for (let t = 0; t < trials; t += 1) column[t] = run.pathIncrements[t * D + d]!;
       column.sort();
       const band = bandAt(column, levels);
-      path.push({ date: run.futureDates[d]!, p10: band.p10, p50: band.p50, p90: band.p90 });
+      path.push({
+        date: run.futureDates[d]!,
+        p10: band.p10,
+        p25: Math.min(band.p50, Math.max(band.p10, Math.round(quantileAt(column, inner.p25)))),
+        p50: band.p50,
+        p75: Math.min(band.p90, Math.max(band.p50, Math.round(quantileAt(column, inner.p75)))),
+        p90: band.p90,
+      });
     }
     // 最終日は着地と同じ数字にそろえる(丸めの差も残さない)。
     const last = path[path.length - 1];
     if (last) {
       last.p10 = Math.max(0, total.p10 - input.actualYen);
+      last.p25 = Math.max(
+        last.p10,
+        Math.round(quantileAt(sortedTotal, inner.p25)) - input.actualYen,
+      );
       last.p50 = Math.max(0, total.p50 - input.actualYen);
+      last.p75 = Math.max(
+        last.p50,
+        Math.round(quantileAt(sortedTotal, inner.p75)) - input.actualYen,
+      );
       last.p90 = Math.max(0, total.p90 - input.actualYen);
+      last.p25 = Math.min(last.p25, last.p50);
+      last.p75 = Math.min(last.p75, last.p90);
     }
   }
 
@@ -577,6 +621,8 @@ export function simulateForecast(input: SimulateInput): Forecast {
     0,
   );
   const sortedSpecial = sortedCopy(specialSamples);
+  const suggestion = suggestCut({ input, run, byCategory, cal });
+  const breakdown = breakdownOf({ input, run, total, byCategory });
 
   return {
     periodId: input.periodId,
@@ -612,6 +658,8 @@ export function simulateForecast(input: SimulateInput): Forecast {
     expectedOvershoot: overshootTrialCount > 0 ? Math.round(overshootSum / overshootTrialCount) : 0,
     drivers,
     safeDailyAllowance,
+    suggestion,
+    breakdown,
     status: input.fitted.dataDays < LEARNING_DATA_DAYS ? 'learning' : 'ready',
     dataDays: input.fitted.dataDays,
     phase: 'early', // engine.ts が埋める
@@ -657,4 +705,102 @@ function findSafeDailyAllowance(input: {
   const meanVariable = mean(input.variableSamples);
   const dailyVariableMean = meanVariable / Math.max(1, input.remainingDays);
   return Math.max(0, Math.round(lo * dailyVariableMean));
+}
+
+/**
+ * 提案を1つ:定常型のカテゴリの回数を週1回減らしたとき、予算に収まる確率がいちばん上がるもの。
+ * 同じ試行のそのカテゴリの額に倍率(1 − 減らす回数 ÷ 見込みの回数)を掛けて数え直す(目安)。
+ */
+function suggestCut(args: {
+  input: SimulateInput;
+  run: TrialRun;
+  byCategory: readonly ForecastCategoryBand[];
+  cal: PitCalibration | null;
+}): ForecastSuggestion | null {
+  const { input, run, byCategory, cal } = args;
+  const budget = input.budgetYen;
+  const D = run.futureDates.length;
+  if (budget === null || D < 7) return null;
+  const weeks = D / 7;
+  const within = (shift: (t: number) => number) => {
+    let n = 0;
+    for (let t = 0; t < run.trials; t += 1) if (run.totalSamples[t]! - shift(t) <= budget) n += 1;
+    return calibratedProbability(cal, n / run.trials);
+  };
+  const probBefore = within(() => 0);
+  let best: ForecastSuggestion | null = null;
+  byCategory.forEach((cat, c) => {
+    if (cat.type !== 'steady' || cat.expectedCount < weeks * 1.5) return;
+    const cut = Math.min(1, weeks / cat.expectedCount);
+    const samples = run.categorySamples[c]!;
+    const probAfter = within((t) => samples[t]! * cut);
+    const savedYen = Math.round(mean(samples) * cut);
+    if (savedYen <= 0) return;
+    if (best === null || probAfter - probBefore > best.probAfter - best.probBefore) {
+      best = {
+        categoryId: cat.categoryId,
+        categoryName: cat.categoryName,
+        perWeek: 1,
+        savedYen,
+        probBefore,
+        probAfter,
+      };
+    }
+  });
+  return best;
+}
+
+/**
+ * 着地の積み上げ:使った額 → 決まっている額 → 来店 → 請求 → 未記録 → 特別費 → 残りの変動費。
+ * 残り全体(中央値 − 決まっている額)を、各部分の平均の比で配る。合計は total.p50 と同じ。
+ */
+function breakdownOf(args: {
+  input: SimulateInput;
+  run: TrialRun;
+  total: Band;
+  byCategory: readonly ForecastCategoryBand[];
+}): ForecastBreakdown {
+  const { input, run, total, byCategory } = args;
+  const committedYen = Math.round(run.eventsYen);
+  const remaining = Math.max(0, total.p50 - input.actualYen - committedYen);
+  const parts = {
+    visits: run.visitMean,
+    bills: run.billMean,
+    unrecorded: mean(run.unrecordedSamples),
+    special: mean(run.specialSamples),
+    variable: run.categoryVariableMean.reduce((a, b) => a + b, 0),
+  };
+  const sum = Object.values(parts).reduce((a, b) => a + b, 0);
+  const scale = sum > 0 ? remaining / sum : 0;
+  const visitsYen = Math.round(parts.visits * scale);
+  const billsYen = Math.round(parts.bills * scale);
+  const unrecordedYen = Math.round(parts.unrecorded * scale);
+  const specialYen = Math.round(parts.special * scale);
+  // 丸めの差は変動費に寄せ、合計を見出しと必ず一致させる。
+  const variableYen = remaining - visitsYen - billsYen - unrecordedYen - specialYen;
+  const variableByCategory = byCategory
+    .map((cat, c) => ({
+      categoryId: cat.categoryId,
+      categoryName: cat.categoryName,
+      raw: c < run.categoryVariableMean.length ? run.categoryVariableMean[c]! : 0,
+    }))
+    .filter((x) => x.raw > 0);
+  const rawSum = variableByCategory.reduce((a, b) => a + b.raw, 0);
+  return {
+    actualYen: input.actualYen,
+    committedYen,
+    visitsYen,
+    billsYen,
+    unrecordedYen,
+    specialYen,
+    variableYen,
+    totalYen: total.p50,
+    variableByCategory: variableByCategory
+      .map((x) => ({
+        categoryId: x.categoryId,
+        categoryName: x.categoryName,
+        yen: rawSum > 0 ? Math.round((x.raw / rawSum) * variableYen) : 0,
+      }))
+      .sort((a, b) => b.yen - a.yen),
+  };
 }

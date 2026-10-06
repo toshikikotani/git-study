@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { MdLocalFireDepartment } from 'react-icons/md';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
 import { listDebts } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
+import { TodaySection } from './_home/today-section';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
@@ -73,19 +75,16 @@ export default async function HomePage() {
   // 数字かを本人が判断できるようにする。
   return (
     <div className="space-y-3">
-      {/* FR-03:完済カウントダウンは最上部に固定。
-          この画面で 48px 超の数字はここだけ(dataviz:ヒーロー figure は1画面に1つ)。 */}
+      {/* 設計書 v3 3.1:ホームの主役は「今日あと使える額」。予測は重いので、ほかを待たせない。
+          この画面で大きな数字はここだけ(dataviz:ヒーロー figure は1画面に1つ)。 */}
+      <Suspense fallback={<TodaySkeleton />}>
+        <TodaySection />
+      </Suspense>
+
       <section
-        className="rise relative overflow-hidden rounded-[28px] p-6 pb-7"
+        className="rise relative overflow-hidden rounded-[22px] px-4 py-4"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
-        {/* 数字の背後の淡い光。視線を最上部へ引く */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-28 -right-20 size-64 rounded-full blur-3xl"
-          style={{ background: 'var(--hero-glow)' }}
-        />
-
         <div className="relative">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -95,7 +94,7 @@ export default async function HomePage() {
           </div>
 
           <p
-            className="mt-3 text-4xl leading-none font-semibold tracking-[-0.045em] tabular"
+            className="mt-2 text-2xl leading-none font-semibold tracking-[-0.03em] tabular"
             style={{ color: 'var(--ink)' }}
           >
             {savingsYen === null ? '—' : formatYen(savingsYen)}
@@ -220,5 +219,24 @@ function StreakBadge({ streak }: { streak: CheckinStreak }) {
         '今日から再開'
       )}
     </span>
+  );
+}
+
+/** 今日あと使える額を読み込んでいる間の枠(高さを先に取り、下の段がずれないようにする)。 */
+function TodaySkeleton() {
+  return (
+    <section
+      aria-label="今日あと使える額"
+      aria-busy="true"
+      className="rounded-[28px] p-6 pb-7"
+      style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+        今日 あと
+      </p>
+      <p className="mt-3 text-sm" style={{ color: 'var(--ink-muted)' }}>
+        見込みを計算しています…
+      </p>
+    </section>
   );
 }

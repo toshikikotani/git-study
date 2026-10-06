@@ -80,6 +80,9 @@ export type CumulativeDay = {
   forecastYen: number | null;
   forecastLowYen: number | null;
   forecastHighYen: number | null;
+  /** 予測の濃い帯(10回中5回。日ごとの分位があるときだけ)。 */
+  forecastInnerLowYen: number | null;
+  forecastInnerHighYen: number | null;
 };
 
 export type CumulativeChart = {
@@ -108,13 +111,62 @@ export type RemainingForecast = {
    * 今日より先の各日までに、今日の実績へ足される額(予定・固定費・請求を含む)の分位。
    * あれば、線と帯はこの値で描く(日数に比例させる近似をしない)。
    */
-  path?: readonly { date: DateOnly; lowYen: number; medianYen: number; highYen: number }[];
+  path?: readonly {
+    date: DateOnly;
+    lowYen: number;
+    medianYen: number;
+    highYen: number;
+    /** 濃い帯(25%・75%)。 */
+    innerLowYen?: number;
+    innerHighYen?: number;
+  }[];
   /**
    * 理想の線の形(各日までに決まっている支払いの累計と、いつもの使い方での変動費の累計の割合)。
    * あれば、目標の理想の線を「決まっている支払い + 残りの予算 × いつもの割合」で引く。
    */
   profile?: readonly { date: DateOnly; committedYen: number; share: number }[];
 };
+
+/**
+ * 「変えられる支出だけ」のグラフ(設計書 v3 3.4)のために、決まった支出のジャンルの予定を、
+ * 予測の日ごとの分位から引く(決まった支出のジャンルは、予定のほかに見込みを持たない)。
+ * 理想の形(profile)は全部の予定で作っているので外す(均等に配る理想になる)。
+ */
+export function withoutScheduled(
+  remaining: RemainingForecast,
+  scheduled: readonly CategoryLine[],
+): RemainingForecast {
+  const byDate = new Map<DateOnly, number>();
+  for (const l of scheduled) {
+    if (l.status !== 'scheduled' || l.amountYen >= 0) continue;
+    byDate.set(l.occurredOn, (byDate.get(l.occurredOn) ?? 0) - l.amountYen);
+  }
+  let cum = 0;
+  const minus = (v: number | undefined) => (v === undefined ? undefined : Math.max(0, v - cum));
+  const path = remaining.path?.map((p) => {
+    cum += byDate.get(p.date) ?? 0;
+    const out = {
+      date: p.date,
+      lowYen: Math.max(0, p.lowYen - cum),
+      medianYen: Math.max(0, p.medianYen - cum),
+      highYen: Math.max(0, p.highYen - cum),
+    };
+    const innerLowYen = minus(p.innerLowYen);
+    const innerHighYen = minus(p.innerHighYen);
+    return {
+      ...out,
+      ...(innerLowYen !== undefined ? { innerLowYen } : {}),
+      ...(innerHighYen !== undefined ? { innerHighYen } : {}),
+    };
+  });
+  // 合計の low・median・high はもともと予定を含まないので、そのまま使う。
+  return {
+    lowYen: remaining.lowYen,
+    medianYen: remaining.medianYen,
+    highYen: remaining.highYen,
+    ...(path ? { path } : {}),
+  };
+}
 
 /** 「理想より○円少ない / 多い」。 */
 export function idealDeltaLabel(deltaYen: number): string {
@@ -242,6 +294,10 @@ export function buildCumulative(input: {
     const spread = Math.sqrt(frac);
     const point = pathByDate?.get(date);
     if (point) lastPath = point;
+    const innerAt = (band: 'innerLowYen' | 'innerHighYen') => {
+      const v = pathByDate !== null ? lastPath?.[band] : undefined;
+      return hasForecast && future && v !== undefined ? Math.round(base + v) : null;
+    };
     const forecastAt = (band: 'lowYen' | 'medianYen' | 'highYen') =>
       rem === null
         ? null
@@ -292,6 +348,8 @@ export function buildCumulative(input: {
             ? forecastAt('highYen')
             : Math.round(base + perDay * (1 + FORECAST_BAND) * k + scheduledCum)
           : null,
+      forecastInnerLowYen: innerAt('innerLowYen'),
+      forecastInnerHighYen: innerAt('innerHighYen'),
     });
   }
 

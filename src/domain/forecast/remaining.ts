@@ -21,6 +21,8 @@ export function remainingOfTotal(forecast: Forecast): RemainingForecast {
       lowYen: p.p10,
       medianYen: p.p50,
       highYen: p.p90,
+      innerLowYen: p.p25,
+      innerHighYen: p.p75,
     })),
     profile: forecast.typicalProfile,
   };

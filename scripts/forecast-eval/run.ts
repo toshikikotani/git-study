@@ -71,6 +71,23 @@ const targets = [
     : `- 分位スコア(CRPS の近似):${yen(overall.score)}`,
 ].join('\n');
 
+// 注意の精度(設計書 v3 3.2、P1 の条件:70%以上)。時点帯ごと・データごと。
+const precisionText = (m: EvalMetrics) =>
+  m.cautionPrecision === null
+    ? '出していない'
+    : `${pct(m.cautionPrecision)}(${m.cautionsIssued}回)`;
+const cautionRows = [
+  ...(['early', 'mid', 'late'] as const).map((phase) => {
+    const label = { early: '序盤', mid: '中盤', late: '終盤' }[phase];
+    return `| ${label} | ${precisionText(metricsOf(points.filter((p) => p.phase === phase)))} |`;
+  }),
+  ...v2Rows.slice(1).map((row) => `| ${row.name} | ${precisionText(row.metrics)} |`),
+  `| **全体** | ${precisionText(overall)} |`,
+].join('\n');
+const cautionTarget = `- 注意の精度:${
+  overall.cautionPrecision === null ? '出していない' : pct(overall.cautionPrecision)
+}(目標 70%以上)${check(overall.cautionPrecision !== null && overall.cautionPrecision >= 0.7)}`;
+
 const md = `# 予測エンジンの評価(v2、ADR-071)
 
 自動生成:\`npm run eval:forecast\`(\`scripts/forecast-eval/run.ts\`)。手で編集しないこと。
@@ -105,9 +122,20 @@ ${table}
 - 中央値の偏り:(中央値 − 実際) ÷ 実際 の平均。負は低く出ている。
 - 分位スコア:p10・p50・p90 のピンボール損失(CRPS の近似、円)。小さいほど良い。
 
-## 目標(仕様の7章)
+## 注意の精度(設計書 v3 3.2)
+
+ジャンルの目標は、各月の直前3か月の平均(3,000円以上のジャンルだけ)。本番と同じ関数
+(\`landingRowsFrom\` → \`cautionsFor\`)で「このままだと」を出し、月末にそのジャンルが目標を
+超えていれば当たり。完了した月での検証で精度が70%未満の時点帯は、本番と同じく出さない。
+
+| 時点・データ | 精度(出した回数) |
+|---|---|
+${cautionRows}
+
+## 目標(仕様の7章・設計書 v3 の P1 の条件)
 
 ${targets}
+${cautionTarget}
 
 ## 残課題
 
@@ -118,4 +146,6 @@ ${targets}
 writeFileSync(OUT_PATH, md, 'utf8');
 console.log(table);
 console.log(targets);
+console.log(cautionRows);
+console.log(cautionTarget);
 console.log(`書き出しました: ${OUT_PATH}`);

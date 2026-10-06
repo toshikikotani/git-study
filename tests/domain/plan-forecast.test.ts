@@ -16,6 +16,9 @@ const cat = (over: Partial<ForecastCategoryBand> = {}): ForecastCategoryBand => 
   fixedYen: 0,
   targetYen: 20000,
   exceedance: 0.1,
+  meanYen: 0,
+  expectedCount: 0,
+  type: 'steady',
   ...over,
 });
 
@@ -45,6 +48,18 @@ const forecast = (c: ForecastCategoryBand, over: Partial<Forecast> = {}): Foreca
   provisional: false,
   balance: null,
   calibration: null,
+  suggestion: null,
+  breakdown: {
+    actualYen: 0,
+    committedYen: 0,
+    visitsYen: 0,
+    billsYen: 0,
+    unrecordedYen: 0,
+    specialYen: 0,
+    variableYen: 0,
+    totalYen: 0,
+    variableByCategory: [],
+  },
   ...over,
 });
 
