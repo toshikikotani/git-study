@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { remainingOfCategory, remainingOfTotal } from '@/domain/forecast/remaining';
 import type { Forecast } from '@/domain/forecast/types';
-import { buildCategoryLines, type CategoryTx } from '@/features/category/model';
-import { buildCumulative } from '@/features/category/pace';
+import { buildCategoryLines, type CategoryLine, type CategoryTx } from '@/features/category/model';
+import { buildCumulative, withoutScheduled } from '@/features/category/pace';
 import { ledgerTx } from '../../helpers/ledger';
 
 const TODAY = '2026-10-06';
@@ -132,5 +132,39 @@ describe('remainingOfTotal / remainingOfCategory', () => {
     expect(remainingOfCategory(forecast, 'none')).toBeNull();
     const over = { ...forecast, total: { ...forecast.total, p10: 1000 } } as Forecast;
     expect(remainingOfTotal(over).lowYen).toBe(0);
+  });
+});
+
+describe('withoutScheduled(変えられる支出だけ、設計書 v3 3.4)', () => {
+  it('決まった支出の予定を、その日から先の日ごとの分位から引く(合計は予定を含まないのでそのまま)', () => {
+    const out = withoutScheduled(
+      {
+        lowYen: 1000,
+        medianYen: 2000,
+        highYen: 3000,
+        path: [
+          {
+            date: '2026-10-07',
+            lowYen: 100,
+            medianYen: 200,
+            highYen: 300,
+            innerLowYen: 150,
+            innerHighYen: 250,
+          },
+          { date: '2026-10-08', lowYen: 5200, medianYen: 5400, highYen: 5600 },
+        ],
+      },
+      [
+        {
+          id: 'rent',
+          occurredOn: '2026-10-08',
+          amountYen: -5000,
+          status: 'scheduled',
+        } as unknown as CategoryLine,
+      ],
+    );
+    expect(out.medianYen).toBe(2000);
+    expect(out.path![0]).toMatchObject({ medianYen: 200, innerLowYen: 150 });
+    expect(out.path![1]).toMatchObject({ lowYen: 200, medianYen: 400, highYen: 600 });
   });
 });

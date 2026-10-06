@@ -112,4 +112,37 @@ describe('同じ範囲の同じ数字(P0)', () => {
     const rem = remainingOfCategory(only, 'dining')!;
     expect(only.actualYen + rem.path!.at(-1)!.medianYen).toBe(only.total.p50);
   });
+
+  it('「なぜ」の積み上げの合計は、見出しの中央と同じ(P1)', () => {
+    const b = forecast.breakdown;
+    const sum =
+      b.actualYen +
+      b.committedYen +
+      b.visitsYen +
+      b.billsYen +
+      b.unrecordedYen +
+      b.specialYen +
+      b.variableYen;
+    expect(sum).toBe(forecast.total.p50);
+    expect(b.totalYen).toBe(forecast.total.p50);
+    expect(b.actualYen).toBe(forecast.actualYen);
+  });
+
+  it('グラフの濃い帯(50%)は、薄い帯(80%)の内側(P1)', () => {
+    for (const p of forecast.path) {
+      expect(p.p10).toBeLessThanOrEqual(p.p25);
+      expect(p.p25).toBeLessThanOrEqual(p.p50);
+      expect(p.p50).toBeLessThanOrEqual(p.p75);
+      expect(p.p75).toBeLessThanOrEqual(p.p90);
+    }
+  });
+
+  it('提案は定常型のジャンルで、減らせば収まる確率が下がらない(P1)', () => {
+    const s = forecast.suggestion;
+    expect(s).not.toBeNull();
+    expect(forecast.byCategory.find((c) => c.categoryId === s!.categoryId)!.type).toBe('steady');
+    expect(s!.probAfter).toBeGreaterThanOrEqual(s!.probBefore);
+    expect(s!.probBefore).toBeCloseTo(forecast.probWithinBudget!, 6);
+    expect(s!.savedYen).toBeGreaterThan(0);
+  });
 });

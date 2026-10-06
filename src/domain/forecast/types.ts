@@ -153,6 +153,8 @@ export type DecomposedSpending = {
   entryLag: readonly number[] | null;
   /** 直近14日の1日あたりの支出(固定費・予測を止めたジャンルを除く)。記録が無ければ null。 */
   recentPerDayYen: number | null;
+  /** カテゴリごとの支出の型(設計書 v3 4.1)。 */
+  categoryTypes: Readonly<Record<string, SpendingType>>;
   missingRecordDays: readonly MissingRecordDay[];
   /** 学習に使えた実際の日数(記録開始日・学習窓の短い方)。 */
   dataDays: number;
@@ -204,7 +206,22 @@ export type FittedModel = {
 export type Band = { p10: number; p50: number; p70: number; p90: number };
 
 /** グラフの予測の線:今日より先の各日までに、今日の実績へ足される額(予定・固定費・請求を含む)。 */
-export type PathPoint = { date: DateOnly; p10: number; p50: number; p90: number };
+export type PathPoint = {
+  date: DateOnly;
+  p10: number;
+  /** 10回中5回の帯(25〜75%)。グラフの濃い帯(設計書 v3 3.4)。 */
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+};
+
+/**
+ * 支出の型(設計書 v3 4.1)。定常型=月に4回以上、間がそろっている(注意の対象)。
+ * まとまり型=月に2回未満、またはまとめて払う(旅行・家電など)。決まった型=固定費・請求・
+ * 予測を止めたもの(注意は出さない)。
+ */
+export type SpendingType = 'steady' | 'lumpy' | 'fixed';
 
 /**
  * 理想の線の形:各日までに決まっている支払い(予定・固定費・請求の見込み)の累計と、
@@ -229,6 +246,41 @@ export type ForecastCategoryBand = {
   /** 目標額と、それを超える確率(目標が無ければ null)。 */
   targetYen: number | null;
   exceedance: number | null;
+  /** 残りの変動する部分の平均(内訳の配分に使う)。 */
+  meanYen: number;
+  /** 残りの期間に見込まれる回数(変動費の部分。学習できないカテゴリは0)。 */
+  expectedCount: number;
+  type: SpendingType;
+};
+
+/**
+ * 提案を1つ(設計書 v3 3.1・3.6):回数を週1回減らしたときの、予算に収まる確率と浮く額。
+ * 試行を回し直さず、同じ試行のそのカテゴリの額に倍率を掛けて出す(目安)。
+ */
+export type ForecastSuggestion = {
+  categoryId: string;
+  categoryName: string;
+  perWeek: number;
+  savedYen: number;
+  probBefore: number;
+  probAfter: number;
+};
+
+/**
+ * 着地の積み上げ(設計書 v3 3.5)。中央値どうしは足し算にならないので、残り全体は中央値で、
+ * その内訳は平均の比で配る。合計は必ず total.p50 と同じ。
+ */
+export type ForecastBreakdown = {
+  actualYen: number;
+  committedYen: number;
+  visitsYen: number;
+  billsYen: number;
+  unrecordedYen: number;
+  specialYen: number;
+  variableYen: number;
+  totalYen: number;
+  /** 残りの変動費のジャンル別(平均の比で配った額)。 */
+  variableByCategory: readonly { categoryId: string; categoryName: string; yen: number }[];
 };
 
 export type ForecastDriver = { categoryId: string; categoryName: string; shareOfRisk: number };
@@ -288,6 +340,8 @@ export type Forecast = {
   expectedOvershoot: number;
   drivers: readonly ForecastDriver[];
   safeDailyAllowance: number | null;
+  suggestion: ForecastSuggestion | null;
+  breakdown: ForecastBreakdown;
   status: 'learning' | 'ready';
   dataDays: number;
   /** 今日が期間のどの時点帯か(中心の補正に使った帯)。 */

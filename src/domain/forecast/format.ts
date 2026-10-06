@@ -54,3 +54,10 @@ function estimateBody(yen: number): string {
   }
   return `${sign}${abs.toLocaleString('ja-JP')}`;
 }
+
+/** 確率を「10回中○回」で言う(設計書 v3 3.9)。%は小さく添える。 */
+export function formatTimesInTen(p: number): string {
+  const times = Math.min(10, Math.max(0, Math.round(p * 10)));
+  if (times === 0) return '10回中1回もない';
+  return `10回中${times}回`;
+}

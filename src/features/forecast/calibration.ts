@@ -18,6 +18,7 @@ import {
   runBacktest,
   type BacktestPoint,
 } from '@/domain/forecast/backtest';
+import type { CautionPrecision } from '@/domain/forecast/caution';
 import { rawLevelFor } from '@/domain/forecast/pit';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
 import type { ForecastCalibration } from '@/domain/forecast/types';
@@ -160,5 +161,53 @@ export function verifyForecast(input: {
   }
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
   cache.set(input.cacheKey, result);
+  return result;
+}
+
+/** 注意の精度を測るときの試行回数と時点の間隔(検証より軽くする)。 */
+const CAUTION_TRIALS = 300;
+const CAUTION_STEP_DAYS = 4;
+const cautionCache = new Map<string, CautionPrecision>();
+
+/**
+ * 注意の精度(設計書 v3 3.2):今の目標を過去の月にも当てて、本番と同じ規則で出した注意が
+ * 実際に当たった(月末に目標を超えた)割合を、時点帯ごとに数える。精度が 70% 未満の時点帯では
+ * 画面に注意を出さない。目標(30日あたり)が変わると鍵が変わる。
+ */
+export function verifyCautions(input: {
+  cacheKey: string;
+  transactions: readonly ForecastSourceTransaction[];
+  today: DateOnly;
+  recordStart: DateOnly | null;
+  payday: number | null;
+  noForecastGenreIds?: ReadonlySet<string>;
+  verification: Verification | null;
+  targets: readonly { categoryId: string; targetYen: number }[];
+}): CautionPrecision {
+  const hit = cautionCache.get(input.cacheKey);
+  if (hit) return hit;
+  const periods = backtestMonths(input.today, input.recordStart);
+  let result: CautionPrecision = {};
+  if (periods.length > 0 && input.targets.length > 0) {
+    result = runBacktest({
+      transactions: input.transactions,
+      periods,
+      trainingWindowDays: TRAINING_WINDOW_DAYS,
+      recordStart: input.recordStart,
+      payday: input.payday,
+      ...(input.noForecastGenreIds ? { noForecastGenreIds: input.noForecastGenreIds } : {}),
+      halfLifeDays: input.verification?.halfLifeDays ?? DEFAULT_HALF_LIFE_DAYS,
+      monthLevelK: input.verification
+        ? (input.verification.monthLevelK ?? Infinity)
+        : DEFAULT_MONTH_LEVEL_K,
+      trials: CAUTION_TRIALS,
+      stepDays: CAUTION_STEP_DAYS,
+      cautionTargets: input.targets,
+    }).cautionPrecision;
+  }
+  if (cautionCache.size >= CACHE_LIMIT) {
+    cautionCache.delete(cautionCache.keys().next().value as string);
+  }
+  cautionCache.set(input.cacheKey, result);
   return result;
 }

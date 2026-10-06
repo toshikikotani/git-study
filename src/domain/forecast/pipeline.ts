@@ -136,6 +136,7 @@ export function simulateInputFor(
     ...(input.remainingScale !== undefined ? { remainingScale: input.remainingScale } : {}),
     calibration: input.calibration ?? null,
     mode: input.mode ?? 'paths',
+    categoryTypes: decomposed.categoryTypes,
   };
 }
 

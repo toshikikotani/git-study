@@ -3,7 +3,12 @@
  * 叱らず、事実→次の一手の順に短く書く(docs/WRITING.md)。数字には単位と期間を添える。
  */
 
-import { CAUTION_EXCEEDANCE, formatEstimate, formatProbability } from '@/domain/forecast/format';
+import {
+  CAUTION_EXCEEDANCE,
+  formatEstimate,
+  formatProbability,
+  formatTimesInTen,
+} from '@/domain/forecast/format';
 import type { Forecast } from '@/domain/forecast/types';
 
 export type Insight = {
@@ -46,41 +51,24 @@ export function reportInsights(input: {
   // 予算に収まる確率と、次の一手(1日の上限)。
   if (budgetYen !== null && forecast.probWithinBudget !== null) {
     const within = forecast.probWithinBudget;
-    const pct = formatProbability(within);
+    const pct = `${formatTimesInTen(within)}(${formatProbability(within)})`;
     if (1 - within < CAUTION_EXCEEDANCE) {
       out.push({
         key: 'budget',
         tone: 'info',
-        text: `予算 ${yen(budgetYen)} に収まる確率は${pct}。このペースで足りる。`,
+        text: `予算 ${yen(budgetYen)} に収まるのは${pct}。このペースで足りる。`,
       });
     } else {
       const allowance =
         forecast.safeDailyAllowance !== null && forecast.remainingDays > 0
-          ? `残り${forecast.remainingDays}日を1日 約${est(forecast.safeDailyAllowance)} までにすると、収まる確率が80%になる。`
+          ? `残り${forecast.remainingDays}日を1日 約${est(forecast.safeDailyAllowance)} までにすると、収まるのが10回中8回になる。`
           : '';
       out.push({
         key: 'budget',
         tone: 'caution',
-        text: `予算 ${yen(budgetYen)} に収まる確率は${pct}。超えるときは平均で 約${est(forecast.expectedOvershoot)} 超える。${allowance}`,
+        text: `予算 ${yen(budgetYen)} に収まるのは${pct}。超えるときは平均で 約${est(forecast.expectedOvershoot)} 超える。${allowance}`,
       });
     }
-  }
-
-  // 残りの見込みが妥当か確かめられるように、1日あたりと直近のペースを並べる。
-  const pace = forecast.pace;
-  if (pace.perDayYen !== null && forecast.remainingDays > 0 && pace.remainingYen > 0) {
-    const recent = pace.recentPerDayYen;
-    const lower = recent !== null && recent > 0 && pace.perDayYen < recent * 0.7;
-    out.push({
-      key: 'pace',
-      tone: lower ? 'caution' : 'info',
-      text:
-        `残り${forecast.remainingDays}日は、中央で約${est(pace.remainingYen)}(1日あたり約${est(pace.perDayYen)})を見込んでいる。` +
-        (recent !== null ? `直近14日の1日あたりは約${est(recent)}。` : '') +
-        (lower
-          ? '見込みは直近のペースより低い。まとまった支払いが続いていたなら、上振れしやすい。'
-          : ''),
-    });
   }
 
   // 先と比べて増える見込みのジャンル(理由は数字で示す)。
@@ -192,4 +180,25 @@ export function reportInsights(input: {
   }
 
   return out.slice(0, MAX_INSIGHTS);
+}
+
+/**
+ * 「なぜこの見込み?」の一文の理由(設計書 v3 3.5)。残りの1日あたりの見込みと、直近14日の
+ * 1日あたりを並べる。見込みが直近よりかなり低いときは、多くなりやすいと添える。
+ */
+export function paceReason(forecast: Forecast): Insight | null {
+  const pace = forecast.pace;
+  if (pace.perDayYen === null || forecast.remainingDays <= 0 || pace.remainingYen <= 0) return null;
+  const recent = pace.recentPerDayYen;
+  const lower = recent !== null && recent > 0 && pace.perDayYen < recent * 0.7;
+  return {
+    key: 'pace',
+    tone: lower ? 'caution' : 'info',
+    text:
+      (recent !== null ? `直近14日は1日 約${est(recent)}。` : '') +
+      `この先の見込みは1日 約${est(pace.perDayYen)}(残り${forecast.remainingDays}日で 約${est(pace.remainingYen)})。` +
+      (lower
+        ? '見込みは直近のペースより低い。まとまった支払いが続いていたなら、多くなりやすい。'
+        : ''),
+  };
 }

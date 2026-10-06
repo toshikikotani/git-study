@@ -14,6 +14,69 @@ import type { DateOnly } from '@/lib/date';
 
 export function GoalChart({
   genreName,
+  lines: allLines,
+  monthStart,
+  monthEnd,
+  today,
+  budgetYen: allBudget,
+  goalFrom,
+  goalTo,
+  remaining: allRemaining,
+  changeable,
+}: {
+  genreName: string;
+  lines: CategoryLine[];
+  monthStart: DateOnly;
+  monthEnd: DateOnly;
+  today: DateOnly;
+  budgetYen: number;
+  goalFrom: DateOnly;
+  goalTo: DateOnly;
+  remaining: RemainingForecast;
+  /**
+   * 「変えられる支出だけ」(設計書 v3 3.4)。決まった支出のジャンルを除いた行・予算・予測。
+   * まとまった支払いで「理想より多い」に見えないようにする。
+   */
+  changeable?: { lines: CategoryLine[]; budgetYen: number; remaining: RemainingForecast } | null;
+}) {
+  const [onlyChangeable, setOnlyChangeable] = useState(false);
+  const view =
+    onlyChangeable && changeable
+      ? changeable
+      : { lines: allLines, budgetYen: allBudget, remaining: allRemaining };
+  return (
+    <div className="space-y-2">
+      {changeable ? (
+        <label
+          className="flex min-h-11 items-center gap-2 text-xs"
+          style={{ color: 'var(--ink-secondary)' }}
+        >
+          <input
+            type="checkbox"
+            checked={onlyChangeable}
+            onChange={(e) => setOnlyChangeable(e.target.checked)}
+            className="size-5"
+          />
+          <span>変えられる支出だけ(決まった支払いを除く)</span>
+        </label>
+      ) : null}
+      <GoalChartView
+        genreName={onlyChangeable && changeable ? '変えられる支出' : genreName}
+        lines={view.lines}
+        monthStart={monthStart}
+        monthEnd={monthEnd}
+        today={today}
+        budgetYen={view.budgetYen}
+        goalFrom={goalFrom}
+        goalTo={goalTo}
+        remaining={view.remaining}
+      />
+    </div>
+  );
+}
+
+function GoalChartView({
+  genreName,
   lines,
   monthStart,
   monthEnd,
@@ -95,7 +158,7 @@ export function GoalChart({
       onUnit={setUnit}
       onPick={() => undefined}
       selectedIndex={null}
-      budgetYen={null}
+      budgetYen={budgetYen}
     />
   );
 }
