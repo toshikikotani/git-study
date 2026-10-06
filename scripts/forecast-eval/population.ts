@@ -66,17 +66,22 @@ for (const scenario of scenarios) {
   }
 }
 
-/** 中心の比:Σ(実際 − 決まっている額) ÷ Σ(中央 − 決まっている額)。 */
+/**
+ * 中心の比:時点ごとの (実際 − 決まっている額) ÷ (中央 − 決まっている額) の中央値(0.8〜1.4)。
+ * 比の和で割ると、大きな支払い(期ごとの税など)のある少数の月に引っ張られるので、中央値にする。
+ * 外れ方の広がりは PIT の方で直す。
+ */
 function centerOf(list: readonly Obs[]): number {
-  let a = 0;
-  let p = 0;
-  for (const o of list) {
-    const median = o.quantiles[9]!;
-    if (median - o.known <= 0) continue;
-    a += Math.max(0, o.actual - o.known);
-    p += median - o.known;
-  }
-  return p > 0 ? Math.min(1.6, Math.max(0.7, a / p)) : 1;
+  const ratios = list
+    .map((o) => {
+      const predicted = o.quantiles[9]! - o.known;
+      return predicted > 0 ? Math.max(0, o.actual - o.known) / predicted : null;
+    })
+    .filter((r): r is number => r !== null)
+    .sort((a, b) => a - b);
+  if (ratios.length === 0) return 1;
+  const median = ratios[Math.floor(ratios.length / 2)]!;
+  return Math.min(1.4, Math.max(0.8, median));
 }
 
 /** 中心をそろえたあとの u の分位点(0, 5%, …, 100% の21点)。 */
