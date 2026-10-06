@@ -50,6 +50,7 @@ const forecast = (c: ForecastCategoryBand, over: Partial<Forecast> = {}): Foreca
   calibration: null,
   totalQuantiles: [],
   suggestion: null,
+  whatIf: [],
   breakdown: {
     actualYen: 0,
     committedYen: 0,

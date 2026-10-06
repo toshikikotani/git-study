@@ -17,7 +17,12 @@ const NO_PRIOR: PopulationPrior = {
   centerByPhase: { early: 1, mid: 1, late: 1 },
   pitByPhase: { early: [], mid: [], late: [] },
 };
-import { DEFAULT_TRIALS, simulateForecast, type CategoryTarget } from './simulate';
+import {
+  DEFAULT_TRIALS,
+  simulateForecast,
+  type CategoryTarget,
+  type ForecastPromise,
+} from './simulate';
 import type { Forecast, ForecastCalibration, ForecastPhase } from './types';
 
 /** 検証できた完了月がこれより少なければ、数字は「目安」。 */
@@ -59,6 +64,8 @@ export type BuildForecastInput = {
   usePopulationPrior?: boolean;
   /** 期間の収入(手取りの設定、または直近の給料の中央値 + 予定の収入)。収支を出す。 */
   income?: { yen: number; source: 'setting' | 'salary' } | null;
+  /** 本人が決めた約束(「外食を週1回へらす」)。今日の月の終わりまで見込みに入れる。 */
+  promises?: readonly ForecastPromise[];
 };
 
 /** 期間のどの時点帯か(序盤:3分の1まで、中盤:3分の2まで、終盤)。 */
@@ -110,6 +117,7 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     genreLevelK: input.genreLevelK,
     todayElapsedShare: input.now ? daySpentShareAt(input.now) : undefined,
     noForecastGenreIds: input.noForecastGenreIds,
+    promises: input.promises,
     mode: 'paths',
   });
 

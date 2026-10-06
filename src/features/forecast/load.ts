@@ -25,6 +25,7 @@ import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
 import { continuousRecordStart, periodIncome } from '@/domain/forecast/record';
 import { verifyCautions, verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
+import { listPromises } from './promise-store';
 import { toForecastSource } from './source';
 
 /** 学習に使う過去の長さ(日)。2年ぶんあれば、同じ月を2回見られる。 */
@@ -102,7 +103,10 @@ export async function loadForecast(args: {
 }): Promise<ForecastView> {
   const today = todayJst(args.now ?? new Date());
   const supabase = await createClient();
-  const [{ data: auth }, settings, fixedKeys, subscriptions, genres, takeHomeYen] =
+  // 約束(ADR-075)は今日の月のものだけを、今日を含む期間の予測に入れる。
+  const thisMonth = monthStartJst(0, args.now ?? new Date());
+  const includesToday = args.period.from <= today && today <= args.period.to;
+  const [{ data: auth }, settings, fixedKeys, subscriptions, genres, takeHomeYen, promises] =
     await Promise.all([
       supabase.auth.getUser(),
       getAppSettings().catch(() => null),
@@ -110,6 +114,7 @@ export async function loadForecast(args: {
       loadDetectedSubscriptions(args.now).catch(() => []),
       listGenres().catch(() => []),
       args.scope ? Promise.resolve(null) : loadTakeHomeYen().catch(() => null),
+      includesToday ? listPromises([thisMonth]).catch(() => []) : Promise.resolve([]),
     ]);
   // 「予測を止める」にしたジャンルは、残りの変動費を予測しない(実績と日付入りの予定は数える)。
   const noForecast = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
@@ -199,6 +204,9 @@ export async function loadForecast(args: {
     payday,
     dataVersion,
     noForecastGenreIds: noForecast,
+    promises: promises
+      .filter((p) => !noForecast.has(p.genreId))
+      .map((p) => ({ categoryId: p.genreId, perWeek: p.perWeek })),
     calibration: verification?.calibration ?? null,
     ...(verification
       ? {

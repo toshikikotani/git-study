@@ -37,8 +37,17 @@ import { SummarySection } from './summary-section';
  * この状態を即座に書き換える(楽観的更新)。合計・グラフ・気づきは、この状態から
  * 家計簿と同じ集計関数で計算し直す。
  */
-export function CategoryScreen({ data }: { data: CategoryDetailData }) {
-  return <CategoryScreenInner key={`${data.genreKey}:${data.monthKey}`} data={data} />;
+export function CategoryScreen({
+  data,
+  whatIf = null,
+}: {
+  data: CategoryDetailData;
+  /** 「もし、へらしたら」(サーバーで読み込む。今月のジャンルだけ)。 */
+  whatIf?: React.ReactNode;
+}) {
+  return (
+    <CategoryScreenInner key={`${data.genreKey}:${data.monthKey}`} data={data} whatIf={whatIf} />
+  );
 }
 
 /** 気づき・グラフの棒から絞り込んだ取引(根拠の取引の id、または日付の範囲)。 */
@@ -48,7 +57,13 @@ export type LineFocus = {
   range?: { from: string; to: string };
 };
 
-function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
+function CategoryScreenInner({
+  data,
+  whatIf,
+}: {
+  data: CategoryDetailData;
+  whatIf: React.ReactNode;
+}) {
   const router = useRouter();
   const {
     transactions,
@@ -400,6 +415,8 @@ function CategoryScreenInner({ data }: { data: CategoryDetailData }) {
         genreName={data.genreName}
         today={data.today}
       />
+
+      {whatIf}
 
       <InsightsSection insights={insights} onFocus={focusInsight} />
 

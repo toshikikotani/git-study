@@ -310,6 +310,37 @@ create policy "own_rows" on public.ai_forecast_reads
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 11. spending_promises — ジャンルの約束(「外食を週1回へらす」、ADR-075)
+-- -----------------------------------------------------------------------------
+-- ジャンル画面の「決める」で、月ごと・ジャンルごとに1行。決めた回数は予測に入り、
+-- 月が終わったら、使った額が「約束どおりの見込み」に収まったか(守れたか)を見せる。
+create table if not exists public.spending_promises (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users(id) on delete cascade,
+  genre_id    uuid        not null references public.genres(id) on delete cascade,
+  month       date        not null,
+  per_week    smallint    not null,
+  promised_on date        not null,
+  usual_yen   integer     not null,
+  limit_yen   integer     not null,
+  created_at  timestamptz not null default now(),
+
+  constraint uq_spending_promises_genre_month unique (user_id, genre_id, month),
+  constraint ck_spending_promises_month check (extract(day from month) = 1),
+  constraint ck_spending_promises_per_week check (per_week between 1 and 7),
+  constraint ck_spending_promises_yen check (usual_yen >= 0 and limit_yen >= 0)
+);
+
+alter table public.spending_promises enable row level security;
+alter table public.spending_promises force row level security;
+
+drop policy if exists "own_rows" on public.spending_promises;
+create policy "own_rows" on public.spending_promises
+  for all
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 commit;
 
 -- =============================================================================
@@ -393,4 +424,11 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'ai_forecast_reads'
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'spending_promises',
+  case when exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'spending_promises'
   ) then 'ok' else 'NG: テーブルが無い' end;

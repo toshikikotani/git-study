@@ -50,6 +50,7 @@ const forecast = (over: Partial<Forecast> = {}): Forecast => ({
   calibration: null,
   totalQuantiles: [],
   suggestion: null,
+  whatIf: [],
   breakdown: {
     actualYen: 0,
     committedYen: 0,

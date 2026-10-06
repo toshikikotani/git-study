@@ -1,7 +1,7 @@
 # 予測の計算式(現在の実装、v3)
 
 数字はコードの定数(`src/domain/forecast/` 配下)。変えたときはこの文書も直す。
-合成データでの当たり具合は `docs/FORECAST_EVAL.md`、決めた理由は `docs/decisions.md`(ADR-071・ADR-074)。
+合成データでの当たり具合は `docs/FORECAST_EVAL.md`、決めた理由は `docs/decisions.md`(ADR-071・ADR-076)。
 v3 で足したもの(製品設計書 v3 の4章)は、見出しに「v3」と書いてある。
 
 ## 全体の流れ

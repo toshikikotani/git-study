@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import Link from 'next/link';
 
 import {
@@ -10,6 +11,8 @@ import {
 import { todaySentence, type TodayAllowance } from '@/domain/forecast/today';
 import type { ForecastSuggestion } from '@/domain/forecast/types';
 import { formatYen } from '@/domain/money';
+import { categoryHref } from '@/lib/category-nav';
+import { monthStartJst } from '@/lib/date';
 import { SpeakButton } from './speak-button';
 
 export type TodayCardProps = {
@@ -111,10 +114,20 @@ export function TodayCard(props: TodayCardProps) {
           ) : null}
         </dl>
         {suggestion && suggestion.probAfter - suggestion.probBefore >= 0.01 ? (
-          <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-            {suggestion.categoryName}を週1回減らすと、収まる確率{' '}
-            {formatProbability(suggestion.probBefore)} → {formatProbability(suggestion.probAfter)}
-          </p>
+          <div className="mt-3">
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+              {suggestion.categoryName}を週1回減らすと、収まる確率{' '}
+              {formatProbability(suggestion.probBefore)} → {formatProbability(suggestion.probAfter)}
+            </p>
+            <Link
+              href={categoryHref(suggestion.categoryId, monthStartJst()) as Route}
+              className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              {suggestion.categoryName}で試してみる
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
         ) : null}
         <div className="mt-3 flex items-center justify-between gap-2">
           <Link
