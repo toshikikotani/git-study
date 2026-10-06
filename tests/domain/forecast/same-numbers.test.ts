@@ -145,4 +145,79 @@ describe('同じ範囲の同じ数字(P0)', () => {
     expect(s!.probBefore).toBeCloseTo(forecast.probWithinBudget!, 6);
     expect(s!.savedYen).toBeGreaterThan(0);
   });
+
+  it('「もし、へらしたら」の「いつも通り」は、ジャンル行・見出しと同じ数字', () => {
+    const w = forecast.whatIf.find((x) => x.categoryId === 'dining')!;
+    expect(w).toBeDefined();
+    const row = forecast.byCategory.find((c) => c.categoryId === 'dining')!;
+    const usual = w.options[0]!;
+    expect(usual.perWeek).toBe(0);
+    expect(usual.landing.p50).toBe(row.landing.p50);
+    expect(usual.landing.p10).toBe(row.landing.p10);
+    expect(usual.landing.p90).toBe(row.landing.p90);
+    expect(usual.exceedance).toBeCloseTo(row.exceedance!, 9);
+    expect(usual.probWithinBudget).toBeCloseTo(forecast.probWithinBudget!, 9);
+    expect(usual.savedYen).toBe(0);
+  });
+
+  it('へらす回数を増やすほど、着地は下がり、目標を超える確率は上がらず、収まる確率は下がらない', () => {
+    const w = forecast.whatIf.find((x) => x.categoryId === 'dining')!;
+    expect(w.options.map((o) => o.perWeek)).toEqual([0, 1, 2]);
+    for (let i = 1; i < w.options.length; i += 1) {
+      const prev = w.options[i - 1]!;
+      const cur = w.options[i]!;
+      expect(cur.landing.p50).toBeLessThan(prev.landing.p50);
+      expect(cur.exceedance!).toBeLessThanOrEqual(prev.exceedance!);
+      expect(cur.probWithinBudget!).toBeGreaterThanOrEqual(prev.probWithinBudget!);
+      expect(cur.savedYen).toBeGreaterThan(prev.savedYen);
+      // 着地は、決まっている額(使った額)を下回らない
+      expect(cur.landing.p10).toBeGreaterThanOrEqual(
+        forecast.byCategory.find((c) => c.categoryId === 'dining')!.baseYen,
+      );
+    }
+    expect(w.perVisitYen).toBeGreaterThan(0);
+    // 残りの週数は、今日より先の日数(提案と同じ数え方)。
+    expect(w.weeks).toBeGreaterThan(3);
+    expect(w.weeks).toBeLessThanOrEqual(forecast.remainingDays / 7);
+  });
+
+  it('約束(週1回へらす)を入れると、全画面の数字が「もし」の週1回と同じになる', () => {
+    const promisedForecast = buildForecast({
+      ...base,
+      budgetYen: 120000,
+      scope,
+      noForecastGenreIds: new Set(['tax']),
+      categoryTargets: [
+        { categoryId: 'dining', categoryName: '外食', targetYen: 40000 },
+        { categoryId: 'hobby', categoryName: '娯楽', targetYen: 30000 },
+      ],
+      promises: [{ categoryId: 'dining', perWeek: 1 }],
+    });
+    const w = promisedForecast.whatIf.find((x) => x.categoryId === 'dining')!;
+    expect(w.promisedPerWeek).toBe(1);
+    const once = w.options.find((o) => o.perWeek === 1)!;
+    const row = promisedForecast.byCategory.find((c) => c.categoryId === 'dining')!;
+    expect(once.landing.p50).toBe(row.landing.p50);
+    expect(once.landing.p10).toBe(row.landing.p10);
+    expect(once.landing.p90).toBe(row.landing.p90);
+    expect(once.probWithinBudget).toBe(promisedForecast.probWithinBudget);
+    // 約束の前(いつも通り)は、約束の無い予測の数字のまま
+    const usual = w.options[0]!;
+    const plain = forecast.whatIf.find((x) => x.categoryId === 'dining')!.options[0]!;
+    expect(usual.landing).toEqual(plain.landing);
+    expect(usual.probWithinBudget).toBeCloseTo(plain.probWithinBudget!, 9);
+    // 着地は下がり、グラフの右端は着地のまま、予算に収まる確率は下がらない
+    expect(promisedForecast.total.p50).toBeLessThan(forecast.total.p50);
+    const last = remainingOfTotal(promisedForecast).path!.at(-1)!;
+    expect(promisedForecast.actualYen + last.medianYen).toBe(promisedForecast.total.p50);
+    expect(promisedForecast.probWithinBudget!).toBeGreaterThanOrEqual(forecast.probWithinBudget!);
+    // 約束したジャンルは、提案で重ねて勧めない
+    expect(promisedForecast.suggestion?.categoryId).not.toBe('dining');
+  });
+
+  it('予測を止めたジャンル・残りが1週間未満の期間には「もし」を出さない', () => {
+    expect(forecast.whatIf.some((x) => x.categoryId === 'tax')).toBe(false);
+    const late = buildForecast({ ...base, today: '2026-10-27', budgetYen: 120000 });
+    expect(late.whatIf).toEqual([]);
+  });
 });

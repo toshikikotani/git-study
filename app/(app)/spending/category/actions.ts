@@ -34,10 +34,13 @@ import {
   updateRuleGenre,
 } from '@/features/genre/memory-store';
 import { recordCorrection } from '@/features/genre/memory-store';
-import { setGenreForecastClosed, updateGenreBudget } from '@/features/genre/store';
+import { deletePromise, savePromise } from '@/features/forecast/promise-store';
+import { promiseAmountsFor } from '@/features/forecast/what-if';
+import { listGenres, setGenreForecastClosed, updateGenreBudget } from '@/features/genre/store';
 import { renameGenre, saveGenreStyle } from '@/features/genre/style-store';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { describeUserError } from '@/lib/errors';
+import { monthStartJst, todayJst } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 
 /** 移す前の状態(Undo 用)。 */
@@ -591,5 +594,50 @@ export async function setCategoryForecastClosedAction(
   } catch (error) {
     return { error: error instanceof Error ? error.message : '予測の停止を保存できませんでした' };
   }
+  return { error: null };
+}
+
+/**
+ * ジャンルの約束を決める・変える・やめる(「もし、へらしたら」の「決める」、ADR-075)。
+ * perWeek が null ならやめる(いつも通りに戻す)。見込みの額はサーバーで予測から出し直す
+ * (画面から送られた数字は使わない)。
+ */
+export async function decideCategoryPromiseAction(
+  genreId: string,
+  perWeek: number | null,
+): Promise<{ error: string | null }> {
+  const month = monthStartJst();
+  try {
+    if (perWeek === null) {
+      await deletePromise(genreId, month);
+    } else {
+      if (!Number.isInteger(perWeek) || perWeek < 1 || perWeek > 7) {
+        return { error: '回数を選び直してください' };
+      }
+      const genre = (await listGenres()).find((g) => g.id === genreId);
+      if (genre === undefined) return { error: 'ジャンルが見つかりませんでした' };
+      const amounts = await promiseAmountsFor({
+        genreId,
+        genreName: genre.name,
+        genreBudgetYen: genre.budgetYen,
+        perWeek,
+      });
+      if (amounts === null) {
+        return { error: 'このジャンルは、今は約束の見込みを出せません' };
+      }
+      await savePromise({
+        genreId,
+        month,
+        perWeek,
+        promisedOn: todayJst(),
+        usualYen: amounts.usualYen,
+        limitYen: amounts.limitYen,
+      });
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : '約束を保存できませんでした' };
+  }
+  // 約束は全画面の見込みに入るので、ホーム・レポート・家計簿も出し直す。
+  revalidatePath('/', 'layout');
   return { error: null };
 }

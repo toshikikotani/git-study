@@ -1,7 +1,10 @@
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { loadCategoryDetail } from '@/features/category/loader';
+import { genreIdOfKey } from '@/features/category/model';
 import { CategoryScreen } from './category-screen';
+import { WhatIfSection } from './what-if-section';
 
 /**
  * カテゴリ詳細(家計簿のジャンル内訳・目標のジャンル行・未分類から開く)。
@@ -23,5 +26,17 @@ export default async function CategoryPage({
     month: Array.isArray(month) ? month[0] : month,
   });
   if (data === null) notFound();
-  return <CategoryScreen data={data} />;
+  // 「もし、へらしたら」は今月のジャンルだけ(予測を止めたジャンル・未分類は出さない)。
+  const genreId = genreIdOfKey(genreKey);
+  const whatIf =
+    data.isCurrentMonth && genreId !== null && !data.forecastClosed ? (
+      <Suspense fallback={null}>
+        <WhatIfSection
+          genreId={genreId}
+          genreName={data.genreName}
+          genreBudgetYen={data.genreBudgetYen}
+        />
+      </Suspense>
+    ) : null;
+  return <CategoryScreen data={data} whatIf={whatIf} />;
 }

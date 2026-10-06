@@ -38,6 +38,9 @@ describe('ホームの今日あと使える額(設計書 v3 3.1)', () => {
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain('音で聞く');
+    // 提案から、そのジャンルの「もし、へらしたら」へ
+    expect(html).toContain('外食で試してみる');
+    expect(html).toMatch(/href="\/spending\/category\/dining\?month=\d{4}-\d{2}"/);
   });
 
   it('上限を超えたら、超えた額を文字で(色だけにしない)', () => {
