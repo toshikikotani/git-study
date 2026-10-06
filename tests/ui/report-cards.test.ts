@@ -24,15 +24,51 @@ describe('レポートの着地まわりのカード', () => {
               p90: 33000,
               targetYen: 25000,
               exceedance: 0.58,
+              excludedYen: 0,
+              status: 'forecast',
+            },
+            {
+              genreId: 'hobby',
+              name: '娯楽・趣味',
+              baseYen: 36940,
+              p10: 36940,
+              p50: 36940,
+              p90: 36940,
+              targetYen: 42940,
+              exceedance: 0,
+              excludedYen: 3000,
+              status: 'settled',
+            },
+            {
+              genreId: 'tax',
+              name: '保険・税金・手数料',
+              baseYen: 32000,
+              p10: 32000,
+              p50: 32000,
+              p90: 32000,
+              targetYen: 35700,
+              exceedance: 0,
+              excludedYen: 0,
+              status: 'closed',
             },
           ],
         }),
       ),
     );
     expect(html).toContain('外食');
-    expect(html).toContain('20,000円 〜 33,000円');
+    // 見込みは幅より細かく出さない(1万円以上は千円単位)。
+    expect(html).toContain('約2.6万円');
+    expect(html).toContain('2.0万〜3.3万円');
     expect(html).toContain('目標 25,000円 を超える確率 58%');
     expect(html).toContain('role="img"');
+    // 目印の凡例(点=中央、「目標」の目盛り)。
+    expect(html).toContain('点は中央');
+    expect(html).toContain('>目標<');
+    // 見込みの無いジャンルは、幅ではなく言葉で。範囲から外した額は行で出す。
+    expect(html).toContain('確定(この先の見込みなし)');
+    expect(html).toContain('うち 3,000円 は目標の対象外');
+    expect(html).toContain('予測を止めています');
+    expect(html).not.toContain('36,940円〜36,940円');
   });
 
   it('行が無ければ何も出さない', () => {

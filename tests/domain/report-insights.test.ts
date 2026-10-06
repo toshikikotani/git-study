@@ -73,8 +73,8 @@ describe('reportInsights', () => {
     const budget = out.find((i) => i.key === 'budget')!;
     expect(budget.tone).toBe('caution');
     expect(budget.text).toContain('35%');
-    expect(budget.text).toContain('12,300円');
-    expect(budget.text).toContain('1日 2,500円');
+    expect(budget.text).toContain('約1.2万円');
+    expect(budget.text).toContain('1日 約2,500円');
     expect(budget.text).not.toMatch(/ダメ|失敗|使いすぎ/);
   });
 
@@ -87,8 +87,8 @@ describe('reportInsights', () => {
       previousLabel: '先月',
     });
     const inc = out.find((i) => i.key === 'increase')!;
-    expect(inc.text).toContain('外食は先月より 10,000円 増える見込み');
-    expect(inc.text).toContain('20,000円 → 30,000円');
+    expect(inc.text).toContain('外食は先月より 約1.0万円 増える見込み');
+    expect(inc.text).toContain('20,000円 → 約3.0万円');
   });
 
   it('増え方が小さいジャンルは出さない', () => {
@@ -218,7 +218,7 @@ describe('reportInsights の残りの見込みと直近のペース', () => {
     const pace = out.find((i) => i.key === 'pace')!;
     expect(pace.tone).toBe('info');
     expect(pace.text).toContain('残り26日');
-    expect(pace.text).toContain('約35,000円');
+    expect(pace.text).toContain('約3.5万円');
     expect(pace.text).toContain('1日あたり約1,300円');
     expect(pace.text).toContain('直近14日の1日あたりは約1,500円');
   });
