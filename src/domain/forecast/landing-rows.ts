@@ -64,11 +64,13 @@ export function landingRowsFrom(input: {
     .map((c) => {
       const extra = excluded.get(c.categoryId) ?? 0;
       const settled = c.landing.p90 <= c.baseYen;
-      const status: LandingRowStatus = !settled
-        ? 'forecast'
-        : input.closedGenreIds?.has(c.categoryId)
-          ? 'closed'
-          : 'settled';
+      // 「これ以上は使わない」にしたジャンルは、見込みがあっても「止めた」として出す(守れたら・
+      // いつもの守り方なら の2つを出す。設計書 v3 4.7)。
+      const status: LandingRowStatus = input.closedGenreIds?.has(c.categoryId)
+        ? 'closed'
+        : settled
+          ? 'settled'
+          : 'forecast';
       const row: LandingRow = {
         genreId: c.categoryId,
         name: c.categoryName,

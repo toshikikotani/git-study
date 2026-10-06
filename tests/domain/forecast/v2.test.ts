@@ -158,6 +158,7 @@ describe('記録の始まりと収入', () => {
     expect(periodIncome({ transactions: history, period, takeHomeYen: null })).toEqual({
       yen: 250000,
       source: 'salary',
+      bonusYen: 0,
     });
     expect(
       periodIncome({
@@ -165,12 +166,45 @@ describe('記録の始まりと収入', () => {
         period,
         takeHomeYen: null,
       }),
-    ).toEqual({ yen: 255000, source: 'salary' });
+    ).toEqual({ yen: 255000, source: 'salary', bonusYen: 0 });
     expect(periodIncome({ transactions: [], period, takeHomeYen: 300000 })).toEqual({
       yen: 300000,
       source: 'setting',
+      bonusYen: 0,
     });
     expect(periodIncome({ transactions: [], period, takeHomeYen: 0 })).toBeNull();
+  });
+
+  it('賞与:去年の同じ月に給料より多く入った分を見込み、もう入っていれば足さない', () => {
+    const income = (d: string, yen: number) => tx({ occurredOn: d, amountYen: yen, genreId: null });
+    const history = [
+      income('2025-12-10', 400000),
+      income('2025-12-25', 250000),
+      income('2026-09-25', 250000),
+      income('2026-10-24', 250000),
+      income('2026-11-25', 250000),
+    ];
+    const period = { from: '2026-12-01', to: '2026-12-31' };
+    expect(periodIncome({ transactions: history, period, takeHomeYen: null })).toEqual({
+      yen: 650000,
+      source: 'salary',
+      bonusYen: 400000,
+    });
+    expect(
+      periodIncome({
+        transactions: [...history, income('2026-12-10', 380000)],
+        period,
+        takeHomeYen: null,
+      }),
+    ).toEqual({ yen: 630000, source: 'salary', bonusYen: 0 });
+    // 賞与の無い月は足さない。
+    expect(
+      periodIncome({
+        transactions: history,
+        period: { from: '2026-11-01', to: '2026-11-30' },
+        takeHomeYen: null,
+      })!.bonusYen,
+    ).toBe(0);
   });
 });
 

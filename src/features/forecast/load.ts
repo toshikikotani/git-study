@@ -141,7 +141,7 @@ export async function loadForecast(args: {
   const completedVersion = `${completed.length}:${completed.at(-1)?.occurredOn ?? ''}:${Math.round(
     completed.reduce((sum, t) => sum + t.amountYen, 0),
   )}`;
-  const cacheKey = `v2:${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${recordStart ?? ''}:${[...noForecast].sort().join(',')}`;
+  const cacheKey = `v3:${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${recordStart ?? ''}:${[...noForecast].sort().join(',')}`;
   const verification = await unstable_cache(
     async () =>
       verifyForecast({
@@ -187,6 +187,7 @@ export async function loadForecast(args: {
       : null;
 
   const forecast = buildForecast({
+    now: args.now ?? new Date(),
     transactions,
     period: args.period,
     today,
@@ -203,6 +204,7 @@ export async function loadForecast(args: {
       ? {
           halfLifeDays: verification.halfLifeDays,
           monthLevelK: verification.monthLevelK ?? Infinity,
+          genreLevelK: verification.genreLevelK ?? Infinity,
         }
       : {}),
     ...(args.scope ? { scope: args.scope } : {}),

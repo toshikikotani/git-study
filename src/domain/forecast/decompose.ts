@@ -10,6 +10,8 @@ import { eachDay } from '@/domain/period';
 import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf, type DetectedSubscription } from '@/domain/subscriptions';
 import { detectMonthlyBills, projectBills } from './bills';
+import { isDayOff } from './holidays';
+import { detectPeriodicPayments, projectPeriodic } from './periodic';
 import { entryLagProfile } from './lag';
 import { classifySpending } from './spending-type';
 import { detectRegularMerchants, projectVisits, type VisitSourceTransaction } from './visits';
@@ -18,8 +20,10 @@ import type {
   CategoryDayRecord,
   DatedEvent,
   DecomposedSpending,
+  LumpyCategory,
   MissingRecordDay,
   OutlierExclusion,
+  StoreRecord,
   PeriodObservation,
   SpendingType,
   VariableTrainingData,
@@ -43,9 +47,30 @@ export type ForecastSourceTransaction = {
 };
 
 export const UNCATEGORIZED_ID = 'none';
+/**
+ * 「これ以上は使わない」の守られ方の既定値(設計書 v3 4.7):約束のあとの支出 ÷ 約束が無かったときの
+ * 見込み。本人の約束の記録がまだ無いので、既定値を使う。
+ */
+export const DEFAULT_KEEP_RATE = 0.3;
 /** 外れ値判定に最低限必要な、そのカテゴリの明細件数(少なすぎると誤検出しやすい)。 */
-const MIN_SAMPLES_FOR_OUTLIER = 20;
-const OUTLIER_PERCENTILE = 0.99;
+const MIN_SAMPLES_FOR_OUTLIER = 8;
+/**
+ * 特別費とみなす外れ値(設計書 v3 4.9):金額の対数が「中央値 + 3 × MAD」を超えるもの。
+ * MAD は正規分布の標準偏差にそろえる(× 1.4826)。金額がそろいすぎて MAD が小さいときは、
+ * 下限 0.3 を使う(中央値の約2.5倍未満は外れ値にしない)。上位1%と違い、件数の少ないジャンルでも、
+ * 普通の高い買い物を特別費にしない。
+ */
+const OUTLIER_MADS = 3;
+const MIN_LOG_MAD = 0.3;
+
+function outlierThreshold(amounts: readonly number[]): number {
+  if (amounts.length < MIN_SAMPLES_FOR_OUTLIER) return Infinity;
+  const logs = amounts.map((a) => Math.log(Math.max(1, a))).sort((a, b) => a - b);
+  const median = percentile(logs, 0.5);
+  const deviations = logs.map((l) => Math.abs(l - median)).sort((a, b) => a - b);
+  const mad = Math.max(MIN_LOG_MAD, percentile(deviations, 0.5) * 1.4826);
+  return Math.exp(median + OUTLIER_MADS * mad);
+}
 /** この割合以上の週で支出があるなら「普段は支出がある曜日」とみなす。 */
 const USUAL_WEEKDAY_RATIO = 0.6;
 const MIN_WEEKS_FOR_MISSING_CHECK = 4;
@@ -186,7 +211,6 @@ export function decomposeSpending(input: {
   const learnableAll = countable.filter((t) => {
     if (t.kind !== 'normal' || t.status !== 'actual' || t.amountYen >= 0) return false;
     if (t.occurredOn < trainingWindow.from || t.occurredOn > today) return false;
-    if (t.genreId !== null && input.noForecastGenreIds?.has(t.genreId)) return false;
     return !fixedKeySet.has(subscriptionKeyOf(t.merchantName, t.description, t.amountYen));
   });
 
@@ -225,8 +249,35 @@ export function decomposeSpending(input: {
     scheduled: scheduledKeys,
   }).filter((e) => e.date >= period.from);
 
-  const regularMerchants = detectRegularMerchants(
+  // 期ごと・年ごとの支払い(住民税・固定資産税・年払いなど。設計書 v3 4.4)。
+  const periodic = detectPeriodicPayments(
     learnableAll.filter((t) => !isBill(t)).map(asVisitSource),
+    today,
+  );
+  const periodicMatched = new Set(
+    periodic.flatMap((p) => p.matchedDates.map((d) => `${p.key}|${d}`)),
+  );
+  const periodicKeyOf = (t: ForecastSourceTransaction) =>
+    `${merchantKeyOf(t)}|${t.genreId ?? UNCATEGORIZED_ID}`;
+  const isPeriodic = (t: ForecastSourceTransaction) =>
+    periodicMatched.has(`${periodicKeyOf(t)}|${t.occurredOn}`);
+  const paidByKey = new Map<string, DateOnly[]>();
+  for (const t of learnableAll) {
+    const key = periodicKeyOf(t);
+    paidByKey.set(key, [...(paidByKey.get(key) ?? []), t.occurredOn]);
+  }
+  const periodicEvents = projectPeriodic({
+    payments: periodic,
+    paidDates: (key) => paidByKey.get(key) ?? [],
+    today,
+    periodFrom: period.from,
+    periodTo: period.to,
+    scheduled: scheduledKeys,
+  });
+  billEvents.push(...periodicEvents);
+
+  const regularMerchants = detectRegularMerchants(
+    learnableAll.filter((t) => !isBill(t) && !isPeriodic(t)).map(asVisitSource),
   );
   const regularKeys = new Set(regularMerchants.map((m) => m.key));
   const visits = projectVisits({
@@ -236,10 +287,57 @@ export function decomposeSpending(input: {
     scheduled: scheduledKeys,
   }).filter((v) => v.date >= period.from);
 
-  const variableAll = learnableAll.filter((t) => !isBill(t) && !regularKeys.has(merchantKeyOf(t)));
-  const variableSource = variableAll.filter((t) => t.occurredOn <= trainingWindow.to);
+  const variableAll = learnableAll.filter(
+    (t) => !isBill(t) && !isPeriodic(t) && !regularKeys.has(merchantKeyOf(t)),
+  );
+
+  // 支出の型(定常・まとまり・決まった)。変動費の明細の日付と、来店・請求の有無から決める。
+  const eventDatesById = new Map<string, DateOnly[]>();
+  for (const t of variableAll) {
+    const id = t.genreId ?? UNCATEGORIZED_ID;
+    const list = eventDatesById.get(id) ?? [];
+    list.push(t.occurredOn);
+    eventDatesById.set(id, list);
+  }
+  const nameOf = new Map<string, string>();
+  for (const t of countable) nameOf.set(t.genreId ?? UNCATEGORIZED_ID, t.genreName ?? '未分類');
+  const categoryTypes: Record<string, SpendingType> = {};
+  const typeIds = new Set([
+    ...baseMap.keys(),
+    ...eventDatesById.keys(),
+    ...regularMerchants.map((m) => m.categoryId),
+    ...billCandidates.map((b) => b.categoryId),
+    ...periodic.map((p) => p.categoryId),
+  ]);
+  for (const id of typeIds) {
+    categoryTypes[id] = classifySpending({
+      name: nameOf.get(id) ?? '',
+      eventDates: eventDatesById.get(id) ?? [],
+      recordDays,
+      hasRegularMerchant: regularMerchants.some((m) => m.categoryId === id),
+      hasBills:
+        billCandidates.some((b) => b.categoryId === id) ||
+        periodic.some((p) => p.categoryId === id) ||
+        (baseMap.get(id)?.fixedYen ?? 0) > 0,
+      closed: input.noForecastGenreIds?.has(id) ?? false,
+    });
+  }
+  // まとまり型は、毎日の回数モデルから外し、出来事(3日以内の支払いをまとめたもの)で予測する。
+  const isLumpy = (t: ForecastSourceTransaction) =>
+    categoryTypes[t.genreId ?? UNCATEGORIZED_ID] === 'lumpy';
+  const lumpy = lumpyCategories({
+    transactions: variableAll.filter(isLumpy),
+    from: windowFrom,
+    today,
+    scheduled: events,
+    categoryTypes,
+    nameOf,
+  });
+
+  const dailyAll = variableAll.filter((t) => !isLumpy(t));
+  const variableSource = dailyAll.filter((t) => t.occurredOn <= trainingWindow.to);
   const periodSource = separatedPeriod
-    ? variableAll.filter((t) => t.occurredOn >= period.from && t.occurredOn <= today)
+    ? dailyAll.filter((t) => t.occurredOn >= period.from && t.occurredOn <= today)
     : [];
 
   const byCategory = new Map<string, { name: string; txs: ForecastSourceTransaction[] }>();
@@ -257,11 +355,7 @@ export function decomposeSpending(input: {
   const thresholdById = new Map<string, number>();
 
   for (const [categoryId, { name, txs }] of byCategory) {
-    const amounts = txs.map((t) => -t.amountYen).sort((a, b) => a - b);
-    const threshold =
-      amounts.length >= MIN_SAMPLES_FOR_OUTLIER
-        ? percentile(amounts, OUTLIER_PERCENTILE)
-        : Infinity;
+    const threshold = outlierThreshold(txs.map((t) => -t.amountYen));
     thresholdById.set(categoryId, threshold);
 
     const byDate = new Map<DateOnly, CategoryDayRecord>();
@@ -269,6 +363,7 @@ export function decomposeSpending(input: {
       byDate.set(day, { date: day, count: 0, amountYen: 0, logSum: 0, logSqSum: 0 });
     }
 
+    const stores = new Map<string, StoreRecord>();
     for (const t of txs) {
       const amountYen = -t.amountYen;
       if (amountYen > threshold) {
@@ -287,9 +382,27 @@ export function decomposeSpending(input: {
       rec.amountYen += amountYen;
       rec.logSum = (rec.logSum ?? 0) + log;
       rec.logSqSum = (rec.logSqSum ?? 0) + log * log;
+      const storeKey = merchantKeyOf(t);
+      const store = stores.get(storeKey) ?? {
+        key: storeKey,
+        offCount: 0,
+        onCount: 0,
+        logSum: 0,
+        logSqSum: 0,
+      };
+      if (isDayOff(t.occurredOn)) store.offCount += 1;
+      else store.onCount += 1;
+      store.logSum += log;
+      store.logSqSum += log * log;
+      stores.set(storeKey, store);
     }
 
-    variable.push({ categoryId, categoryName: name, days: [...byDate.values()] });
+    variable.push({
+      categoryId,
+      categoryName: name,
+      days: [...byDate.values()],
+      stores: [...stores.values()],
+    });
 
     // 記録漏れの可能性:直近のその曜日に、普段はあるはずの支出が無い。
     if (dataDays >= MIN_WEEKS_FOR_MISSING_CHECK * 7) {
@@ -360,45 +473,17 @@ export function decomposeSpending(input: {
     }
   }
 
-  // 支出の型(定常・まとまり・決まった)。変動費の明細の日付と、来店・請求の有無から決める。
-  const eventDatesById = new Map<string, DateOnly[]>();
-  for (const t of variableAll) {
-    const id = t.genreId ?? UNCATEGORIZED_ID;
-    const list = eventDatesById.get(id) ?? [];
-    list.push(t.occurredOn);
-    eventDatesById.set(id, list);
-  }
-  const categoryTypes: Record<string, SpendingType> = {};
-  const typeIds = new Set([
-    ...baseMap.keys(),
-    ...eventDatesById.keys(),
-    ...regularMerchants.map((m) => m.categoryId),
-    ...billCandidates.map((b) => b.categoryId),
-  ]);
-  for (const id of typeIds) {
-    const name =
-      baseMap.get(id)?.categoryName ??
-      byCategory.get(id)?.name ??
-      regularMerchants.find((m) => m.categoryId === id)?.categoryName ??
-      billCandidates.find((b) => b.categoryId === id)?.categoryName ??
-      '';
-    categoryTypes[id] = classifySpending({
-      name,
-      eventDates: eventDatesById.get(id) ?? [],
-      recordDays: recordDays,
-      hasRegularMerchant: regularMerchants.some((m) => m.categoryId === id),
-      hasBills:
-        billCandidates.some((b) => b.categoryId === id) || (baseMap.get(id)?.fixedYen ?? 0) > 0,
-      closed: input.noForecastGenreIds?.has(id) ?? false,
-    });
-  }
-
   return {
     trainingWindow,
     period,
     today,
     actualYen,
     categoryTypes,
+    lumpy,
+    // 「これ以上は使わない」にしたジャンル(設計書 v3 4.7):いつもの見込みに守られ方を掛ける。
+    keepRates: Object.fromEntries(
+      [...(input.noForecastGenreIds ?? [])].map((id) => [id, DEFAULT_KEEP_RATE]),
+    ),
     committed: { scheduledYen, fixedYen, fixedItems, events },
     special: {
       actualYen: specialActualYen,
@@ -413,6 +498,7 @@ export function decomposeSpending(input: {
     visits,
     bills: billCandidates,
     billEvents,
+    periodic,
     separatedPeriod,
     periodObservations,
     elapsedDates,
@@ -424,4 +510,65 @@ export function decomposeSpending(input: {
     missingRecordDays,
     dataDays,
   };
+}
+
+/** 同じジャンルで、前の支払いからこの日数以内の支払いは、同じ出来事にまとめる。 */
+export const LUMPY_MERGE_DAYS = 3;
+/** 間隔が少ない(3つ未満)ときの形。少しだけ「直後は起きにくい」とみる。 */
+const DEFAULT_GAP_SHAPE = 1.2;
+const GAP_SHAPE_RANGE = { min: 1, max: 3 } as const;
+
+/** 間隔の変動係数 CV から、ワイブルの形 β ≈ CV^(−1.086)(よく使われる近似)。 */
+export function gapShapeOf(gaps: readonly number[]): number {
+  if (gaps.length < 3) return DEFAULT_GAP_SHAPE;
+  const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  const sd = Math.sqrt(gaps.reduce((a, g) => a + (g - mean) ** 2, 0) / (gaps.length - 1));
+  if (mean <= 0 || sd <= 0) return GAP_SHAPE_RANGE.max;
+  const shape = Math.pow(sd / mean, -1.086);
+  return Math.min(GAP_SHAPE_RANGE.max, Math.max(GAP_SHAPE_RANGE.min, shape));
+}
+
+/** まとまり型のジャンルの出来事(設計書 v3 4.1)。 */
+export function lumpyCategories(input: {
+  transactions: readonly ForecastSourceTransaction[];
+  from: DateOnly;
+  today: DateOnly;
+  scheduled: readonly DatedEvent[];
+  categoryTypes: Readonly<Record<string, SpendingType>>;
+  nameOf: ReadonlyMap<string, string>;
+}): LumpyCategory[] {
+  const byId = new Map<string, ForecastSourceTransaction[]>();
+  for (const t of input.transactions) {
+    if (t.occurredOn < input.from || t.occurredOn > input.today) continue;
+    const id = t.genreId ?? UNCATEGORIZED_ID;
+    byId.set(id, [...(byId.get(id) ?? []), t]);
+  }
+  const exposureDays = Math.max(1, daysBetween(input.from, input.today) + 1);
+  const out: LumpyCategory[] = [];
+  for (const [id, type] of Object.entries(input.categoryTypes)) {
+    if (type !== 'lumpy') continue;
+    const txs = [...(byId.get(id) ?? [])].sort((a, b) => a.occurredOn.localeCompare(b.occurredOn));
+    const events: { first: DateOnly; last: DateOnly; yen: number }[] = [];
+    for (const t of txs) {
+      const current = events.at(-1);
+      if (current && daysBetween(current.last, t.occurredOn) <= LUMPY_MERGE_DAYS) {
+        current.last = t.occurredOn;
+        current.yen += -t.amountYen;
+      } else {
+        events.push({ first: t.occurredOn, last: t.occurredOn, yen: -t.amountYen });
+      }
+    }
+    if (events.length === 0) continue;
+    const gaps = events.slice(1).map((e, i) => daysBetween(events[i]!.first, e.first));
+    out.push({
+      categoryId: id,
+      categoryName: input.nameOf.get(id) ?? '',
+      eventLogAmounts: events.map((e) => Math.log(Math.max(1, e.yen))),
+      exposureDays,
+      daysSinceLast: daysBetween(events.at(-1)!.last, input.today),
+      hasScheduled: input.scheduled.some((e) => e.categoryId === id),
+      gapShape: gapShapeOf(gaps),
+    });
+  }
+  return out;
 }

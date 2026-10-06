@@ -16,6 +16,27 @@ export type VariableTrainingData = {
   categoryId: string;
   categoryName: string;
   days: readonly CategoryDayRecord[];
+  /** 店ごとの、休みの日・平日の回数と金額の対数の和(店ごとの金額の混合に使う。設計書 v3 4.3)。 */
+  stores?: readonly StoreRecord[];
+};
+
+export type StoreRecord = {
+  key: string;
+  offCount: number;
+  onCount: number;
+  logSum: number;
+  logSqSum: number;
+};
+
+/**
+ * 店ごとの金額の混合(設計書 v3 4.3)。1回の金額は、まず店を選び(休みの日と平日で選ばれ方が違う)、
+ * その店の対数正規から引く。最後の成分は「新しい店」(ジャンル全体の金額)。
+ */
+export type StoreMixture = {
+  shareOff: readonly number[];
+  shareOn: readonly number[];
+  mu: readonly number[];
+  sigma: readonly number[];
 };
 
 export type OutlierExclusion = {
@@ -105,6 +126,31 @@ export type PeriodObservation = {
   logAmounts: readonly number[];
 };
 
+/**
+ * まとまり型のジャンル(設計書 v3 4.1)。同じジャンルで3日以内の支払いを1つの「出来事」にまとめる
+ * (旅行の電車・宿・食事が1回の旅行になる)。
+ */
+export type LumpyCategory = {
+  categoryId: string;
+  categoryName: string;
+  /** 過去の出来事の金額(まとめた合計)の対数。 */
+  eventLogAmounts: readonly number[];
+  /** 出来事の率の分母(学習に使える日数)。 */
+  exposureDays: number;
+  /** 今日の時点で、前回の出来事の最後の支払いからの日数。出来事が無ければ exposureDays。 */
+  daysSinceLast: number;
+  /** 残りの期間に、このジャンルの予定がある(予定が主役になり、別の出来事は起きにくい)。 */
+  hasScheduled: boolean;
+  /**
+   * 出来事の間隔の形(ワイブルの形 β)。1 なら前回からの日数によらない(偶然に起きる)。
+   * 大きいほど規則的で、前回の直後は起きにくい。間隔のばらつき(変動係数)から決める。
+   */
+  gapShape: number;
+};
+
+export type { PeriodicPayment } from './periodic';
+import type { PeriodicPayment } from './periodic';
+
 export type DecomposedSpending = {
   trainingWindow: { from: DateOnly; to: DateOnly };
   period: { from: DateOnly; to: DateOnly };
@@ -155,6 +201,12 @@ export type DecomposedSpending = {
   recentPerDayYen: number | null;
   /** カテゴリごとの支出の型(設計書 v3 4.1)。 */
   categoryTypes: Readonly<Record<string, SpendingType>>;
+  /** まとまり型のジャンル(毎日の回数モデルから外し、出来事の回数 × 大きさで予測する)。 */
+  lumpy: readonly LumpyCategory[];
+  /** 「これ以上は使わない」にしたジャンルの守られ方(設計書 v3 4.7)。いつもの見込みに掛ける。 */
+  keepRates: Readonly<Record<string, number>>;
+  /** 期ごと・年ごとの支払い(設計書 v3 4.4)。残りの期間の回は billEvents に入れてある。 */
+  periodic: readonly PeriodicPayment[];
   missingRecordDays: readonly MissingRecordDay[];
   /** 学習に使えた実際の日数(記録開始日・学習窓の短い方)。 */
   dataDays: number;
@@ -186,6 +238,8 @@ export type CategoryModelParams = {
   /** 給料日からの日数の区分ごとの係数(PAY_CYCLE_BUCKETS 個)。給料日が無ければすべて1。 */
   payCycleFactor: readonly number[];
   holidayFactor: number;
+  /** 店ごとの金額の混合。店が1つしか無い・少ないときは無い(ジャンル全体の対数正規だけ)。 */
+  stores?: StoreMixture | undefined;
   dataDays: number;
 };
 
@@ -201,6 +255,11 @@ export type FittedModel = {
   /** 全体で見た1日あたりの回数(カテゴリ横断の事前分布の中心)。 */
   pooledDailyRate: number;
   dataDays: number;
+  /**
+   * 外出のジャンル(外食・酒・カフェ・交通)に日ごとに共通して掛かるゆらぎ ε_d ~ Gamma(a, a)
+   * (設計書 v3 4.2)。同じ日に重なりやすい分。記録で回数のばらつきがポアソンより大きいときだけ。
+   */
+  outingShock: { categoryIds: readonly string[]; shape: number } | null;
 };
 
 export type Band = { p10: number; p50: number; p70: number; p90: number };
@@ -309,6 +368,11 @@ export type Forecast = {
   remainingDays: number;
   /** 着地。p10〜p90 と中央値は補正後の分位(見出しは中央値)。mean は補正後の試行の平均。 */
   total: Band & { mean: number };
+  /**
+   * 着地の補正後の分位を 5%・10%・…・95% の19点(検証・評価で CRPS と PIT を測るため)。
+   * 添字 i が分位 (i + 1) × 5%。
+   */
+  totalQuantiles: readonly number[];
   /** グラフの線と帯(同じ試行の、日ごとの分位)。最終日の値 + 実績 = total。 */
   path: readonly PathPoint[];
   /** 理想の線の形(期間全体)。 */

@@ -103,11 +103,14 @@ describe('decomposeSpending(M1)', () => {
         },
       ],
     });
+    // 普通の店は月1回なので、まとまり型(出来事)として学ぶ。どちらにもサブスクは入らない。
     const totalVariableCount = result.variable.reduce(
       (sum, v) => sum + v.days.reduce((s, d) => s + d.count, 0),
       0,
     );
-    expect(totalVariableCount).toBe(1);
+    const lumpyEvents = result.lumpy.reduce((sum, l) => sum + l.eventLogAmounts.length, 0);
+    expect(totalVariableCount + lumpyEvents).toBe(1);
+    expect(result.lumpy[0]?.eventLogAmounts).toEqual([Math.log(500)]);
   });
 
   it('外れ値(上位1%)は変動費の学習から除外され、記録される', () => {

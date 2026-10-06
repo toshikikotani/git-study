@@ -46,13 +46,15 @@ function isIncome(t: ForecastSourceTransaction): boolean {
 /**
  * 期間の収入。手取りの設定(無ければ直近3か月の給料=その月のいちばん大きい収入の中央値)を
  * 給料の見込みとし、期間に記録・予定された収入に給料らしいもの(見込みの半分以上)が無ければ足す。
- * 給料以外の収入は、記録・予定されたものだけを数える(見込まない)。
+ * 賞与(設計書 v3 4.9):去年・おととしの同じ月に、給料より給料の半分以上多い収入があった月は、
+ * その多かった分(新しい年の値)を賞与として見込む。期間にもう同じくらいの収入が入っていれば足さない。
+ * そのほかの給料以外の収入は、記録・予定されたものだけを数える(見込まない)。
  */
 export function periodIncome(input: {
   transactions: readonly ForecastSourceTransaction[];
   period: { from: DateOnly; to: DateOnly };
   takeHomeYen: number | null;
-}): { yen: number; source: 'setting' | 'salary' } | null {
+}): { yen: number; source: 'setting' | 'salary'; bonusYen: number } | null {
   const { period } = input;
   const largestByMonth = new Map<string, number>();
   for (const t of input.transactions) {
@@ -71,9 +73,37 @@ export function periodIncome(input: {
     (t) => isIncome(t) && t.occurredOn >= period.from && t.occurredOn <= period.to,
   );
   const known = inPeriod.reduce((sum, t) => sum + t.amountYen, 0);
-  const salaryArrived = inPeriod.some((t) => t.amountYen >= salary / 2);
+  const bonus = expectedBonus(input.transactions, period.from, salary);
+  // 賞与を見込む月は、給料の0.5〜1.5倍の収入だけを給料とみなす(賞与を給料と取り違えない)。
+  const salaryArrived = inPeriod.some(
+    (t) => t.amountYen >= salary / 2 && (bonus === 0 || t.amountYen <= salary * 1.5),
+  );
+  // 期間の収入が、給料のほかに賞与の半分以上もう入っていれば、賞与は来たとみなす。
+  const extraArrived = known - (salaryArrived ? salary : 0) >= bonus / 2;
+  const bonusYen = bonus > 0 && !extraArrived ? bonus : 0;
   return {
-    yen: Math.round(salaryArrived ? known : known + salary),
+    yen: Math.round((salaryArrived ? known : known + salary) + bonusYen),
     source: setting !== null ? 'setting' : 'salary',
+    bonusYen: Math.round(bonusYen),
   };
+}
+
+/** 去年・おととしの同じ月の、給料を超えた分(給料の半分以上のときだけ)。新しい年を優先する。 */
+function expectedBonus(
+  transactions: readonly ForecastSourceTransaction[],
+  periodFrom: DateOnly,
+  salary: number,
+): number {
+  const month = periodFrom.slice(5, 7);
+  const year = Number(periodFrom.slice(0, 4));
+  for (const y of [year - 1, year - 2]) {
+    const key = `${y}-${month}`;
+    const total = transactions
+      .filter((t) => isIncome(t) && t.occurredOn.slice(0, 7) === key)
+      .reduce((sum, t) => sum + t.amountYen, 0);
+    const excess = total - salary;
+    if (total > 0 && excess >= salary / 2) return excess;
+    if (total > 0) return 0;
+  }
+  return 0;
 }

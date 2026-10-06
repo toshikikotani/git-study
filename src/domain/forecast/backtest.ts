@@ -17,6 +17,7 @@ import { periodDays } from '@/domain/period';
 import type { ForecastSourceTransaction } from './decompose';
 import { phaseOf } from './engine';
 import { cautionsFor, type CautionPrecision } from './caution';
+import { CENTER_PRIOR_MONTHS } from './pit';
 import { knownAt } from './lag';
 import { DEFAULT_MONTH_LEVEL_K } from './model';
 import { decomposeFor, fitFor, simulateInputFor } from './pipeline';
@@ -215,6 +216,7 @@ function pointFor(
   halfLifeDays: number | undefined,
   monthLevelK: number,
   fitted?: ReturnType<typeof fitFor>,
+  genreLevelK = Infinity,
 ): BacktestPoint {
   const decomposed = cp.decomposed(Number.isFinite(monthLevelK));
   const model = fitted ?? fitFor(decomposed, input.payday ?? null, halfLifeDays);
@@ -224,6 +226,7 @@ function pointFor(
     trials: input.trials ?? 600,
     seed: `backtest:${cp.period.from}:${cp.asOf}`,
     monthLevelK,
+    genreLevelK,
     mode: 'totals',
   });
   const run = runTrials(simulateInput);
@@ -327,13 +330,22 @@ export function summarize(points: readonly BacktestPoint[]): BacktestSummary {
 }
 
 export function runBacktest(
-  input: BacktestInput & { halfLifeDays?: number; monthLevelK?: number },
+  input: BacktestInput & { halfLifeDays?: number; monthLevelK?: number; genreLevelK?: number },
 ): BacktestSummary {
   const k = input.monthLevelK ?? DEFAULT_MONTH_LEVEL_K;
-  return summarize(checkpointsOf(input).map((cp) => pointFor(cp, input, input.halfLifeDays, k)));
+  return summarize(
+    checkpointsOf(input).map((cp) =>
+      pointFor(cp, input, input.halfLifeDays, k, undefined, input.genreLevelK ?? Infinity),
+    ),
+  );
 }
 
-export type GridScore = { halfLifeDays: number; monthLevelK: number; meanCrps: number };
+export type GridScore = {
+  halfLifeDays: number;
+  monthLevelK: number;
+  genreLevelK: number;
+  meanCrps: number;
+};
 
 /**
  * 半減期 × k の組み合わせを、同じ時点で比べる。分解は時点ごとに1回、モデル推定は時点 × 半減期
@@ -343,10 +355,16 @@ export function backtestGrid(
   input: BacktestInput & {
     halfLives: readonly number[];
     monthLevelKs: readonly number[];
+    /** ジャンルごとの水準の強さ k_g の候補(既定は ∞ だけ)。 */
+    genreLevelKs?: readonly number[];
   },
 ): GridScore[] {
   const checkpoints = checkpointsOf(input);
-  const sums = new Map<string, { halfLifeDays: number; monthLevelK: number; sum: number }>();
+  const gks = input.genreLevelKs ?? [Infinity];
+  const sums = new Map<
+    string,
+    { halfLifeDays: number; monthLevelK: number; genreLevelK: number; sum: number }
+  >();
   for (const cp of checkpoints) {
     for (const separate of [true, false]) {
       const ks = input.monthLevelKs.filter((k) => Number.isFinite(k) === separate);
@@ -355,11 +373,14 @@ export function backtestGrid(
       for (const halfLifeDays of input.halfLives) {
         const fitted = fitFor(decomposed, input.payday ?? null, halfLifeDays);
         for (const k of ks) {
-          const point = pointFor(cp, input, halfLifeDays, k, fitted);
-          const key = `${halfLifeDays}:${k}`;
-          const acc = sums.get(key) ?? { halfLifeDays, monthLevelK: k, sum: 0 };
-          acc.sum += point.crps;
-          sums.set(key, acc);
+          // k_g は今月の記録で水準を更新するときだけ効く(k=∞ では ∞ だけ数える)。
+          for (const gk of Number.isFinite(k) ? gks : [Infinity]) {
+            const point = pointFor(cp, input, halfLifeDays, k, fitted, gk);
+            const key = `${halfLifeDays}:${k}:${gk}`;
+            const acc = sums.get(key) ?? { halfLifeDays, monthLevelK: k, genreLevelK: gk, sum: 0 };
+            acc.sum += point.crps;
+            sums.set(key, acc);
+          }
         }
       }
     }
@@ -367,14 +388,13 @@ export function backtestGrid(
   return [...sums.values()].map((s) => ({
     halfLifeDays: s.halfLifeDays,
     monthLevelK: s.monthLevelK,
+    genreLevelK: s.genreLevelK,
     meanCrps: checkpoints.length > 0 ? s.sum / checkpoints.length : 0,
   }));
 }
 
 const MIN_CENTER_FACTOR = 0.75;
 const MAX_CENTER_FACTOR = 1.4;
-/** 中心の補正は、検証の月数が少ないほど1に寄せる(この月数ぶんの事前の確信)。 */
-const CENTER_PRIOR_MONTHS = 8;
 /** PIT の補正は、検証の月数が少ないほど弱める(a = 月数 ÷ (月数 + 6))。 */
 const PIT_PRIOR_MONTHS = 6;
 /** 時点帯ごとの PIT を使うのに要る、その帯の時点の数。少なければ全体の PIT を使う。 */

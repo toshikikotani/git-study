@@ -48,6 +48,10 @@ export type ModelInput = {
   halfLifeDays?: number | undefined;
   calibration?: PitCalibration | null | undefined;
   mode?: 'paths' | 'totals' | undefined;
+  /** ジャンルごとの今月の水準の強さ k_g(設計書 v3 4.2)。Infinity なら使わない。 */
+  genreLevelK?: number | undefined;
+  /** 今日のうち、もう過ぎた割合(設計書 v3 4.9)。無ければ今日は終わったものとして扱う。 */
+  todayElapsedShare?: number | undefined;
 };
 
 export type PipelineInput = DecomposeInput & ModelInput;
@@ -137,6 +141,12 @@ export function simulateInputFor(
     calibration: input.calibration ?? null,
     mode: input.mode ?? 'paths',
     categoryTypes: decomposed.categoryTypes,
+    lumpy: decomposed.lumpy,
+    keepRates: decomposed.keepRates,
+    ...(input.genreLevelK !== undefined ? { genreLevelK: input.genreLevelK } : {}),
+    ...(input.todayElapsedShare !== undefined
+      ? { todayElapsedShare: input.todayElapsedShare }
+      : {}),
   };
 }
 
