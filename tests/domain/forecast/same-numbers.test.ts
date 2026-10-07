@@ -215,6 +215,52 @@ describe('同じ範囲の同じ数字(P0)', () => {
     expect(promisedForecast.suggestion?.categoryId).not.toBe('dining');
   });
 
+  it('「これ以上は使わない」:守れたときは月末まで使わない着地、いつもの守り方は守れ具合の割合だけ減る', () => {
+    const w = forecast.whatIf.find((x) => x.categoryId === 'dining')!;
+    const row = forecast.byCategory.find((c) => c.categoryId === 'dining')!;
+    // 期間が月末までなら、守れたときの着地は決まっている額(使った額)そのもの
+    expect(w.stop.kept.landing.p50).toBe(row.baseYen);
+    expect(w.stop.kept.landing.p90).toBe(row.baseYen);
+    expect(w.stop.keepRate).toBe(0.5);
+    const usual = w.options[0]!;
+    expect(w.stop.usual.landing.p50).toBeLessThan(usual.landing.p50);
+    expect(w.stop.usual.landing.p50).toBeGreaterThan(w.stop.kept.landing.p50);
+    expect(w.stop.kept.probWithinBudget!).toBeGreaterThanOrEqual(w.stop.usual.probWithinBudget!);
+    expect(w.stop.usual.probWithinBudget!).toBeGreaterThanOrEqual(usual.probWithinBudget!);
+  });
+
+  it('「これ以上は使わない」と決めると、全画面の数字が「いつもの守り方」と同じになる', () => {
+    const stopped = buildForecast({
+      ...base,
+      budgetYen: 120000,
+      scope,
+      noForecastGenreIds: new Set(['tax']),
+      categoryTargets: [
+        { categoryId: 'dining', categoryName: '外食', targetYen: 40000 },
+        { categoryId: 'hobby', categoryName: '娯楽', targetYen: 30000 },
+      ],
+      promises: [{ categoryId: 'dining', perWeek: 0 }],
+      promiseKeepRate: 0.75,
+    });
+    const w = stopped.whatIf.find((x) => x.categoryId === 'dining')!;
+    expect(w.promisedPerWeek).toBe(0);
+    expect(w.stop.keepRate).toBe(0.75);
+    const row = stopped.byCategory.find((c) => c.categoryId === 'dining')!;
+    expect(w.stop.usual.landing.p50).toBe(row.landing.p50);
+    expect(w.stop.usual.probWithinBudget).toBe(stopped.probWithinBudget);
+    expect(stopped.total.p50).toBeLessThan(forecast.total.p50);
+    // 守れ具合が高いほど、見込みは少なくなる
+    const lowKeep = buildForecast({
+      ...base,
+      budgetYen: 120000,
+      scope,
+      noForecastGenreIds: new Set(['tax']),
+      promises: [{ categoryId: 'dining', perWeek: 0 }],
+      promiseKeepRate: 0.25,
+    });
+    expect(lowKeep.total.p50).toBeGreaterThan(stopped.total.p50);
+  });
+
   it('予測を止めたジャンル・残りが1週間未満の期間には「もし」を出さない', () => {
     expect(forecast.whatIf.some((x) => x.categoryId === 'tax')).toBe(false);
     const late = buildForecast({ ...base, today: '2026-10-27', budgetYen: 120000 });

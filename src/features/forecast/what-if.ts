@@ -11,7 +11,7 @@
  * (中央)以下か」で決める。
  */
 
-import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
+import { genreSpentYen, promiseKept } from '@/domain/forecast/promise';
 import type { ForecastWhatIf, ForecastWhatIfOption } from '@/domain/forecast/types';
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
@@ -37,6 +37,8 @@ export type CategoryWhatIfView = {
    */
   balanceP50: number | null;
   options: readonly ForecastWhatIfOption[];
+  /** 「これ以上は使わない」の2つの見込み(守れたとき・いつもの守り方)と守れ具合。 */
+  stop: ForecastWhatIf['stop'];
   provisional: boolean;
   /** 予測の範囲での、このジャンルの使った額と、予定・固定費(ジャンル画面の「使った」「予定」)。 */
   spentYen: number;
@@ -53,23 +55,6 @@ type Loaded = {
   /** 今月のすべての支出の予測での「もし」(約束の見込みの額を保存するのに使う)。 */
   monthWhatIf: ForecastWhatIf | null;
 };
-
-/** その月にこのジャンルで使った額(家計簿の「使った額」と同じ:実績、特別費を含み、返金を引く)。 */
-export function genreSpentYen(
-  rows: readonly ForecastSourceTransaction[],
-  genreId: string,
-  period: { from: DateOnly; to: DateOnly },
-): number {
-  let yen = 0;
-  for (const t of rows) {
-    if (t.genreId !== genreId || t.status !== 'actual') continue;
-    if (t.isTransfer || t.reviewStatus === 'ignored') continue;
-    if (t.occurredOn < period.from || t.occurredOn > period.to) continue;
-    if (t.amountYen < 0) yen -= t.amountYen;
-    else if (t.kind === 'refund') yen -= t.amountYen;
-  }
-  return Math.max(0, yen);
-}
 
 async function load(input: {
   genreId: string;
@@ -135,14 +120,23 @@ async function load(input: {
         input.genreId,
         lastMonthPeriod,
       );
-      lastMonth = { promise: lastPromise, spentYen, kept: spentYen <= lastPromise.limitYen };
+      lastMonth = {
+        promise: lastPromise,
+        spentYen,
+        kept: promiseKept(spentYen, lastPromise.limitYen),
+      };
     }
   }
 
   // 今月の予測の収支には約束が入っているので、いつも通りの収支に戻してから選択肢の額を足す。
   const balance = monthView.forecast.balance;
   const promisedSaved =
-    monthWhatIf?.options.find((o) => o.perWeek === monthWhatIf.promisedPerWeek)?.savedYen ?? 0;
+    monthWhatIf === null || monthWhatIf.promisedPerWeek === null
+      ? 0
+      : monthWhatIf.promisedPerWeek === 0
+        ? monthWhatIf.stop.usual.savedYen
+        : (monthWhatIf.options.find((o) => o.perWeek === monthWhatIf.promisedPerWeek)?.savedYen ??
+          0);
   return {
     view: {
       genreId: input.genreId,
@@ -153,6 +147,7 @@ async function load(input: {
       budgetYen: inGoal ? goal.budgetYen : null,
       balanceP50: balance === null ? null : balance.p50 - promisedSaved,
       options: whatIf.options,
+      stop: whatIf.stop,
       provisional: source.forecast.provisional,
       spentYen: row?.actualYen ?? 0,
       scheduledYen: (row?.scheduledYen ?? 0) + (row?.fixedYen ?? 0),
@@ -189,7 +184,11 @@ export async function promiseAmountsFor(input: {
   const w = loaded?.monthWhatIf ?? null;
   if (w === null) return null;
   const usual = w.options[0];
-  const chosen = w.options.find((o) => o.perWeek === input.perWeek);
+  // 「これ以上は使わない」(0)は、守れたとき(月末まで使わない)の見込みを約束の額にする。
+  const chosen =
+    input.perWeek === 0 ? w.stop.kept : w.options.find((o) => o.perWeek === input.perWeek);
   if (usual === undefined || chosen === undefined) return null;
   return { usualYen: usual.landing.p50, limitYen: chosen.landing.p50 };
 }
+
+export { genreSpentYen };

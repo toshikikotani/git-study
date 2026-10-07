@@ -18,7 +18,7 @@ import { getAppSettings } from '@/features/settings/store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
-import { addDays, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
+import { addDays, addMonths, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { periodDays } from '@/domain/period';
 import { createClient } from '@/lib/supabase/server';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
@@ -26,8 +26,11 @@ import { continuousRecordStart, periodIncome } from '@/domain/forecast/record';
 import { verifyCautions, verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
 import { listPromises } from './promise-store';
+import { genreSpentYen, promiseKeepRate, promiseKept } from '@/domain/forecast/promise';
 import { toForecastSource } from './source';
 
+/** 約束の守れ具合を数える、過去の月数。 */
+const PROMISE_HISTORY_MONTHS = 6;
 /** 学習に使う過去の長さ(日)。2年ぶんあれば、同じ月を2回見られる。 */
 const HISTORY_DAYS = 730;
 export type ForecastView = {
@@ -103,8 +106,12 @@ export async function loadForecast(args: {
 }): Promise<ForecastView> {
   const today = todayJst(args.now ?? new Date());
   const supabase = await createClient();
-  // 約束(ADR-075)は今日の月のものだけを、今日を含む期間の予測に入れる。
+  // 約束(ADR-075)は今日の月のものだけを、今日を含む期間の予測に入れる。これまでの月の約束は、
+  // 守れ具合(「これ以上は使わない」のいつもの守り方、ADR-078)を数えるのに使う。
   const thisMonth = monthStartJst(0, args.now ?? new Date());
+  const promiseMonths = Array.from({ length: PROMISE_HISTORY_MONTHS + 1 }, (_, i) =>
+    monthStartJst(-i, args.now ?? new Date()),
+  );
   const includesToday = args.period.from <= today && today <= args.period.to;
   const [{ data: auth }, settings, fixedKeys, subscriptions, genres, takeHomeYen, promises] =
     await Promise.all([
@@ -114,7 +121,7 @@ export async function loadForecast(args: {
       loadDetectedSubscriptions(args.now).catch(() => []),
       listGenres().catch(() => []),
       args.scope ? Promise.resolve(null) : loadTakeHomeYen().catch(() => null),
-      includesToday ? listPromises([thisMonth]).catch(() => []) : Promise.resolve([]),
+      includesToday ? listPromises(promiseMonths).catch(() => []) : Promise.resolve([]),
     ]);
   // 「予測を止める」にしたジャンルは、残りの変動費を予測しない(実績と日付入りの予定は数える)。
   const noForecast = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
@@ -205,8 +212,21 @@ export async function loadForecast(args: {
     dataVersion,
     noForecastGenreIds: noForecast,
     promises: promises
-      .filter((p) => !noForecast.has(p.genreId))
+      .filter((p) => p.month === thisMonth && !noForecast.has(p.genreId))
       .map((p) => ({ categoryId: p.genreId, perWeek: p.perWeek })),
+    promiseKeepRate: promiseKeepRate(
+      promises
+        .filter((p) => p.month < thisMonth)
+        .map((p) => ({
+          kept: promiseKept(
+            genreSpentYen(transactions, p.genreId, {
+              from: p.month,
+              to: addDays(addMonths(p.month, 1), -1),
+            }),
+            p.limitYen,
+          ),
+        })),
+    ),
     calibration: verification?.calibration ?? null,
     ...(verification
       ? {

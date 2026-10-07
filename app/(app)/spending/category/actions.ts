@@ -611,7 +611,8 @@ export async function decideCategoryPromiseAction(
     if (perWeek === null) {
       await deletePromise(genreId, month);
     } else {
-      if (!Number.isInteger(perWeek) || perWeek < 1 || perWeek > 7) {
+      // 0 は「これ以上は使わない」(ADR-078)。
+      if (!Number.isInteger(perWeek) || perWeek < 0 || perWeek > 7) {
         return { error: '回数を選び直してください' };
       }
       const genre = (await listGenres()).find((g) => g.id === genreId);

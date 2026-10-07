@@ -349,9 +349,14 @@ export type ForecastWhatIf = {
   perVisitYen: number;
   /** 月末までの週数(今日の翌日から月末までの日数 ÷ 7)。 */
   weeks: number;
-  /** 本人が決めた約束(週に何回へらすか)。無ければ null。 */
+  /** 本人が決めた約束(週に何回へらすか。0 は「これ以上は使わない」)。無ければ null。 */
   promisedPerWeek: number | null;
   options: readonly ForecastWhatIfOption[];
+  /**
+   * 「これ以上は使わない」の2つの見込み:守れたとき(月末まで使わない)と、いつもの守り方
+   * (これまでの約束の守れ具合 keepRate の割合だけ減る)。
+   */
+  stop: { keepRate: number; kept: ForecastWhatIfOption; usual: ForecastWhatIfOption };
 };
 
 /**
