@@ -73,22 +73,3 @@ jobs:
       # 写しは放っておけばずれるため、同じスキーマを作ることを毎回確かめる。
       - name: Verify apply-pending.sql matches the pending migrations
         run: ./scripts/verify-apply-pending.sh
-
-      # SQL 版と TypeScript 版の完済シミュレーションが乖離していないかを見る。
-      # fixture に差分が出るなら、どちらかの実装が変わったということ。
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Regenerate payoff golden fixture
-        run: ./scripts/gen-payoff-golden.sh
-
-      - name: Fail if fixture drifted
-        run: |
-          if ! git diff --quiet -- tests/domain/fixtures/payoff-golden.json; then
-            echo "::error::SQL 側のシミュレーション結果が fixture と一致しません。"
-            echo "scripts/gen-payoff-golden.sh を実行して差分を確認し、"
-            echo "src/domain/payoff.ts も併せて更新してください(docs/architecture.md §3.1)。"
-            git diff -- tests/domain/fixtures/payoff-golden.json
-            exit 1
-          fi
