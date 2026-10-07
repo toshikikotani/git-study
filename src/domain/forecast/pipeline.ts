@@ -54,6 +54,8 @@ export type ModelInput = {
   todayElapsedShare?: number | undefined;
   /** 本人が決めた約束(本番の予測だけ。検証には渡さない)。 */
   promises?: readonly ForecastPromise[] | undefined;
+  /** これまでの約束の守れ具合(「これ以上は使わない」のいつもの守り方)。 */
+  promiseKeepRate?: number | undefined;
 };
 
 export type PipelineInput = DecomposeInput & ModelInput;
@@ -152,6 +154,7 @@ export function simulateInputFor(
     ...(input.promises !== undefined && input.promises.length > 0
       ? { promises: input.promises }
       : {}),
+    ...(input.promiseKeepRate !== undefined ? { promiseKeepRate: input.promiseKeepRate } : {}),
   };
 }
 

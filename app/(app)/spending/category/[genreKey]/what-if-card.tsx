@@ -21,6 +21,11 @@ function labelOf(perWeek: number): string {
   return LABELS[perWeek] ?? `週${perWeek}回へらす`;
 }
 
+/** 約束の名前(0 は「これ以上は使わない」、ADR-078)。 */
+function promiseLabel(perWeek: number): string {
+  return perWeek === 0 ? 'これ以上は使わない' : labelOf(perWeek);
+}
+
 /** 濃い面(「もし」のカード)の上の文字と線。テーマが変わっても面との対比を保つ。 */
 const ON_DARK = 'var(--surface)';
 const ON_DARK_SOFT = 'color-mix(in srgb, var(--surface) 78%, transparent)';
@@ -33,12 +38,22 @@ const ON_DARK_LINE = 'color-mix(in srgb, var(--surface) 30%, transparent)';
  * 切り替わる。数字はすべて予測と同じ試行から出した目安。
  */
 export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
+  const stopPromised = view.promise?.perWeek === 0;
   const promisedIndex =
-    view.promise === null ? -1 : view.options.findIndex((o) => o.perWeek === view.promise!.perWeek);
+    view.promise === null || stopPromised
+      ? -1
+      : view.options.findIndex((o) => o.perWeek === view.promise!.perWeek);
   const [selected, setSelected] = useState(Math.max(0, promisedIndex));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const option = view.options[selected] ?? view.options[0]!;
+  const decide = (perWeek: number | null) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await decideCategoryPromiseAction(view.genreId, perWeek);
+      if (result.error) setError(result.error);
+    });
+  };
   const usual = view.options[0]!;
   const gap = view.targetYen === null ? null : option.landing.p50 - view.targetYen;
   const pct = (v: number) => {
@@ -276,15 +291,11 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
           selectedPerWeek={option.perWeek}
           pending={pending}
           error={error}
-          onDecide={(perWeek) => {
-            setError(null);
-            startTransition(async () => {
-              const result = await decideCategoryPromiseAction(view.genreId, perWeek);
-              if (result.error) setError(result.error);
-            });
-          }}
+          onDecide={decide}
         />
       </section>
+
+      <StopCard view={view} pending={pending} onDecide={decide} />
     </>
   );
 }
@@ -306,7 +317,9 @@ function PromiseBlock({
   error: string | null;
   onDecide: (perWeek: number | null) => void;
 }) {
-  const current = view.promise?.perWeek ?? 0;
+  // 「これ以上は使わない」の約束中は、どの選択肢を選んでも「変える」「やめる」になる。
+  const current =
+    view.promise === null ? 0 : view.promise.perWeek === 0 ? -1 : view.promise.perWeek;
   const action =
     selectedPerWeek === current
       ? null
@@ -320,7 +333,7 @@ function PromiseBlock({
     <div className="space-y-2">
       {view.lastMonth !== null ? (
         <p className="text-sm leading-relaxed">
-          先月の約束({labelOf(view.lastMonth.promise.perWeek)}):
+          先月の約束({promiseLabel(view.lastMonth.promise.perWeek)}):
           <span className="font-semibold">
             {view.lastMonth.kept ? '守れました' : '守れませんでした'}
           </span>
@@ -330,7 +343,7 @@ function PromiseBlock({
           </span>
         </p>
       ) : null}
-      {view.promise !== null ? (
+      {view.promise !== null && view.promise.perWeek > 0 ? (
         <p
           role="status"
           className="rounded-xl px-3 py-2 text-sm leading-relaxed"
@@ -365,5 +378,91 @@ function PromiseBlock({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * これ以上は使わない(デザインのジャンル画面、ADR-078):「守れたとき」(月末まで使わない)と
+ * 「いつもの守り方」(これまでの約束の守れ具合の割合だけ減る)の2つの見込みを並べ、決める・やめる。
+ * 決めると、全画面の見込みには「いつもの守り方」が入る。
+ */
+function StopCard({
+  view,
+  pending,
+  onDecide,
+}: {
+  view: CategoryWhatIfView;
+  pending: boolean;
+  onDecide: (perWeek: number | null) => void;
+}) {
+  const active = view.promise?.perWeek === 0;
+  const { kept, usual, keepRate } = view.stop;
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const column = (title: string, note: string, o: typeof kept) => (
+    <div className="space-y-1 rounded-2xl p-3" style={{ background: 'var(--plane)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+        {title}
+      </p>
+      <p className="tabular text-lg font-semibold" style={{ color: 'var(--ink)' }}>
+        {formatEstimate(o.landing.p50)}
+      </p>
+      {o.probWithinBudget !== null ? (
+        <p className="tabular text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          予算に収まる {formatTimesInTen(o.probWithinBudget)}
+        </p>
+      ) : null}
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        {note}
+      </p>
+    </div>
+  );
+  return (
+    <section
+      aria-label="これ以上は使わない"
+      className="space-y-3 rounded-[24px] p-5"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+            これ以上は使わない
+          </h2>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            「守れたとき」と「いつもの守り方」の2つの見込みを出します
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onDecide(active ? null : 0)}
+          className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold disabled:opacity-60"
+          style={{ border: '1.5px solid var(--hairline)', color: 'var(--ink)' }}
+        >
+          {active ? 'やめる' : '決める'}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {column(`${view.categoryName}を月末まで使わなかったら`, '守れたとき', kept)}
+        {column(
+          'いつもの守り方なら',
+          `これまでの約束は10回中${Math.round(keepRate * 10)}回守れた、として見込む`,
+          usual,
+        )}
+      </div>
+      {active && view.promise !== null ? (
+        <p
+          role="status"
+          className="rounded-xl px-3 py-2 text-sm leading-relaxed"
+          style={{ background: 'var(--state-ok-track)', color: 'var(--ink)' }}
+        >
+          これ以上は使わない約束を見込みに入れています({md(view.promise.promisedOn)}から)
+          <span className="tabular block text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            見込みは「いつもの守り方」。今月の{view.categoryName}:使った{' '}
+            {formatYen(view.spentThisMonthYen, { sign: 'never' })} / 約束どおりなら{' '}
+            {formatEstimate(view.promise.limitYen)}まで
+          </span>
+        </p>
+      ) : null}
+    </section>
   );
 }

@@ -4,19 +4,9 @@ import { goalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast } from '@/features/forecast/load';
 import { listGenres } from '@/features/genre/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
-import {
-  addDays,
-  addMonths,
-  daysBetween,
-  monthStartJst,
-  splitDateOnly,
-  todayJst,
-  weekdayOf,
-} from '@/lib/date';
+import { addDays, addMonths, monthStartJst, todayJst } from '@/lib/date';
 import { LandingRangesCard } from '../reports/landing-ranges-card';
 import { TodayCard } from './today-card';
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 /**
  * ホームの「今日あと使える額」とその下のカード(デザインのホーム)を読み込む(重い予測なので、
@@ -37,9 +27,6 @@ export async function TodaySection() {
     loadForecast({ period: monthPeriod }).catch(() => null),
   ]);
   const forecast = goalView?.forecast ?? null;
-  const [, month, day] = splitDateOnly(today);
-  const left = daysBetween(today, monthPeriod.to) + 1;
-  const dateLine = `${month}月${day}日(${WEEKDAYS[weekdayOf(today)]}) · ${month}月は残り${left}日`;
   const balance = monthView?.forecast.balance ?? null;
   const rows =
     forecast && goalView
@@ -53,7 +40,6 @@ export async function TodaySection() {
   return (
     <div className="space-y-3">
       <TodayCard
-        dateLine={dateLine}
         today={
           forecast
             ? todayAllowance({

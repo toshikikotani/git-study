@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MdCameraAlt } from 'react-icons/md';
+import { MdCameraAlt, MdHome, MdMenuBook, MdPayments, MdTrackChanges } from 'react-icons/md';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { createLongPress } from '@/lib/long-press';
@@ -28,11 +28,12 @@ import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
+// デザインのボトムナビ:アイコンの下に名前(色だけで選択中を示さない)。
 const NAV = [
-  { href: '/', label: 'ホーム' },
-  { href: '/spending', label: '家計簿' },
-  { href: '/plan', label: '目標' },
-  { href: '/payday', label: '給料日' },
+  { href: '/', label: 'ホーム', Icon: MdHome },
+  { href: '/spending', label: '家計簿', Icon: MdMenuBook },
+  { href: '/plan', label: '目標', Icon: MdTrackChanges },
+  { href: '/payday', label: '給料日', Icon: MdPayments },
 ] as const;
 
 function isSameTab(pathname: string, href: string): boolean {
@@ -304,8 +305,10 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
                     >
                       <span
                         className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                        style={{ flexDirection: 'column', gap: 2 }}
                       >
-                        {item.label}
+                        <item.Icon aria-hidden size={20} />
+                        <span className={isActive ? 'font-semibold' : undefined}>{item.label}</span>
                       </span>
                     </Link>
                   </li>

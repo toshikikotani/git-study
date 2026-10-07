@@ -1780,6 +1780,7 @@ create index ai_forecast_reads_user_month_idx on public.ai_forecast_reads (user_
 -- 3.35 spending_promises — ジャンルの約束(「外食を週1回へらす」、ADR-075)
 -- ジャンル画面の「決める」で、月ごと・ジャンルごとに1行。決めた回数は予測に入り、
 -- 月が終わったら、使った額が「約束どおりの見込み」に収まったか(守れたか)を見せる。
+-- per_week = 0 は「これ以上は使わない」(ADR-078)。
 create table public.spending_promises (
   id          uuid        primary key default gen_random_uuid(),
   user_id     uuid        not null references auth.users(id) on delete cascade,
@@ -1793,7 +1794,7 @@ create table public.spending_promises (
 
   constraint uq_spending_promises_genre_month unique (user_id, genre_id, month),
   constraint ck_spending_promises_month check (extract(day from month) = 1),
-  constraint ck_spending_promises_per_week check (per_week between 1 and 7),
+  constraint ck_spending_promises_per_week check (per_week between 0 and 7),
   constraint ck_spending_promises_yen check (usual_yen >= 0 and limit_yen >= 0)
 );
 
