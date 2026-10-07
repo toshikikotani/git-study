@@ -237,17 +237,17 @@ export function ReceiptConfirm({
     });
   };
 
-  const field = 'w-full rounded-lg px-2 py-2 text-sm';
+  const field = 'mt-1 min-h-11 w-full rounded-xl px-3 text-sm';
   const fieldStyle = {
     background: 'var(--plane)',
     color: 'var(--ink)',
-    border: '1px solid var(--hairline)',
+    border: '1px solid transparent',
   };
 
   return (
     <section
       aria-label={`${store}のレシート`}
-      className="overflow-hidden rounded-2xl"
+      className="overflow-hidden rounded-[28px]"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* 上半分:画像(ズーム可)。品目をタップすると該当行をハイライトする。 */}
@@ -259,47 +259,49 @@ export function ReceiptConfirm({
       />
 
       {/* 下半分:読み取り結果 */}
-      <div className="space-y-4 p-4 pb-2">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="col-span-2 block">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+      <div className="space-y-5 p-5 pb-3">
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
               店名{original.branchName ? `(${original.branchName})` : ''}
             </span>
             <input
               value={store}
               onChange={(e) => setStore(e.target.value)}
-              className={field}
+              className="mt-1 min-h-11 w-full rounded-xl px-3 text-lg font-semibold"
               style={{ ...fieldStyle, ...underline(lowStore) }}
             />
           </label>
-          <label className="block">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              日付
-            </span>
-            <input
-              type="date"
-              value={occurredOn}
-              onChange={(e) => setOccurredOn(e.target.value)}
-              className={field}
-              style={{ ...fieldStyle, ...underline(lowDate) }}
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              支払額(円)
-            </span>
-            <input
-              inputMode="numeric"
-              value={String(paidYen)}
-              onChange={(e) => {
-                const yen = Number(e.target.value.replace(/[^0-9]/g, '') || '0');
-                if (draft !== null) update((d) => ({ ...d, paidYen: yen }));
-              }}
-              disabled={draft === null}
-              className={`${field} tabular`}
-              style={{ ...fieldStyle, ...underline(lowTotal) }}
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+                日付
+              </span>
+              <input
+                type="date"
+                value={occurredOn}
+                onChange={(e) => setOccurredOn(e.target.value)}
+                className={field}
+                style={{ ...fieldStyle, ...underline(lowDate) }}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+                支払額(円)
+              </span>
+              <input
+                inputMode="numeric"
+                value={String(paidYen)}
+                onChange={(e) => {
+                  const yen = Number(e.target.value.replace(/[^0-9]/g, '') || '0');
+                  if (draft !== null) update((d) => ({ ...d, paidYen: yen }));
+                }}
+                disabled={draft === null}
+                className="tabular mt-1 min-h-11 w-full rounded-xl px-3 text-2xl font-semibold"
+                style={{ ...fieldStyle, ...underline(lowTotal) }}
+              />
+            </label>
+          </div>
         </div>
 
         {duplicates > 0 ? (
@@ -319,28 +321,45 @@ export function ReceiptConfirm({
 
         {draft !== null ? (
           <>
-            <div role="radiogroup" aria-label="価格の表示" className="flex gap-1 text-xs">
-              {(
-                [
-                  ['tax_included', '内税(税込表示)'],
-                  ['tax_excluded', '外税(税抜表示)'],
-                ] as [PriceBasis, string][]
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.priceBasis === value}
-                  onClick={() => update((d) => ({ ...d, priceBasis: value }))}
-                  className="min-h-11 rounded-full px-3 py-2 font-semibold"
-                  style={{
-                    background: draft.priceBasis === value ? 'var(--accent)' : 'var(--plane)',
-                    color: draft.priceBasis === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
-                  }}
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+                品目
+                <span
+                  className="ml-1 text-xs font-normal"
+                  style={{ color: 'var(--ink-secondary)' }}
                 >
-                  {label}
-                </button>
-              ))}
+                  {draft.lines.filter((l) => l.kind === 'item').length}点
+                </span>
+              </h3>
+              <div
+                role="radiogroup"
+                aria-label="価格の表示"
+                className="flex gap-1 rounded-full p-1 text-xs"
+                style={{ background: 'var(--plane)' }}
+              >
+                {(
+                  [
+                    ['tax_included', '内税(税込表示)'],
+                    ['tax_excluded', '外税(税抜表示)'],
+                  ] as [PriceBasis, string][]
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.priceBasis === value}
+                    onClick={() => update((d) => ({ ...d, priceBasis: value }))}
+                    className="min-h-11 rounded-full px-3 font-semibold"
+                    style={{
+                      background: draft.priceBasis === value ? 'var(--surface)' : 'transparent',
+                      color: draft.priceBasis === value ? 'var(--ink)' : 'var(--ink-secondary)',
+                      boxShadow: draft.priceBasis === value ? 'var(--card-shadow)' : 'none',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* 品目は税率でグループ化。タップで選択(複数可)→ 下のチップで一括変更 */}
@@ -351,13 +370,13 @@ export function ReceiptConfirm({
               return (
                 <div key={String(g.rate)}>
                   <div
-                    className="flex items-baseline justify-between text-xs"
-                    style={{ color: 'var(--ink-muted)' }}
+                    className="flex items-baseline justify-between px-1 text-xs"
+                    style={{ color: 'var(--ink-secondary)' }}
                   >
                     <span className="font-semibold">{RATE_LABEL[String(g.rate)]}</span>
-                    <span className="tabular">{formatYen(total)}</span>
+                    <span className="tabular font-semibold">{formatYen(total)}</span>
                   </div>
-                  <ul className="mt-1 space-y-1">
+                  <ul className="mt-2 space-y-2">
                     {g.lines.map((l) => (
                       <LineRow
                         key={l.id}
@@ -411,8 +430,8 @@ export function ReceiptConfirm({
             </div>
 
             {/* ジャンル:選んだ品目を、チップで一括変更 */}
-            <div>
-              <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            <div className="rounded-2xl p-3" style={{ background: 'var(--plane)' }}>
+              <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
                 {selected.size > 0
                   ? `${selected.size}件を選択中 ─ ジャンルをタップで一括変更`
                   : '品目をタップして選ぶと、ジャンルを一括で変えられます'}
@@ -428,8 +447,12 @@ export function ReceiptConfirm({
                     type="button"
                     disabled={selected.size === 0}
                     onClick={() => setGenreFor(selected, g.id)}
-                    className="min-h-11 shrink-0 rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-40"
-                    style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                    className="min-h-11 shrink-0 rounded-full px-4 text-xs font-semibold disabled:opacity-40"
+                    style={{
+                      background: 'var(--surface)',
+                      color: 'var(--accent)',
+                      boxShadow: 'var(--card-shadow)',
+                    }}
                   >
                     {g.name}
                   </button>
@@ -467,8 +490,8 @@ export function ReceiptConfirm({
                   ],
                 }))
               }
-              className="min-h-11 text-xs font-semibold"
-              style={{ color: 'var(--accent)' }}
+              className="min-h-11 w-full rounded-2xl text-sm font-semibold"
+              style={{ color: 'var(--accent)', border: '1.5px dashed var(--hairline)' }}
             >
               ＋ 品目を追加
             </button>
@@ -480,8 +503,8 @@ export function ReceiptConfirm({
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <label className="col-span-2 block">
+            <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
               明細のジャンル
             </span>
             <select
@@ -498,23 +521,38 @@ export function ReceiptConfirm({
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              目標の扱い
-            </span>
-            <select
-              value={kind}
-              onChange={(e) => {
-                setKind(e.target.value as 'normal' | 'special');
-                setKindChosen(true);
-              }}
-              className={field}
-              style={fieldStyle}
-            >
-              <option value="normal">目標の予算に含める</option>
-              <option value="special">特別費として別枠</option>
-            </select>
-          </label>
+        </div>
+        <div role="radiogroup" aria-label="目標の扱い" className="space-y-1">
+          <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+            目標の扱い
+          </span>
+          <div className="flex gap-1 rounded-full p-1" style={{ background: 'var(--plane)' }}>
+            {(
+              [
+                ['normal', '目標の予算に含める'],
+                ['special', '特別費として別枠'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={kind === value}
+                onClick={() => {
+                  setKind(value);
+                  setKindChosen(true);
+                }}
+                className="min-h-11 flex-1 rounded-full px-2 text-xs font-semibold"
+                style={{
+                  background: kind === value ? 'var(--surface)' : 'transparent',
+                  color: kind === value ? 'var(--ink)' : 'var(--ink-secondary)',
+                  boxShadow: kind === value ? 'var(--card-shadow)' : 'none',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {choice.needed ? (
@@ -568,8 +606,12 @@ export function ReceiptConfirm({
 
       {/* 照合バー(下部に固定):品目合計 + 税 − 値引き − ポイント = 支払額 */}
       <div
-        className="sticky bottom-0 space-y-2 border-t p-3"
-        style={{ background: 'var(--surface-raised)', borderColor: 'var(--hairline)' }}
+        className="sticky bottom-0 space-y-2 border-t p-4"
+        style={{
+          background: 'var(--surface-raised)',
+          borderColor: 'var(--hairline)',
+          boxShadow: '0 -12px 24px -20px rgba(0, 0, 0, 0.35)',
+        }}
       >
         {reconcile !== null ? (
           <ReconcileBar result={reconcile} onFix={(fix) => update((d) => applyFix(d, fix))} />
@@ -587,8 +629,8 @@ export function ReceiptConfirm({
             <button
               type="button"
               onClick={onDiscard}
-              className="min-h-11 rounded-full px-4 py-3 text-sm"
-              style={{ color: 'var(--ink-muted)', border: '1px solid var(--hairline)' }}
+              className="min-h-12 rounded-full px-5 text-sm font-semibold"
+              style={{ color: 'var(--ink-secondary)', background: 'var(--plane)' }}
             >
               破棄
             </button>
@@ -598,8 +640,12 @@ export function ReceiptConfirm({
               disabled={
                 saving || !accountId || mustChoose || (draft !== null && draft.paidYen <= 0)
               }
-              className="min-h-11 flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
+              style={{
+                background: 'var(--action)',
+                color: 'var(--on-action)',
+                boxShadow: 'var(--card-shadow)',
+              }}
             >
               {saving
                 ? '保存しています…'
@@ -639,10 +685,10 @@ function LineRow({
   const isDiscount = line.kind === 'discount';
   return (
     <li
-      className="rounded-xl"
+      className="rounded-2xl"
       style={{
         background: selected ? 'var(--accent-track)' : 'var(--plane)',
-        border: `1px solid ${selected ? 'var(--accent)' : 'transparent'}`,
+        boxShadow: selected ? 'inset 0 0 0 2px var(--accent)' : 'none',
       }}
     >
       <div className="flex items-center gap-2 px-3 py-2">
@@ -652,19 +698,28 @@ function LineRow({
           onClick={onToggle}
           className="min-h-11 flex min-w-0 flex-1 items-baseline justify-between gap-2 text-left"
         >
-          <span
-            className="min-w-0 truncate text-xs"
-            style={{ color: 'var(--ink)', ...underline(low) }}
-          >
-            {isDiscount ? '値引き ' : ''}
-            {line.name}
+          <span className="min-w-0">
+            <span
+              className="block truncate text-sm"
+              style={{ color: 'var(--ink)', ...underline(low) }}
+            >
+              {selected ? '✓ ' : ''}
+              {isDiscount ? '値引き ' : ''}
+              {line.name}
+            </span>
             {genreLabel !== null ? (
-              <span className="ml-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              <span
+                className="mt-1 inline-block rounded-full px-2 text-xs font-semibold"
+                style={{
+                  background: 'var(--surface)',
+                  color: genreLabel === '未分類' ? 'var(--attention)' : 'var(--ink-secondary)',
+                }}
+              >
                 {genreLabel}
               </span>
             ) : null}
           </span>
-          <span className="tabular shrink-0 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+          <span className="tabular shrink-0 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {isDiscount ? '−' : ''}
             {formatYen(line.amountYen)}
           </span>
