@@ -19,6 +19,7 @@ import {
 import { listDebts } from '@/features/debts/store';
 import { getAppSettings } from '@/features/settings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
+import { HomeHeader } from './_home/home-header';
 import { TodaySection } from './_home/today-section';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
@@ -77,6 +78,7 @@ export default async function HomePage() {
     <div className="space-y-3">
       {/* 設計書 v3 3.1:ホームの主役は「今日あと使える額」。予測は重いので、ほかを待たせない。
           この画面で大きな数字はここだけ(dataviz:ヒーロー figure は1画面に1つ)。 */}
+      <HomeHeader />
       <Suspense fallback={<TodaySkeleton />}>
         <TodaySection />
       </Suspense>
