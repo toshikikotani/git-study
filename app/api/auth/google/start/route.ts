@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
+import { isCurrentUserOwner } from '@/features/auth/owner';
 import { getGoogleClientCredentials } from '@/lib/env';
 import { buildGoogleAuthorizeUrl } from '@/lib/google-auth';
 
@@ -18,7 +19,10 @@ export const runtime = 'nodejs';
 
 export const STATE_COOKIE = 'google_oauth_state';
 
-export function GET(request: Request): NextResponse {
+export async function GET(request: Request): Promise<NextResponse> {
+  if (!(await isCurrentUserOwner())) {
+    return NextResponse.json({ error: 'オーナーだけが使えます' }, { status: 404 });
+  }
   let clientId: string;
   try {
     ({ clientId } = getGoogleClientCredentials());

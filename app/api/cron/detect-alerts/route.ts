@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server';
 import {
   detectAndRecordInactivityAlertAsAdmin,
   detectAndRecordMonthlyRecapAlertAsAdmin,
-  detectAndRecordPaymentDueAlertsAsAdmin,
   detectAndRecordRiskyTransactionAlertsAsAdmin,
   detectAndRecordWastefulBudgetAlertsAsAdmin,
   recordJobFailureAlertAsAdmin,
@@ -23,7 +22,7 @@ import { findOwner } from '@/lib/supabase/owner';
  * `keepalive`/`import-gmail` と同じく本人のセッションが無い経路のため、
  * `createAdminClient()` + 明示的な user_id で検知・送信を行う。
  *
- * 流れ:検知(FR-20 ジャンル予算70%・FR-21 リボ等・FR-22 未取込・FR-23 返済日前日・
+ * 流れ:検知(FR-20 ジャンル予算70%・FR-21 リボ等・FR-22 未取込・
  * P6-1 月末の月次振り返り・新しく検知した定期支払い)→ alerts に記録
  * (重複は DB の一意制約が防ぐ)→ status='pending' の分を Discord・LINE へ送信
  * (どちらか設定されている分だけ。両方でも片方でもよい)。どちらも未設定
@@ -66,28 +65,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const [
-      paymentDueCount,
-      inactivityCount,
-      riskyCount,
-      wastefulCount,
-      recapCount,
-      subscriptionCount,
-    ] = await Promise.all([
-      detectAndRecordPaymentDueAlertsAsAdmin(admin, user.id),
-      detectAndRecordInactivityAlertAsAdmin(admin, user.id),
-      detectAndRecordRiskyTransactionAlertsAsAdmin(admin, user.id),
-      detectAndRecordWastefulBudgetAlertsAsAdmin(admin, user.id),
-      detectAndRecordMonthlyRecapAlertAsAdmin(admin, user.id),
-      detectAndRecordNewSubscriptionAlertsAsAdmin(admin, user.id),
-    ]);
+    const [inactivityCount, riskyCount, wastefulCount, recapCount, subscriptionCount] =
+      await Promise.all([
+        detectAndRecordInactivityAlertAsAdmin(admin, user.id),
+        detectAndRecordRiskyTransactionAlertsAsAdmin(admin, user.id),
+        detectAndRecordWastefulBudgetAlertsAsAdmin(admin, user.id),
+        detectAndRecordMonthlyRecapAlertAsAdmin(admin, user.id),
+        detectAndRecordNewSubscriptionAlertsAsAdmin(admin, user.id),
+      ]);
     const recordedCount =
-      paymentDueCount +
-      inactivityCount +
-      riskyCount +
-      wastefulCount +
-      recapCount +
-      subscriptionCount;
+      inactivityCount + riskyCount + wastefulCount + recapCount + subscriptionCount;
 
     // P6-3: net_worth_snapshots は本番マイグレーション未適用のため(T-26)、
     // 他の検知を止めないよう個別に catch する(rescued_emails の T-25 と同じ扱い)。

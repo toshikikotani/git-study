@@ -12,7 +12,7 @@ import { WorkLogSection } from './work-log-section';
  * 副業トラッカー(P3-1、FR-40, FR-42)。
  *
  * MVP 対象外(フェーズ2以降)だが、本人の希望で着手。作業時間・入金を
- * 記録し、時給換算(FR-40)と返済:投資への自動振り分け(FR-42、既定7:3)
+ * 記録し、時給換算(FR-40)と貯金:投資への自動振り分け(FR-42、既定7:3)
  * を表示する。実際の送金操作はアプリの対象外(他の資金移動と同じく
  * 手動で行い、ここに出す金額は「いくら動かせばよいか」の指示)。
  */
@@ -60,7 +60,7 @@ export default async function SideHustlePage() {
       <IncomeSection
         projects={projects}
         incomes={incomes}
-        repaymentRatio={settings.sideIncomeRepaymentRatio}
+        savingsRatio={settings.sideIncomeSavingsRatio}
       />
     </div>
   );

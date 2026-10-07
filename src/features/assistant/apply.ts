@@ -12,7 +12,7 @@ import {
   setGenreShowOnHome,
   updateGenreBudget,
 } from '@/features/genre/store';
-import { createGoal, listActiveGoals, updateGoalProgress } from '@/features/goals/store';
+import { createGoal, listActiveGoals } from '@/features/goals/store';
 import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems } from '@/features/receipts/items-store';
 import { getAppSettings, updateAppSettings } from '@/features/settings/store';
@@ -38,7 +38,7 @@ export async function loadPlanContext(): Promise<PlanContext> {
     genres,
     settings,
     transactions: transactions.slice(0, RECENT_TRANSACTIONS_LIMIT),
-    goals: goals.map((g) => ({ id: g.id, title: g.title, currentAmountYen: g.currentAmountYen })),
+    goals: goals.map((g) => ({ id: g.id, title: g.title })),
     latestPlan:
       latestPlan === null
         ? null
@@ -93,9 +93,6 @@ export async function executeOperation(operation: Operation): Promise<void> {
         targetDate: operation.targetDate,
         note: null,
       });
-      return;
-    case 'update_goal_progress':
-      await updateGoalProgress(operation.goalId, operation.currentAmountYen);
       return;
     case 'update_plan_targets':
       await updatePlanTargets(operation.planId, operation.items);

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 
+import { requireOwner } from '@/features/auth/owner';
+
 import { Card } from '@/components/ui/card';
-import { formatYen } from '@/domain/money';
 import { listDailyBriefs } from '@/features/briefs/store';
 import { formatDateJa } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
@@ -17,6 +18,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 export const dynamic = 'force-dynamic';
 
 export default async function BriefsPage() {
+  await requireOwner();
   const briefs = await withMinDuration(listDailyBriefs());
 
   return (
@@ -40,10 +42,7 @@ export default async function BriefsPage() {
                   {formatDateJa(brief.briefOn)}
                 </p>
                 <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-                  {brief.daysToPayoff === null ? '完済済み' : `完済まで残り${brief.daysToPayoff}日`}
-                  {brief.remainingDebtYen !== null
-                    ? ` ・ 残債${formatYen(brief.remainingDebtYen, { sign: 'never' })}`
-                    : ''}
+                  {brief.headline ?? ''}
                 </p>
               </Card>
             </Link>

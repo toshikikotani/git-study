@@ -10,7 +10,7 @@
  *
  * ── ここが持つ責務 ──────────────────────────────────────────
  * 「何を描くか」(棒グラフか、色は何色か)はここが決める。
- * 「何のデータを渡すか」(完済の進捗率など)は呼び出し側
+ * 「何のデータを渡すか」(貯金目標の進み具合など)は呼び出し側
  * (features/briefs/notify.ts 等)の業務判断。
  *
  * URL の長さは Discord・LINE どちらも十分な上限(数千文字)があるため、
@@ -19,7 +19,7 @@
 
 const QUICKCHART_BASE_URL = 'https://quickchart.io/chart';
 
-/** globals.css の役割色と揃える(青=返済・予算の残り、赤=超過)。 */
+/** globals.css の役割色と揃える(青=貯金・予算の残り、赤=超過)。 */
 const COLOR_ACCENT = '#2a78d6';
 const COLOR_TRACK = '#e6ebf3';
 const COLOR_OVER = '#e34948';
@@ -38,10 +38,10 @@ function buildChartUrl(config: Record<string, unknown>, width: number, height: n
 }
 
 /**
- * 完済の進捗(0〜1)をドーナツ1枚にする(朝配信、本人発案)。
+ * 貯金目標の進み具合(0〜1)をドーナツ1枚にする(朝配信、本人発案)。
  * percent はラベル用に丸めた整数(データラベルにそのまま出る)。
  */
-export function buildPayoffProgressChartUrl(progressRatio: number): string {
+export function buildSavingsProgressChartUrl(progressRatio: number): string {
   const ratio = Math.min(1, Math.max(0, progressRatio));
   const percent = Math.round(ratio * 100);
 
@@ -49,7 +49,7 @@ export function buildPayoffProgressChartUrl(progressRatio: number): string {
     {
       type: 'doughnut',
       data: {
-        labels: ['返済済み', '残り'],
+        labels: ['貯まった', 'あと'],
         datasets: [
           {
             data: [percent, 100 - percent],

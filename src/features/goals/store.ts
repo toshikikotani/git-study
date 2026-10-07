@@ -3,14 +3,15 @@
  *
  * RLS が本人の行だけに絞る(ADR-011)ため SELECT は user_id を意識しない。
  * `goals` は本番未適用(B-10)。未適用時の扱いは lib/supabase/errors.ts。
+ *
+ * 目標は「貯金目標」として使う(ADR-081)。貯まった額は収入 − 支出から自動で数える
+ * (features/savings/store.ts)。current_amount_yen は以前の手入力の名残で、もう使わない。
  */
 
-import {
-  assertGoalCurrentAmountYen,
-  assertGoalTargetAmountYen,
-  assertGoalTitle,
-} from '@/domain/goals';
-import type { DateOnly } from '@/lib/date';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import { assertGoalTargetAmountYen, assertGoalTitle } from '@/domain/goals';
+import { todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -23,7 +24,8 @@ export type Goal = {
   title: string;
   targetAmountYen: number | null;
   targetDate: DateOnly | null;
-  currentAmountYen: number;
+  /** 貯金を数え始める日(作った日)。 */
+  startOn: DateOnly;
   status: GoalStatus;
   note: string | null;
   createdAt: string;
@@ -48,7 +50,8 @@ function fromRow(row: GoalRow): Goal {
     title: row.title,
     targetAmountYen: row.target_amount_yen,
     targetDate: row.target_date,
-    currentAmountYen: row.current_amount_yen,
+    // start_on が未適用の本番(ADR-081 のマイグレーション前)では作った日から数える。
+    startOn: (row as Partial<GoalRow>).start_on ?? todayJst(new Date(row.created_at)),
     status: row.status,
     note: row.note,
     createdAt: row.created_at,
@@ -56,14 +59,27 @@ function fromRow(row: GoalRow): Goal {
   };
 }
 
-/** 進行中の目標を、新しい順に返す。ホーム画面等では使わず(FR-61)、/advisor 専用。 */
+/** 進行中の目標を、新しい順に返す。 */
 export async function listActiveGoals(): Promise<Goal[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('goals')
-    .select('*')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
+  return listActiveGoalsWith(supabase, null);
+}
+
+/** 進行中の目標(管理クライアント版。cron には本人のセッションが無いので user_id で絞る)。 */
+export async function listActiveGoalsAsAdmin(
+  client: SupabaseClient<Database>,
+  userId: string,
+): Promise<Goal[]> {
+  return listActiveGoalsWith(client, userId);
+}
+
+async function listActiveGoalsWith(
+  client: SupabaseClient<Database>,
+  userId: string | null,
+): Promise<Goal[]> {
+  let query = client.from('goals').select('*').eq('status', 'active');
+  if (userId !== null) query = query.eq('user_id', userId);
+  const { data, error } = await query.order('created_at', { ascending: false });
   if (error) {
     if (isMissingTableError(error)) return [];
     throw new GoalStoreError(`目標を取得できませんでした: ${error.message}`);
@@ -100,43 +116,17 @@ export async function createGoal(input: GoalInput): Promise<Goal> {
   return fromRow(data);
 }
 
-/**
- * 進捗額を更新する。目標金額に達した(またはそれを超えた)時点で自動的に
- * achieved へ倒す(FR-64 と同じ「肯定形」の考え方:本人が節目を見落とさない
- * ようにする)。目標金額を持たない目標(target_amount_yen が null)は
- * 自動達成の判定ができないため、本人が明示的に達成操作をするまで active のまま。
- */
-export async function updateGoalProgress(id: string, currentAmountYen: number): Promise<Goal> {
+/** 達成にする(貯まった目標を、本人が「使った・済んだ」として閉じる)。 */
+export async function achieveGoal(id: string): Promise<void> {
   const supabase = await createClient();
-  const amount = assertGoalCurrentAmountYen(currentAmountYen);
-
-  const { data: existing, error: fetchError } = await supabase
+  const { error } = await supabase
     .from('goals')
-    .select('target_amount_yen')
-    .eq('id', id)
-    .single();
-  if (fetchError) {
-    if (isMissingTableError(fetchError)) throw new GoalStoreError('目標機能はまだ利用できません');
-    throw new GoalStoreError(`目標を取得できませんでした: ${fetchError.message}`);
-  }
-
-  const achieved = existing.target_amount_yen !== null && amount >= existing.target_amount_yen;
-
-  const { data, error } = await supabase
-    .from('goals')
-    .update({
-      current_amount_yen: amount,
-      ...(achieved ? { status: 'achieved' as const, achieved_at: new Date().toISOString() } : {}),
-    })
-    .eq('id', id)
-    .select('*')
-    .single();
-
+    .update({ status: 'achieved', achieved_at: new Date().toISOString() })
+    .eq('id', id);
   if (error) {
     if (isMissingTableError(error)) throw new GoalStoreError('目標機能はまだ利用できません');
-    throw new GoalStoreError(`進捗を更新できませんでした: ${error.message}`);
+    throw new GoalStoreError(`目標を更新できませんでした: ${error.message}`);
   }
-  return fromRow(data);
 }
 
 /** 見送りにする(削除はしない。「前にこう考えたことがある」を残す)。 */

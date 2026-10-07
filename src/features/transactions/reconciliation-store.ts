@@ -67,7 +67,6 @@ export async function reconcileAccountStatement(
           `取り込み済みの明細合計は ${formatYen(importedTotalYen)}` +
           `(差額 ${formatYen(Math.abs(outcome.differenceYen))}${outcome.differenceYen > 0 ? '不足' : '超過'})。`,
         dedupKey: `import_gap:${input.accountId}:${input.period.endOn}`,
-        debtId: null,
         transactionId: null,
       },
     ]);

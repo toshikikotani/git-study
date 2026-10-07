@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # 使い捨ての PostgreSQL クラスタを立て、docs/schema.sql を適用するための共通処理。
-# scripts/verify-schema.sh と scripts/gen-payoff-golden.sh が読み込む。
+# scripts/verify-schema.sh などが読み込む。
 #
 # 提供するもの:
 #   pg_sandbox_start        一時クラスタを起動し、schema.sql を適用した DB を用意する

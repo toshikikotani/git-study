@@ -9,7 +9,9 @@
 import { wasteRatioOf } from '@/domain/diagnosis';
 import type { SpendingPersonaType } from '@/domain/persona';
 import { loadSpendingDiagnosisView } from '@/features/diagnosis/store';
+import { nextGoal, nextGoalRatio } from '@/domain/savings';
 import { loadHomeSummary } from '@/features/home/summary';
+import type { SavingsSummary } from '@/features/savings/store';
 import { averageDailySpendYen } from '@/domain/spending';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { monthStartJst, todayJst } from '@/lib/date';
@@ -87,12 +89,7 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
       monthKey: row.monthKey,
       wasteRatio: wasteRatioOf(row),
     })),
-    payoff: {
-      remainingYen: home.payoff.remainingYen,
-      progressRatio: home.payoff.progressRatio,
-      reducedThisMonthYen: home.payoff.reducedThisMonthYen,
-      daysRemaining: home.payoff.daysRemaining,
-    },
+    savings: savingsForReport(home.savings),
     forecast: forecast === null ? null : forecastSummary(forecast.forecast),
     evidence: {
       ...evidence,
@@ -100,6 +97,25 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
       pastReads: past.reads,
       trust: past.trust,
     },
+  };
+}
+
+function savingsForReport(savings: SavingsSummary): MonthlyReportInput['savings'] {
+  const next = nextGoal(savings.goals);
+  return {
+    totalYen: savings.totalYen,
+    thisMonthYen: savings.thisMonthYen,
+    paceYen: savings.paceYen,
+    nextGoal:
+      next === null
+        ? null
+        : {
+            title: next.goal.title,
+            targetAmountYen: next.goal.targetAmountYen,
+            remainingYen: next.remainingYen,
+            targetDate: next.goal.targetDate,
+            progressRatio: nextGoalRatio(savings.goals),
+          },
   };
 }
 

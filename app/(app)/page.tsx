@@ -8,16 +8,13 @@ import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { streakBadgeFor } from '@/domain/streak';
 import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
+import { getCurrentAccount } from '@/features/auth/owner';
 import { loadHomeSummary } from '@/features/home/summary';
 import { loadMonthlyLedger } from '@/features/spending/store';
-import {
-  lockedSavingsYen,
-  MISSING_INCOME_NOTE,
-  obligationYen,
-  sinkingFromRules,
-} from '@/domain/locked-savings';
-import { listDebts } from '@/features/debts/store';
-import { getAppSettings } from '@/features/settings/store';
+import { todayJst } from '@/lib/date';
+import { lockedSavingsYen, MISSING_INCOME_NOTE, sinkingFromRules } from '@/domain/locked-savings';
+import { goalOutlook, nextGoal } from '@/domain/savings';
+import type { SavingsSummary } from '@/features/savings/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
 import { HomeHeader } from './_home/home-header';
 import { TodaySection } from './_home/today-section';
@@ -41,26 +38,20 @@ export default async function HomePage() {
   // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
   // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
   // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
-  const [, summary, ledger, debts, settings, rules] = await Promise.all([
+  const [, summary, ledger, rules, account] = await Promise.all([
     recordCheckin().catch(() => undefined),
     loadHomeSummary(),
     loadMonthlyLedger().catch(() => null),
-    listDebts().catch(() => []),
-    getAppSettings().catch(() => null),
     listTransferRules().catch(() => []),
+    getCurrentAccount(),
   ]);
   const streak = await getCheckinStreak();
   const { tiles } = summary;
-  const obligation = obligationYen(
-    debts.reduce((sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0), 0),
-    settings?.monthlyRepaymentTargetYen ?? 0,
-  );
   const sinking = sinkingFromRules(rules);
   const scheduled = ledger?.totals.scheduledYen ?? 0;
   const savingsYen = ledger
     ? lockedSavingsYen({
         incomeYen: ledger.totals.incomeYen,
-        obligationYen: obligation,
         sinkingYen: sinking,
         scheduledYen: scheduled,
         discretionaryCapYen: tiles.reduce((sum, tile) => sum + (tile.budgetYen ?? 0), 0),
@@ -87,36 +78,7 @@ export default async function HomePage() {
         className="rise relative overflow-hidden rounded-[22px] px-4 py-4"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
-        <div className="relative">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              今日残せる
-            </p>
-            <StreakBadge streak={streak} />
-          </div>
-
-          <p
-            className="mt-2 text-2xl leading-none font-semibold tracking-[-0.03em] tabular"
-            style={{ color: 'var(--ink)' }}
-          >
-            {savingsYen === null ? '—' : formatYen(savingsYen)}
-          </p>
-          <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            {savingsYen === null
-              ? MISSING_INCOME_NOTE
-              : '撮ると、この数字が減る。残った分が貯蓄になる。'}
-          </p>
-          {savingsYen === null ? (
-            <a
-              href="/payday"
-              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold"
-              style={{ color: 'var(--accent)' }}
-            >
-              手取りを入れる
-              <span aria-hidden>→</span>
-            </a>
-          ) : null}
-        </div>
+        <SavingsCard savings={summary.savings} leftThisMonthYen={savingsYen} streak={streak} />
       </section>
 
       {/* FR-14 / FR-64:残額は肯定形で示す。責める文言を使わない。
@@ -176,14 +138,16 @@ export default async function HomePage() {
        * 近くに置く。機能がいっぱいあるように見せない」)。以前はここに
        * 6件の文字リンクが横並びだった。副業・転職準備・Google連携は
        * 「その他」メニュー(P10-1)から辿れるため重複させず削除し、今見ている
-       * 数字(完済・予算タイル)と直接関係の深い2件だけをボタンとして残した。
+       * 数字(貯金・予算タイル)と直接関係の深い2件だけをボタンとして残した。
        */}
-      <div className="rise" style={{ animationDelay: `${100 + tiles.length * 70}ms` }}>
-        <Button href="/briefs" variant="elevated" className="w-full">
-          朝配信のアーカイブを見る
-          <span aria-hidden>→</span>
-        </Button>
-      </div>
+      {account.isOwner ? (
+        <div className="rise" style={{ animationDelay: `${100 + tiles.length * 70}ms` }}>
+          <Button href="/briefs" variant="elevated" className="w-full">
+            朝配信のアーカイブを見る
+            <span aria-hidden>→</span>
+          </Button>
+        </div>
+      ) : null}
 
       <div className="rise flex gap-3" style={{ animationDelay: `${170 + tiles.length * 70}ms` }}>
         <Button href="/reports" variant="outlined" className="flex-1">
@@ -193,6 +157,106 @@ export default async function HomePage() {
           AI相談
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 貯金(ADR-081。以前の「完済まで」の場所)。
+ *
+ * 貯金目標があれば、貯まった合計と、いちばん近い目標までの残り・届く見込み。
+ * 無ければ、今月残せる見込み(手取り − 積立 − 予定 − 予算)と、目標をつくる入口。
+ */
+function SavingsCard({
+  savings,
+  leftThisMonthYen,
+  streak,
+}: {
+  savings: SavingsSummary;
+  leftThisMonthYen: number | null;
+  streak: CheckinStreak;
+}) {
+  const today = todayJst();
+  const next = nextGoal(savings.goals);
+
+  const header = (label: string) => (
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+        {label}
+      </p>
+      <StreakBadge streak={streak} />
+    </div>
+  );
+  const bigNumber = (text: string) => (
+    <p
+      className="mt-2 text-2xl leading-none font-semibold tracking-[-0.03em] tabular"
+      style={{ color: 'var(--ink)' }}
+    >
+      {text}
+    </p>
+  );
+  const link = (href: string, text: string) => (
+    <a
+      href={href}
+      className="mt-3 inline-flex items-center gap-1 text-xs font-semibold"
+      style={{ color: 'var(--accent)' }}
+    >
+      {text}
+      <span aria-hidden>→</span>
+    </a>
+  );
+
+  if (next === null) {
+    return (
+      <div className="relative">
+        {header('今月残せる見込み')}
+        {bigNumber(leftThisMonthYen === null ? '—' : formatYen(leftThisMonthYen))}
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          {leftThisMonthYen === null
+            ? MISSING_INCOME_NOTE
+            : '貯金目標をつくると、貯まり具合と、いつ届くかが見えます。'}
+        </p>
+        {leftThisMonthYen === null
+          ? link('/payday', '手取りを入れる')
+          : link('/savings', '貯金目標をつくる')}
+      </div>
+    );
+  }
+
+  const target = next.goal.targetAmountYen;
+  const percent = target === null ? null : Math.round(Math.min(1, next.savedYen / target) * 100);
+  return (
+    <div className="relative">
+      {header('貯金')}
+      {bigNumber(formatYen(savings.totalYen, { sign: 'never' }))}
+      <p className="mt-3 text-sm" style={{ color: 'var(--ink)' }}>
+        {next.goal.title}
+        {next.remainingYen !== null && next.remainingYen > 0 ? (
+          <span className="tabular ml-2" style={{ color: 'var(--ink-secondary)' }}>
+            あと {formatYen(next.remainingYen, { sign: 'never' })}
+          </span>
+        ) : null}
+      </p>
+      {percent !== null ? (
+        <div
+          className="mt-2 h-2 w-full overflow-hidden rounded-full"
+          style={{ background: 'var(--accent-track)' }}
+          role="progressbar"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${next.goal.title} ${percent}%`}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${percent}%`, background: 'var(--accent)' }}
+          />
+        </div>
+      ) : null}
+      <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        {goalOutlook(next, today)}
+      </p>
+      {link('/savings', '貯金を見る')}
     </div>
   );
 }

@@ -11,12 +11,14 @@
  * この planToolCall() を通す(クライアントから戻ってきた値を信用しない)。
  *
  * ── 致命的な変更をさせない(本人の条件) ──────────────────────
- * ①削除系のツールは1つも用意しない(明細・口座・負債・ジャンル・目標の削除、
+ * ①削除系のツールは1つも用意しない(明細・口座・ジャンル・目標の削除、
  *   目標の断念、ジャンルの統合はすべて対象外)。
- * ②秘匿情報(環境変数名の参照値、Gmail設定、認証)・口座残高・負債の元本や
- *   金利・FR-21の検知ルールには触れるツールが無い(ADR-010/014)。
- * ③高リスク投資枠の解禁(is_high_risk_unlocked)は完済を機に人が判断するゲート
- *   (FR-52)なので会話からは変えられない。
+ * ②秘匿情報(環境変数名の参照値、Gmail設定、認証)・口座残高・
+ *   FR-21の検知ルールには触れるツールが無い(ADR-010/014)。
+ * ③高リスク投資枠を使うか(is_high_risk_unlocked)は本人が投資画面で決める
+ *   (FR-52、ADR-081)ので会話からは変えられない。
+ * 貯金目標の貯まった額は収入 − 支出から自動で数える(ADR-081)ので、進捗を変える
+ * ツールは無い。
  * ④金額・比率には上限を置く(桁の読み違いを承認カードに出す前に止める)。
  * ⑤1回の変更案は MAX_CHANGES_PER_PROPOSAL 件まで。
  */
@@ -51,7 +53,6 @@ export const WRITE_TOOL_NAMES = [
   'set_genre_show_on_home',
   'create_genre',
   'create_goal',
-  'update_goal_progress',
   'update_plan_targets',
 ] as const;
 export type WriteToolName = (typeof WRITE_TOOL_NAMES)[number];
@@ -71,7 +72,7 @@ export type ProposedChange = {
   detail: string;
 };
 
-export type GoalRef = { id: string; title: string; currentAmountYen: number };
+export type GoalRef = { id: string; title: string };
 export type PlanRef = {
   id: string;
   items: readonly { genreId: string; genreName: string; targetYen: number }[];
@@ -110,7 +111,6 @@ export type Operation =
       targetAmountYen: number | null;
       targetDate: string | null;
     }
-  | { op: 'update_goal_progress'; goalId: string; currentAmountYen: number }
   | {
       op: 'update_plan_targets';
       planId: string;
@@ -146,27 +146,22 @@ function requireAmount(value: unknown, label: string, max: number): number {
 function describeSettingsChange(patch: AppSettingsPatch, current: AppSettings): string {
   const parts: string[] = [];
   if (patch.payday !== undefined) parts.push(`給料日: ${current.payday}日→${patch.payday}日`);
-  if (patch.monthlyRepaymentTargetYen !== undefined) {
+  if (patch.monthlySavingsTargetYen !== undefined) {
     parts.push(
-      `月々の返済目標額: ${yen(current.monthlyRepaymentTargetYen)}→${yen(patch.monthlyRepaymentTargetYen)}`,
+      `毎月の貯金目標: ${yen(current.monthlySavingsTargetYen)}→${yen(patch.monthlySavingsTargetYen)}`,
     );
   }
-  if (patch.repaymentStrategy !== undefined) {
-    parts.push(`返済戦略: ${current.repaymentStrategy}→${patch.repaymentStrategy}`);
-  }
-  if (patch.investmentRatioOfRepayment !== undefined) {
-    parts.push(
-      `投資比率: ${current.investmentRatioOfRepayment}→${patch.investmentRatioOfRepayment}`,
-    );
+  if (patch.investmentRatioOfSavings !== undefined) {
+    parts.push(`投資比率: ${current.investmentRatioOfSavings}→${patch.investmentRatioOfSavings}`);
   }
   if (patch.highRiskAllocationRatio !== undefined) {
     parts.push(
       `高リスク投資枠の比率: ${current.highRiskAllocationRatio}→${patch.highRiskAllocationRatio}`,
     );
   }
-  if (patch.sideIncomeRepaymentRatio !== undefined) {
+  if (patch.sideIncomeSavingsRatio !== undefined) {
     parts.push(
-      `副業収入の返済比率: ${current.sideIncomeRepaymentRatio}→${patch.sideIncomeRepaymentRatio}`,
+      `副業収入の貯金比率: ${current.sideIncomeSavingsRatio}→${patch.sideIncomeSavingsRatio}`,
     );
   }
   return parts.join(' / ');
@@ -176,15 +171,15 @@ function planUpdateSettings(input: unknown, ctx: PlanContext): PlannedChange {
   const args = asRecord(input);
   if (args.is_high_risk_unlocked !== undefined) {
     throw new ChatToolError(
-      '高リスク投資枠の解禁は、完済を機に本人が判断する設定(FR-52)のため会話からは変更できません。',
+      '高リスク投資枠を使うかは、本人が投資画面で決める設定(FR-52)のため会話からは変更できません。',
     );
   }
   const { patch } = parseAppSettingsPatch(input);
   if (
-    patch.monthlyRepaymentTargetYen !== undefined &&
-    patch.monthlyRepaymentTargetYen > MAX_AMOUNT_YEN
+    patch.monthlySavingsTargetYen !== undefined &&
+    patch.monthlySavingsTargetYen > MAX_AMOUNT_YEN
   ) {
-    throw new ChatToolError(`月々の返済目標額は${yen(MAX_AMOUNT_YEN)}以下で指定してください。`);
+    throw new ChatToolError(`毎月の貯金目標は${yen(MAX_AMOUNT_YEN)}以下で指定してください。`);
   }
   return {
     change: {
@@ -422,27 +417,6 @@ function planCreateGoal(input: unknown): PlannedChange {
   };
 }
 
-function planGoalProgress(input: unknown, ctx: PlanContext): PlannedChange {
-  const args = asRecord(input);
-  const goal = ctx.goals.find((g) => g.id === args.goal_id);
-  if (!goal) {
-    throw new ChatToolError(
-      'goal_id の目標が見つかりません。進行中の目標一覧のidから選んでください。',
-    );
-  }
-  const current = requireAmount(args.current_amount_yen, '進捗額', MAX_GOAL_AMOUNT_YEN);
-  return {
-    change: {
-      tool: 'update_goal_progress',
-      input: args,
-      kind: 'updated',
-      target: goal.title,
-      detail: `進捗: ${yen(goal.currentAmountYen)}→${yen(current)}`,
-    },
-    operation: { op: 'update_goal_progress', goalId: goal.id, currentAmountYen: current },
-  };
-}
-
 function planPlanTargets(input: unknown, ctx: PlanContext): PlannedChange {
   const args = asRecord(input);
   if (ctx.latestPlan === null) {
@@ -510,8 +484,6 @@ export function planToolCall(name: string, input: unknown, ctx: PlanContext): Pl
       return planCreateGenre(input, ctx);
     case 'create_goal':
       return planCreateGoal(input);
-    case 'update_goal_progress':
-      return planGoalProgress(input, ctx);
     case 'update_plan_targets':
       return planPlanTargets(input, ctx);
     default:

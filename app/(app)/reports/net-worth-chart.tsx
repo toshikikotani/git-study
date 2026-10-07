@@ -2,12 +2,11 @@ import { formatYen } from '@/domain/money';
 import type { NetWorthPoint } from '@/features/net-worth/store';
 
 /**
- * 資産推移(残債総額 + 投資評価額)のグラフ(P6-3)。
+ * 資産推移(貯金 + 投資評価額)のグラフ(P6-3。ADR-081 で残債から貯金に)。
  *
  * ── 色について ──────────────────────────────────────────────
  * カテゴリと違い、この2本は本アプリが既に予約している役割の色をそのまま使う
- * (残債総額=var(--over)「支出・負債」、投資評価額=var(--income)「収入・資産」)。
- * globals.css の設計判断どおり、緑×赤は通常視ΔEが境界帯(6〜8)のため、
+ * (貯金=var(--accent)、投資評価額=var(--income)「収入・資産」)。
  * 色だけに頼らず凡例・直接ラベルに必ず文字と数値を添える。
  *
  * ── 記録が無い間 ────────────────────────────────────────────
@@ -35,7 +34,7 @@ export function NetWorthChart({ points }: { points: readonly NetWorthPoint[] }) 
     );
   }
 
-  const maxYen = Math.max(...points.flatMap((p) => [p.debtBalanceYen, p.investmentValueYen]), 1);
+  const maxYen = Math.max(...points.flatMap((p) => [p.savingsYen, p.investmentValueYen]), 1);
   const stepX = points.length > 1 ? (WIDTH - PADDING * 2) / (points.length - 1) : 0;
 
   function toXY(index: number, valueYen: number): { x: number; y: number } {
@@ -68,12 +67,12 @@ export function NetWorthChart({ points }: { points: readonly NetWorthPoint[] }) 
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mt-3 w-full"
         role="img"
-        aria-label={`残債総額${formatYen(latest.debtBalanceYen)}、投資評価額${formatYen(latest.investmentValueYen)}(${latest.asOf}時点)`}
+        aria-label={`貯金${formatYen(latest.savingsYen)}、投資評価額${formatYen(latest.investmentValueYen)}(${latest.asOf}時点)`}
       >
         <path
-          d={linePath(points.map((p) => p.debtBalanceYen))}
+          d={linePath(points.map((p) => p.savingsYen))}
           fill="none"
-          stroke="var(--over)"
+          stroke="var(--accent)"
           strokeWidth={2}
           strokeLinecap="round"
         />
@@ -85,12 +84,12 @@ export function NetWorthChart({ points }: { points: readonly NetWorthPoint[] }) 
           strokeLinecap="round"
         />
         {points.map((p, i) => {
-          const debtPoint = toXY(i, p.debtBalanceYen);
+          const savingsPoint = toXY(i, p.savingsYen);
           const investmentPoint = toXY(i, p.investmentValueYen);
           return (
             <g key={p.asOf}>
-              <circle cx={debtPoint.x} cy={debtPoint.y} r={4} fill="var(--over)">
-                <title>{`${p.asOf}: 残債総額 ${formatYen(p.debtBalanceYen)}`}</title>
+              <circle cx={savingsPoint.x} cy={savingsPoint.y} r={4} fill="var(--accent)">
+                <title>{`${p.asOf}: 貯金 ${formatYen(p.savingsYen)}`}</title>
               </circle>
               <circle cx={investmentPoint.x} cy={investmentPoint.y} r={4} fill="var(--income)">
                 <title>{`${p.asOf}: 投資評価額 ${formatYen(p.investmentValueYen)}`}</title>
@@ -101,7 +100,7 @@ export function NetWorthChart({ points }: { points: readonly NetWorthPoint[] }) 
       </svg>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <Legend color="var(--over)" label={`残債総額 ${formatYen(latest.debtBalanceYen)}`} />
+        <Legend color="var(--accent)" label={`貯金 ${formatYen(latest.savingsYen)}`} />
         <Legend
           color="var(--income)"
           label={`投資評価額 ${formatYen(latest.investmentValueYen)}`}
@@ -129,14 +128,14 @@ function NetWorthTable({ points }: { points: readonly NetWorthPoint[] }) {
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full text-xs">
-        <caption className="sr-only">月末時点の残債総額・投資評価額の表</caption>
+        <caption className="sr-only">月末時点の貯金・投資評価額の表</caption>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--hairline)' }}>
             <th className="p-2 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
               月末
             </th>
             <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
-              残債総額
+              貯金
             </th>
             <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
               投資評価額
@@ -150,7 +149,7 @@ function NetWorthTable({ points }: { points: readonly NetWorthPoint[] }) {
                 {p.asOf}
               </td>
               <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
-                {formatYen(p.debtBalanceYen)}
+                {formatYen(p.savingsYen)}
               </td>
               <td className="tabular p-2 text-right" style={{ color: 'var(--ink-secondary)' }}>
                 {formatYen(p.investmentValueYen)}

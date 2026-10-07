@@ -16,7 +16,7 @@ import { signUpAction } from './actions';
 type Tab = 'password' | 'register';
 
 /**
- * ログインできたら、ホームをページごと読み直して開く(ADR-081)。
+ * ログインできたら、ホームをページごと読み直して開く(ADR-083)。
  *
  * 以前は `router.push('/')` の直後に `router.refresh()` を呼んでいた。refresh は「今の画面」を
  * 読み直すため、ホームへの移動が終わる前に呼ばれるとログイン画面を読み直してしまい、ホームへ

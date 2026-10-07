@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 
+import { isCurrentUserOwner } from '@/features/auth/owner';
 import { getGoogleClientCredentials } from '@/lib/env';
 import { exchangeGoogleAuthorizationCode } from '@/lib/google-auth';
 import { STATE_COOKIE } from '../start/route';
@@ -18,6 +19,9 @@ import { STATE_COOKIE } from '../start/route';
 export const runtime = 'nodejs';
 
 export async function GET(request: Request): Promise<Response> {
+  if (!(await isCurrentUserOwner())) {
+    return Response.json({ error: 'オーナーだけが使えます' }, { status: 404 });
+  }
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');

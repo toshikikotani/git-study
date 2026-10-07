@@ -47,9 +47,8 @@ Supabase / Vercel / Anthropic のアカウントが未作成でも、`npm run te
 | `npm run typecheck` | 型検査 |
 | `npm run test` | 単体テスト |
 | `npm run verify:schema` | `docs/schema.sql` を一時 PostgreSQL に流し、制約・関数・RLS を検証 |
-| `./scripts/gen-payoff-golden.sh` | SQL 版シミュレーションの出力を fixture に書き出す |
 
-`verify:schema` と `gen-payoff-golden.sh` はローカルに PostgreSQL 15 以上(`initdb` / `pg_ctl` / `psql`)が必要。Ubuntu なら `apt-get install -y postgresql-16`。
+`verify:schema` はローカルに PostgreSQL 15 以上(`initdb` / `pg_ctl` / `psql`)が必要。Ubuntu なら `apt-get install -y postgresql-16`。
 
 ## デプロイ
 

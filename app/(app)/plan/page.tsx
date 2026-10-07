@@ -9,8 +9,7 @@ import { loadGoalView } from '@/features/goals/loader';
 import { listGenreOptions } from '@/features/spending-plan/membership';
 import { getCurrentPlan, listPlanRanges, type SpendingPlan } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
-import { lockedSavingsYen, obligationYen, sinkingFromRules } from '@/domain/locked-savings';
-import { listDebts } from '@/features/debts/store';
+import { lockedSavingsYen, sinkingFromRules } from '@/domain/locked-savings';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { listTransferRules } from '@/features/transfer-rules/store';
 import { categoryHref } from '@/lib/category-nav';
@@ -113,7 +112,7 @@ function LoadError({ what, error }: { what: string; error: unknown }) {
 }
 
 async function SpentRows({ today }: { today: string }) {
-  const [goal, ledger, debts, settings, rules, captures] = await Promise.all([
+  const [goal, ledger, rules, captures] = await Promise.all([
     loadGoalView().then(
       (value) => ({ ok: true as const, value }),
       (error: unknown) => {
@@ -122,8 +121,6 @@ async function SpentRows({ today }: { today: string }) {
       },
     ),
     loadMonthlyLedger().catch(() => null),
-    listDebts().catch(() => []),
-    getAppSettings().catch(() => null),
     listTransferRules().catch(() => []),
     listOpenCaptures().catch(() => []),
   ]);
@@ -136,13 +133,6 @@ async function SpentRows({ today }: { today: string }) {
   const savingsYen = ledger
     ? lockedSavingsYen({
         incomeYen: ledger.totals.incomeYen,
-        obligationYen: obligationYen(
-          debts.reduce(
-            (sum, debt) => sum + (debt.status === 'active' ? debt.minimumPaymentYen : 0),
-            0,
-          ),
-          settings?.monthlyRepaymentTargetYen ?? 0,
-        ),
         sinkingYen: sinkingFromRules(rules),
         scheduledYen: view.guidance.scheduledYen,
         discretionaryCapYen: view.guidance.targetYen,

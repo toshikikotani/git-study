@@ -6,7 +6,6 @@ import {
   buildMonthlyRecapAlert,
   buildNewSubscriptionAlert,
   detectInactivity,
-  detectPaymentDueTomorrow,
   detectRiskyTransaction,
   detectWastefulBudget,
   isAheadOfPace,
@@ -42,46 +41,6 @@ describe('detectInactivity(FR-22)', () => {
     const a = detectInactivity('2026-09-01', '2026-09-09');
     const b = detectInactivity('2026-09-01', '2026-09-10');
     expect(a!.dedupKey).not.toBe(b!.dedupKey);
-  });
-});
-
-describe('detectPaymentDueTomorrow(FR-23)', () => {
-  it('明日が返済日の負債だけ検知する', () => {
-    const debts = [
-      { id: 'd1', lenderName: 'カードA', paymentDay: 10 },
-      { id: 'd2', lenderName: 'カードB', paymentDay: 15 },
-    ];
-    const alerts = detectPaymentDueTomorrow(debts, '2026-09-09');
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.debtId).toBe('d1');
-    expect(alerts[0]!.title).toBe('カードAの返済日は明日です');
-  });
-
-  it('該当が無ければ空配列', () => {
-    const debts = [{ id: 'd1', lenderName: 'カードA', paymentDay: 20 }];
-    expect(detectPaymentDueTomorrow(debts, '2026-09-09')).toEqual([]);
-  });
-
-  it('29〜31日指定は、その月の末日に丸めて比較する', () => {
-    // 2026-09 は30日まで。paymentDay=31 は9/30に丸まる
-    const debts = [{ id: 'd1', lenderName: 'カードA', paymentDay: 31 }];
-    const alerts = detectPaymentDueTomorrow(debts, '2026-09-29');
-    expect(alerts).toHaveLength(1);
-  });
-
-  it('月をまたぐ dedup_key になる(月ごとに1回)', () => {
-    const debts = [{ id: 'd1', lenderName: 'カードA', paymentDay: 10 }];
-    const alerts = detectPaymentDueTomorrow(debts, '2026-09-09');
-    expect(alerts[0]!.dedupKey).toBe('payment_due:d1:2026-09');
-  });
-
-  it('複数の負債が同じ日に返済日でも、それぞれ検知する', () => {
-    const debts = [
-      { id: 'd1', lenderName: 'カードA', paymentDay: 27 },
-      { id: 'd2', lenderName: 'カードB', paymentDay: 27 },
-    ];
-    const alerts = detectPaymentDueTomorrow(debts, '2026-09-26');
-    expect(alerts.map((a) => a.debtId).sort()).toEqual(['d1', 'd2']);
   });
 });
 
@@ -287,16 +246,16 @@ describe('isLastDayOfMonth(P6-1)', () => {
 });
 
 describe('buildMonthlyRecapAlert(P6-1)', () => {
-  it('返済・副業収入・浪費カテゴリの状況を1件のアラートにまとめる', () => {
+  it('貯金・副業収入・浪費カテゴリの状況を1件のアラートにまとめる', () => {
     const alert = buildMonthlyRecapAlert({
       monthKey: '2026-09',
-      totalPaidYen: 50_000,
+      savedYen: 50_000,
       totalSideIncomeYen: 30_000,
       wasteCategories: [{ name: '浪費', status: status({ spentYen: 15_000, usageRatio: 0.75 }) }],
     });
     expect(alert.kind).toBe('other');
     expect(alert.title).toBe('2026年9月の振り返り');
-    expect(alert.body).toMatch(/今月の返済: 50,000円/);
+    expect(alert.body).toMatch(/今月の貯金: 50,000円/);
     expect(alert.body).toMatch(/副業収入: 30,000円/);
     expect(alert.body).toMatch(/浪費: 15,000円\(予算の75%\)/);
     expect(alert.dedupKey).toBe('monthly_recap:2026-09');
@@ -305,17 +264,17 @@ describe('buildMonthlyRecapAlert(P6-1)', () => {
   it('浪費カテゴリが無くても組み立てられる', () => {
     const alert = buildMonthlyRecapAlert({
       monthKey: '2026-09',
-      totalPaidYen: 0,
+      savedYen: 0,
       totalSideIncomeYen: 0,
       wasteCategories: [],
     });
-    expect(alert.body).toBe('今月の返済: 0円\n副業収入: 0円');
+    expect(alert.body).toBe('今月の貯金: 0円\n副業収入: 0円');
   });
 
   it('予算が無い浪費カテゴリは「予算なし」と表示する', () => {
     const alert = buildMonthlyRecapAlert({
       monthKey: '2026-09',
-      totalPaidYen: 0,
+      savedYen: 0,
       totalSideIncomeYen: 0,
       wasteCategories: [
         { name: '浪費', status: status({ budgetYen: null, usageRatio: null, spentYen: 3_000 }) },
@@ -325,7 +284,7 @@ describe('buildMonthlyRecapAlert(P6-1)', () => {
   });
 
   it('月が変わると dedup_key も変わる', () => {
-    const summary = { totalPaidYen: 0, totalSideIncomeYen: 0, wasteCategories: [] };
+    const summary = { savedYen: 0, totalSideIncomeYen: 0, wasteCategories: [] };
     const a = buildMonthlyRecapAlert({ ...summary, monthKey: '2026-09' });
     const b = buildMonthlyRecapAlert({ ...summary, monthKey: '2026-10' });
     expect(a.dedupKey).not.toBe(b.dedupKey);

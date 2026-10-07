@@ -20,13 +20,12 @@ import { ChatToolError } from '@/lib/chat-tools';
  */
 
 const SETTINGS: AppSettings = {
-  monthlyRepaymentTargetYen: 100_000,
-  repaymentStrategy: 'avalanche',
-  investmentRatioOfRepayment: 0.2,
+  monthlySavingsTargetYen: 100_000,
+  investmentRatioOfSavings: 0.2,
   isHighRiskUnlocked: false,
   highRiskAllocationRatio: 0.3,
   payday: 25,
-  sideIncomeRepaymentRatio: 0.7,
+  sideIncomeSavingsRatio: 0.7,
   aiEnabled: true,
 };
 
@@ -74,7 +73,7 @@ const CTX: PlanContext = {
   genres: GENRES,
   settings: SETTINGS,
   transactions: [TRANSACTION],
-  goals: [{ id: 'goal1', title: '旅行', currentAmountYen: 10_000 }],
+  goals: [{ id: 'goal1', title: '旅行' }],
   latestPlan: {
     id: 'plan1',
     items: [
@@ -88,7 +87,7 @@ describe('planToolCall: update_settings', () => {
   it('変更前→変更後を見せる説明と、実行用のpatchを返す', () => {
     const { change, operation } = planToolCall(
       'update_settings',
-      { payday: 20, monthly_repayment_target_yen: 80_000 },
+      { payday: 20, monthly_savings_target_yen: 80_000 },
       CTX,
     );
     expect(change.target).toBe('設定');
@@ -96,19 +95,19 @@ describe('planToolCall: update_settings', () => {
     expect(change.detail).toContain('100,000円→80,000円');
     expect(operation).toEqual({
       op: 'update_settings',
-      patch: { payday: 20, monthlyRepaymentTargetYen: 80_000 },
+      patch: { payday: 20, monthlySavingsTargetYen: 80_000 },
     });
   });
 
-  it('高リスク投資枠の解禁は会話から変えられない(致命的な変更の禁止)', () => {
+  it('高リスク投資枠の切り替えは会話から変えられない(致命的な変更の禁止)', () => {
     expect(() => planToolCall('update_settings', { is_high_risk_unlocked: true }, CTX)).toThrow(
       ChatToolError,
     );
   });
 
-  it('返済目標額の上限を超える値は拒む', () => {
+  it('毎月の貯金目標の上限を超える値は拒む', () => {
     expect(() =>
-      planToolCall('update_settings', { monthly_repayment_target_yen: MAX_AMOUNT_YEN + 1 }, CTX),
+      planToolCall('update_settings', { monthly_savings_target_yen: MAX_AMOUNT_YEN + 1 }, CTX),
     ).toThrow(ChatToolError);
   });
 
@@ -255,15 +254,9 @@ describe('planToolCall: 目標', () => {
     );
   });
 
-  it('進捗の更新は進行中の目標に限る', () => {
-    const { change } = planToolCall(
-      'update_goal_progress',
-      { goal_id: 'goal1', current_amount_yen: 30_000 },
-      CTX,
-    );
-    expect(change.detail).toBe('進捗: 10,000円→30,000円');
+  it('進捗を手で変えるツールは無い(貯金は収入 − 支出から自動で数える)', () => {
     expect(() =>
-      planToolCall('update_goal_progress', { goal_id: 'nope', current_amount_yen: 1 }, CTX),
+      planToolCall('update_goal_progress', { goal_id: 'goal1', current_amount_yen: 1 }, CTX),
     ).toThrow(ChatToolError);
   });
 });

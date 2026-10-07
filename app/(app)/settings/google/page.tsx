@@ -1,12 +1,14 @@
 import Link from 'next/link';
 
+import { requireOwner } from '@/features/auth/owner';
+
 import { Card } from '@/components/ui/card';
 import { getGoogleEnv } from '@/lib/env';
 
 /**
  * Google 連携の設定(本人発案)。
  *
- * カレンダー同期(給料日・サブスク更新日・完済予定日)とスプレッドシート
+ * カレンダー同期(給料日・サブスク更新日・貯金目標の期限)とスプレッドシート
  * への月次バックアップの両方が、ここでの同意1回だけで有効になる
  * (Calendar + Sheets の両方のスコープを一度に要求するため)。
  *
@@ -16,6 +18,7 @@ import { getGoogleEnv } from '@/lib/env';
  * (Vercel + GitHub Secrets)へ手でコピーする(ADR-014、NFR-04)。
  */
 export default async function GoogleSettingsPage() {
+  await requireOwner();
   const connected = getGoogleEnv() !== null;
 
   return (
@@ -30,7 +33,7 @@ export default async function GoogleSettingsPage() {
       </header>
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        給料日・サブスクの更新日・完済予定日をGoogleカレンダーへ、毎月の明細を
+        給料日・サブスクの更新日・貯金目標の期限をGoogleカレンダーへ、毎月の明細を
         Googleスプレッドシートへ自動でバックアップします。
       </p>
 

@@ -11,15 +11,15 @@ import { createIncomeAction, type SideHustleFormState } from './actions';
 
 const INITIAL_STATE: SideHustleFormState = { error: null };
 
-/** 入金の記録と、返済:投資への自動振り分け(FR-42)。 */
+/** 入金の記録と、貯金:投資への自動振り分け(FR-42)。 */
 export function IncomeSection({
   projects,
   incomes,
-  repaymentRatio,
+  savingsRatio,
 }: {
   projects: readonly SideProject[];
   incomes: readonly SideIncome[];
-  repaymentRatio: number;
+  savingsRatio: number;
 }) {
   const [adding, setAdding] = useState(false);
   const projectName = (id: string | null) =>
@@ -31,9 +31,8 @@ export function IncomeSection({
         入金の記録
       </h2>
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-        入金額を返済:投資 = {Math.round(repaymentRatio * 100)}:
-        {Math.round((1 - repaymentRatio) * 100)} で自動的に振り分けます。実際の資金移動は
-        本人が手動で行ってください。
+        入金額を貯金:投資 = {Math.round(savingsRatio * 100)}:{Math.round((1 - savingsRatio) * 100)}{' '}
+        で自動的に振り分けます。実際の資金移動は 本人が手動で行ってください。
       </p>
 
       {incomes.length === 0 ? (
@@ -52,9 +51,9 @@ export function IncomeSection({
                   <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
                     {formatDateJa(income.receivedOn)}
                   </p>
-                  {income.allocatedToRepaymentYen !== null ? (
+                  {income.allocatedToSavingsYen !== null ? (
                     <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-                      返済へ {formatYen(income.allocatedToRepaymentYen, { sign: 'never' })}
+                      貯金へ {formatYen(income.allocatedToSavingsYen, { sign: 'never' })}
                       ・投資へ {formatYen(income.allocatedToInvestmentYen ?? 0, { sign: 'never' })}
                     </p>
                   ) : null}
@@ -75,7 +74,7 @@ export function IncomeSection({
         <Card>
           <IncomeForm
             projects={projects}
-            repaymentRatio={repaymentRatio}
+            savingsRatio={savingsRatio}
             onDone={() => setAdding(false)}
           />
         </Card>
@@ -99,11 +98,11 @@ export function IncomeSection({
 
 function IncomeForm({
   projects,
-  repaymentRatio,
+  savingsRatio,
   onDone,
 }: {
   projects: readonly SideProject[];
-  repaymentRatio: number;
+  savingsRatio: number;
   onDone: () => void;
 }) {
   const [amountText, setAmountText] = useState('');
@@ -120,11 +119,11 @@ function IncomeForm({
     try {
       const amountYen = parseYen(amountText);
       if (amountYen <= 0) return null;
-      return computeIncomeAllocation(amountYen, repaymentRatio);
+      return computeIncomeAllocation(amountYen, savingsRatio);
     } catch {
       return null;
     }
-  }, [amountText, repaymentRatio]);
+  }, [amountText, savingsRatio]);
 
   return (
     <form action={formAction} className="space-y-3">
@@ -179,7 +178,7 @@ function IncomeForm({
 
       {preview ? (
         <p className="text-xs" style={{ color: 'var(--accent)' }}>
-          返済へ {formatYen(preview.repaymentYen, { sign: 'never' })}・投資へ{' '}
+          貯金へ {formatYen(preview.savingsYen, { sign: 'never' })}・投資へ{' '}
           {formatYen(preview.investmentYen, { sign: 'never' })}
         </p>
       ) : null}

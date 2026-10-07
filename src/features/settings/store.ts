@@ -17,72 +17,69 @@ import { createClient } from '@/lib/supabase/server';
 import { isMissingColumnError } from '@/lib/supabase/errors';
 import type { Database } from '@/lib/supabase/types';
 
-export type RepaymentStrategy = Database['public']['Enums']['repayment_strategy'];
-
 export type AppSettings = {
-  monthlyRepaymentTargetYen: number;
-  repaymentStrategy: RepaymentStrategy;
-  /** 返済目標額に対する投資額の比率(0〜1)。既定 0.2(FR-50)。 */
-  investmentRatioOfRepayment: number;
-  /** 完済を機に高リスク投資枠が解禁されているか(FR-52)。 */
+  /** 毎月の貯金目標(円)。給料日の振替・投資額の基準(ADR-081)。 */
+  monthlySavingsTargetYen: number;
+  /** 貯金目標額に対する投資額の比率(0〜1)。既定 0.2(FR-50)。 */
+  investmentRatioOfSavings: number;
+  /** 高リスク投資の枠を使うか(本人が設定で切り替える。ADR-081)。 */
   isHighRiskUnlocked: boolean;
-  /** 高リスク枠解禁後、投資総額のうち高リスク枠に回す比率(0〜1)。既定 0.3。 */
+  /** 高リスク枠を使うとき、投資総額のうち高リスク枠に回す比率(0〜1)。既定 0.3。 */
   highRiskAllocationRatio: number;
   /** 給料日(1〜31)。月末に無い日は月末に丸める(M4-4)。既定25。 */
   payday: number;
-  /** 副業収入のうち返済に回す比率(0〜1)。既定 0.7(FR-42、P3-1)。 */
-  sideIncomeRepaymentRatio: number;
+  /** 副業収入のうち貯金に回す比率(0〜1)。既定 0.7(FR-42、P3-1)。 */
+  sideIncomeSavingsRatio: number;
   /** 全AI機能の一括オフ(N1)。false でもアプリの基本機能はすべて使える。既定 true。 */
   aiEnabled: boolean;
 };
 
 export class SettingsStoreError extends AppError {}
 
+/** 列名を「貯金」に変えるマイグレーション(ADR-081)が未適用の本番では、旧い列名で持っている。 */
+const LEGACY_COLUMNS = {
+  monthly_savings_target_yen: 'monthly_repayment_target_yen',
+  investment_ratio_of_savings: 'investment_ratio_of_repayment',
+  side_income_savings_ratio: 'side_income_repayment_ratio',
+} as const;
+
+function pickNumber(row: Record<string, unknown>, column: keyof typeof LEGACY_COLUMNS): number {
+  const value = row[column] ?? row[LEGACY_COLUMNS[column]];
+  return typeof value === 'number' ? value : 0;
+}
+
 /**
  * 本人設定を1件取得する(管理クライアント版)。
  *
  * cron ジョブには本人のセッションが無く RLS に頼れないため、user_id を
  * 明示して絞り込む(M5-2 の朝配信ジョブから利用)。
+ * 列は `*` で読む:未適用の列(ai_enabled、貯金への改名)があっても落ちない(ADR-033)。
  */
 export async function getAppSettingsAsAdmin(
   client: SupabaseClient<Database>,
   userId: string,
 ): Promise<AppSettings> {
-  let { data, error } = await client
-    .from('app_settings')
-    .select(
-      'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio, ai_enabled',
-    )
-    .eq('user_id', userId)
-    .single();
-
-  // ai_enabled 列が本番に未適用のあいだは、その列を外して再取得する
-  // (ADR-033・isMissingColumnError と同じ扱い。AI既定はオン)。
-  let aiEnabled = data?.ai_enabled ?? true;
-  if (error && isMissingColumnError(error)) {
-    const retry = await client
+  const read = () => client.from('app_settings').select('*').eq('user_id', userId).maybeSingle();
+  let { data, error } = await read();
+  if (!error && data === null) {
+    // 新しく登録した利用者には、まだ行が無い(既定値の行を作ってから読み直す。ADR-082)。
+    await client
       .from('app_settings')
-      .select(
-        'monthly_repayment_target_yen, repayment_strategy, investment_ratio_of_repayment, is_high_risk_unlocked, high_risk_allocation_ratio, payday, side_income_repayment_ratio',
-      )
-      .eq('user_id', userId)
-      .single();
-    data = retry.data as typeof data;
-    error = retry.error;
-    aiEnabled = true;
+      .upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true });
+    ({ data, error } = await read());
   }
   if (error) throw new SettingsStoreError(`設定を取得できませんでした: ${error.message}`);
   if (data === null) throw new SettingsStoreError('設定を取得できませんでした');
 
+  const row = data as unknown as Record<string, unknown>;
   return {
-    monthlyRepaymentTargetYen: data.monthly_repayment_target_yen,
-    repaymentStrategy: data.repayment_strategy,
-    investmentRatioOfRepayment: data.investment_ratio_of_repayment,
-    isHighRiskUnlocked: data.is_high_risk_unlocked,
-    highRiskAllocationRatio: data.high_risk_allocation_ratio,
-    payday: data.payday,
-    sideIncomeRepaymentRatio: data.side_income_repayment_ratio,
-    aiEnabled,
+    monthlySavingsTargetYen: pickNumber(row, 'monthly_savings_target_yen'),
+    investmentRatioOfSavings: pickNumber(row, 'investment_ratio_of_savings'),
+    isHighRiskUnlocked: row.is_high_risk_unlocked === true,
+    highRiskAllocationRatio: Number(row.high_risk_allocation_ratio ?? 0),
+    payday: Number(row.payday ?? 25),
+    sideIncomeSavingsRatio: pickNumber(row, 'side_income_savings_ratio'),
+    aiEnabled: typeof row.ai_enabled === 'boolean' ? row.ai_enabled : true,
   };
 }
 
@@ -110,24 +107,34 @@ export async function updateAppSettings(patch: AppSettingsPatch): Promise<AppSet
   }
 
   const row: Database['public']['Tables']['app_settings']['Update'] = {};
-  if (patch.monthlyRepaymentTargetYen !== undefined) {
-    row.monthly_repayment_target_yen = patch.monthlyRepaymentTargetYen;
+  if (patch.monthlySavingsTargetYen !== undefined) {
+    row.monthly_savings_target_yen = patch.monthlySavingsTargetYen;
   }
-  if (patch.repaymentStrategy !== undefined) row.repayment_strategy = patch.repaymentStrategy;
-  if (patch.investmentRatioOfRepayment !== undefined) {
-    row.investment_ratio_of_repayment = patch.investmentRatioOfRepayment;
+  if (patch.investmentRatioOfSavings !== undefined) {
+    row.investment_ratio_of_savings = patch.investmentRatioOfSavings;
   }
   if (patch.isHighRiskUnlocked !== undefined) row.is_high_risk_unlocked = patch.isHighRiskUnlocked;
   if (patch.highRiskAllocationRatio !== undefined) {
     row.high_risk_allocation_ratio = patch.highRiskAllocationRatio;
   }
   if (patch.payday !== undefined) row.payday = patch.payday;
-  if (patch.sideIncomeRepaymentRatio !== undefined) {
-    row.side_income_repayment_ratio = patch.sideIncomeRepaymentRatio;
+  if (patch.sideIncomeSavingsRatio !== undefined) {
+    row.side_income_savings_ratio = patch.sideIncomeSavingsRatio;
   }
   if (patch.aiEnabled !== undefined) row.ai_enabled = patch.aiEnabled;
 
-  const { error } = await supabase.from('app_settings').update(row).eq('user_id', auth.user.id);
+  let { error } = await supabase.from('app_settings').update(row).eq('user_id', auth.user.id);
+  if (error && isMissingColumnError(error)) {
+    // 貯金への改名が未適用なら、旧い列名で書く。
+    const legacy: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      legacy[LEGACY_COLUMNS[key as keyof typeof LEGACY_COLUMNS] ?? key] = value;
+    }
+    ({ error } = await supabase
+      .from('app_settings')
+      .update(legacy as typeof row)
+      .eq('user_id', auth.user.id));
+  }
   if (error) throw new SettingsStoreError(`設定を更新できませんでした: ${error.message}`);
   return getAppSettingsAsAdmin(supabase, auth.user.id);
 }

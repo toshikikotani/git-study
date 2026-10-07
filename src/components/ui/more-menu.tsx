@@ -12,7 +12,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/plan', label: '貯蓄', dek: '先に移した分。借金の画面は設定で切り替える' },
+      { href: '/plan', label: '目標', dek: '期間ごとの、ジャンル別に使う額' },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',
@@ -36,12 +36,12 @@ const GROUPS = [
         label: 'AIに相談',
         dek: '意見を話すと、設定・予算・目標をまとめて変更案に',
       },
-      { href: '/advisor', label: '目標', dek: '進行中の目標と進捗' },
     ],
   },
   {
     title: 'この先に向けて',
     items: [
+      { href: '/savings', label: '貯金', dek: '貯金目標と貯まり具合' },
       { href: '/investments', label: '投資' },
       { href: '/side-hustle', label: '副業' },
       { href: '/job-change', label: '転職準備' },
@@ -57,7 +57,7 @@ const GROUPS = [
         label: 'ジャンル管理・分析',
         dek: 'ジャンルの追加削除・予算設定、AIによる客観的な支出分類',
       },
-      { href: '/briefs', label: '朝配信' },
+      { href: '/briefs', label: '朝配信', ownerOnly: true },
     ],
   },
   {
@@ -65,15 +65,36 @@ const GROUPS = [
     items: [
       { href: '/settings/theme', label: '色', dek: '背景・文字・強調を変える' },
       { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
-      { href: '/settings/gmail', label: 'Gmail連携' },
-      { href: '/settings/google', label: 'Google連携' },
+      { href: '/settings/gmail', label: 'Gmail連携', ownerOnly: true },
+      { href: '/settings/google', label: 'Google連携', ownerOnly: true },
       { href: '/settings/password', label: 'パスワード' },
-      { href: '/settings/rescued-emails', label: '読み取れなかったメール' },
+      { href: '/settings/rescued-emails', label: '読み取れなかったメール', ownerOnly: true },
     ],
   },
 ] as const;
 
-export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }) {
+function clearSession() {
+  try {
+    window.sessionStorage.clear();
+  } catch {
+    // 消せなくてもログアウトは続ける
+  }
+}
+
+/** メニューに出すログイン中のアカウント。連携(朝配信・Gmail・Google)はオーナーだけに出す(ADR-082)。 */
+export type MenuAccount = { email: string | null; isOwner: boolean };
+
+export function MoreMenu({
+  onNavigate,
+  account,
+}: {
+  onNavigate?: (href: string) => void;
+  account: MenuAccount;
+}) {
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => account.isOwner || !('ownerOnly' in item)),
+  })).filter((group) => group.items.length > 0);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const [pathAtOpen, setPathAtOpen] = useState(pathname);
@@ -113,14 +134,30 @@ export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }
       </button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">
-        <div className="flex items-center justify-between px-3 pt-1 pb-2">
-          <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-            その他の機能
-          </h2>
+        <div className="flex items-center justify-between gap-3 px-3 pt-1 pb-2">
+          <div className="min-w-0">
+            <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+              その他の機能
+            </h2>
+            {account.email ? (
+              <p className="mt-1 truncate text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>
+                {account.email} でログイン中
+              </p>
+            ) : null}
+          </div>
+          <form action={signOutAction} onSubmit={clearSession} className="shrink-0">
+            <button
+              type="submit"
+              className="min-h-11 rounded-full px-4 text-xs font-semibold"
+              style={{ background: 'var(--surface)', color: 'var(--over)' }}
+            >
+              ログアウト
+            </button>
+          </form>
         </div>
 
         <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
-          {GROUPS.map((group) => (
+          {groups.map((group) => (
             <section key={group.title}>
               <h3
                 className="px-2 pb-2 text-xs font-medium tracking-[0.06em] uppercase"
@@ -176,16 +213,7 @@ export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }
             </section>
           ))}
 
-          <form
-            action={signOutAction}
-            onSubmit={() => {
-              try {
-                window.sessionStorage.clear();
-              } catch {
-                // 消せなくてもログアウトは続ける
-              }
-            }}
-          >
+          <form action={signOutAction} onSubmit={clearSession}>
             <button
               type="submit"
               className="min-h-11 w-full rounded-2xl px-4 py-3 text-left text-sm font-medium"

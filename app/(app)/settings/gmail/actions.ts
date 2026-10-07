@@ -14,6 +14,7 @@ import {
   assertGmailFromAddresses,
   GmailSettingsError,
 } from '@/domain/gmail-settings';
+import { isCurrentUserOwner } from '@/features/auth/owner';
 import { GmailSettingsStoreError, updateGmailSettings } from '@/features/settings/gmail-store';
 
 export type GmailSettingsFormState = {
@@ -25,6 +26,8 @@ export async function updateGmailSettingsAction(
   _prev: GmailSettingsFormState,
   formData: FormData,
 ): Promise<GmailSettingsFormState> {
+  if (!(await isCurrentUserOwner()))
+    return { error: 'この設定はオーナーだけが使えます。', saved: false };
   const gmailEnabled = formData.get('gmailEnabled') === 'on';
   const fromAddressesRaw = String(formData.get('gmailFromAddresses') ?? '');
   const fetchLimitRaw = Number(formData.get('gmailFetchLimit'));

@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BudgetTransaction } from '@/domain/budget';
-import {
-  MAX_HOME_TILES,
-  buildHomeTiles,
-  computePayoffSummary,
-  type HomeGenre,
-} from '@/features/home/summary';
+import { MAX_HOME_TILES, buildHomeTiles, type HomeGenre } from '@/features/home/summary';
 
 /**
  * ADR-016/ADR-057:ジャンルの表示名も、ホームに出す枠の選択も、本人が変更できる。
@@ -114,69 +109,3 @@ describe('buildHomeTiles — 残額', () => {
     expect(tile!.usageRatio).toBeNull();
   });
 });
-
-describe('computePayoffSummary', () => {
-  const debts = [
-    {
-      id: 'd1',
-      balanceYen: 400_000,
-      annualRate: 0.15,
-      minimumPaymentYen: 10_000,
-      paymentDay: 27,
-    },
-  ];
-  const now = new Date('2026-09-08T00:00:00Z');
-
-  it('残り日数と残債を返す', () => {
-    const payoff = computePayoffSummary(
-      {
-        debts,
-        monthlyBudgetYen: 100_000,
-        originalTotalYen: 1_000_000,
-        isEstimated: true,
-        reducedThisMonthYen: 0,
-      },
-      now,
-    );
-    expect(payoff.remainingYen).toBe(400_000);
-    expect(payoff.daysRemaining).toBeGreaterThan(0);
-    expect(payoff.isEstimated).toBe(true);
-  });
-
-  it('返済済みの割合を進捗ゲージ用に返す', () => {
-    const payoff = computePayoffSummary(
-      {
-        debts,
-        monthlyBudgetYen: 100_000,
-        originalTotalYen: 1_000_000,
-        isEstimated: true,
-        reducedThisMonthYen: 0,
-      },
-      now,
-    );
-    expect(payoff.progressRatio).toBeCloseTo(0.6);
-  });
-
-  it('完済していれば日付も日数も null(推定バッジも消える)', () => {
-    const payoff = computePayoffSummary(
-      {
-        debts: [],
-        monthlyBudgetYen: 100_000,
-        originalTotalYen: 1_000_000,
-        isEstimated: true,
-        reducedThisMonthYen: 0,
-      },
-      now,
-    );
-    expect(payoff.daysRemaining).toBeNull();
-    expect(payoff.payoffOn).toBeNull();
-    expect(payoff.progressRatio).toBe(1);
-    expect(payoff.isEstimated).toBe(false);
-  });
-});
-
-// loadHomeSummary() は M0-3 以降 Supabase(次に next/headers の cookies())に
-// 触れる関数になったため、ここではユニットテストしない。実データでの検証は
-// リクエストスコープ(実際の画面・ブラウザ経由)で行う。ここでテストし続ける
-// のは、Supabase に触れない buildHomeTiles / computePayoffSummary という
-// 純粋関数の側。この2つが緑であるかぎり、ホームの計算ロジック自体は保証される。

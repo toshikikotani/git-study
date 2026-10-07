@@ -22,7 +22,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
-import { MoreMenu } from '@/components/ui/more-menu';
+import { MoreMenu, type MenuAccount } from '@/components/ui/more-menu';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
@@ -60,7 +60,13 @@ function isSameTab(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  account,
+}: {
+  children: React.ReactNode;
+  account: MenuAccount;
+}) {
   const pathname = usePathname();
   // 以前に選んだ色(4色だけの保存)を、今の色の役割に置き換える(ADR-079)。
   useEffect(() => {
@@ -91,15 +97,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </PullToRefresh>
       <UndoToastHost />
       {isClient ? (
-        createPortal(<BottomBar onNavigate={beginNavigate} />, document.body)
+        createPortal(<BottomBar onNavigate={beginNavigate} account={account} />, document.body)
       ) : (
-        <BottomBar onNavigate={beginNavigate} />
+        <BottomBar onNavigate={beginNavigate} account={account} />
       )}
     </div>
   );
 }
 
-function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
+function BottomBar({
+  onNavigate,
+  account,
+}: {
+  onNavigate: (href: string) => void;
+  account: MenuAccount;
+}) {
   const pathname = usePathname();
   const isClient = useIsClient();
   const jobs = useReceiptJobs();
@@ -382,7 +394,7 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
               );
             })}
             <li className="flex shrink-0 items-center justify-center self-center">
-              <MoreMenu onNavigate={onNavigate} />
+              <MoreMenu onNavigate={onNavigate} account={account} />
             </li>
           </ul>
         </nav>
