@@ -10,7 +10,7 @@ export default function ThemeSettingsPage() {
           色
         </h1>
         <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          背景と文字と強調を変えられる。収入の緑と超過の赤はそのまま。
+          20の配色から選ぶか、自由に混ぜられる。収入の緑・超過の赤・注意の黄は意味の色なのでそのまま。
         </p>
       </header>
       <ThemePicker />
