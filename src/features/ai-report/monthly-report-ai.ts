@@ -60,11 +60,21 @@ export type MonthlyReportInput = {
   topWasteItems: readonly MonthlyReportItem[];
   topNecessaryItems: readonly MonthlyReportItem[];
   wasteRatioTrend: readonly { monthKey: string; wasteRatio: number | null }[];
-  payoff: {
-    remainingYen: number;
-    progressRatio: number;
-    reducedThisMonthYen: number;
-    daysRemaining: number | null;
+  /** 貯金(収入 − 支出の自動の数え方、ADR-081)。 */
+  savings: {
+    totalYen: number;
+    thisMonthYen: number;
+    /** いつものペース(直近の月の平均)。 */
+    paceYen: number | null;
+    /** 次の貯金目標(無ければ null)。 */
+    nextGoal: {
+      title: string;
+      targetAmountYen: number | null;
+      remainingYen: number | null;
+      targetDate: string | null;
+      /** 0〜1。金額の無い目標は null。 */
+      progressRatio: number | null;
+    } | null;
   };
   /** 確率予測(v2)の着地の見込み。作れなければ null(そのときAIの読みは出さない)。 */
   forecast: MonthlyReportForecast | null;
@@ -266,14 +276,22 @@ function buildUserContent(input: MonthlyReportInput): string {
     lines.push('');
   }
 
+  const s = input.savings;
   lines.push(
-    '負債返済の状況:',
-    `残債 ${input.payoff.remainingYen}円 ・ 進捗率 ${Math.round(input.payoff.progressRatio * 100)}%` +
-      ` ・ 今月の返済実績 ${input.payoff.reducedThisMonthYen}円` +
-      (input.payoff.daysRemaining !== null
-        ? ` ・ 完済まで残り${input.payoff.daysRemaining}日`
-        : ''),
+    '貯金の状況(収入 − 支出):',
+    `今月 ${s.thisMonthYen}円` +
+      (s.paceYen !== null ? ` ・ いつもの月 ${s.paceYen}円` : '') +
+      (s.nextGoal !== null ? ` ・ 貯まった合計 ${s.totalYen}円` : ''),
   );
+  if (s.nextGoal !== null) {
+    const g = s.nextGoal;
+    lines.push(
+      `次の貯金目標: ${g.title}` +
+        (g.targetAmountYen !== null ? ` ${g.targetAmountYen}円` : '') +
+        (g.remainingYen !== null ? ` ・ あと${g.remainingYen}円` : '') +
+        (g.targetDate !== null ? ` ・ 期限${g.targetDate}` : ''),
+    );
+  }
 
   appendForecastSection(lines, input);
 

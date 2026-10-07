@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { planPaydayEvents, planPayoffEvent, planSubscriptionEvents } from '@/domain/calendar-sync';
+import {
+  planPaydayEvents,
+  planSavingsGoalEvents,
+  planSubscriptionEvents,
+} from '@/domain/calendar-sync';
 
 describe('planPaydayEvents', () => {
   it('今日以降、直近3ヶ月分の給料日を積む', () => {
@@ -47,14 +51,17 @@ describe('planSubscriptionEvents', () => {
   });
 });
 
-describe('planPayoffEvent', () => {
-  it('完済予定日を1件のイベントにする', () => {
-    expect(planPayoffEvent('2028-03-01')).toEqual([
-      { key: 'payoff', title: '完済予定日', date: '2028-03-01' },
+describe('planSavingsGoalEvents', () => {
+  it('期限のある貯金目標ごとに1件(key は目標の id)', () => {
+    expect(
+      planSavingsGoalEvents([
+        { id: 'g1', title: '旅行', targetDate: '2027-03-31', remainingYen: 80_000 },
+        { id: 'g2', title: 'もしものとき', targetDate: null, remainingYen: null },
+        { id: 'g3', title: '引っ越し', targetDate: '2027-06-30', remainingYen: 0 },
+      ]),
+    ).toEqual([
+      { key: 'savings-goal:g1', title: '旅行の期限(あと80,000円)', date: '2027-03-31' },
+      { key: 'savings-goal:g3', title: '引っ越しの期限', date: '2027-06-30' },
     ]);
-  });
-
-  it('完済済み(null)なら空配列', () => {
-    expect(planPayoffEvent(null)).toEqual([]);
   });
 });

@@ -15,10 +15,10 @@ describe('toCalendarEventId', () => {
   });
 
   it('同じ key からは常に同じ id になる(冪等性の要)', () => {
-    expect(toCalendarEventId('payoff')).toBe(toCalendarEventId('payoff'));
+    expect(toCalendarEventId('savings-goal:g1')).toBe(toCalendarEventId('savings-goal:g1'));
   });
 
   it('key が違えば id も変わる', () => {
-    expect(toCalendarEventId('payoff')).not.toBe(toCalendarEventId('payday:2026-10-25'));
+    expect(toCalendarEventId('savings-goal:g1')).not.toBe(toCalendarEventId('payday:2026-10-25'));
   });
 });

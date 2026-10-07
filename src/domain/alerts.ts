@@ -3,12 +3,13 @@
  *
  * FR-20(浪費70%到達)と FR-21(リボ/キャッシング/分割)の判定は
  * domain/budget.ts と features/classification/rules.ts に実装済み。
- * ここに置くのは残り2つ、FR-22(未取込・未確認)と FR-23(返済日前日)。
+ * ここに置くのは FR-22(未取込・未確認)ほか。FR-23(返済日前日)は借金をなくした
+ * (ADR-081)ので外した。
  *
  * ── なぜ純粋関数にするか ────────────────────────────────────
  * 「いつ発火させるか」の判断と、「DB から何を読むか」「DB へどう書くか」を
  * 分離する。判断だけをここに置けば、日付を差し替えるだけで境界値
- * (ちょうど3日目、返済日の前日ぴったり)をテストできる。
+ * (ちょうど3日目、月末ぴったり)をテストできる。
  *
  * ── dedup_key について ─────────────────────────────────────
  * alerts テーブルは (user_id, dedup_key) が一意(同じ事象を繰り返し
@@ -19,25 +20,20 @@
 import { hasReachedAlertThreshold, type BudgetStatus } from '@/domain/budget';
 import { formatYen } from '@/domain/money';
 import type { DetectedSubscription } from '@/domain/subscriptions';
-import {
-  addDays,
-  addMonthsToParts,
-  daysBetween,
-  splitDateOnly,
-  formatDateJa,
-  type DateOnly,
-} from '@/lib/date';
+import { daysBetween, formatDateJa, type DateOnly } from '@/lib/date';
 
 /** P6-1 の月次振り返りに載せる、予算設定済みジャンル1件分の消化状況。 */
 export type RecapWasteCategory = { name: string; status: BudgetStatus };
 
 export type MonthlyRecapSummary = {
   monthKey: string;
-  totalPaidYen: number;
+  /** 今月の貯金(収入 − 支出。マイナスもある)。 */
+  savedYen: number;
   totalSideIncomeYen: number;
   wasteCategories: readonly RecapWasteCategory[];
 };
 
+/** 'payment_due'・'debt_paid_off' は借金をなくした(ADR-081)ので使わない(DB の列挙には残る)。 */
 export type AlertKind =
   | 'inactivity'
   | 'payment_due'
@@ -57,7 +53,6 @@ export type CandidateAlert = {
   title: string;
   body: string | null;
   dedupKey: string;
-  debtId: string | null;
   transactionId: string | null;
 };
 
@@ -87,35 +82,8 @@ export function detectInactivity(
         ? 'まだ明細が取り込まれていません。CSV か通知メールから取り込んでみましょう。'
         : `${idleDays}日間、新しい明細が取り込まれていません。取り込みが空くと、リボ・キャッシングの検知が遅れます。`,
     dedupKey: `inactivity:${today}`,
-    debtId: null,
     transactionId: null,
   };
-}
-
-/**
- * FR-23:返済日の前日にリマインドする。
- *
- * 返済日(1〜31)は月によって存在しない日がありうる(29〜31日等)。
- * その月の実際の末日に丸めて比較する(domain/payoff.ts と同じ考え方)。
- */
-export function detectPaymentDueTomorrow(
-  debts: readonly { id: string; lenderName: string; paymentDay: number }[],
-  today: DateOnly,
-): CandidateAlert[] {
-  const tomorrow = addDays(today, 1);
-  const [ty, tm] = splitDateOnly(tomorrow);
-
-  return debts
-    .filter((debt) => addMonthsToParts(ty, tm, debt.paymentDay, 0) === tomorrow)
-    .map((debt) => ({
-      kind: 'payment_due' as const,
-      severity: 'warn' as const,
-      title: `${debt.lenderName}の返済日は明日です`,
-      body: null,
-      dedupKey: `payment_due:${debt.id}:${tomorrow.slice(0, 7)}`,
-      debtId: debt.id,
-      transactionId: null,
-    }));
 }
 
 /**
@@ -146,7 +114,6 @@ export function detectRiskyTransaction(transaction: {
     title: `${label}を検知しました`,
     body: `${transaction.description}(${Math.abs(transaction.amountYen).toLocaleString('ja-JP')}円)。該当カードの利用停止を検討してください。`,
     dedupKey: `risky_payment:${transaction.id}`,
-    debtId: null,
     transactionId: transaction.id,
   };
 }
@@ -180,7 +147,6 @@ export function detectWastefulBudget(
     title: `${category.name}が予算の${Math.round(threshold * 100)}%に達しました`,
     body: status.remainingYen === null ? null : `残り${formatYen(status.remainingYen)}使えます`,
     dedupKey: `waste_budget_70:${category.id}:${monthKey}`,
-    debtId: null,
     transactionId: null,
   };
 }
@@ -203,7 +169,6 @@ export function buildJobFailureAlert(
     title: `${jobName}が失敗しました`,
     body: errorMessage,
     dedupKey: `job_failure:${jobName}:${today}`,
-    debtId: null,
     transactionId: null,
   };
 }
@@ -258,7 +223,6 @@ export function buildBudgetPaceAlert(
         ? null
         : `このペースだと、月末までに予算を使い切る可能性があります。残り${formatYen(status.remainingYen)}使えます。`,
     dedupKey: `budget_pace:${category.id}:${monthKey}`,
-    debtId: null,
     transactionId: null,
   };
 }
@@ -283,7 +247,7 @@ export function isLastDayOfMonth(today: DateOnly, tomorrow: DateOnly): boolean {
 export function buildMonthlyRecapAlert(summary: MonthlyRecapSummary): CandidateAlert {
   const [year, month] = summary.monthKey.split('-');
   const lines = [
-    `今月の返済: ${formatYen(summary.totalPaidYen)}`,
+    `今月の貯金: ${formatYen(summary.savedYen)}`,
     `副業収入: ${formatYen(summary.totalSideIncomeYen)}`,
   ];
   for (const category of summary.wasteCategories) {
@@ -300,7 +264,6 @@ export function buildMonthlyRecapAlert(summary: MonthlyRecapSummary): CandidateA
     title: `${year}年${Number(month)}月の振り返り`,
     body: lines.join('\n'),
     dedupKey: `monthly_recap:${summary.monthKey}`,
-    debtId: null,
     transactionId: null,
   };
 }
@@ -322,7 +285,6 @@ export function buildNewSubscriptionAlert(subscription: DetectedSubscription): C
     title: `定期支払いを検知しました: ${subscription.label}`,
     body: `${formatYen(subscription.amountYen)}が${subscription.occurrenceCount}ヶ月連続で引き落とされています(前回: ${formatDateJa(subscription.lastOccurredOn)})。忘れているサブスクでなければ、そのままで大丈夫です。`,
     dedupKey: `subscription:${subscription.key}`,
-    debtId: null,
     transactionId: null,
   };
 }

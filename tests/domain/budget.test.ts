@@ -23,7 +23,7 @@ const WASTE: CategoryBudget = {
   carryOverYen: 0,
 };
 
-/** 予算上限を持たないジャンル(返済・投資など)。 */
+/** 予算上限を持たないジャンル(貯金・投資など)。 */
 const REPAYMENT: CategoryBudget = {
   categoryId: 'genre-repayment',
   budgetYen: null,

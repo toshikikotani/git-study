@@ -141,7 +141,6 @@
 ├── scripts/
 │   ├── verify-schema.sh             # ローカル PostgreSQL でスキーマを検証
 │   ├── verify-migrations.sh         # migrations と docs/schema.sql の一致を検証
-│   ├── gen-payoff-golden.sh         # SQL 版シミュレーションの出力を fixture 化
 │   ├── lib/pg-sandbox.sh            # 使い捨て PostgreSQL の共通処理
 │   └── schema-test/
 │       ├── supabase-stub.sql

@@ -9,13 +9,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { nextGoalRatio } from '@/domain/savings';
 import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { postDiscordEmbed } from '@/lib/discord';
 import { todayJst } from '@/lib/date';
 import type { NotificationChannels } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 import { postLineMessage, postLineTextWithImage } from '@/lib/line';
-import { buildPayoffProgressChartUrl } from '@/lib/quickchart';
+import { buildSavingsProgressChartUrl } from '@/lib/quickchart';
 import type { Database } from '@/lib/supabase/types';
 
 export class BriefNotifyError extends AppError {}
@@ -47,12 +48,15 @@ export async function deliverDailyBriefAsAdmin(
   if (!brief) return 'not_generated';
   if (brief.status === 'delivered') return 'already_delivered';
 
-  // 完済の進捗をグラフ画像にして添える(本人発案)。ホーム画面の数字と
-  // 必ず一致させるため、ここでも同じ loadHomeSummaryAsAdmin() を使う
+  // 次の貯金目標の進み具合をグラフ画像にして添える(本人発案、ADR-081)。ホーム画面の
+  // 数字と必ず一致させるため、ここでも同じ loadHomeSummaryAsAdmin() を使う
   // (generateDailyBriefAsAdmin() と同じ考え方、計算式を複製しない)。
-  // 失敗しても配信本体は止めない(QuickChart は補助表示のため)。
+  // 金額のある目標が無ければ添えない。失敗しても配信本体は止めない(補助表示のため)。
   const progressChartUrl = await loadHomeSummaryAsAdmin(client, userId, now)
-    .then((summary) => buildPayoffProgressChartUrl(summary.payoff.progressRatio))
+    .then((summary) => {
+      const ratio = nextGoalRatio(summary.savings.goals);
+      return ratio === null ? null : buildSavingsProgressChartUrl(ratio);
+    })
     .catch(() => null);
 
   const attempts: Promise<void>[] = [];

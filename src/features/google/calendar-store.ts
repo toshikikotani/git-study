@@ -13,7 +13,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
   planPaydayEvents,
-  planPayoffEvent,
+  planSavingsGoalEvents,
   planSubscriptionEvents,
   type PlannedCalendarEvent,
 } from '@/domain/calendar-sync';
@@ -42,7 +42,7 @@ export function toCalendarEventId(key: string): string {
 export type SyncCalendarResult = { syncedCount: number };
 
 /**
- * 給料日・サブスク更新日・完済予定日を Google カレンダーへ同期する
+ * 給料日・サブスク更新日・貯金目標の期限を Google カレンダーへ同期する
  * (cron 向け、管理クライアント版)。1件ずつ upsert するため、途中で
  * 失敗しても、それ以前に同期できた分はカレンダーに残る。
  */
@@ -63,7 +63,14 @@ export async function syncCalendarAsAdmin(
   const events: PlannedCalendarEvent[] = [
     ...planPaydayEvents(settings.payday, today),
     ...planSubscriptionEvents(subscriptions),
-    ...planPayoffEvent(summary.payoff.payoffOn),
+    ...planSavingsGoalEvents(
+      summary.savings.goals.map((g) => ({
+        id: g.goal.id,
+        title: g.goal.title,
+        targetDate: g.goal.targetDate,
+        remainingYen: g.remainingYen,
+      })),
+    ),
   ];
 
   const accessToken = await refreshGoogleAccessToken(

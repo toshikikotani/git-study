@@ -9,16 +9,9 @@
  * `AppSettingsPatch` の型自体がそれ以外の列を受け付けない。
  */
 
-import type { AppSettings, AppSettingsPatch, RepaymentStrategy } from '@/features/settings/store';
+import type { AppSettings, AppSettingsPatch } from '@/features/settings/store';
 import { ChatToolError } from '@/lib/chat-tools';
 import { isValidDayOfMonth } from '@/lib/date';
-
-const REPAYMENT_STRATEGIES: readonly RepaymentStrategy[] = [
-  'avalanche',
-  'snowball',
-  'minimum',
-  'custom',
-];
 
 function isRatio(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
@@ -49,36 +42,26 @@ export function parseAppSettingsPatch(input: unknown): {
     patch.payday = value;
     descriptions.push(`給料日: ${value}日`);
   }
-  if (args.monthly_repayment_target_yen !== undefined) {
-    const value = Number(args.monthly_repayment_target_yen);
+  if (args.monthly_savings_target_yen !== undefined) {
+    const value = Number(args.monthly_savings_target_yen);
     if (!Number.isInteger(value) || value < 0) {
-      throw new ChatToolError('返済目標額は0以上の整数円で指定してください。');
+      throw new ChatToolError('毎月の貯金目標は0以上の整数円で指定してください。');
     }
-    patch.monthlyRepaymentTargetYen = value;
-    descriptions.push(`月々の返済目標額: ${value.toLocaleString('ja-JP')}円`);
+    patch.monthlySavingsTargetYen = value;
+    descriptions.push(`毎月の貯金目標: ${value.toLocaleString('ja-JP')}円`);
   }
-  if (args.repayment_strategy !== undefined) {
-    const value = args.repayment_strategy;
-    if (typeof value !== 'string' || !REPAYMENT_STRATEGIES.includes(value as RepaymentStrategy)) {
-      throw new ChatToolError(
-        `返済戦略は ${REPAYMENT_STRATEGIES.join('/')} のいずれかで指定してください。`,
-      );
-    }
-    patch.repaymentStrategy = value as RepaymentStrategy;
-    descriptions.push(`返済戦略: ${value}`);
-  }
-  if (args.investment_ratio_of_repayment !== undefined) {
-    const value = Number(args.investment_ratio_of_repayment);
+  if (args.investment_ratio_of_savings !== undefined) {
+    const value = Number(args.investment_ratio_of_savings);
     if (!isRatio(value)) throw new ChatToolError('投資比率は0〜1の数値で指定してください。');
-    patch.investmentRatioOfRepayment = value;
-    descriptions.push(`返済目標額に対する投資比率: ${value}`);
+    patch.investmentRatioOfSavings = value;
+    descriptions.push(`貯金目標に対する投資比率: ${value}`);
   }
   if (args.is_high_risk_unlocked !== undefined) {
     if (typeof args.is_high_risk_unlocked !== 'boolean') {
-      throw new ChatToolError('高リスク投資枠の解禁は true/false で指定してください。');
+      throw new ChatToolError('高リスク投資枠を使うかは true/false で指定してください。');
     }
     patch.isHighRiskUnlocked = args.is_high_risk_unlocked;
-    descriptions.push(`高リスク投資枠: ${args.is_high_risk_unlocked ? '解禁' : '未解禁'}`);
+    descriptions.push(`高リスク投資枠: ${args.is_high_risk_unlocked ? '使う' : '使わない'}`);
   }
   if (args.high_risk_allocation_ratio !== undefined) {
     const value = Number(args.high_risk_allocation_ratio);
@@ -88,13 +71,13 @@ export function parseAppSettingsPatch(input: unknown): {
     patch.highRiskAllocationRatio = value;
     descriptions.push(`高リスク投資枠の比率: ${value}`);
   }
-  if (args.side_income_repayment_ratio !== undefined) {
-    const value = Number(args.side_income_repayment_ratio);
+  if (args.side_income_savings_ratio !== undefined) {
+    const value = Number(args.side_income_savings_ratio);
     if (!isRatio(value)) {
-      throw new ChatToolError('副業収入のうち返済に回す比率は0〜1の数値で指定してください。');
+      throw new ChatToolError('副業収入のうち貯金に回す比率は0〜1の数値で指定してください。');
     }
-    patch.sideIncomeRepaymentRatio = value;
-    descriptions.push(`副業収入の返済比率: ${value}`);
+    patch.sideIncomeSavingsRatio = value;
+    descriptions.push(`副業収入の貯金比率: ${value}`);
   }
 
   if (Object.keys(patch).length === 0) {
@@ -107,11 +90,10 @@ export function parseAppSettingsPatch(input: unknown): {
 export function buildSettingsContextLine(settings: AppSettings): string {
   return [
     `給料日=${settings.payday}日`,
-    `月々の返済目標額=${settings.monthlyRepaymentTargetYen}円`,
-    `返済戦略=${settings.repaymentStrategy}`,
-    `返済目標額に対する投資比率=${settings.investmentRatioOfRepayment}`,
-    `高リスク投資枠=${settings.isHighRiskUnlocked ? '解禁' : '未解禁'}`,
+    `毎月の貯金目標=${settings.monthlySavingsTargetYen}円`,
+    `貯金目標に対する投資比率=${settings.investmentRatioOfSavings}`,
+    `高リスク投資枠=${settings.isHighRiskUnlocked ? '使う' : '使わない'}`,
     `高リスク投資枠の比率=${settings.highRiskAllocationRatio}`,
-    `副業収入の返済比率=${settings.sideIncomeRepaymentRatio}`,
+    `副業収入の貯金比率=${settings.sideIncomeSavingsRatio}`,
   ].join(' / ');
 }

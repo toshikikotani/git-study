@@ -2,34 +2,29 @@
  * AIの窓口(/assistant)へ渡す「今の状況」のコンテキスト文(本人発案)。
  *
  * ここで組み立てる数字は既存のドメイン計算(features/home/summary.ts の
- * loadHomeSummary、domain/goals.ts の goalProgressRatio)そのものであり、
+ * loadHomeSummary と、その中の貯金 features/savings)そのものであり、
  * AI に新しく計算させない。AI はこの文章を読んで会話するだけ
  * (features/assistant/chat-tools.ts のシステムプロンプト参照)。
  */
 
-import { goalProgressRatio } from '@/domain/goals';
 import { formatYen } from '@/domain/money';
-import { listActiveGoals } from '@/features/goals/store';
+import { goalOutlook } from '@/domain/savings';
 import { loadHomeSummary } from '@/features/home/summary';
 import { todayJst } from '@/lib/date';
 
 export async function buildAdvisorContextText(now: Date = new Date()): Promise<string> {
-  const [summary, goals] = await Promise.all([loadHomeSummary(now), listActiveGoals()]);
+  const summary = await loadHomeSummary(now);
+  const { savings } = summary;
+  const today = todayJst(now);
 
-  const lines: string[] = [`今日の日付: ${todayJst(now)}`, ''];
+  const lines: string[] = [`今日の日付: ${today}`, ''];
 
-  lines.push('完済状況:');
-  if (summary.payoff.daysRemaining === null) {
-    lines.push('- 負債は完済済み');
-  } else {
-    lines.push(`- 残債務: ${formatYen(summary.payoff.remainingYen)}`);
-    lines.push(`- 完済まで: ${summary.payoff.daysRemaining}日`);
-    if (summary.payoff.reducedThisMonthYen > 0) {
-      lines.push(`- 今月すでに${formatYen(summary.payoff.reducedThisMonthYen)}減らした`);
-    }
-    if (summary.payoff.isEstimated) {
-      lines.push('- (残高・金利の一部が未確定の推定値のため、この日数は確定ではない)');
-    }
+  lines.push('貯金(収入 − 支出で自動で数える):');
+  lines.push(`- 今月: ${formatYen(savings.thisMonthYen)}`);
+  if (savings.paceYen !== null)
+    lines.push(`- いつもの月(直近3か月の平均): ${formatYen(savings.paceYen)}`);
+  if (savings.startOn !== null) {
+    lines.push(`- ${savings.startOn}から貯まった合計: ${formatYen(savings.totalYen)}`);
   }
 
   lines.push('', 'ホームに出ている予算枠(今月分、ここに無い枠は分からない):');
@@ -47,18 +42,17 @@ export async function buildAdvisorContextText(now: Date = new Date()): Promise<s
     }
   }
 
-  lines.push('', '進行中の目標:');
-  if (goals.length === 0) {
+  lines.push('', '貯金目標(期限の近い順。貯まった合計を順に割り当てる):');
+  if (savings.goals.length === 0) {
     lines.push('- まだ無い');
   } else {
-    for (const goal of goals) {
-      const ratio = goalProgressRatio(goal);
+    for (const progress of savings.goals) {
+      const { goal } = progress;
       const targetPart =
         goal.targetAmountYen === null ? '' : `/目標${formatYen(goal.targetAmountYen)}`;
-      const ratioPart = ratio === null ? '' : `(${Math.round(ratio * 100)}%)`;
       const datePart = goal.targetDate === null ? '' : `、期限${goal.targetDate}`;
       lines.push(
-        `- ${goal.title}: 現在${formatYen(goal.currentAmountYen)}${targetPart}${ratioPart}${datePart}`,
+        `- ${goal.title}: ${formatYen(progress.savedYen)}${targetPart}${datePart}(${goalOutlook(progress, today)})`,
       );
     }
   }

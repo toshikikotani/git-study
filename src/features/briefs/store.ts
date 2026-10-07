@@ -4,7 +4,7 @@
  * 「いつ生成するか」(毎朝07:00 JST)は M5-2(配信ジョブ)の責務。ここは
  * 呼ばれたときに1回分を組み立てて保存するところまでを担う。
  *
- * 冒頭の数字(完済まで残り日数・使える残額)はホーム画面と必ず一致させる
+ * 冒頭の数字(貯金・使える残額)はホーム画面と必ず一致させる
  * 必要があるため、ホーム画面と同じ `loadHomeSummaryAsAdmin()` をそのまま使う
  * (計算式を複製しない)。
  */
@@ -15,6 +15,7 @@ import { filterBriefTopics, pickDailyTopic } from '@/domain/briefs';
 import { INCOME_TIP_BANK } from '@/features/briefs/tips';
 import { loadHomeSummaryAsAdmin } from '@/features/home/summary';
 import { formatYen } from '@/domain/money';
+import { savingsHeadline } from '@/domain/savings';
 import { todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -65,10 +66,7 @@ export async function generateDailyBriefAsAdmin(
   const topic = pickDailyTopic(INCOME_TIP_BANK, briefOn);
   const { included, excluded } = filterBriefTopics([topic]);
 
-  const headlineTitle = buildHeadlineTitle(
-    summary.payoff.daysRemaining,
-    summary.payoff.remainingYen,
-  );
+  const headlineTitle = savingsHeadline(summary.savings);
   const bodyMd = buildBodyMd({
     headlineTitle,
     tiles: [firstTile, secondTile].filter((tile) => tile !== undefined),
@@ -81,8 +79,6 @@ export async function generateDailyBriefAsAdmin(
       user_id: userId,
       brief_on: briefOn,
       status: 'generated',
-      days_to_payoff: summary.payoff.daysRemaining,
-      remaining_debt_yen: summary.payoff.remainingYen,
       spendable_living_yen: firstTile?.remainingYen ?? null,
       spendable_sanctuary_yen: secondTile?.remainingYen ?? null,
       body_md: bodyMd,
@@ -157,8 +153,8 @@ export type BriefListItem = {
   id: string;
   briefOn: DateOnly;
   status: BriefStatus;
-  daysToPayoff: number | null;
-  remainingDebtYen: number | null;
+  /** その日の見出し(body_md の1行目)。 */
+  headline: string | null;
 };
 
 /** 過去の配信を新しい順に並べる(M5-3、FR-32)。 */
@@ -166,7 +162,7 @@ export async function listDailyBriefs(): Promise<BriefListItem[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('daily_briefs')
-    .select('id, brief_on, status, days_to_payoff, remaining_debt_yen')
+    .select('id, brief_on, status, body_md')
     .order('brief_on', { ascending: false });
   if (error) throw new BriefStoreError(`配信の一覧を取得できませんでした: ${error.message}`);
 
@@ -174,8 +170,7 @@ export async function listDailyBriefs(): Promise<BriefListItem[]> {
     id: row.id,
     briefOn: row.brief_on,
     status: row.status,
-    daysToPayoff: row.days_to_payoff,
-    remainingDebtYen: row.remaining_debt_yen,
+    headline: row.body_md?.split('\n')[0]?.replace(/^#+\s*/, '') || null,
   }));
 }
 
@@ -252,11 +247,6 @@ export async function getDailyBrief(id: string): Promise<BriefDetail | null> {
       reasonDetail: item.reason_detail,
     })),
   };
-}
-
-function buildHeadlineTitle(daysRemaining: number | null, remainingYen: number): string {
-  const daysText = daysRemaining === null ? '完済済み' : `完済まで残り${daysRemaining}日`;
-  return `${daysText}・残債${formatYen(remainingYen, { sign: 'never' })}`;
 }
 
 function buildBodyMd(input: {

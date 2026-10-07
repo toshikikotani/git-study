@@ -13,13 +13,12 @@ import type { StoredTransaction } from '@/features/transactions/types';
  */
 
 const SETTINGS: AppSettings = {
-  monthlyRepaymentTargetYen: 100000,
-  repaymentStrategy: 'avalanche',
-  investmentRatioOfRepayment: 0.2,
+  monthlySavingsTargetYen: 100000,
+  investmentRatioOfSavings: 0.2,
   isHighRiskUnlocked: false,
   highRiskAllocationRatio: 0.3,
   payday: 25,
-  sideIncomeRepaymentRatio: 0.7,
+  sideIncomeSavingsRatio: 0.7,
   aiEnabled: true,
 };
 
@@ -59,9 +58,9 @@ describe('buildAssistantSystemPrompt', () => {
       genres: [GENRE],
       settings: SETTINGS,
       recentTransactions: [TRANSACTION],
-      goals: [{ id: 'goal1', title: '旅行', currentAmountYen: 5_000 }],
+      goals: [{ id: 'goal1', title: '旅行' }],
       latestPlan: { id: 'plan1', items: [{ genreId: 'g1', genreName: '浪費', targetYen: 15_000 }] },
-      situationText: '完済まで: 100日',
+      situationText: '今月の貯金: 5,000円',
     });
 
     expect(prompt).toContain('- 浪費(月次予算=20000円');
@@ -69,7 +68,7 @@ describe('buildAssistantSystemPrompt', () => {
     expect(prompt).toContain('id=t1');
     expect(prompt).toContain('id=goal1');
     expect(prompt).toContain('目標額=15000円');
-    expect(prompt).toContain('完済まで: 100日');
+    expect(prompt).toContain('今月の貯金: 5,000円');
     expect(prompt).toContain('ask_user');
   });
 
@@ -83,7 +82,7 @@ describe('buildAssistantSystemPrompt', () => {
       situationText: '',
     });
     expect(prompt).toContain('削除すべて');
-    expect(prompt).toContain('高リスク投資枠の解禁');
+    expect(prompt).toContain('高リスク投資枠を使うかの切り替え');
     expect(prompt).toContain('リボ払い');
   });
 
@@ -98,7 +97,7 @@ describe('buildAssistantSystemPrompt', () => {
     });
     expect(prompt).toContain('(まだ1件もありません)');
     expect(prompt).toContain('(まだ明細がありません)');
-    expect(prompt).toContain('(進行中の目標はありません)');
+    expect(prompt).toContain('(進行中の貯金目標はありません)');
     expect(prompt).toContain('(支出目標はまだ立てられていません)');
     expect(prompt).toContain('(取得できませんでした)');
   });

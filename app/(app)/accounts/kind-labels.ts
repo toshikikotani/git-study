@@ -16,7 +16,7 @@ export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
 
 export const ACCOUNT_PURPOSE_LABELS: Record<AccountPurpose, string> = {
   salary: '給与受取',
-  repayment: '返済',
+  repayment: '貯金',
   investment: '投資',
   sanctuary: '聖域支出',
   living: '生活費',

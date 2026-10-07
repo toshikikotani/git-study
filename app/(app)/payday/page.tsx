@@ -3,7 +3,7 @@ import { todayJst } from '@/lib/date';
 import { PaydayAmountForm, PaydayChecklist } from './checklist';
 
 /**
- * 給料日は入金額だけを聞く。振替ルール(返済へ・投資へ等)は使わない。
+ * 給料日は入金額だけを聞く。振替ルール(貯金へ・投資へ等)は使わない。
  */
 
 export const dynamic = 'force-dynamic';

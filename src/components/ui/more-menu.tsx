@@ -12,7 +12,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/plan', label: '貯蓄', dek: '先に移した分。借金の画面は設定で切り替える' },
+      { href: '/plan', label: '目標', dek: '期間ごとの、ジャンル別に使う額' },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',
@@ -36,12 +36,12 @@ const GROUPS = [
         label: 'AIに相談',
         dek: '意見を話すと、設定・予算・目標をまとめて変更案に',
       },
-      { href: '/advisor', label: '目標', dek: '進行中の目標と進捗' },
     ],
   },
   {
     title: 'この先に向けて',
     items: [
+      { href: '/savings', label: '貯金', dek: '貯金目標と貯まり具合' },
       { href: '/investments', label: '投資' },
       { href: '/side-hustle', label: '副業' },
       { href: '/job-change', label: '転職準備' },

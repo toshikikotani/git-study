@@ -11,7 +11,7 @@ import { MoneyError } from '@/domain/money';
 
 describe('assertRuleName', () => {
   it('前後の空白を取り除く', () => {
-    expect(assertRuleName('  返済へ  ')).toBe('返済へ');
+    expect(assertRuleName('  貯金へ  ')).toBe('貯金へ');
   });
 
   it('空文字・空白のみは拒否する', () => {
@@ -58,7 +58,7 @@ describe('assertAmountShape', () => {
 
 describe('computeTransferPlan', () => {
   const seedRules: PlannableRule[] = [
-    { id: 'r1', name: '返済へ', amountType: 'fixed', amountYen: 100_000, percentage: null },
+    { id: 'r1', name: '貯金へ', amountType: 'fixed', amountYen: 100_000, percentage: null },
     { id: 'r2', name: '投資へ', amountType: 'fixed', amountYen: 20_000, percentage: null },
     { id: 'r3', name: '聖域枠へ', amountType: 'fixed', amountYen: 40_000, percentage: null },
     { id: 'r4', name: '生活費へ', amountType: 'remainder', amountYen: null, percentage: null },
@@ -66,7 +66,7 @@ describe('computeTransferPlan', () => {
 
   it('シードの4ルールを入金額300,000円に按分する(remainderが残りを受け取る)', () => {
     expect(computeTransferPlan(seedRules, 300_000)).toEqual([
-      { ruleId: 'r1', label: '返済へ', plannedAmountYen: 100_000 },
+      { ruleId: 'r1', label: '貯金へ', plannedAmountYen: 100_000 },
       { ruleId: 'r2', label: '投資へ', plannedAmountYen: 20_000 },
       { ruleId: 'r3', label: '聖域枠へ', plannedAmountYen: 40_000 },
       { ruleId: 'r4', label: '生活費へ', plannedAmountYen: 140_000 },
@@ -86,7 +86,7 @@ describe('computeTransferPlan', () => {
 
   it('fixed の合計が入金額を超える場合は、以降を0円に切り詰める(マイナスにしない)', () => {
     expect(computeTransferPlan(seedRules, 50_000)).toEqual([
-      { ruleId: 'r1', label: '返済へ', plannedAmountYen: 50_000 },
+      { ruleId: 'r1', label: '貯金へ', plannedAmountYen: 50_000 },
       { ruleId: 'r2', label: '投資へ', plannedAmountYen: 0 },
       { ruleId: 'r3', label: '聖域枠へ', plannedAmountYen: 0 },
       { ruleId: 'r4', label: '生活費へ', plannedAmountYen: 0 },

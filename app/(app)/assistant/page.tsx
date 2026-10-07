@@ -40,7 +40,7 @@ type Message = {
 
 const SUGGESTIONS = [
   '食費をもう少し抑えたい',
-  '給料日を20日にして、返済目標を8万円にしたい',
+  '給料日を20日にして、毎月の貯金目標を8万円にしたい',
   '旅行のために貯金したい',
   'これを買おうか迷っている',
 ];
@@ -185,8 +185,8 @@ export default function AssistantChatPage() {
             意見を話すと、必要な設定をまとめて変更案にします
           </p>
         </div>
-        <Link href="/advisor" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          目標
+        <Link href="/savings" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          貯金目標
         </Link>
       </header>
 
