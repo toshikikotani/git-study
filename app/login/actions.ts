@@ -68,7 +68,7 @@ export async function signUpAction(
       return { error: '現在、新規登録は受け付けていません(利用者数の上限に達しています)。' };
     }
 
-    const { error: createError } = await admin.auth.admin.createUser({
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
       email: normalizedEmail,
       password: confirmedPassword,
       email_confirm: true,
@@ -76,6 +76,15 @@ export async function signUpAction(
     if (createError) {
       // すでにあるメールアドレスでも、そうでなくても、同じ言葉で返す(登録の有無を知らせない)。
       return { error: GENERIC_FAILURE };
+    }
+    // 設定・ジャンル・振替ルールの初期値を入れる(失敗しても、各画面が足りない分を作る)。
+    const newUserId = created?.user?.id;
+    if (newUserId) {
+      try {
+        await admin.rpc('seed_defaults', { p_user_id: newUserId });
+      } catch {
+        // 入れられなくても登録は成功にする。
+      }
     }
     return { error: null };
   } catch {

@@ -59,11 +59,15 @@ export async function getAppSettingsAsAdmin(
   client: SupabaseClient<Database>,
   userId: string,
 ): Promise<AppSettings> {
-  const { data, error } = await client
-    .from('app_settings')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+  const read = () => client.from('app_settings').select('*').eq('user_id', userId).maybeSingle();
+  let { data, error } = await read();
+  if (!error && data === null) {
+    // 新しく登録した利用者には、まだ行が無い(既定値の行を作ってから読み直す。ADR-082)。
+    await client
+      .from('app_settings')
+      .upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true });
+    ({ data, error } = await read());
+  }
   if (error) throw new SettingsStoreError(`設定を取得できませんでした: ${error.message}`);
   if (data === null) throw new SettingsStoreError('設定を取得できませんでした');
 
