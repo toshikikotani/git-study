@@ -8,6 +8,7 @@ import { formatSpendable, formatYen, spendableParts } from '@/domain/money';
 import { streakBadgeFor } from '@/domain/streak';
 import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
+import { getCurrentAccount } from '@/features/auth/owner';
 import { loadHomeSummary } from '@/features/home/summary';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { todayJst } from '@/lib/date';
@@ -37,11 +38,12 @@ export default async function HomePage() {
   // ただし getCheckinStreak() は app_checkins の行を数えるビューを読むため、
   // recordCheckin() の upsert より先に走ると「今日の分」を含め損ねる
   // (バッジの日数が1日ずれる)。そちらは recordCheckin() の後に残す。
-  const [, summary, ledger, rules] = await Promise.all([
+  const [, summary, ledger, rules, account] = await Promise.all([
     recordCheckin().catch(() => undefined),
     loadHomeSummary(),
     loadMonthlyLedger().catch(() => null),
     listTransferRules().catch(() => []),
+    getCurrentAccount(),
   ]);
   const streak = await getCheckinStreak();
   const { tiles } = summary;
@@ -138,12 +140,14 @@ export default async function HomePage() {
        * 「その他」メニュー(P10-1)から辿れるため重複させず削除し、今見ている
        * 数字(貯金・予算タイル)と直接関係の深い2件だけをボタンとして残した。
        */}
-      <div className="rise" style={{ animationDelay: `${100 + tiles.length * 70}ms` }}>
-        <Button href="/briefs" variant="elevated" className="w-full">
-          朝配信のアーカイブを見る
-          <span aria-hidden>→</span>
-        </Button>
-      </div>
+      {account.isOwner ? (
+        <div className="rise" style={{ animationDelay: `${100 + tiles.length * 70}ms` }}>
+          <Button href="/briefs" variant="elevated" className="w-full">
+            朝配信のアーカイブを見る
+            <span aria-hidden>→</span>
+          </Button>
+        </div>
+      ) : null}
 
       <div className="rise flex gap-3" style={{ animationDelay: `${170 + tiles.length * 70}ms` }}>
         <Button href="/reports" variant="outlined" className="flex-1">

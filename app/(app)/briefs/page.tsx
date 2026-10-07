@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { requireOwner } from '@/features/auth/owner';
+
 import { Card } from '@/components/ui/card';
 import { listDailyBriefs } from '@/features/briefs/store';
 import { formatDateJa } from '@/lib/date';
@@ -16,6 +18,7 @@ import { withMinDuration } from '@/lib/min-loading-duration';
 export const dynamic = 'force-dynamic';
 
 export default async function BriefsPage() {
+  await requireOwner();
   const briefs = await withMinDuration(listDailyBriefs());
 
   return (

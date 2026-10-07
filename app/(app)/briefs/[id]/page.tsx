@@ -1,4 +1,6 @@
 import Link from 'next/link';
+
+import { requireOwner } from '@/features/auth/owner';
 import { notFound } from 'next/navigation';
 
 import { Card } from '@/components/ui/card';
@@ -17,6 +19,7 @@ import { BRIEF_EXCLUSION_REASON_LABELS, BRIEF_ITEM_KIND_LABELS } from '../kind-l
 export const dynamic = 'force-dynamic';
 
 export default async function BriefDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireOwner();
   const { id } = await params;
   const brief = await withMinDuration(getDailyBrief(id));
   if (!brief) notFound();

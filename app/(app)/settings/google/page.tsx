@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { requireOwner } from '@/features/auth/owner';
+
 import { Card } from '@/components/ui/card';
 import { getGoogleEnv } from '@/lib/env';
 
@@ -16,6 +18,7 @@ import { getGoogleEnv } from '@/lib/env';
  * (Vercel + GitHub Secrets)へ手でコピーする(ADR-014、NFR-04)。
  */
 export default async function GoogleSettingsPage() {
+  await requireOwner();
   const connected = getGoogleEnv() !== null;
 
   return (
