@@ -22,6 +22,7 @@ import {
   useReceiptJobs,
 } from '@/features/import/receipt-queue';
 import { nextChromeCompact } from '@/lib/chrome';
+import { upgradeStoredTheme } from '@/lib/color-theme';
 import { scrollToTop, tabTapAction } from '@/lib/scroll';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
 import './liquid-tab.css';
@@ -43,6 +44,10 @@ function isSameTab(pathname: string, href: string): boolean {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // 以前に選んだ色(4色だけの保存)を、今の色の役割に置き換える(ADR-079)。
+  useEffect(() => {
+    upgradeStoredTheme();
+  }, []);
   const isClient = useIsClient();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const navigating = pendingHref !== null && !isSameTab(pathname, pendingHref);
