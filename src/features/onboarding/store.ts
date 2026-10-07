@@ -14,7 +14,7 @@ export const WELCOME_SKIPPED_COOKIE = 'welcome_skipped';
 
 export class OnboardingStoreError extends AppError {}
 
-/** いまの人に、はじめての設定を出すか。調べられないときは出さない(画面を止めない)。 */
+/** いまの人に、はじめての設定を出すか。調べられないときは出さない(画面を止めない。原因はログに残す)。 */
 export async function shouldShowOnboarding(): Promise<boolean> {
   try {
     const supabase = await createClient();
@@ -24,18 +24,14 @@ export async function shouldShowOnboarding(): Promise<boolean> {
     const skipped = jar.get(WELCOME_SKIPPED_COOKIE)?.value === auth.user.id;
     if (skipped) return false;
 
-    const [plans, transactions] = await Promise.all([
-      supabase.from('spending_plans').select('id').limit(1),
-      supabase.from('transactions').select('id').limit(1),
-    ]);
-    if (plans.error && !isMissingTableError(plans.error)) return false;
-    if (transactions.error) return false;
-    return needsOnboarding({
-      hasPlan: (plans.data ?? []).length > 0,
-      hasTransactions: transactions.data.length > 0,
-      skipped,
-    });
-  } catch {
+    const plans = await supabase.from('spending_plans').select('id').limit(1);
+    if (plans.error && !isMissingTableError(plans.error)) {
+      console.error('[onboarding] 目標を確かめられませんでした', plans.error);
+      return false;
+    }
+    return needsOnboarding({ hasPlan: (plans.data ?? []).length > 0, skipped });
+  } catch (error) {
+    console.error('[onboarding] はじめての設定を出すか確かめられませんでした', error);
     return false;
   }
 }

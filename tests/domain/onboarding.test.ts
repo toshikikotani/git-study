@@ -22,10 +22,9 @@ describe('starterTargetYen', () => {
 });
 
 describe('needsOnboarding', () => {
-  it('目標も明細も無く、「あとで」も選んでいない人だけに出す', () => {
-    expect(needsOnboarding({ hasPlan: false, hasTransactions: false, skipped: false })).toBe(true);
-    expect(needsOnboarding({ hasPlan: true, hasTransactions: false, skipped: false })).toBe(false);
-    expect(needsOnboarding({ hasPlan: false, hasTransactions: true, skipped: false })).toBe(false);
-    expect(needsOnboarding({ hasPlan: false, hasTransactions: false, skipped: true })).toBe(false);
+  it('目標を立てておらず、「あとで」も選んでいない人に出す(明細があっても出す)', () => {
+    expect(needsOnboarding({ hasPlan: false, skipped: false })).toBe(true);
+    expect(needsOnboarding({ hasPlan: true, skipped: false })).toBe(false);
+    expect(needsOnboarding({ hasPlan: false, skipped: true })).toBe(false);
   });
 });

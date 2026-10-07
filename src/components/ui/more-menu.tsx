@@ -63,6 +63,7 @@ const GROUPS = [
   {
     title: '設定',
     items: [
+      { href: '/welcome', label: 'はじめての設定', dek: '手取り・今日からの目標・貯金目標' },
       { href: '/settings/theme', label: '色', dek: '背景・文字・強調を変える' },
       { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
       { href: '/settings/gmail', label: 'Gmail連携', ownerOnly: true },
