@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * 貯金画面(/savings)の Server Action(ADR-080)。
+ * 貯金画面(/savings)の Server Action(ADR-081)。
  *
  * バリデーションは domain/goals.ts の assertX、店(features/goals/store.ts)を
  * 呼ぶだけにする(docs/glossary.md「レイヤーの命名」)。

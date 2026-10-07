@@ -4,18 +4,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MdClose, MdPhotoLibrary } from 'react-icons/md';
 
 import {
+  assessReceipt,
   createStabilityTracker,
   cropRect,
   detectDocument,
   stitchLayout,
   type Box,
+  type ReceiptAssessment,
 } from '@/features/import/document-detect';
 
 /**
  * レシートの自動撮影(全画面のカメラ)。
  *
- * 映像を縮小して輪郭を検出し(features/import/document-detect.ts)、レシートが
- * 一定時間ほぼ動かずに枠へ収まったら自動でシャッターを切る。
+ * 映像を縮小して輪郭を検出し(features/import/document-detect.ts)、レシートだと確かめられて
+ * (紙の全体が枠の中・縦長・印字の行がいくつもある)、2秒ほぼ動かなかったときだけ自動でシャッターを
+ * 切る。確かめられないものは自動では撮らない(シャッターで撮る)。自動はオフにもできる。
  *   - 1枚:撮ったら閉じる
  *   - 連続:撮り続けられる(1枚ごとに読み取りは裏で進む)
  *   - 長いレシート:分けて撮った複数枚を縦に結合して1枚にする
@@ -31,7 +34,16 @@ const MODES: { value: Mode; label: string }[] = [
   { value: 'long', label: '長いレシート' },
 ];
 
-const SAMPLE_WIDTH = 160;
+const SAMPLE_WIDTH = 240;
+const AUTO_KEY = 'receipt-camera-auto';
+
+function readAuto(): boolean {
+  try {
+    return localStorage.getItem(AUTO_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
 const SAMPLE_INTERVAL_MS = 250;
 const COOLDOWN_MS = 1600;
 
@@ -54,6 +66,9 @@ export function ReceiptCamera({
   const modeRef = useRef<Mode>(initialMode);
   const [box, setBox] = useState<Box | null>(null);
   const [progress, setProgress] = useState(0);
+  const [assessment, setAssessment] = useState<ReceiptAssessment | null>(null);
+  const [auto, setAuto] = useState(() => (typeof window === 'undefined' ? true : readAuto()));
+  const autoRef = useRef(auto);
   const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState(0);
   const [parts, setParts] = useState<Blob[]>([]);
@@ -184,10 +199,15 @@ export function ReceiptCamera({
       for (let i = 0; i < w * h; i += 1) {
         gray[i] = 0.299 * rgba[i * 4]! + 0.587 * rgba[i * 4 + 1]! + 0.114 * rgba[i * 4 + 2]!;
       }
-      const detection = detectDocument({ width: w, height: h, data: gray });
+      const image = { width: w, height: h, data: gray };
+      const detection = detectDocument(image);
       boxRef.current = detection?.box ?? null;
       setBox(detection?.box ?? null);
-      const { stable, progress: p } = trackerRef.current.push(detection?.box ?? null);
+      const judged = detection === null ? null : assessReceipt(image, detection);
+      setAssessment(judged);
+      // レシートだと確かめられたときだけ数える(それ以外は自動では撮らない)。
+      const confirmed = autoRef.current && judged?.receipt === true ? detection!.box : null;
+      const { stable, progress: p } = trackerRef.current.push(confirmed);
       setProgress(p);
       if (stable && Date.now() - lastCaptureRef.current > COOLDOWN_MS) void shoot();
     }, SAMPLE_INTERVAL_MS);
@@ -243,7 +263,31 @@ export function ReceiptCamera({
             </button>
           ))}
         </div>
-        <span className="w-10" />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={auto}
+          aria-label="レシートと確かめられたら自動で撮る"
+          onClick={() => {
+            const next = !auto;
+            setAuto(next);
+            autoRef.current = next;
+            trackerRef.current.reset();
+            setProgress(0);
+            try {
+              localStorage.setItem(AUTO_KEY, next ? 'on' : 'off');
+            } catch {
+              // 保存できなくても、この撮影の間は切り替える
+            }
+          }}
+          className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold"
+          style={{
+            background: auto ? '#fff' : 'rgba(255,255,255,0.18)',
+            color: auto ? '#000' : '#fff',
+          }}
+        >
+          自動 {auto ? 'オン' : 'オフ'}
+        </button>
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -269,7 +313,8 @@ export function ReceiptCamera({
               top: `${box.y0 * 100}%`,
               width: `${(box.x1 - box.x0) * 100}%`,
               height: `${(box.y1 - box.y0) * 100}%`,
-              borderColor: progress >= 1 ? '#34d399' : '#fbbf24',
+              borderColor: assessment?.receipt && auto ? '#34d399' : '#fbbf24',
+              borderStyle: assessment?.receipt && auto ? 'solid' : 'dashed',
             }}
           />
         ) : null}
@@ -278,13 +323,7 @@ export function ReceiptCamera({
           className="absolute inset-x-0 bottom-3 text-center text-xs"
           style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
         >
-          {error !== null
-            ? ''
-            : box === null
-              ? 'レシートを枠に収めてください'
-              : progress >= 1
-                ? '撮影します'
-                : 'そのまま動かさずに…'}
+          {error !== null ? '' : guidance({ box, assessment, auto, progress })}
           {mode === 'continuous' && count > 0 ? `(${count}枚撮影済み)` : ''}
           {mode === 'long' && parts.length > 0 ? `(${parts.length}枚目まで撮影済み)` : ''}
         </p>
@@ -344,4 +383,31 @@ export function ReceiptCamera({
       </div>
     </div>
   );
+}
+
+/** 画面の下の案内。自動で撮らないときは、理由と「シャッターで撮れる」ことを伝える。 */
+function guidance({
+  box,
+  assessment,
+  auto,
+  progress,
+}: {
+  box: Box | null;
+  assessment: ReceiptAssessment | null;
+  auto: boolean;
+  progress: number;
+}): string {
+  if (!auto) return 'シャッターを押して撮ります(自動はオフ)';
+  if (box === null || assessment === null) {
+    return 'レシート全体を枠に収めてください。自動で撮れないときはシャッターを';
+  }
+  if (assessment.receipt) return progress >= 1 ? '撮影します' : 'レシートです。そのまま動かさずに…';
+  switch (assessment.reason) {
+    case 'edge':
+      return 'レシート全体が画面に入るように、少し離してください';
+    case 'shape':
+      return 'レシートを縦向きにしてください';
+    default:
+      return 'レシートと確かめられないので、自動では撮りません(シャッターで撮れます)';
+  }
 }

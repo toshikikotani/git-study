@@ -348,7 +348,7 @@ alter table public.spending_promises
   add constraint ck_spending_promises_per_week check (per_week between 0 and 7);
 
 
--- 13. 借金をやめ、貯金(貯金目標)に変える(ADR-080)
+-- 13. 借金をやめ、貯金(貯金目標)に変える(ADR-081)
 -- -----------------------------------------------------------------------------
 -- 借金の記録(debts・debt_payments・repayment_scenarios と計算の関数・ビュー)を消す(戻せない)。
 -- 設定の返済の列は貯金に、純資産の記録は残債 → 貯金に、目標に数え始める日を足す。

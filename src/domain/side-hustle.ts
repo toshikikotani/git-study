@@ -38,7 +38,7 @@ export type IncomeAllocation = {
 
 /**
  * FR-42:副業収入を貯金:投資の比率で振り分ける(既定 7:3、
- * `app_settings.side_income_savings_ratio`。ADR-080 で返済から貯金に)。
+ * `app_settings.side_income_savings_ratio`。ADR-081 で返済から貯金に)。
  *
  * 端数は貯金側に寄せる(投資額を先に丸め、貯金額は差分で求める)ことで、
  * 常に savingsYen + investmentYen = amountYen になる

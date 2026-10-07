@@ -4,7 +4,7 @@
  * RLS が本人の行だけに絞る(ADR-011)ため SELECT は user_id を意識しない。
  * `goals` は本番未適用(B-10)。未適用時の扱いは lib/supabase/errors.ts。
  *
- * 目標は「貯金目標」として使う(ADR-080)。貯まった額は収入 − 支出から自動で数える
+ * 目標は「貯金目標」として使う(ADR-081)。貯まった額は収入 − 支出から自動で数える
  * (features/savings/store.ts)。current_amount_yen は以前の手入力の名残で、もう使わない。
  */
 
@@ -50,7 +50,7 @@ function fromRow(row: GoalRow): Goal {
     title: row.title,
     targetAmountYen: row.target_amount_yen,
     targetDate: row.target_date,
-    // start_on が未適用の本番(ADR-080 のマイグレーション前)では作った日から数える。
+    // start_on が未適用の本番(ADR-081 のマイグレーション前)では作った日から数える。
     startOn: (row as Partial<GoalRow>).start_on ?? todayJst(new Date(row.created_at)),
     status: row.status,
     note: row.note,

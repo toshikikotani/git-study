@@ -1,5 +1,5 @@
 /**
- * 資産推移(貯金 + 投資評価額)の記録と読み出し(P6-3。ADR-080 で残債から貯金に)。
+ * 資産推移(貯金 + 投資評価額)の記録と読み出し(P6-3。ADR-081 で残債から貯金に)。
  *
  * 貯金(features/savings の合計)は履歴を持たないため、月末に
  * net_worth_snapshots へ1行ずつ記録し始める(TASKS.md P6-3。マイグレーションは
@@ -60,7 +60,7 @@ export async function recordNetWorthSnapshotAsAdmin(
     .from('net_worth_snapshots')
     .upsert({ ...row, savings_yen: savings.totalYen }, { onConflict: 'user_id,as_of' });
   if (error && isMissingColumnError(error)) {
-    // 貯金の列が未適用(ADR-080 のマイグレーション前)なら、旧い残債の列に 0 を入れて投資額だけ残す。
+    // 貯金の列が未適用(ADR-081 のマイグレーション前)なら、旧い残債の列に 0 を入れて投資額だけ残す。
     ({ error } = await client
       .from('net_worth_snapshots')
       .upsert({ ...row, debt_balance_yen: 0 } as typeof row, { onConflict: 'user_id,as_of' }));

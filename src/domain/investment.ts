@@ -9,7 +9,7 @@
  * ふだんは投資総額の全額をインデックス枠に入れる。本人が設定で高リスク枠を
  * 使うと決めたとき(`isHighRiskUnlocked`)だけ、`highRiskAllocationRatio` の分を
  * 高リスク枠に回す。以前は全負債の完済で自動で切り替えていたが、借金をなくした
- * (ADR-080)ので本人の切り替えにした。
+ * (ADR-081)ので本人の切り替えにした。
  */
 
 import { AppError } from '@/lib/errors';

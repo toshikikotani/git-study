@@ -4,7 +4,7 @@ import { chain, type MockResult } from '../../helpers/supabase-mock';
 import { getAppSettingsAsAdmin } from '@/features/settings/store';
 
 /**
- * 列が本番にまだ適用されていない(ai_enabled、ADR-080 の貯金への改名)ときに、
+ * 列が本番にまだ適用されていない(ai_enabled、ADR-081 の貯金への改名)ときに、
  * 設定の読み取りが画面全体を落とさず動き続けることを確認する回帰テスト。
  * 直接の原因:マージ後に /plan・/investments・/side-hustle・
  * /settings/ai など getAppSettings() を呼ぶ画面が軒並み動かなくなった不具合
@@ -29,7 +29,7 @@ const savingsRow = {
   ai_enabled: false,
 };
 
-/** 貯金への改名(ADR-080)も ai_enabled も未適用の本番の行。 */
+/** 貯金への改名(ADR-081)も ai_enabled も未適用の本番の行。 */
 const legacyRow = {
   monthly_repayment_target_yen: 40000,
   repayment_strategy: 'avalanche',

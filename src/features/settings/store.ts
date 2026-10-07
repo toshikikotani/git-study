@@ -18,11 +18,11 @@ import { isMissingColumnError } from '@/lib/supabase/errors';
 import type { Database } from '@/lib/supabase/types';
 
 export type AppSettings = {
-  /** 毎月の貯金目標(円)。給料日の振替・投資額の基準(ADR-080)。 */
+  /** 毎月の貯金目標(円)。給料日の振替・投資額の基準(ADR-081)。 */
   monthlySavingsTargetYen: number;
   /** 貯金目標額に対する投資額の比率(0〜1)。既定 0.2(FR-50)。 */
   investmentRatioOfSavings: number;
-  /** 高リスク投資の枠を使うか(本人が設定で切り替える。ADR-080)。 */
+  /** 高リスク投資の枠を使うか(本人が設定で切り替える。ADR-081)。 */
   isHighRiskUnlocked: boolean;
   /** 高リスク枠を使うとき、投資総額のうち高リスク枠に回す比率(0〜1)。既定 0.3。 */
   highRiskAllocationRatio: number;
@@ -36,7 +36,7 @@ export type AppSettings = {
 
 export class SettingsStoreError extends AppError {}
 
-/** 列名を「貯金」に変えるマイグレーション(ADR-080)が未適用の本番では、旧い列名で持っている。 */
+/** 列名を「貯金」に変えるマイグレーション(ADR-081)が未適用の本番では、旧い列名で持っている。 */
 const LEGACY_COLUMNS = {
   monthly_savings_target_yen: 'monthly_repayment_target_yen',
   investment_ratio_of_savings: 'investment_ratio_of_repayment',

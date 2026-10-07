@@ -161,7 +161,7 @@ export type SideIncome = {
 
 type SideIncomeRow = Database['public']['Tables']['side_incomes']['Row'];
 
-/** 貯金への改名(ADR-080)が未適用の本番では、旧い列名 allocated_to_repayment_yen で持っている。 */
+/** 貯金への改名(ADR-081)が未適用の本番では、旧い列名 allocated_to_repayment_yen で持っている。 */
 function incomeFromRow(row: SideIncomeRow): SideIncome {
   const legacy = row as unknown as { allocated_to_repayment_yen?: number | null };
   return {

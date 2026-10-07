@@ -22,7 +22,7 @@ insert into public.accounts (id, user_id, name, kind, purpose)
 values ('aaaaaaaa-0000-0000-0000-000000000001',
         '11111111-1111-1111-1111-111111111111', 'メイン銀行', 'bank', 'salary');
 
-\echo '--- 貯金目標(ADR-080:数え始める日は今日が既定)---'
+\echo '--- 貯金目標(ADR-081:数え始める日は今日が既定)---'
 insert into public.goals (user_id, title, target_amount_yen, target_date)
 values ('11111111-1111-1111-1111-111111111111', '旅行', 120000, public.today_jst() + 180);
 select title, target_amount_yen, start_on = public.today_jst() as starts_today

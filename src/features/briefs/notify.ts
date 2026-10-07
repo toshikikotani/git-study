@@ -48,7 +48,7 @@ export async function deliverDailyBriefAsAdmin(
   if (!brief) return 'not_generated';
   if (brief.status === 'delivered') return 'already_delivered';
 
-  // 次の貯金目標の進み具合をグラフ画像にして添える(本人発案、ADR-080)。ホーム画面の
+  // 次の貯金目標の進み具合をグラフ画像にして添える(本人発案、ADR-081)。ホーム画面の
   // 数字と必ず一致させるため、ここでも同じ loadHomeSummaryAsAdmin() を使う
   // (generateDailyBriefAsAdmin() と同じ考え方、計算式を複製しない)。
   // 金額のある目標が無ければ添えない。失敗しても配信本体は止めない(補助表示のため)。

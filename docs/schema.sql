@@ -59,7 +59,7 @@ create type account_kind as enum (
 -- 口座の用途(仕様書 7章 accounts:用途=給与/返済/投資/女遊び/生活費)
 create type account_purpose as enum (
   'salary',         -- 給与受取
-  'repayment',      -- 貯金(以前は「返済」。値はそのまま使う、ADR-080)
+  'repayment',      -- 貯金(以前は「返済」。値はそのまま使う、ADR-081)
   'investment',     -- 投資
   'sanctuary',      -- 聖域支出(女遊び枠)
   'living',         -- 生活費
@@ -277,7 +277,7 @@ create table public.app_settings (
   -- (ADR-016/ADR-057)。設定側にも金額を持つと二重定義になり、
   -- 本人が片方だけ直したときに残額表示が静かにずれる。
 
-  -- 貯金・投資のルール(ADR-080。以前は返済のルール)
+  -- 貯金・投資のルール(ADR-081。以前は返済のルール)
   monthly_savings_target_yen          bigint       not null default 100000,
   investment_ratio_of_savings         numeric(4,3) not null default 0.200,
   side_income_savings_ratio           numeric(4,3) not null default 0.700,  -- FR-42 貯金7:投資3
@@ -895,7 +895,7 @@ create table public.side_incomes (
   account_id     uuid        references public.accounts(id) on delete set null,
   transaction_id uuid        references public.transactions(id) on delete set null,
 
-  -- FR-42 振り分け(貯金7:投資3。ADR-080 で返済から貯金へ)
+  -- FR-42 振り分け(貯金7:投資3。ADR-081 で返済から貯金へ)
   allocated_to_savings_yen bigint,
   allocated_to_investment_yen bigint,
   transfer_run_id uuid       references public.transfer_runs(id) on delete set null,
@@ -1205,7 +1205,7 @@ create index ix_rescued_emails_user_created on public.rescued_emails (user_id, c
 -- 3.22 net_worth_snapshots — 資産推移の月次記録(P6-3)
 --
 --   資産推移グラフ(貯金 + 投資評価額の時系列)のため、月末に両者を1行として
---   記録する。貯金は「収入 − 支出」の累計(domain/savings.ts、ADR-080。以前は
+--   記録する。貯金は「収入 − 支出」の累計(domain/savings.ts、ADR-081。以前は
 --   残債を持っていた)。投資評価額は investment_snapshots(商品ごとの時点
 --   スナップショット)から、記録時点で商品ごとに最新の値を合算したもの。
 -- -----------------------------------------------------------------------------
@@ -1258,7 +1258,7 @@ create index ix_transaction_splits_user on public.transaction_splits (user_id);
 
 -- 3.24 goals — AI相談(目標設定・買う前相談)で決めた目標(本人発案)
 --
---   「◯月までに◯万円貯める」のような貯金目標(ADR-080)。貯まった額は
+--   「◯月までに◯万円貯める」のような貯金目標(ADR-081)。貯まった額は
 --   「収入 − 支出」の、start_on からの累計を、期限の近い目標から順に割り当てて
 --   自動で数える(domain/savings.ts)。current_amount_yen は以前の手入力の値で、
 --   今は使わない。target_amount_yen/target_date は無くても目標として成立する。
@@ -1840,8 +1840,8 @@ commit;
 --  付録:仕様書 7章のエンティティとの対応
 --
 --   accounts                → accounts
---   debts                   → 廃止(ADR-080。借金をやめ、貯金目標 goals に)
---   debt_payments           → 廃止(ADR-080)
+--   debts                   → 廃止(ADR-081。借金をやめ、貯金目標 goals に)
+--   debt_payments           → 廃止(ADR-081)
 --   transactions            → transactions(+ import_batches, import_adapters)
 --   categories              → genres に統合(ADR-057。classification_rules・budgets
 --                             も同時に廃止し、genre_id/budget_yen/must_pay へ集約)

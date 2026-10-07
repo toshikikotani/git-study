@@ -60,7 +60,7 @@ export type MonthlyReportInput = {
   topWasteItems: readonly MonthlyReportItem[];
   topNecessaryItems: readonly MonthlyReportItem[];
   wasteRatioTrend: readonly { monthKey: string; wasteRatio: number | null }[];
-  /** 貯金(収入 − 支出の自動の数え方、ADR-080)。 */
+  /** 貯金(収入 − 支出の自動の数え方、ADR-081)。 */
   savings: {
     totalYen: number;
     thisMonthYen: number;

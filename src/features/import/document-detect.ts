@@ -127,13 +127,100 @@ export function detectDocument(gray: GrayImage): Detection | null {
   return { box, coverage, confidence: Math.min(1, separation * 1.5) * fill };
 }
 
+/** レシートらしさの判定の結果。receipt が true のときだけ自動で撮ってよい。 */
+export type ReceiptAssessment = {
+  receipt: boolean;
+  /** 自動で撮らない理由(画面に出す。receipt が true なら null)。 */
+  reason: 'edge' | 'shape' | 'no-text' | 'weak' | null;
+  /** 紙の中に見つけた、印字の行のまとまりの数。 */
+  textBands: number;
+};
+
+/** 自動撮影に必要な、紙と背景の分かれ方・紙の詰まり具合(手動のシャッターより厳しい)。 */
+const AUTO_MIN_CONFIDENCE = 0.3;
+const AUTO_MIN_FILL = 0.75;
+/** 紙が画面の端に触れていたら、壁・机・画面など「紙より大きいもの」の一部とみなす。 */
+const EDGE_MARGIN = 0.02;
+/** 印字の行として数える、行の中の濃い点の割合。 */
+const TEXT_ROW_RATIO = 0.03;
+/** レシートとみなす印字の行のまとまりの数。 */
+const MIN_TEXT_BANDS = 3;
+
+/**
+ * 見つけた紙が「レシート」だと言えるか(自動のシャッターを切ってよいか)。誤って撮らないよう、
+ * 次を全部満たすときだけ true にする(本人の希望:レシートと確定できるときだけ自動で撮る)。
+ *   1. 紙が画面の端に触れていない(紙の全体が枠の中にある。白い壁・机・画面を除く)
+ *   2. 縦長か、少なくとも横長すぎない(実際の画素で 高さ ≥ 0.9 × 幅)
+ *   3. 紙と背景がはっきり分かれ、紙が外接矩形をよく満たす
+ *   4. 紙の中に、印字の行のまとまりが3つ以上ある(白紙・光の反射を除く)
+ */
+export function assessReceipt(gray: GrayImage, detection: Detection): ReceiptAssessment {
+  const { width: w, height: h, data } = gray;
+  const { box } = detection;
+  if (
+    box.x0 < EDGE_MARGIN ||
+    box.y0 < EDGE_MARGIN ||
+    box.x1 > 1 - EDGE_MARGIN ||
+    box.y1 > 1 - EDGE_MARGIN
+  ) {
+    return { receipt: false, reason: 'edge', textBands: 0 };
+  }
+  const pxW = (box.x1 - box.x0) * w;
+  const pxH = (box.y1 - box.y0) * h;
+  if (pxH < 0.9 * pxW) return { receipt: false, reason: 'shape', textBands: 0 };
+  if (detection.confidence < AUTO_MIN_CONFIDENCE) {
+    return { receipt: false, reason: 'weak', textBands: 0 };
+  }
+
+  // 紙の内側(縁を少し除く)で、紙の明るさより十分に暗い点を「印字」として数える。
+  const x0 = Math.ceil(box.x0 * w + pxW * 0.06);
+  const x1 = Math.floor(box.x1 * w - pxW * 0.06);
+  const y0 = Math.ceil(box.y0 * h + pxH * 0.04);
+  const y1 = Math.floor(box.y1 * h - pxH * 0.04);
+  if (x1 - x0 < 4 || y1 - y0 < 8) return { receipt: false, reason: 'weak', textBands: 0 };
+  let paperSum = 0;
+  let paperN = 0;
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      paperSum += data[y * w + x]!;
+      paperN += 1;
+    }
+  }
+  const paper = paperSum / paperN;
+  const ink = paper - Math.max(35, paper * 0.22);
+  let bright = 0;
+  let inkTotal = 0;
+  let bands = 0;
+  let inBand = false;
+  for (let y = y0; y < y1; y += 1) {
+    let rowInk = 0;
+    for (let x = x0; x < x1; x += 1) {
+      const v = data[y * w + x]!;
+      if (v < ink) rowInk += 1;
+      else bright += 1;
+    }
+    inkTotal += rowInk;
+    const isText = rowInk / (x1 - x0) >= TEXT_ROW_RATIO;
+    if (isText && !inBand) bands += 1;
+    inBand = isText;
+  }
+  const fill = bright / paperN;
+  if (fill < AUTO_MIN_FILL - 0.2) return { receipt: false, reason: 'weak', textBands: bands };
+  const inkRatio = inkTotal / paperN;
+  if (bands < MIN_TEXT_BANDS || inkRatio < 0.01 || inkRatio > 0.4) {
+    return { receipt: false, reason: 'no-text', textBands: bands };
+  }
+  return { receipt: true, reason: null, textBands: bands };
+}
+
 /**
  * 自動撮影の判定。矩形が「一定のフレーム数、ほとんど動かずに検出され続けた」ら
  * 撮影してよいと返す(手ぶれ・検出の途切れの間は撮らない)。
  */
 export function createStabilityTracker(options: { frames?: number; tolerance?: number } = {}) {
-  const frames = options.frames ?? 6;
-  const tolerance = options.tolerance ?? 0.02;
+  // 2秒(8回 × 250ms)ほとんど動かないこと。手ぶれの途中で撮らない。
+  const frames = options.frames ?? 8;
+  const tolerance = options.tolerance ?? 0.015;
   let history: Box[] = [];
 
   const near = (a: Box, b: Box) =>

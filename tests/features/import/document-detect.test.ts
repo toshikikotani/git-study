@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assessReceipt,
   createStabilityTracker,
   cropRect,
   detectDocument,
@@ -101,5 +102,62 @@ describe('cropRect / stitchLayout', () => {
     );
     expect(layout.height).toBeLessThanOrEqual(6000);
     expect(layout.width).toBe(600);
+  });
+});
+
+/** 紙の中に、印字の行(濃い横線)を等間隔に入れる。 */
+function withText(
+  img: GrayImage,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+  every = 6,
+): GrayImage {
+  const data = Uint8ClampedArray.from(img.data as ArrayLike<number>);
+  for (let y = rect.y0 + 4; y < rect.y1 - 4; y += every) {
+    for (let x = rect.x0 + 4; x < rect.x0 + Math.floor((rect.x1 - rect.x0) * 0.7); x += 1) {
+      data[y * img.width + x] = 50;
+    }
+  }
+  return { ...img, data };
+}
+
+describe('assessReceipt(自動シャッターは、レシートと言えるときだけ)', () => {
+  const tall = { x0: 50, y0: 20, x1: 110, y1: 200 };
+
+  it('枠の中に縦長の紙があり、印字の行がいくつもあればレシート', () => {
+    const img = withText(synthetic(160, 220, tall), tall);
+    const d = detectDocument(img)!;
+    const a = assessReceipt(img, d);
+    expect(a.receipt).toBe(true);
+    expect(a.textBands).toBeGreaterThanOrEqual(3);
+  });
+
+  it('白紙・光の反射(印字が無い)はレシートとしない', () => {
+    const img = synthetic(160, 220, tall);
+    const a = assessReceipt(img, detectDocument(img)!);
+    expect(a).toMatchObject({ receipt: false, reason: 'no-text' });
+  });
+
+  it('画面の端に触れている明るい面(壁・机・画面)はレシートとしない', () => {
+    const edge = { x0: 0, y0: 20, x1: 110, y1: 200 };
+    const img = withText(synthetic(160, 220, edge), edge);
+    const d = detectDocument(img);
+    expect(d).not.toBeNull();
+    expect(assessReceipt(img, d!)).toMatchObject({ receipt: false, reason: 'edge' });
+  });
+
+  it('横長の紙(本・箱・画面など)はレシートとしない', () => {
+    const wide = { x0: 20, y0: 70, x1: 140, y1: 140 };
+    const img = withText(synthetic(160, 220, wide), wide);
+    const d = detectDocument(img)!;
+    expect(assessReceipt(img, d)).toMatchObject({ receipt: false, reason: 'shape' });
+  });
+
+  it('2秒(8回)ほとんど動かないときだけ、撮ってよいと返す', () => {
+    const t = createStabilityTracker();
+    const box = { x0: 0.3, y0: 0.1, x1: 0.7, y1: 0.9 };
+    for (let i = 0; i < 7; i += 1) expect(t.push(box).stable).toBe(false);
+    expect(t.push(box).stable).toBe(true);
+    // 少し動いたら数え直す
+    expect(t.push({ ...box, x0: 0.33 }).stable).toBe(false);
   });
 });

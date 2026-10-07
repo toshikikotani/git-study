@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 
 import { setHighRiskAction } from './actions';
 
-/** 高リスク枠を使うかの切り替え(ADR-080。本人の判断で決める)。 */
+/** 高リスク枠を使うかの切り替え(ADR-081。本人の判断で決める)。 */
 export function HighRiskToggle({ enabled }: { enabled: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
