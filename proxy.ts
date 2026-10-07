@@ -12,6 +12,9 @@
  * /api/cron/* は対象外。cron ジョブはブラウザのセッション cookie を
  * 持たず、CRON_SECRET で自分自身を認証する(ADR-009、M2-7c で実装)。
  *
+ * ログイン画面は、ログイン済みならホームへ送る(ログインのあと画面が切り替わらず、
+ * ログイン画面に取り残されるのを防ぐ。ADR-081)。
+ *
  * /api/webhooks/* も対象外。LINE のサーバーがセッション cookie を持たずに
  * 直接叩いてくる経路のため(本人発案のレシート受信 Webhook)。X-Line-Signature
  * による検証は各 route.ts 側の責務にする(app/api/webhooks/line/route.ts)。
@@ -19,13 +22,12 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { authGate, isPublicPath } from '@/lib/auth-gate';
 import { getPublicEnv } from '@/lib/env';
-
-const PUBLIC_PATHS = ['/login', '/manifest.webmanifest'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
@@ -55,13 +57,15 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    return NextResponse.redirect(loginUrl);
+  const gate = authGate(pathname, user !== null);
+  if (gate === 'unauthorized') {
+    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+  }
+  if (gate === 'to-login' || gate === 'to-home') {
+    const url = request.nextUrl.clone();
+    url.pathname = gate === 'to-login' ? '/login' : '/';
+    url.search = '';
+    return NextResponse.redirect(url);
   }
 
   return response;
