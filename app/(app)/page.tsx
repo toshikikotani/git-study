@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { MdLocalFireDepartment } from 'react-icons/md';
 
@@ -10,6 +11,7 @@ import { loadGenreMonthDetail } from '@/features/genre/genre-detail-store';
 import { getCheckinStreak, recordCheckin, type CheckinStreak } from '@/features/checkins/store';
 import { getCurrentAccount } from '@/features/auth/owner';
 import { loadHomeSummary } from '@/features/home/summary';
+import { shouldShowOnboarding } from '@/features/onboarding/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { todayJst } from '@/lib/date';
 import { lockedSavingsYen, MISSING_INCOME_NOTE, sinkingFromRules } from '@/domain/locked-savings';
@@ -27,6 +29,9 @@ import { TodaySection } from './_home/today-section';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
+  // 目標も明細もまだ無い新しい人は、はじめての設定へ(ADR-084)。
+  if (await shouldShowOnboarding()) redirect('/welcome');
+
   // ホームを開いた = 今日確認した(FR-62)。失敗しても画面は止めない。
   //
   // recordCheckin() は loadHomeSummary() と依存関係が無い(片方の結果を
