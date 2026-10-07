@@ -159,7 +159,7 @@ export function isCountable(tx: BudgetTransaction): boolean {
 }
 
 /**
- * 進捗ゲージ(完済・予算)に刻むマイルストーン。到達を祝うための節目。
+ * 進捗ゲージ(貯金目標・予算)に刻むマイルストーン。到達を祝うための節目。
  *
  * `features/home/summary.ts` は `next/headers` に依存する `createClient()` を
  * 使うため、そこにこの定数を置くと `Meter`(Client Component)がそれを

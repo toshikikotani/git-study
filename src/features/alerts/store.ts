@@ -29,7 +29,6 @@ import {
   buildJobFailureAlert,
   buildMonthlyRecapAlert,
   detectInactivity,
-  detectPaymentDueTomorrow,
   detectRiskyTransaction,
   detectWastefulBudget,
   isAheadOfPace,
@@ -45,6 +44,7 @@ import {
 } from '@/domain/budget';
 import { expandTransactionsWithSplits } from '@/domain/transaction-splits';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
+import { loadSavingsSummaryAsAdmin } from '@/features/savings/store';
 import { listSplitsForTransactionIds } from '@/features/transactions/splits-store';
 import { addDays, daysBetween, monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
@@ -74,7 +74,6 @@ export async function recordAlertsAsAdmin(
         title: c.title,
         body: c.body,
         dedup_key: c.dedupKey,
-        debt_id: c.debtId,
         transaction_id: c.transactionId,
       })),
       { onConflict: 'user_id,dedup_key', ignoreDuplicates: true },
@@ -93,40 +92,6 @@ export async function recordAlerts(candidates: readonly CandidateAlert[]): Promi
     throw new AlertStoreError('ログイン状態を確認できませんでした');
   }
   return recordAlertsAsAdmin(supabase, auth.user.id, candidates);
-}
-
-/**
- * FR-23:返済日前日の通知を検知して積む。
- * 対象は active な負債(debts.status='active')のみ。
- */
-export async function detectAndRecordPaymentDueAlertsAsAdmin(
-  client: SupabaseClient<Database>,
-  userId: string,
-  now: Date = new Date(),
-): Promise<number> {
-  const { data, error } = await client
-    .from('debts')
-    .select('id, lender_name, payment_day')
-    .eq('user_id', userId)
-    .eq('status', 'active');
-  if (error) throw new AlertStoreError(`負債を取得できませんでした: ${error.message}`);
-
-  const today: DateOnly = todayJst(now);
-  const candidates = detectPaymentDueTomorrow(
-    data.map((d) => ({ id: d.id, lenderName: d.lender_name, paymentDay: d.payment_day })),
-    today,
-  );
-
-  return recordAlertsAsAdmin(client, userId, candidates);
-}
-
-export async function detectAndRecordPaymentDueAlerts(now: Date = new Date()): Promise<number> {
-  const supabase = await createClient();
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth.user) {
-    throw new AlertStoreError('ログイン状態を確認できませんでした');
-  }
-  return detectAndRecordPaymentDueAlertsAsAdmin(supabase, auth.user.id, now);
 }
 
 /**
@@ -287,10 +252,9 @@ export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
 }
 
 /**
- * P6-1:月次の振り返りを月末にだけ Discord へ積む(今月の返済実績・
- * 副業収入・浪費枠消化)。数値は既存の debt_payments/side_incomes と
- * loadWasteCategoryStatuses() から集計するだけで、新規スキーマは不要
- * (TASKS.md P6-1)。
+ * P6-1:月次の振り返りを月末にだけ Discord へ積む(今月の貯金・
+ * 副業収入・浪費枠消化)。貯金は features/savings(収入 − 支出、ADR-077)、
+ * ほかは side_incomes と loadWasteCategoryStatuses() から集計する(TASKS.md P6-1)。
  *
  * 月末以外は何もしない(isLastDayOfMonth)。dedup_key が月単位のため、
  * 月末に cron が複数回走っても二重には積まれない。
@@ -307,17 +271,8 @@ export async function detectAndRecordMonthlyRecapAlertAsAdmin(
   const nextMonthStart = monthStartJst(1, now);
   const monthKey = monthStart.slice(0, 7);
 
-  const [
-    { data: payments, error: paymentsError },
-    { data: incomes, error: incomesError },
-    budgetedGenres,
-  ] = await Promise.all([
-    client
-      .from('debt_payments')
-      .select('amount_yen')
-      .eq('user_id', userId)
-      .gte('paid_on', monthStart)
-      .lt('paid_on', nextMonthStart),
+  const [savings, { data: incomes, error: incomesError }, budgetedGenres] = await Promise.all([
+    loadSavingsSummaryAsAdmin(client, userId, now),
     client
       .from('side_incomes')
       .select('amount_yen')
@@ -326,16 +281,13 @@ export async function detectAndRecordMonthlyRecapAlertAsAdmin(
       .lt('received_on', nextMonthStart),
     loadBudgetedGenreStatuses(client, userId, now),
   ]);
-  if (paymentsError) {
-    throw new AlertStoreError(`返済実績を取得できませんでした: ${paymentsError.message}`);
-  }
   if (incomesError) {
     throw new AlertStoreError(`副業収入を取得できませんでした: ${incomesError.message}`);
   }
 
   const summary = {
     monthKey,
-    totalPaidYen: payments.reduce((sum, p) => sum + p.amount_yen, 0),
+    savedYen: savings.thisMonthYen,
     totalSideIncomeYen: incomes.reduce((sum, i) => sum + i.amount_yen, 0),
     wasteCategories: budgetedGenres.map(({ name, status }): RecapWasteCategory => ({
       name,

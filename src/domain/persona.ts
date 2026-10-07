@@ -29,7 +29,7 @@ export const SPENDING_PERSONA_DESCRIPTIONS: Record<SpendingPersonaType, string> 
   impulsive: '計画外の突発的な支出が多い傾向',
   steady: '支出が安定していて予算内に収まりやすい傾向',
   social: '人との付き合いに使う支出が多い傾向',
-  goal_oriented: '貯蓄・投資・返済など明確な目的に向けて支出を絞れている傾向',
+  goal_oriented: '貯蓄・投資など明確な目的に向けて支出を絞れている傾向',
   frugal: '全体的に支出を抑える傾向が強い',
   balanced: '使うところと締めるところの差がはっきりしている傾向',
 };

@@ -52,10 +52,8 @@ function formatGenreLines(genres: readonly Genre[]): string {
 }
 
 function formatGoalLines(goals: readonly GoalRef[]): string {
-  if (goals.length === 0) return '(進行中の目標はありません)';
-  return goals
-    .map((g) => `- id=${g.id} ${JSON.stringify(g.title)} 進捗=${g.currentAmountYen}円`)
-    .join('\n');
+  if (goals.length === 0) return '(進行中の貯金目標はありません)';
+  return goals.map((g) => `- id=${g.id} ${JSON.stringify(g.title)}`).join('\n');
 }
 
 function formatPlanLines(plan: PlanRef | null): string {
@@ -66,7 +64,7 @@ function formatPlanLines(plan: PlanRef | null): string {
 export function buildAssistantSystemPrompt(context: AssistantChatContext): string {
   return [
     'あなたは家計簿アプリ「資産形成」の、唯一のAIの窓口です。',
-    '本人の意見・希望・悩み(「食費を抑えたい」「返済を早めたい」「これを買おうか迷っている」など)を聞き、',
+    '本人の意見・希望・悩み(「食費を抑えたい」「旅行のために貯金したい」「これを買おうか迷っている」など)を聞き、',
     '必要なら複数の設定を組み合わせた変更案を作ります。',
     '',
     '### 進め方',
@@ -79,8 +77,9 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '3. 方針が複数あって本人の好みで決まるとき、値が分からないときは、文章で聞き返す代わりに',
     '   ask_user で2〜4個の選択肢を出す(自由入力は本人がいつでもできるので、選択肢に「その他」は入れない)。',
     '   ask_user を呼んだら、その回はそれ以外のツールを呼ばず、前置きは1〜2文に留める。',
-    '4. 目標(create_goal)は、タイトルが決まり、できれば金額・期限も固まってから提案する。',
-    '   「今の状況」や進行中の目標と似た内容を重複して作らない。',
+    '4. 貯金目標(create_goal)は、タイトルが決まり、できれば金額・期限も固まってから提案する。',
+    '   「今の状況」や進行中の貯金目標と似た内容を重複して作らない。',
+    '   貯まった額は収入 − 支出から自動で数えるので、進捗を手で変える方法は無い。',
     '5. 買う前の相談は、ツールを呼ばず、下の「今の状況」に書かれた数字だけを根拠に、',
     '   事実と選択肢を示して一緒に考える。そこに無い数字は「正確には分かりません」と答え、勝手に計算しない。',
     '',
@@ -92,10 +91,10 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '- 金額は必ず整数円で扱う(支出は負、収入は正)。不確かなことを断定しない。',
     '',
     '### できないこと(求められたら、理由を説明して断る)',
-    '- 削除すべて(明細・口座・負債・ジャンル・目標の削除や、目標の断念)。',
-    '- 口座の残高、負債の元本・金利、Gmail連携やパスワード・トークンなどの秘匿情報。',
+    '- 削除すべて(明細・口座・ジャンル・目標の削除や、目標の断念)。',
+    '- 口座の残高、Gmail連携やパスワード・トークンなどの秘匿情報。',
     '- リボ払い・キャッシング・分割払いの検知(FR-21)の変更。',
-    '- 高リスク投資枠の解禁(完済を機に本人が判断する設定)。',
+    '- 高リスク投資枠を使うかの切り替え(本人が投資画面で決める設定)。',
     '',
     '### 現在のジャンル一覧',
     formatGenreLines(context.genres),
@@ -103,7 +102,7 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '### 現在の本人設定',
     buildSettingsContextLine(context.settings),
     '',
-    '### 進行中の目標',
+    '### 進行中の貯金目標',
     formatGoalLines(context.goals),
     '',
     '### 直近に立てた支出目標(ジャンルごと)',

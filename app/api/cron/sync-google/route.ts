@@ -11,7 +11,7 @@ import { findOwner } from '@/lib/supabase/owner';
 
 /**
  * Google連携ジョブ(本人発案、①③)。毎日1回このルートを叩くだけで:
- *  - カレンダー同期(給料日・サブスク更新日・完済予定日)は毎回実行、
+ *  - カレンダー同期(給料日・サブスク更新日・貯金目標の期限)は毎回実行、
  *  - スプレッドシートへの月次バックアップは月末だけ実際に書き込む
  * (P6-3 の net_worth_snapshots と同じ「既存の日次cronに相乗り」設計。
  *  月末判定自体は backupTransactionsToSheetAsAdmin() 側の isLastDayOfMonth()

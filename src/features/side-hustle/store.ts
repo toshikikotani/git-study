@@ -11,7 +11,9 @@ import { computeIncomeAllocation } from '@/domain/side-hustle';
 import { getAppSettings } from '@/features/settings/store';
 import type { DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
+import { isMissingColumnError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/types';
 
 export class SideHustleStoreError extends AppError {}
 
@@ -152,30 +154,36 @@ export type SideIncome = {
   projectId: string | null;
   receivedOn: DateOnly;
   amountYen: number;
-  allocatedToRepaymentYen: number | null;
+  allocatedToSavingsYen: number | null;
   allocatedToInvestmentYen: number | null;
   note: string | null;
 };
+
+type SideIncomeRow = Database['public']['Tables']['side_incomes']['Row'];
+
+/** 貯金への改名(ADR-077)が未適用の本番では、旧い列名 allocated_to_repayment_yen で持っている。 */
+function incomeFromRow(row: SideIncomeRow): SideIncome {
+  const legacy = row as unknown as { allocated_to_repayment_yen?: number | null };
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    receivedOn: row.received_on,
+    amountYen: row.amount_yen,
+    allocatedToSavingsYen:
+      row.allocated_to_savings_yen ?? legacy.allocated_to_repayment_yen ?? null,
+    allocatedToInvestmentYen: row.allocated_to_investment_yen,
+    note: row.note,
+  };
+}
 
 export async function listIncomes(): Promise<SideIncome[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('side_incomes')
-    .select(
-      'id, project_id, received_on, amount_yen, allocated_to_repayment_yen, allocated_to_investment_yen, note',
-    )
+    .select('*')
     .order('received_on', { ascending: false });
   if (error) throw new SideHustleStoreError(`入金記録を取得できませんでした: ${error.message}`);
-
-  return data.map((row) => ({
-    id: row.id,
-    projectId: row.project_id,
-    receivedOn: row.received_on,
-    amountYen: row.amount_yen,
-    allocatedToRepaymentYen: row.allocated_to_repayment_yen,
-    allocatedToInvestmentYen: row.allocated_to_investment_yen,
-    note: row.note,
-  }));
+  return data.map(incomeFromRow);
 }
 
 export type IncomeInput = {
@@ -186,7 +194,7 @@ export type IncomeInput = {
 };
 
 /**
- * 入金を記録する。振り分け(FR-42)は `app_settings.side_income_repayment_ratio`
+ * 入金を記録する。振り分け(FR-42)は `app_settings.side_income_savings_ratio`
  * (既定 7:3)を使ってここで自動計算し、`allocated_to_*` へ保存する。
  * 実際の振替(送金)は本アプリの対象外(他の資金移動と同じく手動で行い、
  * ここに出す金額は「いくら動かせばよいか」の指示)。
@@ -199,32 +207,30 @@ export async function createIncome(input: IncomeInput): Promise<SideIncome> {
   }
 
   const settings = await getAppSettings();
-  const allocation = computeIncomeAllocation(input.amountYen, settings.sideIncomeRepaymentRatio);
-
-  const { data, error } = await supabase
-    .from('side_incomes')
-    .insert({
-      user_id: auth.user.id,
-      project_id: input.projectId,
-      received_on: input.receivedOn,
-      amount_yen: input.amountYen,
-      allocated_to_repayment_yen: allocation.repaymentYen,
-      allocated_to_investment_yen: allocation.investmentYen,
-      note: input.note,
-    })
-    .select(
-      'id, project_id, received_on, amount_yen, allocated_to_repayment_yen, allocated_to_investment_yen, note',
-    )
-    .single();
-  if (error) throw new SideHustleStoreError(`入金記録を保存できませんでした: ${error.message}`);
-
-  return {
-    id: data.id,
-    projectId: data.project_id,
-    receivedOn: data.received_on,
-    amountYen: data.amount_yen,
-    allocatedToRepaymentYen: data.allocated_to_repayment_yen,
-    allocatedToInvestmentYen: data.allocated_to_investment_yen,
-    note: data.note,
+  const allocation = computeIncomeAllocation(input.amountYen, settings.sideIncomeSavingsRatio);
+  const base = {
+    user_id: auth.user.id,
+    project_id: input.projectId,
+    received_on: input.receivedOn,
+    amount_yen: input.amountYen,
+    allocated_to_investment_yen: allocation.investmentYen,
+    note: input.note,
   };
+
+  let result = await supabase
+    .from('side_incomes')
+    .insert({ ...base, allocated_to_savings_yen: allocation.savingsYen })
+    .select('*')
+    .single();
+  if (result.error && isMissingColumnError(result.error)) {
+    result = await supabase
+      .from('side_incomes')
+      .insert({ ...base, allocated_to_repayment_yen: allocation.savingsYen } as typeof base)
+      .select('*')
+      .single();
+  }
+  if (result.error) {
+    throw new SideHustleStoreError(`入金記録を保存できませんでした: ${result.error.message}`);
+  }
+  return incomeFromRow(result.data);
 }

@@ -341,6 +341,132 @@ create policy "own_rows" on public.spending_promises
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+
+-- 12. 借金をやめ、貯金(貯金目標)に変える(ADR-077)
+-- -----------------------------------------------------------------------------
+-- 借金の記録(debts・debt_payments・repayment_scenarios と計算の関数・ビュー)を消す(戻せない)。
+-- 設定の返済の列は貯金に、純資産の記録は残債 → 貯金に、目標に数え始める日を足す。
+alter table public.transfer_rules drop column if exists debt_id;
+alter table public.alerts drop column if exists debt_id;
+
+drop view if exists public.v_debt_overview;
+do $$
+begin
+  if exists (select 1 from pg_type where typname = 'repayment_strategy') then
+    execute 'drop function if exists public.simulate_total_payoff(uuid, bigint, repayment_strategy, integer)';
+  end if;
+end;
+$$;
+drop function if exists public.simulate_debt_payoff(uuid, bigint, integer);
+drop table if exists public.debt_payments;
+drop table if exists public.repayment_scenarios;
+drop table if exists public.debts;
+drop type if exists debt_status;
+drop type if exists debt_kind;
+
+alter table public.app_settings drop column if exists repayment_strategy;
+drop type if exists repayment_strategy;
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+             and table_name = 'app_settings' and column_name = 'monthly_repayment_target_yen') then
+    alter table public.app_settings rename column monthly_repayment_target_yen to monthly_savings_target_yen;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+             and table_name = 'app_settings' and column_name = 'investment_ratio_of_repayment') then
+    alter table public.app_settings rename column investment_ratio_of_repayment to investment_ratio_of_savings;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+             and table_name = 'app_settings' and column_name = 'side_income_repayment_ratio') then
+    alter table public.app_settings rename column side_income_repayment_ratio to side_income_savings_ratio;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+             and table_name = 'side_incomes' and column_name = 'allocated_to_repayment_yen') then
+    alter table public.side_incomes rename column allocated_to_repayment_yen to allocated_to_savings_yen;
+  end if;
+end;
+$$;
+alter table public.app_settings
+  drop constraint if exists ck_app_settings_ratios,
+  drop constraint if exists ck_app_settings_amounts;
+alter table public.app_settings
+  add constraint ck_app_settings_ratios
+    check (investment_ratio_of_savings between 0 and 1
+       and side_income_savings_ratio   between 0 and 1
+       and high_risk_allocation_ratio  between 0 and 1
+       and waste_alert_threshold       between 0 and 1
+       and classification_confidence_threshold between 0 and 1),
+  add constraint ck_app_settings_amounts
+    check (monthly_take_home_yen      >= 0
+       and monthly_savings_target_yen >= 0);
+comment on column public.app_settings.is_high_risk_unlocked is
+  '高リスク投資の枠を使うか(本人が設定で切り替える)。以前は全負債の完済で自動で解禁していた。';
+
+alter table public.goals add column if not exists start_on date;
+update public.goals set start_on = (created_at at time zone 'Asia/Tokyo')::date where start_on is null;
+alter table public.goals
+  alter column start_on set default public.today_jst(),
+  alter column start_on set not null;
+
+alter table public.net_worth_snapshots drop constraint if exists ck_net_worth_debt_balance;
+alter table public.net_worth_snapshots drop column if exists debt_balance_yen;
+alter table public.net_worth_snapshots add column if not exists savings_yen bigint not null default 0;
+alter table public.net_worth_snapshots drop constraint if exists ck_net_worth_savings;
+alter table public.net_worth_snapshots
+  add constraint ck_net_worth_savings check (savings_yen >= 0);
+
+alter table public.daily_briefs drop column if exists days_to_payoff;
+alter table public.daily_briefs drop column if exists remaining_debt_yen;
+
+update public.transfer_rules t
+set name = '貯金へ'
+where t.name = '返済へ'
+  and not exists (
+    select 1 from public.transfer_rules o where o.user_id = t.user_id and o.name = '貯金へ'
+  );
+
+create or replace function public.seed_defaults(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.app_settings (user_id)
+  values (p_user_id)
+  on conflict (user_id) do nothing;
+
+  -- ジャンル(ADR-057)。features/genre/store.ts の DEFAULT_GENRE_NAMES と同じ一覧。
+  insert into public.genres (user_id, name, sort_order)
+  values
+    (p_user_id, '食料品', 10), (p_user_id, '外食', 20),
+    (p_user_id, 'カフェ・飲料', 30), (p_user_id, '酒', 40),
+    (p_user_id, '日用品', 50), (p_user_id, '衣服・ファッション', 60),
+    (p_user_id, '美容', 70), (p_user_id, '医療・健康', 80),
+    (p_user_id, '住居費', 90), (p_user_id, '光熱費', 100),
+    (p_user_id, '通信費', 110), (p_user_id, '交通・車両', 120),
+    (p_user_id, '娯楽・趣味', 130), (p_user_id, '書籍・学習', 140),
+    (p_user_id, 'サブスクリプション・会費', 150), (p_user_id, '交際費・贈答', 160),
+    (p_user_id, 'こども・教育', 170), (p_user_id, 'ペット', 180),
+    (p_user_id, '家電・家具', 190), (p_user_id, '旅行', 200),
+    (p_user_id, '保険・税金・手数料', 210), (p_user_id, 'その他', 220)
+  on conflict (user_id, name) do nothing;
+
+  -- FR-15:給料日振替の既定順序(貯金 → 投資 → 聖域 → 生活費)。金額は本人が調整する。
+  insert into public.transfer_rules
+    (user_id, name, trigger, execution_order, amount_type, amount_yen, genre_id)
+  values
+    (p_user_id, '貯金へ',       'payday', 1, 'fixed',      30000, null),
+    (p_user_id, '投資へ',       'payday', 2, 'fixed',      10000, null),
+    (p_user_id, '聖域枠へ',     'payday', 3, 'fixed',      40000, null),
+    (p_user_id, '生活費へ',     'payday', 4, 'remainder',   null, null)
+  on conflict (user_id, name) do nothing;
+end;
+$$;
+
+comment on function public.seed_defaults(uuid) is
+  'ジャンル・振替ルールの初期値を投入する。ユーザー作成直後に一度だけ実行する。';
+
 commit;
 
 -- =============================================================================
@@ -431,4 +557,17 @@ select
   case when exists (
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'spending_promises'
-  ) then 'ok' else 'NG: テーブルが無い' end;
+  ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  '借金 → 貯金(debts の削除・設定の列・goals.start_on)',
+  case when not exists (
+    select 1 from information_schema.tables where table_schema = 'public' and table_name = 'debts'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'goals' and column_name = 'start_on'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'app_settings'
+      and column_name = 'monthly_savings_target_yen'
+  ) then 'ok' else 'NG: まだ借金の表が残っている' end;

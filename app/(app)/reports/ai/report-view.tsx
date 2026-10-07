@@ -90,22 +90,26 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
       <WasteRatioBars points={wasteRatioPoints} />
 
-      <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            負債返済の進捗
-          </p>
-          <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>
-            {formatYen(input.payoff.remainingYen, { sign: 'never' })} 残
-          </p>
+      {input.savings.nextGoal !== null && input.savings.nextGoal.progressRatio !== null ? (
+        <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              {input.savings.nextGoal.title}
+            </p>
+            {input.savings.nextGoal.remainingYen !== null ? (
+              <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>
+                あと {formatYen(input.savings.nextGoal.remainingYen, { sign: 'never' })}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-2">
+            <ProgressGauge
+              ratio={input.savings.nextGoal.progressRatio}
+              label={`貯金 ${Math.round(input.savings.nextGoal.progressRatio * 100)}%`}
+            />
+          </div>
         </div>
-        <div className="mt-2">
-          <ProgressGauge
-            ratio={input.payoff.progressRatio}
-            label={`返済進捗 ${Math.round(input.payoff.progressRatio * 100)}%`}
-          />
-        </div>
-      </div>
+      ) : null}
 
       <button
         type="button"

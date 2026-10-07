@@ -78,22 +78,18 @@ const TOOLS: Tool[] = [
       type: 'object',
       properties: {
         payday: { type: 'number', description: '給料日(1〜31)' },
-        monthly_repayment_target_yen: { type: 'number', description: '月々の返済目標額(円)' },
-        repayment_strategy: {
-          type: 'string',
-          enum: ['avalanche', 'snowball', 'minimum', 'custom'],
-        },
-        investment_ratio_of_repayment: {
+        monthly_savings_target_yen: { type: 'number', description: '毎月の貯金目標(円)' },
+        investment_ratio_of_savings: {
           type: 'number',
-          description: '返済目標額に対する投資額の比率(0〜1)',
+          description: '毎月の貯金目標に対する投資額の比率(0〜1)',
         },
         high_risk_allocation_ratio: {
           type: 'number',
           description: '投資総額のうち高リスク枠に回す比率(0〜1)',
         },
-        side_income_repayment_ratio: {
+        side_income_savings_ratio: {
           type: 'number',
-          description: '副業収入のうち返済に回す比率(0〜1)',
+          description: '副業収入のうち貯金に回す比率(0〜1)',
         },
       },
     },
@@ -192,7 +188,8 @@ const TOOLS: Tool[] = [
   {
     name: 'create_goal',
     description:
-      '新しい目標を追加する案を作る。タイトルが決まり、できれば金額・期限も固まってから使う。',
+      '新しい貯金目標を追加する案を作る。タイトルが決まり、できれば金額・期限も固まってから使う。' +
+      '貯まった額は収入 − 支出から自動で数える。',
     input_schema: {
       type: 'object',
       properties: {
@@ -204,18 +201,6 @@ const TOOLS: Tool[] = [
         },
       },
       required: ['title'],
-    },
-  },
-  {
-    name: 'update_goal_progress',
-    description: '進行中の目標の現在の進捗額を変更する案を作る。',
-    input_schema: {
-      type: 'object',
-      properties: {
-        goal_id: { type: 'string', description: '進行中の目標一覧の id' },
-        current_amount_yen: { type: 'number' },
-      },
-      required: ['goal_id', 'current_amount_yen'],
     },
   },
   {

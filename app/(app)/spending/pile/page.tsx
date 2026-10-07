@@ -11,9 +11,9 @@ import { formatDateJa } from '@/lib/date';
  * 既存の家計簿(ホームの「あと◯円使える」・/reports のカテゴリ別推移)は
  * どちらも **引き算** の見せ方で、1回400円のような支出はどこにも現れない。
  * この画面はその逆側——小さな支出を回数と年換算で **掛け算** し、最後に
- * 「完済が何ヶ月延びるか」へ翻訳する。480円が「完済2ヶ月」に見えた瞬間が、
- * ちりつもの実感そのもの(換算は domain/payoff.ts の
- * payoffImpactOfExtraPayment。既存の完済シミュレータを支出側に転用している)。
+ * 「貯金目標に何か月早く届くか」へ翻訳する。480円が「2か月早く届く」に見えた
+ * 瞬間が、ちりつもの実感そのもの(換算は domain/savings.ts の monthsSoonerWith。
+ * ADR-077 で完済の短縮から貯金目標に変えた)。
  *
  * ── 文言の方針(設計原則5:責めない)────────────────────────
  * 「使いすぎ」と判定しない。出すのは事実(回数・合計・このペースが続いた場合)
@@ -102,25 +102,17 @@ function SmallSpendHero({ view }: { view: AccumulationView }) {
             </dd>
           </div>
 
-          {/* 完済の短縮は月単位でしか動かないため、小さな額では0ヶ月になる。
-              そのとき利息だけが動く(それも立派なちりつも)ので、行が単独でも
-              意味が通る文言にしておく。 */}
-          {view.payoffImpact !== null && view.payoffImpact.savedInterestYen > 0 ? (
+          {/* 届く月は月単位でしか動かないため、小さな額では0か月になる。そのときは出さない。 */}
+          {view.savingsImpact !== null && view.savingsImpact.monthsSooner > 0 ? (
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                同じ額を返済に回すと
+                同じ額を貯金に回すと
               </dt>
               <dd
                 className="tabular text-right text-sm font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
-                利息が {formatYen(view.payoffImpact.savedInterestYen, { sign: 'never' })} 減る
-                {view.payoffImpact.shortenedMonths > 0 ? (
-                  <>
-                    <br />
-                    完済も {view.payoffImpact.shortenedMonths}ヶ月 早まる
-                  </>
-                ) : null}
+                {view.savingsImpact.goalTitle}に {view.savingsImpact.monthsSooner}か月 早く届く
               </dd>
             </div>
           ) : null}

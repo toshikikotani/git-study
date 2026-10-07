@@ -32,28 +32,25 @@ export function assertIncomeAmountYen(value: number): number {
 }
 
 export type IncomeAllocation = {
-  repaymentYen: number;
+  savingsYen: number;
   investmentYen: number;
 };
 
 /**
- * FR-42:副業収入を返済:投資の比率で振り分ける(既定 7:3、
- * `app_settings.side_income_repayment_ratio`)。
+ * FR-42:副業収入を貯金:投資の比率で振り分ける(既定 7:3、
+ * `app_settings.side_income_savings_ratio`。ADR-077 で返済から貯金に)。
  *
- * 端数は返済側に寄せる(投資額を先に丸め、返済額は差分で求める)ことで、
- * 常に repaymentYen + investmentYen = amountYen になる
+ * 端数は貯金側に寄せる(投資額を先に丸め、貯金額は差分で求める)ことで、
+ * 常に savingsYen + investmentYen = amountYen になる
  * (DB 制約 ck_side_incomes_alloc_sum を確実に満たす)。
  */
-export function computeIncomeAllocation(
-  amountYen: number,
-  repaymentRatio: number,
-): IncomeAllocation {
-  if (!Number.isFinite(repaymentRatio) || repaymentRatio < 0 || repaymentRatio > 1) {
-    throw new SideHustleError(`振り分け比率は0以上1以下で指定してください: ${repaymentRatio}`);
+export function computeIncomeAllocation(amountYen: number, savingsRatio: number): IncomeAllocation {
+  if (!Number.isFinite(savingsRatio) || savingsRatio < 0 || savingsRatio > 1) {
+    throw new SideHustleError(`振り分け比率は0以上1以下で指定してください: ${savingsRatio}`);
   }
-  const investmentYen = Math.round(amountYen * (1 - repaymentRatio));
-  const repaymentYen = amountYen - investmentYen;
-  return { repaymentYen, investmentYen };
+  const investmentYen = Math.round(amountYen * (1 - savingsRatio));
+  const savingsYen = amountYen - investmentYen;
+  return { savingsYen, investmentYen };
 }
 
 /**

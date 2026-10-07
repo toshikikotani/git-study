@@ -59,30 +59,12 @@ create type account_kind as enum (
 -- 口座の用途(仕様書 7章 accounts:用途=給与/返済/投資/女遊び/生活費)
 create type account_purpose as enum (
   'salary',         -- 給与受取
-  'repayment',      -- 返済
+  'repayment',      -- 貯金(以前は「返済」。値はそのまま使う、ADR-077)
   'investment',     -- 投資
   'sanctuary',      -- 聖域支出(女遊び枠)
   'living',         -- 生活費
   'emergency',      -- 生活防衛資金
   'other'
-);
-
--- 借入の種別(FR-01)
-create type debt_kind as enum (
-  'revolving',        -- リボ払い
-  'cashing',          -- キャッシング
-  'installment',      -- 分割払い
-  'card_loan',        -- カードローン
-  'consumer_finance', -- 消費者金融
-  'bank_loan',        -- 銀行ローン
-  'other'
-);
-
-create type debt_status as enum (
-  'active',
-  'paid_off',
-  'refinanced',   -- 借り換えにより別債務へ移行
-  'closed'        -- 誤登録などによる無効化
 );
 
 -- 明細の取り込み元(FR-10)
@@ -214,14 +196,6 @@ create type milestone_phase as enum ('research', 'resume', 'apply', 'interview',
 
 create type milestone_status as enum ('todo', 'doing', 'done', 'dropped');
 
--- 返済戦略(ADR-013)
-create type repayment_strategy as enum (
-  'avalanche',  -- 高金利優先(既定)
-  'snowball',   -- 少額優先
-  'minimum',    -- 最低返済のみ(FR-02 の比較対象)
-  'custom'
-);
-
 -- 目標(AI相談で決めた目標、本人発案)
 create type goal_status as enum ('active', 'achieved', 'abandoned');
 
@@ -303,13 +277,12 @@ create table public.app_settings (
   -- (ADR-016/ADR-057)。設定側にも金額を持つと二重定義になり、
   -- 本人が片方だけ直したときに残額表示が静かにずれる。
 
-  -- 返済・投資のルール(ADR-003, ADR-013)
-  repayment_strategy                  repayment_strategy not null default 'avalanche',
-  monthly_repayment_target_yen        bigint       not null default 100000,
-  investment_ratio_of_repayment       numeric(4,3) not null default 0.200,
-  side_income_repayment_ratio         numeric(4,3) not null default 0.700,  -- FR-42 返済7:投資3
+  -- 貯金・投資のルール(ADR-077。以前は返済のルール)
+  monthly_savings_target_yen          bigint       not null default 100000,
+  investment_ratio_of_savings         numeric(4,3) not null default 0.200,
+  side_income_savings_ratio           numeric(4,3) not null default 0.700,  -- FR-42 貯金7:投資3
 
-  -- 完済後の切り替え(FR-52)
+  -- 高リスク投資の枠(本人が設定で切り替える。以前は全負債の完済で自動解禁、FR-52)
   is_high_risk_unlocked               boolean      not null default false,
   high_risk_allocation_ratio          numeric(4,3) not null default 0.300,
 
@@ -359,14 +332,14 @@ create table public.app_settings (
   constraint ck_app_settings_payday
     check (payday between 1 and 31),
   constraint ck_app_settings_ratios
-    check (investment_ratio_of_repayment between 0 and 1
-       and side_income_repayment_ratio   between 0 and 1
-       and high_risk_allocation_ratio    between 0 and 1
-       and waste_alert_threshold         between 0 and 1
+    check (investment_ratio_of_savings between 0 and 1
+       and side_income_savings_ratio   between 0 and 1
+       and high_risk_allocation_ratio  between 0 and 1
+       and waste_alert_threshold       between 0 and 1
        and classification_confidence_threshold between 0 and 1),
   constraint ck_app_settings_amounts
-    check (monthly_take_home_yen        >= 0
-       and monthly_repayment_target_yen >= 0),
+    check (monthly_take_home_yen      >= 0
+       and monthly_savings_target_yen >= 0),
   constraint ck_app_settings_inactivity
     check (inactivity_alert_days between 1 and 30),
   constraint ck_app_settings_gmail_limit
@@ -487,71 +460,6 @@ create unique index ux_genres_user_name on public.genres (user_id, name);
 create index ix_genres_user on public.genres (user_id, sort_order);
 create index ix_genres_show_on_home on public.genres (user_id, sort_order)
   where show_on_home;
-
-
--- -----------------------------------------------------------------------------
--- 3.5 debts — 借入(FR-01)
--- -----------------------------------------------------------------------------
-create table public.debts (
-  id                  uuid primary key default gen_random_uuid(),
-  user_id             uuid        not null references auth.users(id) on delete cascade,
-
-  lender_name         text        not null,
-  kind                debt_kind   not null,
-  account_id          uuid        references public.accounts(id) on delete set null,
-
-  -- 金額(ADR-008:円単位)
-  original_principal_yen bigint,
-  current_balance_yen    bigint    not null,
-  minimum_payment_yen    bigint    not null,
-
-  -- 金利は小数で保持(15% → 0.1500)。ADR-008
-  annual_rate         numeric(6,4) not null,
-
-  payment_day         smallint     not null,
-  status              debt_status  not null default 'active',
-
-  -- ADR-006:正確な値が未把握のあいだ true。UI は「推定」バッジを出す
-  is_estimated        boolean      not null default true,
-
-  opened_on           date,
-  balance_as_of       date         not null default public.today_jst(),
-  paid_off_on         date,
-
-  -- 借り換え(FR-04)で移行した場合の追跡
-  refinanced_into_id  uuid         references public.debts(id) on delete set null,
-
-  sort_order          smallint     not null default 100,
-  note                text,
-
-  created_at          timestamptz  not null default now(),
-  updated_at          timestamptz  not null default now(),
-
-  constraint ck_debts_lender_not_blank check (btrim(lender_name) <> ''),
-  constraint ck_debts_balance          check (current_balance_yen >= 0),
-  constraint ck_debts_minimum          check (minimum_payment_yen >= 0),
-  constraint ck_debts_principal        check (original_principal_yen is null
-                                              or original_principal_yen >= 0),
-  -- 金利は 0〜100% の小数。1.5(=150%)のような桁間違いをここで止める
-  constraint ck_debts_rate             check (annual_rate >= 0 and annual_rate <= 1),
-  constraint ck_debts_payment_day      check (payment_day between 1 and 31),
-  -- 完済しているのに残高が残っている、という矛盾を許さない
-  constraint ck_debts_paid_off_zero    check (status <> 'paid_off' or current_balance_yen = 0),
-  constraint ck_debts_paid_off_date    check ((status = 'paid_off') = (paid_off_on is not null)),
-  constraint ck_debts_refinance_target check (refinanced_into_id is null or refinanced_into_id <> id),
-  constraint ck_debts_refinanced_state check (refinanced_into_id is null or status = 'refinanced')
-);
-
-create index ix_debts_user_status  on public.debts (user_id, status);
-create index ix_debts_user_active  on public.debts (user_id, annual_rate desc)
-  where status = 'active';
-create index ix_debts_payment_day  on public.debts (user_id, payment_day)
-  where status = 'active';
-
-comment on column public.debts.annual_rate is
-  '年利を小数で保持する(15% → 0.1500)。パーセント値を入れると利息が100倍になるため CHECK で 1 以下に制限している。';
-comment on column public.debts.is_estimated is
-  '残高・金利が本人による実確認を経ていない推定値であることを示す。1件でも true が残るあいだ、完済予定日を確定値として表示してはならない(ADR-006)。';
 
 
 -- -----------------------------------------------------------------------------
@@ -822,91 +730,6 @@ create trigger trg_transactions_fingerprint
 
 
 -- -----------------------------------------------------------------------------
--- 3.10 debt_payments — 返済実績(FR-05)
--- -----------------------------------------------------------------------------
-create table public.debt_payments (
-  id              uuid primary key default gen_random_uuid(),
-  user_id         uuid        not null references auth.users(id) on delete cascade,
-  debt_id         uuid        not null references public.debts(id) on delete cascade,
-
-  paid_on         date        not null,
-  amount_yen      bigint      not null,
-  principal_yen   bigint,
-  interest_yen    bigint,
-
-  balance_after_yen bigint,
-
-  is_extra        boolean     not null default false,  -- 最低返済額を超える追加返済
-  transaction_id  uuid        references public.transactions(id) on delete set null,
-  note            text,
-
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now(),
-
-  constraint ck_debt_payments_amount   check (amount_yen > 0),
-  constraint ck_debt_payments_parts    check ((principal_yen is null) = (interest_yen is null)),
-  -- 内訳が入っているなら合計が一致すること
-  constraint ck_debt_payments_parts_sum
-    check (principal_yen is null or principal_yen + interest_yen = amount_yen),
-  constraint ck_debt_payments_nonneg
-    check ((principal_yen is null or principal_yen >= 0)
-           and (interest_yen is null or interest_yen >= 0)
-           and (balance_after_yen is null or balance_after_yen >= 0))
-);
-
-create index ix_debt_payments_debt_paid on public.debt_payments (debt_id, paid_on desc);
-create index ix_debt_payments_user_paid on public.debt_payments (user_id, paid_on desc);
--- 1件の明細を2件の返済に紐付ける事故を防ぐ
-create unique index ux_debt_payments_transaction
-  on public.debt_payments (transaction_id)
-  where transaction_id is not null;
-
-
--- -----------------------------------------------------------------------------
--- 3.11 repayment_scenarios — 完済シミュレーションの保存(FR-02, FR-04)
---
---   計算自体は関数で行う(§5)。ここには本人が比較したい条件を保存する。
--- -----------------------------------------------------------------------------
-create table public.repayment_scenarios (
-  id                     uuid primary key default gen_random_uuid(),
-  user_id                uuid        not null references auth.users(id) on delete cascade,
-
-  name                   text        not null,   -- 例:「月10万返済」「おまとめ年8%」
-  strategy               repayment_strategy not null default 'avalanche',
-  monthly_budget_yen     bigint,                 -- minimum 戦略では NULL
-  -- FR-04 借り換えシミュレーション:全債務の金利をこの値に置き換えて計算する
-  override_annual_rate   numeric(6,4),
-
-  -- 計算結果のキャッシュ(表示の即時性のため)
-  months_to_payoff       integer,
-  payoff_on              date,
-  total_interest_yen     bigint,
-  total_paid_yen         bigint,
-  computed_at            timestamptz,
-
-  is_baseline            boolean     not null default false,  -- 比較の基準(最低返済のみ)
-  sort_order             smallint    not null default 100,
-
-  created_at             timestamptz not null default now(),
-  updated_at             timestamptz not null default now(),
-
-  constraint ck_scenarios_name   check (btrim(name) <> ''),
-  constraint ck_scenarios_budget check (monthly_budget_yen is null or monthly_budget_yen > 0),
-  constraint ck_scenarios_budget_required
-    check (strategy = 'minimum' or monthly_budget_yen is not null),
-  constraint ck_scenarios_rate
-    check (override_annual_rate is null
-           or (override_annual_rate >= 0 and override_annual_rate <= 1))
-);
-
-create unique index ux_scenarios_user_name on public.repayment_scenarios (user_id, name);
--- 基準シナリオは1件だけ
-create unique index ux_scenarios_baseline
-  on public.repayment_scenarios (user_id)
-  where is_baseline;
-
-
--- -----------------------------------------------------------------------------
 -- 3.12 transfer_rules — 給料日振替ルール(FR-15)
 -- -----------------------------------------------------------------------------
 create table public.transfer_rules (
@@ -919,7 +742,6 @@ create table public.transfer_rules (
 
   from_account_id  uuid                 references public.accounts(id) on delete set null,
   to_account_id    uuid                 references public.accounts(id) on delete set null,
-  debt_id          uuid                 references public.debts(id) on delete set null,
   genre_id         uuid                 references public.genres(id) on delete set null,
 
   amount_type      transfer_amount_type not null,
@@ -1073,8 +895,8 @@ create table public.side_incomes (
   account_id     uuid        references public.accounts(id) on delete set null,
   transaction_id uuid        references public.transactions(id) on delete set null,
 
-  -- FR-42 振り分け(返済7:投資3)
-  allocated_to_repayment_yen bigint,
+  -- FR-42 振り分け(貯金7:投資3。ADR-077 で返済から貯金へ)
+  allocated_to_savings_yen bigint,
   allocated_to_investment_yen bigint,
   transfer_run_id uuid       references public.transfer_runs(id) on delete set null,
 
@@ -1084,12 +906,12 @@ create table public.side_incomes (
 
   constraint ck_side_incomes_amount check (amount_yen > 0),
   constraint ck_side_incomes_alloc
-    check ((allocated_to_repayment_yen is null) = (allocated_to_investment_yen is null)),
+    check ((allocated_to_savings_yen is null) = (allocated_to_investment_yen is null)),
   constraint ck_side_incomes_alloc_sum
-    check (allocated_to_repayment_yen is null
-           or allocated_to_repayment_yen + allocated_to_investment_yen <= amount_yen),
+    check (allocated_to_savings_yen is null
+           or allocated_to_savings_yen + allocated_to_investment_yen <= amount_yen),
   constraint ck_side_incomes_alloc_nonneg
-    check ((allocated_to_repayment_yen is null or allocated_to_repayment_yen >= 0)
+    check ((allocated_to_savings_yen is null or allocated_to_savings_yen >= 0)
            and (allocated_to_investment_yen is null or allocated_to_investment_yen >= 0))
 );
 
@@ -1212,9 +1034,7 @@ create table public.daily_briefs (
   brief_on              date         not null,
   status                brief_status not null default 'pending',
 
-  -- FR-30-1:冒頭に必ず載せる2つの数字。生成時点の値をスナップショットする
-  days_to_payoff        integer,
-  remaining_debt_yen    bigint,
+  -- FR-30-1:冒頭に載せる数字。生成時点の値をスナップショットする
   spendable_living_yen  bigint,
   spendable_sanctuary_yen bigint,
 
@@ -1312,7 +1132,6 @@ create table public.alerts (
 
   -- 関連レコード(どれか、または無し)
   transaction_id uuid                 references public.transactions(id) on delete cascade,
-  debt_id        uuid                 references public.debts(id) on delete cascade,
   genre_id       uuid                 references public.genres(id) on delete set null,
   job_run_id     uuid                 references public.job_runs(id) on delete set null,
 
@@ -1385,23 +1204,23 @@ create index ix_rescued_emails_user_created on public.rescued_emails (user_id, c
 -- -----------------------------------------------------------------------------
 -- 3.22 net_worth_snapshots — 資産推移の月次記録(P6-3)
 --
---   debts.current_balance_yen は現在値のみで履歴を持たない。資産推移グラフ
---   (残債総額 + 投資評価額の時系列)を出すには、月末に両者の合計を1行として
---   記録し始める必要がある。投資評価額は investment_snapshots(商品ごとの
---   時点スナップショット)から、記録時点で商品ごとに最新の値を合算したもの。
+--   資産推移グラフ(貯金 + 投資評価額の時系列)のため、月末に両者を1行として
+--   記録する。貯金は「収入 − 支出」の累計(domain/savings.ts、ADR-077。以前は
+--   残債を持っていた)。投資評価額は investment_snapshots(商品ごとの時点
+--   スナップショット)から、記録時点で商品ごとに最新の値を合算したもの。
 -- -----------------------------------------------------------------------------
 create table public.net_worth_snapshots (
   id                   uuid        primary key default gen_random_uuid(),
   user_id              uuid        not null references auth.users(id) on delete cascade,
 
   as_of                date        not null,
-  debt_balance_yen     bigint      not null,
   investment_value_yen bigint      not null,
 
   created_at           timestamptz not null default now(),
+  savings_yen          bigint      not null default 0,
 
-  constraint ck_net_worth_debt_balance check (debt_balance_yen >= 0),
-  constraint ck_net_worth_investment_value check (investment_value_yen >= 0)
+  constraint ck_net_worth_investment_value check (investment_value_yen >= 0),
+  constraint ck_net_worth_savings check (savings_yen >= 0)
 );
 
 create unique index ux_net_worth_snapshots_user_as_of
@@ -1439,11 +1258,10 @@ create index ix_transaction_splits_user on public.transaction_splits (user_id);
 
 -- 3.24 goals — AI相談(目標設定・買う前相談)で決めた目標(本人発案)
 --
---   「◯月までに◯万円貯める」のような目標を、対話の結果として保存する。
---   進捗(current_amount_yen)は自動計算せず本人が更新する(口座連携が無く、
---   収支全体からの推定では「この目標のために」貯めた額と一致しない可能性が
---   あるため。TASKS.md 参照)。target_amount_yen/target_date は無くても
---   目標として成立する(「浪費を減らす」のような金額・期限を持たない目標もある)。
+--   「◯月までに◯万円貯める」のような貯金目標(ADR-077)。貯まった額は
+--   「収入 − 支出」の、start_on からの累計を、期限の近い目標から順に割り当てて
+--   自動で数える(domain/savings.ts)。current_amount_yen は以前の手入力の値で、
+--   今は使わない。target_amount_yen/target_date は無くても目標として成立する。
 -- -----------------------------------------------------------------------------
 create table public.goals (
   id                 uuid        primary key default gen_random_uuid(),
@@ -1460,6 +1278,7 @@ create table public.goals (
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
   achieved_at        timestamptz,
+  start_on           date        not null default public.today_jst(),
 
   constraint ck_goals_title_not_blank check (btrim(title) <> ''),
   constraint ck_goals_target_amount   check (target_amount_yen is null or target_amount_yen > 0),
@@ -1809,8 +1628,8 @@ declare
   t text;
 begin
   foreach t in array array[
-    'app_settings','accounts','debts','import_adapters',
-    'transactions','debt_payments','repayment_scenarios',
+    'app_settings','accounts','import_adapters',
+    'transactions',
     'transfer_rules','transfer_runs','transfer_run_items','side_projects',
     'side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','daily_briefs','alerts'
@@ -1827,264 +1646,10 @@ $$;
 
 
 -- =============================================================================
---  5. 完済シミュレーション(FR-02, FR-04)
---
---   利息計算は「毎月末に残高 × 年利 ÷ 12 を単利で加算し、返済は利息 → 元本の順に
---   充当する」モデル。日割り計算より粗いが、比較目的には十分で、本人が検算できる。
---   円未満は floor(切り捨て)で統一する。
--- =============================================================================
-
--- 単一債務の償還スケジュール
-create or replace function public.simulate_debt_payoff(
-  p_debt_id             uuid,
-  p_monthly_payment_yen bigint,
-  p_max_months          integer default 600
-)
-returns table (
-  month_index         integer,
-  due_on              date,
-  opening_balance_yen bigint,
-  interest_yen        bigint,
-  principal_yen       bigint,
-  payment_yen         bigint,
-  closing_balance_yen bigint
-)
-language plpgsql
-stable
-set search_path = public, pg_temp
-as $$
-declare
-  v_balance  bigint;
-  v_rate     numeric;
-  v_day      smallint;
-  v_interest bigint;
-  v_payment  bigint;
-  v_i        integer := 0;
-begin
-  select d.current_balance_yen, d.annual_rate, d.payment_day
-    into v_balance, v_rate, v_day
-  from public.debts d
-  where d.id = p_debt_id;
-
-  if v_balance is null then
-    raise exception '債務 % が見つかりません', p_debt_id;
-  end if;
-  if p_monthly_payment_yen <= 0 then
-    raise exception '月額返済額は正の値である必要があります(指定値: %)', p_monthly_payment_yen;
-  end if;
-
-  while v_balance > 0 and v_i < p_max_months loop
-    v_i := v_i + 1;
-
-    v_interest := floor(v_balance * v_rate / 12)::bigint;
-    v_payment  := least(p_monthly_payment_yen, v_balance + v_interest);
-
-    if v_payment <= v_interest then
-      raise exception
-        '月額 % 円では利息 % 円を下回るため完済できません(債務 %)',
-        p_monthly_payment_yen, v_interest, p_debt_id;
-    end if;
-
-    month_index         := v_i;
-    -- 支払日は 29〜31 日を月末差異で崩さないよう 28 日に丸める
-    due_on              := public.month_start_jst(v_i) + (least(v_day, 28) - 1);
-    opening_balance_yen := v_balance;
-    interest_yen        := v_interest;
-    payment_yen         := v_payment;
-    principal_yen       := v_payment - v_interest;
-
-    v_balance           := v_balance - principal_yen;
-    closing_balance_yen := v_balance;
-
-    return next;
-  end loop;
-
-  if v_balance > 0 then
-    raise exception '% ヶ月以内に完済しません(残高 % 円)', p_max_months, v_balance;
-  end if;
-end;
-$$;
-
-comment on function public.simulate_debt_payoff(uuid, bigint, integer) is
-  'FR-02:単一債務について、指定した月額返済額での償還スケジュールを返す。';
-
-
--- 全債務の合算シミュレーション(戦略込み)
-create or replace function public.simulate_total_payoff(
-  p_user_id            uuid,
-  p_monthly_budget_yen bigint,
-  p_strategy           repayment_strategy default 'avalanche',
-  p_max_months         integer default 600
-)
-returns table (
-  month_index          integer,
-  month_on             date,
-  opening_total_yen    bigint,
-  interest_total_yen   bigint,
-  principal_total_yen  bigint,
-  payment_total_yen    bigint,
-  closing_total_yen    bigint,
-  debts_remaining      integer
-)
-language plpgsql
-stable
-set search_path = public, pg_temp
-as $$
-declare
-  v_bal      bigint[] := '{}';
-  v_rate     numeric[] := '{}';
-  v_min      bigint[]  := '{}';
-  v_n        integer;
-  v_i        integer := 0;
-  k          integer;
-  v_budget   bigint;
-  v_interest bigint;
-  v_pay      bigint;
-  v_opening  bigint;
-  v_closing  bigint;
-  v_int_sum  bigint;
-  v_pay_sum  bigint;
-  r          record;
-begin
-  -- 戦略ごとの充当順に並べて配列へ読み込む。
-  -- avalanche は金利降順、snowball は残高昇順。どちらも順序は期間中不変。
-  for r in
-    select d.current_balance_yen, d.annual_rate, d.minimum_payment_yen
-    from public.debts d
-    where d.user_id = p_user_id
-      and d.status = 'active'
-      and d.current_balance_yen > 0
-    order by
-      case when p_strategy = 'snowball' then d.current_balance_yen end asc nulls last,
-      case when p_strategy <> 'snowball' then d.annual_rate end desc nulls last,
-      d.id
-  loop
-    v_bal  := array_append(v_bal,  r.current_balance_yen);
-    v_rate := array_append(v_rate, r.annual_rate);
-    v_min  := array_append(v_min,  r.minimum_payment_yen);
-  end loop;
-
-  v_n := coalesce(array_length(v_bal, 1), 0);
-  if v_n = 0 then
-    return;
-  end if;
-
-  -- 'minimum' 戦略(FR-02 の比較対象)では月額予算を指定させず、各債務の最低返済額
-  -- だけを充てる。債務が消えるほど月々の支払総額も減る、という実際の挙動を再現する。
-  if p_strategy <> 'minimum'
-     and (p_monthly_budget_yen is null or p_monthly_budget_yen <= 0) then
-    raise exception '月額予算は正の値である必要があります(指定値: %)', p_monthly_budget_yen;
-  end if;
-
-  while v_i < p_max_months loop
-    select coalesce(sum(b), 0) into v_opening from unnest(v_bal) as b;
-    exit when v_opening <= 0;
-
-    v_i := v_i + 1;
-    v_int_sum := 0;
-    v_pay_sum := 0;
-
-    -- (1) 利息を計上して残高に加える
-    for k in 1 .. v_n loop
-      if v_bal[k] > 0 then
-        v_interest := floor(v_bal[k] * v_rate[k] / 12)::bigint;
-        v_bal[k]   := v_bal[k] + v_interest;
-        v_int_sum  := v_int_sum + v_interest;
-      end if;
-    end loop;
-
-    -- (2) 全債務へ最低返済額を充てる。
-    --     予算は毎月ここでリセットする(前月の残りを持ち越さない)。
-    if p_strategy = 'minimum' then
-      -- 残っている債務の最低返済額の合計。完済した債務の分は自動的に外れる
-      select coalesce(sum(v_min[i]), 0) into v_budget
-      from generate_subscripts(v_bal, 1) as i
-      where v_bal[i] > 0;
-    else
-      v_budget := p_monthly_budget_yen;
-    end if;
-
-    for k in 1 .. v_n loop
-      exit when v_budget <= 0;
-      if v_bal[k] > 0 then
-        v_pay     := least(v_min[k], v_bal[k], v_budget);
-        v_bal[k]  := v_bal[k] - v_pay;
-        v_budget  := v_budget - v_pay;
-        v_pay_sum := v_pay_sum + v_pay;
-      end if;
-    end loop;
-
-    -- (3) 余剰を戦略順(配列順)に充てる。
-    --     'minimum' は最低返済のみを再現する比較対象なので、余剰充当を行わない。
-    if p_strategy <> 'minimum' then
-      for k in 1 .. v_n loop
-        exit when v_budget <= 0;
-        if v_bal[k] > 0 then
-          v_pay     := least(v_budget, v_bal[k]);
-          v_bal[k]  := v_bal[k] - v_pay;
-          v_budget  := v_budget - v_pay;
-          v_pay_sum := v_pay_sum + v_pay;
-        end if;
-      end loop;
-    end if;
-
-    select coalesce(sum(b), 0) into v_closing from unnest(v_bal) as b;
-
-    -- 残高が減らない月額は完済に到達しない。無限ループにせず明示的に落とす。
-    if v_closing >= v_opening then
-      raise exception
-        '月額 % 円では残高が減りません(月初 % 円 → 月末 % 円)。利息 % 円を上回る返済が必要です。',
-        coalesce(p_monthly_budget_yen, 0), v_opening, v_closing, v_int_sum;
-    end if;
-
-    month_index         := v_i;
-    month_on            := public.month_start_jst(v_i);
-    opening_total_yen   := v_opening;
-    interest_total_yen  := v_int_sum;
-    payment_total_yen   := v_pay_sum;
-    principal_total_yen := v_pay_sum - v_int_sum;
-    closing_total_yen   := v_closing;
-
-    select count(*)::integer into debts_remaining from unnest(v_bal) as b where b > 0;
-
-    return next;
-  end loop;
-end;
-$$;
-
-comment on function public.simulate_total_payoff(uuid, bigint, repayment_strategy, integer) is
-  'FR-02/FR-04:全債務を合算し、戦略(アバランチ/スノーボール/最低返済のみ)に沿って配分した償還スケジュールを返す。';
-
-
--- =============================================================================
 --  6. ビュー
 --
 --   security_invoker = true により、呼び出し元の権限で RLS が評価される。
 -- =============================================================================
-
--- 負債の全体像。ホーム画面の完済カウントダウン(FR-03)の元データ
-create view public.v_debt_overview
-with (security_invoker = true) as
-select
-  d.user_id,
-  count(*)::integer                                     as active_debt_count,
-  sum(d.current_balance_yen)                            as total_balance_yen,
-  sum(d.minimum_payment_yen)                            as total_minimum_payment_yen,
-  -- 残高で加重した平均年利。単純平均は少額高金利の債務を過大評価する
-  case when sum(d.current_balance_yen) > 0
-       then round(sum(d.annual_rate * d.current_balance_yen)
-                  / sum(d.current_balance_yen), 4)
-  end                                                   as weighted_annual_rate,
-  max(d.annual_rate)                                    as max_annual_rate,
-  bool_or(d.is_estimated)                               as has_estimated_values,
-  min(d.payment_day)                                    as next_payment_day
-from public.debts d
-where d.status = 'active'
-group by d.user_id;
-
-comment on view public.v_debt_overview is
-  'has_estimated_values が true のあいだ、完済予定日を確定値として表示してはならない(ADR-006)。';
-
 
 -- v_monthly_category_spend・v_current_month_budget_status(カテゴリ別支出・
 -- 予算消化状況)は、どちらもアプリのどこからも実際に問い合わせていない
@@ -2131,9 +1696,9 @@ declare
   t text;
 begin
   foreach t in array array[
-    'app_settings','accounts','debts','import_adapters',
-    'import_batches','transactions','debt_payments',
-    'repayment_scenarios','transfer_rules','transfer_runs','transfer_run_items',
+    'app_settings','accounts','import_adapters',
+    'import_batches','transactions',
+    'transfer_rules','transfer_runs','transfer_run_items',
     'side_projects','side_work_logs','side_incomes','job_change_milestones',
     'investment_contributions','investment_snapshots','job_runs','daily_briefs',
     'brief_items','brief_excluded_items','alerts','app_checkins','rescued_emails',
@@ -2207,14 +1772,11 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  -- 設定(ADR-003〜005 の初期値は列 DEFAULT に持たせてある)
   insert into public.app_settings (user_id)
   values (p_user_id)
   on conflict (user_id) do nothing;
 
-  -- ジャンル(ADR-057)。本人がいつでも自由に追加・削除できる一覧で、
-  -- ここでの初期値は最初の目安に過ぎない(features/genre/store.ts の
-  -- DEFAULT_GENRE_NAMES と同じ一覧)。
+  -- ジャンル(ADR-057)。features/genre/store.ts の DEFAULT_GENRE_NAMES と同じ一覧。
   insert into public.genres (user_id, name, sort_order)
   values
     (p_user_id, '食料品', 10), (p_user_id, '外食', 20),
@@ -2230,50 +1792,20 @@ begin
     (p_user_id, '保険・税金・手数料', 210), (p_user_id, 'その他', 220)
   on conflict (user_id, name) do nothing;
 
-  -- FR-21:リボ・キャッシング・分割の検知は、AI にもDBにも頼らず
-  -- `DEFAULT_DETECTION_RULES`(features/classification/rules.ts)として
-  -- TS側に固定してある(ADR-010・ADR-057)。ここでは何も投入しない。
-
-  -- FR-15:給料日振替の既定順序(返済 → 投資 → 女遊び → 生活費)。
-  -- 金額は本人が設定画面で調整する前提の初期値。ジャンルは本人が後から
-  -- 選び直せるよう、ここでは未設定のままにする(ADR-057)。
+  -- FR-15:給料日振替の既定順序(貯金 → 投資 → 聖域 → 生活費)。金額は本人が調整する。
   insert into public.transfer_rules
     (user_id, name, trigger, execution_order, amount_type, amount_yen, genre_id)
   values
-    (p_user_id, '返済へ',       'payday', 1, 'fixed',     100000, null),
-    (p_user_id, '投資へ',       'payday', 2, 'fixed',      20000, null),
+    (p_user_id, '貯金へ',       'payday', 1, 'fixed',      30000, null),
+    (p_user_id, '投資へ',       'payday', 2, 'fixed',      10000, null),
     (p_user_id, '聖域枠へ',     'payday', 3, 'fixed',      40000, null),
     (p_user_id, '生活費へ',     'payday', 4, 'remainder',   null, null)
   on conflict (user_id, name) do nothing;
-
-  -- FR-02:比較の基準となる「最低返済のみ」シナリオ
-  insert into public.repayment_scenarios
-    (user_id, name, strategy, monthly_budget_yen, is_baseline, sort_order)
-  values
-    (p_user_id, '最低返済のみ', 'minimum',   null,   true,  10),
-    (p_user_id, '月10万円返済', 'avalanche', 100000, false, 20)
-  on conflict (user_id, name) do nothing;
-
-  -- ADR-006:負債の正確な内訳が判明するまでの仮置き3件。
-  -- is_estimated = true とし、画面には「推定」バッジと「正確な値を入力する」
-  -- 導線を出す(M1-2)。最低返済額は ADR-006 に定めが無いため、リボ・
-  -- 消費者金融の一般的な水準から妥当な仮値を置いた(decisions.md に追記)。
-  -- 既に debts が1件でもあれば(本人が入力・削除済み)何もしない。
-  insert into public.debts
-    (user_id, lender_name, kind, current_balance_yen, minimum_payment_yen, annual_rate, payment_day, is_estimated)
-  select p_user_id, v.lender_name, v.kind, v.balance_yen, v.minimum_payment_yen, v.annual_rate, v.payment_day, true
-  from (
-    values
-      ('カードA',     'revolving'::debt_kind,        400000, 10000, 0.15::numeric, 27),
-      ('カードB',     'revolving'::debt_kind,         300000,  8000, 0.15::numeric, 27),
-      ('消費者金融C', 'consumer_finance'::debt_kind, 300000, 10000, 0.18::numeric,  5)
-  ) as v(lender_name, kind, balance_yen, minimum_payment_yen, annual_rate, payment_day)
-  where not exists (select 1 from public.debts where user_id = p_user_id);
 end;
 $$;
 
 comment on function public.seed_defaults(uuid) is
-  'ジャンル・振替ルール・比較シナリオ・負債の初期値を投入する。ユーザー作成直後に一度だけ実行する。';
+  'ジャンル・振替ルールの初期値を投入する。ユーザー作成直後に一度だけ実行する。';
 
 
 -- =============================================================================
@@ -2307,8 +1839,8 @@ commit;
 --  付録:仕様書 7章のエンティティとの対応
 --
 --   accounts                → accounts
---   debts                   → debts
---   debt_payments           → debt_payments
+--   debts                   → 廃止(ADR-077。借金をやめ、貯金目標 goals に)
+--   debt_payments           → 廃止(ADR-077)
 --   transactions            → transactions(+ import_batches, import_adapters)
 --   categories              → genres に統合(ADR-057。classification_rules・budgets
 --                             も同時に廃止し、genre_id/budget_yen/must_pay へ集約)
@@ -2327,7 +1859,6 @@ commit;
 --
 --   追加したテーブル
 --   app_settings            → ADR-014(業務パラメータの外出し)
---   repayment_scenarios     → FR-02/FR-04 の比較条件の保存
 --   import_adapters         → ADR-007(CSV フォーマット差異の吸収)
 --   import_batches          → FR-10 の冪等な取り込み
 --   app_checkins            → FR-62 のストリーク算出

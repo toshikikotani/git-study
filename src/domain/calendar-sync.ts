@@ -2,7 +2,7 @@
  * Google カレンダーへ同期する予定を組み立てる(本人発案)。
  *
  * ── なぜ作るか ──────────────────────────────────────────────
- * 給料日・サブスクの更新日・完済予定日は、このアプリの中でしか見えない
+ * 給料日・サブスクの更新日・貯金目標の期限は、このアプリの中でしか見えない
  * (毎回開かないと気づかない)。普段から開いているカレンダーに乗せておけば
  * 見落としが減る。
  *
@@ -15,10 +15,10 @@
  * ── key の設計(冪等性の要) ──────────────────────────────────
  * 給料日は「今月の給料日」「来月の給料日」がそれぞれ別の日付として実在する
  * ため、日付を key に含める(月ごとに1件ずつ増える。それが正しい)。
- * 一方サブスクの次回更新日・完済予定日は「1つの見込みを日々更新していく
- * 予報」であり、日付を key に含めてしまうと見込みが動くたびに新しい
- * イベントが作られ、古い予定がゴミとして残り続ける。そのためこの2つは
- * 日付を key に含めず、同じイベントの日付を毎回上書きする形にする。
+ * 一方サブスクの次回更新日は「1つの見込みを日々更新していく予報」であり、
+ * 日付を key に含めてしまうと見込みが動くたびに新しいイベントが作られ、
+ * 古い予定がゴミとして残り続ける。そのため日付を key に含めず、同じイベントの
+ * 日付を毎回上書きする形にする。貯金目標の期限も、目標ごと(id)に1件にする。
  */
 
 import { addMonths, nthDayOfMonth, type DateOnly } from '@/lib/date';
@@ -71,10 +71,29 @@ export function planSubscriptionEvents(
 }
 
 /**
- * 完済予定日。返済状況で日付が前後に動きうるため、こちらも key に
- * 日付を含めない(1つのイベントの日付を上書きし続ける)。
+ * 貯金目標の期限(ADR-077。以前の「完済予定日」の代わり)。期限のある目標ごとに1件。
+ * key は目標の id だけにし、期限を直しても同じイベントの日付を上書きする。
  */
-export function planPayoffEvent(payoffOn: DateOnly | null): PlannedCalendarEvent[] {
-  if (!payoffOn) return [];
-  return [{ key: 'payoff', title: '完済予定日', date: payoffOn }];
+export function planSavingsGoalEvents(
+  goals: readonly {
+    id: string;
+    title: string;
+    targetDate: DateOnly | null;
+    remainingYen: number | null;
+  }[],
+): PlannedCalendarEvent[] {
+  return goals.flatMap((goal) =>
+    goal.targetDate === null
+      ? []
+      : [
+          {
+            key: `savings-goal:${goal.id}`,
+            title:
+              goal.remainingYen !== null && goal.remainingYen > 0
+                ? `${goal.title}の期限(あと${formatYen(goal.remainingYen, { sign: 'never' })})`
+                : `${goal.title}の期限`,
+            date: goal.targetDate,
+          },
+        ],
+  );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildBudgetUsageChartUrl, buildPayoffProgressChartUrl } from '@/lib/quickchart';
+import { buildBudgetUsageChartUrl, buildSavingsProgressChartUrl } from '@/lib/quickchart';
 
 /**
  * QuickChart の URL 組み立て(本人発案)。実際に画像が正しく描かれるかは
@@ -15,9 +15,9 @@ function decodeConfig(url: string): Record<string, unknown> {
   return JSON.parse(c) as Record<string, unknown>;
 }
 
-describe('buildPayoffProgressChartUrl', () => {
+describe('buildSavingsProgressChartUrl', () => {
   it('QuickChart v4 の doughnut チャートの URL を返す', () => {
-    const url = buildPayoffProgressChartUrl(0.62);
+    const url = buildSavingsProgressChartUrl(0.62);
     const parsed = new URL(url);
     expect(parsed.origin + parsed.pathname).toBe('https://quickchart.io/chart');
     expect(parsed.searchParams.get('version')).toBe('4');
@@ -28,12 +28,12 @@ describe('buildPayoffProgressChartUrl', () => {
   });
 
   it('比率は0〜1の範囲に丸める(はみ出た入力を信用しない)', () => {
-    const over = decodeConfig(buildPayoffProgressChartUrl(1.4)) as {
+    const over = decodeConfig(buildSavingsProgressChartUrl(1.4)) as {
       data: { datasets: [{ data: number[] }] };
     };
     expect(over.data.datasets[0].data).toEqual([100, 0]);
 
-    const under = decodeConfig(buildPayoffProgressChartUrl(-0.2)) as {
+    const under = decodeConfig(buildSavingsProgressChartUrl(-0.2)) as {
       data: { datasets: [{ data: number[] }] };
     };
     expect(under.data.datasets[0].data).toEqual([0, 100]);

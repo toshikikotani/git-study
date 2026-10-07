@@ -2,7 +2,7 @@
  * 「ちりつも」画面のデータアクセス(本人発案)。
  *
  * 判断(何をどう積み上げるか)は domain/accumulation.ts の純粋関数、
- * 完済への換算は domain/payoff.ts の payoffImpactOfExtraPayment() に任せ、
+ * 貯金目標への換算は domain/savings.ts の monthsSoonerWith() に任せ、
  * ここでは「DB から何を読むか」だけを担う。新しいテーブルは持たない
  * (毎回 transactions を集計し直す。features/reports/store.ts と同じ考え方)。
  */
@@ -18,9 +18,8 @@ import {
   type PaceComparison,
   type SmallSpendGroup,
 } from '@/domain/accumulation';
-import { payoffImpactOfExtraPayment } from '@/domain/payoff';
-import { listDebts, toPayoffDebt } from '@/features/debts/store';
-import { getAppSettings } from '@/features/settings/store';
+import { monthsSoonerWith, nextGoal } from '@/domain/savings';
+import { loadSavingsSummary } from '@/features/savings/store';
 import { addMonths, nthDayOfMonth, todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -42,10 +41,10 @@ export type AccumulationView = {
   noSpend: NoSpendSummary;
   pace: PaceComparison;
   /**
-   * 小口支出を丸ごと返済に回した場合の効果。
-   * 債務が無い・返済目標が未設定なら null(画面では出さない)。
+   * 小口支出を丸ごと貯金に回した場合の効果(ADR-077。以前は完済の短縮)。
+   * 金額のある貯金目標が無い・届く見込みが出せないなら null(画面では出さない)。
    */
-  payoffImpact: { shortenedMonths: number; savedInterestYen: number } | null;
+  savingsImpact: { goalTitle: string; monthsSooner: number } | null;
 };
 
 export async function loadAccumulationView(now: Date = new Date()): Promise<AccumulationView> {
@@ -85,36 +84,32 @@ export async function loadAccumulationView(now: Date = new Date()): Promise<Accu
     smallSpendAnnualizedYen,
     noSpend,
     pace: compareToPreviousMonthPace(transactions, today),
-    payoffImpact: await loadPayoffImpact(Math.round(smallSpendAnnualizedYen / 12)),
+    savingsImpact: await loadSavingsImpact(Math.round(smallSpendAnnualizedYen / 12), now),
   };
 }
 
 /**
- * 小口支出の月あたり相当額をそのまま返済に上乗せした場合の効果。
+ * 小口支出の月あたり相当額をそのまま貯金に上乗せした場合に、次の貯金目標へ
+ * 何か月早く届くか。
  *
- * 債務・設定の読み出しに失敗しても「ちりつも」画面自体は落とさない
+ * 貯金の読み出しに失敗しても「ちりつも」画面自体は落とさない
  * (この換算はあくまで添え物で、小口の山そのものは単独で意味を持つ)。
  */
-async function loadPayoffImpact(
+async function loadSavingsImpact(
   extraMonthlyYen: number,
-): Promise<{ shortenedMonths: number; savedInterestYen: number } | null> {
+  now: Date,
+): Promise<{ goalTitle: string; monthsSooner: number } | null> {
   if (extraMonthlyYen <= 0) return null;
-
   try {
-    const [debts, settings] = await Promise.all([listDebts(), getAppSettings()]);
-    if (debts.length === 0 || settings.monthlyRepaymentTargetYen <= 0) return null;
-
-    // app_settings は 'minimum'/'custom' も持ちうるが、ここで比べたいのは
-    // 「今の返済額 vs 上乗せ後」であって戦略の違いではない。順序付けの
-    // 2択(/debts のシミュレーションと同じ扱い)へ寄せる。
-    const strategy = settings.repaymentStrategy === 'snowball' ? 'snowball' : 'avalanche';
-
-    return payoffImpactOfExtraPayment(
-      debts.map(toPayoffDebt),
-      settings.monthlyRepaymentTargetYen,
-      extraMonthlyYen,
-      { strategy },
-    );
+    const savings = await loadSavingsSummary(now);
+    const next = nextGoal(savings.goals);
+    if (next === null || next.remainingYen === null) return null;
+    const monthsSooner = monthsSoonerWith({
+      remainingYen: next.remainingYen,
+      pace: savings.paceYen,
+      extraPerMonthYen: extraMonthlyYen,
+    });
+    return monthsSooner === null ? null : { goalTitle: next.goal.title, monthsSooner };
   } catch {
     return null;
   }

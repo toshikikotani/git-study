@@ -1,7 +1,7 @@
 /**
- * 資産推移(残債総額 + 投資評価額)の記録と読み出し(P6-3)。
+ * 資産推移(貯金 + 投資評価額)の記録と読み出し(P6-3。ADR-077 で残債から貯金に)。
  *
- * debts.current_balance_yen は現在値のみで履歴を持たないため、月末に
+ * 貯金(features/savings の合計)は履歴を持たないため、月末に
  * net_worth_snapshots へ1行ずつ記録し始める(TASKS.md P6-3。マイグレーションは
  * 20260912000100_net_worth_snapshots.sql / 20260912000200_net_worth_snapshots_rls.sql)。
  * 記録した月以降のデータしか残らないため、グラフは記録開始後から少しずつ
@@ -12,8 +12,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isLastDayOfMonth } from '@/domain/alerts';
 import { totalInvestmentValueAsOf, type InvestmentSnapshotPoint } from '@/domain/investment';
+import { loadSavingsSummaryAsAdmin } from '@/features/savings/store';
 import { addDays, todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
+import { isMissingColumnError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -35,24 +37,16 @@ export async function recordNetWorthSnapshotAsAdmin(
   const today = todayJst(now);
   if (!isLastDayOfMonth(today, addDays(today, 1))) return 0;
 
-  const [{ data: debts, error: debtsError }, { data: snapshots, error: snapshotsError }] =
-    await Promise.all([
-      client
-        .from('debts')
-        .select('current_balance_yen')
-        .eq('user_id', userId)
-        .eq('status', 'active'),
-      client
-        .from('investment_snapshots')
-        .select('account_id, product_name, as_of, market_value_yen')
-        .eq('user_id', userId),
-    ]);
-  if (debtsError) throw new NetWorthStoreError(`負債を取得できませんでした: ${debtsError.message}`);
+  const [savings, { data: snapshots, error: snapshotsError }] = await Promise.all([
+    loadSavingsSummaryAsAdmin(client, userId, now),
+    client
+      .from('investment_snapshots')
+      .select('account_id, product_name, as_of, market_value_yen')
+      .eq('user_id', userId),
+  ]);
   if (snapshotsError) {
     throw new NetWorthStoreError(`投資残高を取得できませんでした: ${snapshotsError.message}`);
   }
-
-  const debtBalanceYen = debts.reduce((sum, d) => sum + d.current_balance_yen, 0);
 
   const points: InvestmentSnapshotPoint[] = snapshots.map((s) => ({
     productKey: `${s.account_id ?? ''}:${s.product_name ?? ''}`,
@@ -61,15 +55,16 @@ export async function recordNetWorthSnapshotAsAdmin(
   }));
   const investmentValueYen = totalInvestmentValueAsOf(points, today);
 
-  const { error } = await client.from('net_worth_snapshots').upsert(
-    {
-      user_id: userId,
-      as_of: today,
-      debt_balance_yen: debtBalanceYen,
-      investment_value_yen: investmentValueYen,
-    },
-    { onConflict: 'user_id,as_of' },
-  );
+  const row = { user_id: userId, as_of: today, investment_value_yen: investmentValueYen };
+  let { error } = await client
+    .from('net_worth_snapshots')
+    .upsert({ ...row, savings_yen: savings.totalYen }, { onConflict: 'user_id,as_of' });
+  if (error && isMissingColumnError(error)) {
+    // 貯金の列が未適用(ADR-077 のマイグレーション前)なら、旧い残債の列に 0 を入れて投資額だけ残す。
+    ({ error } = await client
+      .from('net_worth_snapshots')
+      .upsert({ ...row, debt_balance_yen: 0 } as typeof row, { onConflict: 'user_id,as_of' }));
+  }
   if (error)
     throw new NetWorthStoreError(`資産スナップショットを記録できませんでした: ${error.message}`);
   return 1;
@@ -77,7 +72,7 @@ export async function recordNetWorthSnapshotAsAdmin(
 
 export type NetWorthPoint = {
   asOf: DateOnly;
-  debtBalanceYen: number;
+  savingsYen: number;
   investmentValueYen: number;
 };
 
@@ -86,13 +81,14 @@ export async function loadNetWorthTrend(): Promise<NetWorthPoint[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('net_worth_snapshots')
-    .select('as_of, debt_balance_yen, investment_value_yen')
+    .select('*')
     .order('as_of', { ascending: true });
   if (error) throw new NetWorthStoreError(`資産推移を取得できませんでした: ${error.message}`);
 
   return data.map((row) => ({
     asOf: row.as_of,
-    debtBalanceYen: row.debt_balance_yen,
+    // 貯金の列が未適用の本番では 0(残債の値はもう見せない)。
+    savingsYen: (row as Partial<typeof row>).savings_yen ?? 0,
     investmentValueYen: row.investment_value_yen,
   }));
 }

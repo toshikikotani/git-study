@@ -22,6 +22,7 @@ import {
   type InvestmentContributionInput,
   type InvestmentSnapshotInput,
 } from '@/features/investments/store';
+import { updateAppSettings } from '@/features/settings/store';
 import { assertDateOnly } from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 
@@ -81,6 +82,17 @@ export async function upsertSnapshotAction(
     await upsertInvestmentSnapshot(input);
   } catch (error) {
     return { error: describeUserError(error) };
+  }
+  revalidatePath('/investments');
+  return { error: null };
+}
+
+/** 高リスク枠を使うかを切り替える(ADR-077。以前は完済で自動に切り替えていた)。 */
+export async function setHighRiskAction(enabled: boolean): Promise<{ error: string | null }> {
+  try {
+    await updateAppSettings({ isHighRiskUnlocked: enabled });
+  } catch (error) {
+    return { error: describeUserError(error, '設定を変更できませんでした。') };
   }
   revalidatePath('/investments');
   return { error: null };

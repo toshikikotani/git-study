@@ -47,12 +47,12 @@ describe('assertIncomeAmountYen', () => {
 describe('computeIncomeAllocation(FR-42)', () => {
   it('既定7:3で振り分ける', () => {
     const result = computeIncomeAllocation(100000, 0.7);
-    expect(result).toEqual({ repaymentYen: 70000, investmentYen: 30000 });
+    expect(result).toEqual({ savingsYen: 70000, investmentYen: 30000 });
   });
 
-  it('端数は返済側に寄せる(合計が入金額と一致する)', () => {
+  it('端数は貯金側に寄せる(合計が入金額と一致する)', () => {
     const result = computeIncomeAllocation(10000, 0.7);
-    expect(result.repaymentYen + result.investmentYen).toBe(10000);
+    expect(result.savingsYen + result.investmentYen).toBe(10000);
   });
 
   it('比率が範囲外なら拒否する', () => {

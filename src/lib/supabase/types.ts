@@ -116,7 +116,6 @@ export type Database = {
           genre_id: string | null;
           channel: Database['public']['Enums']['notification_channel'];
           created_at: string;
-          debt_id: string | null;
           dedup_key: string;
           error_message: string | null;
           id: string;
@@ -137,7 +136,6 @@ export type Database = {
           genre_id?: string | null;
           channel?: Database['public']['Enums']['notification_channel'];
           created_at?: string;
-          debt_id?: string | null;
           dedup_key: string;
           error_message?: string | null;
           id?: string;
@@ -158,7 +156,6 @@ export type Database = {
           genre_id?: string | null;
           channel?: Database['public']['Enums']['notification_channel'];
           created_at?: string;
-          debt_id?: string | null;
           dedup_key?: string;
           error_message?: string | null;
           id?: string;
@@ -179,13 +176,6 @@ export type Database = {
             columns: ['genre_id'];
             isOneToOne: false;
             referencedRelation: 'genres';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'alerts_debt_id_fkey';
-            columns: ['debt_id'];
-            isOneToOne: false;
-            referencedRelation: 'debts';
             referencedColumns: ['id'];
           },
           {
@@ -243,15 +233,14 @@ export type Database = {
           google_backup_spreadsheet_id: string | null;
           high_risk_allocation_ratio: number;
           inactivity_alert_days: number;
-          investment_ratio_of_repayment: number;
+          investment_ratio_of_savings: number;
           is_high_risk_unlocked: boolean;
           line_token_env_key: string | null;
-          monthly_repayment_target_yen: number;
+          monthly_savings_target_yen: number;
           monthly_take_home_yen: number;
           payday: number;
           payment_due_reminder_days: number;
-          repayment_strategy: Database['public']['Enums']['repayment_strategy'];
-          side_income_repayment_ratio: number;
+          side_income_savings_ratio: number;
           timezone: string;
           updated_at: string;
           user_id: string;
@@ -274,15 +263,14 @@ export type Database = {
           google_backup_spreadsheet_id?: string | null;
           high_risk_allocation_ratio?: number;
           inactivity_alert_days?: number;
-          investment_ratio_of_repayment?: number;
+          investment_ratio_of_savings?: number;
           is_high_risk_unlocked?: boolean;
           line_token_env_key?: string | null;
-          monthly_repayment_target_yen?: number;
+          monthly_savings_target_yen?: number;
           monthly_take_home_yen?: number;
           payday?: number;
           payment_due_reminder_days?: number;
-          repayment_strategy?: Database['public']['Enums']['repayment_strategy'];
-          side_income_repayment_ratio?: number;
+          side_income_savings_ratio?: number;
           timezone?: string;
           updated_at?: string;
           user_id: string;
@@ -305,15 +293,14 @@ export type Database = {
           google_backup_spreadsheet_id?: string | null;
           high_risk_allocation_ratio?: number;
           inactivity_alert_days?: number;
-          investment_ratio_of_repayment?: number;
+          investment_ratio_of_savings?: number;
           is_high_risk_unlocked?: boolean;
           line_token_env_key?: string | null;
-          monthly_repayment_target_yen?: number;
+          monthly_savings_target_yen?: number;
           monthly_take_home_yen?: number;
           payday?: number;
           payment_due_reminder_days?: number;
-          repayment_strategy?: Database['public']['Enums']['repayment_strategy'];
-          side_income_repayment_ratio?: number;
+          side_income_savings_ratio?: number;
           timezone?: string;
           updated_at?: string;
           user_id?: string;
@@ -430,7 +417,6 @@ export type Database = {
           brief_on: string;
           channel: Database['public']['Enums']['notification_channel'];
           created_at: string;
-          days_to_payoff: number | null;
           delivered_at: string | null;
           error_message: string | null;
           generated_at: string | null;
@@ -439,7 +425,6 @@ export type Database = {
           job_run_id: string | null;
           model: string | null;
           output_tokens: number | null;
-          remaining_debt_yen: number | null;
           spendable_living_yen: number | null;
           spendable_sanctuary_yen: number | null;
           status: Database['public']['Enums']['brief_status'];
@@ -451,7 +436,6 @@ export type Database = {
           brief_on: string;
           channel?: Database['public']['Enums']['notification_channel'];
           created_at?: string;
-          days_to_payoff?: number | null;
           delivered_at?: string | null;
           error_message?: string | null;
           generated_at?: string | null;
@@ -460,7 +444,6 @@ export type Database = {
           job_run_id?: string | null;
           model?: string | null;
           output_tokens?: number | null;
-          remaining_debt_yen?: number | null;
           spendable_living_yen?: number | null;
           spendable_sanctuary_yen?: number | null;
           status?: Database['public']['Enums']['brief_status'];
@@ -472,7 +455,6 @@ export type Database = {
           brief_on?: string;
           channel?: Database['public']['Enums']['notification_channel'];
           created_at?: string;
-          days_to_payoff?: number | null;
           delivered_at?: string | null;
           error_message?: string | null;
           generated_at?: string | null;
@@ -481,7 +463,6 @@ export type Database = {
           job_run_id?: string | null;
           model?: string | null;
           output_tokens?: number | null;
-          remaining_debt_yen?: number | null;
           spendable_living_yen?: number | null;
           spendable_sanctuary_yen?: number | null;
           status?: Database['public']['Enums']['brief_status'];
@@ -498,153 +479,6 @@ export type Database = {
           },
         ];
       };
-      debt_payments: {
-        Row: {
-          amount_yen: number;
-          balance_after_yen: number | null;
-          created_at: string;
-          debt_id: string;
-          id: string;
-          interest_yen: number | null;
-          is_extra: boolean;
-          note: string | null;
-          paid_on: string;
-          principal_yen: number | null;
-          transaction_id: string | null;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          amount_yen: number;
-          balance_after_yen?: number | null;
-          created_at?: string;
-          debt_id: string;
-          id?: string;
-          interest_yen?: number | null;
-          is_extra?: boolean;
-          note?: string | null;
-          paid_on: string;
-          principal_yen?: number | null;
-          transaction_id?: string | null;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          amount_yen?: number;
-          balance_after_yen?: number | null;
-          created_at?: string;
-          debt_id?: string;
-          id?: string;
-          interest_yen?: number | null;
-          is_extra?: boolean;
-          note?: string | null;
-          paid_on?: string;
-          principal_yen?: number | null;
-          transaction_id?: string | null;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'debt_payments_debt_id_fkey';
-            columns: ['debt_id'];
-            isOneToOne: false;
-            referencedRelation: 'debts';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'debt_payments_transaction_id_fkey';
-            columns: ['transaction_id'];
-            isOneToOne: false;
-            referencedRelation: 'transactions';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      debts: {
-        Row: {
-          account_id: string | null;
-          annual_rate: number;
-          balance_as_of: string;
-          created_at: string;
-          current_balance_yen: number;
-          id: string;
-          is_estimated: boolean;
-          kind: Database['public']['Enums']['debt_kind'];
-          lender_name: string;
-          minimum_payment_yen: number;
-          note: string | null;
-          opened_on: string | null;
-          original_principal_yen: number | null;
-          paid_off_on: string | null;
-          payment_day: number;
-          refinanced_into_id: string | null;
-          sort_order: number;
-          status: Database['public']['Enums']['debt_status'];
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          account_id?: string | null;
-          annual_rate: number;
-          balance_as_of?: string;
-          created_at?: string;
-          current_balance_yen: number;
-          id?: string;
-          is_estimated?: boolean;
-          kind: Database['public']['Enums']['debt_kind'];
-          lender_name: string;
-          minimum_payment_yen: number;
-          note?: string | null;
-          opened_on?: string | null;
-          original_principal_yen?: number | null;
-          paid_off_on?: string | null;
-          payment_day: number;
-          refinanced_into_id?: string | null;
-          sort_order?: number;
-          status?: Database['public']['Enums']['debt_status'];
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          account_id?: string | null;
-          annual_rate?: number;
-          balance_as_of?: string;
-          created_at?: string;
-          current_balance_yen?: number;
-          id?: string;
-          is_estimated?: boolean;
-          kind?: Database['public']['Enums']['debt_kind'];
-          lender_name?: string;
-          minimum_payment_yen?: number;
-          note?: string | null;
-          opened_on?: string | null;
-          original_principal_yen?: number | null;
-          paid_off_on?: string | null;
-          payment_day?: number;
-          refinanced_into_id?: string | null;
-          sort_order?: number;
-          status?: Database['public']['Enums']['debt_status'];
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'debts_account_id_fkey';
-            columns: ['account_id'];
-            isOneToOne: false;
-            referencedRelation: 'accounts';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'debts_refinanced_into_id_fkey';
-            columns: ['refinanced_into_id'];
-            isOneToOne: false;
-            referencedRelation: 'debts';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
       goals: {
         Row: {
           achieved_at: string | null;
@@ -654,6 +488,7 @@ export type Database = {
           note: string | null;
           status: Database['public']['Enums']['goal_status'];
           target_amount_yen: number | null;
+          start_on: string;
           target_date: string | null;
           title: string;
           updated_at: string;
@@ -666,6 +501,7 @@ export type Database = {
           id?: string;
           note?: string | null;
           status?: Database['public']['Enums']['goal_status'];
+          start_on?: string;
           target_amount_yen?: number | null;
           target_date?: string | null;
           title: string;
@@ -678,6 +514,7 @@ export type Database = {
           current_amount_yen?: number;
           id?: string;
           note?: string | null;
+          start_on?: string;
           status?: Database['public']['Enums']['goal_status'];
           target_amount_yen?: number | null;
           target_date?: string | null;
@@ -1028,7 +865,7 @@ export type Database = {
         Row: {
           as_of: string;
           created_at: string;
-          debt_balance_yen: number;
+          savings_yen: number;
           id: string;
           investment_value_yen: number;
           user_id: string;
@@ -1036,7 +873,7 @@ export type Database = {
         Insert: {
           as_of: string;
           created_at?: string;
-          debt_balance_yen: number;
+          savings_yen?: number;
           id?: string;
           investment_value_yen: number;
           user_id: string;
@@ -1044,63 +881,9 @@ export type Database = {
         Update: {
           as_of?: string;
           created_at?: string;
-          debt_balance_yen?: number;
+          savings_yen?: number;
           id?: string;
           investment_value_yen?: number;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      repayment_scenarios: {
-        Row: {
-          computed_at: string | null;
-          created_at: string;
-          id: string;
-          is_baseline: boolean;
-          monthly_budget_yen: number | null;
-          months_to_payoff: number | null;
-          name: string;
-          override_annual_rate: number | null;
-          payoff_on: string | null;
-          sort_order: number;
-          strategy: Database['public']['Enums']['repayment_strategy'];
-          total_interest_yen: number | null;
-          total_paid_yen: number | null;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          computed_at?: string | null;
-          created_at?: string;
-          id?: string;
-          is_baseline?: boolean;
-          monthly_budget_yen?: number | null;
-          months_to_payoff?: number | null;
-          name: string;
-          override_annual_rate?: number | null;
-          payoff_on?: string | null;
-          sort_order?: number;
-          strategy?: Database['public']['Enums']['repayment_strategy'];
-          total_interest_yen?: number | null;
-          total_paid_yen?: number | null;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          computed_at?: string | null;
-          created_at?: string;
-          id?: string;
-          is_baseline?: boolean;
-          monthly_budget_yen?: number | null;
-          months_to_payoff?: number | null;
-          name?: string;
-          override_annual_rate?: number | null;
-          payoff_on?: string | null;
-          sort_order?: number;
-          strategy?: Database['public']['Enums']['repayment_strategy'];
-          total_interest_yen?: number | null;
-          total_paid_yen?: number | null;
-          updated_at?: string;
           user_id?: string;
         };
         Relationships: [];
@@ -1139,7 +922,7 @@ export type Database = {
         Row: {
           account_id: string | null;
           allocated_to_investment_yen: number | null;
-          allocated_to_repayment_yen: number | null;
+          allocated_to_savings_yen: number | null;
           amount_yen: number;
           created_at: string;
           id: string;
@@ -1154,7 +937,7 @@ export type Database = {
         Insert: {
           account_id?: string | null;
           allocated_to_investment_yen?: number | null;
-          allocated_to_repayment_yen?: number | null;
+          allocated_to_savings_yen?: number | null;
           amount_yen: number;
           created_at?: string;
           id?: string;
@@ -1169,7 +952,7 @@ export type Database = {
         Update: {
           account_id?: string | null;
           allocated_to_investment_yen?: number | null;
-          allocated_to_repayment_yen?: number | null;
+          allocated_to_savings_yen?: number | null;
           amount_yen?: number;
           created_at?: string;
           id?: string;
@@ -1972,7 +1755,6 @@ export type Database = {
           amount_yen: number | null;
           genre_id: string | null;
           created_at: string;
-          debt_id: string | null;
           execution_order: number;
           from_account_id: string | null;
           id: string;
@@ -1990,7 +1772,6 @@ export type Database = {
           amount_yen?: number | null;
           genre_id?: string | null;
           created_at?: string;
-          debt_id?: string | null;
           execution_order: number;
           from_account_id?: string | null;
           id?: string;
@@ -2008,7 +1789,6 @@ export type Database = {
           amount_yen?: number | null;
           genre_id?: string | null;
           created_at?: string;
-          debt_id?: string | null;
           execution_order?: number;
           from_account_id?: string | null;
           id?: string;
@@ -2027,13 +1807,6 @@ export type Database = {
             columns: ['genre_id'];
             isOneToOne: false;
             referencedRelation: 'genres';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'transfer_rules_debt_id_fkey';
-            columns: ['debt_id'];
-            isOneToOne: false;
-            referencedRelation: 'debts';
             referencedColumns: ['id'];
           },
           {
@@ -2169,57 +1942,10 @@ export type Database = {
         };
         Relationships: [];
       };
-      v_debt_overview: {
-        Row: {
-          active_debt_count: number | null;
-          has_estimated_values: boolean | null;
-          max_annual_rate: number | null;
-          next_payment_day: number | null;
-          total_balance_yen: number | null;
-          total_minimum_payment_yen: number | null;
-          user_id: string | null;
-          weighted_annual_rate: number | null;
-        };
-        Relationships: [];
-      };
     };
     Functions: {
       month_start_jst: { Args: { p_offset_months?: number }; Returns: string };
       seed_defaults: { Args: { p_user_id: string }; Returns: undefined };
-      simulate_debt_payoff: {
-        Args: {
-          p_debt_id: string;
-          p_max_months?: number;
-          p_monthly_payment_yen: number;
-        };
-        Returns: {
-          closing_balance_yen: number;
-          due_on: string;
-          interest_yen: number;
-          month_index: number;
-          opening_balance_yen: number;
-          payment_yen: number;
-          principal_yen: number;
-        }[];
-      };
-      simulate_total_payoff: {
-        Args: {
-          p_max_months?: number;
-          p_monthly_budget_yen: number;
-          p_strategy?: Database['public']['Enums']['repayment_strategy'];
-          p_user_id: string;
-        };
-        Returns: {
-          closing_total_yen: number;
-          debts_remaining: number;
-          interest_total_yen: number;
-          month_index: number;
-          month_on: string;
-          opening_total_yen: number;
-          payment_total_yen: number;
-          principal_total_yen: number;
-        }[];
-      };
       today_jst: { Args: never; Returns: string };
     };
     Enums: {
@@ -2253,15 +1979,6 @@ export type Database = {
       brief_item_kind: 'headline' | 'income_tip' | 'market' | 'campaign';
       brief_status: 'pending' | 'generated' | 'delivered' | 'failed';
       classified_by: 'unclassified' | 'rule' | 'ai' | 'manual';
-      debt_kind:
-        | 'revolving'
-        | 'cashing'
-        | 'installment'
-        | 'card_loan'
-        | 'consumer_finance'
-        | 'bank_loan'
-        | 'other';
-      debt_status: 'active' | 'paid_off' | 'refinanced' | 'closed';
       goal_status: 'active' | 'achieved' | 'abandoned';
       import_status: 'pending' | 'succeeded' | 'partial' | 'failed';
       job_status: 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -2271,7 +1988,6 @@ export type Database = {
       notification_channel: 'discord' | 'line' | 'email' | 'none';
       payment_method:
         'one_time' | 'revolving' | 'cashing' | 'installment' | 'debit' | 'transfer' | 'unknown';
-      repayment_strategy: 'avalanche' | 'snowball' | 'minimum' | 'custom';
       review_status: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
       rule_match_type: 'keyword' | 'regex' | 'exact' | 'amount_range' | 'merchant';
       spending_persona_type:
@@ -2441,16 +2157,6 @@ export const Constants = {
       brief_item_kind: ['headline', 'income_tip', 'market', 'campaign'],
       brief_status: ['pending', 'generated', 'delivered', 'failed'],
       classified_by: ['unclassified', 'rule', 'ai', 'manual'],
-      debt_kind: [
-        'revolving',
-        'cashing',
-        'installment',
-        'card_loan',
-        'consumer_finance',
-        'bank_loan',
-        'other',
-      ],
-      debt_status: ['active', 'paid_off', 'refinanced', 'closed'],
       goal_status: ['active', 'achieved', 'abandoned'],
       import_status: ['pending', 'succeeded', 'partial', 'failed'],
       job_status: ['running', 'succeeded', 'failed', 'cancelled'],
@@ -2467,7 +2173,6 @@ export const Constants = {
         'transfer',
         'unknown',
       ],
-      repayment_strategy: ['avalanche', 'snowball', 'minimum', 'custom'],
       review_status: ['auto_ok', 'pending', 'confirmed', 'corrected', 'ignored'],
       rule_match_type: ['keyword', 'regex', 'exact', 'amount_range', 'merchant'],
       spending_persona_type: [

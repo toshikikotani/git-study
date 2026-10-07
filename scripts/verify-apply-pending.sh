@@ -44,6 +44,7 @@ PENDING=(
   20261006000200_ai_forecast_reads_rls.sql
   20261006000300_spending_promises.sql
   20261006000400_spending_promises_rls.sql
+  20261007000100_savings_replace_debts.sql
 )
 
 WORK="$(mktemp -d)"
