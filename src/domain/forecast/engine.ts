@@ -66,6 +66,8 @@ export type BuildForecastInput = {
   income?: { yen: number; source: 'setting' | 'salary' } | null;
   /** 本人が決めた約束(「外食を週1回へらす」)。今日の月の終わりまで見込みに入れる。 */
   promises?: readonly ForecastPromise[];
+  /** これまでの約束の守れ具合(0〜1)。無ければ半分。 */
+  promiseKeepRate?: number;
 };
 
 /** 期間のどの時点帯か(序盤:3分の1まで、中盤:3分の2まで、終盤)。 */
@@ -118,6 +120,7 @@ export function buildForecast(input: BuildForecastInput): Forecast {
     todayElapsedShare: input.now ? daySpentShareAt(input.now) : undefined,
     noForecastGenreIds: input.noForecastGenreIds,
     promises: input.promises,
+    promiseKeepRate: input.promiseKeepRate,
     mode: 'paths',
   });
 

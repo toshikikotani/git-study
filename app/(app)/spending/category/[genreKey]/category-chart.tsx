@@ -565,9 +565,11 @@ export function CategoryChart({
                     boxShadow: '0 0 0 2px var(--surface)',
                   }}
                 />
-                {(endNote ?? cumulative.deltaYen) !== null && deltaGeometry && !bigText ? (
+                {/* 予測があるときは、月末の見込みを右端の目盛り(多くて・中央・少なくて)で見せ、
+                    線の上には何も置かない(デザインの月末の見込み。線や帯と重ならない)。 */}
+                {endNote === null && cumulative.deltaYen !== null && deltaGeometry && !bigText ? (
                   <DeltaLabel
-                    text={endNote ?? idealDeltaLabel(cumulative.deltaYen!)}
+                    text={idealDeltaLabel(cumulative.deltaYen)}
                     geometry={deltaGeometry}
                   />
                 ) : null}
@@ -589,8 +591,12 @@ export function CategoryChart({
                 style={{
                   top: p.centerPx,
                   transform: 'translateY(-50%)',
-                  color: p.kind === 'tag' ? 'var(--ink)' : 'var(--ink-secondary)',
-                  fontWeight: p.kind === 'tag' ? 600 : 400,
+                  color:
+                    p.kind === 'tag' || p.key === `tick-${forecastMid}`
+                      ? 'var(--ink)'
+                      : 'var(--ink-secondary)',
+                  // 月末の見込みの中央は太く(デザインの右端の「17.8万」)。
+                  fontWeight: p.kind === 'tag' ? 600 : p.key === `tick-${forecastMid}` ? 700 : 400,
                 }}
               >
                 {p.kind === 'tag' ? (
@@ -676,13 +682,19 @@ export function CategoryChart({
 
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          <p>
-            {isCum
-              ? cumulative.hasForecast
-                ? `実線=実績の累計、点線=予算までの理想${budgetLine !== null ? '、破線=予算' : ''}。右の帯は、濃い=10回中5回、薄い=10回中8回`
-                : '実線=実績の累計、点線=予算までの理想'
-              : '長押ししてなぞると、日ごとの金額が見られます'}
-          </p>
+          {isCum ? (
+            <CumulativeLegend
+              color={lineColor}
+              forecast={cumulative.hasForecast}
+              budget={budgetLine !== null}
+              ideal={cumulative.days.some((d) => d.idealYen !== null)}
+              scheduled={cumulative.days.some(
+                (d) => d.forecastHighYen !== null && d.scheduledYen > 0,
+              )}
+            />
+          ) : (
+            <p>長押ししてなぞると、日ごとの金額が見られます</p>
+          )}
           {isCum && endNote !== null && cumulative.deltaYen !== null ? (
             <p className="tabular mt-1" style={{ color: 'var(--ink-muted)' }}>
               今日までは{idealDeltaLabel(cumulative.deltaYen)}
@@ -881,5 +893,102 @@ function CumulativeLayer({
           />
         ))}
     </>
+  );
+}
+
+/**
+ * 累計のグラフの凡例(デザインの月末の見込み):線と帯の見本を並べる。色だけでなく
+ * 線の種類(実線・破線・点線)と濃さでも見分けられるようにする。
+ */
+function CumulativeLegend({
+  color,
+  forecast,
+  budget,
+  ideal,
+  scheduled,
+}: {
+  color: string;
+  forecast: boolean;
+  budget: boolean;
+  ideal: boolean;
+  scheduled: boolean;
+}) {
+  const item = (swatch: React.ReactNode, label: string) => (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      {swatch}
+      {label}
+    </span>
+  );
+  return (
+    <p className="flex flex-wrap gap-x-3 gap-y-1">
+      {item(
+        <span
+          aria-hidden
+          className="inline-block h-1 w-4 rounded-full"
+          style={{ background: color }}
+        />,
+        '使った額',
+      )}
+      {forecast
+        ? item(
+            <span
+              aria-hidden
+              className="inline-block w-4"
+              style={{ borderTop: `2px dashed ${color}`, opacity: 0.8 }}
+            />,
+            '中央',
+          )
+        : null}
+      {forecast
+        ? item(
+            <span
+              aria-hidden
+              className="inline-block h-2 w-3 rounded-sm"
+              style={{ background: `color-mix(in srgb, ${color} 34%, transparent)` }}
+            />,
+            '10回中5回',
+          )
+        : null}
+      {forecast
+        ? item(
+            <span
+              aria-hidden
+              className="inline-block h-2 w-3 rounded-sm"
+              style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}
+            />,
+            '10回中8回',
+          )
+        : null}
+      {ideal
+        ? item(
+            <span
+              aria-hidden
+              className="inline-block w-4"
+              style={{ borderTop: '2px dotted var(--ink-secondary)' }}
+            />,
+            '予算までの理想',
+          )
+        : null}
+      {budget
+        ? item(
+            <span
+              aria-hidden
+              className="inline-block w-4"
+              style={{ borderTop: '1.5px dashed var(--ink-secondary)' }}
+            />,
+            '予算',
+          )
+        : null}
+      {scheduled
+        ? item(
+            <span
+              aria-hidden
+              className="inline-block size-2 rounded-sm"
+              style={{ background: 'var(--surface)', border: `1.5px solid ${color}` }}
+            />,
+            '予定の支払い',
+          )
+        : null}
+    </p>
   );
 }

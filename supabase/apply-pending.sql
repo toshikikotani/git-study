@@ -341,8 +341,14 @@ create policy "own_rows" on public.spending_promises
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- 12. spending_promises に「これ以上は使わない」(per_week = 0)を許す(ADR-078)
+-- -----------------------------------------------------------------------------
+alter table public.spending_promises drop constraint if exists ck_spending_promises_per_week;
+alter table public.spending_promises
+  add constraint ck_spending_promises_per_week check (per_week between 0 and 7);
 
--- 12. 借金をやめ、貯金(貯金目標)に変える(ADR-077)
+
+-- 13. 借金をやめ、貯金(貯金目標)に変える(ADR-080)
 -- -----------------------------------------------------------------------------
 -- 借金の記録(debts・debt_payments・repayment_scenarios と計算の関数・ビュー)を消す(戻せない)。
 -- 設定の返済の列は貯金に、純資産の記録は残債 → 貯金に、目標に数え始める日を足す。
@@ -558,6 +564,14 @@ select
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'spending_promises'
   ) then 'ok' else 'NG: テーブルが無い' end
+union all
+select
+  'spending_promises.per_week = 0(これ以上は使わない)',
+  case when exists (
+    select 1 from pg_constraint
+    where conname = 'ck_spending_promises_per_week'
+      and pg_get_constraintdef(oid) like '%>= 0%'
+  ) then 'ok' else 'NG: 制約が古い' end
 union all
 select
   '借金 → 貯金(debts の削除・設定の列・goals.start_on)',

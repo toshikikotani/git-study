@@ -5,8 +5,9 @@ import { InsightsList } from './insights-card';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
+import { LandingHero, NextStepCard } from './landing-hero';
 import { GoalChart } from './goal-chart';
-import { formatEstimate, formatProbability, formatTimesInTen } from '@/domain/forecast/format';
+import { formatEstimate } from '@/domain/forecast/format';
 import { landingRowsFrom } from '@/domain/forecast/landing-rows';
 import { listGenres } from '@/features/genre/store';
 import { loadLatestRead } from '@/features/ai-report/forecast-read';
@@ -24,7 +25,6 @@ import { NetWorthChart } from './net-worth-chart';
 import { PurposeBalanceCard } from './purpose-balance-card';
 import { YearNetBarChart } from './year-net-bar-chart';
 import { hasIncome } from '@/domain/summary-rules';
-import { formatYen } from '@/domain/money';
 import {
   loadAccountBalanceByPurpose,
   loadCategorySpendingTrend,
@@ -214,63 +214,42 @@ export default async function ReportsPage({
           </p>
           {hasGoal ? <ScopeSwitch current={goalPlan ? 'goal' : 'all'} /> : null}
         </div>
-        {forecast && landing && forecast.total.p50 > 0 ? (
-          <>
-            <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              {endLabel}の見込み(中央){forecast.provisional ? ' ・ 目安' : ''}
-            </p>
-            <p
-              className="tabular mt-1 text-4xl font-semibold tracking-[-0.045em]"
-              style={{ color: 'var(--ink)' }}
-            >
-              {formatEstimate(landing.p50)}
-            </p>
-            <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-              10回中8回は、少なくて {formatEstimate(landing.p10)}、多くて{' '}
-              {formatEstimate(landing.p90)}。
-              {budgetYen !== null ? (
-                forecast.probWithinBudget !== null ? (
-                  <>
-                    予算 {formatYen(budgetYen, { sign: 'never' })} に収まるのは
-                    {formatTimesInTen(forecast.probWithinBudget)}
-                    <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                      ({formatProbability(forecast.probWithinBudget)})
-                    </span>
-                    。
-                  </>
-                ) : null
-              ) : (
-                '目標の予算がないので、収まるかどうかは出していない。'
-              )}
+      </header>
+      {forecast && landing && forecast.total.p50 > 0 ? (
+        <>
+          <LandingHero
+            endLabel={endLabel}
+            landing={landing}
+            budgetYen={budgetYen}
+            probWithinBudget={forecast.probWithinBudget}
+            provisional={forecast.provisional}
+          />
+          {budgetYen === null || forecast.drivers[0] ? (
+            <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              {budgetYen === null ? '目標の予算がないので、収まるかどうかは出していない。' : ''}
               {forecast.drivers[0]
-                ? ` 増えるとしたら、大きいのは${forecast.drivers[0].categoryName}。`
+                ? `増えるとしたら、大きいのは${forecast.drivers[0].categoryName}。`
+                : ''}
+              {budgetYen !== null && forecast.expectedOvershoot > 0
+                ? `超えるときは、平均で${formatEstimate(forecast.expectedOvershoot)}超える。`
                 : ''}
             </p>
-            {suggestion && suggestion.probAfter - suggestion.probBefore >= 0.01 ? (
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-                {suggestion.categoryName}を週1回減らすと、収まる確率{' '}
-                {formatProbability(suggestion.probBefore)} →{' '}
-                {formatProbability(suggestion.probAfter)}
-                <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                  (約{formatEstimate(suggestion.savedYen, { approx: false })}少なくなる目安)
-                </span>
-              </p>
-            ) : null}
-            {aiRead ? (
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                AIの読み({formatDateJa(aiRead.asOf)}時点):中央 {formatEstimate(aiRead.adjusted.p50)}
-                。{aiRead.reason}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="mt-3 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            {forecast === null
-              ? `着地の予測を計算できませんでした。ほかの集計は下に出ています。${forecastError ? `(${forecastError})` : ''}`
-              : '予測に足る記録がまだない。'}
-          </p>
-        )}
-      </header>
+          ) : null}
+          {suggestion ? <NextStepCard suggestion={suggestion} monthKey={monthKey} /> : null}
+          {aiRead ? (
+            <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              AIの読み({formatDateJa(aiRead.asOf)}時点):中央 {formatEstimate(aiRead.adjusted.p50)}。
+              {aiRead.reason}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          {forecast === null
+            ? `着地の予測を計算できませんでした。ほかの集計は下に出ています。${forecastError ? `(${forecastError})` : ''}`
+            : '予測に足る記録がまだない。'}
+        </p>
+      )}
       {goalPlan && budgetYen !== null && chart ? (
         <GoalChart
           genreName="全体"

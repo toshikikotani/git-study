@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MdCameraAlt } from 'react-icons/md';
+import { MdCameraAlt, MdHome, MdMenuBook, MdPayments, MdTrackChanges } from 'react-icons/md';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { createLongPress } from '@/lib/long-press';
@@ -22,17 +22,19 @@ import {
   useReceiptJobs,
 } from '@/features/import/receipt-queue';
 import { nextChromeCompact } from '@/lib/chrome';
+import { upgradeStoredTheme } from '@/lib/color-theme';
 import { scrollToTop, tabTapAction } from '@/lib/scroll';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
 import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
+// デザインのボトムナビ:アイコンの下に名前(色だけで選択中を示さない)。
 const NAV = [
-  { href: '/', label: 'ホーム' },
-  { href: '/spending', label: '家計簿' },
-  { href: '/plan', label: '目標' },
-  { href: '/payday', label: '給料日' },
+  { href: '/', label: 'ホーム', Icon: MdHome },
+  { href: '/spending', label: '家計簿', Icon: MdMenuBook },
+  { href: '/plan', label: '目標', Icon: MdTrackChanges },
+  { href: '/payday', label: '給料日', Icon: MdPayments },
 ] as const;
 
 function isSameTab(pathname: string, href: string): boolean {
@@ -42,6 +44,10 @@ function isSameTab(pathname: string, href: string): boolean {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // 以前に選んだ色(4色だけの保存)を、今の色の役割に置き換える(ADR-079)。
+  useEffect(() => {
+    upgradeStoredTheme();
+  }, []);
   const isClient = useIsClient();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const navigating = pendingHref !== null && !isSameTab(pathname, pendingHref);
@@ -304,8 +310,10 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
                     >
                       <span
                         className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                        style={{ flexDirection: 'column', gap: 2 }}
                       >
-                        {item.label}
+                        <item.Icon aria-hidden size={20} />
+                        <span className={isActive ? 'font-semibold' : undefined}>{item.label}</span>
                       </span>
                     </Link>
                   </li>

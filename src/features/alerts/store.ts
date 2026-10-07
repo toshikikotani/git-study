@@ -253,7 +253,7 @@ export async function detectAndRecordWastefulBudgetAlertsAsAdmin(
 
 /**
  * P6-1:月次の振り返りを月末にだけ Discord へ積む(今月の貯金・
- * 副業収入・浪費枠消化)。貯金は features/savings(収入 − 支出、ADR-077)、
+ * 副業収入・浪費枠消化)。貯金は features/savings(収入 − 支出、ADR-080)、
  * ほかは side_incomes と loadWasteCategoryStatuses() から集計する(TASKS.md P6-1)。
  *
  * 月末以外は何もしない(isLastDayOfMonth)。dedup_key が月単位のため、

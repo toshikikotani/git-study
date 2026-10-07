@@ -99,15 +99,17 @@ export function MoreMenu({ onNavigate }: { onNavigate?: (href: string) => void }
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="その他の機能"
-        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"
+        className="flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center px-2 text-xs"
         style={{
+          gap: 2,
           borderRadius: 'var(--radius-full)',
           background: open ? 'var(--accent-track)' : 'transparent',
           color: open ? 'var(--accent)' : 'var(--ink-secondary)',
           transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)`,
         }}
       >
-        <MdMoreHoriz aria-hidden size={22} />
+        <MdMoreHoriz aria-hidden size={20} />
+        <span aria-hidden>その他</span>
       </button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">

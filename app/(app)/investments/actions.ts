@@ -87,7 +87,7 @@ export async function upsertSnapshotAction(
   return { error: null };
 }
 
-/** 高リスク枠を使うかを切り替える(ADR-077。以前は完済で自動に切り替えていた)。 */
+/** 高リスク枠を使うかを切り替える(ADR-080。以前は完済で自動に切り替えていた)。 */
 export async function setHighRiskAction(enabled: boolean): Promise<{ error: string | null }> {
   try {
     await updateAppSettings({ isHighRiskUnlocked: enabled });

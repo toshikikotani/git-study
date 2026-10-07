@@ -129,6 +129,11 @@ export type SimulateInput = {
    * 週に perWeek 回へらしたとして見込む(ジャンル画面の「決める」、ADR-075)。
    */
   promises?: readonly ForecastPromise[];
+  /**
+   * これまでの約束の守れ具合(0〜1)。「これ以上は使わない」の「いつもの守り方」の見込みに使う。
+   * 無ければ DEFAULT_PROMISE_KEEP_RATE。
+   */
+  promiseKeepRate?: number;
 };
 
 /**
@@ -145,7 +150,14 @@ const LUMPY_SCHEDULED_FACTOR = 0.2;
 const LUMPY_FALLBACK_SIGMA = 0.6;
 const LUMPY_MIN_SIGMA = 0.25;
 
+/**
+ * 約束。perWeek が 1 以上なら「週に perWeek 回へらす」、0 なら「これ以上は使わない」
+ * (月末までの残りを、これまでの約束の守れ具合 promiseKeepRate の割合だけ減らして見込む)。
+ */
 export type ForecastPromise = { categoryId: string; perWeek: number };
+
+/** これまでの約束の守れ具合が分からないときの割合(半分は守れる、として見込む)。 */
+export const DEFAULT_PROMISE_KEEP_RATE = 0.5;
 
 function quantileAt(sortedAsc: ArrayLike<number>, p: number): number {
   const n = sortedAsc.length;
@@ -932,6 +944,24 @@ function actionDays(input: SimulateInput, run: TrialRun): number {
   return run.futureDates.filter((d) => d <= until).length;
 }
 
+/**
+ * 約束で減らす割合。週に n 回へらす:n × 月末までの週数 ÷ 見込みの回数。これ以上は使わない:
+ * 月末までの残りの日の分(残りの日数のうち月末までの割合)に、守れ具合 keep を掛ける。
+ */
+function promiseCut(
+  perWeek: number,
+  count: number,
+  actionDayCount: number,
+  remainingDayCount: number,
+  keep: number,
+): number {
+  if (perWeek <= 0) {
+    const share = remainingDayCount > 0 ? actionDayCount / remainingDayCount : 0;
+    return Math.min(1, Math.max(0, keep * share));
+  }
+  return count > 0 ? Math.min(1, (perWeek * (actionDayCount / 7)) / count) : 0;
+}
+
 /** 約束を入れる前の、約束したカテゴリの試行の額と回数(「もし」を約束の前から数えるため)。 */
 type PromiseState = {
   /** カテゴリの添字 → 約束を入れる前の試行の額。 */
@@ -958,13 +988,14 @@ function applyPromises(input: SimulateInput, run: TrialRun): PromiseState {
   const Dm = actionDays(input, run);
   const D = run.futureDates.length;
   if (Dm <= 0) return state;
-  const weeks = Dm / 7;
+  const keep = input.promiseKeepRate ?? DEFAULT_PROMISE_KEEP_RATE;
   for (const p of promises) {
     const c = run.categories.findIndex((cat) => cat.id === p.categoryId);
     if (c < 0 || c >= run.categoryCountMean.length) continue;
     const count = run.categoryCountMean[c]!;
-    if (count <= 0 || p.perWeek <= 0) continue;
-    const cut = Math.min(1, (p.perWeek * weeks) / count);
+    if (count <= 0 || p.perWeek < 0) continue;
+    const cut = promiseCut(p.perWeek, count, Dm, D, keep);
+    if (cut <= 0) continue;
     const samples = run.categorySamples[c]!;
     state.before.set(c, Float64Array.from(samples));
     state.cut.set(c, cut);
@@ -1016,8 +1047,9 @@ function whatIfOf(args: {
     const meanYen = mean(samples);
     if (meanYen <= 0) return;
     const scaled = new Float64Array(run.trials);
-    const options = WHAT_IF_PER_WEEK.map((perWeek) => {
-      const cut = Math.min(1, (perWeek * weeks) / expectedCount);
+    const D = run.futureDates.length;
+    const keep = input.promiseKeepRate ?? DEFAULT_PROMISE_KEEP_RATE;
+    const optionFor = (perWeek: number, cut: number) => {
       let over = 0;
       let within = 0;
       for (let t = 0; t < run.trials; t += 1) {
@@ -1042,7 +1074,16 @@ function whatIfOf(args: {
         probWithinBudget: budget === null ? null : calibratedProbability(cal, within / run.trials),
         savedYen: Math.round(meanYen * cut),
       };
-    });
+    };
+    const options = WHAT_IF_PER_WEEK.map((perWeek) =>
+      optionFor(perWeek, promiseCut(perWeek, expectedCount, Dm, D, perWeek === 0 ? 0 : keep)),
+    );
+    // 「これ以上は使わない」:守れたとき(月末までの残りを全部へらす)と、いつもの守り方。
+    const stop = {
+      keepRate: keep,
+      kept: optionFor(0, promiseCut(0, expectedCount, Dm, D, 1)),
+      usual: optionFor(0, promiseCut(0, expectedCount, Dm, D, keep)),
+    };
     // 週1回へらすだけで残りが無くなるなら、週2回は出さない(同じ数字が並ぶため)。
     const distinct = options.filter((o, i) => i === 0 || o.savedYen !== options[i - 1]!.savedYen);
     out.push({
@@ -1052,6 +1093,7 @@ function whatIfOf(args: {
       weeks,
       promisedPerWeek: promiseOf.get(cat.categoryId) ?? null,
       options: distinct,
+      stop,
     });
   });
   return out;

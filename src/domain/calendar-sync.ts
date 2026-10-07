@@ -71,7 +71,7 @@ export function planSubscriptionEvents(
 }
 
 /**
- * 貯金目標の期限(ADR-077。以前の「完済予定日」の代わり)。期限のある目標ごとに1件。
+ * 貯金目標の期限(ADR-080。以前の「完済予定日」の代わり)。期限のある目標ごとに1件。
  * key は目標の id だけにし、期限を直しても同じイベントの日付を上書きする。
  */
 export function planSavingsGoalEvents(

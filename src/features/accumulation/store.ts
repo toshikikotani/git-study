@@ -41,7 +41,7 @@ export type AccumulationView = {
   noSpend: NoSpendSummary;
   pace: PaceComparison;
   /**
-   * 小口支出を丸ごと貯金に回した場合の効果(ADR-077。以前は完済の短縮)。
+   * 小口支出を丸ごと貯金に回した場合の効果(ADR-080。以前は完済の短縮)。
    * 金額のある貯金目標が無い・届く見込みが出せないなら null(画面では出さない)。
    */
   savingsImpact: { goalTitle: string; monthsSooner: number } | null;

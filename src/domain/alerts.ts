@@ -4,7 +4,7 @@
  * FR-20(浪費70%到達)と FR-21(リボ/キャッシング/分割)の判定は
  * domain/budget.ts と features/classification/rules.ts に実装済み。
  * ここに置くのは FR-22(未取込・未確認)ほか。FR-23(返済日前日)は借金をなくした
- * (ADR-077)ので外した。
+ * (ADR-080)ので外した。
  *
  * ── なぜ純粋関数にするか ────────────────────────────────────
  * 「いつ発火させるか」の判断と、「DB から何を読むか」「DB へどう書くか」を
@@ -33,7 +33,7 @@ export type MonthlyRecapSummary = {
   wasteCategories: readonly RecapWasteCategory[];
 };
 
-/** 'payment_due'・'debt_paid_off' は借金をなくした(ADR-077)ので使わない(DB の列挙には残る)。 */
+/** 'payment_due'・'debt_paid_off' は借金をなくした(ADR-080)ので使わない(DB の列挙には残る)。 */
 export type AlertKind =
   | 'inactivity'
   | 'payment_due'
