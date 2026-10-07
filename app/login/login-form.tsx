@@ -7,7 +7,6 @@
  */
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { createClient } from '@/lib/supabase/client';
@@ -15,6 +14,19 @@ import { createClient } from '@/lib/supabase/client';
 import { signUpAction } from './actions';
 
 type Tab = 'password' | 'register';
+
+/**
+ * ログインできたら、ホームをページごと読み直して開く(ADR-083)。
+ *
+ * 以前は `router.push('/')` の直後に `router.refresh()` を呼んでいた。refresh は「今の画面」を
+ * 読み直すため、ホームへの移動が終わる前に呼ばれるとログイン画面を読み直してしまい、ホームへ
+ * 移れずに「ログインしています…」のまま止まることがあった(ホームの読み込みが重いほど起きる)。
+ * ページごと読み直せば、新しいセッションの cookie を必ず持ってホームを開ける。戻るボタンで
+ * ログイン画面に戻らないよう replace にする。
+ */
+function openHome() {
+  window.location.replace('/');
+}
 
 export function LoginForm() {
   const [tab, setTab] = useState<Tab>('password');
@@ -40,7 +52,6 @@ export function LoginForm() {
 }
 
 function PasswordForm() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle');
@@ -56,8 +67,7 @@ function PasswordForm() {
       setStatus('error');
       return;
     }
-    router.push('/');
-    router.refresh();
+    openHome();
   }
 
   return (
@@ -111,7 +121,6 @@ function PasswordForm() {
 }
 
 function RegisterForm() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -150,8 +159,7 @@ function RegisterForm() {
       return;
     }
 
-    router.push('/');
-    router.refresh();
+    openHome();
   }
 
   return (
