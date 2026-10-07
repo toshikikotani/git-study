@@ -32,13 +32,10 @@ export function starterTargetYen(
 }
 
 /**
- * はじめての設定を出すか。目標を一度も立てておらず、明細も1件も無く、
- * 「あとで」を選んでいない人だけ(いつも使っている人には出さない)。
+ * はじめての設定を出すか。目標を一度も立てておらず、「あとで」を選んでいない人だけ
+ * (目標を立てて使っている人には出さない)。明細があっても出す:登録してすぐ明細を入れた人も、
+ * 目標が無いままでは何を基準に使えばいいかわからないため。
  */
-export function needsOnboarding(state: {
-  hasPlan: boolean;
-  hasTransactions: boolean;
-  skipped: boolean;
-}): boolean {
-  return !state.hasPlan && !state.hasTransactions && !state.skipped;
+export function needsOnboarding(state: { hasPlan: boolean; skipped: boolean }): boolean {
+  return !state.hasPlan && !state.skipped;
 }
