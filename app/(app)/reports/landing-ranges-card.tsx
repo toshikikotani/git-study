@@ -181,7 +181,7 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
               className="absolute top-0 size-4 -translate-x-1/2 rounded-full"
               style={{
                 left: pct(row.p50),
-                background: 'var(--accent)',
+                background: 'var(--sub, #8fd9b8)',
                 boxShadow: '0 0 0 3px var(--surface)',
               }}
             />
