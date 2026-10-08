@@ -30,57 +30,59 @@ export function LandingRangesCard({
   const fixed = rows.filter((r) => r.group === 'fixed');
   const fixedTotal = fixed.reduce((sum, r) => sum + r.p50, 0);
   return (
-    <section
-      aria-label="ジャンルごとの月末の見込み"
-      className="rounded-[22px] px-4 py-4"
-      style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
-    >
-      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        {periodLabel}の見込み(ジャンル別)
+    <div className="space-y-3">
+      <h2 className="px-1 pt-2 text-xl font-bold" style={{ color: 'var(--ink)' }}>
+        ジャンル別
+      </h2>
+      <section
+        aria-label={`${periodLabel}のジャンルごとの見込み`}
+        className="rounded-[28px] px-5 py-2"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      >
+        {changeable.length > 0 ? (
+          <>
+            <p className="pt-3 text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+              変えられる支出
+            </p>
+            <ul>
+              {changeable.map((row, i) => (
+                <ChangeableRow key={row.genreId} row={row} first={i === 0} />
+              ))}
+            </ul>
+          </>
+        ) : null}
+        {fixed.length > 0 ? (
+          <details style={{ borderTop: '1px solid var(--hairline)' }}>
+            <summary
+              className="tabular flex min-h-12 cursor-pointer items-center justify-between gap-3 text-xs font-semibold"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              <span>決まった支出({fixed.length}つ)</span>
+              <span style={{ color: 'var(--ink)' }}>
+                {formatYen(fixedTotal, { sign: 'never' })}
+              </span>
+            </summary>
+            <ul className="space-y-2 pb-3">
+              {fixed.map((row) => (
+                <FixedRow key={row.genreId} row={row} />
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </section>
+      <p className="px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        帯は80%の範囲、点は中央、縦の線は目標(棒は目標の1.5倍まで)。行を押すと、なぜその見込みかを出す。
       </p>
-      {changeable.length > 0 ? (
-        <>
-          <p className="mt-3 text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
-            変えられる支出
-          </p>
-          <ul className="mt-2 space-y-2">
-            {changeable.map((row) => (
-              <ChangeableRow key={row.genreId} row={row} />
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {fixed.length > 0 ? (
-        <details className="mt-4">
-          <summary
-            className="tabular flex min-h-11 cursor-pointer items-center justify-between gap-3 text-xs font-semibold"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            <span>決まった支出({fixed.length}つ)</span>
-            <span style={{ color: 'var(--ink)' }}>{formatYen(fixedTotal, { sign: 'never' })}</span>
-          </summary>
-          <ul className="mt-2 space-y-2">
-            {fixed.map((row) => (
-              <FixedRow key={row.genreId} row={row} />
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        濃い棒はもう決まっている額、帯は10回中8回の範囲、点は中央、「目標」の目盛りは目標(棒は目標の1.5倍まで)。
-        「このままだと」は、目標を超える見込みが10回中5回以上で、超える額の大きいジャンルに2つまで。行を押すと、なぜその見込みかを出す。
-      </p>
-    </section>
+    </div>
   );
 }
 
-function ChangeableRow({ row }: { row: LandingRow }) {
+function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
   const scaleMax =
     row.targetYen !== null && row.targetYen > 0
       ? row.targetYen * SCALE_OF_TARGET
       : Math.max(row.p90, 1) * 1.1;
   const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / scaleMax) * 100))}%`;
-  const overflow = row.p90 > scaleMax;
   const exceedText =
     row.targetYen !== null && row.exceedance !== null
       ? `目標${formatEstimate(row.targetYen, { approx: false })}を超える見込み ${formatTimesInTen(row.exceedance)}`
@@ -88,84 +90,79 @@ function ChangeableRow({ row }: { row: LandingRow }) {
   const spoken = `${row.name}、月末の見込み${formatEstimate(row.p50)}、10回中8回は${formatEstimateRange(row.p10, row.p90)}${
     exceedText ? `、${exceedText}` : ''
   }`;
+  const likely = row.caution?.kind === 'likely';
+  const cut =
+    likely && row.cutPerWeekYen !== null && row.cutPerWeekYen > 0
+      ? ` · 週1回へらすと${formatEstimate(row.cutPerWeekYen)}減`
+      : '';
   return (
-    <li>
+    <li style={first ? undefined : { borderTop: '1px solid var(--hairline)' }}>
       <details>
-        <summary className="cursor-pointer list-none py-1">
+        <summary className="flex cursor-pointer list-none flex-col gap-3 py-4">
           <div className="flex items-baseline justify-between gap-3">
             <span
-              className="min-w-0 truncate text-sm font-semibold"
+              className="min-w-0 truncate text-base font-semibold"
               style={{ color: 'var(--ink)' }}
             >
               {row.name}
             </span>
-            <span className="tabular shrink-0 text-sm" style={{ color: 'var(--ink)' }}>
+            <span
+              className="tabular shrink-0 text-sm font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               {formatEstimate(row.p50)}
+              {row.targetYen !== null ? (
+                <span className="font-normal" style={{ color: 'var(--ink-secondary)' }}>
+                  {' '}
+                  / 目標 {formatEstimate(row.targetYen, { approx: false })}
+                </span>
+              ) : null}
             </span>
           </div>
-          <div
-            role="img"
-            aria-label={spoken}
-            className="relative mt-4 h-3 w-full rounded-full"
-            style={{ background: 'var(--hairline)' }}
-          >
+          <div role="img" aria-label={spoken} className="relative h-4 w-full">
             <span
-              className="absolute inset-y-0 left-0 rounded-full"
-              style={{ width: pct(row.baseYen), background: 'var(--ink-muted)', opacity: 0.7 }}
+              className="absolute inset-x-0 top-1 h-2 rounded-full"
+              style={{ background: 'var(--plane)' }}
             />
             <span
-              className="absolute inset-y-0 rounded-full"
+              className="absolute top-1 h-2 rounded-full"
               style={{
                 left: pct(row.p10),
                 width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
-                background: 'var(--income)',
-                opacity: 0.3,
-              }}
-            />
-            <span
-              aria-hidden
-              className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full"
-              style={{
-                left: pct(row.p50),
-                background: 'var(--income)',
-                boxShadow: '0 0 0 2px var(--surface-raised)',
+                background: 'var(--accent-track)',
               }}
             />
             {row.targetYen !== null ? (
               <span
                 aria-hidden
-                className="absolute -inset-y-1 w-0.5"
+                className="absolute inset-y-0 w-0.5 -translate-x-1/2"
                 style={{ left: pct(row.targetYen), background: 'var(--ink)' }}
               >
-                <span
-                  className="absolute -top-4 left-1/2 -translate-x-1/2 text-xs leading-none whitespace-nowrap"
-                  style={{ color: 'var(--ink-secondary)' }}
-                >
-                  目標
-                </span>
+                <span className="sr-only">目標</span>
               </span>
             ) : null}
-            {overflow ? (
-              <span
-                aria-hidden
-                className="absolute top-1/2 right-0 -translate-y-1/2 text-xs leading-none"
-                style={{ color: 'var(--ink-secondary)' }}
-              >
-                ›
-              </span>
-            ) : null}
+            <span
+              aria-hidden
+              className="absolute top-0 size-4 -translate-x-1/2 rounded-full"
+              style={{
+                left: pct(row.p50),
+                background: 'var(--accent)',
+                boxShadow: '0 0 0 3px var(--surface)',
+              }}
+            />
           </div>
-          <p className="tabular mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-            {formatEstimate(row.p50)}({formatEstimateRange(row.p10, row.p90)})
-            {exceedText ? `・${exceedText}` : ''}
-            {row.exceedance !== null && row.targetYen !== null ? (
-              <span style={{ color: 'var(--ink-muted)' }}>
-                {' '}
-                ({formatProbability(row.exceedance)})
-              </span>
-            ) : null}
+          <p
+            className="tabular text-xs"
+            style={{
+              color: likely ? 'var(--state-caution)' : 'var(--ink-secondary)',
+              fontWeight: likely ? 600 : 400,
+            }}
+          >
+            {row.exceedance !== null && row.targetYen !== null
+              ? `${formatProbability(row.exceedance)}の確率で 目標を超えます${cut}`
+              : `80%の確率で ${formatEstimateRange(row.p10, row.p90)}`}
           </p>
-          {row.caution ? <CautionLine row={row} /> : null}
+          {row.caution?.kind === 'over' ? <CautionLine row={row} /> : null}
         </summary>
         <GenreWhy row={row} />
       </details>

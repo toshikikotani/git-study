@@ -2,27 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   MdBurstMode,
   MdCameraAlt,
   MdEdit,
-  MdHome,
-  MdMenuBook,
   MdMic,
-  MdPayments,
   MdPhotoLibrary,
-  MdReceiptLong,
   MdScreenshot,
-  MdTrackChanges,
 } from 'react-icons/md';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
-import { MoreMenu, type MenuAccount } from '@/components/ui/more-menu';
+import { GoalIcon, LedgerIcon, OutlookIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
@@ -41,12 +36,13 @@ import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
-// デザインのボトムナビ:アイコンの下に名前(色だけで選択中を示さない)。
+// デザインのボトムナビ(ADR-085):今日・見通し・家計簿・目標と、右に記録する(＋)。
+// アイコンの下に名前(色だけで選択中を示さない)。給料日と「その他」はホームの右上へ。
 const NAV = [
-  { href: '/', label: 'ホーム', Icon: MdHome },
-  { href: '/spending', label: '家計簿', Icon: MdMenuBook },
-  { href: '/plan', label: '目標', Icon: MdTrackChanges },
-  { href: '/payday', label: '給料日', Icon: MdPayments },
+  { href: '/', label: '今日', Icon: TodayIcon },
+  { href: '/reports', label: '見通し', Icon: OutlookIcon },
+  { href: '/spending', label: '家計簿', Icon: LedgerIcon },
+  { href: '/plan', label: '目標', Icon: GoalIcon },
 ] as const;
 
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */
@@ -60,13 +56,7 @@ function isSameTab(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({
-  children,
-  account,
-}: {
-  children: React.ReactNode;
-  account: MenuAccount;
-}) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // 以前に選んだ色(4色だけの保存)を、今の色の役割に置き換える(ADR-079)。
   useEffect(() => {
@@ -97,21 +87,15 @@ export function AppShell({
       </PullToRefresh>
       <UndoToastHost />
       {isClient ? (
-        createPortal(<BottomBar onNavigate={beginNavigate} account={account} />, document.body)
+        createPortal(<BottomBar onNavigate={beginNavigate} />, document.body)
       ) : (
-        <BottomBar onNavigate={beginNavigate} account={account} />
+        <BottomBar onNavigate={beginNavigate} />
       )}
     </div>
   );
 }
 
-function BottomBar({
-  onNavigate,
-  account,
-}: {
-  onNavigate: (href: string) => void;
-  account: MenuAccount;
-}) {
+function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
   const pathname = usePathname();
   const isClient = useIsClient();
   const jobs = useReceiptJobs();
@@ -169,7 +153,7 @@ function BottomBar({
   // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じメニュー。
   const fab = (
     <Fab label="記録する(カメラ・写真・手入力)" onPress={() => setFabMenuOpen(true)}>
-      <MdReceiptLong aria-hidden size={26} />
+      <PlusIcon />
     </Fab>
   );
   const closeMenuAnd = (fn: () => void) => () => {
@@ -338,66 +322,54 @@ function BottomBar({
           </ul>
         </div>
       </BottomSheet>
-      <div className="tabbar flex w-full items-center" data-compact={compact}>
-        <nav className="min-w-0 flex-1">
+      <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
+        <nav aria-label="メイン" className="min-w-0 flex-1">
           <ul className="tabbar-pill liquid-capsule flex items-center gap-1">
-            {NAV.map((item, index) => {
+            {NAV.map((item) => {
               const isActive = isSameTab(pathname, item.href);
               return (
-                <Fragment key={item.href}>
-                  {index === 2 ? (
-                    <li
-                      className="flex w-16 shrink-0 justify-center self-center"
-                      aria-label="レシートを撮る"
+                <li key={item.href} className="flex-1">
+                  <Link
+                    href={item.href}
+                    prefetch
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={(e) => {
+                      if (tabTapAction(pathname, item.href) === 'scroll-top') {
+                        e.preventDefault();
+                        scrollToTop();
+                      }
+                    }}
+                    className="min-h-11 flex flex-col items-center gap-1 py-1"
+                  >
+                    <span
+                      className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                      style={{ flexDirection: 'column', gap: 2 }}
                     >
-                      <div
-                        style={{ transform: 'translateY(calc(var(--fab-lift) * -1))' }}
-                        onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
-                        onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
-                        onPointerUp={longPress.end}
-                        onPointerCancel={longPress.end}
-                        onContextMenu={(e) => e.preventDefault()}
-                        onClickCapture={(e) => {
-                          if (longPress.consumeClick()) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }
-                        }}
-                      >
-                        {fab}
-                      </div>
-                    </li>
-                  ) : null}
-                  <li className="flex-1">
-                    <Link
-                      href={item.href}
-                      prefetch
-                      aria-current={isActive ? 'page' : undefined}
-                      onClick={(e) => {
-                        if (tabTapAction(pathname, item.href) === 'scroll-top') {
-                          e.preventDefault();
-                          scrollToTop();
-                        }
-                      }}
-                      className="min-h-11 flex flex-col items-center gap-1 py-2"
-                    >
-                      <span
-                        className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
-                        style={{ flexDirection: 'column', gap: 2 }}
-                      >
-                        <item.Icon aria-hidden size={20} />
-                        <span className={isActive ? 'font-semibold' : undefined}>{item.label}</span>
-                      </span>
-                    </Link>
-                  </li>
-                </Fragment>
+                      <item.Icon />
+                      <span className="font-semibold">{item.label}</span>
+                    </span>
+                  </Link>
+                </li>
               );
             })}
-            <li className="flex shrink-0 items-center justify-center self-center">
-              <MoreMenu onNavigate={onNavigate} account={account} />
-            </li>
           </ul>
         </nav>
+        <div
+          className="shrink-0"
+          onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
+          onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
+          onPointerUp={longPress.end}
+          onPointerCancel={longPress.end}
+          onContextMenu={(e) => e.preventDefault()}
+          onClickCapture={(e) => {
+            if (longPress.consumeClick()) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
+          {fab}
+        </div>
       </div>
     </div>
   );

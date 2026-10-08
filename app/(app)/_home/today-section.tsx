@@ -1,25 +1,33 @@
-import { landingRowsFrom } from '@/domain/forecast/landing-rows';
 import { todayAllowance } from '@/domain/forecast/today';
 import { goalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast } from '@/features/forecast/load';
-import { listGenres } from '@/features/genre/store';
+import { countPendingReview } from '@/features/home/pending';
 import { getCurrentPlan } from '@/features/spending-plan/store';
-import { addDays, addMonths, monthStartJst, todayJst } from '@/lib/date';
-import { LandingRangesCard } from '../reports/landing-ranges-card';
+import { addDays, addMonths, monthStartJst, splitDateOnly, todayJst } from '@/lib/date';
+import { HomeList, type HomeListProps } from './home-list';
 import { TodayCard } from './today-card';
 
+/** 「10月の見通し」(暦の1か月の目標)/「10月14日までの見通し」(それ以外)。 */
+export function outlookLabel(period: { from: string; to: string }): string {
+  const [, fm, fd] = splitDateOnly(period.from);
+  const [ty, tm, td] = splitDateOnly(period.to);
+  const lastDay = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+  if (fd === 1 && fm === tm && td === lastDay) return `${tm}月の見通し`;
+  return `${tm}月${td}日までの見通し`;
+}
+
 /**
- * ホームの「今日あと使える額」とその下のカード(デザインのホーム)を読み込む(重い予測なので、
- * ホームの他の部分を待たせないように Suspense の中で読む)。今日あと使える額・収まる確率・
- * ジャンル別は目標の範囲、月末の収支は今月のすべての支出で出す(レポートと同じ範囲・同じ数字)。
+ * ホームの「今日使える額」から下(デザインの「今日」、ADR-085)を読み込む(重い予測なので、
+ * ホームの他の部分を待たせないように Suspense の中で読む)。今日使える額・見通し・次の一手は
+ * 目標の範囲、月末に残る見込みは今月のすべての支出で出す(レポートと同じ範囲・同じ数字)。
  */
-export async function TodaySection() {
+export async function TodaySection({ savings }: { savings: HomeListProps['savings'] }) {
   const today = todayJst();
   const monthFrom = monthStartJst();
   const monthPeriod = { from: monthFrom, to: addDays(addMonths(monthFrom, 1), -1) };
-  const [plan, genres] = await Promise.all([
+  const [plan, pendingCount] = await Promise.all([
     getCurrentPlan(today).catch(() => null),
-    listGenres().catch(() => []),
+    countPendingReview(),
   ]);
   const goal = goalForecastArgs(plan);
   const [goalView, monthView] = await Promise.all([
@@ -28,15 +36,6 @@ export async function TodaySection() {
   ]);
   const forecast = goalView?.forecast ?? null;
   const balance = monthView?.forecast.balance ?? null;
-  const rows =
-    forecast && goalView
-      ? landingRowsFrom({
-          forecast,
-          excludedByCategory: goalView.excludedByCategory,
-          closedGenreIds: new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id)),
-          cautionPrecision: goalView.cautionPrecision,
-        })
-      : [];
   return (
     <div className="space-y-3">
       <TodayCard
@@ -48,22 +47,28 @@ export async function TodaySection() {
               })
             : null
         }
-        balance={balance ? { ...balance, incomeYen: balance.incomeYen } : null}
-        suggestion={forecast?.suggestion ?? null}
-        probWithinBudget={forecast?.probWithinBudget ?? null}
-        provisional={forecast?.provisional ?? false}
-        budget={
+        outlook={
           goal && forecast
             ? {
-                yen: goal.budgetYen,
-                landingP50: forecast.total.p50,
-                expectedOvershoot: forecast.expectedOvershoot,
+                label: outlookLabel(goal.period),
+                spentYen: forecast.breakdown.actualYen,
+                p10: forecast.total.p10,
+                p50: forecast.total.p50,
+                p90: forecast.total.p90,
+                budgetYen: goal.budgetYen,
               }
             : null
         }
+        suggestion={forecast?.suggestion ?? null}
+        probWithinBudget={forecast?.probWithinBudget ?? null}
+        provisional={forecast?.provisional ?? false}
         monthKey={monthFrom.slice(0, 7)}
       />
-      <LandingRangesCard rows={rows} periodLabel="目標の期間" />
+      <HomeList
+        balance={balance ? { p50: balance.p50, incomeYen: balance.incomeYen } : null}
+        pendingCount={pendingCount}
+        savings={savings}
+      />
     </div>
   );
 }

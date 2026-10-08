@@ -46,13 +46,11 @@ describe('レポートの着地まわりのカード', () => {
         }),
       ),
     );
-    // 設計書 v3 3.3 の文字の形。
-    expect(html).toContain('約5.0万円(3.3万〜8.0万円)・目標4.2万円を超える見込み 10回中7回');
-    expect(html).toContain('(70%)');
-    // 注意(3.2):「このままだと」と、形(▲)と、1行の提案。
-    expect(html).toContain('このままだと 約8,800円オーバー(10回中7回)');
-    expect(html).toContain('▲');
-    expect(html).toContain('週1回減らすと、約6,200円少なくなる見込み');
+    // デザインの「見通し」のジャンル別(ADR-085):見込み / 目標、超える確率と1行の提案。
+    expect(html).toContain('ジャンル別');
+    expect(html).toContain('約5.0万円');
+    expect(html).toContain('/ 目標 4.2万円');
+    expect(html).toContain('70%の確率で 目標を超えます · 週1回へらすと約6,200円減');
     expect(html).toContain('変えられる支出');
     expect(html).not.toContain('決まった支出');
     // 読み上げ(3.10)。
@@ -64,6 +62,7 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).toContain('この先の見込み(中央)');
     expect(html).toContain('>目標<');
     expect(html).toContain('点は中央');
+    expect(html).toContain('state-caution');
   });
 
   it('決まった支出は1行に畳み、見込みの無いジャンルは言葉で出す', () => {

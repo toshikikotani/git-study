@@ -7,7 +7,6 @@ import { formatSignedYen } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
 import { Yen } from '@/components/ui/money';
 import type { PaceComparison } from '@/domain/summary-rules';
-import { splitDateOnly } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
 
 export type ForecastInfo = {
@@ -32,15 +31,23 @@ export function SummaryCard({
   forecast,
   hasIncomeRegistered,
   goal,
+  fixedVariable = null,
 }: {
   pace: PaceComparison;
   forecast: ForecastInfo;
   hasIncomeRegistered: boolean;
   /** 目標期間中のサマリー(期間・残り日数・使った額/予算・今日使える額)。 */
   goal: ReactNode | null;
+  /** 今月の固定費(本人が確認したもの)と変えられる支出。今月のときだけ出す。 */
+  fixedVariable?: { fixedYen: number; variableYen: number } | null;
 }) {
   const monthPane = (
-    <MonthPane pace={pace} forecast={forecast} hasIncomeRegistered={hasIncomeRegistered} />
+    <MonthPane
+      pace={pace}
+      forecast={forecast}
+      hasIncomeRegistered={hasIncomeRegistered}
+      fixedVariable={fixedVariable}
+    />
   );
   if (goal === null) return monthPane;
 
@@ -134,76 +141,142 @@ function SwipeableSummary({ goal, monthPane }: { goal: ReactNode; monthPane: Rea
   );
 }
 
+/**
+ * 月のサマリー(デザインの「家計簿」、ADR-085):支出と収入を2つ並べ、その下に固定費と
+ * 変えられる支出の帯、先月の同じ日との比べと月末までのペース。
+ */
 function MonthPane({
   pace,
   forecast,
   hasIncomeRegistered,
+  fixedVariable,
 }: {
   pace: PaceComparison;
   forecast: ForecastInfo;
   hasIncomeRegistered: boolean;
+  fixedVariable: { fixedYen: number; variableYen: number } | null;
 }) {
-  const { totals, isCurrentMonth, visibleMonth, loading, error } = useSpendingMonth();
-  const [year, month] = splitDateOnly(visibleMonth);
+  const { totals, isCurrentMonth, loading, error } = useSpendingMonth();
   // 別の月を取りに行っているあいだは、0円ではなく読み込み中と分かるようにする。
   const waiting = !isCurrentMonth && (loading || error !== null);
   const incomeRegistered = isCurrentMonth ? hasIncomeRegistered : totals.incomeYen > 0;
-  const netYen = totals.incomeYen - totals.spentYen;
+  const split = isCurrentMonth ? fixedVariable : null;
+  const splitTotal = split ? split.fixedYen + split.variableYen : 0;
 
   return (
-    <section
-      aria-label="使った額のサマリー"
-      className="rounded-3xl p-6"
-      style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
-    >
-      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        {isCurrentMonth ? '今月つかった' : `${year}年${month}月`}
-      </p>
-      {waiting && error === null ? (
-        <div
-          role="status"
-          aria-label="読み込み中"
-          className="mt-2 h-10 w-44 animate-pulse rounded-lg"
-          style={{ background: 'var(--hairline)' }}
-        />
-      ) : (
-        <p
-          className="tabular mt-3 text-4xl leading-none font-semibold tracking-[-0.045em]"
-          style={{ color: waiting ? 'var(--ink-muted)' : 'var(--ink)' }}
-        >
-          {waiting ? '—' : <Yen value={totals.spentYen} />}
-        </p>
-      )}
+    <section aria-label="使った額のサマリー" className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Tile label="支出">
+          {waiting && error === null ? (
+            <span
+              role="status"
+              aria-label="読み込み中"
+              className="block h-8 w-28 animate-pulse rounded-lg"
+              style={{ background: 'var(--hairline)' }}
+            />
+          ) : waiting ? (
+            '—'
+          ) : (
+            <Yen value={totals.spentYen} />
+          )}
+        </Tile>
+        <Tile label="収入">
+          {waiting ? (
+            '—'
+          ) : incomeRegistered ? (
+            <Yen value={totals.incomeYen} />
+          ) : (
+            <Link
+              href="/transactions/new?type=income"
+              prefetch={false}
+              className="inline-flex min-h-11 items-center text-base font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              手取りを入れる
+            </Link>
+          )}
+        </Tile>
+      </div>
       {waiting && error !== null ? (
-        <p role="alert" className="mt-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        <p role="alert" className="px-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {error}
         </p>
       ) : null}
 
       {!waiting ? (
-        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          {totals.scheduledYen > 0
-            ? `予定 ${formatYen(totals.scheduledYen)} は入っていない。`
-            : '予定は入っていない。'}
-          {incomeRegistered ? ` 収入との差は ${formatSignedYen(netYen)}。` : ''}
-        </p>
-      ) : null}
-      {!waiting && !incomeRegistered ? (
-        <Link
-          href="/transactions/new?type=income"
-          prefetch={false}
-          className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold"
-          style={{ color: 'var(--accent)' }}
+        <div
+          className="space-y-3 rounded-[28px] px-5 py-5"
+          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
-          手取りを入れる
-        </Link>
-      ) : null}
-
-      {isCurrentMonth ? <PaceLine pace={pace} /> : null}
-      {isCurrentMonth && forecast.projectedTotalYen !== null ? (
-        <ForecastLine forecast={forecast} />
+          {split && splitTotal > 0 ? (
+            <>
+              <div
+                role="img"
+                aria-label={`固定費 ${formatYen(split.fixedYen, { sign: 'never' })}、変えられる支出 ${formatYen(split.variableYen, { sign: 'never' })}`}
+                className="flex h-3.5 gap-px overflow-hidden rounded-full"
+              >
+                <span
+                  style={{
+                    width: `${(split.fixedYen / splitTotal) * 100}%`,
+                    background: 'var(--ink)',
+                  }}
+                />
+                <span className="flex-1" style={{ background: 'var(--accent)' }} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SplitLegend color="var(--ink)" label="固定費" yen={split.fixedYen} />
+                <SplitLegend color="var(--accent)" label="変えられる支出" yen={split.variableYen} />
+              </div>
+            </>
+          ) : null}
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            {totals.scheduledYen > 0
+              ? `予定 ${formatYen(totals.scheduledYen)} は入っていない。`
+              : '予定は入っていない。'}
+            {incomeRegistered
+              ? ` 収入との差は ${formatSignedYen(totals.incomeYen - totals.spentYen)}。`
+              : ''}
+          </p>
+          {isCurrentMonth ? <PaceLine pace={pace} /> : null}
+          {isCurrentMonth && forecast.projectedTotalYen !== null ? (
+            <ForecastLine forecast={forecast} />
+          ) : null}
+        </div>
       ) : null}
     </section>
+  );
+}
+
+function Tile({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div
+      className="flex flex-col gap-1 rounded-[22px] p-5"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <span className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        {label}
+      </span>
+      <span
+        className="tabular text-xl font-bold tracking-[-0.02em]"
+        style={{ color: 'var(--ink)' }}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function SplitLegend({ color, label, yen }: { color: string; label: string; yen: number }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        <span aria-hidden className="size-2.5 rounded-sm" style={{ background: color }} />
+        {label}
+      </span>
+      <span className="tabular text-base font-bold" style={{ color: 'var(--ink)' }}>
+        {formatYen(yen, { sign: 'never' })}
+      </span>
+    </div>
   );
 }
 
