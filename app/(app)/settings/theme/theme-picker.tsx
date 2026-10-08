@@ -17,6 +17,7 @@ import {
 const GROUPS = [
   { style: 'simple', title: 'シンプル' },
   { style: 'stylish', title: 'おしゃれ' },
+  { style: 'adult', title: '大人可愛い' },
   { style: 'cute', title: 'かわいい' },
   { style: 'cool', title: 'かっこいい' },
 ] as const;
