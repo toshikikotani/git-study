@@ -88,7 +88,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
           <TenDots probability={SAFE_ALLOWANCE_PROB} />
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
             毎日この額までなら、
-            <strong style={{ color: 'var(--accent)' }}>
+            <strong style={{ color: 'var(--genre-3, var(--sub, var(--accent)))' }}>
               {formatProbability(SAFE_ALLOWANCE_PROB)}の確率
             </strong>
             で予算内に収まります。
@@ -108,7 +108,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
           <Link
             href="/plan"
             className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
-            style={{ color: 'var(--accent)' }}
+            style={{ color: 'var(--sub, var(--accent))' }}
           >
             目標を決める
             <ChevronRightIcon />
@@ -119,7 +119,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
         <Link
           href="/reports"
           className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
-          style={{ color: 'var(--accent)' }}
+          style={{ color: 'var(--genre-3, var(--accent))' }}
         >
           なぜこの額?
           <ChevronRightIcon />
@@ -188,7 +188,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
           className="absolute top-[15px] size-4 -translate-x-1/2 rounded-full"
           style={{
             left: pct(outlook.p50),
-            background: 'var(--accent)',
+            background: 'var(--genre-3, var(--accent))',
             boxShadow: '0 0 0 3px var(--surface)',
           }}
         />
@@ -198,7 +198,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
         />
         <span
           className="absolute -top-1.5 -translate-x-1/2 text-xs font-semibold"
-          style={{ left: pct(outlook.budgetYen), color: 'var(--accent)' }}
+          style={{ left: pct(outlook.budgetYen), color: 'var(--sub, var(--accent))' }}
         >
           予算
         </span>
@@ -226,7 +226,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
             className="h-1.5 rounded-full"
             style={{
               width: `${Math.round(Math.min(1, Math.max(0, probOver)) * 100)}%`,
-              background: caution ? 'var(--state-caution)' : 'var(--accent)',
+              background: caution ? 'var(--sub, var(--accent))' : 'var(--genre-3, var(--accent))',
             }}
           />
         </div>
