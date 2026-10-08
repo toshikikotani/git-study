@@ -903,18 +903,7 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
   const dark = isDark(plane);
   const onAccent = contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink;
   const [hueA, hueB, hueC, hueD, hueE] = themeHues(colors);
-  const genres = [
-    hueA,
-    hueB,
-    hueC,
-    hueD,
-    mixHex(hueC, ink, 0.75),
-    mixHex(hueD, ink, 0.72),
-    mixHex(hueA, hueC, 0.5),
-    mixHex(hueB, hueD, 0.5),
-    mixHex(hueC, hueD, 0.45),
-    mixHex(hueD, hueA, 0.4),
-  ];
+
   return {
     '--plane': plane,
     '--surface': surface,
