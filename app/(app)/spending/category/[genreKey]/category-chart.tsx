@@ -364,7 +364,7 @@ export function CategoryChart({
               className="text-xs font-semibold"
               style={{ color: 'var(--ink)' }}
             >
-              <span aria-hidden style={{ color: lineColor }}>
+              <span aria-hidden style={{ color: barColor }}>
                 ●{' '}
               </span>
               {endNote ?? idealDeltaLabel(cumulative.deltaYen!)}
@@ -449,7 +449,7 @@ export function CategoryChart({
                 x={x}
                 y={y}
                 n={n}
-                color={lineColor}
+                color={barColor}
                 dim={tip !== null}
                 budgetYen={budgetYen}
               />
@@ -566,7 +566,7 @@ export function CategoryChart({
                     left: `${x(end.index)}%`,
                     bottom: `${100 - y(end.actualYen)}%`,
                     transform: 'translate(-50%, 50%)',
-                    background: lineColor,
+                    background: barColor,
                     boxShadow: '0 0 0 2px var(--surface)',
                   }}
                 />
@@ -689,7 +689,7 @@ export function CategoryChart({
         <div className="min-w-0 flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {isCum ? (
             <CumulativeLegend
-              color={lineColor}
+              color={barColor}
               forecast={cumulative.hasForecast}
               budget={budgetLine !== null}
               ideal={cumulative.days.some((d) => d.idealYen !== null)}
