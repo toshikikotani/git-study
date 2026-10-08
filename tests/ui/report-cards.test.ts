@@ -106,7 +106,7 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).toContain('決まった支出(2つ)');
     expect(html).toContain('68,940円');
     expect(html).toContain('確定(この先の見込みなし)');
-    expect(html).toContain('うち 3,000円 は目標の対象外');
+    expect(html).toContain('うち 3,000円 は特別費だった記録(今は目標に含む)');
     expect(html).toContain('予測を止めています');
     // 赤は、決まっている額だけで超えたときだけ(形と文字も付ける)。
     expect(html).toContain('決まっている額だけで、目標を2,000円超えています');

@@ -111,7 +111,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
           style={{ borderColor: 'var(--hairline)' }}
         >
           <span style={{ color: 'var(--ink-secondary)' }}>
-            未分類 {formatYen(model.uncategorized.yen, { sign: 'never' })}
+            未分類 {formatYen(model.uncategorized.yen, { sign: 'never' })}(目標に未反映)
           </span>
           <span style={{ color: 'var(--ink)' }}>分類する →</span>
         </Link>
