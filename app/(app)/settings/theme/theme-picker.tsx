@@ -5,6 +5,7 @@ import { useState } from 'react';
 import {
   DEFAULT_CUSTOM,
   PRESETS,
+  themeHues,
   applyColorTheme,
   readColorTheme,
   writeColorTheme,
@@ -118,7 +119,8 @@ function PresetButton({
   selected: boolean;
   onChoose: () => void;
 }) {
-  const { plane, surface, ink, accent, sub } = preset.colors;
+  const { plane, surface, ink, accent } = preset.colors;
+  const hues = themeHues(preset.colors);
   return (
     <button
       type="button"
@@ -141,8 +143,9 @@ function PresetButton({
             Aa
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-3 rounded-full" style={{ background: accent }} />
-            <span className="size-3 rounded-full" style={{ background: sub ?? accent }} />
+            {hues.map((hue) => (
+              <span key={hue} className="size-3 rounded-full" style={{ background: hue }} />
+            ))}
           </span>
         </span>
         <span className="mt-2 flex items-center gap-1">

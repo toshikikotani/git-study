@@ -343,6 +343,52 @@ export function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** 色相をずらす。1つのテーマの中で、同じ色の濃淡ではない色を作る。 */
+export function rotateHue(hex: string, degrees: number): string {
+  const rgb = rgbOf(hex) ?? [0, 0, 0];
+  const [r, g, b] = rgb.map((v) => v / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  const s = max === 0 ? 0 : d / max;
+  const v = max;
+  h = (h + degrees + 360) % 360;
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  const seg = Math.floor(h / 60);
+  const table = [
+    [c, x, 0],
+    [x, c, 0],
+    [0, c, x],
+    [0, x, c],
+    [x, 0, c],
+    [c, 0, x],
+  ][seg] ?? [0, 0, 0];
+  return `#${table
+    .map((channel) =>
+      Math.round((channel + m) * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}
+
+/** 1つのテーマで使う4色。強調、サブ、隣の色、向かいの色。 */
+export function themeHues(colors: ThemeColors): [string, string, string, string] {
+  const accent = colors.accent;
+  const sub = colors.sub ?? rotateHue(accent, 150);
+  return [accent, sub, rotateHue(accent, 32), rotateHue(sub, 168)];
+}
+
 /** a を t、b を 1 − t の割合で混ぜる。 */
 export function mixHex(a: string, b: string, t: number): string {
   const ra = rgbOf(a) ?? [0, 0, 0];
@@ -376,17 +422,18 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
   const sub = colors.sub ?? accent;
   const dark = isDark(plane);
   const onAccent = contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink;
+  const [hueA, hueB, hueC, hueD] = themeHues(colors);
   const genres = [
-    accent,
-    sub,
-    mixHex(accent, sub, 0.45),
-    mixHex(sub, accent, 0.25),
-    mixHex(accent, ink, 0.62),
-    mixHex(sub, ink, 0.58),
-    mixHex(accent, sub, 0.7),
-    mixHex(sub, plane, 0.72),
-    mixHex(accent, plane, 0.68),
-    mixHex(mixHex(accent, sub, 0.5), ink, 0.5),
+    hueA,
+    hueB,
+    hueC,
+    hueD,
+    mixHex(hueC, ink, 0.75),
+    mixHex(hueD, ink, 0.72),
+    mixHex(hueA, hueC, 0.5),
+    mixHex(hueB, hueD, 0.5),
+    mixHex(hueC, hueD, 0.45),
+    mixHex(hueD, hueA, 0.4),
   ];
   return {
     '--plane': plane,
