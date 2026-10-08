@@ -745,7 +745,7 @@ export const PRESETS: readonly ThemePreset[] = [
       plane: '#fffafb',
       surface: '#ffffff',
       ink: '#4a3038',
-      accent: '#c45a78',
+      accent: '#b04468',
       sub: '#8a6a10',
     },
   },
