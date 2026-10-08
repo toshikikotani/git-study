@@ -154,8 +154,8 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
               style={{
                 left: pct(row.p10),
                 width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
-                background: 'var(--accent)',
-                opacity: 0.28,
+                background: 'var(--genre-3, var(--accent))',
+                opacity: 0.45,
               }}
             />
             <span
@@ -164,7 +164,7 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
                 left: pct(tight.low),
                 width: `calc(${pct(tight.high)} - ${pct(tight.low)})`,
                 background: 'var(--accent)',
-                opacity: 0.62,
+                opacity: 0.7,
               }}
             />
             {row.targetYen !== null ? (

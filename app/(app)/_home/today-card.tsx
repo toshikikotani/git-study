@@ -88,7 +88,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
           <TenDots probability={SAFE_ALLOWANCE_PROB} />
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
             毎日この額までなら、
-            <strong style={{ color: 'var(--genre-3, var(--sub, var(--accent)))' }}>
+            <strong style={{ color: 'var(--ink)' }}>
               {formatProbability(SAFE_ALLOWANCE_PROB)}の確率
             </strong>
             で予算内に収まります。
@@ -119,7 +119,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
         <Link
           href="/reports"
           className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
-          style={{ color: 'var(--genre-3, var(--accent))' }}
+          style={{ color: 'var(--ink)' }}
         >
           なぜこの額?
           <ChevronRightIcon />
@@ -181,14 +181,15 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
           style={{
             left: pct(outlook.p10),
             width: `calc(${pct(outlook.p90)} - ${pct(outlook.p10)})`,
-            background: 'var(--accent-track)',
+            background: 'var(--genre-3, var(--accent))',
+            opacity: 0.35,
           }}
         />
         <div
           className="absolute top-[15px] size-4 -translate-x-1/2 rounded-full"
           style={{
             left: pct(outlook.p50),
-            background: 'var(--genre-3, var(--accent))',
+            background: 'var(--ink)',
             boxShadow: '0 0 0 3px var(--surface)',
           }}
         />
@@ -226,7 +227,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
             className="h-1.5 rounded-full"
             style={{
               width: `${Math.round(Math.min(1, Math.max(0, probOver)) * 100)}%`,
-              background: caution ? 'var(--sub, var(--accent))' : 'var(--genre-3, var(--accent))',
+              background: caution ? 'var(--sub, var(--accent))' : 'var(--ink)',
             }}
           />
         </div>

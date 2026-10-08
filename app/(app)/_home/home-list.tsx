@@ -84,7 +84,7 @@ function LinkRow({
           <span
             aria-hidden
             className="size-2 rounded-full"
-            style={{ background: 'var(--genre-3, var(--accent))' }}
+            style={{ background: 'var(--accent)' }}
           />
         ) : null}
         {label}
