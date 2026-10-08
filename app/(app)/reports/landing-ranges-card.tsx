@@ -91,15 +91,15 @@ export function LandingRangesCard({
         ) : null}
       </section>
       <p className="px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        薄い帯は90%、濃い帯は80%、丸は中央、縦線は目標です。行を押すと、なぜその見込みかを出します。
+        薄い帯は80%、濃い帯は50%、丸は中央、縦線は目標です。行を押すと、なぜその見込みかを出します。
       </p>
     </div>
   );
 }
 
-/** 90%の幅。80%(p10〜p90)の広がりを、正規分布の比で外側へ延ばした目安。 */
-function wider(row: LandingRow): { low: number; high: number } {
-  const scale = 1.64485 / 1.28155;
+/** 50%の幅。80%(p10〜p90)を中央へ寄せた目安。 */
+function tighter(row: LandingRow): { low: number; high: number } {
+  const scale = 0.67449 / 1.28155;
   return {
     low: Math.max(0, row.p50 - (row.p50 - row.p10) * scale),
     high: row.p50 + (row.p90 - row.p50) * scale,
@@ -107,8 +107,8 @@ function wider(row: LandingRow): { low: number; high: number } {
 }
 
 function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
-  const wide = wider(row);
-  const scaleMax = Math.max(row.targetYen ?? 0, wide.high, row.p90, 1) * 1.08;
+  const tight = tighter(row);
+  const scaleMax = Math.max(row.targetYen ?? 0, row.p90, 1) * 1.12;
   const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / scaleMax) * 100))}%`;
   const exceedText =
     row.targetYen !== null && row.exceedance !== null
@@ -154,8 +154,8 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
             <span
               className="absolute top-1 h-2 rounded-full"
               style={{
-                left: pct(wider(row).low),
-                width: `calc(${pct(wider(row).high)} - ${pct(wider(row).low)})`,
+                left: pct(row.p10),
+                width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
                 background: 'var(--accent)',
                 opacity: 0.28,
               }}
@@ -163,10 +163,10 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
             <span
               className="absolute top-1 h-2 rounded-full"
               style={{
-                left: pct(row.p10),
-                width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
+                left: pct(tight.low),
+                width: `calc(${pct(tight.high)} - ${pct(tight.low)})`,
                 background: 'var(--accent)',
-                opacity: 0.55,
+                opacity: 0.62,
               }}
             />
             {row.targetYen !== null ? (
