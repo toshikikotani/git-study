@@ -227,6 +227,22 @@ export function selectableColorIndexes(): number[] {
  * バー(比率・内訳)用の色。ジャンルの色を少し落ち着かせる(灰に寄せる)。
  * アイコンや文字の色は今の彩度のまま、面積の大きいバーだけを静かにする。
  */
+const GENRE_HUES = [
+  '#e06088',
+  '#2f9a78',
+  '#3a90c8',
+  '#d4a017',
+  '#8a4ec4',
+  '#e07050',
+  '#3aaa78',
+  '#d05080',
+  '#4a78c0',
+  '#c4a020',
+];
+
+/** ジャンル別の帯。保存したテーマに上書きされないよう、色相はここで決める。薄い画面では薄く、暗い画面では濃く。 */
 export function genreBarColor(name: string | null, override?: GenreStyleOverride | null): string {
-  return genreColorVar(name, override);
+  const { colorIndex } = genreStyle(name, override);
+  const hue = GENRE_HUES[(colorIndex ?? 1) - 1] ?? GENRE_HUES[0];
+  return `color-mix(in srgb, ${hue} 62%, var(--plane))`;
 }
