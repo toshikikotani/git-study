@@ -163,12 +163,13 @@ function ChangeableRow({
               style={{ width: pct(row.baseYen), background: 'var(--accent)' }}
             />
             <span
-              className="absolute top-1 h-2 rounded-full"
+              className="absolute top-1 h-2"
               style={{
                 left: pct(row.p10),
                 width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
                 background: 'transparent',
-                border: '2px solid var(--mark, var(--accent))',
+                border: '1.5px dotted var(--mark, var(--accent))',
+                borderRadius: 2,
                 boxSizing: 'border-box',
               }}
             />
