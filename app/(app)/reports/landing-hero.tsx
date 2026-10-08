@@ -28,53 +28,27 @@ export function LandingHero({
   return (
     <section
       aria-label={`${endLabel}の支出の見込み`}
-      className="flex flex-col gap-3 rounded-[28px] p-6"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      className="flex flex-col gap-2 rounded-[22px] bg-white p-5"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-            {endLabel}の支出
-            {provisional ? (
-              <span
-                className="rounded-full px-2 py-1 text-xs font-semibold"
-                style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
-              >
-                目安
-              </span>
-            ) : null}
-          </h2>
-          <p
-            className="tabular text-xl font-bold tracking-[-0.02em]"
-            style={{ color: 'var(--ink)' }}
-          >
-            {formatEstimate(landing.p50)}
-            {budgetYen !== null ? (
-              <span
-                className="ml-2 text-base font-normal"
-                style={{ color: 'var(--ink-secondary)' }}
-              >
-                / 予算 {formatEstimate(budgetYen, { approx: false })}
-              </span>
-            ) : null}
-          </p>
-        </div>
-        {gap !== null ? (
-          <span
-            className="mt-1 shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
-            style={
-              gap > 0
-                ? { background: 'var(--state-caution-track)', color: 'var(--state-caution)' }
-                : { background: 'var(--state-ok-track)', color: 'var(--state-ok)' }
-            }
-          >
-            {gap > 0
-              ? `予算を${formatEstimate(gap)} 超えそう`
-              : `予算まで ${formatEstimate(-gap)}の余裕`}
+      <h2 className="text-[17px] leading-snug font-semibold tracking-[-0.02em] text-black">
+        {gap === null
+          ? `${endLabel}の支出`
+          : gap > 0
+            ? `予算を${formatEstimate(gap)}超えそうです。`
+            : `予算まで${formatEstimate(-gap)}の余裕です。`}
+        {provisional ? (
+          <span className="ml-2 align-middle text-xs font-semibold text-[#8e8e93]">目安</span>
+        ) : null}
+      </h2>
+      <p className="tabular text-[40px] leading-none font-bold tracking-[-0.04em] text-black">
+        {formatEstimate(landing.p50)}
+        {budgetYen !== null ? (
+          <span className="ml-2 text-[17px] font-normal text-[#8e8e93]">
+            / 予算 {formatEstimate(budgetYen, { approx: false })}
           </span>
         ) : null}
-      </div>
-      <p className="tabular text-sm" style={{ color: 'var(--ink-secondary)' }}>
+      </p>
+      <p className="tabular text-[13px] text-[#8e8e93]">
         80%の確率で {formatEstimateRange(landing.p10, landing.p90)}
         {probWithinBudget !== null ? (
           <>
@@ -104,15 +78,9 @@ export function NextStepCard({
 }) {
   if (suggestion.probAfter - suggestion.probBefore < 0.01) return null;
   return (
-    <section
-      aria-label="次の一手"
-      className="flex flex-col gap-1 rounded-[28px] p-6"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-    >
-      <h2 className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-        次の一手
-      </h2>
-      <p className="text-xl font-bold tracking-[-0.01em]" style={{ color: 'var(--ink)' }}>
+    <section aria-label="次の一手" className="flex flex-col gap-2 rounded-[22px] bg-white p-5">
+      <h2 className="text-[13px] font-semibold text-[#007aff]">次の一手</h2>
+      <p className="text-[22px] leading-snug font-bold tracking-[-0.02em] text-black">
         {suggestion.categoryName}を週{suggestion.perWeek}回へらすと
       </p>
       <p className="tabular text-base leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -126,8 +94,7 @@ export function NextStepCard({
       </p>
       <Link
         href={categoryHref(suggestion.categoryId, monthKey) as Route}
-        className="mt-3 inline-flex min-h-11 items-center self-start rounded-full px-5 text-base font-semibold"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="mt-2 inline-flex min-h-11 items-center self-start rounded-full bg-[#007aff] px-4 text-[15px] font-semibold text-white"
       >
         {suggestion.categoryName}の見通しを見る
       </Link>

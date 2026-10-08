@@ -210,7 +210,7 @@ export default async function ReportsPage({
           <p className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
             {scopeLabel}
           </p>
-          <h1 className="text-xl font-bold tracking-[-0.02em]" style={{ color: 'var(--ink)' }}>
+          <h1 className="text-[34px] leading-none font-bold tracking-[-0.03em] text-black">
             見通し
           </h1>
         </div>
@@ -272,8 +272,7 @@ export default async function ReportsPage({
       )}
       <Link
         href="/reports/ai"
-        className="flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="flex min-h-11 items-center justify-center rounded-full bg-[#007aff] px-4 text-[17px] font-semibold text-white"
       >
         AIに見てもらう
       </Link>
