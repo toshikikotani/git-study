@@ -58,7 +58,11 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
     <section
       aria-label="今日使える額"
       className="rise flex flex-col gap-1 rounded-[28px] px-6 pt-6 pb-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',
+        boxShadow: 'var(--card-shadow)',
+      }}
     >
       {today ? (
         <>
@@ -142,7 +146,11 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
     <section
       aria-label={outlook.label}
       className="flex flex-col gap-3 rounded-[28px] p-6"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',
+        boxShadow: 'var(--card-shadow)',
+      }}
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>

@@ -37,7 +37,11 @@ export function LandingRangesCard({
       <section
         aria-label={`${periodLabel}のジャンルごとの見込み`}
         className="rounded-[28px] px-5 py-2"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',
+          boxShadow: 'var(--card-shadow)',
+        }}
       >
         {changeable.length > 0 ? (
           <>

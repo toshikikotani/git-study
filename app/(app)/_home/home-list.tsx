@@ -51,7 +51,11 @@ export function HomeList({ balance, pendingCount, savings }: HomeListProps) {
     <section
       aria-label="そのほか"
       className="overflow-hidden rounded-[24px]"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',
+        boxShadow: 'var(--card-shadow)',
+      }}
     >
       {rows.map((row, i) => (
         <div key={i} style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}>
