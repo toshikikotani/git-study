@@ -19,7 +19,7 @@ export function outlookLabel(period: { from: string; to: string }): string {
 /**
  * ホームの「今日使える額」から下(デザインの「今日」、ADR-085)を読み込む(重い予測なので、
  * ホームの他の部分を待たせないように Suspense の中で読む)。今日使える額・見通し・次の一手は
- * 目標の範囲、月末に残る見込みは今月のすべての支出で出す(レポートと同じ範囲・同じ数字)。
+ * 見通しと月末に残る見込みは、同じ範囲(目標があれば目標のジャンル)の同じ数字にする。
  */
 export async function TodaySection({ savings }: { savings: HomeListProps['savings'] }) {
   const today = todayJst();
@@ -35,7 +35,7 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
     loadForecast({ period: monthPeriod }).catch(() => null),
   ]);
   const forecast = goalView?.forecast ?? null;
-  const balance = monthView?.forecast.balance ?? null;
+  const balance = (goalView ?? monthView)?.forecast.balance ?? null;
   return (
     <div className="space-y-3">
       <TodayCard
