@@ -867,6 +867,35 @@ function softenedInk(ink: string, plane: string, surface: string, target: number
   return ink;
 }
 
+/** ジャンル別だけは色相を分ける。明るいテーマは薄く、暗いテーマは濃く。 */
+function genrePalette(dark: boolean): string[] {
+  return dark
+    ? [
+        '#e06088',
+        '#3ecf9a',
+        '#4aa8e0',
+        '#e0b040',
+        '#b070e0',
+        '#e07858',
+        '#40c090',
+        '#e060a0',
+        '#5a88d8',
+        '#d0b050',
+      ]
+    : [
+        '#f4b4c8',
+        '#9ed9c4',
+        '#a9d7f2',
+        '#f0d09a',
+        '#d8c6f2',
+        '#f6c4b4',
+        '#b7e6d0',
+        '#f6c0d4',
+        '#c5dff6',
+        '#ead7a4',
+      ];
+}
+
 /** テーマの5色から、画面で使う色の役割(CSS 変数)をまとめて作る。 */
 export function themeTokens(colors: ThemeColors): Record<string, string> {
   const { plane, surface, ink, accent } = colors;
@@ -911,16 +940,16 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--state-over-track': mixHex('#b82b2b', surface, dark ? 0.2 : 0.08),
     '--state-none': softenedInk(ink, plane, surface, 5.4),
     '--state-none-track': mixHex(ink, surface, dark ? 0.2 : 0.08),
-    '--genre-1': genres[0]!,
-    '--genre-2': genres[1]!,
-    '--genre-3': genres[2]!,
-    '--genre-4': genres[3]!,
-    '--genre-5': genres[4]!,
-    '--genre-6': genres[5]!,
-    '--genre-7': genres[6]!,
-    '--genre-8': genres[7]!,
-    '--genre-9': genres[8]!,
-    '--genre-10': genres[9]!,
+    '--genre-1': genrePalette(dark)[0]!,
+    '--genre-2': genrePalette(dark)[1]!,
+    '--genre-3': genrePalette(dark)[2]!,
+    '--genre-4': genrePalette(dark)[3]!,
+    '--genre-5': genrePalette(dark)[4]!,
+    '--genre-6': genrePalette(dark)[5]!,
+    '--genre-7': genrePalette(dark)[6]!,
+    '--genre-8': genrePalette(dark)[7]!,
+    '--genre-9': genrePalette(dark)[8]!,
+    '--genre-10': genrePalette(dark)[9]!,
     '--genre-none': softenedInk(ink, plane, surface, 5.4),
     '--hero-glow': rgba(accent, dark ? 0.1 : 0.05),
     '--card-shadow': dark

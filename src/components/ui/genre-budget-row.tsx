@@ -13,6 +13,7 @@ import {
   budgetSpokenLabel,
   budgetState,
 } from '@/domain/budget-state';
+import { genreColorVar } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
 
 /**
@@ -117,7 +118,10 @@ export function GenreBudgetRow({
       >
         <div
           className="h-full rounded-full"
-          style={{ width: `${ratio * 100}%`, background: STATE_COLOR[state] }}
+          style={{
+            width: `${ratio * 100}%`,
+            background: genreColorVar(name === '未分類' ? null : name),
+          }}
         />
         {scheduledRatio > 0 ? (
           <div

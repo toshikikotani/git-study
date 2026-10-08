@@ -228,5 +228,5 @@ export function selectableColorIndexes(): number[] {
  * アイコンや文字の色は今の彩度のまま、面積の大きいバーだけを静かにする。
  */
 export function genreBarColor(name: string | null, override?: GenreStyleOverride | null): string {
-  return `color-mix(in srgb, ${genreColorVar(name, override)} 62%, var(--ink-muted))`;
+  return genreColorVar(name, override);
 }
