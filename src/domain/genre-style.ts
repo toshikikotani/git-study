@@ -227,22 +227,24 @@ export function selectableColorIndexes(): number[] {
  * バー(比率・内訳)用の色。ジャンルの色を少し落ち着かせる(灰に寄せる)。
  * アイコンや文字の色は今の彩度のまま、面積の大きいバーだけを静かにする。
  */
-const GENRE_HUES = [
-  '#e06088',
-  '#2f9a78',
-  '#3a90c8',
-  '#d4a017',
-  '#8a4ec4',
-  '#e07050',
-  '#3aaa78',
-  '#d05080',
-  '#4a78c0',
-  '#c4a020',
+const GENRE_PASTELS = [
+  '#9ed9c4', '#a9d7f2', '#f0d09a', '#d8c6f2', '#f6c4b4',
+  '#f4b4c8', '#8ecfc8', '#c8b8ee', '#f0b0a8', '#ead7a4',
+  '#b7d4b0', '#b7c6f0', '#f6d0b0', '#9ec8e8', '#e8c4a8', '#d4c0e8',
+];
+const GENRE_VIVID = [
+  '#2f9a78', '#3a90c8', '#d4a017', '#8a4ec4', '#e07050',
+  '#e06088', '#1f8f8a', '#6a48b8', '#d05040', '#c4a020',
+  '#5a9a48', '#4a68c0', '#d08040', '#2f78a8', '#c07040', '#7040a8',
 ];
 
-/** ジャンル別の帯。保存したテーマに上書きされないよう、色相はここで決める。薄い画面では薄く、暗い画面では濃く。 */
-export function genreBarColor(name: string | null, override?: GenreStyleOverride | null): string {
-  const { colorIndex } = genreStyle(name, override);
+/** ジャンル別の帯。テーマの色には混ぜない。名前ごとに別の色相。明るい画面は淡く、暗い画面は濃く。 */
+export function genreBarColor(name: string | null, _override?: GenreStyleOverride | null): string {
+  if (name === null || name === '' || name === '未分類') return 'var(--ink-muted)';
+  const i = hash(name) % GENRE_PASTELS.length;
+  return `light-dark(${GENRE_PASTELS[i]}, ${GENRE_VIVID[i]})`;
+}
+ = genreStyle(name, override);
   const hue = GENRE_HUES[(colorIndex ?? 1) - 1] ?? GENRE_HUES[0];
   return `color-mix(in srgb, ${hue} 62%, var(--plane))`;
 }
