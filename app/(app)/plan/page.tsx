@@ -60,7 +60,7 @@ function BudgetRows({ plan, today }: { plan: SpendingPlan | null; today: string 
   return (
     <section
       aria-label="今の目標"
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
@@ -148,7 +148,7 @@ async function SpentRows({ today }: { today: string }) {
       ) : null}
       <section
         aria-label="今の目標"
-        className="rounded-2xl p-4"
+        className="glass rounded-2xl p-4"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>

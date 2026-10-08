@@ -34,7 +34,7 @@ export default async function SavingsPage() {
       </header>
 
       <section
-        className="rounded-[22px] px-4 py-4"
+        className="glass rounded-[22px] px-4 py-4"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
         <div className="grid grid-cols-3 gap-3">

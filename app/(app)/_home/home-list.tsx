@@ -50,7 +50,7 @@ export function HomeList({ balance, pendingCount, savings }: HomeListProps) {
   return (
     <section
       aria-label="そのほか"
-      className="overflow-hidden rounded-[24px]"
+      className="glass overflow-hidden rounded-[24px]"
       style={{
         background: 'var(--surface)',
         border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',

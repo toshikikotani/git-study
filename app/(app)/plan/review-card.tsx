@@ -35,7 +35,7 @@ export function ReviewCard({ planId, review }: { planId: string; review: GoalRev
   return (
     <section
       aria-label="目標の振り返り"
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>

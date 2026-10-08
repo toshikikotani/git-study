@@ -19,7 +19,7 @@ export function PasswordForm() {
         minLength={MIN_PASSWORD_LENGTH}
         autoComplete="new-password"
         placeholder={`新しいパスワード(${MIN_PASSWORD_LENGTH}文字以上)`}
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+        className="glass w-full rounded-2xl px-4 py-3 text-sm outline-none"
         style={{
           background: 'var(--surface)',
           color: 'var(--ink)',
@@ -33,7 +33,7 @@ export function PasswordForm() {
         minLength={MIN_PASSWORD_LENGTH}
         autoComplete="new-password"
         placeholder="確認のため再入力"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+        className="glass w-full rounded-2xl px-4 py-3 text-sm outline-none"
         style={{
           background: 'var(--surface)',
           color: 'var(--ink)',

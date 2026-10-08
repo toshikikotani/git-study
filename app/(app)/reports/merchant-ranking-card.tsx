@@ -19,7 +19,7 @@ export function MerchantRankingCard({ ranking }: { ranking: MerchantRanking }) {
   if (merchants.length === 0) {
     return (
       <div
-        className="rounded-[22px] p-5"
+        className="glass rounded-[22px] p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -36,7 +36,7 @@ export function MerchantRankingCard({ ranking }: { ranking: MerchantRanking }) {
 
   return (
     <div
-      className="rounded-[22px] p-5"
+      className="glass rounded-[22px] p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-2">

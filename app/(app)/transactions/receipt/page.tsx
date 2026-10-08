@@ -296,7 +296,7 @@ export default function ReceiptPage() {
           key={job.id}
           role="status"
           aria-label="読み取り中"
-          className="flex items-center gap-3 rounded-2xl p-3"
+          className="glass flex items-center gap-3 rounded-2xl p-3"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -326,7 +326,7 @@ export default function ReceiptPage() {
           <div
             key={job.id}
             role="alert"
-            className="flex items-center gap-3 rounded-2xl p-3"
+            className="glass flex items-center gap-3 rounded-2xl p-3"
             style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -419,7 +419,7 @@ export default function ReceiptPage() {
 function ParkedJobCard({ job }: { job: ReceiptJob }) {
   return (
     <div
-      className="flex items-center gap-3 rounded-2xl p-3"
+      className="glass flex items-center gap-3 rounded-2xl p-3"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

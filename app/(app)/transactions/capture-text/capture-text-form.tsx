@@ -192,7 +192,7 @@ export function CaptureTextForm() {
           onChange={(e) => setText(e.target.value)}
           rows={4}
           placeholder="例:今日スタバでコーヒー500円"
-          className="w-full rounded-2xl p-4 pr-14 text-sm outline-none"
+          className="glass w-full rounded-2xl p-4 pr-14 text-sm outline-none"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',

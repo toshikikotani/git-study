@@ -16,7 +16,7 @@ export function GoalCard({ model }: { model: GoalCardModel }) {
   return (
     <section
       aria-label="目標"
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>

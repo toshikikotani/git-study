@@ -78,7 +78,7 @@ export default async function SpendingPilePage() {
 function SmallSpendHero({ view }: { view: AccumulationView }) {
   return (
     <div
-      className="rounded-3xl p-6"
+      className="glass rounded-3xl p-6"
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
@@ -141,7 +141,7 @@ function SmallSpendPile({ view }: { view: AccumulationView }) {
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
@@ -196,7 +196,7 @@ function NoSpendCard({ view }: { view: AccumulationView }) {
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -242,7 +242,7 @@ function PaceCard({ view }: { view: AccumulationView }) {
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">

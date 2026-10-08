@@ -47,7 +47,7 @@ export default async function AiReportPage() {
       {ledger.genreBreakdown.length > 0 ? (
         <section
           aria-label="ジャンル別の内訳"
-          className="rounded-2xl p-4"
+          className="glass rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <h2 className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>

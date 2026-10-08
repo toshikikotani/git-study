@@ -147,7 +147,7 @@ export function PlanBuilder({
   return (
     <details
       open={!reserving}
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <summary

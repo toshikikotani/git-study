@@ -39,7 +39,7 @@ export function GoalCard({
 
   return (
     <div
-      className="rounded-[22px] p-5"
+      className="glass rounded-[22px] p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-2">

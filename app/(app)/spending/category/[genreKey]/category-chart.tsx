@@ -308,7 +308,7 @@ export function CategoryChart({
   return (
     <section
       aria-label="グラフ"
-      className="space-y-3 rounded-2xl p-4"
+      className="glass space-y-3 rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

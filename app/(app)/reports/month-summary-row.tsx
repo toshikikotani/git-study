@@ -55,7 +55,7 @@ export function MonthSummaryRow({
           </>
         ) : (
           <div
-            className="col-span-2 flex items-center justify-center rounded-2xl p-3"
+            className="glass col-span-2 flex items-center justify-center rounded-2xl p-3"
             style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
           >
             <Link
@@ -88,7 +88,7 @@ function Tile({
 }) {
   return (
     <div
-      className="rounded-2xl p-3"
+      className="glass rounded-2xl p-3"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>

@@ -56,7 +56,7 @@ export function CaptureCandidateCard({
 
   return (
     <div
-      className="space-y-2 rounded-2xl p-3"
+      className="glass space-y-2 rounded-2xl p-3"
       style={{
         background: 'var(--surface)',
         boxShadow: 'var(--card-shadow)',

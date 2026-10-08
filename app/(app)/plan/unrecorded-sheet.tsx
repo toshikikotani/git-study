@@ -53,7 +53,7 @@ export function UnrecordedSheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="min-h-11 flex w-full items-center justify-between px-4 py-3 text-sm font-semibold"
+        className="glass min-h-11 flex w-full items-center justify-between px-4 py-3 text-sm font-semibold"
         style={{
           borderRadius: 'var(--radius-full)',
           background: 'var(--surface)',

@@ -53,7 +53,7 @@ export function FixedVariableCard({
 
   return (
     <div
-      className="rounded-[22px] p-5"
+      className="glass rounded-[22px] p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>

@@ -6,7 +6,7 @@ export function InsightsList({ insights }: { insights: readonly Insight[] }) {
   return (
     <section
       aria-label="気づき"
-      className="rounded-[22px] px-4 py-4"
+      className="glass rounded-[22px] px-4 py-4"
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>

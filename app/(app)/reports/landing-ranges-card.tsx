@@ -36,7 +36,7 @@ export function LandingRangesCard({
       </h2>
       <section
         aria-label={`${periodLabel}のジャンルごとの見込み`}
-        className="rounded-[28px] px-5 py-2"
+        className="glass rounded-[28px] px-5 py-2"
         style={{
           background: 'var(--surface)',
           border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',

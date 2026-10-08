@@ -27,7 +27,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
   if (!hasAnyActivity) {
     return (
       <div
-        className="rounded-[22px] p-5"
+        className="glass rounded-[22px] p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -64,7 +64,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
 
   return (
     <div
-      className="rounded-[22px] p-5"
+      className="glass rounded-[22px] p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-2">

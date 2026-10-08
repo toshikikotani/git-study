@@ -32,7 +32,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">

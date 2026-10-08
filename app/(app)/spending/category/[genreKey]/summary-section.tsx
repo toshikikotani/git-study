@@ -42,7 +42,7 @@ export function SummarySection({
   return (
     <section
       aria-label="サマリー"
-      className="space-y-3 rounded-2xl p-4"
+      className="glass space-y-3 rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* 件数と1回あたりは大きな数字にせず、1行にまとめる */}

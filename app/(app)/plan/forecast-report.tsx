@@ -71,7 +71,7 @@ export function ForecastReport({
         {rows.map((row) => (
           <li
             key={row.genreId}
-            className="rounded-[22px] px-4 py-4"
+            className="glass rounded-[22px] px-4 py-4"
             style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
           >
             <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>

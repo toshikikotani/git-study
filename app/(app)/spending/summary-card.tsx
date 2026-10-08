@@ -205,7 +205,7 @@ function MonthPane({
 
       {!waiting ? (
         <div
-          className="space-y-3 rounded-[28px] px-5 py-5"
+          className="glass space-y-3 rounded-[28px] px-5 py-5"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           {split && splitTotal > 0 ? (
@@ -250,7 +250,7 @@ function MonthPane({
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div
-      className="flex flex-col gap-1 rounded-[22px] p-5"
+      className="glass flex flex-col gap-1 rounded-[22px] p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <span className="text-xs" style={{ color: 'var(--ink-secondary)' }}>

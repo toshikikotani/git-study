@@ -247,7 +247,7 @@ export function ReceiptConfirm({
   return (
     <section
       aria-label={`${store}のレシート`}
-      className="overflow-hidden rounded-[28px]"
+      className="glass overflow-hidden rounded-[28px]"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* 上半分:画像(ズーム可)。品目をタップすると該当行をハイライトする。 */}
@@ -349,7 +349,7 @@ export function ReceiptConfirm({
                     role="radio"
                     aria-checked={draft.priceBasis === value}
                     onClick={() => update((d) => ({ ...d, priceBasis: value }))}
-                    className="min-h-11 rounded-full px-3 font-semibold"
+                    className="glass min-h-11 rounded-full px-3 font-semibold"
                     style={{
                       background: draft.priceBasis === value ? 'var(--surface)' : 'transparent',
                       color: draft.priceBasis === value ? 'var(--ink)' : 'var(--ink-secondary)',
@@ -447,7 +447,7 @@ export function ReceiptConfirm({
                     type="button"
                     disabled={selected.size === 0}
                     onClick={() => setGenreFor(selected, g.id)}
-                    className="min-h-11 shrink-0 rounded-full px-4 text-xs font-semibold disabled:opacity-40"
+                    className="glass min-h-11 shrink-0 rounded-full px-4 text-xs font-semibold disabled:opacity-40"
                     style={{
                       background: 'var(--surface)',
                       color: 'var(--accent)',
@@ -542,7 +542,7 @@ export function ReceiptConfirm({
                   setKind(value);
                   setKindChosen(true);
                 }}
-                className="min-h-11 flex-1 rounded-full px-2 text-xs font-semibold"
+                className="glass min-h-11 flex-1 rounded-full px-2 text-xs font-semibold"
                 style={{
                   background: kind === value ? 'var(--surface)' : 'transparent',
                   color: kind === value ? 'var(--ink)' : 'var(--ink-secondary)',
@@ -640,7 +640,7 @@ export function ReceiptConfirm({
               disabled={
                 saving || !accountId || mustChoose || (draft !== null && draft.paidYen <= 0)
               }
-              className="min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
+              className="glass min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
               style={{
                 background: 'var(--action)',
                 color: 'var(--on-action)',

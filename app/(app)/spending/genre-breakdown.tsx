@@ -92,7 +92,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
       </div>
 
       <div
-        className="rounded-[28px] px-5 py-4"
+        className="glass rounded-[28px] px-5 py-4"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         {loading && !isCurrentMonth ? (

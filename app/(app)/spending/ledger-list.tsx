@@ -113,7 +113,7 @@ export function LedgerList({
       {duplicateCount > 0 ? (
         <Link
           href="/transactions/duplicates"
-          className="min-h-11 flex items-center justify-between gap-3 rounded-2xl p-4"
+          className="glass min-h-11 flex items-center justify-between gap-3 rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -217,7 +217,7 @@ function DaySection({
   return (
     <section
       aria-label={heading}
-      className="rounded-2xl"
+      className="glass rounded-2xl"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* 日付ヘッダーは画面上部に固定(ステータスバー下のぼかしの下に付く) */}
@@ -278,7 +278,7 @@ function ListSkeleton() {
       {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
-          className="flex items-center gap-3 rounded-2xl p-4"
+          className="glass flex items-center gap-3 rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <div
@@ -309,7 +309,7 @@ function EmptyState() {
   return (
     <div className="space-y-3">
       <div
-        className="rounded-3xl p-6"
+        className="glass rounded-3xl p-6"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
         <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

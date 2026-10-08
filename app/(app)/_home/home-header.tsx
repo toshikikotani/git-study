@@ -32,7 +32,7 @@ export async function HomeHeader() {
         <Link
           href="/notifications"
           aria-label={unread > 0 ? `お知らせ(まだ見ていないもの${unread}件)` : 'お知らせ'}
-          className="relative flex size-11 min-h-11 items-center justify-center rounded-full"
+          className="glass relative flex size-11 min-h-11 items-center justify-center rounded-full"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',

@@ -38,7 +38,7 @@ export function PendingReceiptRows() {
   return (
     <ul
       aria-label="読み取り中・入力待ちのレシート"
-      className="divider-list overflow-hidden rounded-2xl"
+      className="glass divider-list overflow-hidden rounded-2xl"
       style={{
         background: 'var(--surface)',
         boxShadow: 'var(--card-shadow)',

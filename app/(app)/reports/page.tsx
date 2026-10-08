@@ -339,7 +339,7 @@ function ScopeSwitch({ current }: { current: 'goal' | 'all' }) {
     <Link
       href={key === 'all' ? { pathname: '/reports', query: { scope: 'all' } } : '/reports'}
       aria-current={current === key ? 'page' : undefined}
-      className="flex min-h-9 flex-1 items-center justify-center rounded-[10px] px-3 text-sm"
+      className="glass flex min-h-9 flex-1 items-center justify-center rounded-[10px] px-3 text-sm"
       style={{
         background: current === key ? 'var(--surface)' : 'transparent',
         boxShadow: current === key ? 'var(--card-shadow)' : undefined,

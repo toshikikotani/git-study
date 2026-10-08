@@ -50,7 +50,7 @@ export default async function NotificationsPage() {
           {items.map((item) => (
             <li
               key={item.id}
-              className="space-y-1 rounded-2xl p-4"
+              className="glass space-y-1 rounded-2xl p-4"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               <p

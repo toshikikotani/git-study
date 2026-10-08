@@ -194,7 +194,7 @@ export default function AssistantChatPage() {
         {messages.length === 0 ? (
           <div className="space-y-3">
             <div
-              className="rounded-2xl p-4"
+              className="glass rounded-2xl p-4"
               style={{ background: 'var(--accent-track)', boxShadow: 'var(--card-shadow)' }}
             >
               <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -209,7 +209,7 @@ export default function AssistantChatPage() {
                   key={s}
                   type="button"
                   onClick={() => void send(s)}
-                  className="block w-full rounded-2xl px-4 py-3 text-left text-xs"
+                  className="glass block w-full rounded-2xl px-4 py-3 text-left text-xs"
                   style={{
                     background: 'var(--surface)',
                     color: 'var(--ink-secondary)',
@@ -238,7 +238,7 @@ export default function AssistantChatPage() {
         {sending ? (
           <div className="pop-in flex justify-start">
             <div
-              className="flex items-center gap-2 rounded-2xl rounded-bl-md px-4 py-3"
+              className="glass flex items-center gap-2 rounded-2xl rounded-bl-md px-4 py-3"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               {[0, 1, 2].map((i) => (
@@ -277,7 +277,7 @@ export default function AssistantChatPage() {
           }}
           rows={1}
           placeholder="例:食費をもう少し抑えたい"
-          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl px-4 py-3 text-sm outline-none"
+          className="glass max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl px-4 py-3 text-sm outline-none"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',
@@ -394,7 +394,7 @@ function QuestionCard({
               type="button"
               disabled={disabled}
               onClick={() => tap(option.label)}
-              className="block w-full rounded-xl px-3 py-2 text-left"
+              className="glass block w-full rounded-xl px-3 py-2 text-left"
               style={{
                 background: isPicked ? 'var(--accent-track)' : 'var(--surface)',
                 boxShadow: 'var(--card-shadow)',
@@ -482,7 +482,7 @@ function ProposalCard({
         {changes.map((c, i) => (
           <li key={i}>
             <label
-              className="flex items-start gap-2 rounded-xl px-3 py-2"
+              className="glass flex items-start gap-2 rounded-xl px-3 py-2"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               <input

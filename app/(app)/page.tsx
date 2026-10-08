@@ -58,7 +58,7 @@ function TodaySkeleton() {
     <section
       aria-label="今日使える額"
       aria-busy="true"
-      className="rounded-[28px] p-6 pb-7"
+      className="glass rounded-[28px] p-6 pb-7"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>

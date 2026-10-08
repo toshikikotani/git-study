@@ -294,7 +294,7 @@ export function CategoryTabs({
             </EmptyMessage>
           ) : (
             <div
-              className="relative rounded-2xl"
+              className="glass relative rounded-2xl"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               {sticky && sticky.kind === 'header' && firstVisible > 0 ? (
@@ -347,7 +347,7 @@ export function CategoryTabs({
             <EmptyMessage>この月の品目はありません。</EmptyMessage>
           ) : (
             <div
-              className="rounded-2xl"
+              className="glass rounded-2xl"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               <VirtualList
@@ -369,7 +369,7 @@ export function CategoryTabs({
             <EmptyMessage>この月の店はありません。</EmptyMessage>
           ) : (
             <div
-              className="rounded-2xl"
+              className="glass rounded-2xl"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               <VirtualList

@@ -144,7 +144,7 @@ export function CaptureScreenshotForm() {
       </p>
 
       <label
-        className="flex min-h-11 cursor-pointer items-center justify-center rounded-2xl py-6 text-sm font-semibold"
+        className="glass flex min-h-11 cursor-pointer items-center justify-center rounded-2xl py-6 text-sm font-semibold"
         style={{
           background: 'var(--surface)',
           color: 'var(--accent)',

@@ -69,7 +69,7 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
       <section
         aria-label={`${view.categoryName}の月末の見込み`}
         aria-live="polite"
-        className="space-y-3 rounded-[28px] p-5"
+        className="glass space-y-3 rounded-[28px] p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -419,7 +419,7 @@ function StopCard({
   return (
     <section
       aria-label="これ以上は使わない"
-      className="space-y-3 rounded-[24px] p-5"
+      className="glass space-y-3 rounded-[24px] p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-start justify-between gap-3">

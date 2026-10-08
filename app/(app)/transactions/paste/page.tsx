@@ -155,7 +155,7 @@ export default function PastePage() {
 
       {/* 主経路ではないことを画面で明示する */}
       <div
-        className="rounded-2xl p-4"
+        className="glass rounded-2xl p-4"
         style={{ background: 'var(--accent-track)', boxShadow: 'var(--card-shadow)' }}
       >
         <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

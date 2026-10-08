@@ -52,7 +52,7 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
   return (
     <>
       <div
-        className="w-full rounded-2xl p-4"
+        className="glass w-full rounded-2xl p-4"
         style={{
           background: 'var(--attention-track)',
           boxShadow: 'var(--card-shadow)',

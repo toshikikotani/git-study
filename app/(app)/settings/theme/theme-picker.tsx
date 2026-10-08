@@ -43,7 +43,7 @@ export function ThemePicker() {
         type="button"
         onClick={() => choose({ id: 'system' })}
         aria-pressed={theme.id === 'system'}
-        className="min-h-11 w-full rounded-2xl px-4 text-left text-sm font-semibold"
+        className="glass min-h-11 w-full rounded-2xl px-4 text-left text-sm font-semibold"
         style={{
           background: 'var(--surface)',
           color: 'var(--ink)',
@@ -130,7 +130,7 @@ function PresetButton({
       onClick={onChoose}
       aria-pressed={selected}
       aria-label={`${preset.label}(${preset.note})`}
-      className="min-h-11 w-full overflow-hidden rounded-2xl text-left"
+      className="glass min-h-11 w-full overflow-hidden rounded-2xl text-left"
       style={{
         background: plane,
         boxShadow: selected ? `0 0 0 3px ${accent}` : 'var(--card-shadow)',

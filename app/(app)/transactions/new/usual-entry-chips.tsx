@@ -31,7 +31,7 @@ export function UsualEntryChips({
             key={i}
             type="button"
             onClick={() => onPick(c)}
-            className="min-h-11 rounded-2xl px-3 py-2 text-left text-xs"
+            className="glass min-h-11 rounded-2xl px-3 py-2 text-left text-xs"
             style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
           >
             <span className="block font-semibold" style={{ color: 'var(--ink)' }}>

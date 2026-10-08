@@ -30,7 +30,7 @@ export function InsightsSection({
                 onFocus(i);
               }}
               aria-label={`${i.message}(根拠の取引${i.evidenceTxIds.length}件を表示)`}
-              className="min-h-11 block w-full rounded-2xl p-4 text-left"
+              className="glass min-h-11 block w-full rounded-2xl p-4 text-left"
               style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
             >
               <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>

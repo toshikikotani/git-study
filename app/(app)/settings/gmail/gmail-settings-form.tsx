@@ -33,7 +33,7 @@ export function GmailSettingsForm({ settings }: { settings: GmailSettings }) {
           rows={5}
           defaultValue={settings.gmailFromAddresses.join('\n')}
           placeholder={'rakuten-card.co.jp\nsmbc-card.com'}
-          className="w-full rounded-2xl px-4 py-3 font-mono text-xs outline-none"
+          className="glass w-full rounded-2xl px-4 py-3 font-mono text-xs outline-none"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',
@@ -52,7 +52,7 @@ export function GmailSettingsForm({ settings }: { settings: GmailSettings }) {
           min={1}
           max={1000}
           defaultValue={settings.gmailFetchLimit}
-          className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+          className="glass w-full rounded-2xl px-4 py-3 text-sm outline-none"
           style={{
             background: 'var(--surface)',
             color: 'var(--ink)',
