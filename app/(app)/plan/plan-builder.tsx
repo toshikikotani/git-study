@@ -293,7 +293,7 @@ export function PlanBuilder({
           {suggestion.uncategorizedYen > 0 ? (
             <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               未分類の支出が{formatYen(suggestion.uncategorizedYen, { sign: 'never' })}
-              あり、目標に含まれていません。先に
+              。分類すると目標に入ります あり、目標に含まれていません。先に
               <Link
                 href="/reports/genres"
                 className="min-h-11 inline-flex items-center font-semibold"

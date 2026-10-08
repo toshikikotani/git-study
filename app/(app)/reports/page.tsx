@@ -88,7 +88,7 @@ export default async function ReportsPage({
   const today = todayJst();
   const [plan, genres] = await Promise.all([getCurrentPlan(today), listGenres().catch(() => [])]);
   const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
-  // 目標があれば、既定は目標の期間・目標のジャンル(特別費を除く)。「全部」に切り替えると、
+  // 目標があれば、既定は目標の期間・すべての支出。「全部」に切り替えると、
   // 今月のすべての支出で出す。どちらの範囲かは、画面の上に名前で出す(設計書 v3 2.2 の2)。
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
   const hasGoal = plan !== null && budgetTotal > 0;
@@ -161,10 +161,8 @@ export default async function ReportsPage({
     linesForGoal(
       genreIds.flatMap((genreId) =>
         buildCategoryLines(
-          // 目標のペースは特別費を数えない(予測も同じ範囲で出している)。
-          ledger.transactions
-            .filter((tx) => tx.kind !== 'special')
-            .map((tx) => ({ ...tx, items: [] })),
+          // 目標の範囲はすべての支出。
+          ledger.transactions.map((tx) => ({ ...tx, items: [] })),
           genreId,
           { from: ledger.period.from, to: period.to },
           today,

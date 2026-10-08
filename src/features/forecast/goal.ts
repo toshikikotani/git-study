@@ -1,6 +1,6 @@
 /**
  * 目標(支出の計画)から、予測の範囲・予算・ジャンルの目標を作る。レポートとホームが同じ範囲で
- * 予測を出すため、ここ1か所で決める(目標のジャンル・特別費を除く・期間は目標の期間)。
+ * 予測を出すため、ここ1か所で決める。範囲はすべての支出。期間は目標の期間。
  */
 
 import type { ForecastScope } from '@/domain/forecast/pipeline';
@@ -24,7 +24,7 @@ export function goalForecastArgs(plan: SpendingPlan | null): GoalForecastArgs | 
   return {
     period: { from: plan.periodStart, to: plan.periodEnd },
     budgetYen,
-    scope: { genreIds: new Set(items.map((item) => item.genreId)), excludeSpecial: true },
+    scope: {},
     categoryTargets: items.map((item) => ({
       categoryId: item.genreId,
       categoryName: item.genreName,

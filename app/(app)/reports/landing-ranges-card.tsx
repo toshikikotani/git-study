@@ -270,7 +270,7 @@ function GenreWhy({ row }: { row: LandingRow }) {
       </dd>
       {row.excludedYen > 0 ? (
         <dd className="col-span-2" style={{ color: 'var(--ink-muted)' }}>
-          うち {formatYen(row.excludedYen, { sign: 'never' })} は目標の対象外(特別費)
+          うち {formatYen(row.excludedYen, { sign: 'never' })} は特別費だった記録(今は目標に含む)
         </dd>
       ) : null}
       <dd className="col-span-2" style={{ color: 'var(--ink-muted)' }}>
@@ -320,7 +320,7 @@ function FixedRow({ row }: { row: LandingRow }) {
       ) : null}
       {row.excludedYen > 0 ? (
         <p className="tabular mt-1" style={{ color: 'var(--ink-muted)' }}>
-          うち {formatYen(row.excludedYen, { sign: 'never' })} は目標の対象外(特別費)
+          うち {formatYen(row.excludedYen, { sign: 'never' })} は特別費だった記録(今は目標に含む)
         </p>
       ) : null}
     </li>

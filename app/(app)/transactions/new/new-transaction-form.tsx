@@ -269,7 +269,6 @@ export function NewTransactionForm({
             }}
           >
             <option value="normal">目標の予算に含める</option>
-            <option value="special">特別費として別枠</option>
           </select>
         </label>
       ) : null}

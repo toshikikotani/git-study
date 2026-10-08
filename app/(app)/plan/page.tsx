@@ -184,7 +184,7 @@ async function SpentRows({ today }: { today: string }) {
             className="tabular mt-3 border-t pt-3 text-xs"
             style={{ borderColor: 'var(--hairline)', color: 'var(--ink-secondary)' }}
           >
-            特別費(ペースに含めない) {formatYen(guidance.specialYen, { sign: 'never' })}
+            以前の特別費(今は目標に含む) {formatYen(guidance.specialYen, { sign: 'never' })}
           </p>
         ) : null}
         <div className="mt-4 space-y-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>

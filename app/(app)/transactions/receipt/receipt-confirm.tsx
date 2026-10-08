@@ -527,12 +527,7 @@ export function ReceiptConfirm({
             目標の扱い
           </span>
           <div className="flex gap-1 rounded-full p-1" style={{ background: 'var(--plane)' }}>
-            {(
-              [
-                ['normal', '目標の予算に含める'],
-                ['special', '特別費として別枠'],
-              ] as const
-            ).map(([value, label]) => (
+            {([['normal', '目標の予算に含める']] as const).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -572,12 +567,7 @@ export function ReceiptConfirm({
               目標の扱いを選んでください
             </p>
             <div className="mt-2 flex gap-2">
-              {(
-                [
-                  ['normal', '目標の予算に含める'],
-                  ['special', '特別費として別枠'],
-                ] as const
-              ).map(([value, label]) => (
+              {([['normal', '目標の予算に含める']] as const).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
