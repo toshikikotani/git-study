@@ -6,7 +6,7 @@ import { MdCheck } from 'react-icons/md';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { GenreBadge, ICONS } from '@/components/ui/genre-badge';
-import { useGenreOverride } from '@/components/ui/genre-style-context';
+import { useGenreOverride, useGenreOverrides } from '@/components/ui/genre-style-context';
 import { Yen } from '@/components/ui/money';
 import {
   ICON_LABELS,
@@ -66,7 +66,7 @@ export function SettingsBody({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const override = useGenreOverride(data.genreName);
+  const override = useGenreOverride, useGenreOverrides(data.genreName);
   const current = genreStyle(data.genreName, override);
   const colors = selectableColorIndexes();
   const [name, setName] = useState(data.genreName);
@@ -181,25 +181,32 @@ export function SettingsBody({
           色
         </h3>
         <div role="group" aria-labelledby="cs-color" className="flex flex-wrap gap-2">
-          {colors.map((i) => (
-            <button
-              key={i}
-              type="button"
-              aria-pressed={colorIndex === i}
-              aria-label={`色${i}${colorIndex === i ? '(選択中)' : ''}`}
-              onClick={() => {
-                hapticFor('tabChange');
-                setColorIndex(i);
-              }}
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-full"
-              style={{ background: `var(--genre-${i})`, color: 'var(--on-action)' }}
-            >
-              {colorIndex === i ? <MdCheck aria-hidden size={20} /> : null}
-            </button>
-          ))}
+          {colors.map((i) => {
+            const used = taken.has(i) && i !== current.colorIndex;
+            const blocked = used && !allowReuse;
+            return (
+              <button
+                key={i}
+                type="button"
+                aria-pressed={colorIndex === i}
+                aria-label={`色${i}${colorIndex === i ? '(選択中)' : ''}${blocked ? '(使用中)' : ''}`}
+                disabled={blocked}
+                onClick={() => {
+                  hapticFor('tabChange');
+                  setColorIndex(i);
+                }}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full disabled:opacity-25"
+                style={{ background: `var(--genre-${i})`, color: 'var(--on-action)' }}
+              >
+                {colorIndex === i ? <MdCheck aria-hidden size={20} /> : null}
+              </button>
+            );
+          })}
         </div>
         <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          背景との差がはっきり見える色だけを並べています。
+          {allowReuse
+            ? '空いている色がないので、同じ色も選べます。'
+            : 'ほかのカテゴリが使っている色は選べません。'}
         </p>
         <button
           type="button"
