@@ -28,27 +28,39 @@ export function LandingHero({
   return (
     <section
       aria-label={`${endLabel}の支出の見込み`}
-      className="flex flex-col gap-2 rounded-[22px] bg-white p-5"
+      className="flex flex-col gap-2 rounded-[22px] p-5"
+      style={{ background: 'var(--surface)' }}
     >
-      <h2 className="text-[17px] leading-snug font-semibold tracking-[-0.02em] text-black">
+      <h2
+        className="text-[17px] leading-snug font-semibold tracking-[-0.02em]"
+        style={{ color: 'var(--ink)' }}
+      >
         {gap === null
           ? `${endLabel}の支出`
           : gap > 0
             ? `予算を${formatEstimate(gap)}超えそうです。`
             : `予算まで${formatEstimate(-gap)}の余裕です。`}
         {provisional ? (
-          <span className="ml-2 align-middle text-xs font-semibold text-[#8e8e93]">目安</span>
+          <span
+            className="ml-2 align-middle text-xs font-semibold"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            目安
+          </span>
         ) : null}
       </h2>
-      <p className="tabular text-[40px] leading-none font-bold tracking-[-0.04em] text-black">
+      <p
+        className="tabular text-[40px] leading-none font-bold tracking-[-0.04em]"
+        style={{ color: 'var(--ink)' }}
+      >
         {formatEstimate(landing.p50)}
         {budgetYen !== null ? (
-          <span className="ml-2 text-[17px] font-normal text-[#8e8e93]">
+          <span className="ml-2 text-[17px] font-normal" style={{ color: 'var(--ink-secondary)' }}>
             / 予算 {formatEstimate(budgetYen, { approx: false })}
           </span>
         ) : null}
       </p>
-      <p className="tabular text-[13px] text-[#8e8e93]">
+      <p className="tabular text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
         80%の確率で {formatEstimateRange(landing.p10, landing.p90)}
         {probWithinBudget !== null ? (
           <>
@@ -78,9 +90,18 @@ export function NextStepCard({
 }) {
   if (suggestion.probAfter - suggestion.probBefore < 0.01) return null;
   return (
-    <section aria-label="次の一手" className="flex flex-col gap-2 rounded-[22px] bg-white p-5">
-      <h2 className="text-[13px] font-semibold text-[#007aff]">次の一手</h2>
-      <p className="text-[22px] leading-snug font-bold tracking-[-0.02em] text-black">
+    <section
+      aria-label="次の一手"
+      className="flex flex-col gap-2 rounded-[22px] p-5"
+      style={{ background: 'var(--surface)' }}
+    >
+      <h2 className="text-[13px] font-semibold" style={{ color: 'var(--accent)' }}>
+        次の一手
+      </h2>
+      <p
+        className="text-[22px] leading-snug font-bold tracking-[-0.02em]"
+        style={{ color: 'var(--ink)' }}
+      >
         {suggestion.categoryName}を週{suggestion.perWeek}回へらすと
       </p>
       <p className="tabular text-base leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -94,7 +115,8 @@ export function NextStepCard({
       </p>
       <Link
         href={categoryHref(suggestion.categoryId, monthKey) as Route}
-        className="mt-2 inline-flex min-h-11 items-center self-start rounded-full bg-[#007aff] px-4 text-[15px] font-semibold text-white"
+        className="mt-2 inline-flex min-h-11 items-center self-start rounded-full px-4 text-[15px] font-semibold"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
         {suggestion.categoryName}の見通しを見る
       </Link>
