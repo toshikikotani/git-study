@@ -181,7 +181,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
           style={{
             left: pct(outlook.p10),
             width: `calc(${pct(outlook.p90)} - ${pct(outlook.p10)})`,
-            background: '#9fd4f2',
+            background: 'var(--sub, var(--accent))',
             opacity: 0.85,
           }}
         />
