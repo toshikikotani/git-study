@@ -203,7 +203,7 @@ function ChangeableRow({
           <p
             className="tabular text-xs"
             style={{
-              color: likely ? 'var(--state-caution)' : 'var(--ink-secondary)',
+              color: 'var(--ink)',
               fontWeight: likely ? 600 : 400,
             }}
           >
