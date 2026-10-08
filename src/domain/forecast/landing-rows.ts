@@ -93,6 +93,6 @@ export function landingRowsFrom(input: {
       return { row, overshoot: c.targetYen === null ? -Infinity : c.landing.p50 - c.targetYen };
     })
     .sort((a, b) => b.overshoot - a.overshoot || b.row.p50 - a.row.p50)
-    .slice(0, input.limit ?? 8);
+    .slice(0, input.limit ?? Number.MAX_SAFE_INTEGER);
   return rows.map(({ row }) => row);
 }
