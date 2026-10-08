@@ -145,7 +145,6 @@ function ChangeableRow({
                 href="/spending/category/none"
                 className="min-w-0 truncate text-base font-semibold underline"
                 style={{ color: 'var(--ink)' }}
-                onClick={(e) => e.stopPropagation()}
               >
                 {row.name} · 分類する
               </Link>
