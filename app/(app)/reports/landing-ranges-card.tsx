@@ -10,8 +10,6 @@ import { formatYen } from '@/domain/money';
 export type { LandingRow };
 
 /** 棒の右端(目標の150%)。目標をどの行でも同じ位置にそろえる(設計書 v3 3.3)。 */
-const SCALE_OF_TARGET = 1.5;
-
 /**
  * ジャンルごとの月末の見込み(設計書 v3 3.2・3.3)。
  * 上が「変えられる支出」(中央での超過額の大きい順)、下が「決まった支出」(1行に畳む)。
