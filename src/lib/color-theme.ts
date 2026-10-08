@@ -902,7 +902,7 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
   const sub = colors.sub ?? accent;
   const dark = isDark(plane);
   const onAccent = contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink;
-  const [hueA, hueB, hueC, hueD, hueE] = themeHues(colors);
+  const hueE = themeHues(colors)[4];
 
   return {
     '--plane': plane,
