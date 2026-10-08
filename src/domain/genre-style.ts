@@ -283,7 +283,7 @@ export function genreSwatchHex(name: string | null): string {
 export function genreSwatch(name: string | null): string {
   if (name === null || name === '' || name === '未分類') return 'var(--ink-muted)';
   const family = FAMILIES[familyIndex(name)]!;
-  return `light-dark(color-mix(in srgb, ${family.pastel} var(--genre-mix, 100%), var(--genre-shade, #ffffff)), color-mix(in srgb, ${family.vivid} 78%, #111111))`;
+  return `light-dark(color-mix(in srgb, ${family.pastel} 68%, var(--accent)), color-mix(in srgb, ${family.vivid} 62%, var(--accent)))`;
 }
 
 export function genreBarColor(name: string | null, _override?: GenreStyleOverride | null): string {
