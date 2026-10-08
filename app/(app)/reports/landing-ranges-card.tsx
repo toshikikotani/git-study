@@ -177,8 +177,8 @@ function ChangeableRow({
               style={{
                 left: pct(tight.low),
                 width: `calc(${pct(tight.high)} - ${pct(tight.low)})`,
-                background: 'var(--accent)',
-                opacity: 0.7,
+                background: 'var(--mark, var(--sub, var(--accent)))',
+                opacity: 0.55,
               }}
             />
             {row.targetYen !== null ? (
