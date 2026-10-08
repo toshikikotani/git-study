@@ -156,6 +156,33 @@ export default async function ReportsPage({
         cautionPrecision: outcome.ok ? outcome.value.cautionPrecision : null,
       })
     : [];
+  const shown = new Set(rangeRows.map((row) => row.genreId));
+  for (const tx of ledger.transactions) {
+    if (tx.amountYen >= 0 || tx.genreId === null || shown.has(tx.genreId)) continue;
+    const yen = rangeRows.find((row) => row.genreId === tx.genreId)?.baseYen ?? 0;
+    if (yen > 0) continue;
+    const spent = ledger.transactions
+      .filter((item) => item.genreId === tx.genreId && item.amountYen < 0)
+      .reduce((sum, item) => sum - item.amountYen, 0);
+    if (spent <= 0) continue;
+    shown.add(tx.genreId);
+    rangeRows.push({
+      genreId: tx.genreId,
+      name: tx.genreName ?? '未分類',
+      baseYen: spent,
+      p10: spent,
+      p50: spent,
+      p90: spent,
+      targetYen: null,
+      exceedance: null,
+      excludedYen: 0,
+      status: 'settled',
+      type: 'committed',
+      group: 'fixed',
+      caution: null,
+      cutPerWeekYen: null,
+    });
+  }
   // グラフ(設計書 v3 3.4)。目標のジャンルの行と、「変えられる支出だけ」の行・予算・予測。
   const goalLines = (genreIds: readonly string[]) =>
     linesForGoal(
