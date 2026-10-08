@@ -174,7 +174,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
         />
         <div
           className="absolute top-[18px] left-0 h-2.5 rounded-full"
-          style={{ width: pct(outlook.spentYen), background: 'var(--ink)' }}
+          style={{ width: pct(outlook.spentYen), background: 'var(--accent)' }}
         />
         <div
           className="absolute top-[18px] h-2.5 rounded-full"
@@ -194,11 +194,11 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
         />
         <div
           className="absolute top-2.5 h-6 w-0.5 -translate-x-1/2"
-          style={{ left: pct(outlook.budgetYen), background: 'var(--ink)' }}
+          style={{ left: pct(outlook.budgetYen), background: 'var(--sub, var(--accent))' }}
         />
         <span
           className="absolute -top-1.5 -translate-x-1/2 text-xs font-semibold"
-          style={{ left: pct(outlook.budgetYen), color: 'var(--ink)' }}
+          style={{ left: pct(outlook.budgetYen), color: 'var(--accent)' }}
         >
           予算
         </span>
