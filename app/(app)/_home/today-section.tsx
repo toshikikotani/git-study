@@ -19,7 +19,7 @@ export function outlookLabel(period: { from: string; to: string }): string {
 /**
  * ホームの「今日使える額」から下(デザインの「今日」、ADR-085)を読み込む(重い予測なので、
  * ホームの他の部分を待たせないように Suspense の中で読む)。今日使える額・見通し・次の一手は
- * 見通しと月末に残る見込みは、同じ範囲(目標があれば目標のジャンル)の同じ数字にする。
+ * 見通しは目標の範囲。残る見込みは今月のすべての支出。目標に入っていないジャンルを見通しに出す。
  */
 export async function TodaySection({ savings }: { savings: HomeListProps['savings'] }) {
   const today = todayJst();
@@ -35,7 +35,16 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
     loadForecast({ period: monthPeriod }).catch(() => null),
   ]);
   const forecast = goalView?.forecast ?? null;
-  const balance = (goalView ?? monthView)?.forecast.balance ?? null;
+  const balance = monthView?.forecast.balance ?? null;
+  const goalIds = goal?.scope.genreIds;
+  const outside =
+    goalIds && monthView
+      ? monthView.forecast.byCategory
+          .filter((c) => !goalIds.has(c.categoryId) && c.landing.p50 > 0)
+          .map((c) => ({ name: c.categoryName, p50: c.landing.p50 }))
+          .sort((a, b) => b.p50 - a.p50)
+      : [];
+
   return (
     <div className="space-y-3">
       <TodayCard
@@ -56,6 +65,7 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
                 p50: forecast.total.p50,
                 p90: forecast.total.p90,
                 budgetYen: goal.budgetYen,
+                outside,
               }
             : null
         }

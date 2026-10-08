@@ -20,6 +20,8 @@ export type TodayOutlook = {
   p50: number;
   p90: number;
   budgetYen: number;
+  /** 目標に入っていないジャンル(すべての支出の着地)。 */
+  outside?: { name: string; p50: number }[];
 };
 
 export type TodayCardProps = {
@@ -175,6 +177,14 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
           / 予算 {formatEstimate(outlook.budgetYen, { approx: false })}
         </span>
       </p>
+      {outlook.outside && outlook.outside.length > 0 ? (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          目標に入っていない:{' '}
+          {outlook.outside
+            .map((c) => `${c.name} ${formatEstimate(c.p50, { approx: false })}`)
+            .join('、')}
+        </p>
+      ) : null}
       <div aria-hidden className="relative h-10">
         <div
           className="absolute inset-x-0 top-[18px] h-2.5 rounded-full"

@@ -23,7 +23,8 @@ export function HomeList({ balance, pendingCount, savings }: HomeListProps) {
             月末に残る見込み
           </p>
           <p className="tabular text-xs" style={{ color: 'var(--ink-secondary)' }}>
-            収入 {formatEstimate(balance.incomeYen, { approx: false }).replace('円', '')} − 支出{' '}
+            すべての支出。収入{' '}
+            {formatEstimate(balance.incomeYen, { approx: false }).replace('円', '')} − 支出{' '}
             {formatEstimate(balance.incomeYen - balance.p50, { approx: false }).replace('円', '')}
           </p>
         </div>
