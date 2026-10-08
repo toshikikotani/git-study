@@ -91,10 +91,19 @@ export function LandingRangesCard({
         ) : null}
       </section>
       <p className="px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        帯は80%の範囲、点は中央、縦の線は目標(棒は目標の1.5倍まで)。行を押すと、なぜその見込みかを出す。
+        薄い帯は90%、濃い帯は80%、丸は中央、縦線は目標です。行を押すと、なぜその見込みかを出します。
       </p>
     </div>
   );
+}
+
+/** 90%の幅。80%(p10〜p90)の広がりを、正規分布の比で外側へ延ばした目安。 */
+function wider(row: LandingRow): { low: number; high: number } {
+  const scale = 1.64485 / 1.28155;
+  return {
+    low: Math.max(0, row.p50 - (row.p50 - row.p10) * scale),
+    high: row.p50 + (row.p90 - row.p50) * scale,
+  };
 }
 
 function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
@@ -147,9 +156,19 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
             <span
               className="absolute top-1 h-2 rounded-full"
               style={{
+                left: pct(wider(row).low),
+                width: `calc(${pct(wider(row).high)} - ${pct(wider(row).low)})`,
+                background: 'var(--accent)',
+                opacity: 0.28,
+              }}
+            />
+            <span
+              className="absolute top-1 h-2 rounded-full"
+              style={{
                 left: pct(row.p10),
                 width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
-                background: 'var(--accent-track)',
+                background: 'var(--accent)',
+                opacity: 0.55,
               }}
             />
             {row.targetYen !== null ? (
