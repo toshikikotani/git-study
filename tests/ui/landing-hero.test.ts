@@ -20,7 +20,7 @@ describe('月末の見込みの見出し(デザインの「月末の支出」)',
         }),
       ),
     );
-    expect(html).toContain('月末の支出');
+    expect(html).toContain('予算を約8,400円超えそうです');
     expect(html).toContain('目安');
     expect(html).toContain('約17.8万円');
     expect(html).toContain('/ 予算 17.0万円');

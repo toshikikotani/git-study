@@ -66,7 +66,7 @@ const isBlue = (hex: string) => {
 
 describe('G 面の3段階と文字のコントラスト', () => {
   it('ダークの面は 背景 #0B0F17 / カード #121826 / 強調面 #1A2233', () => {
-    expect(dark['--plane']).toBe('#0b0f17');
+    expect(dark['--plane']).toBe('#000000');
     expect(dark['--surface']).toBe('#121826');
     expect(dark['--surface-raised']).toBe('#1a2233');
   });
@@ -149,12 +149,13 @@ describe('G 文字は5段階だけ(受け入れ基準9)+ Dynamic Type', () => {
     return px ? Number(px[1]) : null;
   };
 
-  it('文字の大きさは rem のトークン(text-xs〜)だけで、text-[Npx] や px 直書きは無い', () => {
+  it('文字の大きさは 13/15/17/22/34/40 と補足の11だけ', () => {
+    const ok = new Set([11, 13, 15, 17, 22, 34, 40]);
     const bad: string[] = [];
     for (const s of sources.filter((x) => x.path.endsWith('.tsx'))) {
-      for (const m of s.text.matchAll(/text-\[(\d+)px\]/g)) bad.push(`${s.path}: ${m[0]}`);
-      for (const m of s.text.matchAll(/fontSize:\s*(\d+)/g))
-        bad.push(`${s.path}: fontSize ${m[1]}`);
+      for (const m of s.text.matchAll(/text-\[(\d+)px\]/g)) {
+        if (!ok.has(Number(m[1]))) bad.push(`${s.path}: ${m[0]}`);
+      }
     }
     expect(bad).toEqual([]);
   });

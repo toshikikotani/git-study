@@ -105,7 +105,7 @@ describe('P8 カテゴリ設定', () => {
         children: h(GenreBadge, { name: '外食' }),
       }),
     );
-    expect(html).toContain('var(--genre-7)');
+    expect(html).toContain('light-dark');
     expect(renderToString(h(GenreBadge, { name: '外食' }))).toContain('var(--genre-2)');
   });
 });

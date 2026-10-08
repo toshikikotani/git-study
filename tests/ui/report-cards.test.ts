@@ -61,7 +61,7 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).toContain('<details');
     expect(html).toContain('この先の見込み(中央)');
     expect(html).toContain('>目標<');
-    expect(html).toContain('点は中央');
+    expect(html).toContain('塗った帯は使った額');
     expect(html).toContain('state-caution');
   });
 
