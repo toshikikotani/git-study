@@ -618,7 +618,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f2ede4',
       surface: '#ffffff',
-      ink: '#5c4e4a',
+      ink: '#2e2624',
       accent: '#a6808e',
       sub: '#d9b4bb',
     },
@@ -632,7 +632,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f2ebf0',
       surface: '#ffffff',
-      ink: '#4a3844',
+      ink: '#2a2028',
       accent: '#c49ab4',
       sub: '#bac2d9',
     },
@@ -660,7 +660,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f2e7c4',
       surface: '#ffffff',
-      ink: '#4a3c38',
+      ink: '#2e2422',
       accent: '#f28379',
       sub: '#a68f86',
     },
@@ -688,7 +688,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f2efeb',
       surface: '#ffffff',
-      ink: '#4a4542',
+      ink: '#2e2a28',
       accent: '#5da684',
       sub: '#f2b6b6',
     },
@@ -702,7 +702,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f2dfeb',
       surface: '#ffffff',
-      ink: '#3a3838',
+      ink: '#242222',
       accent: '#bf808c',
       sub: '#51a696',
     },
@@ -716,7 +716,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f2e4dc',
       surface: '#ffffff',
-      ink: '#3a3438',
+      ink: '#242024',
       accent: '#a67b7e',
       sub: '#9295a6',
     },

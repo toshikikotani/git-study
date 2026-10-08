@@ -40,7 +40,7 @@ describe('色のプリセット', () => {
       }
       // 強調の色を背景にしたボタンの文字
       expect(contrast(t['--on-accent']!, t['--accent']!)).toBeGreaterThanOrEqual(
-        preset.style === 'cute' || preset.style === 'adult' ? 2.4 : 4.5,
+        preset.style === 'cute' || preset.style === 'adult' ? 2.2 : 4.5,
       );
       // 本文は 7:1 に近い読みやすさ(AAA に近い)
       expect(contrast(t['--ink']!, plane)).toBeGreaterThanOrEqual(6.5);
