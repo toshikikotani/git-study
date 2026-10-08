@@ -28,8 +28,8 @@ export function LandingHero({
   return (
     <section
       aria-label={`${endLabel}の支出の見込み`}
-      className="flex flex-col gap-2 rounded-[22px] p-5"
-      style={{ background: 'var(--surface)' }}
+      className="glass flex flex-col gap-2 rounded-[22px] p-5"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2
         className="text-[17px] leading-snug font-semibold tracking-[-0.02em]"
@@ -92,8 +92,8 @@ export function NextStepCard({
   return (
     <section
       aria-label="次の一手"
-      className="flex flex-col gap-2 rounded-[22px] p-5"
-      style={{ background: 'var(--surface)' }}
+      className="glass flex flex-col gap-2 rounded-[22px] p-5"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-[13px] font-semibold" style={{ color: 'var(--accent)' }}>
         次の一手
