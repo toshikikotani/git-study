@@ -24,8 +24,10 @@ export function LandingRangesCard({
   periodLabel: string;
 }) {
   if (rows.length === 0) return null;
-  const changeable = rows.filter((r) => r.group === 'changeable');
-  const fixed = rows.filter((r) => r.group === 'fixed');
+  const changeable = rows.filter((r) => r.group === 'changeable').sort((a, b) => b.p50 - a.p50);
+  const fixed = rows.filter((r) => r.group === 'fixed').sort((a, b) => b.p50 - a.p50);
+  const scaleMax =
+    Math.max(...rows.map((r) => Math.max(r.p90, r.targetYen ?? 0, r.baseYen)), 1) * 1.08;
   const fixedTotal = fixed.reduce((sum, r) => sum + r.p50, 0);
   return (
     <div className="space-y-3">
@@ -64,7 +66,7 @@ export function LandingRangesCard({
             </p>
             <ul>
               {changeable.map((row, i) => (
-                <ChangeableRow key={row.genreId} row={row} first={i === 0} />
+                <ChangeableRow key={row.genreId} row={row} first={i === 0} scaleMax={scaleMax} />
               ))}
             </ul>
           </>
@@ -104,9 +106,16 @@ function tighter(row: LandingRow): { low: number; high: number } {
   };
 }
 
-function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
+function ChangeableRow({
+  row,
+  first,
+  scaleMax,
+}: {
+  row: LandingRow;
+  first: boolean;
+  scaleMax: number;
+}) {
   const tight = tighter(row);
-  const scaleMax = Math.max(row.targetYen ?? 0, row.p90, 1) * 1.12;
   const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / scaleMax) * 100))}%`;
   const exceedText =
     row.targetYen !== null && row.exceedance !== null
