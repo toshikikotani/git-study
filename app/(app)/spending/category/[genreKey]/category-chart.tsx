@@ -100,7 +100,6 @@ export function CategoryChart({
   const [audioNote, setAudioNote] = useState<string | null>(null);
   const isCum = mode === 'cumulative';
   const n = isCum ? cumulative.days.length : series.buckets.length;
-  const overrides = useGenreOverrides();
   const themeColor = genreName === '全体' || genreName === '変えられる支出';
   const barColor = themeColor
     ? 'var(--accent)'
