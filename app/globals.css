@@ -389,7 +389,7 @@ html {
 
 body {
   overflow-wrap: anywhere;
-  background: color-mix(in srgb, var(--plane) 42%, #ffffff);
+  background: var(--plane);
   color: var(--ink);
   /* 金額は等幅数字(縦に並べたとき桁がそろう)。 */
   font-variant-numeric: tabular-nums;
@@ -753,4 +753,8 @@ button {
     animation-duration: var(--motion-small);
     animation-timing-function: linear;
   }
+}
+
+:root:not([data-theme="dark"]) body {
+  background: color-mix(in srgb, var(--plane) 42%, #ffffff);
 }
