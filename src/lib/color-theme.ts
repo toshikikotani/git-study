@@ -965,11 +965,23 @@ export function applyColorTheme(theme: ColorTheme | null): void {
   const style = 'style' in theme ? theme.style : undefined;
   root.style.setProperty(
     '--genre-shade',
-    style === 'stylish' || style === 'cool' ? '#1c1c1c' : style === 'adult' ? '#4a403c' : style === 'simple' ? '#2a2a2a' : '#ffffff',
+    style === 'stylish' || style === 'cool'
+      ? '#1c1c1c'
+      : style === 'adult'
+        ? '#4a403c'
+        : style === 'simple'
+          ? '#2a2a2a'
+          : '#ffffff',
   );
   root.style.setProperty(
     '--genre-mix',
-    style === 'stylish' || style === 'cool' ? '62%' : style === 'adult' ? '74%' : style === 'simple' ? '78%' : '100%',
+    style === 'stylish' || style === 'cool'
+      ? '62%'
+      : style === 'adult'
+        ? '74%'
+        : style === 'simple'
+          ? '78%'
+          : '100%',
   );
 }
 
