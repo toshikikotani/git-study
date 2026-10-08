@@ -961,6 +961,15 @@ export function applyColorTheme(theme: ColorTheme | null): void {
   for (const [name, value] of Object.entries(themeTokens(theme.colors))) {
     root.style.setProperty(name, value);
   }
+  const style = 'style' in theme ? theme.style : undefined;
+  root.style.setProperty(
+    '--genre-shade',
+    style === 'stylish' || style === 'cool' ? '#1c1c1c' : style === 'adult' ? '#4a403c' : '#ffffff',
+  );
+  root.style.setProperty(
+    '--genre-mix',
+    style === 'stylish' || style === 'cool' ? '68%' : style === 'adult' ? '78%' : '100%',
+  );
 }
 
 export function readColorTheme(): ColorTheme {
@@ -994,7 +1003,7 @@ export function writeColorTheme(theme: ColorTheme): void {
  * 最初の描画の前に色を当てる(ちらつき防止)。保存した tokens があればそのまま当て、
  * 古い保存(4色だけ)なら背景・カード・文字・強調だけを当てる。
  */
-export const THEME_BOOT = `(function(){try{var raw=localStorage.getItem('${THEME_KEY}');if(!raw)return;var t=JSON.parse(raw);if(!t||t.id==='system'||!t.colors)return;var c=t.colors;var hex=(c.plane||'').replace('#','');var dark=false;if(hex.length===6){var r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);dark=(r*299+g*587+b*114)/1000<140;}var root=document.documentElement;root.dataset.theme=dark?'dark':'light';var k=t.tokens;if(k&&typeof k==='object'){for(var n in k){if(Object.prototype.hasOwnProperty.call(k,n)&&n.indexOf('--')===0)root.style.setProperty(n,String(k[n]));}return;}root.style.setProperty('--plane',c.plane);root.style.setProperty('--surface',c.surface);root.style.setProperty('--surface-raised',c.surface);root.style.setProperty('--ink',c.ink);root.style.setProperty('--accent',c.accent);root.style.setProperty('--action',c.accent);}catch(e){}})();`;
+export const THEME_BOOT = `(function(){try{var raw=localStorage.getItem('${THEME_KEY}');if(!raw)return;var t=JSON.parse(raw);if(!t||t.id==='system'||!t.colors)return;var c=t.colors;var hex=(c.plane||'').replace('#','');var dark=false;if(hex.length===6){var r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);dark=(r*299+g*587+b*114)/1000<140;}var root=document.documentElement;root.dataset.theme=dark?'dark':'light';var k=t.tokens;if(k&&typeof k==='object'){for(var n in k){if(Object.prototype.hasOwnProperty.call(k,n)&&n.indexOf('--')===0)root.style.setProperty(n,String(k[n]));}}var s=t.style;root.style.setProperty('--genre-shade',s==='stylish'||s==='cool'?'#1c1c1c':s==='adult'?'#4a403c':'#ffffff');root.style.setProperty('--genre-mix',s==='stylish'||s==='cool'?'68%':s==='adult'?'78%':'100%');if(k&&typeof k==='object')return;root.style.setProperty('--plane',c.plane);root.style.setProperty('--surface',c.surface);root.style.setProperty('--surface-raised',c.surface);root.style.setProperty('--ink',c.ink);root.style.setProperty('--accent',c.accent);root.style.setProperty('--action',c.accent);}catch(e){}})();`;
 
 /**
  * 以前の保存(4色だけ・tokens なし)を、今のプリセットと色の役割に置き換える(アプリを開いたときに1回)。
