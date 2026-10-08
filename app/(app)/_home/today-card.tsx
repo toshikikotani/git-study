@@ -1,185 +1,51 @@
 import Link from 'next/link';
 
+import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { TenDots } from '@/components/ui/ten-dots';
-import {
-  estimateParts,
-  formatEstimate,
-  formatProbability,
-  formatSignedEstimate,
-  formatTimesInTen,
-} from '@/domain/forecast/format';
-import { todaySentence, type TodayAllowance } from '@/domain/forecast/today';
+import { formatEstimate, formatProbability } from '@/domain/forecast/format';
+import type { TodayAllowance } from '@/domain/forecast/today';
 import type { ForecastSuggestion } from '@/domain/forecast/types';
-import { formatYen } from '@/domain/money';
 import { NextStepCard } from '../reports/landing-hero';
-import { SpeakButton } from './speak-button';
 
-/** 今日あと使える額が「予算に収まるのが10回中8回になる額」から出ていること(dots の数)。 */
+/** 今日あと使える額は「予算に収まるのが80%になる額」から出している(点の数)。 */
 const SAFE_ALLOWANCE_PROB = 0.8;
+
+/** 目標の期間の見通し(見込みの幅・予算・使った額)。 */
+export type TodayOutlook = {
+  /** 「10月の見通し」「10月14日までの見通し」 */
+  label: string;
+  /** これまでに使った額(事実)。 */
+  spentYen: number;
+  p10: number;
+  p50: number;
+  p90: number;
+  budgetYen: number;
+};
 
 export type TodayCardProps = {
   /** 目標が無ければ null(今日あと使える額は出せない)。 */
   today: TodayAllowance | null;
-  /** 月末の収支の見込み(今月のすべての支出。収入が無ければ null)。 */
-  balance: { p10: number; p50: number; p90: number; incomeYen?: number } | null;
+  outlook: TodayOutlook | null;
   suggestion: ForecastSuggestion | null;
   /** 予算に収まる確率(目標の範囲)。 */
   probWithinBudget: number | null;
   provisional: boolean;
-  /** 「10月6日(火) · 10月は残り26日」 */
-  dateLine?: string;
-  /** 目標の予算と、その範囲の月末の見込み(中央)・超えるときの平均の超過額。 */
-  budget?: { yen: number; landingP50: number; expectedOvershoot: number } | null;
   /** 「2026-10」(次の一手からジャンル画面へ) */
   monthKey?: string;
 };
 
 /**
- * ホームの先頭(デザインのホーム・設計書 v3 3.1):今日あと使える額(大きな数字は1つだけ)→
- * 月末の収支の見込み → 予算に収まる回数 → 次の一手。
+ * ホームの先頭(デザインの「今日」、ADR-085):今日使える額(大きな数字は1つだけ)→
+ * 見通し(月末の見込みと予算)→ 次の一手。
  */
 export function TodayCard(props: TodayCardProps) {
-  const { today, balance, suggestion, probWithinBudget } = props;
-  const est = (yen: number) => formatEstimate(yen, { approx: false });
-  const spoken = [
-    today ? todaySentence(today, est) : null,
-    balance ? `月末の収支の見込みは${formatSignedEstimate(balance.p50)}。` : null,
-    probWithinBudget !== null ? `予算に収まるのは${formatTimesInTen(probWithinBudget)}。` : null,
-  ]
-    .filter(Boolean)
-    .join('');
+  const { today, outlook, suggestion, probWithinBudget } = props;
   return (
     <div className="space-y-3">
-      {props.dateLine ? (
-        <header className="px-1">
-          <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
-            {props.dateLine}
-          </p>
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>
-            今日の家計
-          </h1>
-        </header>
+      <TodayHero today={today} provisional={props.provisional} />
+      {outlook && probWithinBudget !== null ? (
+        <OutlookCard outlook={outlook} probOver={1 - probWithinBudget} />
       ) : null}
-
-      <section
-        aria-label="今日あと使える額"
-        className="rise relative overflow-hidden rounded-[28px] p-6 pb-7"
-        style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-28 -right-20 size-64 rounded-full blur-3xl"
-          style={{ background: 'var(--hero-glow)' }}
-        />
-        <div className="relative">
-          {today ? (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-                  {today.kind === 'left' ? '今日 あと使える' : '今日は上限を'}
-                </p>
-                {props.provisional ? (
-                  <span
-                    className="rounded-full px-3 py-1 text-xs font-semibold"
-                    style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
-                  >
-                    目安
-                  </span>
-                ) : null}
-              </div>
-              <p
-                className="tabular mt-3 text-4xl leading-none font-semibold tracking-[-0.045em]"
-                style={{ color: today.kind === 'left' ? 'var(--ink)' : 'var(--state-caution)' }}
-              >
-                {today.kind === 'left' ? est(today.leftYen) : `${est(today.overYen)} 超え`}
-              </p>
-              <div
-                className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-3"
-                style={{ borderTop: '1px solid var(--hairline)' }}
-              >
-                <p className="text-sm" style={{ color: 'var(--ink)' }}>
-                  毎日この額までなら、月末に予算に収まる
-                </p>
-                <span className="flex items-center gap-2">
-                  <TenDots probability={SAFE_ALLOWANCE_PROB} size="sm" />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                    10回中8回
-                  </span>
-                </span>
-              </div>
-              <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                1日の上限 {est(today.capYen)}(予算に収まるのが10回中8回になる額)から、今日の{' '}
-                {formatYen(today.spentYen, { sign: 'never' })}{' '}
-                を引いた額。使わなかった分は、明日からの上限に戻る。
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-                今日 あと
-              </p>
-              <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-                目標(ジャンルごとの予算)を決めると、今日あと使える額を出せます。
-              </p>
-              <Link
-                href="/plan"
-                className="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
-                目標を決める
-                <span aria-hidden>→</span>
-              </Link>
-            </>
-          )}
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <Link
-              href="/reports"
-              className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold"
-              style={{ color: 'var(--accent)' }}
-            >
-              なぜこの見込み?
-              <span aria-hidden>→</span>
-            </Link>
-            {spoken ? <SpeakButton text={spoken} /> : null}
-          </div>
-        </div>
-      </section>
-
-      {balance ? <BalanceCard balance={balance} /> : null}
-
-      {probWithinBudget !== null ? (
-        <section
-          aria-label="予算に収まる見込み"
-          className="space-y-3 rounded-[24px] p-5"
-          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-        >
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-              {props.budget
-                ? `予算 ${formatEstimate(props.budget.yen, { approx: false })}に収まる`
-                : '予算に収まる見込み'}
-            </h2>
-            <p className="tabular text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              <span className="font-semibold" style={{ color: 'var(--ink)' }}>
-                {formatTimesInTen(probWithinBudget)}
-              </span>
-              <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                ({formatProbability(probWithinBudget)})
-              </span>
-            </p>
-          </div>
-          <TenDots probability={probWithinBudget} />
-          {props.budget ? (
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              このままだと月末は{formatEstimate(props.budget.landingP50)}。
-              {props.budget.expectedOvershoot > 0
-                ? `超えるときは、平均で${formatEstimate(props.budget.expectedOvershoot)}超える。`
-                : ''}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
       {suggestion && props.monthKey ? (
         <NextStepCard suggestion={suggestion} monthKey={props.monthKey} />
       ) : null}
@@ -187,75 +53,184 @@ export function TodayCard(props: TodayCardProps) {
   );
 }
 
-/** 月末の収支の見込み(デザインのホーム):中央を大きく、10回中8回の幅を帯で、収入 − 支出の見込み。 */
-function BalanceCard({ balance }: { balance: NonNullable<TodayCardProps['balance']> }) {
-  const sign = balance.p50 < 0 ? '−' : '+';
-  const parts = estimateParts(Math.abs(balance.p50));
-  // 帯の位置:0円(収支がちょうど0)を含む範囲で、10回中8回の幅を置く。
-  const lo = Math.min(0, balance.p10);
-  const hi = Math.max(0, balance.p90);
-  const span = Math.max(1, hi - lo);
-  const pct = (v: number) => `${((v - lo) / span) * 100}%`;
+function TodayHero({ today, provisional }: { today: TodayAllowance | null; provisional: boolean }) {
   return (
     <section
-      aria-label="月末の収支の見込み"
-      className="space-y-3 rounded-[24px] p-5"
+      aria-label="今日使える額"
+      className="rise flex flex-col gap-1 rounded-[28px] px-6 pt-6 pb-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <h2 className="text-sm font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-        月末の収支の見込み
-      </h2>
-      <p className="tabular flex items-baseline gap-1" style={{ color: 'var(--ink)' }}>
-        <span className="text-3xl leading-none font-semibold tracking-[-0.03em]">
-          {sign}
-          {parts.number}
-        </span>
-        <span className="text-base font-semibold">{parts.unit}</span>
-      </p>
-      <div>
-        <div aria-hidden className="relative h-3">
-          <div
-            className="absolute inset-x-0 top-1 h-1 rounded-full"
-            style={{ background: 'var(--plane)' }}
-          />
-          <div
-            className="absolute top-0 h-3 rounded-full"
-            style={{
-              left: pct(balance.p10),
-              width: `calc(${pct(balance.p90)} - ${pct(balance.p10)})`,
-              background: balance.p50 < 0 ? 'var(--state-caution-track)' : 'var(--state-ok-track)',
-            }}
-          />
-          <div
-            className="absolute top-0 size-3 -translate-x-1/2 rounded-full"
-            style={{
-              left: pct(balance.p50),
-              background: balance.p50 < 0 ? 'var(--state-caution)' : 'var(--state-ok)',
-              boxShadow: '0 0 0 2px var(--surface)',
-            }}
-          />
-        </div>
-        <div
-          className="tabular mt-1 flex justify-between text-xs"
-          style={{ color: 'var(--ink-secondary)' }}
+      {today ? (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
+              {today.kind === 'left' ? '今日 使えるのは' : '今日は上限を'}
+            </p>
+            {provisional ? (
+              <span
+                className="rounded-full px-3 py-1 text-xs font-semibold"
+                style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+              >
+                目安
+              </span>
+            ) : null}
+          </div>
+          <p
+            className="tabular mt-1 flex items-baseline gap-1"
+            style={{ color: today.kind === 'left' ? 'var(--ink)' : 'var(--state-caution)' }}
+          >
+            <span className="text-4xl leading-none font-bold tracking-[-0.04em]">
+              {(today.kind === 'left' ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
+            </span>
+            <span className="text-base font-bold">{today.kind === 'left' ? '円' : '円 超え'}</span>
+          </p>
+          <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
+          <TenDots probability={SAFE_ALLOWANCE_PROB} />
+          <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
+            毎日この額までなら、
+            <strong style={{ color: 'var(--accent)' }}>
+              {formatProbability(SAFE_ALLOWANCE_PROB)}の確率
+            </strong>
+            で予算内に収まります。
+          </p>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            使わなかった分は、明日に回ります。
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
+            今日 使えるのは
+          </p>
+          <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
+            目標(ジャンルごとの予算)を決めると、今日使える額を出せます。
+          </p>
+          <Link
+            href="/plan"
+            className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            目標を決める
+            <ChevronRightIcon />
+          </Link>
+        </>
+      )}
+      {today ? (
+        <Link
+          href="/reports"
+          className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
+          style={{ color: 'var(--accent)' }}
         >
-          <span>{formatSignedEstimate(balance.p10).replace('円', '')}</span>
-          <span>{formatSignedEstimate(balance.p90).replace('円', '')}</span>
-        </div>
-        <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          10回中8回は、この幅に入る
-        </p>
-      </div>
-      {balance.incomeYen !== undefined ? (
-        <p
-          className="tabular pt-3 text-xs"
-          style={{ color: 'var(--ink-secondary)', borderTop: '1px solid var(--hairline)' }}
-        >
-          収入 {formatEstimate(balance.incomeYen, { approx: false }).replace('円', '')} −
-          支出の見込み{' '}
-          {formatEstimate(balance.incomeYen - balance.p50, { approx: false }).replace('円', '')}
-        </p>
+          なぜこの額?
+          <ChevronRightIcon />
+        </Link>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * 見通しのカード(デザイン):月末の見込み(中央)と予算、使った額・10回中8回の幅・中央の点・予算の線を
+ * 1本の帯に、その下に予算を超える確率。
+ */
+function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: number }) {
+  const overYen = outlook.p50 - outlook.budgetYen;
+  const max = Math.max(outlook.p90, outlook.budgetYen, outlook.spentYen, 1) * 1.02;
+  const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / max) * 100))}%`;
+  const caution = probOver >= 0.5;
+  return (
+    <section
+      aria-label={outlook.label}
+      className="flex flex-col gap-3 rounded-[28px] p-6"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
+          {outlook.label}
+        </h2>
+        <span
+          className="rounded-full px-3 py-1 text-sm font-semibold"
+          style={
+            overYen > 0
+              ? { background: 'var(--state-caution-track)', color: 'var(--state-caution)' }
+              : { background: 'var(--state-ok-track)', color: 'var(--state-ok)' }
+          }
+        >
+          {overYen > 0 ? `${formatEstimate(overYen)} 超えそう` : '予算内の見込み'}
+        </span>
+      </div>
+      <p className="tabular flex flex-wrap items-baseline gap-2">
+        <span className="text-3xl font-bold tracking-[-0.02em]" style={{ color: 'var(--ink)' }}>
+          {formatEstimate(outlook.p50)}
+        </span>
+        <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
+          / 予算 {formatEstimate(outlook.budgetYen, { approx: false })}
+        </span>
+      </p>
+      <div aria-hidden className="relative h-10">
+        <div
+          className="absolute inset-x-0 top-[18px] h-2.5 rounded-full"
+          style={{ background: 'var(--plane)' }}
+        />
+        <div
+          className="absolute top-[18px] left-0 h-2.5 rounded-full"
+          style={{ width: pct(outlook.spentYen), background: 'var(--ink)' }}
+        />
+        <div
+          className="absolute top-[18px] h-2.5 rounded-full"
+          style={{
+            left: pct(outlook.p10),
+            width: `calc(${pct(outlook.p90)} - ${pct(outlook.p10)})`,
+            background: 'var(--accent-track)',
+          }}
+        />
+        <div
+          className="absolute top-[15px] size-4 -translate-x-1/2 rounded-full"
+          style={{
+            left: pct(outlook.p50),
+            background: 'var(--accent)',
+            boxShadow: '0 0 0 3px var(--surface)',
+          }}
+        />
+        <div
+          className="absolute top-2.5 h-6 w-0.5 -translate-x-1/2"
+          style={{ left: pct(outlook.budgetYen), background: 'var(--ink)' }}
+        />
+        <span
+          className="absolute -top-1.5 -translate-x-1/2 text-xs font-semibold"
+          style={{ left: pct(outlook.budgetYen), color: 'var(--ink)' }}
+        >
+          予算
+        </span>
+      </div>
+      <div
+        className="tabular -mt-1 flex justify-between gap-2 text-xs"
+        style={{ color: 'var(--ink-secondary)' }}
+      >
+        <span>使った額 {formatEstimate(outlook.spentYen, { approx: false })}</span>
+        <span>
+          80%の確率で {formatEstimate(outlook.p10, { approx: false }).replace('円', '')}〜
+          {formatEstimate(outlook.p90, { approx: false })}
+        </span>
+      </div>
+      <div className="h-px" style={{ background: 'var(--hairline)' }} />
+      <div className="flex flex-col gap-2">
+        <p className="text-base" style={{ color: 'var(--ink)' }}>
+          <strong style={{ color: caution ? 'var(--state-caution)' : 'var(--ink)' }}>
+            {formatProbability(probOver)}
+          </strong>
+          の確率で 予算を超えます
+        </p>
+        <div aria-hidden className="h-1.5 rounded-full" style={{ background: 'var(--plane)' }}>
+          <div
+            className="h-1.5 rounded-full"
+            style={{
+              width: `${Math.round(Math.min(1, Math.max(0, probOver)) * 100)}%`,
+              background: caution ? 'var(--state-caution)' : 'var(--accent)',
+            }}
+          />
+        </div>
+      </div>
     </section>
   );
 }

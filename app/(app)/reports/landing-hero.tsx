@@ -1,20 +1,13 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 
-import { TenDots } from '@/components/ui/ten-dots';
-import {
-  estimateParts,
-  formatEstimate,
-  formatEstimateRange,
-  formatProbability,
-  formatTimesInTen,
-} from '@/domain/forecast/format';
+import { formatEstimate, formatEstimateRange, formatProbability } from '@/domain/forecast/format';
 import type { ForecastSuggestion } from '@/domain/forecast/types';
 import { categoryHref } from '@/lib/category-nav';
 
 /**
- * 月末の見込みの見出し(デザインの「月末の支出」カード):中央を1つ大きく、予算との差を
- * ひとこと、10回中8回の幅、予算に収まる回数を10個の点で。予算の書き方は「17.0万円」に
+ * 月末の見込みの見出し(デザインの「見通し」の「月末の支出」、ADR-085):中央を1つ大きく、
+ * 予算との差を右上のバッジに、80%の幅と予算に収まる確率をその下に。予算の書き方は「17.0万円」に
  * そろえる(本文・グラフ・注釈で同じ)。
  */
 export function LandingHero({
@@ -31,77 +24,75 @@ export function LandingHero({
   probWithinBudget: number | null;
   provisional: boolean;
 }) {
-  const parts = estimateParts(landing.p50);
   const gap = budgetYen === null ? null : landing.p50 - budgetYen;
-  const budgetText = budgetYen === null ? '' : formatEstimate(budgetYen, { approx: false });
   return (
     <section
       aria-label={`${endLabel}の支出の見込み`}
-      className="space-y-3 rounded-[28px] p-5"
+      className="flex flex-col gap-3 rounded-[28px] p-6"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-          {endLabel}の支出
-        </h2>
-        {provisional ? (
-          <span
-            className="rounded-full px-3 py-1 text-xs font-semibold"
-            style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            {endLabel}の支出
+            {provisional ? (
+              <span
+                className="rounded-full px-2 py-1 text-xs font-semibold"
+                style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+              >
+                目安
+              </span>
+            ) : null}
+          </h2>
+          <p
+            className="tabular text-xl font-bold tracking-[-0.02em]"
+            style={{ color: 'var(--ink)' }}
           >
-            目安
+            {formatEstimate(landing.p50)}
+            {budgetYen !== null ? (
+              <span
+                className="ml-2 text-base font-normal"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
+                / 予算 {formatEstimate(budgetYen, { approx: false })}
+              </span>
+            ) : null}
+          </p>
+        </div>
+        {gap !== null ? (
+          <span
+            className="mt-1 shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+            style={
+              gap > 0
+                ? { background: 'var(--state-caution-track)', color: 'var(--state-caution)' }
+                : { background: 'var(--state-ok-track)', color: 'var(--state-ok)' }
+            }
+          >
+            {gap > 0
+              ? `予算を${formatEstimate(gap)} 超えそう`
+              : `予算まで ${formatEstimate(-gap)}の余裕`}
           </span>
         ) : null}
       </div>
-      <p className="tabular flex items-baseline gap-1" style={{ color: 'var(--ink)' }}>
-        <span className="text-base font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-          約
-        </span>
-        <span className="text-4xl leading-none font-semibold tracking-[-0.03em]">
-          {parts.number}
-        </span>
-        <span className="text-xl font-semibold">{parts.unit}</span>
-      </p>
-      {gap !== null ? (
-        <p
-          className="inline-block rounded-full px-3 py-1 text-sm font-semibold"
-          style={{
-            background: gap > 0 ? 'var(--state-caution-track)' : 'var(--state-ok-track)',
-            color: 'var(--ink)',
-          }}
-        >
-          {gap > 0
-            ? `予算 ${budgetText}を ${formatEstimate(gap)}超えそう`
-            : `予算 ${budgetText}まで ${formatEstimate(-gap)}の余裕`}
-        </p>
-      ) : null}
       <p className="tabular text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        10回中8回は {formatEstimateRange(landing.p10, landing.p90)}
-      </p>
-      {probWithinBudget !== null ? (
-        <div
-          className="flex flex-wrap items-center gap-3 pt-3"
-          style={{ borderTop: '1px solid var(--hairline)' }}
-        >
-          <TenDots probability={probWithinBudget} />
-          <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-            予算に収まる{' '}
+        80%の確率で {formatEstimateRange(landing.p10, landing.p90)}
+        {probWithinBudget !== null ? (
+          <>
+            {' '}
+            ・ 予算に収まる確率{' '}
             <span className="font-semibold" style={{ color: 'var(--ink)' }}>
-              {formatTimesInTen(probWithinBudget)}
+              {formatProbability(probWithinBudget)}
             </span>
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              ({formatProbability(probWithinBudget)})
-            </span>
-          </p>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </p>
     </section>
   );
 }
 
 /**
- * 次の一手(デザインのホーム・レポート):提案を1つと、そのジャンルの「もし」への入口。
- * 収まる確率がほとんど変わらないなら出さない。
+ * 次の一手(デザインの「次の一手」、ADR-085):提案のジャンルを週に何回へらすと、月末の支出が
+ * どれだけ少なくなるか。押すとそのジャンルの見通し(「もし」)へ。
  */
 export function NextStepCard({
   suggestion,
@@ -115,32 +106,30 @@ export function NextStepCard({
   return (
     <section
       aria-label="次の一手"
-      className="space-y-2 rounded-[24px] p-5"
+      className="flex flex-col gap-1 rounded-[28px] p-6"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <h2 className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+      <h2 className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
         次の一手
       </h2>
-      <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+      <p className="text-xl font-bold tracking-[-0.01em]" style={{ color: 'var(--ink)' }}>
         {suggestion.categoryName}を週{suggestion.perWeek}回へらすと
       </p>
-      <p className="tabular text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        予算に収まる {formatTimesInTen(suggestion.probBefore)} →{' '}
-        <span className="font-semibold" style={{ color: 'var(--ink)' }}>
-          {formatTimesInTen(suggestion.probAfter).replace('10回中', '')}
-        </span>
-        <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          ({formatProbability(suggestion.probBefore)} → {formatProbability(suggestion.probAfter)}
-          、約{formatEstimate(suggestion.savedYen, { approx: false })}少なくなる目安)
+      <p className="tabular text-base leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        月末の支出が{' '}
+        <strong style={{ color: 'var(--ink)' }}>{formatEstimate(suggestion.savedYen)}</strong>{' '}
+        少なくなる見込みです。
+        <span className="block text-xs" style={{ color: 'var(--ink-muted)' }}>
+          予算に収まる確率 {formatProbability(suggestion.probBefore)} →{' '}
+          {formatProbability(suggestion.probAfter)}
         </span>
       </p>
       <Link
         href={categoryHref(suggestion.categoryId, monthKey) as Route}
-        className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold"
-        style={{ color: 'var(--accent)' }}
+        className="mt-3 inline-flex min-h-11 items-center self-start rounded-full px-5 text-base font-semibold"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
-        {suggestion.categoryName}で試してみる
-        <span aria-hidden>→</span>
+        {suggestion.categoryName}の見通しを見る
       </Link>
     </section>
   );

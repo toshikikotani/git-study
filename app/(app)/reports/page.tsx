@@ -5,9 +5,10 @@ import { InsightsList } from './insights-card';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
+import { SpeakButton } from '../_home/speak-button';
 import { LandingHero, NextStepCard } from './landing-hero';
 import { GoalChart } from './goal-chart';
-import { formatEstimate } from '@/domain/forecast/format';
+import { formatEstimate, formatEstimateRange } from '@/domain/forecast/format';
 import { landingRowsFrom } from '@/domain/forecast/landing-rows';
 import { listGenres } from '@/features/genre/store';
 import { loadLatestRead } from '@/features/ai-report/forecast-read';
@@ -204,16 +205,16 @@ export default async function ReportsPage({
   const suggestion = forecast?.suggestion ?? null;
   return (
     <div className="rise space-y-4">
-      <header>
-        <h1 className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-          レポート
-        </h1>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+      <header className="space-y-3">
+        <div className="px-1">
+          <p className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
             {scopeLabel}
           </p>
-          {hasGoal ? <ScopeSwitch current={goalPlan ? 'goal' : 'all'} /> : null}
+          <h1 className="text-xl font-bold tracking-[-0.02em]" style={{ color: 'var(--ink)' }}>
+            見通し
+          </h1>
         </div>
+        {hasGoal ? <ScopeSwitch current={goalPlan ? 'goal' : 'all'} /> : null}
       </header>
       {forecast && landing && forecast.total.p50 > 0 ? (
         <>
@@ -224,6 +225,25 @@ export default async function ReportsPage({
             probWithinBudget={forecast.probWithinBudget}
             provisional={forecast.provisional}
           />
+          {goalPlan && budgetYen !== null && chart ? (
+            <GoalChart
+              genreName="全体"
+              lines={chart.lines}
+              monthStart={ledger.period.from}
+              monthEnd={period.to}
+              today={today}
+              budgetYen={budgetYen}
+              goalFrom={goalPlan.periodStart}
+              goalTo={goalPlan.periodEnd}
+              remaining={chart.remaining}
+              changeable={chart.changeable}
+            />
+          ) : null}
+          <SpeakButton
+            label="グラフを音で聞く"
+            text={`${endLabel}の支出は${formatEstimate(landing.p50)}の見込み。80%の確率で${formatEstimateRange(landing.p10, landing.p90)}。${budgetYen !== null ? `予算は${formatEstimate(budgetYen, { approx: false })}。` : ''}`}
+          />
+          <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
           {budgetYen === null || forecast.drivers[0] ? (
             <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
               {budgetYen === null ? '目標の予算がないので、収まるかどうかは出していない。' : ''}
@@ -250,20 +270,6 @@ export default async function ReportsPage({
             : '予測に足る記録がまだない。'}
         </p>
       )}
-      {goalPlan && budgetYen !== null && chart ? (
-        <GoalChart
-          genreName="全体"
-          lines={chart.lines}
-          monthStart={ledger.period.from}
-          monthEnd={period.to}
-          today={today}
-          budgetYen={budgetYen}
-          goalFrom={goalPlan.periodStart}
-          goalTo={goalPlan.periodEnd}
-          remaining={chart.remaining}
-          changeable={chart.changeable}
-        />
-      ) : null}
       <Link
         href="/reports/ai"
         className="flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold"
@@ -275,7 +281,6 @@ export default async function ReportsPage({
       {forecast && forecast.total.p50 > 0 ? (
         <WhyCard forecast={forecast} endLabel={endLabel} />
       ) : null}
-      <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
       {forecast ? (
         <VerificationCard verification={verification} monthStart={ledger.period.from} />
       ) : null}
@@ -332,16 +337,18 @@ export default async function ReportsPage({
   );
 }
 
-/** 「目標の範囲」と「全部」の切り替え(目標があるときだけ)。 */
+/** 「目標のジャンル」と「ぜんぶ」の切り替え(デザインの区切りボタン。目標があるときだけ)。 */
 function ScopeSwitch({ current }: { current: 'goal' | 'all' }) {
   const item = (key: 'goal' | 'all', label: string) => (
     <Link
       href={key === 'all' ? { pathname: '/reports', query: { scope: 'all' } } : '/reports'}
       aria-current={current === key ? 'page' : undefined}
-      className="flex min-h-11 items-center rounded-full px-3 text-xs font-semibold"
+      className="flex min-h-9 flex-1 items-center justify-center rounded-[10px] px-3 text-sm"
       style={{
-        background: current === key ? 'var(--action)' : 'transparent',
-        color: current === key ? 'var(--on-action)' : 'var(--ink-secondary)',
+        background: current === key ? 'var(--surface)' : 'transparent',
+        boxShadow: current === key ? 'var(--card-shadow)' : undefined,
+        color: current === key ? 'var(--ink)' : 'var(--ink-secondary)',
+        fontWeight: current === key ? 600 : 500,
       }}
     >
       {label}
@@ -349,12 +356,12 @@ function ScopeSwitch({ current }: { current: 'goal' | 'all' }) {
   );
   return (
     <nav
-      aria-label="レポートの範囲"
-      className="flex rounded-full"
-      style={{ background: 'var(--surface)' }}
+      aria-label="表示する範囲"
+      className="flex gap-1 rounded-xl p-1"
+      style={{ background: 'var(--surface-fill)' }}
     >
-      {item('goal', '目標の範囲')}
-      {item('all', '全部')}
+      {item('goal', '目標のジャンル')}
+      {item('all', 'ぜんぶ')}
     </nav>
   );
 }

@@ -59,14 +59,10 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
   const maxYen = Math.max(...rows.map((r) => r.spentYen), 1);
 
   return (
-    <section
-      aria-label="ジャンル別の内訳"
-      className="rounded-2xl p-4"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-    >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          ジャンル別の内訳
+    <section aria-label="ジャンル別の内訳" className="space-y-3">
+      <div className="flex items-baseline justify-between gap-3 px-1 pt-2">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>
+          ジャンル別
         </h2>
         {goalRows !== null && isCurrentMonth ? (
           <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-xs">
@@ -95,73 +91,78 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
         ) : null}
       </div>
 
-      {loading && !isCurrentMonth ? (
-        <div className="mt-3 space-y-3" role="status" aria-label="読み込み中">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-8 animate-pulse rounded-lg"
-              style={{ background: 'var(--hairline)' }}
-            />
-          ))}
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {isCurrentMonth
-            ? 'まだ支出の記録がありません。レシートを撮ると、ここに内訳が出ます。'
-            : 'この月の支出はありません。'}
-        </p>
-      ) : (
-        <>
-          <div
-            role="img"
-            aria-label={`内訳:${rows
-              .map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`)
-              .join('、')}`}
-            className={`mt-3 flex h-3 w-full overflow-hidden rounded-full ${justSaved ? 'bar-grow' : ''}`}
-            style={{ background: 'var(--state-none-track)' }}
-          >
-            {rows.map((r) => (
-              <span
-                key={r.key}
-                style={{
-                  width: `${(r.spentYen / Math.max(total, 1)) * 100}%`,
-                  background: genreBarColor(
-                    r.genreId === null ? null : r.name,
-                    r.genreId === null ? null : overrides[r.name],
-                  ),
-                }}
+      <div
+        className="rounded-[28px] px-5 py-4"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      >
+        {loading && !isCurrentMonth ? (
+          <div className="space-y-3" role="status" aria-label="読み込み中">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-8 animate-pulse rounded-lg"
+                style={{ background: 'var(--hairline)' }}
               />
             ))}
           </div>
-
-          <ul className="mt-2 space-y-1">
-            {rows.map((r) => {
-              const selected =
-                filter.genreId === (r.genreId === null ? 'none' : r.genreId) &&
-                filter.genreId !== null;
-              return (
-                <li key={r.key}>
-                  <GenreBudgetRow
-                    name={r.name}
-                    spentYen={r.spentYen}
-                    budgetYen={r.budgetYen}
-                    idealYen={r.idealYen}
-                    scheduledYen={r.scheduledYen}
-                    maxYen={maxYen}
-                    selected={selected}
-                    href={categoryHref(r.key, visibleMonth)}
-                    sharedKey={r.key}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-          <p className="tabular mt-2 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
-            合計 {formatYen(total, { sign: 'never' })}
+        ) : rows.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            {isCurrentMonth
+              ? 'まだ支出の記録がありません。レシートを撮ると、ここに内訳が出ます。'
+              : 'この月の支出はありません。'}
           </p>
-        </>
-      )}
+        ) : (
+          <>
+            <div
+              role="img"
+              aria-label={`内訳:${rows
+                .map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`)
+                .join('、')}`}
+              className={`flex h-3 w-full overflow-hidden rounded-full ${justSaved ? 'bar-grow' : ''}`}
+              style={{ background: 'var(--state-none-track)' }}
+            >
+              {rows.map((r) => (
+                <span
+                  key={r.key}
+                  style={{
+                    width: `${(r.spentYen / Math.max(total, 1)) * 100}%`,
+                    background: genreBarColor(
+                      r.genreId === null ? null : r.name,
+                      r.genreId === null ? null : overrides[r.name],
+                    ),
+                  }}
+                />
+              ))}
+            </div>
+
+            <ul className="mt-2 space-y-1">
+              {rows.map((r) => {
+                const selected =
+                  filter.genreId === (r.genreId === null ? 'none' : r.genreId) &&
+                  filter.genreId !== null;
+                return (
+                  <li key={r.key}>
+                    <GenreBudgetRow
+                      name={r.name}
+                      spentYen={r.spentYen}
+                      budgetYen={r.budgetYen}
+                      idealYen={r.idealYen}
+                      scheduledYen={r.scheduledYen}
+                      maxYen={maxYen}
+                      selected={selected}
+                      href={categoryHref(r.key, visibleMonth)}
+                      sharedKey={r.key}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="tabular mt-2 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
+              合計 {formatYen(total, { sign: 'never' })}
+            </p>
+          </>
+        )}
+      </div>
     </section>
   );
 }

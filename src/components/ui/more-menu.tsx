@@ -12,7 +12,7 @@ const GROUPS = [
   {
     title: '記録する',
     items: [
-      { href: '/plan', label: '目標', dek: '期間ごとの、ジャンル別に使う額' },
+      { href: '/payday', label: '給料日', dek: '入った額を入れて、振り分けを確かめる' },
       {
         href: '/transactions/new',
         label: '明細を手で登録する',
@@ -120,18 +120,17 @@ export function MoreMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="その他の機能"
-        className="flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center px-2 text-xs"
+        aria-label="その他の機能(給料日・設定・ログアウトなど)"
+        className="flex size-11 min-h-11 shrink-0 items-center justify-center"
         style={{
-          gap: 2,
           borderRadius: 'var(--radius-full)',
-          background: open ? 'var(--accent-track)' : 'transparent',
-          color: open ? 'var(--accent)' : 'var(--ink-secondary)',
+          background: open ? 'var(--accent-track)' : 'var(--surface)',
+          color: open ? 'var(--accent)' : 'var(--ink)',
+          boxShadow: 'var(--card-shadow)',
           transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)`,
         }}
       >
-        <MdMoreHoriz aria-hidden size={20} />
-        <span aria-hidden>その他</span>
+        <MdMoreHoriz aria-hidden size={22} />
       </button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">

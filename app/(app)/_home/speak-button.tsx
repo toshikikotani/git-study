@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 /** 「音で聞く」(設計書 v3 3.10)。今日あと使える額から読み上げる。 */
-export function SpeakButton({ text }: { text: string }) {
+export function SpeakButton({ text, label = '音で聞く' }: { text: string; label?: string }) {
   const [note, setNote] = useState<string | null>(null);
   const speak = () => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -26,10 +26,10 @@ export function SpeakButton({ text }: { text: string }) {
       <button
         type="button"
         onClick={speak}
-        className="min-h-11 shrink-0 rounded-full px-3 text-xs font-semibold whitespace-nowrap"
-        style={{ color: 'var(--ink-secondary)' }}
+        className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+        style={{ color: 'var(--ink)', border: '1px solid var(--hairline)' }}
       >
-        音で聞く
+        {label}
       </button>
     </span>
   );
