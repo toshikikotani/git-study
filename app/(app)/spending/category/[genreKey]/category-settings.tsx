@@ -66,9 +66,17 @@ export function SettingsBody({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const override = useGenreOverride, useGenreOverrides(data.genreName);
+  const override = useGenreOverride(data.genreName);
+  const overrides = useGenreOverrides();
   const current = genreStyle(data.genreName, override);
   const colors = selectableColorIndexes();
+  const taken = new Set(
+    data.genres
+      .filter((g) => g.name !== data.genreName)
+      .map((g) => genreStyle(g.name, overrides[g.name]).colorIndex)
+      .filter((i): i is number => i !== null),
+  );
+  const allowReuse = colors.every((i) => taken.has(i));
   const [name, setName] = useState(data.genreName);
   const [icon, setIcon] = useState<GenreIconKey>(current.icon);
   const [colorIndex, setColorIndex] = useState<number>(current.colorIndex ?? colors[0] ?? 1);
