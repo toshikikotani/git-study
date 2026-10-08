@@ -189,7 +189,7 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
           className="absolute top-[15px] size-4 -translate-x-1/2 rounded-full"
           style={{
             left: pct(outlook.p50),
-            background: 'var(--sub, #8fd9b8)',
+            background: 'var(--mark, var(--accent))',
             boxShadow: '0 0 0 3px var(--surface)',
           }}
         />

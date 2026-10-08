@@ -828,10 +828,16 @@ export function rotateHue(hex: string, degrees: number): string {
 }
 
 /** 1つのテーマで使う4色。主、添え、その薄い版。色相を飛ばすと差し色の寄せ集めになる。 */
-export function themeHues(colors: ThemeColors): [string, string, string, string] {
+export function themeHues(colors: ThemeColors): [string, string, string, string, string] {
   const accent = colors.accent;
   const sub = colors.sub ?? accent;
-  return [accent, sub, mixHex(accent, '#ffffff', 0.55), mixHex(sub, '#ffffff', 0.55)];
+  return [
+    accent,
+    sub,
+    mixHex(accent, '#ffffff', 0.55),
+    mixHex(sub, '#ffffff', 0.55),
+    rotateHue(accent, 42),
+  ];
 }
 
 /** a を t、b を 1 − t の割合で混ぜる。 */
@@ -867,7 +873,7 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
   const sub = colors.sub ?? accent;
   const dark = isDark(plane);
   const onAccent = contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink;
-  const [hueA, hueB, hueC, hueD] = themeHues(colors);
+  const [hueA, hueB, hueC, hueD, hueE] = themeHues(colors);
   const genres = [
     hueA,
     hueB,
@@ -893,6 +899,7 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--on-accent': onAccent,
     '--on-action': onAccent,
     '--accent-track': rgba(accent, dark ? 0.12 : 0.07),
+    '--mark': hueE,
     '--state-ok': sub,
     '--state-ok-track': mixHex(sub, surface, dark ? 0.18 : 0.1),
     '--income': sub,
