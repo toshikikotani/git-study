@@ -29,7 +29,7 @@ import {
 } from 'react-icons/md';
 
 import {
-  genreColorVar,
+  genreSwatch,
   genreStyle,
   type GenreIconKey,
   type GenreStyleOverride,
@@ -87,7 +87,7 @@ export function GenreBadge({
   override?: GenreStyleOverride | null | undefined;
 }) {
   const fromContext = useGenreOverride(name);
-  const color = genreColorVar(name, override ?? fromContext);
+  const color = genreSwatch(name);
   return (
     <span
       aria-hidden

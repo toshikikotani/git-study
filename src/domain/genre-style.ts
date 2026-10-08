@@ -227,46 +227,60 @@ export function selectableColorIndexes(): number[] {
  * バー(比率・内訳)用の色。ジャンルの色を少し落ち着かせる(灰に寄せる)。
  * アイコンや文字の色は今の彩度のまま、面積の大きいバーだけを静かにする。
  */
-const GENRE_PASTELS = [
-  '#9ed9c4',
-  '#a9d7f2',
-  '#f0d09a',
-  '#d8c6f2',
-  '#f6c4b4',
-  '#f4b4c8',
-  '#8ecfc8',
-  '#c8b8ee',
-  '#f0b0a8',
-  '#ead7a4',
-  '#b7d4b0',
-  '#b7c6f0',
-  '#f6d0b0',
-  '#9ec8e8',
-  '#e8c4a8',
-  '#d4c0e8',
+const FAMILIES: { pastel: string; vivid: string }[] = [
+  { pastel: '#9ed9c4', vivid: '#2f9a78' },
+  { pastel: '#a9d7f2', vivid: '#3a90c8' },
+  { pastel: '#f0d09a', vivid: '#c49218' },
+  { pastel: '#d8c6f2', vivid: '#8a4ec4' },
+  { pastel: '#f6c4b4', vivid: '#e07050' },
+  { pastel: '#f4b4c8', vivid: '#d05080' },
+  { pastel: '#b7d4b0', vivid: '#5a9a48' },
+  { pastel: '#f0b0a8', vivid: '#d05040' },
+  { pastel: '#b7c6f0', vivid: '#4a68c0' },
+  { pastel: '#ead7a4', vivid: '#c4a020' },
+  { pastel: '#9ecfc8', vivid: '#1f8f8a' },
+  { pastel: '#e8c4a8', vivid: '#c07040' },
 ];
-const GENRE_VIVID = [
-  '#2f9a78',
-  '#3a90c8',
-  '#d4a017',
-  '#8a4ec4',
-  '#e07050',
-  '#e06088',
-  '#1f8f8a',
-  '#6a48b8',
-  '#d05040',
-  '#c4a020',
-  '#5a9a48',
-  '#4a68c0',
-  '#d08040',
-  '#2f78a8',
-  '#c07040',
-  '#7040a8',
-];
+const FAMILY_OF: Record<string, number> = {
+  食料品: 3,
+  外食: 2,
+  'カフェ・飲料': 5,
+  酒: 9,
+  日用品: 4,
+  '衣服・ファッション': 6,
+  美容: 7,
+  '医療・健康': 10,
+  住居費: 8,
+  光熱費: 11,
+  通信費: 10,
+  '交通・車両': 1,
+  '娯楽・趣味': 0,
+  '書籍・学習': 8,
+  'サブスクリプション・会費': 11,
+  '交際費・贈答': 7,
+  'こども・教育': 6,
+  ペット: 0,
+  '家電・家具': 9,
+  旅行: 8,
+  '保険・税金・手数料': 7,
+  その他: 11,
+};
 
-/** ジャンル別の帯。テーマの色には混ぜない。名前ごとに別の色相。明るい画面は淡く、暗い画面は濃く。 */
-export function genreBarColor(name: string | null, _override?: GenreStyleOverride | null): string {
+function familyIndex(name: string): number {
+  if (name in FAMILY_OF) return FAMILY_OF[name]!;
+  const used = new Set(Object.values(FAMILY_OF));
+  const free = FAMILIES.map((_, i) => i).filter((i) => !used.has(i));
+  const pool = free.length > 0 ? free : FAMILIES.map((_, i) => i);
+  return pool[hash(name) % pool.length]!;
+}
+
+/** アイコンも帯も同じ色。系統は一通り使うまで重ねない。明るい画面は淡く、暗い画面は濃く。 */
+export function genreSwatch(name: string | null): string {
   if (name === null || name === '' || name === '未分類') return 'var(--ink-muted)';
-  const i = hash(name) % GENRE_PASTELS.length;
-  return `light-dark(${GENRE_PASTELS[i]}, ${GENRE_VIVID[i]})`;
+  const family = FAMILIES[familyIndex(name)]!;
+  return `light-dark(${family.pastel}, ${family.vivid})`;
+}
+
+export function genreBarColor(name: string | null, _override?: GenreStyleOverride | null): string {
+  return genreSwatch(name);
 }
