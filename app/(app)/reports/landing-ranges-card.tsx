@@ -4,6 +4,8 @@ import {
   formatProbability,
   formatTimesInTen,
 } from '@/domain/forecast/format';
+import Link from 'next/link';
+
 import type { LandingRow } from '@/domain/forecast/landing-rows';
 import { formatYen } from '@/domain/money';
 
@@ -24,8 +26,8 @@ export function LandingRangesCard({
   periodLabel: string;
 }) {
   if (rows.length === 0) return null;
-  const changeable = rows.filter((r) => r.group === 'changeable').sort((a, b) => b.p50 - a.p50);
-  const fixed = rows.filter((r) => r.group === 'fixed').sort((a, b) => b.p50 - a.p50);
+  const changeable = [...rows].sort((a, b) => b.p50 - a.p50);
+  const fixed: LandingRow[] = [];
   const scaleMax =
     Math.max(...rows.map((r) => Math.max(r.p90, r.targetYen ?? 0, r.baseYen)), 1) * 1.08;
   const fixedTotal = fixed.reduce((sum, r) => sum + r.p50, 0);
@@ -138,12 +140,23 @@ function ChangeableRow({
       <details>
         <summary className="flex cursor-pointer list-none flex-col gap-3 py-4">
           <div className="flex items-baseline justify-between gap-3">
-            <span
-              className="min-w-0 truncate text-base font-semibold"
-              style={{ color: 'var(--ink)' }}
-            >
-              {row.name}
-            </span>
+            {row.name === '未分類' ? (
+              <Link
+                href="/spending/category/none"
+                className="min-w-0 truncate text-base font-semibold underline"
+                style={{ color: 'var(--ink)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.name} · 分類する
+              </Link>
+            ) : (
+              <span
+                className="min-w-0 truncate text-base font-semibold"
+                style={{ color: 'var(--ink)' }}
+              >
+                {row.name}
+              </span>
+            )}
             <span
               className="tabular shrink-0 text-sm font-semibold"
               style={{ color: 'var(--ink)' }}
