@@ -37,7 +37,8 @@ export type ThemePreset = {
 };
 
 export type ColorTheme =
-  { id: 'system' } | { id: string; colors: ThemeColors; tokens?: Record<string, string> };
+  | { id: 'system' }
+  | { id: string; colors: ThemeColors; tokens?: Record<string, string>; style?: ThemeStyle };
 
 /**
  * 20のプリセット。日本の伝統色、よく使われている配色(Rosé Pine・Nord・Solarized・
@@ -987,10 +988,11 @@ export function readColorTheme(): ColorTheme {
 
 /** 保存する。最初の描画で計算し直さなくて済むよう、色の役割(tokens)も一緒に保存する。 */
 export function writeColorTheme(theme: ColorTheme): void {
+  const preset = theme.id !== 'system' ? PRESETS.find((item) => item.id === theme.id) : undefined;
   const stored =
     theme.id === 'system' || !('colors' in theme)
       ? theme
-      : { ...theme, tokens: themeTokens(theme.colors) };
+      : { ...theme, style: theme.style ?? preset?.style, tokens: themeTokens(theme.colors) };
   try {
     localStorage.setItem(THEME_KEY, JSON.stringify(stored));
   } catch {
