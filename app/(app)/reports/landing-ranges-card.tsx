@@ -44,6 +44,26 @@ export function LandingRangesCard({
             <p className="pt-3 text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
               変えられる支出
             </p>
+            <p
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              <span className="inline-flex items-center gap-1">
+                <span className="size-3 rounded-full" style={{ background: 'var(--accent)' }} />
+                丸は中央
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-3 w-0.5" style={{ background: 'var(--ink)' }} />
+                縦線は目標
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className="h-2 w-4 rounded-full"
+                  style={{ background: 'var(--accent-track)' }}
+                />
+                帯は80%の範囲
+              </span>
+            </p>
             <ul>
               {changeable.map((row, i) => (
                 <ChangeableRow key={row.genreId} row={row} first={i === 0} />
