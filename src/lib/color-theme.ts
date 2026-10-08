@@ -53,8 +53,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '生成りの紙に、茶とセージ。類似色の組み合わせ',
     colors: {
-      plane: '#fbf9f5',
-      surface: '#fffaf4',
+      plane: '#fcfbf8',
+      surface: '#ffffff',
       ink: '#312826',
       accent: '#8a6840',
       sub: '#5f7d62',
@@ -67,8 +67,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '薄い藍に、藍と砂色。補色に近い組み合わせ',
     colors: {
-      plane: '#f7fafc',
-      surface: '#f8fbfe',
+      plane: '#fafcfd',
+      surface: '#ffffff',
       ink: '#21283b',
       accent: '#245488',
       sub: '#8a6844',
@@ -81,8 +81,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '苔の緑と金茶。隣接色の組み合わせ',
     colors: {
-      plane: '#f7faf8',
-      surface: '#f7fbf8',
+      plane: '#fafcfa',
+      surface: '#ffffff',
       ink: '#212d2a',
       accent: '#2f7358',
       sub: '#a08a4a',
@@ -95,8 +95,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '灰みの桜と、藍鼠。補色の組み合わせ',
     colors: {
-      plane: '#fbf8f8',
-      surface: '#fffafa',
+      plane: '#fcfafa',
+      surface: '#ffffff',
       ink: '#3d2a33',
       accent: '#9a4d60',
       sub: '#6d8794',
@@ -109,8 +109,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '抹茶と土色。分裂補色の組み合わせ',
     colors: {
-      plane: '#fafaf5',
-      surface: '#fbfbf4',
+      plane: '#fcfcf8',
+      surface: '#ffffff',
       ink: '#2d3023',
       accent: '#5c6c28',
       sub: '#b07a4a',
@@ -123,8 +123,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '夜明け。青緑と薔薇の補色に近い組み合わせ',
     colors: {
-      plane: '#fdfbf9',
-      surface: '#fffaf6',
+      plane: '#fefcfb',
+      surface: '#ffffff',
       ink: '#3d3851',
       accent: '#245e76',
       sub: '#a35d72',
@@ -137,8 +137,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '雪の白に、青と若緑。隣接色の組み合わせ',
     colors: {
-      plane: '#f7f9fa',
-      surface: '#f7f8fb',
+      plane: '#fafbfc',
+      surface: '#ffffff',
       ink: '#313343',
       accent: '#3d5c86',
       sub: '#4f7d70',
@@ -151,8 +151,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'クリームに、青と黄土。補色の組み合わせ',
     colors: {
-      plane: '#faf8f3',
-      surface: '#fdf8ee',
+      plane: '#fcfaf7',
+      surface: '#ffffff',
       ink: '#273743',
       accent: '#245a88',
       sub: '#8a6a18',
@@ -165,8 +165,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '淡い灰に、藤と青緑。補色の組み合わせ',
     colors: {
-      plane: '#f7f8fa',
-      surface: '#f6f7fa',
+      plane: '#fafafc',
+      surface: '#ffffff',
       ink: '#393850',
       accent: '#7648c0',
       sub: '#3d8f98',
@@ -179,8 +179,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '若葉と夕焼け。補色の組み合わせ',
     colors: {
-      plane: '#faf9f3',
-      surface: '#fdf8ee',
+      plane: '#fcfbf7',
+      surface: '#ffffff',
       ink: '#353a44',
       accent: '#5a7420',
       sub: '#d07038',
@@ -193,8 +193,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'モカに、セージ。類似色ではなく別の色を添える',
     colors: {
-      plane: '#faf6f4',
-      surface: '#fbf6f2',
+      plane: '#fcf9f8',
+      surface: '#ffffff',
       ink: '#382b2a',
       accent: '#7a5846',
       sub: '#6d8a72',
@@ -207,8 +207,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '白い雲に、石板とセージ。寒色同士の組み合わせ',
     colors: {
-      plane: '#faf9f7',
-      surface: '#fbfaf7',
+      plane: '#fcfbfa',
+      surface: '#ffffff',
       ink: '#2d2a33',
       accent: '#3e5462',
       sub: '#5f7c64',
@@ -221,8 +221,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'テラコッタと青緑。補色の組み合わせ',
     colors: {
-      plane: '#fcf8f5',
-      surface: '#fffaf7',
+      plane: '#fdfaf8',
+      surface: '#ffffff',
       ink: '#3a2727',
       accent: '#a84e38',
       sub: '#5d8a84',
@@ -235,8 +235,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '藤と薔薇。類似色の組み合わせ',
     colors: {
-      plane: '#faf9fc',
-      surface: '#fbfaff',
+      plane: '#fcfbfd',
+      surface: '#ffffff',
       ink: '#312a43',
       accent: '#6e52b4',
       sub: '#b56d84',
@@ -251,7 +251,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '墨に、象牙と青磁',
     colors: {
       plane: '#1a1e24',
-      surface: '#242a32',
+      surface: '#2c3036',
       ink: '#f4f1ea',
       accent: '#d7c4a3',
       sub: '#8fb8a0',
@@ -265,7 +265,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'Nord:極夜の紺に、氷の青とオーロラの緑',
     colors: {
       plane: '#2e3440',
-      surface: '#3b4252',
+      surface: '#3f444f',
       ink: '#eceff4',
       accent: '#88c0d0',
       sub: '#a3be8c',
@@ -279,7 +279,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'Rosé Pine Moon:夜の紫に、菖蒲と泡の青',
     colors: {
       plane: '#232136',
-      surface: '#2a273f',
+      surface: '#353346',
       ink: '#e0def4',
       accent: '#c4a7e7',
       sub: '#9ccfd8',
@@ -293,7 +293,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'Catppuccin Mocha:深い紺に、藤と若草',
     colors: {
       plane: '#222233',
-      surface: '#2a2a3c',
+      surface: '#343443',
       ink: '#cdd6f4',
       accent: '#cba6f7',
       sub: '#a6e3a1',
@@ -307,8 +307,8 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'Kanagawa:北斎の神奈川沖浪裏の藍と砂',
     colors: {
       plane: '#262630',
-      surface: '#31313f',
-      ink: '#dcd7ba',
+      surface: '#373741',
+      ink: '#f0ecd4',
       accent: '#7e9cd8',
       sub: '#e6c384',
     },
@@ -321,7 +321,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'Everforest Dark:夜の森に、苔と灯り',
     colors: {
       plane: '#2d353b',
-      surface: '#343f44',
+      surface: '#3e454b',
       ink: '#d3c6aa',
       accent: '#a7c080',
       sub: '#dbbc7f',
@@ -336,7 +336,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'ブラウザの昼間。白地に墨と藍',
     colors: {
       plane: '#ffffff',
-      surface: '#f7f7f5',
+      surface: '#ffffff',
       ink: '#1b191f',
       accent: '#2f4f6f',
       sub: '#8a5a3c',
@@ -349,7 +349,7 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '白磁に、藍と金',
     colors: {
-      plane: '#fbfbf9',
+      plane: '#fcfcfb',
       surface: '#ffffff',
       ink: '#262326',
       accent: '#2c5278',
@@ -363,8 +363,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '珊瑚と青緑。補色の組み合わせ',
     colors: {
-      plane: '#fcf9f7',
-      surface: '#fffaf8',
+      plane: '#fdfbfa',
+      surface: '#ffffff',
       ink: '#332326',
       accent: '#a44c3e',
       sub: '#3f7d78',
@@ -377,8 +377,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '浅い海と砂',
     colors: {
-      plane: '#f7fafb',
-      surface: '#f8fbfc',
+      plane: '#fafcfc',
+      surface: '#ffffff',
       ink: '#1d2931',
       accent: '#2f6f86',
       sub: '#8a6840',
@@ -391,8 +391,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '柿と松。補色の組み合わせ',
     colors: {
-      plane: '#fbf9f6',
-      surface: '#fffaf6',
+      plane: '#fcfbf9',
+      surface: '#ffffff',
       ink: '#312421',
       accent: '#a45222',
       sub: '#3f6e48',
@@ -405,8 +405,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '葡萄と金茶',
     colors: {
-      plane: '#faf8fb',
-      surface: '#fbf9fc',
+      plane: '#fcfafc',
+      surface: '#ffffff',
       ink: '#2b2133',
       accent: '#6e4a86',
       sub: '#a67c3a',
@@ -419,8 +419,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '空と錆色',
     colors: {
-      plane: '#f7fafc',
-      surface: '#f8fbfe',
+      plane: '#fafcfd',
+      surface: '#ffffff',
       ink: '#212737',
       accent: '#3d6ea0',
       sub: '#a85a3a',
@@ -433,8 +433,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '亜麻に、臙脂とオリーブ',
     colors: {
-      plane: '#faf8f5',
-      surface: '#fbf8f2',
+      plane: '#fcfaf8',
+      surface: '#ffffff',
       ink: '#312a29',
       accent: '#8a3e4a',
       sub: '#6a7a38',
@@ -447,8 +447,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '薄荷と梅',
     colors: {
-      plane: '#f7faf9',
-      surface: '#f7fbf9',
+      plane: '#fafcfb',
+      surface: '#ffffff',
       ink: '#212b2b',
       accent: '#2f7a68',
       sub: '#a45a72',
@@ -461,8 +461,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '琥珀と石板',
     colors: {
-      plane: '#fbf9f4',
-      surface: '#fbf8f1',
+      plane: '#fcfbf8',
+      surface: '#ffffff',
       ink: '#312823',
       accent: '#8c5c18',
       sub: '#4a6270',
@@ -476,7 +476,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'ブラウザの夜間。黒地に象牙と青磁',
     colors: {
       plane: '#000000',
-      surface: '#161616',
+      surface: '#141414',
       ink: '#f4f1ea',
       accent: '#d7c4a3',
       sub: '#8fb8a0',
@@ -490,7 +490,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '夜に桜と薄藍',
     colors: {
       plane: '#1a1418',
-      surface: '#261e24',
+      surface: '#2c272a',
       ink: '#f6ecee',
       accent: '#e7a8b8',
       sub: '#9eb4c8',
@@ -504,7 +504,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '深海に、泡と珊瑚',
     colors: {
       plane: '#10181c',
-      surface: '#182428',
+      surface: '#232a2e',
       ink: '#e7f1f2',
       accent: '#7ec8d4',
       sub: '#e0a090',
@@ -518,7 +518,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '黒檀に、金と緑青',
     colors: {
       plane: '#14110e',
-      surface: '#221c16',
+      surface: '#272421',
       ink: '#f3eadc',
       accent: '#e0c07a',
       sub: '#7dbaa4',
@@ -532,7 +532,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '星空に、銀と琥珀',
     colors: {
       plane: '#12141c',
-      surface: '#1c2030',
+      surface: '#25272e',
       ink: '#e8eaf2',
       accent: '#c5cbe0',
       sub: '#e0b06a',
@@ -546,7 +546,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '夜の葡萄と金',
     colors: {
       plane: '#16121c',
-      surface: '#241c2e',
+      surface: '#29252e',
       ink: '#f0eaf6',
       accent: '#d2b0e8',
       sub: '#e0c080',
@@ -560,7 +560,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '炭に、錆と若草',
     colors: {
       plane: '#161616',
-      surface: '#222222',
+      surface: '#292929',
       ink: '#f0f0ea',
       accent: '#e09878',
       sub: '#b0c888',
@@ -574,7 +574,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '藍の夜に、砂金',
     colors: {
       plane: '#10141c',
-      surface: '#1a2230',
+      surface: '#23272e',
       ink: '#e8eef6',
       accent: '#8eb0e0',
       sub: '#e0c890',
@@ -588,7 +588,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '錆と青磁',
     colors: {
       plane: '#1a1410',
-      surface: '#281e18',
+      surface: '#2c2723',
       ink: '#f4ece4',
       accent: '#e09870',
       sub: '#8ec0b0',
@@ -602,7 +602,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '月下に、銀と藤',
     colors: {
       plane: '#14161a',
-      surface: '#1e2228',
+      surface: '#27292c',
       ink: '#eef0f4',
       accent: '#d0d6e0',
       sub: '#c0a8d8',
@@ -616,7 +616,7 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'クリームに、いちご',
     colors: {
-      plane: '#fffdfd',
+      plane: '#fffefe',
       surface: '#ffffff',
       ink: '#3d1e2c',
       accent: '#b03468',
@@ -630,8 +630,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '飴のピンクとミント',
     colors: {
-      plane: '#fff8fb',
-      surface: '#fff7fb',
+      plane: '#fffafc',
+      surface: '#ffffff',
       ink: '#3d1c37',
       accent: '#b03468',
       sub: '#2f9a84',
@@ -644,8 +644,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '桃と空',
     colors: {
-      plane: '#fff9f6',
-      surface: '#fff8f5',
+      plane: '#fffbf9',
+      surface: '#ffffff',
       ink: '#3d212c',
       accent: '#b03450',
       sub: '#3a78b0',
@@ -658,8 +658,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'レモンに、いちご',
     colors: {
-      plane: '#fffbed',
-      surface: '#fffdf2',
+      plane: '#fffcf3',
+      surface: '#ffffff',
       ink: '#332137',
       accent: '#c43d78',
       sub: '#3a90c8',
@@ -672,8 +672,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'ソーダとピンク',
     colors: {
-      plane: '#f7fcff',
-      surface: '#f7fcff',
+      plane: '#fafdff',
+      surface: '#ffffff',
       ink: '#1e2d3d',
       accent: '#1f7498',
       sub: '#c44878',
@@ -686,8 +686,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '藤とピンク',
     colors: {
-      plane: '#fbf8ff',
-      surface: '#fbf8ff',
+      plane: '#fcfaff',
+      surface: '#ffffff',
       ink: '#32213d',
       accent: '#7a40b0',
       sub: '#c45080',
@@ -700,8 +700,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'プリンとさくらんぼ',
     colors: {
-      plane: '#fffbf5',
-      surface: '#fffbf4',
+      plane: '#fffcf8',
+      surface: '#ffffff',
       ink: '#332120',
       accent: '#c43d68',
       sub: '#2f9a78',
@@ -714,8 +714,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '風船のピンクと空',
     colors: {
-      plane: '#fff8fa',
-      surface: '#fff7f9',
+      plane: '#fffafc',
+      surface: '#ffffff',
       ink: '#351c2c',
       accent: '#b03468',
       sub: '#3a78b0',
@@ -729,7 +729,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '夜に、ピンクと藤',
     colors: {
       plane: '#1c1420',
-      surface: '#2a1e2c',
+      surface: '#2e2732',
       ink: '#ffe8f4',
       accent: '#ff8ab8',
       sub: '#c4a0e8',
@@ -742,8 +742,8 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'うさぎのピンクと藤',
     colors: {
-      plane: '#fff9fb',
-      surface: '#fff8fb',
+      plane: '#fffbfc',
+      surface: '#ffffff',
       ink: '#3d1c2e',
       accent: '#b03468',
       sub: '#8a58c0',
@@ -757,7 +757,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '鋼に、赤',
     colors: {
       plane: '#121416',
-      surface: '#1c2024',
+      surface: '#252729',
       ink: '#e8eef2',
       accent: '#7aa8bc',
       sub: '#e05050',
@@ -771,7 +771,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: 'カーボンに、シアン',
     colors: {
       plane: '#0e1012',
-      surface: '#181c1e',
+      surface: '#212325',
       ink: '#e6f2f2',
       accent: '#5ec8d0',
       sub: '#d0d8dc',
@@ -785,7 +785,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '真夜中に、電光',
     colors: {
       plane: '#0c1020',
-      surface: '#161c30',
+      surface: '#1f2332',
       ink: '#e8eeff',
       accent: '#6aa0ff',
       sub: '#f0c040',
@@ -799,7 +799,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '黒に、銀',
     colors: {
       plane: '#101214',
-      surface: '#1a1e22',
+      surface: '#232527',
       ink: '#f0f4f6',
       accent: '#c8d4dc',
       sub: '#7a98b0',
@@ -813,7 +813,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '黒に、赤と白',
     colors: {
       plane: '#120e0e',
-      surface: '#201616',
+      surface: '#252121',
       ink: '#f6eeee',
       accent: '#ff6a6a',
       sub: '#d8d8d8',
@@ -827,7 +827,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '黒に、黄',
     colors: {
       plane: '#121208',
-      surface: '#1e1e10',
+      surface: '#25251c',
       ink: '#f6f6e4',
       accent: '#c4b420',
       sub: '#d8d8c8',
@@ -841,7 +841,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '深い藍に、金',
     colors: {
       plane: '#0c1420',
-      surface: '#162033',
+      surface: '#1f2732',
       ink: '#e8eef8',
       accent: '#7eb0ee',
       sub: '#e0c070',
@@ -855,7 +855,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '炭に、氷',
     colors: {
       plane: '#12181c',
-      surface: '#1a2428',
+      surface: '#252a2e',
       ink: '#e8f4f6',
       accent: '#5eb0c0',
       sub: '#c8d8e0',
@@ -869,7 +869,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '夜に、マゼンタ',
     colors: {
       plane: '#140e18',
-      surface: '#221828',
+      surface: '#27212a',
       ink: '#f8e8f4',
       accent: '#e060c0',
       sub: '#60d0e0',
@@ -883,7 +883,7 @@ export const PRESETS: readonly ThemePreset[] = [
     note: '墨に、青白',
     colors: {
       plane: '#101418',
-      surface: '#1a2026',
+      surface: '#23272a',
       ink: '#e8f0f4',
       accent: '#8ec0e0',
       sub: '#d8e4ec',
