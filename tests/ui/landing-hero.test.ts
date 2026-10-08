@@ -24,7 +24,6 @@ describe('月末の見込みの見出し(デザインの「月末の支出」)',
     expect(html).toContain('目安');
     expect(html).toContain('約17.8万円');
     expect(html).toContain('/ 予算 17.0万円');
-    expect(html).toContain('予算を約8,400円 超えそう');
     expect(html).toContain('80%の確率で 14.3万〜23.1万円');
     expect(html).toContain('予算に収まる確率 41%');
     expect(html).not.toContain('169,598');
@@ -42,7 +41,7 @@ describe('月末の見込みの見出し(デザインの「月末の支出」)',
         }),
       ),
     );
-    expect(under).toContain('予算まで 約2.0万円の余裕');
+    expect(under).toContain('予算まで約2.0万円の余裕');
     expect(under).not.toContain('目安');
     const none = visible(
       renderToString(

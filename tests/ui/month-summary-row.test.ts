@@ -18,7 +18,7 @@ describe('今月の収支(設計書 v3 2.2 の3)', () => {
         }),
       ),
     );
-    expect(html).toContain('月末に残る見込み');
+    expect(html).toContain('月末の見込み');
     expect(html).toContain('+9.7万円');
     expect(html).toContain('今日まで +176,355円');
   });

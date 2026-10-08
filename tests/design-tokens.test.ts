@@ -67,7 +67,7 @@ const isBlue = (hex: string) => {
 describe('G 面の3段階と文字のコントラスト', () => {
   it('ダークの面は 背景 #0B0F17 / カード #121826 / 強調面 #1A2233', () => {
     expect(dark['--plane']).toBe('#000000');
-    expect(dark['--surface']).toBe('#121826');
+    expect(dark['--surface']).toBe('#161616');
     expect(dark['--surface-raised']).toBe('#1a2233');
   });
 

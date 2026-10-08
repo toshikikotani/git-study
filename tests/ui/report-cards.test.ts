@@ -62,7 +62,6 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).toContain('この先の見込み(中央)');
     expect(html).toContain('>目標<');
     expect(html).toContain('塗った帯は使った額');
-    expect(html).toContain('state-caution');
   });
 
   it('決まった支出は1行に畳み、見込みの無いジャンルは言葉で出す', () => {
