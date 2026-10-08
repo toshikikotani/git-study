@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { Segmented } from '@/components/ui/segmented';
 import { formatEstimate } from '@/domain/forecast/format';
-import { genreBarColor, genreColorVar } from '@/domain/genre-style';
+import { genreBarColor, genreColorVar, genreSwatchHex } from '@/domain/genre-style';
 import { pickAxisLabels } from '@/features/category/axis';
 import {
   TAG_HEIGHT,
@@ -105,7 +105,7 @@ export function CategoryChart({
   const themeColor = genreName === '全体' || genreName === '変えられる支出';
   const barColor = themeColor
     ? 'var(--accent)'
-    : genreBarColor(genreName === '未分類' ? null : genreName, override);
+    : genreSwatchHex(genreName === '未分類' ? null : genreName);
   const lineColor = themeColor
     ? 'var(--accent)'
     : genreColorVar(genreName === '未分類' ? null : genreName, override);

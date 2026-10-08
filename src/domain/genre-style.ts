@@ -275,6 +275,11 @@ function familyIndex(name: string): number {
 }
 
 /** アイコンも帯も同じ色。系統は一通り使うまで重ねない。明るい画面は淡く、暗い画面は濃く。 */
+export function genreSwatchHex(name: string | null): string {
+  if (name === null || name === '' || name === '未分類') return '#9aa3b2';
+  return FAMILIES[familyIndex(name)]!.pastel;
+}
+
 export function genreSwatch(name: string | null): string {
   if (name === null || name === '' || name === '未分類') return 'var(--ink-muted)';
   const family = FAMILIES[familyIndex(name)]!;
