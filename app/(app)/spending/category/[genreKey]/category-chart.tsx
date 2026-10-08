@@ -825,13 +825,20 @@ function CumulativeLayer({
         className="pointer-events-none absolute inset-0 size-full overflow-visible"
       >
         {band ? (
-          <polygon points={band} fill={color} fillOpacity={dim ? 0.12 : 0.22} data-forecast-band />
+          <polygon
+            points={band}
+            fill={color}
+            fillOpacity={dim ? 0.12 : 0.22}
+            style={{ fill: color }}
+            data-forecast-band
+          />
         ) : null}
         {innerBand ? (
           <polygon
             points={innerBand}
             fill={color}
             fillOpacity={dim ? 0.18 : 0.34}
+            style={{ fill: color }}
             data-forecast-band-inner
           />
         ) : null}
@@ -856,6 +863,7 @@ function CumulativeLayer({
             ])}
             fill="none"
             stroke={color}
+            style={{ stroke: color }}
             strokeWidth={1.5}
             strokeDasharray="4 4"
             vectorEffect="non-scaling-stroke"
@@ -868,6 +876,7 @@ function CumulativeLayer({
             points={pts(actual.map((d) => ({ index: d.index, v: d.actualYen! })))}
             fill="none"
             stroke={color}
+            style={{ stroke: color }}
             strokeWidth={2.5}
             strokeLinejoin="round"
             strokeLinecap="round"
