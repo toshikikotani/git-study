@@ -24,10 +24,13 @@ export type ThemeColors = {
 
 export type ThemeGroup = 'light' | 'dark';
 
+export type ThemeStyle = 'simple' | 'stylish' | 'cute' | 'cool';
+
 export type ThemePreset = {
   id: string;
   label: string;
   group: ThemeGroup;
+  style: ThemeStyle;
   /** 配色の出どころ(一言) */
   note: string;
   colors: ThemeColors;
@@ -46,6 +49,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'kinari',
     label: '生成り',
+    style: 'simple',
     group: 'light',
     note: '生成りの紙に、茶とセージ。類似色の組み合わせ',
     colors: {
@@ -59,6 +63,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'ai',
     label: '藍',
+    style: 'stylish',
     group: 'light',
     note: '薄い藍に、藍と砂色。補色に近い組み合わせ',
     colors: {
@@ -72,6 +77,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'koke',
     label: '苔',
+    style: 'stylish',
     group: 'light',
     note: '苔の緑と金茶。隣接色の組み合わせ',
     colors: {
@@ -85,6 +91,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'sakura',
     label: '桜鼠',
+    style: 'stylish',
     group: 'light',
     note: '灰みの桜と、藍鼠。補色の組み合わせ',
     colors: {
@@ -98,6 +105,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'matcha',
     label: '抹茶',
+    style: 'stylish',
     group: 'light',
     note: '抹茶と土色。分裂補色の組み合わせ',
     colors: {
@@ -111,6 +119,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'dawn',
     label: '夜明け',
+    style: 'stylish',
     group: 'light',
     note: '夜明け。青緑と薔薇の補色に近い組み合わせ',
     colors: {
@@ -124,6 +133,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'snow',
     label: '北欧の雪',
+    style: 'simple',
     group: 'light',
     note: '雪の白に、青と若緑。隣接色の組み合わせ',
     colors: {
@@ -137,6 +147,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'solarized',
     label: '陽だまり',
+    style: 'simple',
     group: 'light',
     note: 'クリームに、青と黄土。補色の組み合わせ',
     colors: {
@@ -150,6 +161,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'latte',
     label: 'ラテ',
+    style: 'stylish',
     group: 'light',
     note: '淡い灰に、藤と青緑。補色の組み合わせ',
     colors: {
@@ -163,6 +175,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'morning-forest',
     label: '森の朝',
+    style: 'stylish',
     group: 'light',
     note: '若葉と夕焼け。補色の組み合わせ',
     colors: {
@@ -176,6 +189,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'mocha-mousse',
     label: 'モカムース',
+    style: 'stylish',
     group: 'light',
     note: 'モカに、セージ。類似色ではなく別の色を添える',
     colors: {
@@ -189,6 +203,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'cloud-dancer',
     label: 'クラウドダンサー',
+    style: 'simple',
     group: 'light',
     note: '白い雲に、石板とセージ。寒色同士の組み合わせ',
     colors: {
@@ -202,6 +217,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'terracotta',
     label: 'テラコッタ',
+    style: 'stylish',
     group: 'light',
     note: 'テラコッタと青緑。補色の組み合わせ',
     colors: {
@@ -215,6 +231,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'lavender',
     label: 'ラベンダー',
+    style: 'stylish',
     group: 'light',
     note: '藤と薔薇。類似色の組み合わせ',
     colors: {
@@ -229,6 +246,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'sumi',
     label: '墨',
+    style: 'simple',
     group: 'dark',
     note: '墨に、象牙と青磁',
     colors: {
@@ -242,6 +260,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'polar-night',
     label: '極夜',
+    style: 'stylish',
     group: 'dark',
     note: 'Nord:極夜の紺に、氷の青とオーロラの緑',
     colors: {
@@ -255,6 +274,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'moon',
     label: '月夜',
+    style: 'stylish',
     group: 'dark',
     note: 'Rosé Pine Moon:夜の紫に、菖蒲と泡の青',
     colors: {
@@ -268,6 +288,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'mocha',
     label: 'モカ',
+    style: 'stylish',
     group: 'dark',
     note: 'Catppuccin Mocha:深い紺に、藤と若草',
     colors: {
@@ -281,6 +302,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'kanagawa',
     label: '浪裏',
+    style: 'stylish',
     group: 'dark',
     note: 'Kanagawa:北斎の神奈川沖浪裏の藍と砂',
     colors: {
@@ -294,6 +316,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'night-forest',
     label: '森の夜',
+    style: 'stylish',
     group: 'dark',
     note: 'Everforest Dark:夜の森に、苔と灯り',
     colors: {
@@ -308,6 +331,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'day',
     label: '昼の白',
+    style: 'simple',
     group: 'light',
     note: 'ブラウザの昼間。白地に墨と藍',
     colors: {
@@ -321,6 +345,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'porcelain',
     label: '白磁',
+    style: 'simple',
     group: 'light',
     note: '白磁に、藍と金',
     colors: {
@@ -334,6 +359,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'coral',
     label: '珊瑚',
+    style: 'stylish',
     group: 'light',
     note: '珊瑚と青緑。補色の組み合わせ',
     colors: {
@@ -347,6 +373,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'sea',
     label: '海',
+    style: 'stylish',
     group: 'light',
     note: '浅い海と砂',
     colors: {
@@ -360,6 +387,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'persimmon',
     label: '柿',
+    style: 'stylish',
     group: 'light',
     note: '柿と松。補色の組み合わせ',
     colors: {
@@ -373,6 +401,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'grape',
     label: '葡萄',
+    style: 'stylish',
     group: 'light',
     note: '葡萄と金茶',
     colors: {
@@ -386,6 +415,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'sky',
     label: '空',
+    style: 'stylish',
     group: 'light',
     note: '空と錆色',
     colors: {
@@ -399,6 +429,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'linen',
     label: '亜麻',
+    style: 'simple',
     group: 'light',
     note: '亜麻に、臙脂とオリーブ',
     colors: {
@@ -412,6 +443,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'mint',
     label: '薄荷',
+    style: 'stylish',
     group: 'light',
     note: '薄荷と梅',
     colors: {
@@ -425,6 +457,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'amber',
     label: '琥珀',
+    style: 'stylish',
     group: 'light',
     note: '琥珀と石板',
     colors: {
@@ -438,6 +471,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'night',
     label: '夜の黒',
+    style: 'simple',
     group: 'dark',
     note: 'ブラウザの夜間。黒地に象牙と青磁',
     colors: {
@@ -451,6 +485,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'night-sakura',
     label: '夜桜',
+    style: 'stylish',
     group: 'dark',
     note: '夜に桜と薄藍',
     colors: {
@@ -464,6 +499,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'deep-sea',
     label: '深海',
+    style: 'stylish',
     group: 'dark',
     note: '深海に、泡と珊瑚',
     colors: {
@@ -477,6 +513,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'ebony',
     label: '黒檀',
+    style: 'stylish',
     group: 'dark',
     note: '黒檀に、金と緑青',
     colors: {
@@ -490,6 +527,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'star',
     label: '星空',
+    style: 'stylish',
     group: 'dark',
     note: '星空に、銀と琥珀',
     colors: {
@@ -503,6 +541,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'night-grape',
     label: '葡萄の夜',
+    style: 'stylish',
     group: 'dark',
     note: '夜の葡萄と金',
     colors: {
@@ -516,6 +555,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'charcoal',
     label: '炭',
+    style: 'simple',
     group: 'dark',
     note: '炭に、錆と若草',
     colors: {
@@ -529,6 +569,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'night-indigo',
     label: '藍の夜',
+    style: 'stylish',
     group: 'dark',
     note: '藍の夜に、砂金',
     colors: {
@@ -542,6 +583,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'rust-night',
     label: '錆の夜',
+    style: 'stylish',
     group: 'dark',
     note: '錆と青磁',
     colors: {
@@ -555,6 +597,7 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'moonlight',
     label: '月下',
+    style: 'stylish',
     group: 'dark',
     note: '月下に、銀と藤',
     colors: {
@@ -563,6 +606,287 @@ export const PRESETS: readonly ThemePreset[] = [
       ink: '#eef0f4',
       accent: '#d0d6e0',
       sub: '#c0a8d8',
+    },
+  },
+
+  {
+    id: 'strawberry',
+    label: 'いちご',
+    style: 'cute',
+    group: 'light',
+    note: 'クリームに、いちご',
+    colors: {
+      plane: '#fff5f7',
+      surface: '#fffafb',
+      ink: '#4a2430',
+      accent: '#b43a64',
+      sub: '#c46a84',
+    },
+  },
+  {
+    id: 'candy',
+    label: 'キャンディ',
+    style: 'cute',
+    group: 'light',
+    note: '飴色のピンクとミント',
+    colors: {
+      plane: '#fff6fb',
+      surface: '#fffafd',
+      ink: '#4a2840',
+      accent: '#b03870',
+      sub: '#3f9a86',
+    },
+  },
+  {
+    id: 'peach',
+    label: '桃',
+    style: 'cute',
+    group: 'light',
+    note: '桃と藤',
+    colors: {
+      plane: '#fff3ee',
+      surface: '#fffaf7',
+      ink: '#4a3028',
+      accent: '#a44430',
+      sub: '#8a6ac4',
+    },
+  },
+  {
+    id: 'lemon',
+    label: 'レモン',
+    style: 'cute',
+    group: 'light',
+    note: 'レモンと桜',
+    colors: {
+      plane: '#fffbea',
+      surface: '#fffdf4',
+      ink: '#3d3420',
+      accent: '#6e580c',
+      sub: '#b45470',
+    },
+  },
+  {
+    id: 'soda',
+    label: 'ソーダ',
+    style: 'cute',
+    group: 'light',
+    note: 'ソーダとピンク',
+    colors: {
+      plane: '#f3fbff',
+      surface: '#f8fdff',
+      ink: '#243848',
+      accent: '#1f7498',
+      sub: '#e06a98',
+    },
+  },
+  {
+    id: 'macaron',
+    label: 'マカロン',
+    style: 'cute',
+    group: 'light',
+    note: 'マカロンの薄紫と桃',
+    colors: {
+      plane: '#f8f3fb',
+      surface: '#fcf9fd',
+      ink: '#3c2c48',
+      accent: '#643890',
+      sub: '#b45a74',
+    },
+  },
+  {
+    id: 'pudding',
+    label: 'プリン',
+    style: 'cute',
+    group: 'light',
+    note: 'プリンとさくらんぼ',
+    colors: {
+      plane: '#fff6e8',
+      surface: '#fffaf2',
+      ink: '#3d2e20',
+      accent: '#8a5c18',
+      sub: '#d44858',
+    },
+  },
+  {
+    id: 'balloon',
+    label: '風船',
+    style: 'cute',
+    group: 'light',
+    note: '風船の珊瑚と空',
+    colors: {
+      plane: '#fff4f2',
+      surface: '#fffaf8',
+      ink: '#402828',
+      accent: '#c0443c',
+      sub: '#4a90c0',
+    },
+  },
+  {
+    id: 'night-pop',
+    label: '夜のポップ',
+    style: 'cute',
+    group: 'dark',
+    note: '夜に、ピンクとミント',
+    colors: {
+      plane: '#1c1420',
+      surface: '#2a1e2c',
+      ink: '#ffe8f2',
+      accent: '#ff8ab8',
+      sub: '#7ddec0',
+    },
+  },
+  {
+    id: 'rabbit',
+    label: 'うさぎ',
+    style: 'cute',
+    group: 'light',
+    note: '白いうさぎと耳のピンク',
+    colors: {
+      plane: '#fff8f8',
+      surface: '#ffffff',
+      ink: '#4a3038',
+      accent: '#a44460',
+      sub: '#a46850',
+    },
+  },
+  {
+    id: 'steel',
+    label: '鋼',
+    style: 'cool',
+    group: 'dark',
+    note: '鋼に、赤',
+    colors: {
+      plane: '#121416',
+      surface: '#1c2024',
+      ink: '#e8eef2',
+      accent: '#7aa8bc',
+      sub: '#e05050',
+    },
+  },
+  {
+    id: 'carbon',
+    label: 'カーボン',
+    style: 'cool',
+    group: 'dark',
+    note: 'カーボンに、シアン',
+    colors: {
+      plane: '#0e1012',
+      surface: '#181c1e',
+      ink: '#e6f2f2',
+      accent: '#5ec8d0',
+      sub: '#d0d8dc',
+    },
+  },
+  {
+    id: 'midnight',
+    label: '真夜中',
+    style: 'cool',
+    group: 'dark',
+    note: '真夜中に、電光',
+    colors: {
+      plane: '#0c1020',
+      surface: '#161c30',
+      ink: '#e8eeff',
+      accent: '#6aa0ff',
+      sub: '#f0c040',
+    },
+  },
+  {
+    id: 'blade',
+    label: '刃',
+    style: 'cool',
+    group: 'dark',
+    note: '黒に、銀',
+    colors: {
+      plane: '#101214',
+      surface: '#1a1e22',
+      ink: '#f0f4f6',
+      accent: '#c8d4dc',
+      sub: '#7a98b0',
+    },
+  },
+  {
+    id: 'racer',
+    label: 'レーサー',
+    style: 'cool',
+    group: 'dark',
+    note: '黒に、赤と白',
+    colors: {
+      plane: '#120e0e',
+      surface: '#201616',
+      ink: '#f6eeee',
+      accent: '#ff6a6a',
+      sub: '#d8d8d8',
+    },
+  },
+  {
+    id: 'voltage',
+    label: '電圧',
+    style: 'cool',
+    group: 'dark',
+    note: '黒に、黄',
+    colors: {
+      plane: '#121208',
+      surface: '#1e1e10',
+      ink: '#f6f6e4',
+      accent: '#c4b420',
+      sub: '#d8d8c8',
+    },
+  },
+  {
+    id: 'abyss',
+    label: '深淵',
+    style: 'cool',
+    group: 'dark',
+    note: '深い藍に、金',
+    colors: {
+      plane: '#0c1420',
+      surface: '#162033',
+      ink: '#e8eef8',
+      accent: '#7eb0ee',
+      sub: '#e0c070',
+    },
+  },
+  {
+    id: 'ice',
+    label: '氷',
+    style: 'cool',
+    group: 'dark',
+    note: '炭に、氷',
+    colors: {
+      plane: '#12181c',
+      surface: '#1a2428',
+      ink: '#e8f4f6',
+      accent: '#5eb0c0',
+      sub: '#c8d8e0',
+    },
+  },
+  {
+    id: 'neon',
+    label: 'ネオン',
+    style: 'cool',
+    group: 'dark',
+    note: '夜に、マゼンタ',
+    colors: {
+      plane: '#140e18',
+      surface: '#221828',
+      ink: '#f8e8f4',
+      accent: '#e060c0',
+      sub: '#60d0e0',
+    },
+  },
+  {
+    id: 'gale',
+    label: '疾風',
+    style: 'cool',
+    group: 'dark',
+    note: '墨に、青白',
+    colors: {
+      plane: '#101418',
+      surface: '#1a2026',
+      ink: '#e8f0f4',
+      accent: '#8ec0e0',
+      sub: '#d8e4ec',
     },
   },
 ];

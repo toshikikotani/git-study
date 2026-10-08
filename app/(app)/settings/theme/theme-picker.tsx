@@ -15,8 +15,10 @@ import {
 } from '@/lib/color-theme';
 
 const GROUPS = [
-  { group: 'light', title: '明るい' },
-  { group: 'dark', title: '暗い' },
+  { style: 'simple', title: 'シンプル' },
+  { style: 'stylish', title: 'おしゃれ' },
+  { style: 'cute', title: 'かわいい' },
+  { style: 'cool', title: 'かっこいい' },
 ] as const;
 
 export function ThemePicker() {
@@ -50,13 +52,13 @@ export function ThemePicker() {
         ブラウザに合わせる（昼は白、夜は黒）
       </button>
 
-      {GROUPS.map(({ group, title }) => (
+      {GROUPS.map(({ style: group, title }) => (
         <section key={group} aria-label={`${title}色`} className="space-y-2">
           <h2 className="px-1 text-sm font-semibold" style={{ color: 'var(--ink-secondary)' }}>
             {title}
           </h2>
           <ul className="grid grid-cols-2 gap-3">
-            {PRESETS.filter((p) => p.group === group).map((preset) => (
+            {PRESETS.filter((p) => p.style === group).map((preset) => (
               <li key={preset.id}>
                 <PresetButton
                   preset={preset}
