@@ -820,13 +820,13 @@ function CumulativeLayer({
         className="pointer-events-none absolute inset-0 size-full overflow-visible"
       >
         {band ? (
-          <polygon points={band} fill={color} fillOpacity={dim ? 0.04 : 0.07} data-forecast-band />
+          <polygon points={band} fill={color} fillOpacity={dim ? 0.12 : 0.22} data-forecast-band />
         ) : null}
         {innerBand ? (
           <polygon
             points={innerBand}
             fill={color}
-            fillOpacity={dim ? 0.06 : 0.12}
+            fillOpacity={dim ? 0.18 : 0.34}
             data-forecast-band-inner
           />
         ) : null}
