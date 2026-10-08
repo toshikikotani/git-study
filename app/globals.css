@@ -71,8 +71,8 @@
   color-scheme: light;
 
   /* 面(青みを含んだ階調) */
-  --plane: #eef1f6;
-  --surface: #ffffff;
+  --plane: #ffffff;
+  --surface: #f7f7f5;
   --surface-raised: #f4f6fa;
   --hairline: rgba(10, 16, 32, 0.06);
 
@@ -124,8 +124,8 @@
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --plane: #0b0f17;
-    --surface: #121826;
+    --plane: #000000;
+    --surface: #161616;
     --surface-raised: #1a2233;
     --hairline: rgba(255, 255, 255, 0.06);
 
@@ -173,8 +173,8 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --plane: #0b0f17;
-  --surface: #121826;
+  --plane: #000000;
+  --surface: #161616;
   --surface-raised: #1a2233;
   --hairline: rgba(255, 255, 255, 0.06);
 
@@ -440,7 +440,7 @@ body {
   position: fixed;
   inset: 0 0 auto 0;
   z-index: 30;
-  height: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+  height: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 1.25rem));
   background: linear-gradient(to bottom, var(--surface) 62%, transparent);
   pointer-events: none;
 }

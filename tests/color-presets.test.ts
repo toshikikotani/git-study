@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { PRESETS, contrast, isDark, themeTokens } from '@/lib/color-theme';
 
-/** 色のプリセット(ADR-079):20種類、どれも読める濃さ。 */
+/** 色のプリセット(ADR-079):40種類、どれも読める濃さ。 */
 describe('色のプリセット', () => {
-  it('20種類、id は重ならず、以前のプリセット(生成り・墨・藍・苔)の id は残す', () => {
-    expect(PRESETS).toHaveLength(20);
-    expect(new Set(PRESETS.map((p) => p.id)).size).toBe(20);
+  it('40種類、id は重ならず、以前のプリセット(生成り・墨・藍・苔)の id は残す', () => {
+    expect(PRESETS).toHaveLength(40);
+    expect(new Set(PRESETS.map((p) => p.id)).size).toBe(40);
     for (const id of ['kinari', 'sumi', 'ai', 'koke']) {
       expect(PRESETS.some((p) => p.id === id)).toBe(true);
     }

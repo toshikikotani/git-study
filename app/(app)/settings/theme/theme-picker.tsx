@@ -47,7 +47,7 @@ export function ThemePicker() {
           boxShadow: theme.id === 'system' ? 'inset 0 0 0 2px var(--accent)' : 'var(--card-shadow)',
         }}
       >
-        端末の設定に合わせる
+        ブラウザに合わせる（昼は白、夜は黒）
       </button>
 
       {GROUPS.map(({ group, title }) => (
