@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Segmented } from '@/components/ui/segmented';
 import { formatEstimate } from '@/domain/forecast/format';
-import { genreSwatchHex } from '@/domain/genre-style';
+import { genreSwatch } from '@/domain/genre-style';
 import { pickAxisLabels } from '@/features/category/axis';
 import {
   TAG_HEIGHT,
@@ -102,7 +102,7 @@ export function CategoryChart({
   const themeColor = genreName === '全体' || genreName === '変えられる支出';
   const barColor = themeColor
     ? 'var(--accent)'
-    : genreSwatchHex(genreName === '未分類' ? null : genreName);
+    : genreSwatch(genreName === '未分類' ? null : genreName);
   const forecastEnd = cumulative.days.filter((day) => day.forecastYen !== null).at(-1);
   const forecastLow = forecastEnd?.forecastLowYen ?? 0;
   const forecastMid = forecastEnd?.forecastYen ?? 0;
