@@ -207,9 +207,6 @@ export default async function ReportsPage({
     <div className="rise space-y-4">
       <header className="space-y-3">
         <div className="px-1">
-          <p className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
-            {scopeLabel}
-          </p>
           <h1
             className="text-[34px] leading-none font-bold tracking-[-0.03em]"
             style={{ color: 'var(--ink)' }}

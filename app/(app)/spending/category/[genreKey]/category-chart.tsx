@@ -102,8 +102,13 @@ export function CategoryChart({
   const n = isCum ? cumulative.days.length : series.buckets.length;
   const overrides = useGenreOverrides();
   const override = genreName === '未分類' ? null : overrides[genreName];
-  const barColor = genreBarColor(genreName === '未分類' ? null : genreName, override);
-  const lineColor = genreColorVar(genreName === '未分類' ? null : genreName, override);
+  const themeColor = genreName === '全体' || genreName === '変えられる支出';
+  const barColor = themeColor
+    ? 'var(--accent)'
+    : genreBarColor(genreName === '未分類' ? null : genreName, override);
+  const lineColor = themeColor
+    ? 'var(--accent)'
+    : genreColorVar(genreName === '未分類' ? null : genreName, override);
   const forecastEnd = cumulative.days.filter((day) => day.forecastYen !== null).at(-1);
   const forecastLow = forecastEnd?.forecastLowYen ?? 0;
   const forecastMid = forecastEnd?.forecastYen ?? 0;

@@ -616,11 +616,11 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'クリームに、いちご',
     colors: {
-      plane: '#fff5f7',
+      plane: '#fff4f6',
       surface: '#fffafb',
       ink: '#4a2430',
-      accent: '#b43a64',
-      sub: '#c46a84',
+      accent: '#c43d78',
+      sub: '#7a58b0',
     },
   },
   {
@@ -630,11 +630,11 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '飴色のピンクとミント',
     colors: {
-      plane: '#fff6fb',
+      plane: '#fff5fb',
       surface: '#fffafd',
       ink: '#4a2840',
-      accent: '#b03870',
-      sub: '#3f9a86',
+      accent: '#c43480',
+      sub: '#2f8a78',
     },
   },
   {
@@ -647,8 +647,8 @@ export const PRESETS: readonly ThemePreset[] = [
       plane: '#fff3ee',
       surface: '#fffaf7',
       ink: '#4a3028',
-      accent: '#a44430',
-      sub: '#8a6ac4',
+      accent: '#c45a42',
+      sub: '#4a88c4',
     },
   },
   {
@@ -661,8 +661,8 @@ export const PRESETS: readonly ThemePreset[] = [
       plane: '#fffbea',
       surface: '#fffdf4',
       ink: '#3d3420',
-      accent: '#6e580c',
-      sub: '#b45470',
+      accent: '#b45470',
+      sub: '#6e580c',
     },
   },
   {
@@ -676,7 +676,7 @@ export const PRESETS: readonly ThemePreset[] = [
       surface: '#f8fdff',
       ink: '#243848',
       accent: '#1f7498',
-      sub: '#e06a98',
+      sub: '#d45a88',
     },
   },
   {
@@ -686,11 +686,11 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: 'マカロンの薄紫と桃',
     colors: {
-      plane: '#f8f3fb',
+      plane: '#f7f2fb',
       surface: '#fcf9fd',
       ink: '#3c2c48',
-      accent: '#643890',
-      sub: '#b45a74',
+      accent: '#7a48a8',
+      sub: '#3f8a72',
     },
   },
   {
@@ -704,7 +704,7 @@ export const PRESETS: readonly ThemePreset[] = [
       surface: '#fffaf2',
       ink: '#3d2e20',
       accent: '#8a5c18',
-      sub: '#d44858',
+      sub: '#c44858',
     },
   },
   {
@@ -714,11 +714,11 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '風船の珊瑚と空',
     colors: {
-      plane: '#fff4f2',
-      surface: '#fffaf8',
-      ink: '#402828',
-      accent: '#c0443c',
-      sub: '#4a90c0',
+      plane: '#fff4f8',
+      surface: '#fffafb',
+      ink: '#402830',
+      accent: '#d44878',
+      sub: '#3a78b0',
     },
   },
   {
@@ -742,11 +742,11 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '白いうさぎと耳のピンク',
     colors: {
-      plane: '#fff8f8',
+      plane: '#fff6f8',
       surface: '#ffffff',
       ink: '#4a3038',
-      accent: '#a44460',
-      sub: '#a46850',
+      accent: '#c45a78',
+      sub: '#6a58a8',
     },
   },
   {
