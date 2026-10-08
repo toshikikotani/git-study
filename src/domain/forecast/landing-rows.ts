@@ -83,7 +83,7 @@ export function landingRowsFrom(input: {
         excludedYen: extra,
         status,
         type: c.type,
-        group: status === 'forecast' && c.type !== 'fixed' ? 'changeable' : 'fixed',
+        group: c.type === 'fixed' ? 'fixed' : 'changeable',
         caution: cautions.get(c.categoryId) ?? null,
         cutPerWeekYen:
           c.type === 'steady' && weeks >= 1 && c.expectedCount >= weeks * 1.5

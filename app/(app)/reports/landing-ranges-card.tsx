@@ -47,8 +47,8 @@ export function LandingRangesCard({
               style={{ color: 'var(--ink-secondary)' }}
             >
               <span className="inline-flex items-center gap-1">
-                <span className="size-3 rounded-full" style={{ background: 'var(--accent)' }} />
-                丸は中央
+                <span className="h-2 w-4 rounded-full" style={{ background: 'var(--accent)' }} />
+                塗った帯は使った額
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="h-3 w-0.5" style={{ background: 'var(--ink)' }} />
@@ -59,7 +59,7 @@ export function LandingRangesCard({
                   className="h-2 w-4 rounded-full"
                   style={{ background: 'var(--accent-track)' }}
                 />
-                帯は80%の範囲
+                塗った帯は使った額
               </span>
             </p>
             <ul>
@@ -148,6 +148,10 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
             <span
               className="absolute inset-x-0 top-1 h-2 rounded-full"
               style={{ background: 'var(--plane)' }}
+            />
+            <span
+              className="absolute top-1 h-2 rounded-full"
+              style={{ width: pct(row.baseYen), background: 'var(--accent)' }}
             />
             <span
               className="absolute top-1 h-2 rounded-full"
