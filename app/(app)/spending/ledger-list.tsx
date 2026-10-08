@@ -217,7 +217,7 @@ function DaySection({
   return (
     <section
       aria-label={heading}
-      className="glass rounded-2xl"
+      className="glass overflow-hidden rounded-2xl"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* 日付ヘッダーは画面上部に固定(ステータスバー下のぼかしの下に付く) */}
