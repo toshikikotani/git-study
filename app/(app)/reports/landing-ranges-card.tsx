@@ -225,9 +225,13 @@ function ChangeableRow({
               fontWeight: likely ? 600 : 400,
             }}
           >
-            {row.exceedance !== null && row.targetYen !== null
-              ? `${formatProbability(row.exceedance)}の確率で 目標を超えます${cut}`
-              : `80%の確率で ${formatEstimateRange(row.p10, row.p90)}`}
+            {row.status === 'closed'
+              ? `予測を止めています${row.p50 > row.baseYen ? `。守れたら ${formatYen(row.baseYen, { sign: 'never' })}、いつもの守り方なら ${formatEstimate(row.p50)}` : ''}`
+              : row.status === 'settled'
+                ? '確定(この先の見込みなし)'
+                : row.exceedance !== null && row.targetYen !== null
+                  ? `${formatProbability(row.exceedance)}の確率で 目標を超えます${cut}`
+                  : `80%の確率で ${formatEstimateRange(row.p10, row.p90)}`}
           </p>
           {row.caution?.kind === 'over' ? <CautionLine row={row} /> : null}
         </summary>

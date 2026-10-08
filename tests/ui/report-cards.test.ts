@@ -103,7 +103,7 @@ describe('レポートの着地まわりのカード', () => {
         }),
       ),
     );
-    expect(html).toContain('決まった支出(2つ)');
+    expect(html).toContain('保険・税金・手数料');
     expect(html).toContain('68,940円');
     expect(html).toContain('確定(この先の見込みなし)');
     expect(html).toContain('うち 3,000円 は特別費だった記録(今は目標に含む)');
