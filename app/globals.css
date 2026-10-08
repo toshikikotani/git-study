@@ -137,6 +137,8 @@
     --accent: #f2f5fa;
     --on-accent: #0b1b3a;
     --accent-track: rgba(255, 255, 255, 0.08);
+    --action: #d4d4d4;
+    --on-action: #111111;
     --income: #199e70;
     --income-track: #163829;
     --over: #e66767;
@@ -288,7 +290,7 @@
 
   /* 青は主要な操作(撮影・保存・AIで目標案を作る)だけに使う。ほかの色の役割は上の
      --accent(中立の選択色)・--state-*(状態)・--income(収入)。 */
-  --action: #2b6cd4;
+  --action: #3a3a3a;
   --on-action: #ffffff;
 
   /* 余白は4の倍数。画面の左右は16。 */
