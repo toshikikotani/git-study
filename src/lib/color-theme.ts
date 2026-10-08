@@ -899,6 +899,7 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--income-track': mixHex(sub, surface, dark ? 0.18 : 0.08),
     '--over-track': mixHex('#b82b2b', surface, dark ? 0.2 : 0.08),
     '--attention-track': mixHex(accent, surface, dark ? 0.16 : 0.08),
+    '--state-caution': accent,
     '--state-caution-track': mixHex(accent, surface, dark ? 0.16 : 0.08),
     '--state-over-track': mixHex('#b82b2b', surface, dark ? 0.2 : 0.08),
     '--state-none': softenedInk(ink, plane, surface, 5.4),
