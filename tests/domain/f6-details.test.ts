@@ -2,7 +2,7 @@ import { createElement as h } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { genreBarColor, genreColorVar } from '../../src/domain/genre-style';
+import { genreBarColor } from '../../src/domain/genre-style';
 import { consumeJustSaved, markJustSaved } from '../../src/lib/just-saved';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
