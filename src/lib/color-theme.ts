@@ -347,7 +347,7 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'キャンディ',
     style: 'cute',
     group: 'light',
-    note: '綿あめと、薄いミント',
+    note: '綿あめと、ミントと水色',
     colors: {
       plane: '#fff5fb',
       surface: '#ffffff',
@@ -827,11 +827,11 @@ export function rotateHue(hex: string, degrees: number): string {
     .join('')}`;
 }
 
-/** 1つのテーマで使う4色。強調、サブ、その2色の間。 */
+/** 1つのテーマで使う4色。強調、サブ、水色側、もう一段ずらした色。混ぜると灰色になるのでずらす。 */
 export function themeHues(colors: ThemeColors): [string, string, string, string] {
   const accent = colors.accent;
   const sub = colors.sub ?? accent;
-  return [accent, sub, mixHex(accent, sub, 0.62), mixHex(sub, accent, 0.62)];
+  return [accent, sub, rotateHue(accent, 175), rotateHue(sub, 48)];
 }
 
 /** a を t、b を 1 − t の割合で混ぜる。 */
