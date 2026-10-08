@@ -376,6 +376,18 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
   const sub = colors.sub ?? accent;
   const dark = isDark(plane);
   const onAccent = contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink;
+  const genres = [
+    accent,
+    sub,
+    mixHex(accent, sub, 0.45),
+    mixHex(sub, accent, 0.25),
+    mixHex(accent, ink, 0.62),
+    mixHex(sub, ink, 0.58),
+    mixHex(accent, sub, 0.7),
+    mixHex(sub, plane, 0.72),
+    mixHex(accent, plane, 0.68),
+    mixHex(mixHex(accent, sub, 0.5), ink, 0.5),
+  ];
   return {
     '--plane': plane,
     '--surface': surface,
@@ -391,6 +403,25 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--accent-track': rgba(accent, dark ? 0.18 : 0.12),
     '--state-ok': sub,
     '--state-ok-track': mixHex(sub, surface, dark ? 0.28 : 0.18),
+    '--income': sub,
+    '--income-track': mixHex(sub, surface, dark ? 0.28 : 0.16),
+    '--over-track': mixHex('#b82b2b', surface, dark ? 0.3 : 0.14),
+    '--attention-track': mixHex(accent, surface, dark ? 0.24 : 0.14),
+    '--state-caution-track': mixHex(accent, surface, dark ? 0.24 : 0.14),
+    '--state-over-track': mixHex('#b82b2b', surface, dark ? 0.3 : 0.14),
+    '--state-none': softenedInk(ink, plane, surface, 4.6),
+    '--state-none-track': mixHex(ink, surface, dark ? 0.2 : 0.08),
+    '--genre-1': genres[0]!,
+    '--genre-2': genres[1]!,
+    '--genre-3': genres[2]!,
+    '--genre-4': genres[3]!,
+    '--genre-5': genres[4]!,
+    '--genre-6': genres[5]!,
+    '--genre-7': genres[6]!,
+    '--genre-8': genres[7]!,
+    '--genre-9': genres[8]!,
+    '--genre-10': genres[9]!,
+    '--genre-none': softenedInk(ink, plane, surface, 4.6),
     '--hero-glow': rgba(accent, dark ? 0.16 : 0.1),
     '--card-shadow': dark
       ? '0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -20px rgba(0, 0, 0, 0.6)'
