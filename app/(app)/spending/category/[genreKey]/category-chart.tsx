@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { Segmented } from '@/components/ui/segmented';
 import { formatEstimate } from '@/domain/forecast/format';
-import { genreBarColor, genreColorVar, genreSwatchHex } from '@/domain/genre-style';
+import { genreColorVar, genreSwatchHex } from '@/domain/genre-style';
 import { pickAxisLabels } from '@/features/category/axis';
 import {
   TAG_HEIGHT,
@@ -106,9 +106,6 @@ export function CategoryChart({
   const barColor = themeColor
     ? 'var(--accent)'
     : genreSwatchHex(genreName === '未分類' ? null : genreName);
-  const lineColor = themeColor
-    ? 'var(--accent)'
-    : genreColorVar(genreName === '未分類' ? null : genreName, override);
   const forecastEnd = cumulative.days.filter((day) => day.forecastYen !== null).at(-1);
   const forecastLow = forecastEnd?.forecastLowYen ?? 0;
   const forecastMid = forecastEnd?.forecastYen ?? 0;
