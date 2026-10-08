@@ -107,10 +107,8 @@ function wider(row: LandingRow): { low: number; high: number } {
 }
 
 function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
-  const scaleMax =
-    row.targetYen !== null && row.targetYen > 0
-      ? row.targetYen * SCALE_OF_TARGET
-      : Math.max(row.p90, 1) * 1.1;
+  const wide = wider(row);
+  const scaleMax = Math.max(row.targetYen ?? 0, wide.high, row.p90, 1) * 1.08;
   const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / scaleMax) * 100))}%`;
   const exceedText =
     row.targetYen !== null && row.exceedance !== null
