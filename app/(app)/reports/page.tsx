@@ -177,7 +177,7 @@ export default async function ReportsPage({
       exceedance: null,
       excludedYen: 0,
       status: 'settled',
-      type: 'committed',
+      type: 'fixed',
       group: 'fixed',
       caution: null,
       cutPerWeekYen: null,
