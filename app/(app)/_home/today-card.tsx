@@ -108,7 +108,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
           <Link
             href="/plan"
             className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
-            style={{ color: 'var(--sub, var(--accent))' }}
+            style={{ color: 'var(--ink)' }}
           >
             目標を決める
             <ChevronRightIcon />
@@ -181,25 +181,25 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
           style={{
             left: pct(outlook.p10),
             width: `calc(${pct(outlook.p90)} - ${pct(outlook.p10)})`,
-            background: 'var(--genre-3, var(--accent))',
-            opacity: 0.35,
+            background: '#9fd4f2',
+            opacity: 0.85,
           }}
         />
         <div
           className="absolute top-[15px] size-4 -translate-x-1/2 rounded-full"
           style={{
             left: pct(outlook.p50),
-            background: 'var(--ink)',
+            background: 'var(--accent)',
             boxShadow: '0 0 0 3px var(--surface)',
           }}
         />
         <div
           className="absolute top-2.5 h-6 w-0.5 -translate-x-1/2"
-          style={{ left: pct(outlook.budgetYen), background: 'var(--sub, var(--accent))' }}
+          style={{ left: pct(outlook.budgetYen), background: 'var(--ink)' }}
         />
         <span
           className="absolute -top-1.5 -translate-x-1/2 text-xs font-semibold"
-          style={{ left: pct(outlook.budgetYen), color: 'var(--sub, var(--accent))' }}
+          style={{ left: pct(outlook.budgetYen), color: 'var(--ink)' }}
         >
           予算
         </span>

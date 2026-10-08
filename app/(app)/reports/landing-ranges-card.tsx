@@ -154,8 +154,8 @@ function ChangeableRow({ row, first }: { row: LandingRow; first: boolean }) {
               style={{
                 left: pct(row.p10),
                 width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
-                background: 'var(--genre-3, var(--accent))',
-                opacity: 0.45,
+                background: '#9fd4f2',
+                opacity: 0.9,
               }}
             />
             <span
