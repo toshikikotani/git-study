@@ -116,11 +116,17 @@ export function GenreDonutChart({
               })}
             </g>
           </svg>
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <div
+            className="pointer-events-none absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center text-center"
+            style={{ width: SIZE - STROKE * 2 - 16 }}
+          >
+            <span className="text-[11px] leading-tight" style={{ color: 'var(--ink-muted)' }}>
               {centerLabel}
             </span>
-            <span className="tabular text-xl font-semibold" style={{ color: 'var(--ink)' }}>
+            <span
+              className="tabular text-base leading-none font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
               {formatYen(centerAmount, { sign: 'never' })}
             </span>
             {centerRatio !== null ? (

@@ -39,7 +39,7 @@ export function MonthSummaryRow({
             />
             {balance ? (
               <Tile
-                label="月末の収支(見込み)"
+                label="月末の見込み"
                 value={formatSignedEstimate(balance.p50)}
                 color="var(--ink)"
                 sub={`今日まで ${formatSignedYen(incomeYen - spentYen)}`}
