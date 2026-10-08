@@ -607,7 +607,7 @@ export function contrast(a: string, b: string): number {
 /** 色相をずらす。1つのテーマの中で、同じ色の濃淡ではない色を作る。 */
 export function rotateHue(hex: string, degrees: number): string {
   const rgb = rgbOf(hex) ?? [0, 0, 0];
-  const [r, g, b] = rgb.map((v) => v / 255);
+  const [r, g, b] = rgb.map((v) => v / 255) as [number, number, number];
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const d = max - min;
