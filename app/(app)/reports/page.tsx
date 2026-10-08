@@ -130,10 +130,6 @@ export default async function ReportsPage({
   const budgetYen = goalPlan ? budgetTotal : null;
   const periodLabel = goalPlan ? 'この目標の期間' : '今月';
   const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
-  const scopeLabel = goalPlan
-    ? `範囲:目標のジャンル${goalItems.length}つ(特別費を除く)・${formatDateJa(period.from)}〜${formatDateJa(period.to)}`
-    : '範囲:今月のすべての支出';
-
   const previousMonthKey = trend.monthKeys.filter((key) => key < monthKey).at(-1);
   const previousByGenre =
     !goalPlan && previousMonthKey !== undefined
