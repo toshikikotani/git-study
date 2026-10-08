@@ -333,13 +333,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'いちご',
     style: 'cute',
     group: 'light',
-    note: '淡いクリームと、薄いいちご',
+    note: 'クリームに、薄いいちご',
     colors: {
       plane: '#fff6f8',
       surface: '#ffffff',
       ink: '#1a1020',
-      accent: '#f4a8c4',
-      sub: '#f7d0de',
+      accent: '#f4b4c8',
+      sub: '#f7d5e0',
     },
   },
   {
@@ -347,13 +347,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'キャンディ',
     style: 'cute',
     group: 'light',
-    note: '綿あめと、ミントと水色',
+    note: '綿あめに、薄いミント',
     colors: {
       plane: '#fff5fb',
       surface: '#ffffff',
       ink: '#1a1020',
       accent: '#f3b6d8',
-      sub: '#b7eadc',
+      sub: '#c8eadf',
     },
   },
   {
@@ -361,13 +361,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '桃',
     style: 'cute',
     group: 'light',
-    note: '薄い桃と、空',
+    note: '薄い桃に、空',
     colors: {
       plane: '#fff5f0',
       surface: '#ffffff',
       ink: '#1a1020',
-      accent: '#f6c2b0',
-      sub: '#b9ddf6',
+      accent: '#f6c8b4',
+      sub: '#c5e3f6',
     },
   },
   {
@@ -375,13 +375,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'レモン',
     style: 'cute',
     group: 'light',
-    note: 'バタークリームと、薄い桜',
+    note: 'バタークリームに、薄い桜',
     colors: {
       plane: '#fff9e8',
       surface: '#fffefb',
       ink: '#1a1020',
-      accent: '#f0c98a',
-      sub: '#f6b8cc',
+      accent: '#f0d09a',
+      sub: '#f6c4d4',
     },
   },
   {
@@ -389,13 +389,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'ソーダ',
     style: 'cute',
     group: 'light',
-    note: '薄い空と、桜',
+    note: '薄い空に、桜',
     colors: {
       plane: '#f4fbff',
       surface: '#ffffff',
       ink: '#102028',
-      accent: '#a9d7f2',
-      sub: '#f6b7d0',
+      accent: '#b7ddf4',
+      sub: '#f6c4d6',
     },
   },
   {
@@ -403,13 +403,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'マカロン',
     style: 'cute',
     group: 'light',
-    note: '薄い藤と、桃',
+    note: '薄い藤に、桃',
     colors: {
       plane: '#f8f4ff',
       surface: '#ffffff',
       ink: '#1a1028',
-      accent: '#d4c0f2',
-      sub: '#f8c8b8',
+      accent: '#d8c6f2',
+      sub: '#f8d0c0',
     },
   },
   {
@@ -417,13 +417,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'プリン',
     style: 'cute',
     group: 'light',
-    note: 'カスタードと、薄いさくらんぼ',
+    note: 'カスタードに、薄いさくらんぼ',
     colors: {
       plane: '#fff8ee',
       surface: '#fffefb',
       ink: '#1a1020',
-      accent: '#f0d0a0',
-      sub: '#f6b0bc',
+      accent: '#f0d4a8',
+      sub: '#f6c0c8',
     },
   },
   {
@@ -431,13 +431,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '風船',
     style: 'cute',
     group: 'light',
-    note: '薄いピンクと、空',
+    note: '薄いピンクに、空',
     colors: {
       plane: '#fff5f8',
       surface: '#ffffff',
       ink: '#1a1020',
-      accent: '#f6b4cc',
-      sub: '#b7dcf4',
+      accent: '#f6c0d2',
+      sub: '#c5e4f6',
     },
   },
   {
@@ -459,13 +459,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'うさぎ',
     style: 'cute',
     group: 'light',
-    note: '白に、薄い耳のピンクと藤',
+    note: '白に、薄いピンクと藤',
     colors: {
       plane: '#fff7f9',
       surface: '#ffffff',
       ink: '#1a1020',
-      accent: '#f6c0d4',
-      sub: '#d8c4f2',
+      accent: '#f6c8d8',
+      sub: '#ddcef2',
     },
   },
   {
@@ -827,11 +827,11 @@ export function rotateHue(hex: string, degrees: number): string {
     .join('')}`;
 }
 
-/** 1つのテーマで使う4色。強調、サブ、水色側、もう一段ずらした色。混ぜると灰色になるのでずらす。 */
+/** 1つのテーマで使う4色。主、添え、その薄い版。色相を飛ばすと差し色の寄せ集めになる。 */
 export function themeHues(colors: ThemeColors): [string, string, string, string] {
   const accent = colors.accent;
   const sub = colors.sub ?? accent;
-  return [accent, sub, rotateHue(accent, 175), rotateHue(sub, 48)];
+  return [accent, sub, mixHex(accent, '#ffffff', 0.55), mixHex(sub, '#ffffff', 0.55)];
 }
 
 /** a を t、b を 1 − t の割合で混ぜる。 */
