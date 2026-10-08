@@ -168,7 +168,7 @@ function ChangeableRow({
                 left: pct(row.p10),
                 width: `calc(${pct(row.p90)} - ${pct(row.p10)})`,
                 background: 'transparent',
-                border: '1.5px solid var(--mark, var(--accent))',
+                border: '2px solid var(--mark, var(--accent))',
                 boxSizing: 'border-box',
               }}
             />
@@ -177,8 +177,8 @@ function ChangeableRow({
               style={{
                 left: pct(tight.low),
                 width: `calc(${pct(tight.high)} - ${pct(tight.low)})`,
-                background: 'var(--mark, var(--sub, var(--accent)))',
-                opacity: 0.55,
+                background: 'var(--accent)',
+                opacity: 0.35,
               }}
             />
             {row.targetYen !== null ? (
