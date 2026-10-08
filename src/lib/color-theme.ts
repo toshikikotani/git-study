@@ -308,7 +308,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#262630',
       surface: '#373741',
-      ink: '#f7f4e4',
+      ink: '#fff8e8',
       accent: '#7e9cd8',
       sub: '#e6c384',
     },
@@ -618,8 +618,8 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#fff0f6',
       surface: '#ffffff',
-      ink: '#3a1830',
-      accent: '#d52066',
+      ink: '#1a1020',
+      accent: '#ff3d88',
       sub: '#ff267e',
     },
   },
@@ -632,7 +632,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#fff0fa',
       surface: '#ffffff',
-      ink: '#3a1840',
+      ink: '#1a1020',
       accent: '#d11f75',
       sub: '#0f9a7b',
     },
@@ -646,7 +646,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#fff1f4',
       surface: '#ffffff',
-      ink: '#3a1828',
+      ink: '#1a1020',
       accent: '#d52050',
       sub: '#2090d5',
     },
@@ -660,8 +660,8 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#fff7c8',
       surface: '#fffef6',
-      ink: '#3a1840',
-      accent: '#d52066',
+      ink: '#1a1020',
+      accent: '#ff3d88',
       sub: '#2193d9',
     },
   },
@@ -674,7 +674,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#eef9ff',
       surface: '#ffffff',
-      ink: '#183040',
+      ink: '#102028',
       accent: '#1379a7',
       sub: '#ff2684',
     },
@@ -688,7 +688,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#f7f0ff',
       surface: '#ffffff',
-      ink: '#301840',
+      ink: '#1a1028',
       accent: '#a126fb',
       sub: '#ff2682',
     },
@@ -702,7 +702,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#fff4d8',
       surface: '#fffdf6',
-      ink: '#3a1828',
+      ink: '#1a1020',
       accent: '#d9213f',
       sub: '#129a75',
     },
@@ -716,7 +716,7 @@ export const PRESETS: readonly ThemePreset[] = [
     colors: {
       plane: '#fff0f6',
       surface: '#ffffff',
-      ink: '#3a1830',
+      ink: '#1a1020',
       accent: '#d5205c',
       sub: '#2090d5',
     },

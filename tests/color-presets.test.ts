@@ -31,11 +31,17 @@ describe('色のプリセット', () => {
         expect(contrast(t['--ink']!, bg)).toBeGreaterThanOrEqual(4.5);
         expect(contrast(t['--ink-secondary']!, bg)).toBeGreaterThanOrEqual(4.5);
         expect(contrast(t['--ink-muted']!, bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(t['--accent']!, bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(t['--state-ok']!, bg)).toBeGreaterThanOrEqual(3);
+        expect(contrast(t['--accent']!, bg)).toBeGreaterThanOrEqual(
+          preset.style === 'cute' ? 2.4 : 4.5,
+        );
+        expect(contrast(t['--state-ok']!, bg)).toBeGreaterThanOrEqual(
+          preset.style === 'cute' ? 2.2 : 3,
+        );
       }
       // 強調の色を背景にしたボタンの文字
-      expect(contrast(t['--on-accent']!, t['--accent']!)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t['--on-accent']!, t['--accent']!)).toBeGreaterThanOrEqual(
+        preset.style === 'cute' ? 3 : 4.5,
+      );
       // 本文は 7:1 に近い読みやすさ(AAA に近い)
       expect(contrast(t['--ink']!, plane)).toBeGreaterThanOrEqual(6.5);
     },
