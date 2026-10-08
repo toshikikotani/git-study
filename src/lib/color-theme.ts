@@ -614,13 +614,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'いちご',
     style: 'cute',
     group: 'light',
-    note: 'クリームに、いちご',
+    note: 'ピンクと藤',
     colors: {
-      plane: '#fff4f6',
-      surface: '#fffafb',
-      ink: '#4a2430',
+      plane: '#fff4f8',
+      surface: '#fffafc',
+      ink: '#4a2438',
       accent: '#c43d78',
-      sub: '#7a58b0',
+      sub: '#7a4ea8',
     },
   },
   {
@@ -628,13 +628,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'キャンディ',
     style: 'cute',
     group: 'light',
-    note: '飴色のピンクとミント',
+    note: 'ピンクと藤',
     colors: {
-      plane: '#fff5fb',
+      plane: '#fff3fa',
       surface: '#fffafd',
-      ink: '#4a2840',
-      accent: '#c43480',
-      sub: '#2f8a78',
+      ink: '#4a2844',
+      accent: '#b83878',
+      sub: '#8a5cb8',
     },
   },
   {
@@ -644,11 +644,11 @@ export const PRESETS: readonly ThemePreset[] = [
     group: 'light',
     note: '桃と藤',
     colors: {
-      plane: '#fff3ee',
-      surface: '#fffaf7',
-      ink: '#4a3028',
-      accent: '#a44430',
-      sub: '#4a88c4',
+      plane: '#fff4f6',
+      surface: '#fffaf8',
+      ink: '#4a2834',
+      accent: '#b04468',
+      sub: '#6e48a0',
     },
   },
   {
@@ -684,13 +684,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'マカロン',
     style: 'cute',
     group: 'light',
-    note: 'マカロンの薄紫と桃',
+    note: '藤とピンク',
     colors: {
       plane: '#f7f2fb',
       surface: '#fcf9fd',
       ink: '#3c2c48',
       accent: '#7a48a8',
-      sub: '#3f8a72',
+      sub: '#c45a84',
     },
   },
   {
@@ -712,13 +712,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '風船',
     style: 'cute',
     group: 'light',
-    note: '風船の珊瑚と空',
+    note: 'ピンクと藤',
     colors: {
       plane: '#fff4f8',
       surface: '#fffafb',
-      ink: '#402830',
-      accent: '#b03862',
-      sub: '#3a78b0',
+      ink: '#402834',
+      accent: '#b03c68',
+      sub: '#7a58b0',
     },
   },
   {
@@ -726,13 +726,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '夜のポップ',
     style: 'cute',
     group: 'dark',
-    note: '夜に、ピンクとミント',
+    note: '夜に、ピンクと藤',
     colors: {
       plane: '#1c1420',
       surface: '#2a1e2c',
-      ink: '#ffe8f2',
+      ink: '#ffe8f4',
       accent: '#ff8ab8',
-      sub: '#7ddec0',
+      sub: '#c4a0e8',
     },
   },
   {
@@ -740,13 +740,13 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'うさぎ',
     style: 'cute',
     group: 'light',
-    note: '白いうさぎと耳のピンク',
+    note: 'ピンクと藤',
     colors: {
       plane: '#fff6f8',
       surface: '#ffffff',
       ink: '#4a3038',
-      accent: '#a84060',
-      sub: '#6a58a8',
+      accent: '#b04068',
+      sub: '#7a58b0',
     },
   },
   {
@@ -967,11 +967,11 @@ export function rotateHue(hex: string, degrees: number): string {
     .join('')}`;
 }
 
-/** 1つのテーマで使う4色。強調、サブ、隣の色、向かいの色。 */
+/** 1つのテーマで使う4色。強調、サブ、その2色の間。 */
 export function themeHues(colors: ThemeColors): [string, string, string, string] {
   const accent = colors.accent;
-  const sub = colors.sub ?? rotateHue(accent, 150);
-  return [accent, sub, rotateHue(accent, 32), rotateHue(sub, 168)];
+  const sub = colors.sub ?? accent;
+  return [accent, sub, mixHex(accent, sub, 0.62), mixHex(sub, accent, 0.62)];
 }
 
 /** a を t、b を 1 − t の割合で混ぜる。 */
