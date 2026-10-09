@@ -442,7 +442,7 @@ body {
   position: fixed;
   inset: 0 0 auto 0;
   z-index: 30;
-  height: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 1.25rem));
+  height: max(4.5rem, calc(env(safe-area-inset-top, 0px) + 2.5rem));
   background: linear-gradient(to bottom, var(--surface) 62%, transparent);
   pointer-events: none;
 }
