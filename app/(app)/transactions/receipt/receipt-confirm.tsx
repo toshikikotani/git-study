@@ -427,6 +427,18 @@ export function ReceiptConfirm({
                 onChange={(v) => update((d) => ({ ...d, couponYen: v }))}
                 style={fieldStyle}
               />
+              <NumberField
+                label="割り勘でもらった額(円)"
+                value={draft.splitYen}
+                onChange={(v) =>
+                  update((d) => ({
+                    ...d,
+                    splitYen: v,
+                    paidYen: Math.max(0, d.paidYen - (v - d.splitYen)),
+                  }))
+                }
+                style={fieldStyle}
+              />
             </div>
 
             {/* ジャンル:選んだ品目を、チップで一括変更 */}
@@ -824,7 +836,7 @@ function ReconcileBar({
   onFix: (fix: ReconcileSuggestion) => void;
 }) {
   const ok = result.status === 'ok';
-  const discounts = result.discountYen + result.pointsYen + result.couponYen;
+  const discounts = result.discountYen + result.pointsYen + result.couponYen + result.splitYen;
   return (
     <div role="status" aria-live="polite">
       <p className="tabular text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

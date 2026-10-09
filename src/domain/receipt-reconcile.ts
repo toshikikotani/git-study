@@ -48,6 +48,8 @@ export type ReceiptDraft = {
   pointsYen: number;
   /** クーポン・商品券など、値引きではなく支払い側に出るもの。 */
   couponYen: number;
+  /** 割り勘でもらった額。クーポンと同じく支払額から引く。 */
+  splitYen: number;
   /** 本人が「端数として調整」した額(符号あり)。 */
   roundingAdjustYen: number;
   /** 実際に支払った額。 */
@@ -78,6 +80,7 @@ export type ReconcileResult = {
   discountYen: number;
   pointsYen: number;
   couponYen: number;
+  splitYen: number;
   roundingAdjustYen: number;
   expectedPaidYen: number;
   paidYen: number;
@@ -215,7 +218,13 @@ export function reconcileReceipt(draft: ReceiptDraft): ReconcileResult {
   const includedTaxYen = groups.reduce((a, g) => a + g.includedTaxYen, 0);
 
   const expectedPaidYen =
-    itemsYen + taxYen - discountYen - draft.pointsYen - draft.couponYen + draft.roundingAdjustYen;
+    itemsYen +
+    taxYen -
+    discountYen -
+    draft.pointsYen -
+    draft.couponYen -
+    draft.splitYen +
+    draft.roundingAdjustYen;
   const diffYen = draft.paidYen - expectedPaidYen;
   const withinAbsorb = Math.abs(diffYen) <= RECEIPT_ABSORB_YEN;
 
@@ -226,6 +235,7 @@ export function reconcileReceipt(draft: ReceiptDraft): ReconcileResult {
     discountYen,
     pointsYen: draft.pointsYen,
     couponYen: draft.couponYen,
+    splitYen: draft.splitYen,
     roundingAdjustYen: draft.roundingAdjustYen,
     expectedPaidYen,
     paidYen: draft.paidYen,

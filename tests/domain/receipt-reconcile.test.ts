@@ -30,6 +30,7 @@ function draft(o: Partial<ReceiptDraft> & { lines: ReceiptLine[]; paidYen: numbe
     taxRounding: 'floor',
     pointsYen: 0,
     couponYen: 0,
+    splitYen: 0,
     roundingAdjustYen: 0,
     ...o,
   };
@@ -143,6 +144,8 @@ describe('reconcileReceipt', () => {
         ],
         pointsYen: 500,
         couponYen: 100,
+        splitYen: 0,
+        splitYen: 0,
         paidYen: 2444,
       }),
     );
@@ -223,6 +226,8 @@ describe('allocateToPayment(品目を支払額へ按分)', () => {
       ],
       pointsYen: 500,
       couponYen: 100,
+      splitYen: 0,
+      splitYen: 0,
       paidYen: 2444 + 366 - 366 + 0,
     });
     const items = allocateToPayment(d);

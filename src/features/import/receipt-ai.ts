@@ -523,6 +523,7 @@ function draftFromRow(row: ExtractionRow, paidYen: number): ReceiptDraft {
     taxRounding: 'floor',
     pointsYen: Math.max(Math.round(row.points_used_yen ?? 0), 0),
     couponYen: Math.max(Math.round(row.coupon_yen ?? 0), 0),
+    splitYen: 0,
     roundingAdjustYen: 0,
     paidYen,
   };
