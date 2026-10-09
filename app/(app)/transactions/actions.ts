@@ -413,8 +413,11 @@ export async function deleteTransactionAction(
         subtypes: (subtypes ?? []) as unknown as Record<string, unknown>[],
       };
     }
+    await supabase.from('receipt_items').delete().eq('transaction_id', id);
+    await supabase.from('transaction_splits').delete().eq('transaction_id', id);
+    await supabase.from('transaction_expense_subtypes').delete().eq('transaction_id', id);
     const { error } = await supabase.from('transactions').delete().eq('id', id);
-    if (error) return { error: '削除できませんでした。' };
+    if (error) return { error: `削除できませんでした。${error.message}` };
   } catch (error) {
     return { error: describeUserError(error, '削除できませんでした。') };
   }

@@ -521,6 +521,10 @@ function CategoryScreenInner({
           setOpenLine(null);
           void moveWithRule([line], to);
         }}
+        onDelete={(line) => {
+          setOpenLine(null);
+          void deleteLines([line]);
+        }}
         onMoveItem={(line, itemId, to) => {
           setOpenLine(null);
           void moveItemWithRule(line, itemId, to);

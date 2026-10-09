@@ -25,6 +25,7 @@ export function EditSheet({
   onSave,
   onMove,
   onMoveItem,
+  onDelete,
 }: {
   line: CategoryLine | null;
   genres: readonly { id: string; name: string }[];
@@ -33,6 +34,7 @@ export function EditSheet({
   onSave: (line: CategoryLine, patch: TxPatch) => void;
   onMove: (line: CategoryLine, toGenreId: string | null) => void;
   onMoveItem: (line: CategoryLine, itemId: string, toGenreId: string | null) => void;
+  onDelete: (line: CategoryLine) => void;
 }) {
   const [state, setState] = useState<Exclude<SheetState, 'closed'>>('half');
   return (
@@ -56,6 +58,7 @@ export function EditSheet({
           onSave={onSave}
           onMove={onMove}
           onMoveItem={onMoveItem}
+          onDelete={onDelete}
         />
       ) : null}
     </ExpandableSheet>
@@ -70,6 +73,7 @@ export function EditForm({
   onSave,
   onMove,
   onMoveItem,
+  onDelete,
 }: {
   line: CategoryLine;
   genres: readonly { id: string; name: string }[];
@@ -78,6 +82,7 @@ export function EditForm({
   onSave: (line: CategoryLine, patch: TxPatch) => void;
   onMove: (line: CategoryLine, toGenreId: string | null) => void;
   onMoveItem: (line: CategoryLine, itemId: string, toGenreId: string | null) => void;
+  onDelete: (line: CategoryLine) => void;
 }) {
   const tx = line.tx;
   const isSplit = tx.splits.length > 0;
@@ -255,7 +260,7 @@ export function EditForm({
       >
         保存する
       </button>
-      <DeleteRow id={tx.id} />
+      <DeleteRow onDelete={() => onDelete(line)} />
     </div>
   );
 }
@@ -277,47 +282,25 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function DeleteRow({ id }: { id: string }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function DeleteRow({ onDelete }: { onDelete: () => void }) {
   const [ask, setAsk] = useState(false);
-  return (
-    <div className="space-y-2">
-      {error ? (
-        <p className="text-sm" style={{ color: 'var(--over)' }}>
-          {error}
-        </p>
-      ) : null}
-      {ask ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void deleteTransactionAction(id).then((result) => {
-              setBusy(false);
-              if (result.error) {
-                setError(result.error);
-                return;
-              }
-              window.location.reload();
-            });
-          }}
-          className="min-h-12 w-full rounded-2xl text-base font-semibold"
-          style={{ background: 'var(--over)', color: '#fff' }}
-        >
-          {busy ? '削除しています…' : '本当に削除する'}
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAsk(true)}
-          className="min-h-12 w-full rounded-2xl text-base font-semibold"
-          style={{ color: 'var(--over)', background: 'var(--plane)' }}
-        >
-          この明細を削除
-        </button>
-      )}
-    </div>
+  return ask ? (
+    <button
+      type="button"
+      onClick={onDelete}
+      className="min-h-12 w-full rounded-2xl text-base font-semibold"
+      style={{ background: 'var(--over)', color: '#fff' }}
+    >
+      本当に削除する
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setAsk(true)}
+      className="min-h-12 w-full rounded-2xl text-base font-semibold"
+      style={{ color: 'var(--over)', background: 'var(--plane)' }}
+    >
+      この明細を削除
+    </button>
   );
 }
