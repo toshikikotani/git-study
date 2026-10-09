@@ -164,6 +164,8 @@ async function SpentRows({ today }: { today: string }) {
         <ul className="mt-3 space-y-1">
           {view.breakdown
             .filter((r) => r.targetYen !== null)
+            .slice()
+            .sort((a, b) => b.spentYen - a.spentYen || (b.targetYen ?? 0) - (a.targetYen ?? 0))
             .map((r) => (
               <li key={r.genreId ?? 'none'}>
                 <GenreBudgetRow
