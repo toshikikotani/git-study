@@ -74,14 +74,14 @@ export function buildGoalView(input: {
       genreId: item.genreId,
       genreName: item.genreName,
       targetYen: item.targetYen,
-      spentYen: summary.byGenrePace.get(item.genreId) ?? 0,
-      todaySpentYen: todaySummary.byGenrePace.get(item.genreId) ?? 0,
+      spentYen: summary.byGenre.get(item.genreId) ?? 0,
+      todaySpentYen: todaySummary.byGenre.get(item.genreId) ?? 0,
       scheduledYen: summary.scheduledByGenre.get(item.genreId) ?? 0,
     })),
     specialYen: summary.specialYen,
     scheduledYen: summary.scheduledYen,
-    uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
-    uncategorizedTodayYen: todaySummary.byGenrePace.get(null) ?? 0,
+    uncategorizedYen: summary.byGenre.get(null) ?? 0,
+    uncategorizedTodayYen: todaySummary.byGenre.get(null) ?? 0,
   });
 
   // 目標が0円のジャンルは「予算なし」。実績があれば未収録に出し、見えなくしない。
@@ -98,7 +98,7 @@ export function buildGoalView(input: {
       reserved: g.status === 'reserved',
     }));
   const noBudget: GoalView['noBudget'] = [];
-  for (const [genreId, spentYen] of summary.byGenrePace) {
+  for (const [genreId, spentYen] of summary.byGenre) {
     if (genreId !== null && planned.has(genreId)) continue;
     if (spentYen <= 0) continue;
     noBudget.push({
@@ -138,7 +138,7 @@ export function buildGoalView(input: {
         genreId: i.genreId,
         genreName: i.genreName,
         targetYen: i.targetYen,
-        spentYen: summary.byGenrePace.get(i.genreId) ?? 0,
+        spentYen: summary.byGenre.get(i.genreId) ?? 0,
       })),
     },
     breakdown,
@@ -149,11 +149,11 @@ export function buildGoalView(input: {
       ? buildGoalReview({
           items: plan.items,
           actualByGenre: new Map(
-            plan.items.map((i) => [i.genreId, summary.byGenrePace.get(i.genreId) ?? 0]),
+            plan.items.map((i) => [i.genreId, summary.byGenre.get(i.genreId) ?? 0]),
           ),
         })
       : null,
-    uncategorizedYen: summary.byGenrePace.get(null) ?? 0,
+    uncategorizedYen: summary.byGenre.get(null) ?? 0,
     scheduledItems: (input.transactions ?? [])
       .filter(
         (t) =>
