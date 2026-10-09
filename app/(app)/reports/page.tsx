@@ -94,7 +94,6 @@ export default async function ReportsPage() {
   };
   const period = monthPeriod;
   const goalItems = plan ? plan.items.filter((item) => item.targetYen > 0) : [];
-  const goalArgs = null;
   const settle = <T,>(promise: Promise<T>) =>
     promise.then(
       (value) => ({ ok: true as const, value }),
@@ -108,10 +107,7 @@ export default async function ReportsPage() {
     );
   // 予測が失敗しても、ほかの集計(下のカード)は見られるようにする。月末の収支は、目標の範囲では
   // なく今月の全部で出す(収入は1か月分なので)。目標の範囲のときは、全部の予測も並べて読む。
-  const [outcome, monthOutcome] = await Promise.all([
-    settle(loadForecast(goalArgs ?? { period })),
-    Promise.resolve(null),
-  ]);
+  const [outcome] = await Promise.all([settle(loadForecast({ period }))]);
   const forecast = outcome.ok ? outcome.value.forecast : null;
   const monthForecast = forecast;
   const aiRead = await loadLatestRead(ledger.period.from).catch(() => null);
