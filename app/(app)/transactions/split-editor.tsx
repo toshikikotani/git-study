@@ -719,18 +719,6 @@ export function TransactionRowWithSplit({
         {/* 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付
           とは独立した操作なので、別の開閉状態を持つ(このファイル冒頭の
           コメント参照)。 */}
-        {open ? (
-          <button
-            type="button"
-            onClick={() => void toggleSpecial()}
-            aria-pressed={special}
-            className="min-h-11 mt-3 text-xs font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            {special ? '特別費を通常の支出に戻す' : '特別費にする(目標のペースから除く)'}
-          </button>
-        ) : null}
-
         {open && !memoFormOpen ? (
           <div className="mt-3 flex items-start justify-between gap-2">
             {memo ? (
