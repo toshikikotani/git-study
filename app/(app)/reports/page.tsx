@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { CategoryTrendChart } from './category-trend-chart';
 import { InsightsList } from './insights-card';
+import { AiInsightButton } from './ai-insight-button';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
 import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
@@ -56,7 +57,6 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { scope: scopeParam } = await searchParams;
   const [
     trend,
     netWorthPoints,
@@ -92,7 +92,7 @@ export default async function ReportsPage({
   // 今月のすべての支出で出す。どちらの範囲かは、画面の上に名前で出す(設計書 v3 2.2 の2)。
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
   const hasGoal = plan !== null && budgetTotal > 0;
-  const goalPlan = hasGoal && scopeParam !== 'all' ? plan : null;
+  const goalPlan = null;
   const monthPeriod = {
     from: ledger.period.from,
     to: addDays(addMonths(ledger.period.from, 1), -1),
@@ -127,7 +127,7 @@ export default async function ReportsPage({
   const aiRead = goalPlan ? null : await loadLatestRead(ledger.period.from).catch(() => null);
   const verification = outcome.ok ? outcome.value.verification : null;
   const forecastError = outcome.ok ? null : outcome.message;
-  const budgetYen = goalPlan ? budgetTotal : null;
+  const budgetYen = hasGoal ? budgetTotal : null;
   const periodLabel = goalPlan ? 'この目標の期間' : '今月';
   const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
   const previousMonthKey = trend.monthKeys.filter((key) => key < monthKey).at(-1);
@@ -235,7 +235,6 @@ export default async function ReportsPage({
             見通し
           </h1>
         </div>
-        {hasGoal ? <ScopeSwitch current={goalPlan ? 'goal' : 'all'} /> : null}
       </header>
       {forecast && landing && forecast.total.p50 > 0 ? (
         <>
@@ -299,6 +298,7 @@ export default async function ReportsPage({
         AIに見てもらう
       </Link>
       <InsightsList insights={insights} />
+      <AiInsightButton />
       {forecast && forecast.total.p50 > 0 ? (
         <WhyCard forecast={forecast} endLabel={endLabel} closedGenreIds={closedGenreIds} />
       ) : null}
@@ -355,34 +355,5 @@ export default async function ReportsPage({
 
       <PurposeBalanceCard balances={purposeBalances} />
     </div>
-  );
-}
-
-/** 「目標のジャンル」と「ぜんぶ」の切り替え(デザインの区切りボタン。目標があるときだけ)。 */
-function ScopeSwitch({ current }: { current: 'goal' | 'all' }) {
-  const item = (key: 'goal' | 'all', label: string) => (
-    <Link
-      href={key === 'all' ? { pathname: '/reports', query: { scope: 'all' } } : '/reports'}
-      aria-current={current === key ? 'page' : undefined}
-      className="glass flex min-h-9 flex-1 items-center justify-center rounded-[10px] px-3 text-sm"
-      style={{
-        background: current === key ? 'var(--surface)' : 'transparent',
-        boxShadow: current === key ? 'var(--card-shadow)' : undefined,
-        color: current === key ? 'var(--ink)' : 'var(--ink-secondary)',
-        fontWeight: current === key ? 600 : 500,
-      }}
-    >
-      {label}
-    </Link>
-  );
-  return (
-    <nav
-      aria-label="表示する範囲"
-      className="flex gap-1 rounded-xl p-1"
-      style={{ background: 'var(--surface-fill)' }}
-    >
-      {item('goal', '目標のジャンル')}
-      {item('all', 'ぜんぶ')}
-    </nav>
   );
 }
