@@ -88,7 +88,7 @@ export default async function ReportsPage() {
   // 今月のすべての支出で出す。どちらの範囲かは、画面の上に名前で出す(設計書 v3 2.2 の2)。
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
   const hasGoal = plan !== null && budgetTotal > 0;
-  const goalPlan = null;
+  const goalPlan: typeof plan = null;
   const monthPeriod = {
     from: ledger.period.from,
     to: addDays(addMonths(ledger.period.from, 1), -1),

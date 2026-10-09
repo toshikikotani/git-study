@@ -6,7 +6,7 @@ import { generateMonthlyAiReportAction } from './ai/actions';
 
 /** 固定の気づきとは別に、今の記録をAIに分析させて出す。 */
 export function AiInsightButton() {
-  const [lines, setLines] = useState<string[] | null>(null);
+  const [lines, setLines] = useState<readonly string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

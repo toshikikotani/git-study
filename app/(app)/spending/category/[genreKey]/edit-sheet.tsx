@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { deleteTransactionAction } from '@/app/(app)/transactions/actions';
+import { deleteTransactionAction } from '../../../transactions/actions';
 
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
 import { ExpandableSheet } from '@/components/ui/expandable-sheet';
