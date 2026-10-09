@@ -106,7 +106,7 @@ export function summarizeLedger(
 ): LedgerSummary {
   let spentYen = 0;
   let incomeYen = 0;
-  let specialYen = 0;
+  const specialYen = 0;
   let scheduledYen = 0;
   const byGenre = new Map<string | null, number>();
   const byGenrePace = new Map<string | null, number>();
