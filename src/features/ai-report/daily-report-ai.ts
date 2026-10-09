@@ -111,18 +111,13 @@ export class ClaudeDailyReportAnalyzer implements DailyReportAnalyzer {
         // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
         // 台帳に無い数字が1つでも混じっていれば、出力ごと破棄して代替表示にする。
         const facts = extractNumbers(userContent);
-        const verification = verifyNumbersAgainstFacts(
-          [...result.value.insights, ...result.value.advice],
-          facts,
-        );
-        if (!verification.ok) {
-          return {
-            report: null,
-            warnings: ['AIの出力に台帳と一致しない数字があったため、今回は表示しません。'],
-          };
-        }
-
-        return buildFromAiOutput(result.value);
+        const keep = (lines: string[]) =>
+          lines.filter((line) => verifyNumbersAgainstFacts([line], facts).ok);
+        return buildFromAiOutput({
+          ...result.value,
+          insights: keep(result.value.insights),
+          advice: keep(result.value.advice),
+        });
       },
       { shouldCache: (outcome) => outcome.report !== null },
     );

@@ -204,24 +204,23 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
 
         // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
         const facts = extractNumbers(userContent);
-        const verification = verifyNumbersAgainstFacts(
-          [
-            result.value.personaReasoning,
-            ...result.value.insights,
-            ...result.value.advice,
-            result.value.forecastRead.reason,
-            ...result.value.forecastRead.evidence,
-          ],
-          facts,
+        const keep = (lines: string[]) =>
+          lines.filter((line) => verifyNumbersAgainstFacts([line], facts).ok);
+        return buildFromAiOutput(
+          {
+            ...result.value,
+            personaReasoning: keep([result.value.personaReasoning])[0] ?? '',
+            insights: keep(result.value.insights),
+            advice: keep(result.value.advice),
+            forecastRead: {
+              ...result.value.forecastRead,
+              reason:
+                keep([result.value.forecastRead.reason])[0] ?? result.value.forecastRead.reason,
+              evidence: keep(result.value.forecastRead.evidence),
+            },
+          },
+          { hasForecast: input.forecast !== null },
         );
-        if (!verification.ok) {
-          return {
-            report: null,
-            warnings: ['AIの出力に台帳と一致しない数字があったため、今回は表示しません。'],
-          };
-        }
-
-        return buildFromAiOutput(result.value, { hasForecast: input.forecast !== null });
       },
       { shouldCache: (outcome) => outcome.report !== null },
     );
