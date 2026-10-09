@@ -165,7 +165,7 @@ async function SpentRows({ today }: { today: string }) {
           {view.breakdown
             .filter((r) => r.targetYen !== null)
             .slice()
-            .sort((a, b) => b.spentYen - a.spentYen || (b.targetYen ?? 0) - (a.targetYen ?? 0))
+            .sort((a, b) => b.spentYen / (b.targetYen || 1) - a.spentYen / (a.targetYen || 1))
             .map((r) => (
               <li key={r.genreId ?? 'none'}>
                 <GenreBudgetRow
