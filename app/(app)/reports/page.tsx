@@ -15,7 +15,6 @@ import { listGenres } from '@/features/genre/store';
 import { loadLatestRead } from '@/features/ai-report/forecast-read';
 import { remainingOfTotal } from '@/domain/forecast/remaining';
 import { reportInsights } from '@/domain/report-insights';
-import { goalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast } from '@/features/forecast/load';
 import { addDays, addMonths } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
