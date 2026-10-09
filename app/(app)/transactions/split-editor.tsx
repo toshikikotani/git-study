@@ -31,7 +31,6 @@ import {
   replaceSplitsAction,
   restoreDeletedTransactionAction,
   restoreRowFieldsAction,
-  setTransactionKindAction,
   updateTransactionAction,
   updateTransactionMemoAction,
 } from './actions';
@@ -202,7 +201,6 @@ export function TransactionRowWithSplit({
   const [genreSheetOpen, setGenreSheetOpen] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
-  const [special, setSpecial] = useState(display?.special ?? false);
   // 未分類のインライン分類(予測上位3件のシート)と、確定時のアニメーション。
   const [pickOpen, setPickOpen] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -420,26 +418,6 @@ export function TransactionRowWithSplit({
       itemName: display?.name ?? transaction.description,
       genreId: newGenreId,
     });
-  }
-
-  async function toggleSpecial(): Promise<void> {
-    setRowError(null);
-    const next = !special;
-    const result = await setTransactionKindAction(transaction.id, next ? 'special' : 'normal');
-    if (result.error) {
-      setRowError(result.error);
-      return;
-    }
-    setSpecial(next);
-    if (result.previous) {
-      const previous = result.previous;
-      pushUndo(next ? '特別費にしました' : '通常の支出に戻しました', async () => {
-        const r = await restoreRowFieldsAction(previous);
-        if (r.error) return r.error;
-        setSpecial(!next);
-        return null;
-      });
-    }
   }
 
   async function remove(): Promise<void> {
