@@ -82,8 +82,18 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
             trust={input.evidence.trust}
           />
 
-          <BulletList heading="気づき" items={report.insights} />
-          <BulletList heading="アドバイス" items={report.advice} />
+          <BulletList
+            heading="気づき"
+            items={report.insights.filter(
+              (line) => !line.includes('未診断') && !line.includes('診断'),
+            )}
+          />
+          <BulletList
+            heading="アドバイス"
+            items={report.advice.filter(
+              (line) => !line.includes('未診断') && !line.includes('診断'),
+            )}
+          />
           <AiLabel feature="monthly-report" contentKey={input.monthKey} evidenceHref="/spending" />
         </>
       )}

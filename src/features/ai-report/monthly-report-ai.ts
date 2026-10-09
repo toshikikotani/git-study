@@ -236,9 +236,8 @@ function buildUserContent(input: MonthlyReportInput): string {
   lines.push(
     `総支出: ${input.totalSpentYen}円 / 総収入: ${input.totalIncomeYen}円`,
     input.wasteRatio === null
-      ? '浪費/必要経費の診断: まだ無い'
+      ? '見直し候補の比率: まだ無い'
       : `浪費 ${input.wasteYen}円 ・ 必要経費 ${input.necessaryYen}円(浪費比率 ${Math.round(input.wasteRatio * 100)}%)`,
-    `今月まだ診断していない支出: ${input.undiagnosedCount}件`,
     '',
   );
 

@@ -10,6 +10,7 @@ export const MONTHLY_REPORT_PROMPT = definePrompt(
     '- personaType は必ず渡された6分類から選ぶ(impulsive/steady/social/goal_oriented/frugal/balanced)。',
     '  それ以外の分類名を作らない。',
     '- persona・insights・advice はすべて渡された数字だけを根拠にする。渡されていない',
+    '- 診断・未診断・仕分けには触れない。その機能は無い。',
     '  情報(食事・睡眠・ホルモン・血液検査・生年月日から推測する性格等)を作り出さない。',
     '- 医学的な診断、体質の断定、食事・サプリ・栄養に関する助言は一切書かない。本人から',
     '  「そういう身体的な話は要らない」と明示されている。',
