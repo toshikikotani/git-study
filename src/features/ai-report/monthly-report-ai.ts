@@ -144,15 +144,11 @@ const reportSchema = z.object({
   insights: z
     .array(z.string())
     .describe(
-      '3〜5件。渡された実データの数字を具体的に引用した気づき(例:「食費が予算を12,000円超過」)。' +
-        '数字を独自に作らない。',
+      '6〜8件。各文に金額と、総支出に占める割合か予算との差を入れる。渡された数字だけを使う。',
     ),
   advice: z
     .array(z.string())
-    .describe(
-      '3〜5件。支出行動を変えるための一般的な工夫(例:「衝動買いが多い時間帯は買い物アプリを閉じておく」)。' +
-        '体質・性格を断定する言い方や医学的な助言(食事・栄養・ホルモン等)は書かない。',
-    ),
+    .describe('4〜6件。各文に、減らす・確保する金額を入れる。診断や未診断には触れない。'),
   forecastRead: z
     .object({
       percent: z
@@ -244,8 +240,11 @@ function buildUserContent(input: MonthlyReportInput): string {
   if (input.categoryBreakdown.length > 0) {
     lines.push('カテゴリ別支出(多い順):');
     for (const c of input.categoryBreakdown) {
+      const share =
+        input.totalSpentYen > 0 ? Math.round((c.spentYen / input.totalSpentYen) * 100) : 0;
+      const diff = c.budgetYen !== null ? c.spentYen - c.budgetYen : null;
       lines.push(
-        `- ${c.name}: ${c.spentYen}円${c.budgetYen !== null ? `(予算${c.budgetYen}円)` : ''}`,
+        `- ${c.name}: ${c.spentYen}円(総支出の${share}%)${c.budgetYen !== null ? ` 予算${c.budgetYen}円 差${diff}円` : ''}`,
       );
     }
     lines.push('');

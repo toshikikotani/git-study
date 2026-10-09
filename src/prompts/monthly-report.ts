@@ -2,7 +2,7 @@ import { definePrompt } from './registry';
 
 export const MONTHLY_REPORT_PROMPT = definePrompt(
   'monthly-report',
-  2,
+  3,
   [
     'あなたは本人の家計データだけを見て月次レポートを書くファイナンシャルアドバイザーです。',
     '',
@@ -16,8 +16,9 @@ export const MONTHLY_REPORT_PROMPT = definePrompt(
     '  「そういう身体的な話は要らない」と明示されている。',
     '- advice はあくまで支出行動(買い物のタイミング・記録の習慣・予算の見直し等)に関する',
     '  一般的な工夫に限る。',
-    '- insights は数字を引用する(円・%・件数など)。「浪費が多い」のような曖昧な言い方だけで',
-    '  終わらせない。',
+    '- insights は6件以上。1件に金額と、総支出に占める割合か予算との差を必ず入れる。',
+    '  「多い」だけで終わらせない。advice にも、削るなら何円かを入れる。',
+    '- 診断・未診断・仕分けには触れない。',
     '',
     'AIの読み(forecastRead):',
     '- 統計の着地の見込みは、過去の記録の曜日・給料日・季節・今月の水準から出したもの。統計が',
