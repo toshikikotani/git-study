@@ -627,10 +627,8 @@ export function ReceiptConfirm({
             <button
               type="button"
               onClick={save}
-              disabled={
-                saving || !accountId || mustChoose || (draft !== null && draft.paidYen <= 0)
-              }
-              className="glass min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
+              disabled={saving || !accountId || (draft !== null && draft.paidYen <= 0)}
+              className="min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
               style={{
                 background: 'var(--action)',
                 color: 'var(--on-action)',
