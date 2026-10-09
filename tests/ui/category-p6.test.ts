@@ -83,6 +83,7 @@ const form = (t: CategoryTx, full = false) =>
         onSave: () => {},
         onMove: () => {},
         onMoveItem: () => {},
+        onDelete: () => {},
       }),
     ),
   );
