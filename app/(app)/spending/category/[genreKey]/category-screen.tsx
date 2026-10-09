@@ -1,6 +1,7 @@
 'use client';
 
 import type { Route } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -396,6 +397,8 @@ function CategoryScreenInner({
         }
       />
 
+      {isUncategorizedScreen ? <UncategorizedMonths lines={historyLines} /> : null}
+
       {isUncategorizedScreen && confident.length > 0 ? (
         <button
           type="button"
@@ -662,5 +665,59 @@ function CategoryScreenInner({
         onApplied={(scope, toGenreId, ids) => applyRuleResult(scope, toGenreId, ids)}
       />
     </div>
+  );
+}
+
+function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
+  const byMonth = new Map<string, { yen: number; count: number }>();
+  for (const line of lines) {
+    if (line.status !== 'actual' || line.amountYen >= 0) continue;
+    const key = line.occurredOn.slice(0, 7);
+    const row = byMonth.get(key) ?? { yen: 0, count: 0 };
+    row.yen += -line.amountYen;
+    row.count += 1;
+    byMonth.set(key, row);
+  }
+  const months = [...byMonth.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const max = Math.max(...months.map(([, row]) => row.yen), 1);
+  return (
+    <section aria-label="月ごとの未分類" className="glass space-y-2 rounded-2xl p-4">
+      <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+        月ごとの未分類
+      </h2>
+      {months.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          直近6か月に未分類の明細はありません。見通しの約3,700円は、これからの見込みです。
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {months.map(([key, row]) => (
+            <li key={key}>
+              <Link
+                href={`/spending/category/none?month=${key}` as Route}
+                className="block min-h-11"
+              >
+                <span className="flex items-baseline justify-between gap-3 text-sm">
+                  <span style={{ color: 'var(--ink)' }}>
+                    {key.slice(0, 4)}年{formatMonthJa(key)} · {row.count}件
+                  </span>
+                  <span className="tabular font-semibold" style={{ color: 'var(--ink)' }}>
+                    {row.yen.toLocaleString('ja-JP')}円
+                  </span>
+                </span>
+                <span
+                  aria-hidden
+                  className="mt-1 block h-2 rounded-full"
+                  style={{
+                    width: `${Math.max(8, (row.yen / max) * 100)}%`,
+                    background: 'var(--accent)',
+                  }}
+                />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
