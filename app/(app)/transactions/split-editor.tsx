@@ -169,6 +169,7 @@ export function TransactionRowWithSplit({
   const [genreId, setGenreId] = useState(transaction.genreId ?? '');
   // 金額・日付の編集(本人発案「今金額と日付が一切編集できない」)。
   // カテゴリ変更と同じフォームにまとめる(下の canSaveSimpleEdit 参照)。
+  const [splitYenInput, setSplitYenInput] = useState('');
   const [amountAbsYenInput, setAmountAbsYenInput] = useState(
     String(Math.abs(transaction.amountYen)),
   );
@@ -230,13 +231,14 @@ export function TransactionRowWithSplit({
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
-  const amountAbsYen = Number(amountAbsYenInput);
+  const amountAbsYen = Math.max(0, Number(amountAbsYenInput) - (Number(splitYenInput) || 0));
   const nameTrimmed = nameInput.trim();
   const simpleEditUnchanged =
     genreId === (transaction.genreId ?? '') &&
     amountAbsYen === targetAbsYen &&
     occurredOnInput === transaction.occurredOn &&
-    nameTrimmed === (display?.name ?? transaction.description);
+    nameTrimmed === (display?.name ?? transaction.description) &&
+    (Number(splitYenInput) || 0) === 0;
   const canSaveSimpleEdit =
     !!genreId &&
     amountAbsYen > 0 &&
@@ -1135,6 +1137,20 @@ export function TransactionRowWithSplit({
               }}
             />
           </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label="割り勘でもらった額"
+            placeholder="割り勘でもらった額"
+            value={splitYenInput}
+            onChange={(e) => setSplitYenInput(e.target.value.replace(/[^0-9]/g, ''))}
+            className="min-h-11 w-full rounded-xl px-3 text-sm"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--ink)',
+              border: '1px solid var(--hairline)',
+            }}
+          />
           <select
             aria-label="カテゴリ"
             value={genreId}
