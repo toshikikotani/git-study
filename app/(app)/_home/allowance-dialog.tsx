@@ -36,7 +36,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
         className="mt-2 inline-flex min-h-11 items-center text-base font-semibold"
         style={{ color: 'var(--ink)' }}
       >
-        なぜこの額? >
+        なぜこの額?
       </button>
       {open ? (
         <div
