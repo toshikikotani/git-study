@@ -687,7 +687,7 @@ function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
       </h2>
       {months.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-          直近6か月に未分類の明細はありません。見通しの約3,700円は、これからの見込みです。
+          直近6か月に未分類の明細はありません。見通しに出ている額は、これからの見込みです。
         </p>
       ) : (
         <ul className="space-y-2">
