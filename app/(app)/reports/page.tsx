@@ -88,14 +88,13 @@ export default async function ReportsPage() {
   // 今月のすべての支出で出す。どちらの範囲かは、画面の上に名前で出す(設計書 v3 2.2 の2)。
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
   const hasGoal = plan !== null && budgetTotal > 0;
-  const goalPlan: typeof plan = null;
   const monthPeriod = {
     from: ledger.period.from,
     to: addDays(addMonths(ledger.period.from, 1), -1),
   };
-  const period = goalPlan ? { from: goalPlan.periodStart, to: goalPlan.periodEnd } : monthPeriod;
-  const goalItems = goalPlan ? goalPlan.items.filter((item) => item.targetYen > 0) : [];
-  const goalArgs = goalForecastArgs(goalPlan);
+  const period = monthPeriod;
+  const goalItems = plan ? plan.items.filter((item) => item.targetYen > 0) : [];
+  const goalArgs = null;
   const settle = <T,>(promise: Promise<T>) =>
     promise.then(
       (value) => ({ ok: true as const, value }),
@@ -111,24 +110,19 @@ export default async function ReportsPage() {
   // なく今月の全部で出す(収入は1か月分なので)。目標の範囲のときは、全部の予測も並べて読む。
   const [outcome, monthOutcome] = await Promise.all([
     settle(loadForecast(goalArgs ?? { period })),
-    goalPlan ? settle(loadForecast({ period: monthPeriod })) : Promise.resolve(null),
+    Promise.resolve(null),
   ]);
   const forecast = outcome.ok ? outcome.value.forecast : null;
-  const monthForecast = goalPlan
-    ? monthOutcome?.ok
-      ? monthOutcome.value.forecast
-      : null
-    : forecast;
-  // AIの読み(AIレポートで作ったもの)。今月の全体の見込みのときだけ並べる(目標の範囲とは違うため)。
-  const aiRead = goalPlan ? null : await loadLatestRead(ledger.period.from).catch(() => null);
+  const monthForecast = forecast;
+  const aiRead = await loadLatestRead(ledger.period.from).catch(() => null);
   const verification = outcome.ok ? outcome.value.verification : null;
   const forecastError = outcome.ok ? null : outcome.message;
   const budgetYen = hasGoal ? budgetTotal : null;
-  const periodLabel = goalPlan ? 'この目標の期間' : '今月';
-  const endLabel = goalPlan ? `${formatDateJa(period.to)}` : '月末';
+  const periodLabel = '今月';
+  const endLabel = '月末';
   const previousMonthKey = trend.monthKeys.filter((key) => key < monthKey).at(-1);
   const previousByGenre =
-    !goalPlan && previousMonthKey !== undefined
+    previousMonthKey !== undefined
       ? new Map(
           trend.rows
             .filter((row) => row.monthKey === previousMonthKey)
@@ -202,7 +196,7 @@ export default async function ReportsPage() {
   );
   const changeableItems = goalItems.filter((item) => !fixedGenreIds.has(item.genreId));
   const chart =
-    goalPlan && budgetYen !== null && outcome.ok
+    hasGoal && budgetYen !== null && outcome.ok
       ? {
           lines: goalLines(goalItems.map((item) => item.genreId)),
           remaining: remainingOfTotal(outcome.value.forecast),
@@ -241,7 +235,7 @@ export default async function ReportsPage() {
             probWithinBudget={forecast.probWithinBudget}
             provisional={forecast.provisional}
           />
-          {goalPlan && budgetYen !== null && chart ? (
+          {hasGoal && budgetYen !== null && chart && plan ? (
             <GoalChart
               genreName="全体"
               lines={chart.lines}
@@ -249,8 +243,8 @@ export default async function ReportsPage() {
               monthEnd={period.to}
               today={today}
               budgetYen={budgetYen}
-              goalFrom={goalPlan.periodStart}
-              goalTo={goalPlan.periodEnd}
+              goalFrom={plan.periodStart}
+              goalTo={plan.periodEnd}
               remaining={chart.remaining}
               changeable={chart.changeable}
             />
