@@ -52,6 +52,9 @@ export function AllocationEditor({
   const [proposedTotal, setProposedTotal] = useState<number | null>(null);
   const [busy, setBusy] = useState<'ai' | 'save' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ genreId: string; yen: number; previous: number } | null>(
+    null,
+  );
 
   const parsed = rows.map((r) => parseYen(inputs[r.genreId] ?? ''));
   const allValid = parsed.every((yen) => yen !== null);
@@ -315,8 +318,11 @@ export function AllocationEditor({
             rows={forecasts}
             onApply={(row) => {
               if (row.recommendedYen === null) return;
+              const index = rows.findIndex((item) => item.genreId === row.genreId);
+              const previous = parsed[index] ?? 0;
               setYen(row.genreId, row.recommendedYen, true);
               setLockTotal(false);
+              setNotice({ genreId: row.genreId, yen: row.recommendedYen, previous });
             }}
             onApplyAll={() => void applyAllForecasts()}
             applying={busy === 'save'}
@@ -331,6 +337,27 @@ export function AllocationEditor({
       >
         {busy === 'save' ? '保存しています…' : saveLabel}
       </Button>
+      {notice ? (
+        <p
+          className="flex items-center justify-between gap-3 text-sm"
+          style={{ color: 'var(--ink)' }}
+        >
+          <span>
+            {notice.yen.toLocaleString('ja-JP')}円を入力欄に入れました。保存すると反映されます。
+          </span>
+          <button
+            type="button"
+            className="min-h-11 shrink-0 font-semibold"
+            style={{ color: 'var(--accent)' }}
+            onClick={() => {
+              setYen(notice.genreId, notice.previous, true);
+              setNotice(null);
+            }}
+          >
+            元に戻す
+          </button>
+        </p>
+      ) : null}
       {error ? (
         <p className="text-xs" style={{ color: 'var(--over)' }}>
           {error}

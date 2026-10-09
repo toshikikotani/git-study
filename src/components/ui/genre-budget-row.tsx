@@ -66,9 +66,7 @@ export function GenreBudgetRow({
     ? Math.min(scheduledYen / budgetYen!, 1 - Math.min(spentYen / budgetYen!, 1))
     : 0;
   // 余裕のときは状態を出さない(注意・超過・予定で確保済みのときだけ)。
-  const ratio = hasBudget
-    ? Math.min(spentYen / budgetYen!, 1)
-    : Math.min(spentYen / Math.max(maxYen, 1), 1);
+  const ratio = Math.min(spentYen / Math.max(maxYen, budgetYen ?? 1, 1), 1);
   const idealRatio =
     hasBudget && idealYen !== null ? Math.min(Math.max(idealYen / budgetYen!, 0), 1) : null;
 
