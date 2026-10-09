@@ -1324,11 +1324,23 @@ export function TransactionRowWithSplit({
                   </li>
                 ))}
               </ul>
-              {splits.length === 0 && itemsStatus === 'mismatched' ? (
-                <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
-                  品目の合計が金額と一致しません
-                </p>
-              ) : null}
+              {(() => {
+                const itemSum = items.reduce((acc, item) => acc + Math.abs(item.amountYen), 0);
+                const paid = Math.abs(transaction.amountYen);
+                const splitOff = itemSum - paid;
+                if (splitOff > 0) {
+                  return (
+                    <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+                      割り勘で {splitOff.toLocaleString('ja-JP')}円引いています
+                    </p>
+                  );
+                }
+                return splits.length === 0 && itemsStatus === 'mismatched' ? (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
+                    品目の合計が金額と一致しません
+                  </p>
+                ) : null;
+              })()}
             </div>
           ) : null}
         </div>
