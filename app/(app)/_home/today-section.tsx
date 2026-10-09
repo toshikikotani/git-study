@@ -51,15 +51,7 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
         today={
           forecast && goal
             ? todayAllowance({
-                capYen: Math.max(
-                  0,
-                  Math.round(
-                    (goal.budgetYen -
-                      forecast.breakdown.actualYen +
-                      (goalView?.todaySpentYen ?? 0)) /
-                      Math.max(1, forecast.remainingDays),
-                  ),
-                ),
+                capYen: forecast.safeDailyAllowance,
                 spentTodayYen: goalView?.todaySpentYen ?? 0,
               })
             : null
