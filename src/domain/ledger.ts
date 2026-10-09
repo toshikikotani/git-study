@@ -144,11 +144,7 @@ export function summarizeLedger(
     spentYen += yen;
     add(byGenre, e.categoryId, yen);
     add(byDay, e.occurredOn, yen);
-    if (e.kind === 'special') {
-      specialYen += yen;
-    } else {
-      add(byGenrePace, e.categoryId, yen);
-    }
+    add(byGenrePace, e.categoryId, yen);
   }
 
   return {
