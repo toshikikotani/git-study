@@ -63,10 +63,15 @@ export function reportInsights(input: {
         forecast.safeDailyAllowance !== null && forecast.remainingDays > 0
           ? `残り${forecast.remainingDays}日を1日 約${est(forecast.safeDailyAllowance)} までにすると、収まるのが10回中8回になる。`
           : '';
+      const drivers = forecast.breakdown.variableByCategory
+        .filter((c) => c.yen > 0)
+        .slice(0, 2)
+        .map((c) => c.categoryName);
+      const driverText = drivers.length > 0 ? `今増えているのは${drivers.join('と')}。` : '';
       out.push({
         key: 'budget',
         tone: 'caution',
-        text: `予算 ${yen(budgetYen)} に収まるのは${pct}。超えるときは平均で 約${est(forecast.expectedOvershoot)} 超える。${allowance}`,
+        text: `予算 ${yen(budgetYen)} に収まるのは${pct}。超えるときは平均で 約${est(forecast.expectedOvershoot)} 超える。${driverText}${allowance}`,
       });
     }
   }

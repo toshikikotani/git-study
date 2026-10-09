@@ -300,7 +300,7 @@ export default async function ReportsPage({
       </Link>
       <InsightsList insights={insights} />
       {forecast && forecast.total.p50 > 0 ? (
-        <WhyCard forecast={forecast} endLabel={endLabel} />
+        <WhyCard forecast={forecast} endLabel={endLabel} closedGenreIds={closedGenreIds} />
       ) : null}
       {forecast ? (
         <VerificationCard verification={verification} monthStart={ledger.period.from} />

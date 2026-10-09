@@ -16,7 +16,15 @@ type Line = { key: string; label: string; note?: string | undefined; yen: number
  * 中央値どうしは足し算にならないので、これからの合計は中央の見込みから出し、その内訳は
  * それぞれの平均の割合で分けた目安(forecast.breakdown)。合計は見出しの数字と必ず一致する。
  */
-export function WhyCard({ forecast, endLabel }: { forecast: Forecast; endLabel: string }) {
+export function WhyCard({
+  forecast,
+  endLabel,
+  closedGenreIds,
+}: {
+  forecast: Forecast;
+  endLabel: string;
+  closedGenreIds?: ReadonlySet<string>;
+}) {
   const b = forecast.breakdown;
   if (b.totalYen <= 0) return null;
   const decided = b.actualYen + b.committedYen;
@@ -24,7 +32,9 @@ export function WhyCard({ forecast, endLabel }: { forecast: Forecast; endLabel: 
   const days = forecast.remainingDays;
   const perDay = (yen: number) => (days > 0 ? `1日 ${formatEstimate(yen / days)}` : undefined);
 
-  const genres = b.variableByCategory.filter((c) => c.yen > 0);
+  const genres = b.variableByCategory.filter(
+    (c) => c.yen > 0 && !closedGenreIds?.has(c.categoryId),
+  );
   const shown = genres.slice(0, MAX_GENRES);
   const restYen = b.variableYen - shown.reduce((sum, c) => sum + c.yen, 0);
   const daily: Line[] = [

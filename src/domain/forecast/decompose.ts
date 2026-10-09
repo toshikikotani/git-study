@@ -355,6 +355,7 @@ export function decomposeSpending(input: {
   const thresholdById = new Map<string, number>();
 
   for (const [categoryId, { name, txs }] of byCategory) {
+    if (input.noForecastGenreIds?.has(categoryId)) continue;
     const threshold = outlierThreshold(txs.map((t) => -t.amountYen));
     thresholdById.set(categoryId, threshold);
 
