@@ -125,8 +125,11 @@ export function describeAnthropicError(error: unknown, rateLimitHint?: string): 
   if (error instanceof Anthropic.RateLimitError) {
     return `AI の利用上限に達しました。${rateLimitHint ?? 'しばらくしてから再試行してください。'}`;
   }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `AI への要求が受け付けられませんでした: ${error.message}`;
+  if (
+    error instanceof Anthropic.BadRequestError ||
+    (error instanceof Error && error.message.includes('Unterminated string'))
+  ) {
+    return 'AI の文章が途中で切れたので、もう一度お試しください。';
   }
   if (error instanceof Anthropic.APIError) {
     return `AI の呼び出しに失敗しました(${error.status}): ${error.message}`;
