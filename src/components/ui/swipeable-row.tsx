@@ -147,9 +147,13 @@ export function SwipeableRow({
           setOpen(false);
         }
       } else if (modeRef.current === 'unknown' && revealedRef.current) {
-        // 開いている間のタップは、行を開かずに閉じるだけ。
-        e.preventDefault();
-        setOpen(false);
+        const target = e.target instanceof Element ? e.target : null;
+        const onAction = target?.closest('button') !== null;
+        // 削除・複製のボタンは押せる。それ以外のタップだけ閉じる。
+        if (!onAction) {
+          e.preventDefault();
+          setOpen(false);
+        }
       }
       startRef.current = null;
       modeRef.current = 'unknown';
