@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { deleteTransactionAction } from '@/app/(app)/transactions/actions';
 
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
 import { ExpandableSheet } from '@/components/ui/expandable-sheet';
@@ -254,6 +255,7 @@ export function EditForm({
       >
         保存する
       </button>
+      <DeleteRow id={tx.id} />
     </div>
   );
 }
@@ -272,5 +274,50 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </span>
       {children}
     </label>
+  );
+}
+
+function DeleteRow({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ask, setAsk] = useState(false);
+  return (
+    <div className="space-y-2">
+      {error ? (
+        <p className="text-sm" style={{ color: 'var(--over)' }}>
+          {error}
+        </p>
+      ) : null}
+      {ask ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void deleteTransactionAction(id).then((result) => {
+              setBusy(false);
+              if (result.error) {
+                setError(result.error);
+                return;
+              }
+              window.location.reload();
+            });
+          }}
+          className="min-h-12 w-full rounded-2xl text-base font-semibold"
+          style={{ background: 'var(--over)', color: '#fff' }}
+        >
+          {busy ? '削除しています…' : '本当に削除する'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAsk(true)}
+          className="min-h-12 w-full rounded-2xl text-base font-semibold"
+          style={{ color: 'var(--over)', background: 'var(--plane)' }}
+        >
+          この明細を削除
+        </button>
+      )}
+    </div>
   );
 }
