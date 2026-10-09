@@ -16,7 +16,7 @@ export function AiInsightButton() {
     const result = await generateMonthlyAiReportAction();
     setBusy(false);
     if (result.error || result.report === null) {
-      setError(result.error ?? '分析できませんでした。');
+      setError(result.error ?? result.warnings[0] ?? '分析できませんでした。');
       return;
     }
     setLines(result.report.insights);

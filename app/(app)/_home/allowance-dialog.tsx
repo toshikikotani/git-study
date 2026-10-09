@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
+
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 
 export type AllowanceExplain = {
   budgetYen: number;
@@ -40,77 +41,67 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       >
         なぜこの額?
       </button>
-      {open
-        ? createPortal(
-            <div
-              role="dialog"
-              aria-label="今日の上限の計算"
-              className="fixed inset-0 z-[80] flex items-end justify-center p-3"
-              style={{ background: 'rgba(0,0,0,0.45)' }}
-              onClick={() => setOpen(false)}
-            >
-              <div
-                className="max-h-[85vh] w-full max-w-md space-y-3 overflow-y-auto rounded-3xl p-5"
-                style={{ background: 'var(--surface)' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
-                  今日の上限の計算
-                </h2>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                  平日は少なめ、休日は多めの重みで、残り{explain.remainingDays}
-                  日の全部の見込みが予算内に収まる額です。
-                </p>
-                <ul className="space-y-3">
-                  <li>
-                    <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
-                      <span>予算</span>
-                      <span className="tabular">{yen(explain.budgetYen)}</span>
-                    </span>
-                    {bar(explain.budgetYen, 'var(--ink-muted)')}
-                  </li>
-                  <li>
-                    <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
-                      <span>今日より前に使った額</span>
-                      <span className="tabular">{yen(spentBefore)}</span>
-                    </span>
-                    {bar(spentBefore, 'var(--accent)')}
-                  </li>
-                  <li>
-                    <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
-                      <span>今日の上限</span>
-                      <span className="tabular">{yen(cap)}</span>
-                    </span>
-                    {bar(cap, 'var(--mark, var(--accent))')}
-                  </li>
-                  <li>
-                    <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
-                      <span>今日使った額</span>
-                      <span className="tabular">{yen(explain.spentTodayYen)}</span>
-                    </span>
-                    {bar(explain.spentTodayYen, 'var(--state-caution)')}
-                  </li>
-                </ul>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-                  残りは{yen(leftBudget)}
-                  。平日と休日の重みで、100%の見込みが予算内に収まる今日の上限は{yen(cap)}です。
-                  {over > 0
-                    ? `今日は${yen(explain.spentTodayYen)}使ったので、${yen(over)}超えています。`
-                    : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="min-h-12 w-full rounded-full text-base font-semibold"
-                  style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-                >
-                  閉じる
-                </button>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      <BottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        role="dialog"
+        label="今日の上限の計算"
+      >
+        <div className="space-y-3 px-4 pb-4">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
+            今日の上限の計算
+          </h2>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            平日は少なめ、休日は多めの重みで、残り{explain.remainingDays}
+            日の全部の見込みが予算内に収まる額です。
+          </p>
+          <ul className="space-y-3">
+            <li>
+              <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
+                <span>予算</span>
+                <span className="tabular">{yen(explain.budgetYen)}</span>
+              </span>
+              {bar(explain.budgetYen, 'var(--ink-muted)')}
+            </li>
+            <li>
+              <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
+                <span>今日より前に使った額</span>
+                <span className="tabular">{yen(spentBefore)}</span>
+              </span>
+              {bar(spentBefore, 'var(--accent)')}
+            </li>
+            <li>
+              <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
+                <span>今日の上限</span>
+                <span className="tabular">{yen(cap)}</span>
+              </span>
+              {bar(cap, 'var(--mark, var(--accent))')}
+            </li>
+            <li>
+              <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
+                <span>今日使った額</span>
+                <span className="tabular">{yen(explain.spentTodayYen)}</span>
+              </span>
+              {bar(explain.spentTodayYen, 'var(--state-caution)')}
+            </li>
+          </ul>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+            残りは{yen(leftBudget)}
+            。平日と休日の重みで、100%の見込みが予算内に収まる今日の上限は{yen(cap)}です。
+            {over > 0
+              ? `今日は${yen(explain.spentTodayYen)}使ったので、${yen(over)}超えています。`
+              : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}
+          </p>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="min-h-12 w-full rounded-full text-base font-semibold"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            閉じる
+          </button>
+        </div>
+      </BottomSheet>
     </>
   );
 }
