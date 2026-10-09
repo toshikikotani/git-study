@@ -8,6 +8,7 @@ export type AllowanceExplain = {
   spentYen: number;
   spentTodayYen: number;
   remainingDays: number;
+  capYen: number;
 };
 
 function yen(n: number): string {
@@ -19,7 +20,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
   const [open, setOpen] = useState(false);
   const spentBefore = Math.max(0, explain.spentYen - explain.spentTodayYen);
   const leftBudget = explain.budgetYen - spentBefore;
-  const cap = Math.max(0, Math.round(leftBudget / Math.max(1, explain.remainingDays)));
+  const cap = explain.capYen;
   const over = explain.spentTodayYen - cap;
   const max = Math.max(explain.budgetYen, explain.spentYen, cap, explain.spentTodayYen, 1);
   const bar = (value: number, color: string) => (
@@ -57,8 +58,8 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                   今日の上限の計算
                 </h2>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                  予算から、今日より前に使った額を引き、残り{explain.remainingDays}
-                  日で割っています。
+                  平日は少なめ、休日は多めの重みで、残り{explain.remainingDays}
+                  日の全部の見込みが予算内に収まる額です。
                 </p>
                 <ul className="space-y-3">
                   <li>
@@ -91,8 +92,8 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                   </li>
                 </ul>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-                  {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}。これを
-                  {explain.remainingDays}日で割ると、今日の上限は{yen(cap)}です。
+                  残りは{yen(leftBudget)}
+                  。平日と休日の重みで、100%の見込みが予算内に収まる今日の上限は{yen(cap)}です。
                   {over > 0
                     ? `今日は${yen(explain.spentTodayYen)}使ったので、${yen(over)}超えています。`
                     : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}

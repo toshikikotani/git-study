@@ -63,6 +63,7 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
                 spentYen: forecast.breakdown.actualYen,
                 spentTodayYen: goalView?.todaySpentYen ?? 0,
                 remainingDays: forecast.remainingDays,
+                capYen: forecast.safeDailyAllowance ?? 0,
               }
             : null
         }
