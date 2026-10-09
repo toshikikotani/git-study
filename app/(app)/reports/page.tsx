@@ -52,11 +52,7 @@ export const dynamic = 'force-dynamic';
 // 着地の予測は過去2年ぶんの学習と、過去の月での検証(初回だけ)を含むため、余裕を持たせる。
 export const maxDuration = 60;
 
-export default async function ReportsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function ReportsPage({}: {}) {
   const [
     trend,
     netWorthPoints,
