@@ -140,7 +140,7 @@ export function decomposeSpending(input: {
   };
   const dataDays = Math.max(0, daysBetween(trainingWindow.from, trainingWindow.to) + 1);
 
-  const countable = input.transactions.filter(isCountable);
+  const countable = input.transactions.filter((t) => isCountable(t) && t.genreId !== null);
   const inPeriod = (t: ForecastSourceTransaction) =>
     t.occurredOn >= period.from && t.occurredOn <= period.to;
 
