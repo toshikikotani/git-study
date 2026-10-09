@@ -47,7 +47,11 @@ export function TodayCard(props: TodayCardProps) {
   const { today, outlook, suggestion, probWithinBudget } = props;
   return (
     <div className="space-y-3">
-      <TodayHero today={today} provisional={props.provisional} />
+      <TodayHero
+        today={today}
+        provisional={props.provisional}
+        allowanceExplain={props.allowanceExplain ?? null}
+      />
       {outlook && probWithinBudget !== null ? (
         <OutlookCard outlook={outlook} probOver={1 - probWithinBudget} />
       ) : null}
@@ -58,7 +62,15 @@ export function TodayCard(props: TodayCardProps) {
   );
 }
 
-function TodayHero({ today, provisional }: { today: TodayAllowance | null; provisional: boolean }) {
+function TodayHero({
+  today,
+  provisional,
+  allowanceExplain,
+}: {
+  today: TodayAllowance | null;
+  provisional: boolean;
+  allowanceExplain: AllowanceExplain | null;
+}) {
   return (
     <section
       aria-label="今日使える額"
