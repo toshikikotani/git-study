@@ -53,7 +53,7 @@ export const MIN_TRIALS = 2_000;
 /** 変動費の記録がこの日数未満なら「学習中」。 */
 export const LEARNING_DATA_DAYS = 14;
 /** 安全に使える1日の額が守るべき、予算内に収まる確率の目標。 */
-const SAFE_ALLOWANCE_TARGET_PROB = 0.8;
+const SAFE_ALLOWANCE_TARGET_PROB = 1;
 /** totalQuantiles の分位(5%〜95%、5% きざみ)。 */
 export const TOTAL_QUANTILE_LEVELS: readonly number[] = Array.from(
   { length: 19 },

@@ -9,7 +9,7 @@ import type { ForecastSuggestion } from '@/domain/forecast/types';
 import { NextStepCard } from '../reports/landing-hero';
 
 /** 今日あと使える額は「予算に収まるのが80%になる額」から出している(点の数)。 */
-const SAFE_ALLOWANCE_PROB = 0.8;
+const SAFE_ALLOWANCE_PROB = 1;
 
 /** 目標の期間の見通し(見込みの幅・予算・使った額)。 */
 export type TodayOutlook = {
@@ -108,7 +108,7 @@ function TodayHero({
           <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
           <TenDots probability={SAFE_ALLOWANCE_PROB} />
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
-            毎日この額までなら、
+            平日と休日の重みを入れ、毎日この額までなら、
             <strong style={{ color: 'var(--ink)' }}>
               {formatProbability(SAFE_ALLOWANCE_PROB)}の確率
             </strong>
