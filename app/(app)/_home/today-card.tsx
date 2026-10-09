@@ -4,6 +4,7 @@ import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { TenDots } from '@/components/ui/ten-dots';
 import { formatEstimate, formatProbability } from '@/domain/forecast/format';
 import type { TodayAllowance } from '@/domain/forecast/today';
+import { AllowanceDialog, type AllowanceExplain } from './allowance-dialog';
 import type { ForecastSuggestion } from '@/domain/forecast/types';
 import { NextStepCard } from '../reports/landing-hero';
 
@@ -32,6 +33,8 @@ export type TodayCardProps = {
   /** 予算に収まる確率(目標の範囲)。 */
   probWithinBudget: number | null;
   provisional: boolean;
+  /** 今日の上限の内訳。見通しとは別の説明。 */
+  allowanceExplain?: AllowanceExplain | null;
   /** 「2026-10」(次の一手からジャンル画面へ) */
   monthKey?: string;
 };
@@ -121,16 +124,7 @@ function TodayHero({ today, provisional }: { today: TodayAllowance | null; provi
           </Link>
         </>
       )}
-      {today ? (
-        <Link
-          href="/reports"
-          className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
-          style={{ color: 'var(--ink)' }}
-        >
-          なぜこの額?
-          <ChevronRightIcon />
-        </Link>
-      ) : null}
+      {today && allowanceExplain ? <AllowanceDialog explain={allowanceExplain} /> : null}
     </section>
   );
 }

@@ -49,11 +49,29 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
     <div className="space-y-3">
       <TodayCard
         today={
-          forecast
+          forecast && goal
             ? todayAllowance({
-                capYen: forecast.safeDailyAllowance,
+                capYen: Math.max(
+                  0,
+                  Math.round(
+                    (goal.budgetYen -
+                      forecast.breakdown.actualYen +
+                      (goalView?.todaySpentYen ?? 0)) /
+                      Math.max(1, forecast.remainingDays),
+                  ),
+                ),
                 spentTodayYen: goalView?.todaySpentYen ?? 0,
               })
+            : null
+        }
+        allowanceExplain={
+          forecast && goal
+            ? {
+                budgetYen: goal.budgetYen,
+                spentYen: forecast.breakdown.actualYen,
+                spentTodayYen: goalView?.todaySpentYen ?? 0,
+                remainingDays: forecast.remainingDays,
+              }
             : null
         }
         outlook={
