@@ -117,7 +117,7 @@ export function apiKeyMissingMessage(feature: string): string {
 /** API の失敗を本人に見える言葉にする。 */
 export function describeAnthropicError(error: unknown, rateLimitHint?: string): string {
   if (error instanceof Anthropic.APIConnectionTimeoutError) {
-    return 'AI の応答がタイムアウトしました(10秒)。もう一度お試しください。';
+    return 'AI の応答がタイムアウトしました。もう一度お試しください。';
   }
   if (error instanceof Anthropic.AuthenticationError) {
     return 'AI の API キーが無効です。ANTHROPIC_API_KEY を確認してください。';

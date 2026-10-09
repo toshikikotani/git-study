@@ -200,6 +200,7 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
           messages: [{ role: 'user', content: userContent }],
           schema: reportSchema,
           hints: { truncated: 'もう一度お試しください。' },
+          timeoutMs: 45_000,
         });
         if (!result.ok) return { report: null, warnings: [result.message] };
 
