@@ -68,6 +68,7 @@ describe('R5 「取引 / 品目 / 店」はヘッダーの直下に固定され�
     genreName: '外食',
     genreBudgetYen: null,
     forecastClosed: false,
+    isFixed: false,
     remaining: null,
     monthKey: '2026-09',
     monthStart: '2026-09-01',

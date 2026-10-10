@@ -25,6 +25,7 @@ const base: CategoryDetailData = {
   genreName: '外食',
   genreBudgetYen: 20000,
   forecastClosed: false,
+  isFixed: false,
   remaining: null,
   monthKey: '2026-09',
   monthStart: '2026-09-01',

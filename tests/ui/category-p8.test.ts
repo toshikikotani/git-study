@@ -37,6 +37,7 @@ const data = {
   genreName: '外食',
   genreBudgetYen: 30000,
   forecastClosed: false,
+  isFixed: false,
   genres: [
     { id: 'dining', name: '外食' },
     { id: 'cafe', name: 'カフェ' },
