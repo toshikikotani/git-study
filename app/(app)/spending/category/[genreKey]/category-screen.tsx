@@ -358,7 +358,7 @@ function CategoryScreenInner({
         totalYen={totalYen}
         onBack={() => router.back()}
         menu={
-          <div className="flex flex-wrap items-center">
+          <div className="flex items-center">
             <button
               type="button"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
@@ -371,44 +371,9 @@ function CategoryScreenInner({
             {currentGenreId !== null ? (
               <button
                 type="button"
-                onClick={() =>
-                  void setCategoryFixedAction(currentGenreId, !data.isFixed).then(() =>
-                    router.refresh(),
-                  )
-                }
-                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
-                style={{ color: data.isFixed ? 'var(--income)' : 'var(--ink)' }}
-              >
-                {data.isFixed ? '固定費' : '固定費にする'}
-              </button>
-            ) : null}
-            {currentGenreId !== null && !data.isFixed ? (
-              <button
-                type="button"
-                onClick={() =>
-                  void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
-                    () => router.refresh(),
-                  )
-                }
-                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
-                style={{ color: data.forecastClosed ? 'var(--income)' : 'var(--ink)' }}
-              >
-                {data.forecastClosed ? '予測しない' : '予測を止める'}
-              </button>
-            ) : null}
-            <a
-              href="/reports/genres"
-              className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
-              style={{ color: 'var(--ink)' }}
-            >
-              カテゴリを追加・削除
-            </a>
-            {currentGenreId !== null ? (
-              <button
-                type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-label={`${data.genreName}の設定`}
-                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
+                className="min-h-11 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
                 style={{ color: 'var(--ink)' }}
               >
                 設定
