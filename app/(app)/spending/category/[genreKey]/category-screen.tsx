@@ -24,7 +24,7 @@ import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
-import { setCategoryForecastClosedAction } from '../actions';
+import { setCategoryFixedAction, setCategoryForecastClosedAction } from '../actions';
 import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
@@ -369,6 +369,20 @@ function CategoryScreenInner({
               {selectMode ? '完了' : '選択'}
             </button>
             {currentGenreId !== null ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void setCategoryFixedAction(currentGenreId, !data.isFixed).then(() =>
+                    router.refresh(),
+                  )
+                }
+                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
+                style={{ color: data.isFixed ? 'var(--income)' : 'var(--ink)' }}
+              >
+                {data.isFixed ? '固定費' : '固定費にする'}
+              </button>
+            ) : null}
+            {currentGenreId !== null && !data.isFixed ? (
               <button
                 type="button"
                 onClick={() =>

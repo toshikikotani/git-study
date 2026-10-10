@@ -1,4 +1,5 @@
 import { listGenres } from '@/features/genre/store';
+import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 /**
  * カテゴリ詳細の読み込み(サーバー)。
  *
@@ -31,6 +32,7 @@ export type CategoryDetailData = {
   genreBudgetYen: number | null;
   /** もう使わない。残りの予測に足さない。 */
   forecastClosed: boolean;
+  isFixed: boolean;
   /** 確率予測の、残りの期間の支出(予定を除く)。今月以外・未分類・予測を止めたジャンルは null。 */
   remaining: RemainingForecast | null;
   monthKey: string;
@@ -127,6 +129,7 @@ export async function loadCategoryDetail(input: {
     genreName: genre?.name ?? '未分類',
     genreBudgetYen: genre?.budget_yen ?? null,
     forecastClosed: genres.find((item) => item.id === genreId)?.forecastClosed ?? false,
+    isFixed: genreId !== null && (await listConfirmedFixedCostKeys()).has(`genre:${genreId}`),
     remaining,
     monthKey,
     monthStart,

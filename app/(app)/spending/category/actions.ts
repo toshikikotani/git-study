@@ -10,6 +10,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { confirmFixedCost, unconfirmFixedCost } from '@/features/subscriptions/fixed-cost-store';
+
 import {
   MovePlanError,
   applyPlanToInput,
@@ -585,6 +587,10 @@ export async function updateCategoryBudgetAction(
   return { error: null };
 }
 
+export function genreFixedKey(genreId: string): string {
+  return `genre:${genreId}`;
+}
+
 export async function setCategoryForecastClosedAction(
   genreId: string,
   closed: boolean,
@@ -594,6 +600,25 @@ export async function setCategoryForecastClosedAction(
   } catch (error) {
     return { error: error instanceof Error ? error.message : '予測の停止を保存できませんでした' };
   }
+  return { error: null };
+}
+
+/** カテゴリを固定費にする。固定費は予測を止めるのが必須。 */
+export async function setCategoryFixedAction(
+  genreId: string,
+  fixed: boolean,
+): Promise<{ error: string | null }> {
+  try {
+    if (fixed) {
+      await confirmFixedCost(genreFixedKey(genreId));
+      await setGenreForecastClosed(genreId, true);
+    } else {
+      await unconfirmFixedCost(genreFixedKey(genreId));
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : '固定費を保存できませんでした' };
+  }
+  revalidatePath('/', 'layout');
   return { error: null };
 }
 
