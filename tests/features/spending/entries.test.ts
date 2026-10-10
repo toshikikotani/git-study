@@ -130,7 +130,7 @@ describe('loadLedgerTransactions', () => {
 });
 
 describe('loadGenreSpend(目標の実績、受け入れ基準2)', () => {
-  it('未来日の特別費は実績に入らず、予定・特別費として別に返す', async () => {
+  it('未来日は予定に分け、特別費も実績のジャンルに入れる', async () => {
     tables = {
       genres: { data: genres, error: null },
       transactions: {
@@ -160,8 +160,8 @@ describe('loadGenreSpend(目標の実績、受け入れ基準2)', () => {
       new Date('2026-09-29T03:00:00Z'),
     );
     expect(result.byGenre.get('drug')).toBe(2500);
-    expect(result.byGenre.has('event')).toBe(false);
-    expect(result.specialYen).toBe(9000);
+    expect(result.byGenre.get('event')).toBe(9000);
+    expect(result.specialYen).toBe(0);
     expect(result.scheduledYen).toBe(26540);
     expect(result.uncategorizedYen).toBe(0);
   });
