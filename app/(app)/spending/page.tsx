@@ -53,7 +53,7 @@ export default async function SpendingPage() {
       listDuplicateCandidates(),
       listOpenCaptures().catch(() => []),
       loadFixedVariableSplit().catch(() => null),
-      listConfirmedFixedCostKeys().catch(() => new Set()),
+      listConfirmedFixedCostKeys().catch(() => new Set<string>()),
     ]);
   const plan = await getCurrentPlan(ledger.period.to).catch(() => null);
   // 目標があるときは目標のジャンルだけを全体の累計に入れる(総予算と同じ範囲)。
