@@ -22,6 +22,8 @@ import {
   listRulesAction,
   renameCategoryAction,
   saveCategoryStyleAction,
+  setCategoryFixedAction,
+  setCategoryForecastClosedAction,
   updateCategoryBudgetAction,
   updateRuleGenreAction,
 } from '../actions';
@@ -127,6 +129,48 @@ export function SettingsBody({
           カテゴリの設定
         </h2>
       </div>
+
+      <section aria-label="このカテゴリ" className="space-y-2">
+        <button
+          type="button"
+          onClick={() =>
+            void setCategoryFixedAction(genreId, !data.isFixed).then(() => router.refresh())
+          }
+          className="flex min-h-11 w-full items-center justify-between rounded-xl px-4 text-sm font-semibold"
+          style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+        >
+          <span>{data.isFixed ? '固定費をやめる' : '固定費にする'}</span>
+          <span style={{ color: 'var(--ink-muted)' }}>{data.isFixed ? '固定費' : ''}</span>
+        </button>
+        {!data.isFixed ? (
+          <button
+            type="button"
+            onClick={() =>
+              void setCategoryForecastClosedAction(genreId, !data.forecastClosed).then(() =>
+                router.refresh(),
+              )
+            }
+            className="flex min-h-11 w-full items-center justify-between rounded-xl px-4 text-sm font-semibold"
+            style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+          >
+            <span>{data.forecastClosed ? '予測を戻す' : '予測を止める'}</span>
+            <span style={{ color: 'var(--ink-muted)' }}>
+              {data.forecastClosed ? '止めている' : ''}
+            </span>
+          </button>
+        ) : (
+          <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            固定費なので、予測は止めています。
+          </p>
+        )}
+        <a
+          href="/reports/genres"
+          className="flex min-h-11 w-full items-center rounded-xl px-4 text-sm font-semibold"
+          style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+        >
+          カテゴリを追加・削除
+        </a>
+      </section>
 
       <section aria-labelledby="cs-name" className="space-y-2">
         <h3 id="cs-name" className={sectionTitle}>
