@@ -7,7 +7,10 @@ import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-sto
 import { listOpenCaptures } from '@/features/receipt-captures/store';
 import { loadMonthlyLedger } from '@/features/spending/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
-import { loadFixedVariableSplit } from '@/features/subscriptions/fixed-cost-store';
+import {
+  listConfirmedFixedCostKeys,
+  loadFixedVariableSplit,
+} from '@/features/subscriptions/fixed-cost-store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { addMonths } from '@/lib/date';
 import { AttentionCard } from './attention-card';
@@ -42,14 +45,16 @@ import { SummaryCard } from './summary-card';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [ledger, genres, accounts, duplicates, captures, fixedVariable] = await Promise.all([
-    loadMonthlyLedger(),
-    listGenres(),
-    listAccounts(),
-    listDuplicateCandidates(),
-    listOpenCaptures().catch(() => []),
-    loadFixedVariableSplit().catch(() => null),
-  ]);
+  const [ledger, genres, accounts, duplicates, captures, fixedVariable, fixedKeys] =
+    await Promise.all([
+      loadMonthlyLedger(),
+      listGenres(),
+      listAccounts(),
+      listDuplicateCandidates(),
+      listOpenCaptures().catch(() => []),
+      loadFixedVariableSplit().catch(() => null),
+      listConfirmedFixedCostKeys().catch(() => new Set()),
+    ]);
   const plan = await getCurrentPlan(ledger.period.to).catch(() => null);
   // 目標があるときは目標のジャンルだけを全体の累計に入れる(総予算と同じ範囲)。
   const goalItems = plan ? plan.items.filter((item) => item.targetYen > 0) : [];
@@ -119,7 +124,11 @@ export default async function SpendingPage() {
         </Suspense>
         <GenreBreakdown goalRows={null} />
         <CalendarHeatmap goal={null} />
-        <LedgerList goalRange={null} duplicateCount={duplicates.length} />
+        <LedgerList
+          goalRange={null}
+          duplicateCount={duplicates.length}
+          fixedKeys={[...fixedKeys]}
+        />
         <CurrentMonthOnly>
           <Suspense fallback={null}>
             <LaterCards totalSpentYen={ledger.totals.spentYen} />

@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/money';
 import { formatYen } from '@/domain/money';
+import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
   EMPTY_FILTER,
@@ -39,9 +40,11 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 export function LedgerList({
   goalRange,
   duplicateCount,
+  fixedKeys = [],
 }: {
   goalRange: { from: string; to: string } | null;
   duplicateCount: number;
+  fixedKeys?: readonly string[];
 }) {
   const {
     transactions,
@@ -53,10 +56,34 @@ export function LedgerList({
     isCurrentMonth,
     reloadVisibleMonth,
     captures,
+    visibleMonth,
   } = useSpendingMonth();
+  const fixedKeySet = useMemo(() => new Set(fixedKeys), [fixedKeys]);
+  const isFixed = (t: (typeof transactions)[number]) =>
+    fixedKeySet.has(subscriptionKeyOf(t.label, t.description, t.amountYen)) ||
+    (t.genreId !== null && fixedKeySet.has(`genre:${t.genreId}`));
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
   const model = useMemo(() => buildListModel(filtered, today), [filtered, today]);
+  const fixed = useMemo(
+    () => filtered.filter((t) => t.amountYen < 0 && isFixed(t)),
+    [filtered, fixedKeySet],
+  );
+  const dayGroups = useMemo(
+    () =>
+      model.dayGroups
+        .map((g) => {
+          const rows = g.transactions.filter((t) => !isFixed(t));
+          return {
+            ...g,
+            transactions: rows,
+            spentYen: rows.reduce((sum, t) => sum + (t.amountYen < 0 ? -t.amountYen : 0), 0),
+          };
+        })
+        .filter((g) => g.transactions.length > 0),
+    [model.dayGroups, fixedKeySet],
+  );
+  const monthLabel = `${Number(visibleMonth.slice(5, 7))}月 固定費`;
   const risky = useMemo(
     () => transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod)),
     [transactions],
@@ -149,7 +176,7 @@ export function LedgerList({
         <ListSkeleton />
       ) : transactions.length === 0 ? (
         <EmptyState />
-      ) : model.dayGroups.length === 0 && model.scheduled.length === 0 ? (
+      ) : dayGroups.length === 0 && model.scheduled.length === 0 && fixed.length === 0 ? (
         <div className="px-1 py-6 text-center">
           <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
             この絞り込みに一致する明細がありません。
@@ -165,15 +192,24 @@ export function LedgerList({
         </div>
       ) : (
         <>
+          {fixed.length > 0 ? (
+            <DaySection
+              key="fixed"
+              heading={monthLabel}
+              sub="日付ではなく、この月の固定費です"
+              total={fixed.reduce((sum, t) => sum - t.amountYen, 0)}
+              transactions={fixed}
+            />
+          ) : null}
           {model.scheduled.length > 0 ? (
             <DaySection
               key="scheduled"
               heading="予定"
               sub="今日より先の日付(使った額には入りません)"
-              transactions={model.scheduled}
+              transactions={model.scheduled.filter((t) => !isFixed(t))}
             />
           ) : null}
-          {model.dayGroups.map((g) => (
+          {dayGroups.map((g) => (
             <DaySection
               key={g.date}
               heading={`${formatDateJa(g.date)}(${WEEKDAYS[weekdayOf(g.date)]})`}
