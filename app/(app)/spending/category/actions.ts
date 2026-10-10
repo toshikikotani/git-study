@@ -587,10 +587,6 @@ export async function updateCategoryBudgetAction(
   return { error: null };
 }
 
-export function genreFixedKey(genreId: string): string {
-  return `genre:${genreId}`;
-}
-
 export async function setCategoryForecastClosedAction(
   genreId: string,
   closed: boolean,
@@ -610,10 +606,10 @@ export async function setCategoryFixedAction(
 ): Promise<{ error: string | null }> {
   try {
     if (fixed) {
-      await confirmFixedCost(genreFixedKey(genreId));
+      await confirmFixedCost(`genre:${genreId}`);
       await setGenreForecastClosed(genreId, true);
     } else {
-      await unconfirmFixedCost(genreFixedKey(genreId));
+      await unconfirmFixedCost(`genre:${genreId}`);
     }
   } catch (error) {
     return { error: error instanceof Error ? error.message : '固定費を保存できませんでした' };
