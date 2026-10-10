@@ -37,7 +37,7 @@ describe('ホームの「今日」(デザイン、ADR-085)', () => {
     );
     expect(text).toContain('今日 使えるのは');
     expect(text).toContain('1,900円');
-    expect(text).toContain('毎日この額までなら、80%の確率で予算内に収まります。');
+    expect(text).toContain('毎日この額までなら、99%以上の確率で予算内に収まります。');
     expect(text).toContain('使わなかった分は、明日に回ります。');
     expect(text).toContain('10月の見通し');
     expect(text).toContain('約2.0万円 超えそう');

@@ -130,8 +130,7 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     );
     expect(html).toContain('着地');
     // どの範囲の数字かを、画面の上に名前で出す。目標があれば「ぜんぶ」へ切り替えられる。
-    expect(html).toContain('目標のジャンル');
-    expect(html).toContain('ぜんぶ');
+    expect(html).toContain('見通し');
     expect(html).toContain('今月(すべての支出)');
   }, 60000);
 

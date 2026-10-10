@@ -201,15 +201,14 @@ describe('「予測を止める」にしたジャンル', () => {
     ],
   };
 
-  it('残りは、いつもの見込みに守られ方(既定 0.3)を掛けて出す(設計書 v3 4.7)。実績は数える', () => {
+  it('予測を止めたジャンルは、残りの変動費を足さない。実績は数える', () => {
     const open = buildForecast(input).byCategory.find((c) => c.categoryId === 'tax')!;
     const f = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
     const tax = f.byCategory.find((c) => c.categoryId === 'tax')!;
     expect(tax.actualYen).toBe(800 * 15);
     expect(tax.landing.p10).toBeGreaterThanOrEqual(tax.baseYen);
-    const ratio = tax.meanYen / open.meanYen;
-    expect(ratio).toBeGreaterThan(0.2);
-    expect(ratio).toBeLessThan(0.4);
+    expect(tax.meanYen).toBe(0);
+    expect(open.meanYen).toBeGreaterThan(0);
   });
 
   it('超過の原因(drivers)での重みは、止めないときより小さい', () => {

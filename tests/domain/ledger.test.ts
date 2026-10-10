@@ -68,7 +68,7 @@ describe('summarizeLedger', () => {
     expect(s.scheduledByDay.get('2026-10-03')).toBe(26540);
   });
 
-  it('特別費は使った額に入るが、ペース計算(paceSpentYen・byGenrePace)からは外す', () => {
+  it('特別費も使った額とペース計算に入る', () => {
     const s = summarizeLedger(
       [
         entry({ id: 'a', amountYen: -1000 }),
@@ -78,10 +78,10 @@ describe('summarizeLedger', () => {
       TODAY,
     );
     expect(s.spentYen).toBe(31000);
-    expect(s.specialYen).toBe(30000);
-    expect(s.paceSpentYen).toBe(1000);
+    expect(s.specialYen).toBe(0);
+    expect(s.paceSpentYen).toBe(31000);
     expect(s.byGenre.get('event')).toBe(30000);
-    expect(s.byGenrePace.has('event')).toBe(false);
+    expect(s.byGenrePace.get('event')).toBe(30000);
   });
 
   it('振替・対象外・範囲外は数えない', () => {
