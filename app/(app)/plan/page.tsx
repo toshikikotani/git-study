@@ -161,7 +161,16 @@ async function SpentRows({ today }: { today: string }) {
             {formatRemainingDays(plan.periodStart, plan.periodEnd, today)})
           </span>
         </p>
-        <ul className="mt-3 space-y-1">
+        <div className="mt-3 flex justify-end">
+          <a
+            href="/reports/genres"
+            className="min-h-11 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            カテゴリを追加・削除
+          </a>
+        </div>
+        <ul className="mt-1 space-y-1">
           {view.breakdown
             .filter((r) => r.targetYen !== null)
             .slice()

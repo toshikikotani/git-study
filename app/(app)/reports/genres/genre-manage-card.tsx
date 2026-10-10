@@ -23,7 +23,7 @@ import {
 const INITIAL_STATE: { error: string | null } = { error: null };
 
 export function GenreManageCard({ genres }: { genres: readonly Genre[] }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   return (
     <div
@@ -36,7 +36,7 @@ export function GenreManageCard({ genres }: { genres: readonly Genre[] }) {
         className="flex w-full items-center justify-between gap-3"
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          ジャンルを管理する
+          カテゴリを追加・削除
         </h2>
         <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
           {open ? '閉じる' : `${genres.length}件`}
@@ -45,12 +45,12 @@ export function GenreManageCard({ genres }: { genres: readonly Genre[] }) {
 
       {open ? (
         <div className="mt-3 space-y-3">
+          <NewGenreForm />
           <ul className="space-y-2">
             {genres.map((genre) => (
               <GenreListItem key={genre.id} genre={genre} />
             ))}
           </ul>
-          <NewGenreForm />
         </div>
       ) : null}
     </div>
@@ -109,7 +109,11 @@ function GenreListItem({ genre }: { genre: Genre }) {
           </span>
           <button
             type="button"
-            onClick={() => void handleDelete()}
+            onClick={() => {
+              if (window.confirm(`${genre.name}を削除します。使った明細は未分類に戻ります。`)) {
+                void handleDelete();
+              }
+            }}
             disabled={pending}
             className="shrink-0 text-xs font-semibold disabled:opacity-40"
             style={{ color: 'var(--over)' }}
@@ -176,7 +180,7 @@ function NewGenreForm() {
       <div className="flex gap-2">
         <input
           name="name"
-          placeholder="新しいジャンル名"
+          placeholder="新しいカテゴリ名"
           required
           className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
           style={{

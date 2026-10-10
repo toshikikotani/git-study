@@ -396,6 +396,13 @@ function CategoryScreenInner({
                 {data.forecastClosed ? '予測しない' : '予測を止める'}
               </button>
             ) : null}
+            <a
+              href="/reports/genres"
+              className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
+              style={{ color: 'var(--ink)' }}
+            >
+              カテゴリを追加・削除
+            </a>
             {currentGenreId !== null ? (
               <button
                 type="button"
