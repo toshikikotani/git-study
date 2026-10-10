@@ -358,13 +358,13 @@ function CategoryScreenInner({
         totalYen={totalYen}
         onBack={() => router.back()}
         menu={
-          <div className="flex items-center gap-1">
+          <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
               aria-pressed={selectMode}
-              className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
-              style={{ color: 'var(--ink)' }}
+              className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+              style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
             >
               {selectMode ? '完了' : '選択'}
             </button>
@@ -376,19 +376,46 @@ function CategoryScreenInner({
                     router.refresh(),
                   )
                 }
-                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
-                style={{ color: data.isFixed ? 'var(--income)' : 'var(--ink)' }}
+                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+                style={{
+                  background: 'var(--surface-raised)',
+                  color: data.isFixed ? 'var(--income)' : 'var(--ink)',
+                }}
               >
-                {data.isFixed ? '固定費' : '固定費'}
+                {data.isFixed ? '固定費' : '固定費にする'}
               </button>
             ) : null}
+            {currentGenreId !== null && !data.isFixed ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
+                    () => router.refresh(),
+                  )
+                }
+                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+                style={{
+                  background: 'var(--surface-raised)',
+                  color: data.forecastClosed ? 'var(--income)' : 'var(--ink)',
+                }}
+              >
+                {data.forecastClosed ? '予測しない' : '予測を止める'}
+              </button>
+            ) : null}
+            <a
+              href="/reports/genres"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+              style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+            >
+              カテゴリ
+            </a>
             {currentGenreId !== null ? (
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-label={`${data.genreName}の設定`}
-                className="min-h-11 rounded-full px-3 text-sm font-semibold whitespace-nowrap"
-                style={{ color: 'var(--ink)' }}
+                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
               >
                 設定
               </button>

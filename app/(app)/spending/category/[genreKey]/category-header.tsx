@@ -130,17 +130,15 @@ export function CategoryHeader({
           swipe.current = null;
         }}
       >
-        <div className="flex flex-wrap items-center justify-between">
-          <button
-            type="button"
-            onClick={onBack}
-            className="min-h-11 inline-flex items-center pr-3 text-sm font-semibold whitespace-nowrap"
-            style={{ color: 'var(--ink-secondary)' }}
-          >
-            ‹ 家計簿
-          </button>
-          {menu}
-        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="min-h-11 inline-flex items-center pr-3 text-sm font-semibold whitespace-nowrap"
+          style={{ color: 'var(--ink-secondary)' }}
+        >
+          ‹ 家計簿
+        </button>
+        {menu}
 
         <div ref={sentinel} className="mt-2 flex items-center gap-3">
           <SharedElement name={sharedName.icon(genreKey)}>
