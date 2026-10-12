@@ -211,14 +211,18 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
         }
         if (!result.ok) return { report: null, warnings: [result.message] };
 
-        // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
+        // N1: 数字が事実に無い行は外す。ただし全部落ちるとレポート自体が出ないので、
+        // そのときは元の文章を残す。
         const facts = extractNumbers(userContent);
-        const keep = (lines: string[]) =>
-          lines.filter((line) => verifyNumbersAgainstFacts([line], facts).ok);
+        const keep = (lines: string[]) => {
+          const kept = lines.filter((line) => verifyNumbersAgainstFacts([line], facts).ok);
+          return kept.length > 0 ? kept : lines;
+        };
         return buildFromAiOutput(
           {
             ...result.value,
-            personaReasoning: keep([result.value.personaReasoning])[0] ?? '',
+            personaReasoning:
+              keep([result.value.personaReasoning])[0] ?? result.value.personaReasoning,
             insights: keep(result.value.insights),
             advice: keep(result.value.advice),
             forecastRead: {
