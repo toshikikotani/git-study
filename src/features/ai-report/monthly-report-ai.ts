@@ -29,7 +29,8 @@ import { MONTHLY_REPORT_PROMPT } from '@/prompts/monthly-report';
 /** レポート生成に使うモデル(ADR-031)。日付サフィックスは付けない。 */
 export const MONTHLY_REPORT_MODEL = 'claude-sonnet-5-5';
 
-const MAX_OUTPUT_TOKENS = 8192;
+// 文章の長さで途中切れしないよう、モデルが受け付ける上限まで取る。
+const MAX_OUTPUT_TOKENS = 64000;
 
 /** AIへ渡す明細例の上限。件数が多い月でも1件ずつ全部渡すと入力が肥大化する
  * ため、代表例だけに絞る(app/(app)/spending の一覧表示自体は全件表示する
