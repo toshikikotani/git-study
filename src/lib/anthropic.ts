@@ -69,7 +69,10 @@ export async function parseStructured<S extends z.ZodType>(
         system,
         messages,
         // Sonnet 5 は disabled を受けない。思考を止めるときは between_tools。
-        ...(disableThinking ? { thinking: { type: 'between_tools' as const } } : {}),
+        // SDK の型にはまだ無いので、送る値だけ合わせる。
+        ...(disableThinking
+          ? { thinking: { type: 'between_tools' } as unknown as Anthropic.ThinkingConfigParam }
+          : {}),
         output_config: {
           format: zodOutputFormat(schema),
           ...(effort ? { effort } : {}),
