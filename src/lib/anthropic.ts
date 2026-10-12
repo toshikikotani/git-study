@@ -68,7 +68,8 @@ export async function parseStructured<S extends z.ZodType>(
         max_tokens: maxTokens,
         system,
         messages,
-        ...(disableThinking ? { thinking: { type: 'disabled' as const } } : {}),
+        // Sonnet 5 は disabled を受けない。思考を止めるときは between_tools。
+        ...(disableThinking ? { thinking: { type: 'between_tools' as const } } : {}),
         output_config: {
           format: zodOutputFormat(schema),
           ...(effort ? { effort } : {}),
