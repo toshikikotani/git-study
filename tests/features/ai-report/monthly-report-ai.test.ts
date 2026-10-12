@@ -64,11 +64,11 @@ describe('buildFromAiOutput(monthly report) — モデルの出力を信用し�
     expect(result.report?.advice).toEqual(['有効な助言']);
   });
 
-  it('件数が多すぎる場合は5件に切る', () => {
+  it('件数はそのまま返す', () => {
     const many = Array.from({ length: 8 }, (_, i) => `気づき${i}`);
     const result = buildFromAiOutput(validRow({ insights: many, advice: many }));
-    expect(result.report?.insights).toHaveLength(5);
-    expect(result.report?.advice).toHaveLength(5);
+    expect(result.report?.insights).toHaveLength(8);
+    expect(result.report?.advice).toHaveLength(8);
   });
 });
 

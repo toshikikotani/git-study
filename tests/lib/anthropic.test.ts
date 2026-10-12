@@ -33,7 +33,7 @@ describe('parseStructured の thinking / effort', () => {
     await parseStructured({ ...base, client, disableThinking: true, effort: 'low' });
 
     const args = parse.mock.calls[0]![0];
-    expect(args.thinking).toEqual({ type: 'disabled' });
+    expect(args.thinking).toEqual({ type: 'between_tools' });
     expect(args.output_config.effort).toBe('low');
     expect(args.output_config.format).toBeDefined();
   });
