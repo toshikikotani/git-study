@@ -29,7 +29,7 @@ import { MONTHLY_REPORT_PROMPT } from '@/prompts/monthly-report';
 /** レポート生成に使うモデル(ADR-031)。日付サフィックスは付けない。 */
 export const MONTHLY_REPORT_MODEL = 'claude-sonnet-5-5';
 
-const MAX_OUTPUT_TOKENS = 4096;
+const MAX_OUTPUT_TOKENS = 8192;
 
 /** AIへ渡す明細例の上限。件数が多い月でも1件ずつ全部渡すと入力が肥大化する
  * ため、代表例だけに絞る(app/(app)/spending の一覧表示自体は全件表示する
@@ -144,11 +144,11 @@ const reportSchema = z.object({
   insights: z
     .array(z.string())
     .describe(
-      '6〜8件。各文に金額と、総支出に占める割合か予算との差を入れる。渡された数字だけを使う。',
+      '4〜5件。各文は短く、金額と、総支出に占める割合か予算との差を入れる。渡された数字だけを使う。',
     ),
   advice: z
     .array(z.string())
-    .describe('4〜6件。各文に、減らす・確保する金額を入れる。診断や未診断には触れない。'),
+    .describe('3〜4件。各文は短く、減らす・確保する金額を入れる。診断や未診断には触れない。'),
   forecastRead: z
     .object({
       percent: z
@@ -188,18 +188,26 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
       input,
       async () => {
         const userContent = buildUserContent(input);
-        const result = await parseStructuredGated({
-          client: this.client,
-          model: MONTHLY_REPORT_MODEL,
-          maxTokens: MAX_OUTPUT_TOKENS,
-          system: MONTHLY_REPORT_PROMPT.text,
-          messages: [{ role: 'user', content: userContent }],
-          schema: reportSchema,
-          hints: { truncated: 'もう一度お試しください。' },
-          disableThinking: true,
-          effort: 'low',
-          timeoutMs: 45_000,
-        });
+        const call = () =>
+          parseStructuredGated({
+            client: this.client,
+            model: MONTHLY_REPORT_MODEL,
+            maxTokens: MAX_OUTPUT_TOKENS,
+            system: MONTHLY_REPORT_PROMPT.text,
+            messages: [{ role: 'user', content: userContent }],
+            schema: reportSchema,
+            hints: { truncated: 'もう一度お試しください。' },
+            disableThinking: true,
+            effort: 'low',
+            timeoutMs: 60_000,
+          });
+        let result = await call();
+        if (
+          !result.ok &&
+          (result.failure === 'truncated' || result.message.includes('途中で切れ'))
+        ) {
+          result = await call();
+        }
         if (!result.ok) return { report: null, warnings: [result.message] };
 
         // N1: 出力の数値は本文(userContent)に登場した数字とだけ突き合わせる。
