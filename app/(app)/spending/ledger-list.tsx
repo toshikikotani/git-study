@@ -53,7 +53,6 @@ export function LedgerList({
     loading,
     error,
     isCurrentMonth,
-    reloadVisibleMonth,
     captures,
     visibleMonth,
   } = useSpendingMonth();
