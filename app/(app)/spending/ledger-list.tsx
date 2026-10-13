@@ -15,7 +15,6 @@ import {
   splitShares,
 } from '@/features/spending/views';
 import { useJustSaved } from '@/lib/just-saved';
-import { setTransactionMustPayAction } from '../transactions/actions';
 import { formatDateJa, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
@@ -286,25 +285,6 @@ function DaySection({
                 special: t.kind === 'special',
               }}
             />
-            {t.amountYen < 0 ? (
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const next = !t.mustPay;
-                  const result = await setTransactionMustPayAction(t.id, next);
-                  if (result.error) alert(result.error);
-                  else reloadVisibleMonth();
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex min-h-11 items-center rounded-full px-3 py-1 text-[11px] font-medium"
-                style={{
-                  background: t.mustPay ? 'var(--state-ok)' : 'var(--plane)',
-                  color: t.mustPay ? 'var(--on-action)' : 'var(--ink-secondary)',
-                }}
-              >
-                {t.mustPay ? '固定' : '変動'}
-              </button>
-            ) : null}
           </div>
         ))}
       </ul>
