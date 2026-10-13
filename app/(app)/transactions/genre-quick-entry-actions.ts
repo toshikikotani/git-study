@@ -40,3 +40,15 @@ export async function setQuickEntryGenreHiddenAction(
   }
   return { error: null };
 }
+
+export async function createQuickEntryGenreAction(
+  name: string,
+): Promise<{ error: string | null; id?: string }> {
+  try {
+    const { createGenre } = await import('@/features/genre/store');
+    const genre = await createGenre(name);
+    return { error: null, id: genre.id };
+  } catch (error) {
+    return { error: error instanceof GenreStoreError ? error.message : '作成できませんでした。' };
+  }
+}
