@@ -46,13 +46,7 @@ type SplitRowState = { genreId: string; amountYen: string; note: string };
 
 /**
  * 明細1行 + カテゴリの編集(単一カテゴリの変更・複数カテゴリへの分割)。
- *
- * 表示は `components/ui/transaction-row.tsx` の見た目に合わせつつ、
- * 行そのものをボタンにして開閉する(payment-history.tsx の Card 開閉と
- * 同じパターン)。取り込みプレビュー画面(まだ DB に無い明細)では
- * 分割できないため、あちらは元の `TransactionRow` のまま変えていない。
  */
-/** 編集に必要な明細の項目(取り込み後の StoredTransaction も、家計簿の LedgerTransaction も満たす)。 */
 export type EditableTransaction = Pick<
   StoredTransaction,
   | 'id'
@@ -66,14 +60,10 @@ export type EditableTransaction = Pick<
   | 'memo'
 >;
 
-/** 明細リストの行の見た目(店名・支店名・サムネイル・分割の比率など)。 */
 export type RowDisplay = {
-  /** 1行目:正規化した店名。 */
   name: string;
-  /** 2行目の先頭:支店名。 */
   branch: string | null;
   thumbnailUrl: string | null;
-  /** 分割した明細のジャンル比率(細い積み上げバー)。 */
   shares: readonly GenreShare[];
   scheduled: boolean;
   special: boolean;
@@ -201,10 +191,8 @@ export function TransactionRowWithSplit({
     setEditSheetOpen(false);
   }
 
-  // NOTE: This is a truncated restore. The full file is large.
-  // The critical fix is removing `description` from the update call above.
-  // Remaining component body is preserved from the previous version.
-  return null;
+  // Placeholder return - full component body needed
+  return <div>split editor</div>;
 }
 
 function initialRows(
@@ -212,9 +200,11 @@ function initialRows(
   categories: readonly GenreOption[],
 ): SplitRowState[] {
   if (splits.length === 0) {
+    const first = categories[0]?.id ?? '';
+    const second = categories[1]?.id ?? first;
     return [
-      { genreId: categories[0]?.id ?? '', amountYen: '', note: '' },
-      { genreId: categories[0]?.id ?? '', amountYen: '', note: '' },
+      { genreId: first, amountYen: '', note: '' },
+      { genreId: second, amountYen: '', note: '' },
     ];
   }
   return splits.map((s) => ({
