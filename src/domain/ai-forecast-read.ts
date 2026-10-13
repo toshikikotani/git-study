@@ -3,11 +3,11 @@
  *
  * AIには計算させない(N1):AIは決まった選択肢から「残りの支出を何%動かすか」を選ぶだけで、
  * 金額はここで計算する。補正をどれだけ効かせるかは、AIの読みがこれまで統計より当たったか
- * (当たり具合)で決める。記録が無いうちは半分だけ効かせる。
+ * (当たり具合)で決める。記録が無いうちはそのまま効かせる。
  */
 
 /** AIが選べる補正(残りの支出に対する%)。 */
-export const AI_ADJUST_CHOICES = [-20, -10, -5, 0, 5, 10, 20, 30] as const;
+export const AI_ADJUST_CHOICES = [-30, -20, -15, -10, -5, 0, 5, 10, 15, 20, 30, 40, 50] as const;
 export type AiAdjustPercent = (typeof AI_ADJUST_CHOICES)[number];
 
 export function isAiAdjustPercent(value: number): value is AiAdjustPercent {
@@ -32,8 +32,9 @@ export type AiTrust = {
 };
 
 /**
- * 当たり具合:補正した読みが統計の中央値より実際に近かった割合を、事前に「1勝1敗」を足して
- * 求める((勝ち + 1) ÷ (比べた回数 + 2))。記録が無ければ 0.5。
+ * 当たり具合:補正した読みが統計の中央値より実際に近かった割合を、事前に「2勝」を足して
+ * 求める((勝ち + 2) ÷ (比べた回数 + 2))。記録が無ければ 1.0(AIの読みをそのまま効かせる)。
+ * 外れた回が増えると徐々に弱くなる。
  */
 export function aiTrust(history: readonly ScoredRead[]): AiTrust {
   let wins = 0;
@@ -47,7 +48,7 @@ export function aiTrust(history: readonly ScoredRead[]): AiTrust {
       wins += 1;
     }
   }
-  return { weight: (wins + 1) / (compared + 2), wins, compared };
+  return { weight: Math.min(1, (wins + 2) / (compared + 2)), wins, compared };
 }
 
 /** 残りの部分(着地 − 決まっている額)だけを動かす。金額は整数の円。 */
