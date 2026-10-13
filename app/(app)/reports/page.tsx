@@ -10,6 +10,7 @@ import { SpeakButton } from '../_home/speak-button';
 import { LandingHero, NextStepCard } from './landing-hero';
 import { GoalChart } from './goal-chart';
 import { SpendingTrendChart } from './spending-trend-chart';
+import { SankeyFlow } from './sankey-flow';
 import { formatEstimate, formatEstimateRange } from '@/domain/forecast/format';
 import { landingRowsFrom } from '@/domain/forecast/landing-rows';
 import { listGenres } from '@/features/genre/store';
@@ -298,6 +299,14 @@ export default async function ReportsPage() {
         incomeYen={ledger.totalIncomeYen}
         incomeRegistered={hasIncome(ledger.totalIncomeYen)}
         balance={monthForecast?.balance ?? null}
+      />
+
+      <SankeyFlow
+        incomeYen={ledger.totalIncomeYen}
+        genres={ledger.genreBreakdown.map((g) => ({
+          name: g.genreName,
+          spentYen: g.spentYen,
+        }))}
       />
 
       <GenreDonutChart
