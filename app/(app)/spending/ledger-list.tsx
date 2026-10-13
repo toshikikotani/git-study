@@ -217,7 +217,7 @@ function DaySection({
   total?: number;
   transactions: DrilldownTransaction[];
 }) {
-  const { genres, transactions: monthTransactions, reloadVisibleMonth } = useSpendingMonth();
+  const { genres, transactions: monthTransactions } = useSpendingMonth();
   const justSavedIds = useJustSaved();
   const history = useMemo(
     () =>
