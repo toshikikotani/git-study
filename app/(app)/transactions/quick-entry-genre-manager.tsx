@@ -18,6 +18,7 @@ import {
   fetchQuickEntryGenreSettingsAction,
   reorderQuickEntryGenresAction,
   setQuickEntryGenreHiddenAction,
+  createQuickEntryGenreAction,
 } from './genre-quick-entry-actions';
 
 export function QuickEntryGenreManager({
@@ -27,11 +28,13 @@ export function QuickEntryGenreManager({
 }: {
   open: boolean;
   onClose: () => void;
-  /** 並び替え・非表示が確定したときに呼ばれる(呼び出し側は格子を再取得する)。 */
+  /** 並べ替え・非表示が確定したときに呼ばれる(呼び出し側は格子を再取得する)。 */
   onChanged: () => void;
 }) {
   const [items, setItems] = useState<QuickEntryGenreSetting[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +70,23 @@ export function QuickEntryGenreManager({
     onChanged();
   }
 
+  async function addGenre(): Promise<void> {
+    const name = newName.trim();
+    if (name === '') return;
+    setSaving(true);
+    setAddError(null);
+    const result = await createQuickEntryGenreAction(name);
+    setSaving(false);
+    if (result.error) {
+      setAddError(result.error);
+      return;
+    }
+    setNewName('');
+    const refreshed = await fetchQuickEntryGenreSettingsAction();
+    setItems(refreshed);
+    onChanged();
+  }
+
   const visible = items?.filter((g) => !g.hiddenInQuickEntry) ?? [];
   const hidden = items?.filter((g) => g.hiddenInQuickEntry) ?? [];
 
@@ -74,10 +94,10 @@ export function QuickEntryGenreManager({
     <BottomSheet open={open} onClose={onClose} role="dialog">
       <div className="px-4 pt-2 pb-6">
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          カテゴリの並び替え・非表示
+          カテゴリの並べ替え・非表示
         </p>
         <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          ▲▼で並び替え、目のアイコンで格子から隠せます(ジャンル自体は残ります)。
+          ▲▼で並べ替え、目のアイコンで格子から隠せます(ジャンル自体は残ります)。
         </p>
 
         {items === null ? (
@@ -165,6 +185,40 @@ export function QuickEntryGenreManager({
             ) : null}
           </>
         )}
+
+        <div className="mt-5">
+          <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
+            新しいジャンルを追加
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="ジャンル名"
+              disabled={saving}
+              className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+              style={{
+                background: 'var(--plane)',
+                color: 'var(--ink)',
+                border: '1px solid var(--hairline)',
+              }}
+            />
+            <button
+              type="button"
+              disabled={saving || newName.trim() === ''}
+              onClick={() => void addGenre()}
+              className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            >
+              追加
+            </button>
+          </div>
+          {addError ? (
+            <p className="mt-1 text-xs" style={{ color: 'var(--over)' }}>
+              {addError}
+            </p>
+          ) : null}
+        </div>
 
         <button
           type="button"
