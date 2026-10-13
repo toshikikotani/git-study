@@ -207,7 +207,7 @@ export function QuickEntryGenreManager({
               type="button"
               disabled={saving || newName.trim() === ''}
               onClick={() => void addGenre()}
-              className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              className="min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               追加

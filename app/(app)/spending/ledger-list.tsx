@@ -101,12 +101,25 @@ export function LedgerList({
         </h2>
         <LedgerMenu />
       </div>
+      <input
+        type="search"
+        value={filter.search ?? ''}
+        onChange={(e) => setFilter({ search: e.target.value })}
+        placeholder="店名・品目・メモを検索"
+        aria-label="明細を検索"
+        className="min-h-11 w-full rounded-xl px-3 text-sm"
+        style={{
+          background: 'var(--surface-raised)',
+          color: 'var(--ink)',
+          border: '1px solid var(--hairline)',
+        }}
+      />
       <ActiveFilterChips goalRange={goalRange} />
       <PendingReceiptRows />
       {risky.length > 0 ? (
         <Link
           href="/transactions/reconcile"
-          className="flex items-center justify-between rounded-2xl px-4 py-3"
+          className="flex min-h-11 items-center justify-between rounded-2xl px-4 py-3"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
@@ -283,7 +296,7 @@ function DaySection({
                   if (result.error) alert(result.error);
                   else reloadVisibleMonth();
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex min-h-11 items-center rounded-full px-3 py-1 text-[11px] font-medium"
                 style={{
                   background: t.mustPay ? 'var(--state-ok)' : 'var(--plane)',
                   color: t.mustPay ? 'var(--on-action)' : 'var(--ink-secondary)',
