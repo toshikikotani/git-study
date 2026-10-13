@@ -2,13 +2,15 @@
 
 import { useMemo } from 'react';
 import {
-  LineChart,
+  ComposedChart,
+  Bar,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from 'recharts';
 
 import { formatYen } from '@/domain/money';
@@ -94,13 +96,13 @@ export function SpendingTrendChart({
       </div>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        短期（{SHORT_WINDOW}日）移動平均が長期（{LONG_WINDOW}
-        日）移動平均を上回っていれば増加傾向、下回っていれば減少傾向。
+        棒は1日の支出。線は平均のペース（実線=直近7日、点線=直近21日）です。
+        実線が点線より上なら増加傾向、下なら減少傾向です。
       </p>
 
-      <div className="h-56 w-full">
+      <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="color-mix(in srgb, var(--ink) 12%, transparent)"
@@ -131,9 +133,24 @@ export function SpendingTrendChart({
                     ? `${SHORT_WINDOW}日平均`
                     : name === 'long'
                       ? `${LONG_WINDOW}日平均`
-                      : 'その日';
+                      : 'その日の支出';
                 return [formatYen(Math.round(num), { sign: 'never' }), label];
               }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+              formatter={(value) => {
+                if (value === 'spent') return 'その日の支出';
+                if (value === 'short') return `${SHORT_WINDOW}日平均`;
+                if (value === 'long') return `${LONG_WINDOW}日平均`;
+                return value;
+              }}
+            />
+            <Bar
+              dataKey="spent"
+              fill="color-mix(in srgb, var(--ink) 18%, transparent)"
+              radius={[2, 2, 0, 0]}
+              name="spent"
             />
             <Line
               type="monotone"
@@ -154,7 +171,7 @@ export function SpendingTrendChart({
               connectNulls
               name="long"
             />
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
