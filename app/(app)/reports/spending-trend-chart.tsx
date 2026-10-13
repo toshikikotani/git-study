@@ -39,9 +39,12 @@ function directionColor(direction: TrendDirection): string {
 
 export function SpendingTrendChart({
   daySpend,
+  fixedYen = 0,
 }: {
-  /** 日次の実績支出（正の数） */
+  /** 日次の実績支出（正の数・固定費を除いたもの） */
   daySpend: Readonly<Record<string, number>>;
+  /** この期間の固定費合計（表示用） */
+  fixedYen?: number;
 }) {
   const today = todayJst();
   const from = addDays(today, -(LOOKBACK_DAYS - 1));
@@ -96,7 +99,7 @@ export function SpendingTrendChart({
       </div>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        棒は1日の支出。線は平均のペース（実線=直近7日、点線=直近21日）です。
+        棒は1日の支出（固定費を除く）。線は平均のペース（実線=直近7日、点線=直近21日）です。
         実線が点線より上なら増加傾向、下なら減少傾向です。
       </p>
 
@@ -196,6 +199,14 @@ export function SpendingTrendChart({
           </strong>
         </span>
       </div>
+
+      {fixedYen > 0 ? (
+        <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          この期間の固定費（家賃・サブスクなど）は{' '}
+          <strong style={{ color: 'var(--ink)' }}>{formatYen(fixedYen, { sign: 'never' })}</strong>
+          あります。上のグラフには含めていません。
+        </p>
+      ) : null}
     </section>
   );
 }
