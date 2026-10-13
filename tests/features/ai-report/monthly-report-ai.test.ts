@@ -88,7 +88,7 @@ describe('buildFromAiOutput — AIの読み(ADR-072)', () => {
   });
 
   it('選択肢にない値・理由が空なら、AIの読みは採らない', () => {
-    expect(buildFromAiOutput(read('15')).report?.forecastRead).toBeNull();
+    expect(buildFromAiOutput(read('7')).report?.forecastRead).toBeNull();
     expect(buildFromAiOutput(read('10', '  ')).report?.forecastRead).toBeNull();
   });
 
