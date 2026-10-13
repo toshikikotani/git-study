@@ -328,7 +328,10 @@ export async function undoReceiptSaveAction(
   if (ids.length === 0) return { error: null };
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from('transactions').delete().in('id', [...ids]);
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .in('id', [...ids]);
     if (error) return { error: '元に戻せませんでした。' };
   } catch (error) {
     return { error: describeUserError(error, '元に戻せませんでした。') };
