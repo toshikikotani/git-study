@@ -24,12 +24,31 @@ import {
 } from '@/features/transactions/store';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
-import { normalizeStoreName } from '@/domain/store-name';
 import { recordCorrection } from '@/features/genre/memory-store';
-import { fingerprintOf } from '@/features/transactions/types';
 import { assertDateOnly } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 import { describeUserError } from '@/lib/errors';
+
+/**
+ * レシート商品行から作った分割。呼び出し側は sourceRef を振っておき、
+ * 保存後の実 id と対応付けて transaction_splits を作る。
+ */
+export type ReceiptSplitInput = {
+  sourceRef: string;
+  splits: TransactionSplitInput[];
+};
+
+/** レシートに写っていた商品行。 */
+export type ReceiptItemsInput = {
+  sourceRef: string;
+  items: ReceiptItemInput[];
+};
+
+/** 「生活費」明細の小分類。 */
+export type ReceiptExpenseSubtypeInput = {
+  sourceRef: string;
+  subtype: string;
+};
 
 export type RowFields = {
   id: string;
@@ -76,26 +95,110 @@ async function readRowFields(ids: readonly string[]): Promise<RowFields[]> {
 }
 
 export async function saveImportBatchAction(
-  source: TransactionSource,
-  transactions: StoredTransaction[],
-): Promise<{ error: string | null; batchId?: string }> {
+  preview: readonly StoredTransaction[],
+  meta: {
+    fileName: string;
+    source: TransactionSource;
+    accountId: string;
+    failedCount: number;
+    receiptImagePath?: string | null;
+  },
+  receiptSplits: readonly ReceiptSplitInput[] = [],
+  receiptItems: readonly ReceiptItemsInput[] = [],
+  receiptExpenseSubtypes: readonly ReceiptExpenseSubtypeInput[] = [],
+): Promise<{
+  imported: number;
+  duplicates: number;
+  error: string | null;
+  splitWarnings: string[];
+  insertedIds: string[];
+}> {
+  let result;
   try {
-    const batchId = await importTransactions(source, transactions);
-    return { error: null, batchId };
+    result = await importTransactions(preview, meta);
   } catch (error) {
-    return { error: describeUserError(error, '取り込みできませんでした。') };
+    const message =
+      error instanceof TransactionStoreError ? error.message : '取り込みに失敗しました。';
+    return { imported: 0, duplicates: 0, error: message, splitWarnings: [], insertedIds: [] };
   }
+  revalidatePath('/spending');
+
+  const splitWarnings: string[] = [];
+  if (receiptSplits.length > 0) {
+    const splitsBySourceRef = new Map(receiptSplits.map((s) => [s.sourceRef, s.splits]));
+    for (const inserted of result.insertedTransactions) {
+      if (inserted.sourceRef === null) continue;
+      const splits = splitsBySourceRef.get(inserted.sourceRef);
+      if (!splits) continue;
+      try {
+        await replaceSplits(inserted.id, splits);
+      } catch (error) {
+        splitWarnings.push(describeUserError(error, '商品ごとの分割を保存できませんでした。'));
+      }
+    }
+  }
+
+  if (receiptItems.length > 0) {
+    const itemsBySourceRef = new Map(receiptItems.map((s) => [s.sourceRef, s.items]));
+    for (const inserted of result.insertedTransactions) {
+      if (inserted.sourceRef === null) continue;
+      const items = itemsBySourceRef.get(inserted.sourceRef);
+      if (!items) continue;
+      try {
+        await replaceReceiptItems(inserted.id, items);
+      } catch (error) {
+        splitWarnings.push(describeUserError(error, '商品の記録を保存できませんでした。'));
+      }
+    }
+  }
+
+  if (receiptExpenseSubtypes.length > 0) {
+    const subtypeBySourceRef = new Map(receiptExpenseSubtypes.map((s) => [s.sourceRef, s.subtype]));
+    for (const inserted of result.insertedTransactions) {
+      if (inserted.sourceRef === null) continue;
+      const subtype = subtypeBySourceRef.get(inserted.sourceRef);
+      if (!subtype) continue;
+      try {
+        await setExpenseSubtype(inserted.id, subtype);
+      } catch (error) {
+        splitWarnings.push(describeUserError(error, '生活費の小分類を保存できませんでした。'));
+      }
+    }
+  }
+
+  return {
+    imported: result.importedCount,
+    duplicates: result.duplicateCount,
+    error: null,
+    splitWarnings,
+    insertedIds: result.insertedTransactions.map((t) => t.id),
+  };
 }
 
 export async function updateTransactionAction(
   id: string,
   genreId: string | null,
-  fields: { amountYen?: number; occurredOn?: string },
+  patch?: { amountAbsYen?: number; amountYen?: number; occurredOn?: string; isIncome?: boolean },
 ): Promise<{ error: string | null; previous?: RowFields[] }> {
   let previous: RowFields[] = [];
   try {
     previous = await readRowFields([id]);
-    await updateTransaction(id, genreId, fields);
+    let storePatch: { amountYen: number; occurredOn: string } | undefined;
+    if (patch) {
+      const occurredOn = patch.occurredOn ? assertDateOnly(patch.occurredOn) : undefined;
+      let amountYen = patch.amountYen;
+      if (patch.amountAbsYen !== undefined) {
+        const abs = assertYen(patch.amountAbsYen, '金額');
+        if (abs <= 0) throw new MoneyError(`金額は正の値で指定してください: ${abs}`);
+        amountYen = patch.isIncome ? abs : -abs;
+      }
+      if (amountYen !== undefined && occurredOn !== undefined) {
+        storePatch = { amountYen, occurredOn };
+      } else if (amountYen !== undefined) {
+        storePatch = { amountYen, occurredOn: occurredOn ?? '' };
+      }
+    }
+    await updateTransaction(id, genreId ?? '', storePatch);
   } catch (error) {
     return { error: describeUserError(error, '更新できませんでした。') };
   }
@@ -149,7 +252,9 @@ export async function setExpenseSubtypeAction(
   subtype: string | null,
 ): Promise<{ error: string | null }> {
   try {
-    await setExpenseSubtype(id, subtype);
+    if (subtype !== null && subtype.trim() !== '') {
+      await setExpenseSubtype(id, subtype);
+    }
   } catch (error) {
     return { error: describeUserError(error, '更新できませんでした。') };
   }
@@ -158,34 +263,72 @@ export async function setExpenseSubtypeAction(
 }
 
 export async function checkReceiptDuplicatesAction(
-  fingerprints: string[],
-): Promise<{ duplicates: string[] }> {
+  probes: readonly { key: string; storeName: string; occurredOn: string; amountYen: number }[],
+): Promise<{
+  duplicates: Record<string, { id: string; occurredOn: string; amountYen: number }[]>;
+}> {
+  const result: Record<string, { id: string; occurredOn: string; amountYen: number }[]> = {};
   try {
-    const duplicates = await findReceiptDuplicates(fingerprints);
-    return { duplicates };
+    const dates = [...new Set(probes.map((p) => assertDateOnly(p.occurredOn)))];
+    if (dates.length === 0) return { duplicates: result };
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, occurred_on, description, merchant_name, amount_yen, review_status')
+      .in('occurred_on', dates)
+      .neq('review_status', 'ignored');
+    if (error || !data) return { duplicates: result };
+    const existing = data.map((r) => ({
+      id: r.id,
+      storeName: r.merchant_name ?? r.description,
+      occurredOn: r.occurred_on,
+      amountYen: r.amount_yen,
+    }));
+    for (const probe of probes) {
+      const hits = findReceiptDuplicates(
+        {
+          storeName: probe.storeName,
+          occurredOn: assertDateOnly(probe.occurredOn),
+          amountYen: probe.amountYen,
+        },
+        existing,
+      );
+      if (hits.length > 0) {
+        result[probe.key] = hits.map((h) => ({
+          id: h.id,
+          occurredOn: h.occurredOn,
+          amountYen: h.amountYen,
+        }));
+      }
+    }
   } catch {
-    return { duplicates: [] };
+    // ignore
   }
+  return { duplicates: result };
 }
 
 export async function recordGenreCorrectionAction(input: {
   storeName: string;
+  itemName: string;
   genreId: string;
+  pin?: boolean;
+  anyStore?: boolean;
 }): Promise<{ error: string | null }> {
   try {
-    await recordCorrection(normalizeStoreName(input.storeName), input.genreId);
+    await recordCorrection(input);
+    return { error: null };
   } catch (error) {
-    return { error: describeUserError(error, '記録できませんでした。') };
+    return { error: describeUserError(error, '分類の履歴を保存できませんでした。') };
   }
-  return { error: null };
 }
 
 export async function undoReceiptSaveAction(
-  snapshot: DeletedSnapshot,
+  ids: readonly string[],
 ): Promise<{ error: string | null }> {
+  if (ids.length === 0) return { error: null };
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from('transactions').insert(snapshot.row);
+    const { error } = await supabase.from('transactions').delete().in('id', [...ids]);
     if (error) return { error: '元に戻せませんでした。' };
   } catch (error) {
     return { error: describeUserError(error, '元に戻せませんでした。') };
@@ -209,10 +352,7 @@ export async function deleteTransactionAction(
       .from('receipt_items')
       .select('*')
       .eq('transaction_id', id);
-    const { data: subtypes } = await supabase
-      .from('expense_subtypes')
-      .select('*')
-      .eq('transaction_id', id);
+    const subtypes: Record<string, unknown>[] = [];
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) return { error: '削除できませんでした。' };
     return {
@@ -234,7 +374,7 @@ export async function restoreDeletedTransactionAction(
 ): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from('transactions').insert(snapshot.row);
+    const { error } = await supabase.from('transactions').insert(snapshot.row as never);
     if (error) return { error: '元に戻せませんでした。' };
   } catch (error) {
     return { error: describeUserError(error, '元に戻せませんでした。') };
@@ -257,11 +397,11 @@ export async function restoreRowFieldsAction(
           review_status: row.review_status,
           reviewed_at: row.reviewed_at,
           amount_yen: row.amount_yen,
-          occurred_on: row.occurred_on,
+          occurred_on: row.occurred_on ?? '',
           note: row.note,
-          kind: row.kind,
+          kind: row.kind ?? undefined,
           reconcile_diff_yen: row.reconcile_diff_yen,
-        })
+        } as never)
         .eq('id', row.id);
       if (error) return { error: '元に戻せませんでした。' };
     }
