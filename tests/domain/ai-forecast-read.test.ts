@@ -12,8 +12,8 @@ const read = (percent: number, stat: number, adjusted: number, actual: number) =
 });
 
 describe('aiTrust(AIの読みの当たり具合)', () => {
-  it('記録が無ければ半分だけ効かせる', () => {
-    expect(aiTrust([])).toEqual({ weight: 0.5, wins: 0, compared: 0 });
+  it('記録が無ければそのまま効かせる', () => {
+    expect(aiTrust([])).toEqual({ weight: 1, wins: 0, compared: 0 });
   });
 
   it('統計より近かった回が多いほど強く効かせる。補正0の回は数えない', () => {
@@ -25,7 +25,7 @@ describe('aiTrust(AIの読みの当たり具合)', () => {
     ]);
     expect(trust.compared).toBe(3);
     expect(trust.wins).toBe(2);
-    expect(trust.weight).toBeCloseTo(3 / 5);
+    expect(trust.weight).toBeCloseTo(4 / 5);
   });
 });
 
@@ -46,7 +46,8 @@ describe('applyAiRead(補正の計算はアプリがする)', () => {
 
   it('選択肢だけを許す', () => {
     expect(isAiAdjustPercent(10)).toBe(true);
-    expect(isAiAdjustPercent(15)).toBe(false);
+    expect(isAiAdjustPercent(15)).toBe(true);
+    expect(isAiAdjustPercent(7)).toBe(false);
   });
 });
 
