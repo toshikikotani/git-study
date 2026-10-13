@@ -66,9 +66,7 @@ function sma(values: number[], window: number, index: number): number | null {
 }
 
 /** トレンドを計算する */
-export function computeTrend(
-  daily: readonly { date: DateOnly; spentYen: number }[],
-): TrendResult {
+export function computeTrend(daily: readonly { date: DateOnly; spentYen: number }[]): TrendResult {
   if (daily.length === 0) {
     return {
       points: [],
