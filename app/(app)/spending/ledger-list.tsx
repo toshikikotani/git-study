@@ -5,7 +5,6 @@ import { useCallback, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/money';
-import { formatYen } from '@/domain/money';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
@@ -20,9 +19,8 @@ import { setTransactionMustPayAction } from '../transactions/actions';
 import { formatDateJa, weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
-import { ActiveFilterChips, FilterSheet } from './filter-sheet';
+import { ActiveFilterChips } from './filter-sheet';
 import { LedgerMenu } from './ledger-menu';
-import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -102,7 +100,7 @@ export function LedgerList({
         </h2>
         <LedgerMenu />
       </div>
-      <ActiveFilterChips />
+      <ActiveFilterChips goalRange={goalRange} />
       {risky.length > 0 ? (
         <Link
           href="/transactions/reconcile"
@@ -211,10 +209,15 @@ function DaySection({
     () =>
       monthTransactions
         .filter((t) => t.genreId !== null)
-        .reduce((map, t) => {
-          if (t.genreId && !map.has(t.label)) map.set(t.label, t.genreId);
-          return map;
-        }, new Map<string, string>()),
+        .reduce(
+          (acc, t) => {
+            if (t.genreId && !acc.some((e) => e.storeName === t.label)) {
+              acc.push({ storeName: t.label, genreId: t.genreId });
+            }
+            return acc;
+          },
+          [] as { storeName: string; genreId: string }[],
+        ),
     [monthTransactions],
   );
 
