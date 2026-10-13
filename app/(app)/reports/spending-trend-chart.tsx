@@ -94,13 +94,17 @@ export function SpendingTrendChart({
       </div>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        短期（{SHORT_WINDOW}日）移動平均が長期（{LONG_WINDOW}日）移動平均を上回っていれば増加傾向、下回っていれば減少傾向。
+        短期（{SHORT_WINDOW}日）移動平均が長期（{LONG_WINDOW}
+        日）移動平均を上回っていれば増加傾向、下回っていれば減少傾向。
       </p>
 
       <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="color-mix(in srgb, var(--ink) 12%, transparent)" />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="color-mix(in srgb, var(--ink) 12%, transparent)"
+            />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
@@ -154,17 +158,24 @@ export function SpendingTrendChart({
         </ResponsiveContainer>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular" style={{ color: 'var(--ink-secondary)' }}>
+      <div
+        className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular"
+        style={{ color: 'var(--ink-secondary)' }}
+      >
         <span>
           {SHORT_WINDOW}日平均:{' '}
           <strong style={{ color: 'var(--ink)' }}>
-            {result.latestShortMa !== null ? formatYen(Math.round(result.latestShortMa), { sign: 'never' }) : '—'}
+            {result.latestShortMa !== null
+              ? formatYen(Math.round(result.latestShortMa), { sign: 'never' })
+              : '—'}
           </strong>
         </span>
         <span>
           {LONG_WINDOW}日平均:{' '}
           <strong style={{ color: 'var(--ink)' }}>
-            {result.latestLongMa !== null ? formatYen(Math.round(result.latestLongMa), { sign: 'never' }) : '—'}
+            {result.latestLongMa !== null
+              ? formatYen(Math.round(result.latestLongMa), { sign: 'never' })
+              : '—'}
           </strong>
         </span>
       </div>
