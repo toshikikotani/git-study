@@ -286,6 +286,6 @@ export function genreSwatch(name: string | null): string {
   return `light-dark(color-mix(in srgb, ${family.pastel} 84%, var(--accent)), color-mix(in srgb, ${family.vivid} 82%, var(--accent)))`;
 }
 
-export function genreBarColor(name: string | null, _override?: GenreStyleOverride | null): string {
+export function genreBarColor(name: string | null): string {
   return genreSwatch(name);
 }
