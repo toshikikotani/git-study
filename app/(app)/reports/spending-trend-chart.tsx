@@ -119,15 +119,16 @@ export function SpendingTrendChart({
                 borderRadius: 12,
                 fontSize: 12,
               }}
-              formatter={(value: number | null, name: string) => {
-                if (value === null) return ['—', name];
+              formatter={(value, name) => {
+                const num = typeof value === 'number' ? value : null;
+                if (num === null) return ['—', String(name)];
                 const label =
                   name === 'short'
                     ? `${SHORT_WINDOW}日平均`
                     : name === 'long'
                       ? `${LONG_WINDOW}日平均`
                       : 'その日';
-                return [formatYen(Math.round(value), { sign: 'never' }), label];
+                return [formatYen(Math.round(num), { sign: 'never' }), label];
               }}
             />
             <Line
