@@ -9,6 +9,7 @@ import { WhyCard } from './why-card';
 import { SpeakButton } from '../_home/speak-button';
 import { LandingHero, NextStepCard } from './landing-hero';
 import { GoalChart } from './goal-chart';
+import { SpendingTrendChart } from './spending-trend-chart';
 import { formatEstimate, formatEstimateRange } from '@/domain/forecast/format';
 import { landingRowsFrom } from '@/domain/forecast/landing-rows';
 import { listGenres } from '@/features/genre/store';
@@ -248,6 +249,7 @@ export default async function ReportsPage() {
             label="グラフを音で聞く"
             text={`${endLabel}の支出は${formatEstimate(landing.p50)}の見込み。80%の確率で${formatEstimateRange(landing.p10, landing.p90)}。${budgetYen !== null ? `予算は${formatEstimate(budgetYen, { approx: false })}。` : ''}`}
           />
+          <SpendingTrendChart daySpend={ledger.totals.daySpend} />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
           {budgetYen === null || forecast.drivers[0] ? (
             <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
