@@ -39,6 +39,7 @@ import { getCurrentPlan } from '@/features/spending-plan/store';
 import { buildCategoryLines } from '@/features/category/model';
 import { linesForGoal, withoutScheduled } from '@/features/category/pace';
 import { formatDateJa, todayJst } from '@/lib/date';
+import { subscriptionKeyOf } from '@/domain/subscriptions';
 import {
   listConfirmedFixedCostKeys,
   loadFixedVariableSplit,
@@ -68,7 +69,7 @@ export default async function ReportsPage() {
       loadCategorySpendingTrend(),
       // net_worth_snapshots は本番マイグレーション未適用の間、テーブル自体が
       // 無く失敗する(TASKS.md のブロック事項参照)。本人にとっては「記録が
-      // まだ無い」のと同じなので、レポート画面全体を落とさず空状態にする。
+      // まだ無い」の同じなので、レポート画面全体を落とさず空状態にする。
       loadNetWorthTrend().catch(() => []),
       loadIncomeExpenseTrend(),
       loadMerchantSpendingRanking(),
@@ -82,6 +83,20 @@ export default async function ReportsPage() {
   const monthKey = ledger.period.from.slice(0, 7);
 
   const today = todayJst();
+  // 固定費を除いた日次支出（トレンド用）
+  const variableDaySpend: Record<string, number> = {};
+  let fixedYenForTrend = 0;
+  for (const tx of ledger.transactions) {
+    if (tx.amountYen >= 0 || tx.isTransfer || tx.reviewStatus === 'ignored' || tx.needsInput)
+      continue;
+    const key = subscriptionKeyOf(tx.label, tx.description, tx.amountYen);
+    const yen = -tx.amountYen;
+    if (confirmedKeys.has(key)) {
+      fixedYenForTrend += yen;
+    } else {
+      variableDaySpend[tx.occurredOn] = (variableDaySpend[tx.occurredOn] ?? 0) + yen;
+    }
+  }
   const [plan, genres] = await Promise.all([getCurrentPlan(today), listGenres().catch(() => [])]);
   const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
   // 目標があれば、既定は目標の期間・すべての支出。「全部」に切り替えると、
@@ -249,7 +264,7 @@ export default async function ReportsPage() {
             label="グラフを音で聞く"
             text={`${endLabel}の支出は${formatEstimate(landing.p50)}の見込み。80%の確率で${formatEstimateRange(landing.p10, landing.p90)}。${budgetYen !== null ? `予算は${formatEstimate(budgetYen, { approx: false })}。` : ''}`}
           />
-          <SpendingTrendChart daySpend={ledger.totals.daySpend} />
+          <SpendingTrendChart daySpend={variableDaySpend} fixedYen={fixedYenForTrend} />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
           {budgetYen === null || forecast.drivers[0] ? (
             <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
