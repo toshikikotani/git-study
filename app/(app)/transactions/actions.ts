@@ -54,7 +54,10 @@ export type DeletedSnapshot = {
 async function readRowFields(ids: readonly string[]): Promise<RowFields[]> {
   if (ids.length === 0) return [];
   const supabase = await createClient();
-  const { data } = await supabase.from('transactions').select('*').in('id', [...ids]);
+  const { data } = await supabase
+    .from('transactions')
+    .select('*')
+    .in('id', [...ids]);
   return (data ?? []).map((r) => {
     const row = r as unknown as Record<string, unknown>;
     return {
@@ -198,9 +201,18 @@ export async function deleteTransactionAction(
     const supabase = await createClient();
     const { data: row } = await supabase.from('transactions').select('*').eq('id', id).single();
     if (!row) return { error: '見つかりませんでした。' };
-    const { data: splits } = await supabase.from('transaction_splits').select('*').eq('transaction_id', id);
-    const { data: items } = await supabase.from('receipt_items').select('*').eq('transaction_id', id);
-    const { data: subtypes } = await supabase.from('expense_subtypes').select('*').eq('transaction_id', id);
+    const { data: splits } = await supabase
+      .from('transaction_splits')
+      .select('*')
+      .eq('transaction_id', id);
+    const { data: items } = await supabase
+      .from('receipt_items')
+      .select('*')
+      .eq('transaction_id', id);
+    const { data: subtypes } = await supabase
+      .from('expense_subtypes')
+      .select('*')
+      .eq('transaction_id', id);
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) return { error: '削除できませんでした。' };
     return {
@@ -329,7 +341,10 @@ export async function setTransactionMustPayAction(
 ): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from('transactions').update({ must_pay: mustPay }).eq('id', id);
+    const { error } = await supabase
+      .from('transactions')
+      .update({ must_pay: mustPay })
+      .eq('id', id);
     if (error) return { error: '変更できませんでした。' };
   } catch (error) {
     return { error: describeUserError(error, '変更できませんでした。') };
