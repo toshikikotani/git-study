@@ -21,6 +21,7 @@ import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
 import { LedgerMenu } from './ledger-menu';
+import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -101,6 +102,7 @@ export function LedgerList({
         <LedgerMenu />
       </div>
       <ActiveFilterChips goalRange={goalRange} />
+      <PendingReceiptRows />
       {risky.length > 0 ? (
         <Link
           href="/transactions/reconcile"
