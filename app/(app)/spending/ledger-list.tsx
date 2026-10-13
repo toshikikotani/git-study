@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/money';
@@ -59,15 +59,18 @@ export function LedgerList({
     visibleMonth,
   } = useSpendingMonth();
   const fixedKeySet = useMemo(() => new Set(fixedKeys), [fixedKeys]);
-  const isFixed = (t: (typeof transactions)[number]) =>
-    fixedKeySet.has(subscriptionKeyOf(t.label, t.description, t.amountYen)) ||
-    (t.genreId !== null && fixedKeySet.has(`genre:${t.genreId}`));
+  const isFixed = useCallback(
+    (t: (typeof transactions)[number]) =>
+      fixedKeySet.has(subscriptionKeyOf(t.label, t.description, t.amountYen)) ||
+      (t.genreId !== null && fixedKeySet.has(`genre:${t.genreId}`)),
+    [fixedKeySet],
+  );
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
   const model = useMemo(() => buildListModel(filtered, today), [filtered, today]);
   const fixed = useMemo(
     () => filtered.filter((t) => t.amountYen < 0 && isFixed(t)),
-    [filtered, fixedKeySet],
+    [filtered, isFixed],
   );
   const dayGroups = useMemo(
     () =>
@@ -81,7 +84,7 @@ export function LedgerList({
           };
         })
         .filter((g) => g.transactions.length > 0),
-    [model.dayGroups, fixedKeySet],
+    [model.dayGroups, isFixed],
   );
   const monthLabel = `${Number(visibleMonth.slice(5, 7))}月 固定費`;
   const risky = useMemo(
