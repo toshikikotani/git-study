@@ -379,6 +379,12 @@ export async function restoreDeletedTransactionAction(
     const supabase = await createClient();
     const { error } = await supabase.from('transactions').insert(snapshot.row as never);
     if (error) return { error: '元に戻せませんでした。' };
+    if (snapshot.splits.length > 0) {
+      await supabase.from('transaction_splits').insert(snapshot.splits as never);
+    }
+    if (snapshot.items.length > 0) {
+      await supabase.from('receipt_items').insert(snapshot.items as never);
+    }
   } catch (error) {
     return { error: describeUserError(error, '元に戻せませんでした。') };
   }
