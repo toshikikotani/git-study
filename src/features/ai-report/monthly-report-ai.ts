@@ -155,12 +155,12 @@ const reportSchema = z.object({
       percent: z
         .enum(AI_ADJUST_CHOICES.map(String) as [string, ...string[]])
         .describe(
-          '統計の見込みの「残りの支出」を何%動かすか。決まった選択肢から1つ。根拠が弱ければ "0"。',
+          '統計の見込みの「残りの支出」を何%動かすか。決まった選択肢から1つ。数理的な根拠があれば積極的に動かす。特に事情がないときだけ "0"。',
         ),
       reason: z
         .string()
         .describe(
-          '1〜2文。なぜその補正にしたか。統計が見ていない事情を、渡した事実だけで説明する。',
+          '1〜2文。誰が読んでもわかるように、数字と理由をセットで書く。例:「直近の1日あたりが月平均より高いので、残りで約○○円増える見込み」。',
         ),
       evidence: z
         .array(z.string())
@@ -381,7 +381,7 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   }
   lines.push(
     '',
-    `forecastRead.percent の選択肢: ${AI_ADJUST_CHOICES.join(', ')}(%、統計の「残りの支出」に対して)`,
+    `forecastRead.percent の選択肢: ${AI_ADJUST_CHOICES.join(', ')}(%、統計の「残りの支出」に対して)。根拠があれば0以外を選び、先を読む。`,
   );
 }
 
