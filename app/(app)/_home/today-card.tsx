@@ -277,28 +277,60 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           </strong>
           の確率で 予算内に収まります
         </p>
-        <div className="flex items-end gap-0.5 h-8">
-          {Array.from({ length: 20 }).map((_, i) => {
-            const threshold = (i + 1) / 20;
-            const filled = probWithin >= threshold;
-            return (
-              <div
-                key={i}
-                className="flex-1 rounded-sm"
-                style={{
-                  height: filled ? '100%' : '30%',
-                  background: filled
-                    ? caution
-                      ? 'var(--state-caution)'
-                      : 'var(--ink)'
-                    : 'var(--plane)',
-                  opacity: filled ? 1 : 0.4,
-                }}
-              />
-            );
-          })}
-        </div>
+        <DistributionChart
+          p10={outlook.p10}
+          p50={outlook.p50}
+          p90={outlook.p90}
+          budget={outlook.budgetYen}
+        />
       </div>
     </section>
+  );
+}
+
+function DistributionChart({
+  p10,
+  p50,
+  p90,
+  budget,
+}: {
+  p10: number;
+  p50: number;
+  p90: number;
+  budget: number;
+}) {
+  const bins = 24;
+  const min = Math.min(p10, budget) * 0.95;
+  const max = Math.max(p90, budget) * 1.05;
+  const range = max - min;
+  const sigma = (p90 - p10) / 2.56;
+  const mean = p50;
+
+  const heights = Array.from({ length: bins }).map((_, i) => {
+    const x = min + (range * (i + 0.5)) / bins;
+    const z = (x - mean) / sigma;
+    return Math.exp(-0.5 * z * z);
+  });
+  const maxH = Math.max(...heights);
+
+  const budgetBin = Math.floor(((budget - min) / range) * bins);
+
+  return (
+    <div className="flex items-end gap-px h-12">
+      {heights.map((h, i) => {
+        const underBudget = i < budgetBin;
+        return (
+          <div
+            key={i}
+            className="flex-1 rounded-t-sm"
+            style={{
+              height: `${(h / maxH) * 100}%`,
+              background: underBudget ? 'var(--state-ok)' : 'var(--state-caution)',
+              opacity: 0.8,
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }
