@@ -208,7 +208,7 @@ export function SpendingTrendChart({
                 strokeWidth={1.5}
                 label={{
                   value: '予算',
-                  position: 'right',
+                  position: 'insideBottomRight',
                   fontSize: 10,
                   fill: 'var(--state-caution)',
                 }}
