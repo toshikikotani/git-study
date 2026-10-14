@@ -14,7 +14,13 @@ export function computeDayOffWeekdayAverages(
   const byDate = new Map<string, number>();
   for (const t of transactions) {
     if (t.occurredOn < from || t.occurredOn > to) continue;
-    if (t.status !== 'actual' || t.isTransfer || t.kind === 'special' || t.kind === 'refund')
+    if (
+      t.status !== 'actual' ||
+      t.isTransfer ||
+      t.mustPay ||
+      t.kind === 'special' ||
+      t.kind === 'refund'
+    )
       continue;
     // 支出は負の数。正の数は収入なので数えない。
     if (t.amountYen >= 0) continue;

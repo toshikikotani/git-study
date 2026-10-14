@@ -39,6 +39,8 @@ export type ForecastSourceTransaction = {
   status: 'actual' | 'scheduled';
   kind: 'normal' | 'special' | 'refund';
   isTransfer: boolean;
+  /** 固定費(家賃・保険・サブスクなど)。平均の計算から除く。 */
+  mustPay?: boolean;
   reviewStatus: 'auto_ok' | 'pending' | 'confirmed' | 'corrected' | 'ignored';
   /** 入力待ち。金額が分かっていれば実績として数える(金額0は数えない)。 */
   needsInput: boolean;

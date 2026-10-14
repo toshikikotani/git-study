@@ -16,6 +16,7 @@ export function toForecastSource(
       status: t.status,
       kind: t.kind,
       isTransfer: t.isTransfer,
+      mustPay: t.mustPay,
       reviewStatus: t.reviewStatus,
       needsInput: t.needsInput,
       merchantName: t.label,
