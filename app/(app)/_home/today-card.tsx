@@ -299,9 +299,9 @@ function DistributionChart({
   p90: number;
   budget: number;
 }) {
-  const width = 280;
-  const height = 80;
-  const padding = { left: 8, right: 8, top: 8, bottom: 16 };
+  const width = 300;
+  const height = 110;
+  const padding = { left: 32, right: 8, top: 8, bottom: 20 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
@@ -327,9 +327,15 @@ function DistributionChart({
     return x <= budget;
   });
 
+  const formatMan = (n: number) => `${(n / 10000).toFixed(1)}万`;
+  const xLabels = [min, p10, p50, p90, max].map((v) => ({
+    x: padding.left + ((v - min) / (max - min)) * chartW,
+    label: formatMan(v),
+  }));
+
   return (
     <div className="flex flex-col gap-1">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-28">
         <defs>
           <linearGradient id="underGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--state-ok)" stopOpacity="0.6" />
@@ -340,6 +346,20 @@ function DistributionChart({
             <stop offset="100%" stopColor="var(--state-caution)" stopOpacity="0.1" />
           </linearGradient>
         </defs>
+        <line
+          x1={padding.left}
+          y1={padding.top + chartH}
+          x2={padding.left + chartW}
+          y2={padding.top + chartH}
+          stroke="var(--hairline)"
+        />
+        <line
+          x1={padding.left}
+          y1={padding.top}
+          x2={padding.left}
+          y2={padding.top + chartH}
+          stroke="var(--hairline)"
+        />
         <path
           d={`${path.join(' ')} L${padding.left + chartW},${padding.top + chartH} L${padding.left},${padding.top + chartH} Z`}
           fill="url(#overGrad)"
@@ -360,18 +380,39 @@ function DistributionChart({
           strokeWidth="1"
           strokeDasharray="2 2"
         />
+        {xLabels.map((l, i) => (
+          <text
+            key={i}
+            x={l.x}
+            y={height - 4}
+            textAnchor="middle"
+            fontSize="7"
+            fill="var(--ink-muted)"
+          >
+            {l.label}
+          </text>
+        ))}
         <text
-          x={budgetX}
-          y={height - 2}
-          textAnchor="middle"
-          fontSize="8"
-          fill="var(--ink-secondary)"
+          x={padding.left - 2}
+          y={padding.top + 8}
+          textAnchor="end"
+          fontSize="7"
+          fill="var(--ink-muted)"
         >
-          予算
+          高
+        </text>
+        <text
+          x={padding.left - 2}
+          y={padding.top + chartH}
+          textAnchor="end"
+          fontSize="7"
+          fill="var(--ink-muted)"
+        >
+          低
         </text>
       </svg>
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-        緑が予算内、茶色が超過。山の中央が予想額。
+        横軸は月末の支出額、縦軸は起こりやすさ。緑が予算内、茶色が超過。
       </p>
     </div>
   );
