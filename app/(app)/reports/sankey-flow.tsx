@@ -74,7 +74,7 @@ export function SankeyFlow({
   const rightX = width - PADDING_X - NODE_WIDTH;
   const usableHeight = height - PADDING_Y * 2;
 
-  // 右側ノードの高さと位置
+  // 右側ノードの高さと位置（変数の再代入を避ける）
   const targetLayouts = targets.map((t) => {
     const h = Math.max(14, (t.value / totalTarget) * usableHeight * 0.92);
     return { ...t, h };
@@ -82,24 +82,34 @@ export function SankeyFlow({
   const totalTargetH = targetLayouts.reduce((sum, t) => sum + t.h, 0);
   const gapTotal = GAP * Math.max(0, targetLayouts.length - 1);
   const scale = (usableHeight - gapTotal) / totalTargetH;
-  let yCursor = PADDING_Y;
-  const rightNodes = targetLayouts.map((t) => {
+
+  const rightNodes = targetLayouts.reduce<
+    { name: string; value: number; color: string; y: number; h: number }[]
+  >((acc, t) => {
+    const prev = acc[acc.length - 1];
+    const y = prev ? prev.y + prev.h + GAP : PADDING_Y;
     const h = t.h * scale;
-    const node = { ...t, y: yCursor, h };
-    yCursor += h + GAP;
-    return node;
-  });
+    acc.push({ ...t, y, h });
+    return acc;
+  }, []);
 
   // 左側ノード（収入 / 支出合計）
-  const sourceH = Math.min(usableHeight * 0.85, rightNodes.reduce((sum, n) => sum + n.h, 0));
+  const sourceH = Math.min(
+    usableHeight * 0.85,
+    rightNodes.reduce((sum, n) => sum + n.h, 0),
+  );
   const sourceY = PADDING_Y + (usableHeight - sourceH) / 2;
 
   // リンク（左ノードから各右ノードへの曲線）
-  let linkY = sourceY;
-  const links = rightNodes.map((node) => {
-    const thickness = Math.max(2, (node.value / sourceValue) * sourceH);
-    const y0 = linkY + thickness / 2;
-    linkY += thickness;
+  const linkThicknesses = rightNodes.map((node) =>
+    Math.max(2, (node.value / sourceValue) * sourceH),
+  );
+  const links = rightNodes.map((node, i) => {
+    const thickness = linkThicknesses[i]!;
+    const y0 =
+      sourceY +
+      linkThicknesses.slice(0, i).reduce((sum, t) => sum + t, 0) +
+      thickness / 2;
     const y1 = node.y + node.h / 2;
     const x0 = leftX + NODE_WIDTH;
     const x1 = rightX;
