@@ -255,6 +255,14 @@ export function SpendingTrendChart({
               : '—'}
           </strong>
         </span>
+        {remainingPerDayYen != null && remainingPerDayYen > 0 ? (
+          <span>
+            残り平均:{' '}
+            <strong style={{ color: 'var(--state-safe)' }}>
+              {formatYen(remainingPerDayYen, { sign: 'never' })}
+            </strong>
+          </span>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--ink-secondary)' }}>
