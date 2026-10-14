@@ -257,7 +257,7 @@ function buildUserContent(input: MonthlyReportInput): string {
   const lines: string[] = [`${input.monthKey} の家計データ:`, ''];
 
   lines.push(
-    `総支出: ${input.totalSpentYen}円 / 総収入: ${input.totalIncomeYen}円`,
+    `変動費の総支出(固定費を除く): ${input.totalSpentYen}円 / 総収入: ${input.totalIncomeYen}円`,
     input.wasteRatio === null
       ? '見直し候補の比率: まだ無い'
       : `浪費 ${input.wasteYen}円 ・ 必要経費 ${input.necessaryYen}円(浪費比率 ${Math.round(input.wasteRatio * 100)}%)`,
@@ -265,7 +265,7 @@ function buildUserContent(input: MonthlyReportInput): string {
   );
 
   if (input.categoryBreakdown.length > 0) {
-    lines.push('カテゴリ別支出(多い順):');
+    lines.push('カテゴリ別支出(固定費を除いた変動費、多い順):');
     for (const c of input.categoryBreakdown) {
       const share =
         input.totalSpentYen > 0 ? Math.round((c.spentYen / input.totalSpentYen) * 100) : 0;

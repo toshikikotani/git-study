@@ -63,16 +63,27 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
 
   return {
     monthKey: monthStartJst(0, now).slice(0, 7),
-    totalSpentYen: ledger.totalSpentYen,
+    totalSpentYen: ledger.transactions
+      .filter((t) => t.amountYen < 0 && !t.isTransfer && !t.mustPay && t.reviewStatus !== 'ignored')
+      .reduce((sum, t) => sum + -t.amountYen, 0),
     totalIncomeYen: ledger.totalIncomeYen,
     wasteYen: diagnosis.currentMonth.summary.wasteYen,
     necessaryYen: diagnosis.currentMonth.summary.necessaryYen,
     wasteRatio: diagnosis.currentMonth.summary.wasteRatio,
     undiagnosedCount: diagnosis.currentMonth.undiagnosedCount,
-    categoryBreakdown: ledger.genreBreakdown
-      .filter((g) => g.spentYen > 0)
-      .slice(0, MAX_ITEMS_PER_LIST)
-      .map((g) => ({ name: g.genreName, spentYen: g.spentYen, budgetYen: g.budgetYen })),
+    categoryBreakdown: (() => {
+      // 固定費(mustPay)を除いた変動費だけでジャンル別を作る。AIが固定費に引っ張られないようにする。
+      const byGenre = new Map<string, number>();
+      for (const t of ledger.transactions) {
+        if (t.amountYen >= 0 || t.isTransfer || t.mustPay || t.reviewStatus === 'ignored') continue;
+        const name = t.genreName ?? '未分類';
+        byGenre.set(name, (byGenre.get(name) ?? 0) + -t.amountYen);
+      }
+      return [...byGenre.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, MAX_ITEMS_PER_LIST)
+        .map(([name, spentYen]) => ({ name, spentYen, budgetYen: null as number | null }));
+    })(),
     topWasteItems: diagnosis.currentMonth.wasteItems.slice(0, MAX_ITEMS_PER_LIST).map((item) => ({
       label: item.label,
       amountYen: item.amountYen,
