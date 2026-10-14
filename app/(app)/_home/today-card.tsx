@@ -110,6 +110,11 @@ function TodayHero({
               今日使った額: {today.spentYen.toLocaleString('ja-JP')}円
             </p>
           ) : null}
+          {allowanceExplain?.dailyLimit ? (
+            <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
+              普段の{Math.round(allowanceExplain.dailyLimit.safetyFactor * 100)}%くらいに抑えめ
+            </p>
+          ) : null}
           <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
           <TenDots probability={SAFE_ALLOWANCE_PROB} />
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>

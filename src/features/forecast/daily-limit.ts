@@ -68,11 +68,11 @@ export function computeDailyLimit(input: DailyLimitInput): DailyLimitResult {
     `配分 = 残り予算${leftBudgetYen.toLocaleString()} ÷ ${weighted.toFixed(1)} → 平日${Math.round(baseWeekday).toLocaleString()}円、休日${Math.round(baseDayOff).toLocaleString()}円`,
   );
 
-  // 3. 確率で絞る。確率が低いほど係数を下げる(最低0.5)
+  // 3. 確率で絞る。確率が低いほど係数を下げる(最低0.75、普段の75%まで)
   const prob = probWithinBudget ?? 1;
-  const safetyFactor = 0.5 + prob * 0.5;
+  const safetyFactor = 0.75 + prob * 0.25;
   steps.push(
-    `確率による絞り = 0.5 + ${(prob * 100).toFixed(0)}% × 0.5 = ${safetyFactor.toFixed(2)}`,
+    `確率による絞り = 0.75 + ${(prob * 100).toFixed(0)}% × 0.25 = ${safetyFactor.toFixed(2)}(普段の${Math.round(safetyFactor * 100)}%)`,
   );
 
   const weekdayAlloc = Math.round(baseWeekday * safetyFactor);
