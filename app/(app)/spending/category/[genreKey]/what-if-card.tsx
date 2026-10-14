@@ -264,9 +264,9 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
               className="flex items-baseline justify-between gap-3 pt-3"
               style={{ borderTop: `1px solid ${ON_DARK_LINE}` }}
             >
-              <dt style={{ color: ON_DARK_SOFT }}>月末の収支の見込み</dt>
+              <dt style={{ color: ON_DARK_SOFT }}>増える分</dt>
               <dd className="tabular text-xl font-semibold">
-                {formatSignedEstimate(view.balanceP50 + option.savedYen)}
+                {formatSignedEstimate(option.savedYen - usual.savedYen)}
               </dd>
             </div>
           ) : null}
