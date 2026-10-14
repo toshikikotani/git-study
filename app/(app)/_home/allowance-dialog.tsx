@@ -13,7 +13,7 @@ export type AllowanceExplain = {
   /** 予算に収まる確率(今の状態)。 */
   probWithinBudget?: number | null;
   /** 残りの休日数(土日祝)。 */
-  remainingDayOffs?: number;
+  remainingDayOffs?: number | undefined;
   /** 休日の1日あたり見込み(過去データから)。 */
   dayOffPerDayYen?: number | null;
   /** 平日の1日あたり見込み(過去データから)。 */
