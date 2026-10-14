@@ -207,29 +207,16 @@ export function SpendingTrendChart({
               <ReferenceLine
                 y={budgetPerDayYen}
                 stroke="var(--state-caution)"
-                strokeDasharray="3 3"
-                strokeWidth={1}
-                label={{
-                  value: '予算',
-                  position: 'insideBottomRight',
-                  fontSize: 10,
-                  fill: 'var(--state-caution)',
-                }}
+                strokeDasharray="4 3"
+                strokeWidth={1.5}
               />
             ) : null}
             {remainingPerDayYen != null && remainingPerDayYen > 0 ? (
               <ReferenceLine
                 y={remainingPerDayYen}
                 stroke="color-mix(in srgb, var(--ink-secondary) 60%, var(--ink))"
-                strokeDasharray="6 3"
-                strokeWidth={2.5}
-                label={{
-                  value: '残り',
-                  position: 'insideBottomRight',
-                  fontSize: 11,
-                  fill: 'color-mix(in srgb, var(--ink-secondary) 60%, var(--ink))',
-                  fontWeight: 600,
-                }}
+                strokeDasharray="4 3"
+                strokeWidth={1.5}
               />
             ) : null}
           </ComposedChart>
@@ -291,10 +278,37 @@ export function SpendingTrendChart({
         </span>
       </div>
 
+      <div
+        className="flex flex-wrap gap-x-4 gap-y-1 text-xs"
+        style={{ color: 'var(--ink-secondary)' }}
+      >
+        {remainingPerDayYen != null && remainingPerDayYen > 0 ? (
+          <span className="flex items-center gap-1">
+            <span
+              className="inline-block h-0.5 w-4"
+              style={{
+                background:
+                  'repeating-linear-gradient(90deg, color-mix(in srgb, var(--ink-secondary) 60%, var(--ink)) 0 4px, transparent 4px 7px)',
+              }}
+            />
+            この点線は残り平均
+          </span>
+        ) : null}
+        {budgetPerDayYen != null && budgetPerDayYen > 0 ? (
+          <span className="flex items-center gap-1">
+            <span
+              className="inline-block h-0.5 w-4"
+              style={{
+                background:
+                  'repeating-linear-gradient(90deg, var(--state-caution) 0 4px, transparent 4px 7px)',
+              }}
+            />
+            この点線は予算平均
+          </span>
+        ) : null}
+      </div>
       {fixedYen > 0 ? (
         <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          残り平均は残り予算を残り日数で割った1日あたり、予算平均は月の予算を日数で割った1日あたりです。
-          <br />
           この期間の固定費（家賃・サブスクなど）は{' '}
           <strong style={{ color: 'var(--ink)' }}>{formatYen(fixedYen, { sign: 'never' })}</strong>
           あります。上のグラフには含めていません。
