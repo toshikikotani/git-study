@@ -77,7 +77,7 @@ describe('月末の見込みの見出し(デザインの「月末の支出」)',
     expect(html).toContain('外食を週1回へらすと');
     expect(html).toContain('約5,100円');
     expect(html).toContain('少なくなる見込みです');
-    expect(html).toContain('予算に収まる確率(モンテカルロ法) 41% → 52%');
+    expect(html).toContain('予算に収まる確率 41% → 52%');
     expect(html).toContain('外食の見通しを見る');
     expect(
       renderToString(
