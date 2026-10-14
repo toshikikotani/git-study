@@ -8,11 +8,15 @@ export type SankeyGenre = {
   spentYen: number;
 };
 
-const MAX_TARGETS = 6;
+const MAX_TARGETS = 7;
+const NODE_W = 14;
+const GAP = 6;
+const PAD_X = 8;
+const PAD_Y = 4;
 
 /**
- * 今月のお金の流れをサンキー風に表示する。
- * 左: 収入または支出合計 / 右: ジャンル別支出
+ * 今月のお金の流れをサンキーダイアグラムで表示する。
+ * 左: 収入（または支出合計） / 右: ジャンル別支出 + 残り
  */
 export function SankeyFlow({
   incomeYen,
@@ -47,39 +51,71 @@ export function SankeyFlow({
   const top = sorted.slice(0, MAX_TARGETS);
   const restYen = sorted.slice(MAX_TARGETS).reduce((sum, g) => sum + g.spentYen, 0);
 
-  const items: { name: string; value: number; color: string }[] = top.map((g) => ({
+  const targets: { name: string; value: number; color: string }[] = top.map((g) => ({
     name: g.name || '未分類',
     value: g.spentYen,
     color: genreColorVar(g.name),
   }));
   if (restYen > 0) {
-    items.push({ name: 'その他', value: restYen, color: 'var(--ink-muted)' });
+    targets.push({ name: 'その他', value: restYen, color: 'var(--ink-muted)' });
   }
   const surplus = incomeYen > totalSpent ? incomeYen - totalSpent : 0;
   if (surplus > 0) {
-    items.push({ name: '残り', value: surplus, color: 'var(--state-ok)' });
+    targets.push({ name: '残り', value: surplus, color: 'var(--state-ok)' });
   }
 
-  if (items.length === 0) {
-    return (
-      <section
-        className="glass space-y-2 rounded-2xl p-5"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-      >
-        <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-          今月のお金の流れ
-        </h2>
-        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          表示できる支出がありません。
-        </p>
-      </section>
-    );
-  }
+  if (targets.length === 0) return null;
 
-  const total = items.reduce((sum, it) => sum + it.value, 0);
-  if (total <= 0) return null;
+  const totalTarget = targets.reduce((sum, t) => sum + t.value, 0);
+  if (totalTarget <= 0) return null;
 
-  // 単純な横バー形式のフロー表示
+  // レイアウト
+  const width = 360;
+  const rowH = 36;
+  const height = Math.max(220, targets.length * rowH + PAD_Y * 2);
+  const leftX = PAD_X;
+  const rightX = width - PAD_X - NODE_W;
+  const usableH = height - PAD_Y * 2;
+
+  // 右ノードの高さとY位置（変数再代入を避ける）
+  const rawHeights = targets.map((t) =>
+    Math.max(14, (t.value / totalTarget) * usableH * 0.88),
+  );
+  const rawSum = rawHeights.reduce((s, h) => s + h, 0);
+  const gapSum = GAP * Math.max(0, targets.length - 1);
+  const scale = rawSum > 0 ? (usableH - gapSum) / rawSum : 1;
+
+  const rightNodes = targets.map((t, i) => {
+    const h = rawHeights[i]! * scale;
+    const y =
+      PAD_Y +
+      rawHeights.slice(0, i).reduce((s, rh) => s + rh * scale + GAP, 0);
+    return { ...t, y, h };
+  });
+
+  // 左ノード
+  const sourceH = Math.min(
+    usableH * 0.92,
+    rightNodes.reduce((s, n) => s + n.h, 0),
+  );
+  const sourceY = PAD_Y + (usableH - sourceH) / 2;
+
+  // リンク（左から右への曲線）
+  const thicknesses = rightNodes.map((n) =>
+    Math.max(2, (n.value / Math.max(sourceValue, 1)) * sourceH),
+  );
+  const links = rightNodes.map((n, i) => {
+    const thick = thicknesses[i]!;
+    const yOffset = thicknesses.slice(0, i).reduce((s, t) => s + t, 0);
+    const y0 = sourceY + yOffset + thick / 2;
+    const y1 = n.y + n.h / 2;
+    const x0 = leftX + NODE_W;
+    const x1 = rightX;
+    const mx = (x0 + x1) / 2;
+    const d = `M ${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`;
+    return { d, thick, color: n.color, name: n.name, value: n.value };
+  });
+
   return (
     <section
       className="glass space-y-3 rounded-2xl p-5"
@@ -90,51 +126,97 @@ export function SankeyFlow({
       </h2>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        {sourceLabel} {formatYen(sourceValue, { sign: 'never' })} → ジャンル別支出
+        左が{sourceLabel}、右がジャンル別支出です。線の太さは金額の比率を表しています。
       </p>
 
-      <div className="space-y-2">
-        {items.map((item, i) => {
-          const ratio = item.value / total;
-          const pct = Math.round(ratio * 100);
-          return (
-            <div key={i} className="flex items-center gap-2">
-              <div
-                className="w-16 shrink-0 text-right text-xs tabular"
-                style={{ color: 'var(--ink-secondary)' }}
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          width="100%"
+          height={height}
+          role="img"
+          aria-label={`${sourceLabel}からジャンル別支出への流れ`}
+          style={{ display: 'block', maxWidth: '100%' }}
+        >
+          {links.map((link, i) => (
+            <path
+              key={i}
+              d={link.d}
+              fill="none"
+              stroke={link.color}
+              strokeWidth={link.thick}
+              strokeOpacity={0.55}
+              strokeLinecap="round"
+            >
+              <title>
+                {link.name}: {formatYen(link.value, { sign: 'never' })}
+              </title>
+            </path>
+          ))}
+
+          <rect
+            x={leftX}
+            y={sourceY}
+            width={NODE_W}
+            height={sourceH}
+            rx={3}
+            fill="var(--accent)"
+            opacity={0.9}
+          />
+          <text
+            x={leftX + NODE_W / 2}
+            y={sourceY + sourceH / 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="var(--on-action)"
+            fontSize={11}
+            fontWeight={600}
+            transform={`rotate(-90 ${leftX + NODE_W / 2} ${sourceY + sourceH / 2})`}
+          >
+            {sourceLabel}
+          </text>
+
+          {rightNodes.map((n, i) => (
+            <g key={i}>
+              <rect
+                x={rightX}
+                y={n.y}
+                width={NODE_W}
+                height={n.h}
+                rx={3}
+                fill={n.color}
+                opacity={0.95}
+              />
+              <text
+                x={rightX - 6}
+                y={n.y + n.h / 2 - 5}
+                textAnchor="end"
+                dominantBaseline="middle"
+                fill="var(--ink)"
+                fontSize={11}
+                fontWeight={500}
               >
-                {item.name.length > 6 ? `${item.name.slice(0, 5)}…` : item.name}
-              </div>
-              <div
-                className="h-6 flex-1 overflow-hidden rounded-full"
-                style={{ background: 'var(--plane)' }}
+                {n.name.length > 8 ? `${n.name.slice(0, 7)}…` : n.name}
+              </text>
+              <text
+                x={rightX - 6}
+                y={n.y + n.h / 2 + 8}
+                textAnchor="end"
+                dominantBaseline="middle"
+                fill="var(--ink-secondary)"
+                fontSize={9}
+                className="tabular"
               >
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.max(4, pct)}%`,
-                    background: item.color,
-                    opacity: 0.85,
-                  }}
-                />
-              </div>
-              <div
-                className="w-20 shrink-0 text-right text-xs tabular"
-                style={{ color: 'var(--ink)' }}
-              >
-                {formatYen(item.value, { sign: 'never' })}
-                <span className="ml-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
-                  {pct}%
-                </span>
-              </div>
-            </div>
-          );
-        })}
+                {formatYen(n.value, { sign: 'never' })}
+              </text>
+            </g>
+          ))}
+        </svg>
       </div>
 
       <div
-        className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs tabular"
-        style={{ borderColor: 'var(--plane)', color: 'var(--ink-secondary)' }}
+        className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular"
+        style={{ color: 'var(--ink-secondary)' }}
       >
         <span>
           {sourceLabel}:{' '}
