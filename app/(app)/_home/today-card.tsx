@@ -114,7 +114,9 @@ function TodayHero({
             <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
               {(() => {
                 const isDayOff = allowanceExplain.dailyLimit.todayIsDayOff;
-                const avg = isDayOff ? allowanceExplain.dayOffPerDayYen : allowanceExplain.weekdayPerDayYen;
+                const avg = isDayOff
+                  ? allowanceExplain.dayOffPerDayYen
+                  : allowanceExplain.weekdayPerDayYen;
                 const limit = allowanceExplain.dailyLimit.todayLimitYen;
                 if (avg && avg > 0) {
                   const pct = Math.round((limit / avg) * 100);
@@ -275,14 +277,26 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           </strong>
           の確率で 予算内に収まります
         </p>
-        <div aria-hidden className="h-1.5 rounded-full" style={{ background: 'var(--plane)' }}>
-          <div
-            className="h-1.5 rounded-full"
-            style={{
-              width: `${Math.round(Math.min(1, Math.max(0, probWithin)) * 100)}%`,
-              background: caution ? 'var(--sub, var(--accent))' : 'var(--ink)',
-            }}
-          />
+        <div className="flex items-end gap-0.5 h-8">
+          {Array.from({ length: 20 }).map((_, i) => {
+            const threshold = (i + 1) / 20;
+            const filled = probWithin >= threshold;
+            return (
+              <div
+                key={i}
+                className="flex-1 rounded-sm"
+                style={{
+                  height: filled ? '100%' : '30%',
+                  background: filled
+                    ? caution
+                      ? 'var(--state-caution)'
+                      : 'var(--ink)'
+                    : 'var(--plane)',
+                  opacity: filled ? 1 : 0.4,
+                }}
+              />
+            );
+          })}
         </div>
       </div>
     </section>
