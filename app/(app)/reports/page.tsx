@@ -282,8 +282,12 @@ export default async function ReportsPage() {
             remainingPerDayYen={
               budgetYen != null && plan && outcome.ok
                 ? Math.round(
-                    Math.max(0, budgetYen - fixedYenForTrend - outcome.value.forecast.actualYen) /
-                      Math.max(1, outcome.value.forecast.remainingDays),
+                    Math.max(
+                      0,
+                      budgetYen -
+                        fixedYenForTrend -
+                        Math.max(0, outcome.value.forecast.actualYen - fixedYenForTrend),
+                    ) / Math.max(1, outcome.value.forecast.remainingDays),
                   )
                 : null
             }
