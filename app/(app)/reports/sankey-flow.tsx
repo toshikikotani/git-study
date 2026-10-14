@@ -9,10 +9,10 @@ export type SankeyGenre = {
 };
 
 const MAX_TARGETS = 7;
-const NODE_WIDTH = 18;
-const GAP = 8;
-const PADDING_X = 16;
-const PADDING_Y = 12;
+const NODE_WIDTH = 20;
+const GAP = 6;
+const PADDING_X = 12;
+const PADDING_Y = 8;
 
 /**
  * 今月のお金の流れをサンキーダイアグラムで表示する。
@@ -27,9 +27,26 @@ export function SankeyFlow({
   genres: readonly SankeyGenre[];
 }) {
   const positive = genres.filter((g) => g.spentYen > 0);
-  if (positive.length === 0 && incomeYen <= 0) return null;
-
   const totalSpent = positive.reduce((sum, g) => sum + g.spentYen, 0);
+
+  // データが無い場合は空状態を表示
+  if (positive.length === 0 && incomeYen <= 0) {
+    return (
+      <section
+        className="glass space-y-3 rounded-2xl p-5"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        aria-label="今月のお金の流れ"
+      >
+        <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+          今月のお金の流れ
+        </h2>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+          今月の収支記録がまだありません。
+        </p>
+      </section>
+    );
+  }
+
   const sourceValue = Math.max(incomeYen, totalSpent);
   const sourceLabel = incomeYen > 0 ? '収入' : '支出合計';
 
@@ -40,7 +57,7 @@ export function SankeyFlow({
   const restYen = rest.reduce((sum, g) => sum + g.spentYen, 0);
 
   const targets: { name: string; value: number; color: string }[] = top.map((g) => ({
-    name: g.name,
+    name: g.name || '未分類',
     value: g.spentYen,
     color: genreColorVar(g.name),
   }));
@@ -62,26 +79,41 @@ export function SankeyFlow({
     });
   }
 
-  if (targets.length === 0) return null;
+  if (targets.length === 0) {
+    return (
+      <section
+        className="glass space-y-3 rounded-2xl p-5"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        aria-label="今月のお金の流れ"
+      >
+        <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+          今月のお金の流れ
+        </h2>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+          表示できる支出がありません。
+        </p>
+      </section>
+    );
+  }
 
   const totalTarget = targets.reduce((sum, t) => sum + t.value, 0);
   if (totalTarget <= 0) return null;
 
   // レイアウト計算
-  const height = Math.max(280, targets.length * 36 + 40);
-  const width = 360;
+  const height = Math.max(240, targets.length * 40 + 32);
+  const width = 400;
   const leftX = PADDING_X;
   const rightX = width - PADDING_X - NODE_WIDTH;
   const usableHeight = height - PADDING_Y * 2;
 
-  // 右側ノードの高さと位置（変数の再代入を避ける）
-  const targetLayouts = targets.map((t) => {
-    const h = Math.max(14, (t.value / totalTarget) * usableHeight * 0.92);
-    return { ...t, h };
-  });
+  // 右側ノードの高さと位置
+  const targetLayouts = targets.map((t) => ({
+    ...t,
+    h: Math.max(16, (t.value / totalTarget) * usableHeight * 0.9),
+  }));
   const totalTargetH = targetLayouts.reduce((sum, t) => sum + t.h, 0);
   const gapTotal = GAP * Math.max(0, targetLayouts.length - 1);
-  const scale = (usableHeight - gapTotal) / totalTargetH;
+  const scale = totalTargetH > 0 ? (usableHeight - gapTotal) / totalTargetH : 1;
 
   type Node = {
     name: string;
@@ -91,31 +123,29 @@ export function SankeyFlow({
     h: number;
   };
 
-  const rightNodes = targetLayouts.reduce<Node[]>((acc, t) => {
-    const prev = acc[acc.length - 1];
-    const y = prev ? prev.y + prev.h + GAP : PADDING_Y;
+  const rightNodes: Node[] = [];
+  let yCursor = PADDING_Y;
+  for (const t of targetLayouts) {
     const h = t.h * scale;
-    acc.push({ ...t, y, h });
-    return acc;
-  }, []);
+    rightNodes.push({ name: t.name, value: t.value, color: t.color, y: yCursor, h });
+    yCursor += h + GAP;
+  }
 
   // 左側ノード（収入 / 支出合計）
   const sourceH = Math.min(
-    usableHeight * 0.85,
+    usableHeight * 0.9,
     rightNodes.reduce((sum, n) => sum + n.h, 0),
   );
   const sourceY = PADDING_Y + (usableHeight - sourceH) / 2;
 
-  // リンク（左ノードから各右ノードへの曲線）
+  // リンク
   const linkThicknesses = rightNodes.map((node) =>
-    Math.max(2, (node.value / sourceValue) * sourceH),
+    Math.max(3, (node.value / Math.max(sourceValue, 1)) * sourceH),
   );
   const links = rightNodes.map((node, i) => {
     const thickness = linkThicknesses[i]!;
-    const y0 =
-      sourceY +
-      linkThicknesses.slice(0, i).reduce((sum, t) => sum + t, 0) +
-      thickness / 2;
+    const offset = linkThicknesses.slice(0, i).reduce((sum, t) => sum + t, 0);
+    const y0 = sourceY + offset + thickness / 2;
     const y1 = node.y + node.h / 2;
     const x0 = leftX + NODE_WIDTH;
     const x1 = rightX;
@@ -147,14 +177,14 @@ export function SankeyFlow({
         {surplus > 0 ? `収入が支出を上回った分は「残り」として表示しています。` : ''}
       </p>
 
-      <div className="w-full overflow-x-auto">
+      <div className="w-full overflow-x-auto" style={{ minHeight: height }}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           width="100%"
           height={height}
           role="img"
           aria-label={`${sourceLabel}からジャンル別支出への流れ`}
-          style={{ maxWidth: '100%' }}
+          style={{ display: 'block', maxWidth: '100%' }}
         >
           {links.map((link, i) => (
             <path
@@ -163,7 +193,7 @@ export function SankeyFlow({
               fill="none"
               stroke={link.color}
               strokeWidth={link.thickness}
-              strokeOpacity={0.55}
+              strokeOpacity={0.6}
               strokeLinecap="round"
             >
               <title>
@@ -179,7 +209,7 @@ export function SankeyFlow({
             height={sourceH}
             rx={4}
             fill="var(--accent)"
-            opacity={0.85}
+            opacity={0.9}
           />
           <text
             x={leftX + NODE_WIDTH / 2}
@@ -187,7 +217,7 @@ export function SankeyFlow({
             textAnchor="middle"
             dominantBaseline="middle"
             fill="var(--on-action)"
-            fontSize={11}
+            fontSize={12}
             fontWeight={600}
             transform={`rotate(-90 ${leftX + NODE_WIDTH / 2} ${sourceY + sourceH / 2})`}
           >
@@ -203,26 +233,26 @@ export function SankeyFlow({
                 height={node.h}
                 rx={3}
                 fill={node.color}
-                opacity={0.9}
+                opacity={0.95}
               />
               <text
-                x={rightX - 6}
-                y={node.y + node.h / 2}
+                x={rightX - 8}
+                y={node.y + node.h / 2 - 4}
                 textAnchor="end"
                 dominantBaseline="middle"
                 fill="var(--ink)"
-                fontSize={11}
+                fontSize={12}
                 fontWeight={500}
               >
-                {node.name.length > 8 ? `${node.name.slice(0, 7)}…` : node.name}
+                {node.name.length > 10 ? `${node.name.slice(0, 9)}…` : node.name}
               </text>
               <text
-                x={rightX - 6}
-                y={node.y + node.h / 2 + 12}
+                x={rightX - 8}
+                y={node.y + node.h / 2 + 10}
                 textAnchor="end"
                 dominantBaseline="middle"
                 fill="var(--ink-secondary)"
-                fontSize={9}
+                fontSize={10}
                 className="tabular"
               >
                 {formatYen(node.value, { sign: 'never' })}
