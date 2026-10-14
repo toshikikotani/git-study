@@ -142,7 +142,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                     <li>・平日は1日{yen(explain.weekdayPerDayYen)}くらい(過去の実績)</li>
                     <li>・休日は1日{yen(explain.dayOffPerDayYen)}くらい(過去の実績)</li>
                     <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                      過去90日の変動費の平均です。今日の上限{yen(cap)}
+                      過去90日で支出があった日だけの平均です。今日の上限{yen(cap)}
                       は、この平均より低い安全側の数字です。
                     </li>
                   </>

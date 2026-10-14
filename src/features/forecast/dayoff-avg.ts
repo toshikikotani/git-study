@@ -4,7 +4,7 @@ import { addDays, type DateOnly } from '@/lib/date';
 
 /**
  * 過去の実績から、休日(土日祝)と平日の1日あたり平均支出を計算する。
- * 振替・特別費は除く。日単位で合計してから平均するので、その日に明細が無くても0円の日として数える。
+ * 振替・特別費・固定費は除く。支出があった日だけで平均を取る（0円の日は数えない）。
  */
 export function computeDayOffWeekdayAverages(
   transactions: readonly ForecastSourceTransaction[],
@@ -32,9 +32,10 @@ export function computeDayOffWeekdayAverages(
   let weekdaySum = 0;
   let weekdayCount = 0;
 
-  for (let d = from; d <= to; d = addDays(d, 1)) {
-    const yen = byDate.get(d) ?? 0;
-    if (isDayOff(d)) {
+  // 支出があった日だけで平均を取る。0円の日は数えない。
+  for (const [date, yen] of byDate) {
+    if (yen <= 0) continue;
+    if (isDayOff(date)) {
       dayOffSum += yen;
       dayOffCount += 1;
     } else {
