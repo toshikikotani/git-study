@@ -101,7 +101,7 @@ export function SpendingTrendChart({
       </div>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        棒は1日の支出（レシート単位で固定費とマークしたものは除く）。7日平均を上回った日はシアン、下回った日は緑です。
+        棒は1日の支出（レシート単位で固定費とマークしたものは除く）。7日平均を上回った日は赤、下回った日は灰色です。
         線は平均のペース（実線=直近7日、点線=直近21日）です。
       </p>
 
@@ -159,8 +159,8 @@ export function SpendingTrendChart({
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.aboveAvg ? 'var(--genre-5)' : 'var(--genre-1)'}
-                  opacity={0.8}
+                  fill={entry.aboveAvg ? 'var(--over)' : 'color-mix(in srgb, var(--ink) 25%, transparent)'}
+                  opacity={entry.aboveAvg ? 0.75 : 0.5}
                 />
               ))}
             </Bar>
@@ -213,14 +213,14 @@ export function SpendingTrendChart({
         <span className="flex items-center gap-1">
           <span
             className="inline-block size-3 rounded"
-            style={{ background: 'var(--genre-5)', opacity: 0.8 }}
+            style={{ background: 'var(--over)', opacity: 0.75 }}
           />
           7日平均を上回った日
         </span>
         <span className="flex items-center gap-1">
           <span
             className="inline-block size-3 rounded"
-            style={{ background: 'var(--genre-1)', opacity: 0.8 }}
+            style={{ background: 'color-mix(in srgb, var(--ink) 25%, transparent)', opacity: 0.5 }}
           />
           7日平均を下回った日
         </span>
