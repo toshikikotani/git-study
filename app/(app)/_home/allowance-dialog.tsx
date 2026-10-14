@@ -141,6 +141,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 ) : null}
                 {explain.dayOffPerDayYen != null &&
                 explain.weekdayPerDayYen != null &&
+                explain.dayOffPerDayYen > 0 &&
                 explain.weekdayPerDayYen > 0 ? (
                   <li>
                     ・休日は平日の約

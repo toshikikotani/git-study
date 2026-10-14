@@ -16,8 +16,9 @@ export function computeDayOffWeekdayAverages(
     if (t.occurredOn < from || t.occurredOn > to) continue;
     if (t.status !== 'actual' || t.isTransfer || t.kind === 'special' || t.kind === 'refund')
       continue;
-    if (t.amountYen <= 0) continue;
-    byDate.set(t.occurredOn, (byDate.get(t.occurredOn) ?? 0) + t.amountYen);
+    // 支出は負の数。正の数は収入なので数えない。
+    if (t.amountYen >= 0) continue;
+    byDate.set(t.occurredOn, (byDate.get(t.occurredOn) ?? 0) + -t.amountYen);
   }
 
   let dayOffSum = 0;
