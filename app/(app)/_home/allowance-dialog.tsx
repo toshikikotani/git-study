@@ -139,10 +139,10 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 <li>・残り平日: {weekdays}日</li>
                 {explain.dayOffPerDayYen != null && explain.weekdayPerDayYen != null ? (
                   <>
-                    <li>・平日は1日{yen(explain.weekdayPerDayYen)}くらい(過去の実績)</li>
-                    <li>・休日は1日{yen(explain.dayOffPerDayYen)}くらい(過去の実績)</li>
+                    <li>・平日は1日{yen(explain.weekdayPerDayYen)}くらい(過去の中央値)</li>
+                    <li>・休日は1日{yen(explain.dayOffPerDayYen)}くらい(過去の中央値)</li>
                     <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                      過去90日で支出があった日だけの平均です。今日の上限{yen(cap)}
+                      過去90日で支出があった日だけの中央値です。今日の上限{yen(cap)}
                       は、この平均より低い安全側の数字です。
                     </li>
                   </>

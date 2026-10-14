@@ -27,25 +27,28 @@ export function computeDayOffWeekdayAverages(
     byDate.set(t.occurredOn, (byDate.get(t.occurredOn) ?? 0) + -t.amountYen);
   }
 
-  let dayOffSum = 0;
-  let dayOffCount = 0;
-  let weekdaySum = 0;
-  let weekdayCount = 0;
+  const dayOffDays: number[] = [];
+  const weekdayDays: number[] = [];
 
-  // 支出があった日だけで平均を取る。0円の日は数えない。
+  // 支出があった日だけ。0円の日は数えない。
   for (const [date, yen] of byDate) {
     if (yen <= 0) continue;
-    if (isDayOff(date)) {
-      dayOffSum += yen;
-      dayOffCount += 1;
-    } else {
-      weekdaySum += yen;
-      weekdayCount += 1;
-    }
+    if (isDayOff(date)) dayOffDays.push(yen);
+    else weekdayDays.push(yen);
   }
 
+  // 中央値を使う。大きい日に引っ張られない。
+  const median = (xs: number[]): number | null => {
+    if (xs.length === 0) return null;
+    const sorted = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? Math.round((sorted[mid - 1]! + sorted[mid]!) / 2)
+      : sorted[mid]!;
+  };
+
   return {
-    dayOffPerDayYen: dayOffCount > 0 ? Math.round(dayOffSum / dayOffCount) : null,
-    weekdayPerDayYen: weekdayCount > 0 ? Math.round(weekdaySum / weekdayCount) : null,
+    dayOffPerDayYen: median(dayOffDays),
+    weekdayPerDayYen: median(weekdayDays),
   };
 }
