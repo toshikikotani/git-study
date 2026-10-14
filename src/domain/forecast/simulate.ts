@@ -664,6 +664,16 @@ export function simulateForecast(input: SimulateInput): Forecast {
 
   const sortedTotal = sortedCopy(totalSamples);
   const total = bandAt(sortedTotal, levels);
+  // 下限が実績より低くなりすぎないようにする。変動費の平均の半分を最低限とする。
+  const variableMean = mean(variableSamples);
+  const minRemaining = Math.round(variableMean * 0.5);
+  const floor = input.actualYen + minRemaining;
+  if (total.p10 < floor) {
+    total.p10 = floor;
+    if (total.p50 < total.p10) total.p50 = total.p10;
+    if (total.p70 < total.p50) total.p70 = total.p50;
+    if (total.p90 < total.p70) total.p90 = total.p70;
+  }
   const categoryMedian = categorySamples.map((s) => quantileAt(sortedCopy(s), 0.5));
 
   // 予算を超えた試行での、各カテゴリの「ふだんより多い分」(原因の割り当て)。
