@@ -144,19 +144,16 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               >
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
-                {ratio !== null
-                  ? (() => {
-                      const weekdayLimit = cap;
-                      const holidayPool = Math.max(0, leftBudget - weekdays * weekdayLimit);
-                      const holidayLimit = dayOffs > 0 ? Math.round(holidayPool / dayOffs) : 0;
-                      return (
-                        <>
-                          <li>・平日の上限: 1日{yen(weekdayLimit)}(今日の上限)</li>
-                          <li>・休日の上限: 1日{yen(holidayLimit)}(残り予算を休日に配分)</li>
-                        </>
-                      );
-                    })()
-                  : null}
+                {explain.dayOffPerDayYen != null && explain.weekdayPerDayYen != null ? (
+                  <>
+                    <li>・平日は1日{yen(explain.weekdayPerDayYen)}くらい(過去の実績)</li>
+                    <li>・休日は1日{yen(explain.dayOffPerDayYen)}くらい(過去の実績)</li>
+                    <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                      過去90日の変動費の平均です。今日の上限{yen(cap)}
+                      は、この平均より低い安全側の数字です。
+                    </li>
+                  </>
+                ) : null}
               </ul>
             </div>
           ) : null}
