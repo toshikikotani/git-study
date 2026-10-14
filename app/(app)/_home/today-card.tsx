@@ -412,7 +412,7 @@ function DistributionChart({
         </text>
       </svg>
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-        横軸は月末の支出額、縦軸は起こりやすさ。緑が予算内、茶色が超過。
+        横軸は月末の支出額、縦軸は確率密度（高いほど起こりやすい）。緑が予算内、茶色が超過。
       </p>
     </div>
   );
