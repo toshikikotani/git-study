@@ -273,7 +273,10 @@ export default async function ReportsPage() {
             to={plan?.periodEnd}
             budgetPerDayYen={
               budgetYen != null && plan
-                ? Math.round(budgetYen / Math.max(1, periodDays(plan.periodStart, plan.periodEnd)))
+                ? Math.round(
+                    Math.max(0, budgetYen - fixedYenForTrend) /
+                      Math.max(1, periodDays(plan.periodStart, plan.periodEnd)),
+                  )
                 : null
             }
           />
