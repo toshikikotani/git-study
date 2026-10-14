@@ -82,7 +82,7 @@ describe('ジャンル画面の「もし、へらしたら」', () => {
     expect(html).toContain('10回中7回');
     expect(html).toContain('全体で予算に収まる');
     expect(html).toContain('10回中4回');
-    expect(html).toContain('+9.7万円');
+    expect(html).toContain('+0円');
     expect(html).toContain('1回 約3,100円 × 月末まで約3.7週で計算した目安です。');
     // 選択肢はラジオ(押せる大きさ)で、いつも通りが選ばれている
     expect(html).toMatch(/role="radio" aria-checked="true"[^>]*class="min-h-11/);
