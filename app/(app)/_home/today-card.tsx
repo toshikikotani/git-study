@@ -285,6 +285,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           p50={outlook.p50}
           p90={outlook.p90}
           budget={outlook.budgetYen}
+          actualProb={probWithin}
         />
       </div>
     </section>
@@ -473,7 +474,11 @@ function DistributionChart({
       </svg>
       {tapYen !== null && tapProb !== null ? (
         <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-          {formatMan(tapYen)}以下になる確率: {Math.round(tapProb * 100)}%
+          {formatMan(tapYen)}以下になる確率:{' '}
+          {Math.abs(tapYen - budget) < (p90 - p10) * 0.05
+            ? Math.round(actualProb * 100)
+            : Math.round(tapProb * 100)}
+          %
         </p>
       ) : (
         <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
