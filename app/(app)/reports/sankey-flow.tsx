@@ -83,9 +83,15 @@ export function SankeyFlow({
   const gapTotal = GAP * Math.max(0, targetLayouts.length - 1);
   const scale = (usableHeight - gapTotal) / totalTargetH;
 
-  const rightNodes = targetLayouts.reduce<
-    { name: string; value: number; color: string; y: number; h: number }[]
-  >((acc, t) => {
+  type Node = {
+    name: string;
+    value: number;
+    color: string;
+    y: number;
+    h: number;
+  };
+
+  const rightNodes = targetLayouts.reduce<Node[]>((acc, t) => {
     const prev = acc[acc.length - 1];
     const y = prev ? prev.y + prev.h + GAP : PADDING_Y;
     const h = t.h * scale;
@@ -137,8 +143,7 @@ export function SankeyFlow({
       </div>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        左が{sourceLabel}、右がジャンル別の支出です。
-        線の太さは金額の比率を表しています。
+        左が{sourceLabel}、右がジャンル別の支出です。線の太さは金額の比率を表しています。
         {surplus > 0 ? `収入が支出を上回った分は「残り」として表示しています。` : ''}
       </p>
 
@@ -151,7 +156,6 @@ export function SankeyFlow({
           aria-label={`${sourceLabel}からジャンル別支出への流れ`}
           style={{ maxWidth: '100%' }}
         >
-          {/* リンク */}
           {links.map((link, i) => (
             <path
               key={i}
@@ -168,7 +172,6 @@ export function SankeyFlow({
             </path>
           ))}
 
-          {/* 左ノード */}
           <rect
             x={leftX}
             y={sourceY}
@@ -191,7 +194,6 @@ export function SankeyFlow({
             {sourceLabel}
           </text>
 
-          {/* 右ノードとラベル */}
           {rightNodes.map((node, i) => (
             <g key={i}>
               <rect
@@ -230,7 +232,10 @@ export function SankeyFlow({
         </svg>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular" style={{ color: 'var(--ink-secondary)' }}>
+      <div
+        className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular"
+        style={{ color: 'var(--ink-secondary)' }}
+      >
         <span>
           {sourceLabel}:{' '}
           <strong style={{ color: 'var(--ink)' }}>
