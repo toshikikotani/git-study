@@ -163,7 +163,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                     </li>
                     <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
                       残り予算を休日/平日の中央値の比率で配分し、確率
-                      {((explain.probWithinBudget ?? 1) * 100) | 0}%で絞った数字です。
+                      {Math.round((explain.probWithinBudget ?? 1) * 100)}%で絞った数字です。
                     </li>
                   </>
                 ) : explain.dayOffPerDayYen != null && explain.weekdayPerDayYen != null ? (
