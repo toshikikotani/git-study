@@ -28,6 +28,7 @@ import { loadForecastHistory } from './history';
 import { listPromises } from './promise-store';
 import { genreSpentYen, promiseKeepRate, promiseKept } from '@/domain/forecast/promise';
 import { toForecastSource } from './source';
+import { computeDayOffWeekdayAverages } from './dayoff-avg';
 
 /** 約束の守れ具合を数える、過去の月数。 */
 const PROMISE_HISTORY_MONTHS = 6;
@@ -48,6 +49,9 @@ export type ForecastView = {
   cautionPrecision: CautionPrecision | null;
   /** 範囲の、今日の支出(今日あと使える額に使う。設計書 v3 3.1)。 */
   todaySpentYen: number;
+  /** 直近の実績から計算した、休日(土日祝)と平日の1日あたり平均。 */
+  dayOffPerDayYen: number | null;
+  weekdayPerDayYen: number | null;
 };
 
 /** 範囲の、ある日の支出(実績。返金は差し引く。特別費を外す範囲なら外す)。 */
@@ -239,6 +243,11 @@ export async function loadForecast(args: {
     ...(args.categoryTargets ? { categoryTargets: args.categoryTargets } : {}),
     income: args.scope ? null : periodIncome({ transactions, period: args.period, takeHomeYen }),
   });
+  // 直近90日の実績から、休日と平日の1日あたり平均を計算する(残りの日の内訳表示用)。
+  const recentFrom = addDays(today, -90);
+  const recentTo = addDays(today, -1);
+  const averages = computeDayOffWeekdayAverages(transactions, recentFrom, recentTo);
+
   return {
     forecast,
     period: args.period,
@@ -247,5 +256,7 @@ export async function loadForecast(args: {
     excludedByCategory: excludedSpend(transactions, args.period, args.scope),
     cautionPrecision,
     todaySpentYen: spentOn(periodRows, today, args.scope),
+    dayOffPerDayYen: averages.dayOffPerDayYen,
+    weekdayPerDayYen: averages.weekdayPerDayYen,
   };
 }

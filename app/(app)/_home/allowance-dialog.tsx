@@ -134,10 +134,18 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
                 {explain.dayOffPerDayYen != null && explain.dayOffPerDayYen > 0 ? (
-                  <li>・休日の見込み: 1日{yen(explain.dayOffPerDayYen)}(過去データから)</li>
+                  <li>・休日の見込み: 1日{yen(explain.dayOffPerDayYen)}(直近90日の実績)</li>
                 ) : null}
                 {explain.weekdayPerDayYen != null && explain.weekdayPerDayYen > 0 ? (
-                  <li>・平日の見込み: 1日{yen(explain.weekdayPerDayYen)}(過去データから)</li>
+                  <li>・平日の見込み: 1日{yen(explain.weekdayPerDayYen)}(直近90日の実績)</li>
+                ) : null}
+                {explain.dayOffPerDayYen != null &&
+                explain.weekdayPerDayYen != null &&
+                explain.weekdayPerDayYen > 0 ? (
+                  <li>
+                    ・休日は平日の約
+                    {(explain.dayOffPerDayYen / explain.weekdayPerDayYen).toFixed(1)}倍
+                  </li>
                 ) : null}
               </ul>
             </div>
@@ -161,7 +169,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
             </div>
           ) : null}
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-            休日の重みは、過去の支出記録から「休日は平日の何倍使うか」を計算して決めています。
+            休日の重みは、直近90日の実績から「休日(土日祝)の1日あたり」と「平日の1日あたり」を計算し、その比率を使っています。
           </p>
           <button
             type="button"
