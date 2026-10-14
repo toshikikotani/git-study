@@ -18,6 +18,15 @@ export type AllowanceExplain = {
   dayOffPerDayYen?: number | null;
   /** 平日の1日あたり見込み(過去データから)。 */
   weekdayPerDayYen?: number | null;
+  /** 今日の上限の計算結果。 */
+  dailyLimit?: {
+    todayLimitYen: number;
+    weekdayAllocYen: number;
+    dayOffAllocYen: number;
+    ratio: number;
+    safetyFactor: number;
+    steps: string[];
+  } | null;
 };
 
 function yen(n: number): string {
@@ -29,7 +38,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
   const [open, setOpen] = useState(false);
   const spentBefore = Math.max(0, explain.spentYen - explain.spentTodayYen);
   const leftBudget = explain.budgetYen - spentBefore;
-  const cap = explain.capYen;
+  const cap = explain.dailyLimit?.todayLimitYen ?? explain.capYen;
   const over = explain.spentTodayYen - cap;
   const max = Math.max(explain.budgetYen, explain.spentYen, cap, explain.spentTodayYen, 1);
   const bar = (value: number, color: string) => (
@@ -119,7 +128,15 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 2. 単純な1日あたり = {yen(leftBudget)} ÷ {explain.remainingDays}日 ={' '}
                 {yen(simplePerDay)}
               </li>
-              <li>3. 今日の上限 = {yen(cap)}（残り予算を休日/平日の比率で配分した平日分）</li>
+              {explain.dailyLimit ? (
+                explain.dailyLimit.steps.map((s, i) => (
+                  <li key={i}>
+                    {i + 3}. {s}
+                  </li>
+                ))
+              ) : (
+                <li>3. 今日の上限 = {yen(cap)}（残り予算を休日/平日の比率で配分した平日分）</li>
+              )}
             </ol>
           </div>
           {dayOffs > 0 &&
@@ -137,14 +154,22 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               >
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
-                {explain.dayOffPerDayYen != null && explain.weekdayPerDayYen != null ? (
+                {explain.dailyLimit ? (
+                  <>
+                    <li>・平日の配分: 1日{yen(explain.dailyLimit.weekdayAllocYen)}</li>
+                    <li>
+                      ・休日の配分: 1日{yen(explain.dailyLimit.dayOffAllocYen)}(比率
+                      {explain.dailyLimit.ratio.toFixed(1)}倍)
+                    </li>
+                    <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                      残り予算を休日/平日の中央値の比率で配分し、確率
+                      {((explain.probWithinBudget ?? 1) * 100) | 0}%で絞った数字です。
+                    </li>
+                  </>
+                ) : explain.dayOffPerDayYen != null && explain.weekdayPerDayYen != null ? (
                   <>
                     <li>・平日は1日{yen(explain.weekdayPerDayYen)}くらい(過去の中央値)</li>
                     <li>・休日は1日{yen(explain.dayOffPerDayYen)}くらい(過去の中央値)</li>
-                    <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                      過去90日で支出があった日だけの中央値です。今日の上限{yen(cap)}
-                      は、この平均より低い安全側の数字です。
-                    </li>
                   </>
                 ) : null}
               </ul>

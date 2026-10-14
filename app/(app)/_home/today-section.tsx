@@ -75,6 +75,7 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
                 remainingDayOffs: cal?.dayOffs,
                 dayOffPerDayYen: goalView?.dayOffPerDayYen ?? null,
                 weekdayPerDayYen: goalView?.weekdayPerDayYen ?? null,
+                dailyLimit: goalView?.dailyLimit ?? null,
               }
             : null
         }

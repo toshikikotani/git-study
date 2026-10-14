@@ -28,6 +28,9 @@ import { loadForecastHistory } from './history';
 import { listPromises } from './promise-store';
 import { genreSpentYen, promiseKeepRate, promiseKept } from '@/domain/forecast/promise';
 import { toForecastSource } from './source';
+import { computeDailyLimit, type DailyLimitResult } from './daily-limit';
+import { calendarContext } from '@/domain/forecast/calendar';
+import { isDayOff } from '@/domain/forecast/holidays';
 import { computeDayOffWeekdayAverages } from './dayoff-avg';
 
 /** 約束の守れ具合を数える、過去の月数。 */
@@ -52,6 +55,8 @@ export type ForecastView = {
   /** 直近の実績から計算した、休日(土日祝)と平日の1日あたり平均。 */
   dayOffPerDayYen: number | null;
   weekdayPerDayYen: number | null;
+  /** 今日の上限の計算結果(休日軸・確率込み)。 */
+  dailyLimit: DailyLimitResult | null;
 };
 
 /** 範囲の、ある日の支出(実績。返金は差し引く。特別費を外す範囲なら外す)。 */
@@ -248,6 +253,26 @@ export async function loadForecast(args: {
   const recentTo = addDays(today, -1);
   const averages = computeDayOffWeekdayAverages(transactions, recentFrom, recentTo);
 
+  // 今日の上限を、休日軸・確率込みで計算して保存する
+  const cal = calendarContext(today, args.period.to, null);
+  const totalDays = periodDays(args.period.from, args.period.to);
+  const elapsed = periodDays(args.period.from, today);
+  const remainingDays = Math.max(0, totalDays - elapsed + 1);
+  const dayOffs = cal.dayOffs;
+  const weekdays = Math.max(0, remainingDays - dayOffs);
+  const dailyLimit =
+    args.budgetYen != null && averages.weekdayPerDayYen != null
+      ? computeDailyLimit({
+          leftBudgetYen: Math.max(0, (args.budgetYen ?? 0) - forecast.actualYen),
+          remainingDayOffs: dayOffs,
+          remainingWeekdays: weekdays,
+          dayOffMedianYen: averages.dayOffPerDayYen,
+          weekdayMedianYen: averages.weekdayPerDayYen,
+          probWithinBudget: forecast.probWithinBudget,
+          todayIsDayOff: isDayOff(today),
+        })
+      : null;
+
   return {
     forecast,
     period: args.period,
@@ -258,5 +283,6 @@ export async function loadForecast(args: {
     todaySpentYen: spentOn(periodRows, today, args.scope),
     dayOffPerDayYen: averages.dayOffPerDayYen,
     weekdayPerDayYen: averages.weekdayPerDayYen,
+    dailyLimit,
   };
 }
