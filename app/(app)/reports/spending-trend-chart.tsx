@@ -159,8 +159,11 @@ export function SpendingTrendChart({
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.aboveAvg ? 'var(--over)' : 'color-mix(in srgb, var(--ink) 25%, transparent)'}
-                  opacity={entry.aboveAvg ? 0.75 : 0.5}
+                  fill={
+                    entry.aboveAvg
+                      ? 'color-mix(in srgb, var(--over) 75%, transparent)'
+                      : 'color-mix(in srgb, var(--ink) 18%, transparent)'
+                  }
                 />
               ))}
             </Bar>
@@ -213,14 +216,14 @@ export function SpendingTrendChart({
         <span className="flex items-center gap-1">
           <span
             className="inline-block size-3 rounded"
-            style={{ background: 'var(--over)', opacity: 0.75 }}
+            style={{ background: 'color-mix(in srgb, var(--over) 75%, transparent)' }}
           />
           7日平均を上回った日
         </span>
         <span className="flex items-center gap-1">
           <span
             className="inline-block size-3 rounded"
-            style={{ background: 'color-mix(in srgb, var(--ink) 25%, transparent)', opacity: 0.5 }}
+            style={{ background: 'color-mix(in srgb, var(--ink) 18%, transparent)' }}
           />
           7日平均を下回った日
         </span>
