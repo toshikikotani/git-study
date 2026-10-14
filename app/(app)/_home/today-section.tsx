@@ -49,7 +49,8 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
       : [];
 
   // 残りの休日数を計算
-  const cal = forecast ? calendarContext(today, goal?.period.to ?? monthPeriod.to, settings?.payday ?? null) : null;
+  const periodTo = goal?.period.to ?? monthPeriod.to;
+  const cal = forecast ? calendarContext(today, periodTo, settings?.payday ?? null) : null;
 
   return (
     <div className="space-y-3">
