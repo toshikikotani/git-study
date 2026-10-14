@@ -123,7 +123,7 @@ export function SpendingTrendChart({
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         棒は1日の支出（レシート単位で固定費とマークしたものは除く）。7日平均を上回った日はテーマ色、下回った日は灰色です。
-        線は平均のペース（実線=直近7日、点線=直近21日）です。
+        線は平均のペース（実線=直近7日と21日）です。
       </p>
 
       <div className="h-64 w-full">
@@ -198,7 +198,6 @@ export function SpendingTrendChart({
               dataKey="long"
               stroke="var(--ink-secondary)"
               strokeWidth={1.5}
-              strokeDasharray="5 4"
               dot={false}
               connectNulls
               name="long"
