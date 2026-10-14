@@ -119,10 +119,14 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 2. 単純な1日あたり = {yen(leftBudget)} ÷ {explain.remainingDays}日 ={' '}
                 {yen(simplePerDay)}
               </li>
-              <li>3. 今日の上限 = {yen(cap)}（休日重みで調整）</li>
+              <li>3. 今日の上限 = {yen(cap)}（残り予算を休日/平日の比率で配分した平日分）</li>
             </ol>
           </div>
-          {dayOffs > 0 || explain.dayOffPerDayYen != null ? (
+          {dayOffs > 0 &&
+          explain.dayOffPerDayYen != null &&
+          explain.weekdayPerDayYen != null &&
+          explain.dayOffPerDayYen > 0 &&
+          explain.weekdayPerDayYen > 0 ? (
             <div className="rounded-2xl px-3 py-2" style={{ background: 'var(--plane)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                 残りの日の内訳
@@ -133,21 +137,20 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               >
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
-                {explain.dayOffPerDayYen != null && explain.dayOffPerDayYen > 0 ? (
-                  <li>・休日の見込み: 1日{yen(explain.dayOffPerDayYen)}(直近90日の実績)</li>
-                ) : null}
-                {explain.weekdayPerDayYen != null && explain.weekdayPerDayYen > 0 ? (
-                  <li>・平日の見込み: 1日{yen(explain.weekdayPerDayYen)}(直近90日の実績)</li>
-                ) : null}
-                {explain.dayOffPerDayYen != null &&
-                explain.weekdayPerDayYen != null &&
-                explain.dayOffPerDayYen > 0 &&
-                explain.weekdayPerDayYen > 0 ? (
-                  <li>
-                    ・休日は平日の約
-                    {(explain.dayOffPerDayYen / explain.weekdayPerDayYen).toFixed(1)}倍
-                  </li>
-                ) : null}
+                {(() => {
+                  const ratio = explain.dayOffPerDayYen! / explain.weekdayPerDayYen!;
+                  const weighted = dayOffs * ratio + weekdays;
+                  const weekdayAlloc = Math.round(leftBudget / weighted);
+                  const dayOffAlloc = Math.round(weekdayAlloc * ratio);
+                  return (
+                    <>
+                      <li>
+                        ・休日の配分: 1日{yen(dayOffAlloc)}(比率{ratio.toFixed(1)}倍)
+                      </li>
+                      <li>・平日の配分: 1日{yen(weekdayAlloc)}(今日の上限)</li>
+                    </>
+                  );
+                })()}
               </ul>
             </div>
           ) : null}
