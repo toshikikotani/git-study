@@ -208,7 +208,7 @@ export function SpendingTrendChart({
                 y={budgetPerDayYen}
                 stroke="var(--state-caution)"
                 strokeDasharray="3 3"
-                strokeWidth={1.5}
+                strokeWidth={1}
                 label={{
                   value: '予算',
                   position: 'insideBottomRight',
@@ -225,7 +225,7 @@ export function SpendingTrendChart({
                 strokeWidth={2.5}
                 label={{
                   value: '残り',
-                  position: 'insideBottomLeft',
+                  position: 'insideBottomRight',
                   fontSize: 11,
                   fill: 'var(--state-ok)',
                   fontWeight: 600,
@@ -264,6 +264,14 @@ export function SpendingTrendChart({
             </strong>
           </span>
         ) : null}
+        {budgetPerDayYen != null && budgetPerDayYen > 0 ? (
+          <span>
+            予算平均:{' '}
+            <strong style={{ color: 'var(--state-caution)' }}>
+              {formatYen(budgetPerDayYen, { sign: 'never' })}
+            </strong>
+          </span>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--ink-secondary)' }}>
@@ -285,6 +293,8 @@ export function SpendingTrendChart({
 
       {fixedYen > 0 ? (
         <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          残り平均は残り予算を残り日数で割った1日あたり、予算平均は月の予算を日数で割った1日あたりです。
+          <br />
           この期間の固定費（家賃・サブスクなど）は{' '}
           <strong style={{ color: 'var(--ink)' }}>{formatYen(fixedYen, { sign: 'never' })}</strong>
           あります。上のグラフには含めていません。
