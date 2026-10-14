@@ -4,7 +4,7 @@ import { CategoryTrendChart } from './category-trend-chart';
 import { InsightsList } from './insights-card';
 import { AiInsightButton } from './ai-insight-button';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
-import { LandingScenarios } from './landing-scenarios';
+import { GenreWeekdayHeatmap, type GenreWeekdayCell } from './genre-weekday-heatmap';
 import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
 import { SpeakButton } from '../_home/speak-button';
@@ -79,6 +79,8 @@ export default async function ReportsPage() {
   const today = todayJst();
   const variableDaySpend: Record<string, number> = {};
   let fixedYenForTrend = 0;
+  // ジャンル × 曜日の集計（分析用）
+  const genreWeekdayMap = new Map<string, number>();
   for (const tx of ledger.transactions) {
     if (tx.amountYen >= 0 || tx.isTransfer || tx.reviewStatus === 'ignored' || tx.needsInput)
       continue;
@@ -88,7 +90,19 @@ export default async function ReportsPage() {
     } else {
       variableDaySpend[tx.occurredOn] = (variableDaySpend[tx.occurredOn] ?? 0) + yen;
     }
+    // 曜日集計（固定費も含む）
+    if (tx.genreName) {
+      const dow = new Date(tx.occurredOn + 'T00:00:00').getDay();
+      const key = `${tx.genreName}|${dow}`;
+      genreWeekdayMap.set(key, (genreWeekdayMap.get(key) ?? 0) + yen);
+    }
   }
+  const genreWeekdayCells: GenreWeekdayCell[] = [...genreWeekdayMap.entries()].map(
+    ([key, yen]) => {
+      const [genreName, dow] = key.split('|');
+      return { genreName: genreName!, weekday: Number(dow), yen };
+    },
+  );
   const [plan, genres] = await Promise.all([getCurrentPlan(today), listGenres().catch(() => [])]);
   const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
@@ -251,12 +265,7 @@ export default async function ReportsPage() {
             text={`${endLabel}の支出は${formatEstimate(landing.p50)}の見込み。80%の確率で${formatEstimateRange(landing.p10, landing.p90)}。${budgetYen !== null ? `予算は${formatEstimate(budgetYen, { approx: false })}。` : ''}`}
           />
           <SpendingTrendChart daySpend={variableDaySpend} fixedYen={fixedYenForTrend} />
-          <LandingScenarios
-            p10={landing.p10}
-            p50={landing.p50}
-            p90={landing.p90}
-            budgetYen={budgetYen}
-          />
+          <GenreWeekdayHeatmap cells={genreWeekdayCells} />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
           {budgetYen === null || forecast.drivers[0] ? (
             <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
