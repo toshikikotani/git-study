@@ -53,7 +53,7 @@ export function TodayCard(props: TodayCardProps) {
         allowanceExplain={props.allowanceExplain ?? null}
       />
       {outlook && probWithinBudget !== null ? (
-        <OutlookCard outlook={outlook} probOver={1 - probWithinBudget} />
+        <OutlookCard outlook={outlook} probWithin={probWithinBudget} />
       ) : null}
       {suggestion && props.monthKey ? (
         <NextStepCard suggestion={suggestion} monthKey={props.monthKey} />
@@ -158,11 +158,11 @@ function TodayHero({
  * 見通しのカード(デザイン):月末の見込み(中央)と予算、使った額・10回中8回の幅・中央の点・予算の線を
  * 1本の帯に、その下に予算を超える確率。
  */
-function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: number }) {
+function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithin: number }) {
   const overYen = outlook.p50 - outlook.budgetYen;
   const max = Math.max(outlook.p90, outlook.budgetYen, outlook.spentYen, 1) * 1.02;
   const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / max) * 100))}%`;
-  const caution = probOver >= 0.5;
+  const caution = probWithin < 0.5;
   return (
     <section
       aria-label={outlook.label}
@@ -262,15 +262,15 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
       <div className="flex flex-col gap-2">
         <p className="text-base" style={{ color: 'var(--ink)' }}>
           <strong style={{ color: caution ? 'var(--state-caution)' : 'var(--ink)' }}>
-            {formatProbability(probOver)}
+            {formatProbability(probWithin)}
           </strong>
-          の確率で 予算を超えます
+          の確率で 予算内に収まります
         </p>
         <div aria-hidden className="h-1.5 rounded-full" style={{ background: 'var(--plane)' }}>
           <div
             className="h-1.5 rounded-full"
             style={{
-              width: `${Math.round(Math.min(1, Math.max(0, probOver)) * 100)}%`,
+              width: `${Math.round(Math.min(1, Math.max(0, probWithin)) * 100)}%`,
               background: caution ? 'var(--sub, var(--accent))' : 'var(--ink)',
             }}
           />
