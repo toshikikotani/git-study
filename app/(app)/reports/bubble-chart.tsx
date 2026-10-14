@@ -80,7 +80,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
               fontSize={11}
               tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
             />
-            <ZAxis type="number" dataKey="totalYen" range={[80, 400]} />
+            <ZAxis type="number" dataKey="totalYen" range={[150, 600]} />
             <Tooltip
               cursor={{ strokeDasharray: '3 3' }}
               content={({ payload }) => {
