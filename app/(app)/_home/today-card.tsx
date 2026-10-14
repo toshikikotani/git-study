@@ -299,6 +299,7 @@ function DistributionChart({
   p90: number;
   budget: number;
 }) {
+  const [tapX, setTapX] = React.useState<number | null>(null);
   const width = 300;
   const height = 110;
   const padding = { left: 32, right: 8, top: 8, bottom: 20 };
@@ -333,9 +334,44 @@ function DistributionChart({
     label: formatMan(v),
   }));
 
+  const erf = (x: number) => {
+    const a1 = 0.254829592,
+      a2 = -0.284496736,
+      a3 = 1.421413741,
+      a4 = -1.453152027,
+      a5 = 1.061405429,
+      p = 0.3275911;
+    const sign = x < 0 ? -1 : 1;
+    const t = 1 / (1 + p * Math.abs(x));
+    const y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    return sign * y;
+  };
+
+  const cdf = (x: number) => 0.5 * (1 + erf((x - mean) / (sigma * Math.sqrt(2))));
+
+  const handleTap = (e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const clientX = 'touches' in e ? (e.touches[0]?.clientX ?? 0) : e.clientX;
+    const relX = ((clientX - rect.left) / rect.width) * width;
+    const chartRelX = (relX - padding.left) / chartW;
+    if (chartRelX >= 0 && chartRelX <= 1) {
+      setTapX(chartRelX);
+    }
+  };
+
+  const tapYen = tapX !== null ? min + tapX * (max - min) : null;
+  const tapProb = tapYen !== null ? cdf(tapYen) : null;
+  const tapPx = tapX !== null ? padding.left + tapX * chartW : null;
+
   return (
     <div className="flex flex-col gap-1">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-28">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-28 cursor-pointer"
+        onClick={handleTap}
+        onTouchStart={handleTap}
+      >
         <defs>
           <linearGradient id="underGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--state-ok)" stopOpacity="0.6" />
@@ -380,6 +416,16 @@ function DistributionChart({
           strokeWidth="1"
           strokeDasharray="2 2"
         />
+        {tapPx !== null && (
+          <line
+            x1={tapPx}
+            y1={padding.top}
+            x2={tapPx}
+            y2={padding.top + chartH}
+            stroke="var(--ink)"
+            strokeWidth="1"
+          />
+        )}
         {xLabels.map((l, i) => (
           <text
             key={i}
@@ -411,9 +457,15 @@ function DistributionChart({
           低い
         </text>
       </svg>
-      <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-        横軸は月末の支出額、縦軸は確率密度（高いほど起こりやすい）。緑が予算内、茶色が超過。
-      </p>
+      {tapYen !== null && tapProb !== null ? (
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+          {formatMan(tapYen)}以下になる確率: {Math.round(tapProb * 100)}%
+        </p>
+      ) : (
+        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          タップすると、その金額以下になる確率を表示します。
+        </p>
+      )}
     </div>
   );
 }
