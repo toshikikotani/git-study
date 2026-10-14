@@ -61,7 +61,12 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       >
         なぜこの額?
       </button>
-      <BottomSheet open={open} onClose={() => setOpen(false)} role="dialog" label="今日の上限の計算">
+      <BottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        role="dialog"
+        label="今日の上限の計算"
+      >
         <div className="space-y-3 px-4 pb-4">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
             今日の上限の計算

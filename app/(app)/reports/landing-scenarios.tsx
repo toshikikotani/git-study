@@ -21,12 +21,9 @@ export function LandingScenarios({
 
   const max = Math.max(p90, budgetYen ?? 0, p50) * 1.1;
   const scenarios = [
-    { label: '楽観', value: p10, color: 'var(--state-ok)', note: '10%'
-    },
-    { label: '中央', value: p50, color: 'var(--accent)', note: '50%'
-    },
-    { label: '悲観', value: p90, color: 'var(--state-warn)', note: '90%'
-    },
+    { label: '楽観', value: p10, color: 'var(--state-ok)', note: '10%' },
+    { label: '中央', value: p50, color: 'var(--accent)', note: '50%' },
+    { label: '悲観', value: p90, color: 'var(--state-warn)', note: '90%' },
   ];
 
   return (
@@ -91,8 +88,8 @@ export function LandingScenarios({
 
       {budgetYen !== null ? (
         <p className="text-xs tabular" style={{ color: 'var(--ink-secondary)' }}>
-          予算: <strong style={{ color: 'var(--ink)' }}>{formatYen(budgetYen, { sign: 'never' })}</strong>
-          {' '}
+          予算:{' '}
+          <strong style={{ color: 'var(--ink)' }}>{formatYen(budgetYen, { sign: 'never' })}</strong>{' '}
           <span style={{ opacity: 0.6 }}>（縦線）</span>
         </p>
       ) : null}

@@ -159,9 +159,7 @@ const reportSchema = z.object({
     .describe('1〜2文。なぜそのタイプと判断したか、渡された実際の数字を根拠にする。'),
   insights: z
     .array(z.string())
-    .describe(
-      '4〜5件。今の状態を判断する文。金額と割合を含め、定型にしない自然な言葉で。',
-    ),
+    .describe('4〜5件。今の状態を判断する文。金額と割合を含め、定型にしない自然な言葉で。'),
   advice: z
     .array(z.string())
     .describe(
@@ -176,9 +174,7 @@ const reportSchema = z.object({
         ),
       reason: z
         .string()
-        .describe(
-          '1〜2文。休み日と平日の差を踏まえて今の状態を判断する。自由な表現で良い。',
-        ),
+        .describe('1〜2文。休み日と平日の差を踏まえて今の状態を判断する。自由な表現で良い。'),
       evidence: z
         .array(z.string())
         .describe('1〜3件。根拠にした事実(明細・予定・暦・過去の読み)を、渡した表記のまま短く。'),

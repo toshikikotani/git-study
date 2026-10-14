@@ -78,18 +78,14 @@ export function SankeyFlow({
   const usableH = height - PAD_Y * 2;
 
   // 右ノードの高さとY位置（変数再代入を避ける）
-  const rawHeights = targets.map((t) =>
-    Math.max(14, (t.value / totalTarget) * usableH * 0.88),
-  );
+  const rawHeights = targets.map((t) => Math.max(14, (t.value / totalTarget) * usableH * 0.88));
   const rawSum = rawHeights.reduce((s, h) => s + h, 0);
   const gapSum = GAP * Math.max(0, targets.length - 1);
   const scale = rawSum > 0 ? (usableH - gapSum) / rawSum : 1;
 
   const rightNodes = targets.map((t, i) => {
     const h = rawHeights[i]! * scale;
-    const y =
-      PAD_Y +
-      rawHeights.slice(0, i).reduce((s, rh) => s + rh * scale + GAP, 0);
+    const y = PAD_Y + rawHeights.slice(0, i).reduce((s, rh) => s + rh * scale + GAP, 0);
     return { ...t, y, h };
   });
 

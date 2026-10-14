@@ -189,7 +189,10 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
         </span>
       </p>
       <p className="text-sm tabular" style={{ color: 'var(--ink-secondary)' }}>
-        これまで使った額: <strong style={{ color: 'var(--ink)' }}>{formatEstimate(outlook.spentYen, { approx: false })}</strong>
+        これまで使った額:{' '}
+        <strong style={{ color: 'var(--ink)' }}>
+          {formatEstimate(outlook.spentYen, { approx: false })}
+        </strong>
       </p>
       {outlook.outside && outlook.outside.length > 0 ? (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

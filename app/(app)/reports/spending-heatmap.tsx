@@ -39,8 +39,8 @@ export function SpendingHeatmap({
   const startDow = start.getDay(); // 0=Sun
 
   // 週の列（日曜始まり）
-  const weeks: (typeof days[number] | null)[][] = [];
-  let week: (typeof days[number] | null)[] = Array(startDow).fill(null);
+  const weeks: ((typeof days)[number] | null)[][] = [];
+  let week: ((typeof days)[number] | null)[] = Array(startDow).fill(null);
   for (const d of days) {
     week.push(d);
     if (week.length === 7) {
@@ -88,7 +88,10 @@ export function SpendingHeatmap({
       </p>
 
       <div className="flex gap-1">
-        <div className="flex w-5 shrink-0 flex-col gap-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+        <div
+          className="flex w-5 shrink-0 flex-col gap-1 text-[10px]"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           {weekdays.map((w) => (
             <div key={w} className="flex h-6 items-center justify-center">
               {w}
@@ -124,7 +127,10 @@ export function SpendingHeatmap({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+      <div
+        className="flex items-center justify-end gap-1 text-[10px]"
+        style={{ color: 'var(--ink-muted)' }}
+      >
         <span>少</span>
         {colors.map((c, i) => (
           <div key={i} className="h-3 w-3 rounded-sm" style={{ background: c }} />

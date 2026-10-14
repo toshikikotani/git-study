@@ -151,11 +151,7 @@ export function SpendingTrendChart({
                 return value;
               }}
             />
-            <Bar
-              dataKey="spent"
-              radius={[2, 2, 0, 0]}
-              name="spent"
-            >
+            <Bar dataKey="spent" radius={[2, 2, 0, 0]} name="spent">
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}

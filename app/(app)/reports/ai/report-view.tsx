@@ -75,10 +75,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
             </p>
           </div>
 
-          <ForecastReadSection
-            forecast={input.forecast}
-            read={report.forecastRead}
-          />
+          <ForecastReadSection forecast={input.forecast} read={report.forecastRead} />
 
           <BulletList
             heading="気づき"

@@ -15,11 +15,7 @@ const MAX_GENRES = 6;
  * ジャンル × 曜日の支出傾向をヒートマップで分析表示する。
  * 「どの曜日に何を使いやすいか」が一目でわかる。
  */
-export function GenreWeekdayHeatmap({
-  cells,
-}: {
-  cells: readonly GenreWeekdayCell[];
-}) {
+export function GenreWeekdayHeatmap({ cells }: { cells: readonly GenreWeekdayCell[] }) {
   if (cells.length === 0) return null;
 
   // ジャンルごとに集計
