@@ -70,10 +70,13 @@ export async function loadReadEvidence(
   const median = (xs: number[]): number | null => {
     if (xs.length === 0) return null;
     const sorted = [...xs].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-      ? Math.round((sorted[mid - 1]! + sorted[mid]!) / 2)
-      : sorted[mid]!;
+    const trim = Math.floor(sorted.length * 0.1);
+    const trimmed = sorted.slice(trim, sorted.length - trim);
+    if (trimmed.length === 0) return sorted[Math.floor(sorted.length / 2)]!;
+    const mid = Math.floor(trimmed.length / 2);
+    return trimmed.length % 2 === 0
+      ? Math.round((trimmed[mid - 1]! + trimmed[mid]!) / 2)
+      : trimmed[mid]!;
   };
 
   return {
