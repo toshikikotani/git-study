@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  Cell,
 } from 'recharts';
 
 import { formatYen } from '@/domain/money';
@@ -75,6 +76,7 @@ export function SpendingTrendChart({
     short: p.shortMa,
     long: p.longMa,
     spent: p.spentYen,
+    aboveAvg: p.shortMa !== null && p.spentYen > p.shortMa,
   }));
 
   const dir = result.direction;
@@ -99,8 +101,8 @@ export function SpendingTrendChart({
       </div>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        棒は1日の支出（レシート単位で固定費とマークしたものは除く）。線は平均のペース（実線=直近7日、点線=直近21日）です。
-        実線が点線より上なら増加傾向、下なら減少傾向です。
+        棒は1日の支出（レシート単位で固定費とマークしたものは除く）。7日平均を上回った日はオレンジ、下回った日は緑です。
+        線は平均のペース（実線=直近7日、点線=直近21日）です。
       </p>
 
       <div className="h-64 w-full">
@@ -151,10 +153,17 @@ export function SpendingTrendChart({
             />
             <Bar
               dataKey="spent"
-              fill="color-mix(in srgb, var(--ink) 18%, transparent)"
               radius={[2, 2, 0, 0]}
               name="spent"
-            />
+            >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.aboveAvg ? 'var(--state-caution)' : 'var(--state-ok)'}
+                  opacity={0.7}
+                />
+              ))}
+            </Bar>
             <Line
               type="monotone"
               dataKey="short"
@@ -197,6 +206,23 @@ export function SpendingTrendChart({
               ? formatYen(Math.round(result.latestLongMa), { sign: 'never' })
               : '—'}
           </strong>
+        </span>
+      </div>
+
+      <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        <span className="flex items-center gap-1">
+          <span
+            className="inline-block size-3 rounded"
+            style={{ background: 'var(--state-caution)', opacity: 0.7 }}
+          />
+          7日平均を上回った日
+        </span>
+        <span className="flex items-center gap-1">
+          <span
+            className="inline-block size-3 rounded"
+            style={{ background: 'var(--state-ok)', opacity: 0.7 }}
+          />
+          7日平均を下回った日
         </span>
       </div>
 
