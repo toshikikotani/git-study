@@ -120,7 +120,24 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
                   position="bottom"
                   fontSize={9}
                   fill="var(--ink-secondary)"
-                  offset={16}
+                  offset={8}
+                  content={(props: any) => {
+                    const x = Number(props.x ?? 0);
+                    const y = Number(props.y ?? 0);
+                    const index = props.index ?? 0;
+                    const isEven = index % 2 === 0;
+                    return (
+                      <text
+                        x={x}
+                        y={y + (isEven ? 14 : 26)}
+                        textAnchor="middle"
+                        fontSize={9}
+                        fill="var(--ink-secondary)"
+                      >
+                        {props.value}
+                      </text>
+                    );
+                  }}
                 />
               </Scatter>
             ))}
