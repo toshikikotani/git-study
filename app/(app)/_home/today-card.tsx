@@ -127,6 +127,9 @@ function TodayHero({
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
             使わなかった分は、明日に回ります。
           </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            確率はモンテカルロ法により算出。
+          </p>
         </>
       ) : (
         <>

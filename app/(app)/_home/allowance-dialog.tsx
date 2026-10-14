@@ -190,6 +190,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 {over > 0
                   ? '今日の上限を超えているので、このままだと確率は下がります。'
                   : '今日の上限内に収まっているので、確率は保たれています。'}
+                （モンテカルロ法により算出）
               </p>
             </div>
           ) : null}

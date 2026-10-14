@@ -65,7 +65,7 @@ export function LandingHero({
         {probWithinBudget !== null ? (
           <>
             {' '}
-            ・ 予算に収まる確率{' '}
+            ・ 予算に収まる確率(モンテカルロ法){' '}
             <span className="font-semibold" style={{ color: 'var(--ink)' }}>
               {formatProbability(probWithinBudget)}
             </span>
