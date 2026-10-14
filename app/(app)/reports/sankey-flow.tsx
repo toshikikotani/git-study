@@ -99,10 +99,16 @@ export function SankeyFlow({
           const pct = Math.round(ratio * 100);
           return (
             <div key={i} className="flex items-center gap-2">
-              <div className="w-16 shrink-0 text-right text-xs tabular" style={{ color: 'var(--ink-secondary)' }}>
+              <div
+                className="w-16 shrink-0 text-right text-xs tabular"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
                 {item.name.length > 6 ? `${item.name.slice(0, 5)}…` : item.name}
               </div>
-              <div className="h-6 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--plane)' }}>
+              <div
+                className="h-6 flex-1 overflow-hidden rounded-full"
+                style={{ background: 'var(--plane)' }}
+              >
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
@@ -112,7 +118,10 @@ export function SankeyFlow({
                   }}
                 />
               </div>
-              <div className="w-20 shrink-0 text-right text-xs tabular" style={{ color: 'var(--ink)' }}>
+              <div
+                className="w-20 shrink-0 text-right text-xs tabular"
+                style={{ color: 'var(--ink)' }}
+              >
                 {formatYen(item.value, { sign: 'never' })}
                 <span className="ml-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
                   {pct}%
@@ -123,16 +132,28 @@ export function SankeyFlow({
         })}
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs tabular" style={{ borderColor: 'var(--plane)', color: 'var(--ink-secondary)' }}>
+      <div
+        className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs tabular"
+        style={{ borderColor: 'var(--plane)', color: 'var(--ink-secondary)' }}
+      >
         <span>
-          {sourceLabel}: <strong style={{ color: 'var(--ink)' }}>{formatYen(sourceValue, { sign: 'never' })}</strong>
+          {sourceLabel}:{' '}
+          <strong style={{ color: 'var(--ink)' }}>
+            {formatYen(sourceValue, { sign: 'never' })}
+          </strong>
         </span>
         <span>
-          支出合計: <strong style={{ color: 'var(--ink)' }}>{formatYen(totalSpent, { sign: 'never' })}</strong>
+          支出合計:{' '}
+          <strong style={{ color: 'var(--ink)' }}>
+            {formatYen(totalSpent, { sign: 'never' })}
+          </strong>
         </span>
         {surplus > 0 ? (
           <span>
-            残り: <strong style={{ color: 'var(--state-ok)' }}>{formatYen(surplus, { sign: 'never' })}</strong>
+            残り:{' '}
+            <strong style={{ color: 'var(--state-ok)' }}>
+              {formatYen(surplus, { sign: 'never' })}
+            </strong>
           </span>
         ) : null}
       </div>
