@@ -30,6 +30,13 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
   const spentBefore = Math.max(0, explain.spentYen - explain.spentTodayYen);
   const leftBudget = explain.budgetYen - spentBefore;
   const cap = explain.capYen;
+  const ratio =
+    explain.dayOffPerDayYen != null &&
+    explain.weekdayPerDayYen != null &&
+    explain.dayOffPerDayYen > 0 &&
+    explain.weekdayPerDayYen > 0
+      ? explain.dayOffPerDayYen / explain.weekdayPerDayYen
+      : null;
   const over = explain.spentTodayYen - cap;
   const max = Math.max(explain.budgetYen, explain.spentYen, cap, explain.spentTodayYen, 1);
   const bar = (value: number, color: string) => (
@@ -137,20 +144,14 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               >
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
-                {(() => {
-                  const ratio = explain.dayOffPerDayYen! / explain.weekdayPerDayYen!;
-                  const weighted = dayOffs * ratio + weekdays;
-                  const weekdayAlloc = Math.round(leftBudget / weighted);
-                  const dayOffAlloc = Math.round(weekdayAlloc * ratio);
-                  return (
-                    <>
-                      <li>
-                        ・休日の配分: 1日{yen(dayOffAlloc)}(比率{ratio.toFixed(1)}倍)
-                      </li>
-                      <li>・平日の配分: 1日{yen(weekdayAlloc)}(今日の上限)</li>
-                    </>
-                  );
-                })()}
+                {ratio !== null ? (
+                  <>
+                    <li>
+                      ・休日の配分: 1日{yen(Math.round(cap * ratio))}(比率{ratio.toFixed(1)}倍)
+                    </li>
+                    <li>・平日の配分: 1日{yen(cap)}(今日の上限)</li>
+                  </>
+                ) : null}
               </ul>
             </div>
           ) : null}
