@@ -79,13 +79,20 @@ export default async function ReportsPage() {
   const today = todayJst();
   const variableDaySpend: Record<string, number> = {};
   let fixedYenForTrend = 0;
+  const [plan, genres] = await Promise.all([getCurrentPlan(today), listGenres().catch(() => [])]);
+  const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
+  // 固定費ジャンルのID（forecastClosed またはプランの固定費項目）
+  const fixedGenreIdSet = new Set(
+    genres.filter((g) => g.forecastClosed).map((g) => g.id),
+  );
   // ジャンル × 曜日の集計（分析用・固定費除く）
   const genreWeekdayMap = new Map<string, number>();
   for (const tx of ledger.transactions) {
     if (tx.amountYen >= 0 || tx.isTransfer || tx.reviewStatus === 'ignored' || tx.needsInput)
       continue;
     const yen = -tx.amountYen;
-    if (tx.mustPay) {
+    const isFixed = tx.mustPay || (tx.genreId !== null && fixedGenreIdSet.has(tx.genreId));
+    if (isFixed) {
       fixedYenForTrend += yen;
     } else {
       variableDaySpend[tx.occurredOn] = (variableDaySpend[tx.occurredOn] ?? 0) + yen;
@@ -103,8 +110,6 @@ export default async function ReportsPage() {
       return { genreName: genreName!, weekday: Number(dow), yen };
     },
   );
-  const [plan, genres] = await Promise.all([getCurrentPlan(today), listGenres().catch(() => [])]);
-  const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
   const hasGoal = plan !== null && budgetTotal > 0;
   const monthPeriod = {
