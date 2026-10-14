@@ -162,7 +162,7 @@ const reportSchema = z.object({
       reason: z
         .string()
         .describe(
-          '1〜2文。今の状態を判断する表現で、数字と理由をセットにする。定型文にしない。',
+          '1〜2文。土日と平日の差を明記して今の状態を判断する表現で、数字と理由をセットにする。定型にしない。',
         ),
       evidence: z
         .array(z.string())
@@ -315,6 +315,41 @@ function buildUserContent(input: MonthlyReportInput): string {
 
 const yenOf = (n: number) => `${n}円`;
 
+/** 曜日が土日かどうかを判定する。0=日, 6=土 */
+function isWeekend(dateStr: string): boolean {
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  return dow === 0 || dow === 6;
+}
+
+/** 目立つ明細から土日/平日の平均支出を計算する。 */
+function computeWeekdayWeekendAvg(
+  notable: readonly { date: string; amountYen: number }[],
+): { weekdayAvg: number; weekendAvg: number; weekdayCount: number; weekendCount: number } | null {
+  if (notable.length === 0) return null;
+  let weekdaySum = 0;
+  let weekendSum = 0;
+  const weekdayDates = new Set<string>();
+  const weekendDates = new Set<string>();
+  for (const n of notable) {
+    if (isWeekend(n.date)) {
+      weekendSum += n.amountYen;
+      weekendDates.add(n.date);
+    } else {
+      weekdaySum += n.amountYen;
+      weekdayDates.add(n.date);
+    }
+  }
+  const weekdayCount = weekdayDates.size;
+  const weekendCount = weekendDates.size;
+  if (weekdayCount === 0 && weekendCount === 0) return null;
+  return {
+    weekdayAvg: weekdayCount > 0 ? Math.round(weekdaySum / weekdayCount) : 0,
+    weekendAvg: weekendCount > 0 ? Math.round(weekendSum / weekendCount) : 0,
+    weekdayCount,
+    weekendCount,
+  };
+}
+
 /** 着地の見込みと、AIの読みの根拠に使ってよい事実。 */
 function appendForecastSection(lines: string[], input: MonthlyReportInput): void {
   const f = input.forecast;
@@ -345,18 +380,31 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   }
 
   const e = input.evidence;
+  // 土日/平日の平均支出を計算して渡す
+  const dowAvg = computeWeekdayWeekendAvg(e.notable);
+  if (dowAvg !== null) {
+    lines.push(
+      '',
+      '今月の曜日別支出(目立つ明細から計算):',
+      `- 平日の1日あたり: ${yenOf(dowAvg.weekdayAvg)}(${dowAvg.weekdayCount}日分)`,
+      `- 土日の1日あたり: ${yenOf(dowAvg.weekendAvg)}(${dowAvg.weekendCount}日分)`,
+    );
+  }
+
   if (e.notable.length > 0) {
     lines.push('', '今月の目立つ明細(金額の大きいもの・メモのあるもの):');
     for (const n of e.notable) {
       const items = n.items.length > 0 ? ` 品目: ${n.items.join('、')}` : '';
       const memo = n.memo ? ` メモ: ${n.memo}` : '';
-      lines.push(`- ${n.date} ${n.label} ${yenOf(n.amountYen)}(${n.genre})${memo}${items}`);
+      const dow = isWeekend(n.date) ? '土日' : '平日';
+      lines.push(`- ${n.date}(${dow}) ${n.label} ${yenOf(n.amountYen)}(${n.genre})${memo}${items}`);
     }
   }
   lines.push('', 'これからの予定:');
   if (e.scheduled.length === 0) lines.push('- 日付の入った予定は無い');
   for (const s of e.scheduled) {
-    lines.push(`- ${s.date} ${s.label} ${yenOf(s.amountYen)}(${s.genre})`);
+    const dow = isWeekend(s.date) ? '土日' : '平日';
+    lines.push(`- ${s.date}(${dow}) ${s.label} ${yenOf(s.amountYen)}(${s.genre})`);
   }
   if (e.calendar !== null) {
     const c = e.calendar;
