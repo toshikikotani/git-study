@@ -105,6 +105,11 @@ function TodayHero({
             </span>
             <span className="text-base font-bold">{today.kind === 'left' ? '円' : '円 超え'}</span>
           </p>
+          {today.spentYen > 0 ? (
+            <p className="mt-1 text-sm tabular" style={{ color: 'var(--ink-secondary)' }}>
+              今日使った額: {today.spentYen.toLocaleString('ja-JP')}円
+            </p>
+          ) : null}
           <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
           <TenDots probability={SAFE_ALLOWANCE_PROB} />
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
@@ -182,6 +187,9 @@ function OutlookCard({ outlook, probOver }: { outlook: TodayOutlook; probOver: n
         <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
           / 予算 {formatEstimate(outlook.budgetYen, { approx: false })}
         </span>
+      </p>
+      <p className="text-sm tabular" style={{ color: 'var(--ink-secondary)' }}>
+        これまで使った額: <strong style={{ color: 'var(--ink)' }}>{formatEstimate(outlook.spentYen, { approx: false })}</strong>
       </p>
       {outlook.outside && outlook.outside.length > 0 ? (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
