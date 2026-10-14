@@ -299,38 +299,80 @@ function DistributionChart({
   p90: number;
   budget: number;
 }) {
-  const bins = 24;
-  const min = Math.min(p10, budget) * 0.95;
-  const max = Math.max(p90, budget) * 1.05;
-  const range = max - min;
+  const width = 280;
+  const height = 80;
+  const padding = { left: 8, right: 8, top: 8, bottom: 16 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
   const sigma = (p90 - p10) / 2.56;
   const mean = p50;
+  const min = mean - 3 * sigma;
+  const max = mean + 3 * sigma;
 
-  const heights = Array.from({ length: bins }).map((_, i) => {
-    const x = min + (range * (i + 0.5)) / bins;
+  const points = 60;
+  const path: string[] = [];
+  for (let i = 0; i <= points; i++) {
+    const x = min + ((max - min) * i) / points;
     const z = (x - mean) / sigma;
-    return Math.exp(-0.5 * z * z);
-  });
-  const maxH = Math.max(...heights);
+    const y = Math.exp(-0.5 * z * z);
+    const px = padding.left + (i / points) * chartW;
+    const py = padding.top + chartH - y * chartH;
+    path.push(`${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`);
+  }
 
-  const budgetBin = Math.floor(((budget - min) / range) * bins);
+  const budgetX = padding.left + ((budget - min) / (max - min)) * chartW;
+  const underPath = path.filter((_, i) => {
+    const x = min + ((max - min) * i) / points;
+    return x <= budget;
+  });
 
   return (
-    <div className="flex items-end gap-px h-12">
-      {heights.map((h, i) => {
-        const underBudget = i < budgetBin;
-        return (
-          <div
-            key={i}
-            className="flex-1 rounded-t-sm"
-            style={{
-              height: `${(h / maxH) * 100}%`,
-              background: underBudget ? 'var(--state-ok)' : 'var(--state-caution)',
-              opacity: 0.8,
-            }}
+    <div className="flex flex-col gap-1">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20">
+        <defs>
+          <linearGradient id="underGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--state-ok)" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="var(--state-ok)" stopOpacity="0.1" />
+          </linearGradient>
+          <linearGradient id="overGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--state-caution)" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="var(--state-caution)" stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+        <path
+          d={`${path.join(' ')} L${padding.left + chartW},${padding.top + chartH} L${padding.left},${padding.top + chartH} Z`}
+          fill="url(#overGrad)"
+        />
+        {underPath.length > 1 && (
+          <path
+            d={`${underPath.join(' ')} L${budgetX},${padding.top + chartH} L${padding.left},${padding.top + chartH} Z`}
+            fill="url(#underGrad)"
           />
-        );
-      })}
+        )}
+        <path d={path.join(' ')} fill="none" stroke="var(--ink)" strokeWidth="1.5" />
+        <line
+          x1={budgetX}
+          y1={padding.top}
+          x2={budgetX}
+          y2={padding.top + chartH}
+          stroke="var(--state-ok)"
+          strokeWidth="1"
+          strokeDasharray="2 2"
+        />
+        <text
+          x={budgetX}
+          y={height - 2}
+          textAnchor="middle"
+          fontSize="8"
+          fill="var(--ink-secondary)"
+        >
+          予算
+        </text>
+      </svg>
+      <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+        緑が予算内、茶色が超過。山の中央が予想額。
+      </p>
     </div>
   );
 }
