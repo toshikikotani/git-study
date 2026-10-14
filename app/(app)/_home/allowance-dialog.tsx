@@ -12,6 +12,12 @@ export type AllowanceExplain = {
   capYen: number;
   /** 予算に収まる確率(今の状態)。 */
   probWithinBudget?: number | null;
+  /** 残りの休日数(土日祝)。 */
+  remainingDayOffs?: number;
+  /** 休日の1日あたり見込み(過去データから)。 */
+  dayOffPerDayYen?: number | null;
+  /** 平日の1日あたり見込み(過去データから)。 */
+  weekdayPerDayYen?: number | null;
 };
 
 function yen(n: number): string {
@@ -39,6 +45,8 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
     : null;
   // 単純な1日あたり（残り予算 ÷ 残り日数）
   const simplePerDay = explain.remainingDays > 0 ? Math.round(leftBudget / explain.remainingDays) : 0;
+  const dayOffs = explain.remainingDayOffs ?? 0;
+  const weekdays = explain.remainingDays - dayOffs;
   return (
     <>
       <button
@@ -60,8 +68,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
             今日の上限の計算
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            平日は少なめ、休日は多めの重みで、残り{explain.remainingDays}
-            日の全部の見込みが予算内に収まる額です。
+            過去の支出パターンから、休日は平日より多く使う傾向があるため、休日に重みをかけています。
           </p>
           <ul className="space-y-3">
             <li>
@@ -101,11 +108,31 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               計算の毎階
             </p>
             <ol className="mt-1 space-y-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              <li>1. 残り予算 = 予算 − 今日より前の支出 = {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}</li>
-              <li>2. 単純な1日あたり = 残り予算 ÷ 残り日数 = {yen(leftBudget)} ÷ {explain.remainingDays}日 = {yen(simplePerDay)}</li>
-              <li>3. 今日の上限 = {yen(cap)}（平日は少なめ・休日は多めの重みで調整）</li>
+              <li>1. 残り予算 = {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}</li>
+              <li>2. 単純な1日あたり = {yen(leftBudget)} ÷ {explain.remainingDays}日 = {yen(simplePerDay)}</li>
+              <li>3. 今日の上限 = {yen(cap)}（休日重みで調整）</li>
             </ol>
           </div>
+          {dayOffs > 0 || explain.dayOffPerDayYen != null ? (
+            <div
+              className="rounded-2xl px-3 py-2"
+              style={{ background: 'var(--plane)' }}
+            >
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                残りの日の内訳
+              </p>
+              <ul className="mt-1 space-y-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                <li>・残り休日(土日祝): {dayOffs}日</li>
+                <li>・残り平日: {weekdays}日</li>
+                {explain.dayOffPerDayYen != null && explain.dayOffPerDayYen > 0 ? (
+                  <li>・休日の見込み: 1日{yen(explain.dayOffPerDayYen)}(過去データから)</li>
+                ) : null}
+                {explain.weekdayPerDayYen != null && explain.weekdayPerDayYen > 0 ? (
+                  <li>・平日の見込み: 1日{yen(explain.weekdayPerDayYen)}(過去データから)</li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
             {over > 0
               ? `今日は${yen(explain.spentTodayYen)}使ったので、上限を${yen(over)}超えています。`
@@ -128,7 +155,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
             </div>
           ) : null}
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-            今日の上限は、過去の支出パターン（平日は少ない・休日は多い）を考慮して、残りの日々で予算内に収まる確率が最高になる額をシミュレーションで求めています。
+            休日の重みは、過去の支出記録から「休日は平日の何倍使うか」を計算して決めています。
           </p>
           <button
             type="button"
