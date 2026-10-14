@@ -10,7 +10,6 @@ import { ProgressGauge } from '@/components/ui/meter';
 import { WasteRatioBars } from '@/components/ui/waste-ratio-bars';
 import { formatYen } from '@/domain/money';
 import { SPENDING_PERSONA_DESCRIPTIONS, SPENDING_PERSONA_LABELS } from '@/domain/persona';
-import type { AiTrust } from '@/domain/ai-forecast-read';
 import type { ForecastReadView } from '@/features/ai-report/forecast-read';
 import type { MonthlyReportForecast } from '@/features/ai-report/monthly-report-ai';
 import type { MonthlyAiReportView } from '@/features/ai-report/store';
@@ -79,7 +78,6 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
           <ForecastReadSection
             forecast={input.forecast}
             read={report.forecastRead}
-            trust={input.evidence.trust}
           />
 
           <BulletList
@@ -157,16 +155,14 @@ const yen = (n: number) => formatYen(round100(n), { sign: 'never' });
 
 /**
  * 着地の見込み:統計(確率予測 v2)と、AIの読み(ADR-072)を並べる。AIの読みは、統計が見ていない
- * 事情(メモ・品目・予定・暦)から残りの支出を動かしたもので、これまでの当たり具合に応じて効かせる。
+ * 事情(メモ・品目・予定・暦)から残りの支出を動かしたもの。補正は100%効かせる。
  */
 function ForecastReadSection({
   forecast,
   read,
-  trust,
 }: {
   forecast: MonthlyReportForecast | null;
   read: ForecastReadView | null;
-  trust: AiTrust;
 }) {
   if (forecast === null && read === null) return null;
   const stat = read?.stat ?? forecast!;
@@ -191,12 +187,11 @@ function ForecastReadSection({
             <dt style={{ color: 'var(--ink-secondary)' }}>AIの読み</dt>
             <dd className="tabular text-right font-semibold" style={{ color: 'var(--accent)' }}>
               中央 {yen(read.adjusted.p50)}
-              <span className="block text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
-                残りの支出 {signed(read.percent)}
-                {read.percent !== 0
-                  ? `(当たり具合から ${signed(read.adjusted.effectivePercent)} だけ効かせる)`
-                  : ''}
-              </span>
+              {read.percent !== 0 ? (
+                <span className="block text-xs font-normal" style={{ color: 'var(--ink-muted)' }}>
+                  残りの支出 {signed(read.percent)}
+                </span>
+              ) : null}
             </dd>
           </div>
         ) : null}
@@ -219,11 +214,6 @@ function ForecastReadSection({
           レポートを更新すると、AIの読み(統計が見ていない事情からの補正)が出ます。
         </p>
       )}
-      <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        {trust.compared === 0
-          ? 'AIの読みの当たり具合はまだ分からないので、補正は半分だけ効かせる。'
-          : `これまでAIの読みが統計より近かったのは ${trust.compared}回中${trust.wins}回。補正はその割合に応じて効かせる。`}
-      </p>
     </div>
   );
 }
