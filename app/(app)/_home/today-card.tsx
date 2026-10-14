@@ -352,15 +352,25 @@ function DistributionChart({
 
   const cdf = (x: number) => 0.5 * (1 + erf((x - mean) / (sigma * Math.sqrt(2))));
 
-  const handleTap = (e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
+  const updateFromEvent = (clientX: number, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect();
-    const clientX = 'touches' in e ? (e.touches[0]?.clientX ?? 0) : e.clientX;
     const relX = ((clientX - rect.left) / rect.width) * width;
     const chartRelX = (relX - padding.left) / chartW;
     if (chartRelX >= 0 && chartRelX <= 1) {
       setTapX(chartRelX);
     }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    updateFromEvent(e.clientX, e.currentTarget);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.buttons === 0) return;
+    e.preventDefault();
+    updateFromEvent(e.clientX, e.currentTarget);
   };
 
   const tapYen = tapX !== null ? min + tapX * (max - min) : null;
@@ -371,9 +381,10 @@ function DistributionChart({
     <div className="flex flex-col gap-1">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-28 cursor-pointer"
-        onClick={handleTap}
-        onTouchStart={handleTap}
+        className="w-full h-28 cursor-pointer select-none"
+        style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
       >
         <defs>
           <linearGradient id="underGrad" x1="0" y1="0" x2="0" y2="1">
