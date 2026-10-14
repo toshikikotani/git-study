@@ -37,6 +37,8 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
   const probText = prob !== null && prob !== undefined
     ? prob >= 0.995 ? '99%以上' : `${Math.round(prob * 100)}%`
     : null;
+  // 単純な1日あたり（残り予算 ÷ 残り日数）
+  const simplePerDay = explain.remainingDays > 0 ? Math.round(leftBudget / explain.remainingDays) : 0;
   return (
     <>
       <button
@@ -91,11 +93,22 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               {bar(explain.spentTodayYen, 'var(--state-caution)')}
             </li>
           </ul>
+          <div
+            className="rounded-2xl px-3 py-2"
+            style={{ background: 'var(--plane)' }}
+          >
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+              計算の毎階
+            </p>
+            <ol className="mt-1 space-y-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              <li>1. 残り予算 = 予算 − 今日より前の支出 = {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}</li>
+              <li>2. 単純な1日あたり = 残り予算 ÷ 残り日数 = {yen(leftBudget)} ÷ {explain.remainingDays}日 = {yen(simplePerDay)}</li>
+              <li>3. 今日の上限 = {yen(cap)}（平日は少なめ・休日は多めの重みで調整）</li>
+            </ol>
+          </div>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
-            残りは{yen(leftBudget)}
-            。平日と休日の重みで、予算内に収まる見込みが最高になる今日の上限は{yen(cap)}です。
             {over > 0
-              ? `今日は${yen(explain.spentTodayYen)}使ったので、${yen(over)}超えています。`
+              ? `今日は${yen(explain.spentTodayYen)}使ったので、上限を${yen(over)}超えています。`
               : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}
           </p>
           {probText !== null ? (
@@ -115,7 +128,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
             </div>
           ) : null}
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-            計算方法: 予算から今までの支出を引い、残りの日数で割った額を基準に、平日は少なめ・休日は多めの重みをかけて今日の上限を決めています。
+            今日の上限は、過去の支出パターン（平日は少ない・休日は多い）を考慮して、残りの日々で予算内に収まる確率が最高になる額をシミュレーションで求めています。
           </p>
           <button
             type="button"
