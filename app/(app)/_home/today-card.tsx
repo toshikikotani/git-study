@@ -116,11 +116,11 @@ function TodayHero({
             </p>
           ) : null}
           <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
-          <TenDots probability={SAFE_ALLOWANCE_PROB} />
+          <TenDots probability={allowanceExplain?.probWithinBudget ?? SAFE_ALLOWANCE_PROB} />
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
             平日と休日の重みを入れ、毎日この額までなら、
             <strong style={{ color: 'var(--ink)' }}>
-              {formatProbability(SAFE_ALLOWANCE_PROB)}の確率
+              {formatProbability(allowanceExplain?.probWithinBudget ?? SAFE_ALLOWANCE_PROB)}の確率
             </strong>
             で予算内に収まります。
           </p>
