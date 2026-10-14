@@ -399,7 +399,7 @@ function DistributionChart({
           fontSize="7"
           fill="var(--ink-muted)"
         >
-          高
+          高い
         </text>
         <text
           x={padding.left - 2}
@@ -408,7 +408,7 @@ function DistributionChart({
           fontSize="7"
           fill="var(--ink-muted)"
         >
-          低
+          低い
         </text>
       </svg>
       <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
