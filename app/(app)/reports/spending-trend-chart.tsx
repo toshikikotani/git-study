@@ -54,15 +54,22 @@ export function SpendingTrendChart({
   to?: string | undefined;
 }) {
   const today = todayJst();
-  const from = fromProp ?? addDays(today, -(LOOKBACK_DAYS - 1));
-  const to = toProp ?? today;
+  const displayFrom = fromProp ?? addDays(today, -(LOOKBACK_DAYS - 1));
+  const displayTo = toProp && toProp < today ? toProp : today;
+  // 平均線のために、表示開始より前の履歴も含めて計算する
+  const calcFrom = addDays(displayFrom, -(LONG_WINDOW - 1));
 
   const result = useMemo(() => {
-    const daily = buildDailySeries(daySpend, from, to);
-    return computeTrend(daily);
-  }, [daySpend, from, to]);
+    const daily = buildDailySeries(daySpend, calcFrom, displayTo);
+    const trend = computeTrend(daily);
+    // 表示は displayFrom 以降だけ
+    return {
+      ...trend,
+      points: trend.points.filter((p) => p.date >= displayFrom),
+    };
+  }, [daySpend, calcFrom, displayTo, displayFrom]);
 
-  if (result.points.length < LONG_WINDOW) {
+  if (result.points.length < 7) {
     return (
       <section
         className="glass rounded-2xl p-5"
