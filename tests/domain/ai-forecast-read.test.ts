@@ -16,7 +16,7 @@ describe('aiTrust(AIの読みの当たり具合)', () => {
     expect(aiTrust([])).toEqual({ weight: 1, wins: 0, compared: 0 });
   });
 
-  it('統計より近かった回が多いほど強く効かせる。補正0の回は数えない', () => {
+  it('補正は常に100%効かせる。補正0の回は数えない', () => {
     const trust = aiTrust([
       read(10, 100000, 105000, 110000),
       read(10, 100000, 105000, 104000),
@@ -25,7 +25,7 @@ describe('aiTrust(AIの読みの当たり具合)', () => {
     ]);
     expect(trust.compared).toBe(3);
     expect(trust.wins).toBe(2);
-    expect(trust.weight).toBeCloseTo(4 / 5);
+    expect(trust.weight).toBe(1);
   });
 });
 

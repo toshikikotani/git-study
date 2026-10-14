@@ -89,7 +89,7 @@ export function SpendingHeatmap({
 
       <div className="flex gap-1">
         <div
-          className="flex w-5 shrink-0 flex-col gap-1 text-[10px]"
+          className="flex w-5 shrink-0 flex-col gap-1 text-[11px]"
           style={{ color: 'var(--ink-muted)' }}
         >
           {weekdays.map((w) => (
@@ -110,7 +110,7 @@ export function SpendingHeatmap({
                 return (
                   <div
                     key={di}
-                    className="flex h-6 items-center justify-center rounded-sm text-[10px] tabular"
+                    className="flex h-6 items-center justify-center rounded-sm text-[11px] tabular"
                     style={{
                       background: colors[level],
                       color: level >= 3 ? 'var(--on-action)' : 'var(--ink-secondary)',
@@ -128,7 +128,7 @@ export function SpendingHeatmap({
       </div>
 
       <div
-        className="flex items-center justify-end gap-1 text-[10px]"
+        className="flex items-center justify-end gap-1 text-[11px]"
         style={{ color: 'var(--ink-muted)' }}
       >
         <span>少</span>

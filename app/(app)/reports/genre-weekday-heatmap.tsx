@@ -111,7 +111,7 @@ export function GenreWeekdayHeatmap({ cells }: { cells: readonly GenreWeekdayCel
                         ? `${Math.round(yen / 100) / 10}k`
                         : yen;
                   return (
-                    <td key={di} className="p-0.5">
+                    <td key={di} className="p-1">
                       <div
                         className="flex h-7 items-center justify-center rounded-sm"
                         style={{
@@ -123,7 +123,7 @@ export function GenreWeekdayHeatmap({ cells }: { cells: readonly GenreWeekdayCel
                         }`}
                       >
                         {yen > 0 ? (
-                          <span className="text-[9px] tabular opacity-80">{label}</span>
+                          <span className="text-[11px] tabular opacity-80">{label}</span>
                         ) : null}
                       </div>
                     </td>
@@ -136,7 +136,7 @@ export function GenreWeekdayHeatmap({ cells }: { cells: readonly GenreWeekdayCel
       </div>
 
       <div
-        className="flex items-center justify-end gap-1 text-[10px]"
+        className="flex items-center justify-end gap-1 text-[11px]"
         style={{ color: 'var(--ink-muted)' }}
       >
         <span>少</span>

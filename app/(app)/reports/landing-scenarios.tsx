@@ -40,7 +40,7 @@ export function LandingScenarios({
         楽観（下位10%）、中央、悲観（上位10%）を比較しています。
       </p>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {scenarios.map((s) => {
           const pct = Math.min(100, (s.value / max) * 100);
           const over = budgetYen !== null && s.value > budgetYen;
