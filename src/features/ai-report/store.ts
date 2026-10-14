@@ -57,6 +57,8 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
     loadScoredReads(monthStart, today).catch(() => ({ reads: [], trust: aiTrust([]) })),
   ]);
   const evidence = await loadReadEvidence(ledger.transactions, monthRange, today).catch(() => ({
+    dayOffAvgYen: null,
+    weekdayAvgYen: null,
     notable: [],
     scheduled: [],
   }));

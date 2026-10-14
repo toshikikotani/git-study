@@ -119,6 +119,9 @@ export type MonthlyReportForecast = {
 };
 
 export type MonthlyReportEvidence = {
+  /** 今月の全明細から計算した、平日と休み日の1日あたり平均(固定費除く)。 */
+  dayOffAvgYen: number | null;
+  weekdayAvgYen: number | null;
   /** 今月の目立つ明細(金額の大きいもの・メモのあるもの)。 */
   notable: readonly {
     date: string;
@@ -326,35 +329,6 @@ function buildUserContent(input: MonthlyReportInput): string {
 
 const yenOf = (n: number) => `${n}円`;
 
-/** 目立つ明細から休み日(土日祝)/平日の平均支出を計算する。 */
-function computeDayOffWeekdayAvg(
-  notable: readonly { date: string; amountYen: number }[],
-): { weekdayAvg: number; dayOffAvg: number; weekdayCount: number; dayOffCount: number } | null {
-  if (notable.length === 0) return null;
-  let weekdaySum = 0;
-  let dayOffSum = 0;
-  const weekdayDates = new Set<string>();
-  const dayOffDates = new Set<string>();
-  for (const n of notable) {
-    if (isDayOff(n.date)) {
-      dayOffSum += n.amountYen;
-      dayOffDates.add(n.date);
-    } else {
-      weekdaySum += n.amountYen;
-      weekdayDates.add(n.date);
-    }
-  }
-  const weekdayCount = weekdayDates.size;
-  const dayOffCount = dayOffDates.size;
-  if (weekdayCount === 0 && dayOffCount === 0) return null;
-  return {
-    weekdayAvg: weekdayCount > 0 ? Math.round(weekdaySum / weekdayCount) : 0,
-    dayOffAvg: dayOffCount > 0 ? Math.round(dayOffSum / dayOffCount) : 0,
-    weekdayCount,
-    dayOffCount,
-  };
-}
-
 /** 着地の見込みと、AIの読みの根拠に使ってよい事実。 */
 function appendForecastSection(lines: string[], input: MonthlyReportInput): void {
   const f = input.forecast;
@@ -408,14 +382,13 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   }
 
   const e = input.evidence;
-  // 休み日(土日祝)/平日の平均支出を計算して渡す
-  const dowAvg = computeDayOffWeekdayAvg(e.notable);
-  if (dowAvg !== null) {
+  // 休み日(土日祝)/平日の平均支出(全明細から計算済み)
+  if (e.weekdayAvgYen !== null || e.dayOffAvgYen !== null) {
     lines.push(
       '',
-      '今月の休み日・平日別支出(固定費を除いた目立つ明細から計算、休み日=土日祝):',
-      `- 平日の1日あたり: ${yenOf(dowAvg.weekdayAvg)}(${dowAvg.weekdayCount}日分)`,
-      `- 休み日の1日あたり: ${yenOf(dowAvg.dayOffAvg)}(${dowAvg.dayOffCount}日分)`,
+      '今月の休み日・平日別支出(固定費を除いた全明細から計算、休み日=土日祝):',
+      `- 平日の1日あたり: ${e.weekdayAvgYen !== null ? yenOf(e.weekdayAvgYen) : '—'}`,
+      `- 休み日の1日あたり: ${e.dayOffAvgYen !== null ? yenOf(e.dayOffAvgYen) : '—'}`,
     );
   }
 

@@ -7,6 +7,7 @@
  */
 
 import { aiTrust, applyAiRead, type AiTrust, type ScoredRead } from '@/domain/ai-forecast-read';
+import { isDayOff } from '@/domain/forecast/holidays';
 import { actualTotalForPeriod } from '@/domain/forecast/backtest';
 import { toForecastSource } from '@/features/forecast/source';
 import { loadLedgerTransactions } from '@/features/spending/entries';
@@ -20,8 +21,8 @@ import type { MonthlyReportEvidence } from './monthly-report-ai';
 export class ForecastReadStoreError extends AppError {}
 
 /** 金額の大きい明細と、メモのある明細を、それぞれこの件数まで渡す。 */
-const MAX_LARGE = 8;
-const MAX_MEMO = 8;
+const MAX_LARGE = 15;
+const MAX_MEMO = 10;
 const MAX_SCHEDULED = 10;
 const MAX_ITEMS_PER_TX = 6;
 const ID_CHUNK = 20;
@@ -33,7 +34,7 @@ export async function loadReadEvidence(
   transactions: readonly LedgerTransaction[],
   monthRange: { from: DateOnly; to: DateOnly },
   today: DateOnly,
-): Promise<Pick<MonthlyReportEvidence, 'notable' | 'scheduled'>> {
+): Promise<Pick<MonthlyReportEvidence, 'notable' | 'scheduled' | 'dayOffAvgYen' | 'weekdayAvgYen'>> {
   const inMonth = transactions.filter(
     (t) =>
       t.occurredOn >= monthRange.from &&
@@ -52,7 +53,28 @@ export async function loadReadEvidence(
     a.occurredOn.localeCompare(b.occurredOn),
   );
   const items = await loadItemNames(notableTx.map((t) => t.id));
+  // 全明細から平日/休み日の1日あたり平均を計算
+  const byDate = new Map<string, number>();
+  for (const t of past) {
+    byDate.set(t.occurredOn, (byDate.get(t.occurredOn) ?? 0) + -t.amountYen);
+  }
+  let dayOffSum = 0,
+    dayOffCount = 0,
+    weekdaySum = 0,
+    weekdayCount = 0;
+  for (const [date, yen] of byDate) {
+    if (isDayOff(date)) {
+      dayOffSum += yen;
+      dayOffCount += 1;
+    } else {
+      weekdaySum += yen;
+      weekdayCount += 1;
+    }
+  }
+
   return {
+    dayOffAvgYen: dayOffCount > 0 ? Math.round(dayOffSum / dayOffCount) : null,
+    weekdayAvgYen: weekdayCount > 0 ? Math.round(weekdaySum / weekdayCount) : null,
     notable: notableTx.map((t) => ({
       date: t.occurredOn,
       label: t.label,
