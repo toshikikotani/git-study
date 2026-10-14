@@ -15,6 +15,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ZAxis,
+  LabelList,
 } from 'recharts';
 import { genreColorVar } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
