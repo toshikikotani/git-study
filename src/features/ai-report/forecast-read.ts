@@ -39,6 +39,7 @@ export async function loadReadEvidence(
       t.occurredOn >= monthRange.from &&
       t.occurredOn <= monthRange.to &&
       !t.isTransfer &&
+      !t.mustPay &&
       t.reviewStatus !== 'ignored' &&
       t.amountYen < 0,
   );

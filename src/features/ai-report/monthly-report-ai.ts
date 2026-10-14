@@ -413,14 +413,14 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   if (dowAvg !== null) {
     lines.push(
       '',
-      '今月の休み日・平日別支出(目立つ明細から計算、休み日=土日祝):',
+      '今月の休み日・平日別支出(固定費を除いた目立つ明細から計算、休み日=土日祝):',
       `- 平日の1日あたり: ${yenOf(dowAvg.weekdayAvg)}(${dowAvg.weekdayCount}日分)`,
       `- 休み日の1日あたり: ${yenOf(dowAvg.dayOffAvg)}(${dowAvg.dayOffCount}日分)`,
     );
   }
 
   if (e.notable.length > 0) {
-    lines.push('', '今月の目立つ明細(金額の大きいもの・メモのあるもの):');
+    lines.push('', '今月の目立つ明細(固定費を除いた、金額の大きいもの・メモのあるもの):');
     for (const n of e.notable) {
       const items = n.items.length > 0 ? ` 品目: ${n.items.join('、')}` : '';
       const memo = n.memo ? ` メモ: ${n.memo}` : '';
