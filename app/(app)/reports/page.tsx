@@ -22,6 +22,7 @@ import { loadForecast } from '@/features/forecast/load';
 import { addDays, addMonths } from '@/lib/date';
 import { FixedVariableCard } from './fixed-variable-card';
 import { GenreDonutChart } from './genre-donut-chart';
+import { BubbleChart, type BubblePoint } from './bubble-chart';
 import { IncomeExpenseChart } from './income-expense-chart';
 import { MerchantRankingCard } from './merchant-ranking-card';
 import { MonthSummaryRow } from './month-summary-row';
@@ -107,6 +108,28 @@ export default async function ReportsPage() {
     const [genreName, dow] = key.split('|');
     return { genreName: genreName!, weekday: Number(dow), yen };
   });
+
+  const genreBubbleMap = new Map<string, { name: string; count: number; total: number }>();
+  for (const tx of ledger.transactions) {
+    if (tx.amountYen >= 0 || tx.isTransfer || tx.reviewStatus === 'ignored' || tx.needsInput)
+      continue;
+    const yen = -tx.amountYen;
+    const name = tx.genreName ?? '未分類';
+    const key = tx.genreId ?? name;
+    const cur = genreBubbleMap.get(key) ?? { name, count: 0, total: 0 };
+    cur.count += 1;
+    cur.total += yen;
+    genreBubbleMap.set(key, cur);
+  }
+  const bubblePoints: BubblePoint[] = [...genreBubbleMap.entries()]
+    .map(([id, g]) => ({
+      genreId: id,
+      name: g.name,
+      frequency: g.count,
+      avgYen: g.count > 0 ? Math.round(g.total / g.count) : 0,
+      totalYen: g.total,
+    }))
+    .filter((p) => p.frequency > 0);
   const budgetTotal = plan ? plan.items.reduce((sum, item) => sum + item.targetYen, 0) : 0;
   const hasGoal = plan !== null && budgetTotal > 0;
   const monthPeriod = {
@@ -351,6 +374,7 @@ export default async function ReportsPage() {
         }))}
         monthKey={monthKey}
       />
+      <BubbleChart points={bubblePoints} />
 
       <FixedVariableCard
         fixedYen={fixedVariable.fixedYen}
