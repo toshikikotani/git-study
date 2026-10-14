@@ -25,6 +25,7 @@ export type AllowanceExplain = {
     dayOffAllocYen: number;
     ratio: number;
     safetyFactor: number;
+    todayIsDayOff: boolean;
     steps: string[];
   } | null;
 };

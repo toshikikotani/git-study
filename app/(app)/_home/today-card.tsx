@@ -113,7 +113,7 @@ function TodayHero({
           {allowanceExplain?.dailyLimit ? (
             <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
               {(() => {
-                const isDayOff = allowanceExplain.remainingDayOffs !== undefined && allowanceExplain.remainingDayOffs > 0;
+                const isDayOff = allowanceExplain.dailyLimit.todayIsDayOff;
                 const avg = isDayOff ? allowanceExplain.dayOffPerDayYen : allowanceExplain.weekdayPerDayYen;
                 const limit = allowanceExplain.dailyLimit.todayLimitYen;
                 if (avg && avg > 0) {

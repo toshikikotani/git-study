@@ -31,6 +31,8 @@ export type DailyLimitResult = {
   ratio: number;
   /** 確率による絞り係数(0.5〜1) */
   safetyFactor: number;
+  /** 今日が休日か */
+  todayIsDayOff: boolean;
   /** 計算の各段階(表示用) */
   steps: string[];
 };
@@ -93,6 +95,7 @@ export function computeDailyLimit(input: DailyLimitInput): DailyLimitResult {
     dayOffAllocYen: dayOffAlloc,
     ratio,
     safetyFactor,
+    todayIsDayOff,
     steps,
   };
 }
