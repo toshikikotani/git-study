@@ -297,11 +297,13 @@ function DistributionChart({
   p50,
   p90,
   budget,
+  actualProb,
 }: {
   p10: number;
   p50: number;
   p90: number;
   budget: number;
+  actualProb: number;
 }) {
   const [tapX, setTapX] = useState<number | null>(null);
   const width = 300;
