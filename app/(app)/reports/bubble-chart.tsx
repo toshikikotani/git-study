@@ -80,7 +80,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
               fontSize={11}
               tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
             />
-            <ZAxis type="number" dataKey="totalYen" range={[40, 200]} />
+            <ZAxis type="number" dataKey="totalYen" range={[80, 400]} />
             <Tooltip
               cursor={{ strokeDasharray: '3 3' }}
               content={({ payload }) => {
@@ -113,7 +113,15 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
                 stroke="var(--ink)"
                 strokeWidth={1}
                 onClick={() => setSelected(p.genreId ?? p.name)}
-              />
+              >
+                <LabelList
+                  dataKey="name"
+                  position="top"
+                  fontSize={10}
+                  fill="var(--ink-secondary)"
+                  offset={8}
+                />
+              </Scatter>
             ))}
           </ScatterChart>
         </ResponsiveContainer>
