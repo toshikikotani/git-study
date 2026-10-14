@@ -84,6 +84,18 @@ export type MonthlyReportInput = {
   evidence: MonthlyReportEvidence;
 };
 
+/** 見込みの内訳（なぜこの見込み?のデータ） */
+export type ForecastBreakdownData = {
+  actualYen: number;
+  committedYen: number;
+  variableYen: number;
+  visitsYen: number;
+  billsYen: number;
+  unrecordedYen: number;
+  specialYen: number;
+  variableByCategory: readonly { name: string; yen: number }[];
+};
+
 export type MonthlyReportForecast = {
   asOf: string;
   remainingDays: number;
@@ -102,6 +114,8 @@ export type MonthlyReportForecast = {
   /** 検証できた月が3か月未満なら true(統計の数字は目安)。 */
   provisional: boolean;
   categories: readonly { name: string; actualYen: number; p50: number }[];
+  /** 見込みの内訳（なぜこの見込み?のデータ） */
+  breakdown: ForecastBreakdownData | null;
 };
 
 export type MonthlyReportEvidence = {
@@ -372,6 +386,29 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
     for (const c of f.categories) {
       lines.push(`- ${c.name}: ${yenOf(c.p50)}(ここまで ${yenOf(c.actualYen)})`);
     }
+  }
+
+  // 見込みの内訳（なぜこの見込み?のデータ）を渡す
+  if (f.breakdown !== null) {
+    const b = f.breakdown;
+    const decided = b.actualYen + b.committedYen;
+    const ahead = b.variableYen + b.visitsYen + b.billsYen + b.unrecordedYen + b.specialYen;
+    lines.push(
+      '',
+      '見込みの内訳(なぜこの見込み?):',
+      `- もう決まっている: ${yenOf(decided)}(使った額 ${yenOf(b.actualYen)} + 予定・固定費 ${yenOf(b.committedYen)})`,
+      `- これから使いそうな額: ${yenOf(ahead)}`,
+      `  ・ ふだんの買い物: ${yenOf(b.variableYen)}`,
+    );
+    if (b.variableByCategory.length > 0) {
+      for (const c of b.variableByCategory) {
+        lines.push(`    - ${c.name}: ${yenOf(c.yen)}`);
+      }
+    }
+    if (b.visitsYen > 0) lines.push(`  ・ いつも通う店: ${yenOf(b.visitsYen)}`);
+    if (b.billsYen > 0) lines.push(`  ・ 請求・期ごとの支払い: ${yenOf(b.billsYen)}`);
+    if (b.unrecordedYen > 0) lines.push(`  ・ まだ記録していない分: ${yenOf(b.unrecordedYen)}`);
+    if (b.specialYen > 0) lines.push(`  ・ 大きめの出費: ${yenOf(b.specialYen)}`);
   }
 
   const e = input.evidence;
