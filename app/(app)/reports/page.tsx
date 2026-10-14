@@ -265,7 +265,12 @@ export default async function ReportsPage() {
             label="グラフを音で聞く"
             text={`${endLabel}の支出は${formatEstimate(landing.p50)}の見込み。80%の確率で${formatEstimateRange(landing.p10, landing.p90)}。${budgetYen !== null ? `予算は${formatEstimate(budgetYen, { approx: false })}。` : ''}`}
           />
-          <SpendingTrendChart daySpend={variableDaySpend} fixedYen={fixedYenForTrend} />
+          <SpendingTrendChart
+            daySpend={variableDaySpend}
+            fixedYen={fixedYenForTrend}
+            from={plan?.periodStart}
+            to={plan?.periodEnd}
+          />
           <GenreWeekdayHeatmap cells={genreWeekdayCells} />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
           {budgetYen === null || forecast.drivers[0] ? (

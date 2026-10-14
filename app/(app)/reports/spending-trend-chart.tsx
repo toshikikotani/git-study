@@ -41,19 +41,26 @@ function directionColor(direction: TrendDirection): string {
 export function SpendingTrendChart({
   daySpend,
   fixedYen = 0,
+  from: fromProp,
+  to: toProp,
 }: {
   /** 日次の実績支出（正の数・固定費を除いたもの） */
   daySpend: Readonly<Record<string, number>>;
   /** この期間の固定費合計（表示用） */
   fixedYen?: number;
+  /** 表示範囲の開始日。無ければ直近60日。 */
+  from?: string | undefined;
+  /** 表示範囲の終了日。無ければ今日。 */
+  to?: string | undefined;
 }) {
   const today = todayJst();
-  const from = addDays(today, -(LOOKBACK_DAYS - 1));
+  const from = fromProp ?? addDays(today, -(LOOKBACK_DAYS - 1));
+  const to = toProp ?? today;
 
   const result = useMemo(() => {
-    const daily = buildDailySeries(daySpend, from, today);
+    const daily = buildDailySeries(daySpend, from, to);
     return computeTrend(daily);
-  }, [daySpend, from, today]);
+  }, [daySpend, from, to]);
 
   if (result.points.length < LONG_WINDOW) {
     return (
