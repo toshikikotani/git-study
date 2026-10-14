@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Link from 'next/link';
 
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
@@ -299,7 +300,7 @@ function DistributionChart({
   p90: number;
   budget: number;
 }) {
-  const [tapX, setTapX] = React.useState<number | null>(null);
+  const [tapX, setTapX] = useState<number | null>(null);
   const width = 300;
   const height = 110;
   const padding = { left: 32, right: 8, top: 8, bottom: 20 };
