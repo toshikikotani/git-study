@@ -220,14 +220,14 @@ export function SpendingTrendChart({
             {remainingPerDayYen != null && remainingPerDayYen > 0 ? (
               <ReferenceLine
                 y={remainingPerDayYen}
-                stroke="var(--state-ok)"
+                stroke="var(--ink-secondary)"
                 strokeDasharray="6 3"
                 strokeWidth={2.5}
                 label={{
                   value: '残り',
                   position: 'insideBottomRight',
                   fontSize: 11,
-                  fill: 'var(--state-ok)',
+                  fill: 'var(--ink-secondary)',
                   fontWeight: 600,
                 }}
               />
@@ -259,7 +259,7 @@ export function SpendingTrendChart({
         {remainingPerDayYen != null && remainingPerDayYen > 0 ? (
           <span>
             残り平均:{' '}
-            <strong style={{ color: 'var(--state-ok)' }}>
+            <strong style={{ color: 'var(--ink-secondary)' }}>
               {formatYen(remainingPerDayYen, { sign: 'never' })}
             </strong>
           </span>
