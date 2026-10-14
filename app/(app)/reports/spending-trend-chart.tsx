@@ -157,8 +157,8 @@ export function SpendingTrendChart({
                   key={`cell-${index}`}
                   fill={
                     entry.aboveAvg
-                      ? 'color-mix(in srgb, var(--genre-4) 72%, var(--surface))'
-                      : 'color-mix(in srgb, var(--ink) 42%, var(--surface))'
+                      ? 'color-mix(in srgb, var(--accent) 55%, var(--ink))'
+                      : 'color-mix(in srgb, var(--ink) 30%, var(--surface))'
                   }
                 />
               ))}
@@ -212,7 +212,7 @@ export function SpendingTrendChart({
         <span className="flex items-center gap-1">
           <span
             className="inline-block size-3 rounded"
-            style={{ background: 'color-mix(in srgb, var(--genre-4) 72%, var(--surface))' }}
+            style={{ background: 'color-mix(in srgb, var(--accent) 55%, var(--ink))' }}
           />
           7日平均を上回った日
         </span>
