@@ -40,11 +40,15 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
     />
   );
   const prob = explain.probWithinBudget;
-  const probText = prob !== null && prob !== undefined
-    ? prob >= 0.995 ? '99%以上' : `${Math.round(prob * 100)}%`
-    : null;
+  const probText =
+    prob !== null && prob !== undefined
+      ? prob >= 0.995
+        ? '99%以上'
+        : `${Math.round(prob * 100)}%`
+      : null;
   // 単純な1日あたり（残り予算 ÷ 残り日数）
-  const simplePerDay = explain.remainingDays > 0 ? Math.round(leftBudget / explain.remainingDays) : 0;
+  const simplePerDay =
+    explain.remainingDays > 0 ? Math.round(leftBudget / explain.remainingDays) : 0;
   const dayOffs = explain.remainingDayOffs ?? 0;
   const weekdays = explain.remainingDays - dayOffs;
   return (
@@ -57,12 +61,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       >
         なぜこの額?
       </button>
-      <BottomSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        role="dialog"
-        label="今日の上限の計算"
-      >
+      <BottomSheet open={open} onClose={() => setOpen(false)} role="dialog" label="今日の上限の計算">
         <div className="space-y-3 px-4 pb-4">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
             今日の上限の計算
@@ -100,28 +99,33 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               {bar(explain.spentTodayYen, 'var(--state-caution)')}
             </li>
           </ul>
-          <div
-            className="rounded-2xl px-3 py-2"
-            style={{ background: 'var(--plane)' }}
-          >
+          <div className="rounded-2xl px-3 py-2" style={{ background: 'var(--plane)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
               計算の毎階
             </p>
-            <ol className="mt-1 space-y-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              <li>1. 残り予算 = {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}</li>
-              <li>2. 単純な1日あたり = {yen(leftBudget)} ÷ {explain.remainingDays}日 = {yen(simplePerDay)}</li>
+            <ol
+              className="mt-1 space-y-1 text-xs leading-relaxed"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              <li>
+                1. 残り予算 = {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}
+              </li>
+              <li>
+                2. 単純な1日あたり = {yen(leftBudget)} ÷ {explain.remainingDays}日 ={' '}
+                {yen(simplePerDay)}
+              </li>
               <li>3. 今日の上限 = {yen(cap)}（休日重みで調整）</li>
             </ol>
           </div>
           {dayOffs > 0 || explain.dayOffPerDayYen != null ? (
-            <div
-              className="rounded-2xl px-3 py-2"
-              style={{ background: 'var(--plane)' }}
-            >
+            <div className="rounded-2xl px-3 py-2" style={{ background: 'var(--plane)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                 残りの日の内訳
               </p>
-              <ul className="mt-1 space-y-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+              <ul
+                className="mt-1 space-y-1 text-xs leading-relaxed"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
                 {explain.dayOffPerDayYen != null && explain.dayOffPerDayYen > 0 ? (
@@ -139,10 +143,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}
           </p>
           {probText !== null ? (
-            <div
-              className="rounded-2xl px-3 py-2"
-              style={{ background: 'var(--plane)' }}
-            >
+            <div className="rounded-2xl px-3 py-2" style={{ background: 'var(--plane)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                 今の状態での確率
               </p>
