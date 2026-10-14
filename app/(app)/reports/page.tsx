@@ -279,6 +279,14 @@ export default async function ReportsPage() {
                   )
                 : null
             }
+            remainingPerDayYen={
+              budgetYen != null && plan && outcome.ok
+                ? Math.round(
+                    Math.max(0, budgetYen - fixedYenForTrend - outcome.value.forecast.actualYen) /
+                      Math.max(1, outcome.value.forecast.remainingDays),
+                  )
+                : null
+            }
           />
           <GenreWeekdayHeatmap cells={genreWeekdayCells} />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />

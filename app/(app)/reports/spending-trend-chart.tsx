@@ -45,6 +45,7 @@ export function SpendingTrendChart({
   from: fromProp,
   to: toProp,
   budgetPerDayYen,
+  remainingPerDayYen,
 }: {
   /** 日次の実績支出（正の数・固定費を除いたもの） */
   daySpend: Readonly<Record<string, number>>;
@@ -56,6 +57,8 @@ export function SpendingTrendChart({
   to?: string | undefined;
   /** 予算の1日あたり平均(横線)。 */
   budgetPerDayYen?: number | null;
+  /** 残り使える額の1日あたり平均(横線)。 */
+  remainingPerDayYen?: number | null;
 }) {
   const today = todayJst();
   const displayFrom = fromProp ?? addDays(today, -(LOOKBACK_DAYS - 1));
@@ -211,6 +214,20 @@ export function SpendingTrendChart({
                   position: 'insideBottomRight',
                   fontSize: 10,
                   fill: 'var(--state-caution)',
+                }}
+              />
+            ) : null}
+            {remainingPerDayYen != null && remainingPerDayYen > 0 ? (
+              <ReferenceLine
+                y={remainingPerDayYen}
+                stroke="var(--state-safe)"
+                strokeDasharray="4 2"
+                strokeWidth={1.5}
+                label={{
+                  value: '残り',
+                  position: 'insideBottomLeft',
+                  fontSize: 10,
+                  fill: 'var(--state-safe)',
                 }}
               />
             ) : null}
