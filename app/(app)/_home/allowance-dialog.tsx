@@ -144,25 +144,14 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               >
                 <li>・残り休日(土日祝): {dayOffs}日</li>
                 <li>・残り平日: {weekdays}日</li>
-                {ratio !== null
-                  ? (() => {
-                      const weighted = dayOffs * ratio + weekdays;
-                      const weekdayAlloc = Math.round(leftBudget / weighted);
-                      const dayOffAlloc = Math.round(weekdayAlloc * ratio);
-                      return (
-                        <>
-                          <li>
-                            ・休日の配分: 1日{yen(dayOffAlloc)}(比率{ratio.toFixed(1)}倍)
-                          </li>
-                          <li>・平日の配分: 1日{yen(weekdayAlloc)}</li>
-                          <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                            残り予算{yen(leftBudget)}を過去の比率で配分した数字です。今日の上限
-                            {yen(cap)}は、この配分より低い安全側の数字です。
-                          </li>
-                        </>
-                      );
-                    })()
-                  : null}
+                {ratio !== null ? (
+                  <>
+                    <li>
+                      ・休日の上限: 1日{yen(Math.round(cap * ratio))}(比率{ratio.toFixed(1)}倍)
+                    </li>
+                    <li>・平日の上限: 1日{yen(cap)}(今日の上限)</li>
+                  </>
+                ) : null}
               </ul>
             </div>
           ) : null}
