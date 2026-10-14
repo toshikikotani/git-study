@@ -10,6 +10,7 @@ import { WhyCard } from './why-card';
 import { SpeakButton } from '../_home/speak-button';
 import { LandingHero, NextStepCard } from './landing-hero';
 import { GoalChart } from './goal-chart';
+import { periodDays } from '@/domain/period';
 import { SpendingTrendChart } from './spending-trend-chart';
 import { formatEstimate, formatEstimateRange } from '@/domain/forecast/format';
 import { landingRowsFrom } from '@/domain/forecast/landing-rows';
@@ -270,6 +271,11 @@ export default async function ReportsPage() {
             fixedYen={fixedYenForTrend}
             from={plan?.periodStart}
             to={plan?.periodEnd}
+            budgetPerDayYen={
+              budgetYen != null && plan
+                ? Math.round(budgetYen / Math.max(1, periodDays(plan.periodStart, plan.periodEnd)))
+                : null
+            }
           />
           <GenreWeekdayHeatmap cells={genreWeekdayCells} />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />

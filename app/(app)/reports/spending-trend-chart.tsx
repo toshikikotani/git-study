@@ -5,6 +5,7 @@ import {
   ComposedChart,
   Bar,
   Line,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -43,6 +44,7 @@ export function SpendingTrendChart({
   fixedYen = 0,
   from: fromProp,
   to: toProp,
+  budgetPerDayYen,
 }: {
   /** 日次の実績支出（正の数・固定費を除いたもの） */
   daySpend: Readonly<Record<string, number>>;
@@ -52,6 +54,8 @@ export function SpendingTrendChart({
   from?: string | undefined;
   /** 表示範囲の終了日。無ければ今日。 */
   to?: string | undefined;
+  /** 予算の1日あたり平均(横線)。 */
+  budgetPerDayYen?: number | null;
 }) {
   const today = todayJst();
   const displayFrom = fromProp ?? addDays(today, -(LOOKBACK_DAYS - 1));
@@ -196,6 +200,20 @@ export function SpendingTrendChart({
               connectNulls
               name="long"
             />
+            {budgetPerDayYen != null && budgetPerDayYen > 0 ? (
+              <ReferenceLine
+                y={budgetPerDayYen}
+                stroke="var(--state-caution)"
+                strokeDasharray="3 3"
+                strokeWidth={1.5}
+                label={{
+                  value: '予算',
+                  position: 'right',
+                  fontSize: 10,
+                  fill: 'var(--state-caution)',
+                }}
+              />
+            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
