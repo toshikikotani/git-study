@@ -112,7 +112,7 @@ function TodayHero({
           ) : null}
           {allowanceExplain?.dailyLimit ? (
             <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              普段の{Math.round(allowanceExplain.dailyLimit.safetyFactor * 100)}%くらいに抑えめ
+              普段の{Math.round(allowanceExplain.dailyLimit.safetyFactor * 100)}%くらいに抑えてください
             </p>
           ) : null}
           <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
