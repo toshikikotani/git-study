@@ -1,8 +1,10 @@
 import { todayAllowance } from '@/domain/forecast/today';
+import { calendarContext } from '@/domain/forecast/calendar';
 import { goalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast } from '@/features/forecast/load';
 import { countPendingReview } from '@/features/home/pending';
 import { getCurrentPlan } from '@/features/spending-plan/store';
+import { getAppSettings } from '@/features/settings/store';
 import { addDays, addMonths, monthStartJst, splitDateOnly, todayJst } from '@/lib/date';
 import { HomeList, type HomeListProps } from './home-list';
 import { TodayCard } from './today-card';
@@ -25,9 +27,10 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
   const today = todayJst();
   const monthFrom = monthStartJst();
   const monthPeriod = { from: monthFrom, to: addDays(addMonths(monthFrom, 1), -1) };
-  const [plan, pendingCount] = await Promise.all([
+  const [plan, pendingCount, settings] = await Promise.all([
     getCurrentPlan(today).catch(() => null),
     countPendingReview(),
+    getAppSettings().catch(() => null),
   ]);
   const goal = goalForecastArgs(plan);
   const [goalView, monthView] = await Promise.all([
@@ -44,6 +47,9 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
           .map((c) => ({ name: c.categoryName, p50: c.landing.p50 }))
           .sort((a, b) => b.p50 - a.p50)
       : [];
+
+  // 残りの休日数を計算
+  const cal = forecast ? calendarContext(today, goal?.period.to ?? monthPeriod.to, settings?.payday ?? null) : null;
 
   return (
     <div className="space-y-3">
@@ -65,6 +71,9 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
                 remainingDays: forecast.remainingDays,
                 capYen: forecast.safeDailyAllowance ?? 0,
                 probWithinBudget: forecast.probWithinBudget,
+                remainingDayOffs: cal?.dayOffs,
+                dayOffPerDayYen: forecast.pace.perDayYen,
+                weekdayPerDayYen: forecast.pace.perDayYen,
               }
             : null
         }
