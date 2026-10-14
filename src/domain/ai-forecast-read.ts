@@ -2,8 +2,7 @@
  * AIの読み(統計の着地の見込みに、AIが明細のメモ・予定・暦の事情から補正を足す)。
  *
  * AIには計算させない(N1):AIは決まった選択肢から「残りの支出を何%動かすか」を選ぶだけで、
- * 金額はここで計算する。補正をどれだけ効かせるかは、AIの読みがこれまで統計より当たったか
- * (当たり具合)で決める。記録が無いうちはそのまま効かせる。
+ * 金額はここで計算する。補正は常に100%効かせる。
  */
 
 /** AIが選べる補正(残りの支出に対する%)。 */
@@ -24,7 +23,7 @@ export type ScoredRead = {
 };
 
 export type AiTrust = {
-  /** 補正を効かせる割合(0〜1)。 */
+  /** 補正を効かせる割合(0〜1)。常に1.0。 */
   weight: number;
   /** 統計より近かった回数と、比べた回数(補正0の回は数えない)。 */
   wins: number;
@@ -32,9 +31,7 @@ export type AiTrust = {
 };
 
 /**
- * 当たり具合:補正した読みが統計の中央値より実際に近かった割合を、事前に「2勝」を足して
- * 求める((勝ち + 2) ÷ (比べた回数 + 2))。記録が無ければ 1.0(AIの読みをそのまま効かせる)。
- * 外れた回が増えると徐々に弱くなる。
+ * 補正は常に100%効かせる。当たり具合による減算はしない。
  */
 export function aiTrust(history: readonly ScoredRead[]): AiTrust {
   let wins = 0;
@@ -48,7 +45,8 @@ export function aiTrust(history: readonly ScoredRead[]): AiTrust {
       wins += 1;
     }
   }
-  return { weight: Math.min(1, (wins + 2) / (compared + 2)), wins, compared };
+  // 常に100%効かせる
+  return { weight: 1, wins, compared };
 }
 
 /** 残りの部分(着地 − 決まっている額)だけを動かす。金額は整数の円。 */
