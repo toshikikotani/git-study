@@ -20,6 +20,7 @@ import { z } from 'zod';
 
 import { AI_ADJUST_CHOICES, type AiTrust, type ScoredRead } from '@/domain/ai-forecast-read';
 import type { CalendarContext } from '@/domain/forecast/calendar';
+import { isDayOff } from '@/domain/forecast/holidays';
 import { SPENDING_PERSONA_TYPES, type SpendingPersonaType } from '@/domain/persona';
 import { withAiCache } from '@/lib/ai-gateway/cache';
 import { parseStructuredGated } from '@/lib/ai-gateway/gated';
@@ -162,7 +163,7 @@ const reportSchema = z.object({
       reason: z
         .string()
         .describe(
-          '1〜2文。土日と平日の差を明記して今の状態を判断する表現で、数字と理由をセットにする。定型にしない。',
+          '1〜2文。休み日と平日の差を踏まえて今の状態を判断する。自由な表現で良い。',
         ),
       evidence: z
         .array(z.string())
@@ -315,38 +316,32 @@ function buildUserContent(input: MonthlyReportInput): string {
 
 const yenOf = (n: number) => `${n}円`;
 
-/** 曜日が土日かどうかを判定する。0=日, 6=土 */
-function isWeekend(dateStr: string): boolean {
-  const dow = new Date(dateStr + 'T00:00:00').getDay();
-  return dow === 0 || dow === 6;
-}
-
-/** 目立つ明細から土日/平日の平均支出を計算する。 */
-function computeWeekdayWeekendAvg(
+/** 目立つ明細から休み日(土日祝)/平日の平均支出を計算する。 */
+function computeDayOffWeekdayAvg(
   notable: readonly { date: string; amountYen: number }[],
-): { weekdayAvg: number; weekendAvg: number; weekdayCount: number; weekendCount: number } | null {
+): { weekdayAvg: number; dayOffAvg: number; weekdayCount: number; dayOffCount: number } | null {
   if (notable.length === 0) return null;
   let weekdaySum = 0;
-  let weekendSum = 0;
+  let dayOffSum = 0;
   const weekdayDates = new Set<string>();
-  const weekendDates = new Set<string>();
+  const dayOffDates = new Set<string>();
   for (const n of notable) {
-    if (isWeekend(n.date)) {
-      weekendSum += n.amountYen;
-      weekendDates.add(n.date);
+    if (isDayOff(n.date)) {
+      dayOffSum += n.amountYen;
+      dayOffDates.add(n.date);
     } else {
       weekdaySum += n.amountYen;
       weekdayDates.add(n.date);
     }
   }
   const weekdayCount = weekdayDates.size;
-  const weekendCount = weekendDates.size;
-  if (weekdayCount === 0 && weekendCount === 0) return null;
+  const dayOffCount = dayOffDates.size;
+  if (weekdayCount === 0 && dayOffCount === 0) return null;
   return {
     weekdayAvg: weekdayCount > 0 ? Math.round(weekdaySum / weekdayCount) : 0,
-    weekendAvg: weekendCount > 0 ? Math.round(weekendSum / weekendCount) : 0,
+    dayOffAvg: dayOffCount > 0 ? Math.round(dayOffSum / dayOffCount) : 0,
     weekdayCount,
-    weekendCount,
+    dayOffCount,
   };
 }
 
@@ -380,14 +375,14 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   }
 
   const e = input.evidence;
-  // 土日/平日の平均支出を計算して渡す
-  const dowAvg = computeWeekdayWeekendAvg(e.notable);
+  // 休み日(土日祝)/平日の平均支出を計算して渡す
+  const dowAvg = computeDayOffWeekdayAvg(e.notable);
   if (dowAvg !== null) {
     lines.push(
       '',
-      '今月の曜日別支出(目立つ明細から計算):',
+      '今月の休み日・平日別支出(目立つ明細から計算、休み日=土日祝):',
       `- 平日の1日あたり: ${yenOf(dowAvg.weekdayAvg)}(${dowAvg.weekdayCount}日分)`,
-      `- 土日の1日あたり: ${yenOf(dowAvg.weekendAvg)}(${dowAvg.weekendCount}日分)`,
+      `- 休み日の1日あたり: ${yenOf(dowAvg.dayOffAvg)}(${dowAvg.dayOffCount}日分)`,
     );
   }
 
@@ -396,14 +391,14 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
     for (const n of e.notable) {
       const items = n.items.length > 0 ? ` 品目: ${n.items.join('、')}` : '';
       const memo = n.memo ? ` メモ: ${n.memo}` : '';
-      const dow = isWeekend(n.date) ? '土日' : '平日';
+      const dow = isDayOff(n.date) ? '休み日' : '平日';
       lines.push(`- ${n.date}(${dow}) ${n.label} ${yenOf(n.amountYen)}(${n.genre})${memo}${items}`);
     }
   }
   lines.push('', 'これからの予定:');
   if (e.scheduled.length === 0) lines.push('- 日付の入った予定は無い');
   for (const s of e.scheduled) {
-    const dow = isWeekend(s.date) ? '土日' : '平日';
+    const dow = isDayOff(s.date) ? '休み日' : '平日';
     lines.push(`- ${s.date}(${dow}) ${s.label} ${yenOf(s.amountYen)}(${s.genre})`);
   }
   if (e.calendar !== null) {
