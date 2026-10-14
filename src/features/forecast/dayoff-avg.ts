@@ -1,6 +1,6 @@
 import { isDayOff } from '@/domain/forecast/holidays';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
-import { addDays, type DateOnly } from '@/lib/date';
+import type { DateOnly } from '@/lib/date';
 
 /**
  * 過去の実績から、休日(土日祝)と平日の1日あたり平均支出を計算する。
