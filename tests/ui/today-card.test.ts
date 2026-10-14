@@ -43,7 +43,7 @@ describe('ホームの「今日」(デザイン、ADR-085)', () => {
     expect(text).toContain('約2.0万円 超えそう');
     expect(text).toContain('約19.0万円');
     expect(text).toContain('/ 予算 17.0万円');
-    expect(text).toContain('75%の確率で 予算を超えます');
+    expect(text).toContain('25%の確率で 予算内に収まります');
     expect(text).toContain('外食を週1回へらすと');
     const order = ['今日 使えるのは', '10月の見通し', '次の一手'].map((s) => text.indexOf(s));
     expect(order).toEqual([...order].sort((a, b) => a - b));
