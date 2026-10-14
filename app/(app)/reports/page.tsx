@@ -4,13 +4,13 @@ import { CategoryTrendChart } from './category-trend-chart';
 import { InsightsList } from './insights-card';
 import { AiInsightButton } from './ai-insight-button';
 import { LandingRangesCard, type LandingRow } from './landing-ranges-card';
+import { LandingScenarios } from './landing-scenarios';
 import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
 import { SpeakButton } from '../_home/speak-button';
 import { LandingHero, NextStepCard } from './landing-hero';
 import { GoalChart } from './goal-chart';
 import { SpendingTrendChart } from './spending-trend-chart';
-import { SankeyFlow } from './sankey-flow';
 import { formatEstimate, formatEstimateRange } from '@/domain/forecast/format';
 import { landingRowsFrom } from '@/domain/forecast/landing-rows';
 import { listGenres } from '@/features/genre/store';
@@ -251,6 +251,12 @@ export default async function ReportsPage() {
             text={`${endLabel}の支出は${formatEstimate(landing.p50)}の見込み。80%の確率で${formatEstimateRange(landing.p10, landing.p90)}。${budgetYen !== null ? `予算は${formatEstimate(budgetYen, { approx: false })}。` : ''}`}
           />
           <SpendingTrendChart daySpend={variableDaySpend} fixedYen={fixedYenForTrend} />
+          <LandingScenarios
+            p10={landing.p10}
+            p50={landing.p50}
+            p90={landing.p90}
+            budgetYen={budgetYen}
+          />
           <LandingRangesCard rows={rangeRows} periodLabel={periodLabel} />
           {budgetYen === null || forecast.drivers[0] ? (
             <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -299,14 +305,6 @@ export default async function ReportsPage() {
         incomeYen={ledger.totalIncomeYen}
         incomeRegistered={hasIncome(ledger.totalIncomeYen)}
         balance={monthForecast?.balance ?? null}
-      />
-
-      <SankeyFlow
-        incomeYen={ledger.totalIncomeYen}
-        genres={ledger.genreBreakdown.map((g) => ({
-          name: g.genreName,
-          spentYen: g.spentYen,
-        }))}
       />
 
       <GenreDonutChart
