@@ -34,7 +34,9 @@ export async function loadReadEvidence(
   transactions: readonly LedgerTransaction[],
   monthRange: { from: DateOnly; to: DateOnly },
   today: DateOnly,
-): Promise<Pick<MonthlyReportEvidence, 'notable' | 'scheduled' | 'dayOffAvgYen' | 'weekdayAvgYen'>> {
+): Promise<
+  Pick<MonthlyReportEvidence, 'notable' | 'scheduled' | 'dayOffAvgYen' | 'weekdayAvgYen'>
+> {
   const inMonth = transactions.filter(
     (t) =>
       t.occurredOn >= monthRange.from &&

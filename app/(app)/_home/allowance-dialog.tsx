@@ -30,13 +30,6 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
   const spentBefore = Math.max(0, explain.spentYen - explain.spentTodayYen);
   const leftBudget = explain.budgetYen - spentBefore;
   const cap = explain.capYen;
-  const ratio =
-    explain.dayOffPerDayYen != null &&
-    explain.weekdayPerDayYen != null &&
-    explain.dayOffPerDayYen > 0 &&
-    explain.weekdayPerDayYen > 0
-      ? explain.dayOffPerDayYen / explain.weekdayPerDayYen
-      : null;
   const over = explain.spentTodayYen - cap;
   const max = Math.max(explain.budgetYen, explain.spentYen, cap, explain.spentTodayYen, 1);
   const bar = (value: number, color: string) => (
