@@ -55,28 +55,30 @@ export async function loadReadEvidence(
     a.occurredOn.localeCompare(b.occurredOn),
   );
   const items = await loadItemNames(notableTx.map((t) => t.id));
-  // 全明細から平日/休み日の1日あたり平均を計算
+  // 支出があった日だけで中央値を計算(固定費は past から除外済み)
+  const dayOffDays: number[] = [];
+  const weekdayDays: number[] = [];
   const byDate = new Map<string, number>();
   for (const t of past) {
     byDate.set(t.occurredOn, (byDate.get(t.occurredOn) ?? 0) + -t.amountYen);
   }
-  let dayOffSum = 0,
-    dayOffCount = 0,
-    weekdaySum = 0,
-    weekdayCount = 0;
   for (const [date, yen] of byDate) {
-    if (isDayOff(date)) {
-      dayOffSum += yen;
-      dayOffCount += 1;
-    } else {
-      weekdaySum += yen;
-      weekdayCount += 1;
-    }
+    if (yen <= 0) continue;
+    if (isDayOff(date)) dayOffDays.push(yen);
+    else weekdayDays.push(yen);
   }
+  const median = (xs: number[]): number | null => {
+    if (xs.length === 0) return null;
+    const sorted = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? Math.round((sorted[mid - 1]! + sorted[mid]!) / 2)
+      : sorted[mid]!;
+  };
 
   return {
-    dayOffAvgYen: dayOffCount > 0 ? Math.round(dayOffSum / dayOffCount) : null,
-    weekdayAvgYen: weekdayCount > 0 ? Math.round(weekdaySum / weekdayCount) : null,
+    dayOffAvgYen: median(dayOffDays),
+    weekdayAvgYen: median(weekdayDays),
     notable: notableTx.map((t) => ({
       date: t.occurredOn,
       label: t.label,
