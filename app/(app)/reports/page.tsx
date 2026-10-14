@@ -79,7 +79,7 @@ export default async function ReportsPage() {
   const today = todayJst();
   const variableDaySpend: Record<string, number> = {};
   let fixedYenForTrend = 0;
-  // ジャンル × 曜日の集計（分析用）
+  // ジャンル × 曜日の集計（分析用・固定費除く）
   const genreWeekdayMap = new Map<string, number>();
   for (const tx of ledger.transactions) {
     if (tx.amountYen >= 0 || tx.isTransfer || tx.reviewStatus === 'ignored' || tx.needsInput)
@@ -89,12 +89,12 @@ export default async function ReportsPage() {
       fixedYenForTrend += yen;
     } else {
       variableDaySpend[tx.occurredOn] = (variableDaySpend[tx.occurredOn] ?? 0) + yen;
-    }
-    // 曜日集計（固定費も含む）
-    if (tx.genreName) {
-      const dow = new Date(tx.occurredOn + 'T00:00:00').getDay();
-      const key = `${tx.genreName}|${dow}`;
-      genreWeekdayMap.set(key, (genreWeekdayMap.get(key) ?? 0) + yen);
+      // 曜日集計は固定費以外のみ
+      if (tx.genreName) {
+        const dow = new Date(tx.occurredOn + 'T00:00:00').getDay();
+        const key = `${tx.genreName}|${dow}`;
+        genreWeekdayMap.set(key, (genreWeekdayMap.get(key) ?? 0) + yen);
+      }
     }
   }
   const genreWeekdayCells: GenreWeekdayCell[] = [...genreWeekdayMap.entries()].map(
