@@ -112,7 +112,16 @@ function TodayHero({
           ) : null}
           {allowanceExplain?.dailyLimit ? (
             <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              普段の{Math.round(allowanceExplain.dailyLimit.safetyFactor * 100)}%くらいに抑えてください
+              {(() => {
+                const isDayOff = allowanceExplain.remainingDayOffs !== undefined && allowanceExplain.remainingDayOffs > 0;
+                const avg = isDayOff ? allowanceExplain.dayOffPerDayYen : allowanceExplain.weekdayPerDayYen;
+                const limit = allowanceExplain.dailyLimit.todayLimitYen;
+                if (avg && avg > 0) {
+                  const pct = Math.round((limit / avg) * 100);
+                  return `普段の${pct}%くらいに抑えてください`;
+                }
+                return `普段の${Math.round(allowanceExplain.dailyLimit.safetyFactor * 100)}%くらいに抑えてください`;
+              })()}
             </p>
           ) : null}
           <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
