@@ -10,6 +10,8 @@ export type AllowanceExplain = {
   spentTodayYen: number;
   remainingDays: number;
   capYen: number;
+  /** 予算に収まる確率(今の状態)。 */
+  probWithinBudget?: number | null;
 };
 
 function yen(n: number): string {
@@ -31,6 +33,10 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       style={{ width: `${Math.max(4, (value / max) * 100)}%`, background: color }}
     />
   );
+  const prob = explain.probWithinBudget;
+  const probText = prob !== null && prob !== undefined
+    ? prob >= 0.995 ? '99%以上' : `${Math.round(prob * 100)}%`
+    : null;
   return (
     <>
       <button
@@ -87,10 +93,29 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
           </ul>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
             残りは{yen(leftBudget)}
-            。平日と休日の重みで、100%の見込みが予算内に収まる今日の上限は{yen(cap)}です。
+            。平日と休日の重みで、予算内に収まる見込みが最高になる今日の上限は{yen(cap)}です。
             {over > 0
               ? `今日は${yen(explain.spentTodayYen)}使ったので、${yen(over)}超えています。`
               : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}
+          </p>
+          {probText !== null ? (
+            <div
+              className="rounded-2xl px-3 py-2"
+              style={{ background: 'var(--plane)' }}
+            >
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                今の状態での確率
+              </p>
+              <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                今のペースが続くと、{probText}の確率で予算内に収まります。
+                {over > 0
+                  ? '今日の上限を超えているので、このままだと確率は下がります。'
+                  : '今日の上限内に収まっているので、確率は保たれています。'}
+              </p>
+            </div>
+          ) : null}
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+            計算方法: 予算から今までの支出を引い、残りの日数で割った額を基準に、平日は少なめ・休日は多めの重みをかけて今日の上限を決めています。
           </p>
           <button
             type="button"
