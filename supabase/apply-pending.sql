@@ -294,7 +294,7 @@ create table if not exists public.ai_forecast_reads (
   evidence         text[]      not null default '{}',
   created_at       timestamptz not null default now(),
 
-  constraint ck_ai_forecast_reads_percent check (ai_percent between -20 and 30),
+  constraint ck_ai_forecast_reads_percent check (ai_percent between -30 and 50),
   constraint ck_ai_forecast_reads_trust check (trust >= 0 and trust <= 1)
 );
 
