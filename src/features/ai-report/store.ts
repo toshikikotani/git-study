@@ -122,6 +122,7 @@ function savingsForReport(savings: SavingsSummary): MonthlyReportInput['savings'
 function forecastSummary(
   f: Awaited<ReturnType<typeof loadForecast>>['forecast'],
 ): MonthlyReportForecast {
+  const b = f.breakdown;
   return {
     asOf: f.asOf,
     remainingDays: f.remainingDays,
@@ -140,6 +141,19 @@ function forecastSummary(
       .sort((a, b) => b.landing.p50 - a.landing.p50)
       .slice(0, MAX_ITEMS_PER_LIST)
       .map((c) => ({ name: c.categoryName, actualYen: c.actualYen, p50: c.landing.p50 })),
+    breakdown: {
+      actualYen: b.actualYen,
+      committedYen: b.committedYen,
+      variableYen: b.variableYen,
+      visitsYen: b.visitsYen,
+      billsYen: b.billsYen,
+      unrecordedYen: b.unrecordedYen,
+      specialYen: b.specialYen,
+      variableByCategory: b.variableByCategory
+        .filter((c) => c.yen > 0)
+        .slice(0, MAX_ITEMS_PER_LIST)
+        .map((c) => ({ name: c.categoryName, yen: c.yen })),
+    },
   };
 }
 
