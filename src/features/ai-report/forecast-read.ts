@@ -262,7 +262,7 @@ export async function saveForecastRead(input: {
     stat_p10_yen: input.stat.p10,
     stat_p50_yen: input.stat.p50,
     stat_p90_yen: input.stat.p90,
-    ai_percent: input.percent,
+    ai_percent: Math.max(-30, Math.min(50, input.percent)),
     trust: Math.round(input.trust * 1000) / 1000,
     adjusted_p50_yen: adjusted.p50,
     reason: input.reason,
