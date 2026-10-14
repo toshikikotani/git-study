@@ -1,6 +1,5 @@
 'use client';
 
-import { genreColorVar } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
 
 export type GenreWeekdayCell = {
@@ -82,7 +81,10 @@ export function GenreWeekdayHeatmap({
         <table className="w-full text-xs">
           <thead>
             <tr>
-              <th className="w-20 py-1 text-left font-normal" style={{ color: 'var(--ink-muted)' }} />
+              <th
+                className="w-20 py-1 text-left font-normal"
+                style={{ color: 'var(--ink-muted)' }}
+              />
               {WEEKDAYS.map((w) => (
                 <th
                   key={w}
@@ -106,6 +108,12 @@ export function GenreWeekdayHeatmap({
                 </td>
                 {g.days.map((yen, di) => {
                   const level = intensity(yen);
+                  const label =
+                    yen >= 10000
+                      ? `${Math.round(yen / 1000)}k`
+                      : yen >= 1000
+                        ? `${Math.round(yen / 100) / 10}k`
+                        : yen;
                   return (
                     <td key={di} className="p-0.5">
                       <div
@@ -114,12 +122,12 @@ export function GenreWeekdayHeatmap({
                           background: colors[level],
                           color: level >= 3 ? 'var(--on-action)' : 'var(--ink-muted)',
                         }}
-                        title={`${g.name} / ${WEEKDAYS[di]}: ${yen > 0 ? formatYen(yen, { sign: 'never' }) : 'なし'}`}
+                        title={`${g.name} / ${WEEKDAYS[di]}: ${
+                          yen > 0 ? formatYen(yen, { sign: 'never' }) : 'なし'
+                        }`}
                       >
                         {yen > 0 ? (
-                          <span className="text-[9px] tabular opacity-80">
-                            {yen >= 10000 ? `${Math.round(yen / 1000)}k` : yen >= 1000 ? `${Math.round(yen / 100) / 10}k` : yen}
-                          </span>
+                          <span className="text-[9px] tabular opacity-80">{label}</span>
                         ) : null}
                       </div>
                     </td>
@@ -131,7 +139,10 @@ export function GenreWeekdayHeatmap({
         </table>
       </div>
 
-      <div className="flex items-center justify-end gap-1 text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+      <div
+        className="flex items-center justify-end gap-1 text-[10px]"
+        style={{ color: 'var(--ink-muted)' }}
+      >
         <span>少</span>
         {colors.map((c, i) => (
           <div key={i} className="h-3 w-3 rounded-sm" style={{ background: c }} />
