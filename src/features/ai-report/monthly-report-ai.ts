@@ -122,6 +122,15 @@ export type MonthlyReportEvidence = {
   /** 今月の全明細から計算した、平日と休み日の1日あたり平均(固定費除く)。 */
   dayOffAvgYen: number | null;
   weekdayAvgYen: number | null;
+  /** 今日の上限の計算結果(休日軸・確率込み)。 */
+  dailyLimit?: {
+    todayLimitYen: number;
+    weekdayAllocYen: number;
+    dayOffAllocYen: number;
+    ratio: number;
+    safetyFactor: number;
+    steps: string[];
+  } | null;
   /** 今月の目立つ明細(金額の大きいもの・メモのあるもの)。 */
   notable: readonly {
     date: string;
@@ -389,6 +398,15 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
       '今月の休み日・平日別支出(固定費を除いた全明細から計算、休み日=土日祝):',
       `- 平日の1日あたり: ${e.weekdayAvgYen !== null ? yenOf(e.weekdayAvgYen) : '—'}`,
       `- 休み日の1日あたり: ${e.dayOffAvgYen !== null ? yenOf(e.dayOffAvgYen) : '—'}`,
+    );
+  }
+  if (e.dailyLimit) {
+    const d = e.dailyLimit;
+    lines.push(
+      '',
+      '今日の上限の計算(休日軸・確率込み):',
+      ...d.steps.map((s) => `- ${s}`),
+      `- 絞り係数: ${d.safetyFactor.toFixed(2)}(普段の${Math.round(d.safetyFactor * 100)}%)`,
     );
   }
 

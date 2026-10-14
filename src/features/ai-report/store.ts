@@ -109,6 +109,7 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
       calendar: calendarContext(today, monthRange.to, settings?.payday ?? null),
       pastReads: past.reads,
       trust: past.trust,
+      dailyLimit: forecast?.dailyLimit ?? null,
     },
   };
 }
