@@ -429,7 +429,7 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
     const c = e.calendar;
     lines.push(
       '',
-      `残りの日の暦: 休み(土日祝)${c.dayOffs}日、うち平日の祝日${c.weekdayHolidays}日` +
+      `残りの日の暦: 休み(土日祝)${c.dayOffs}日、平日${f.remainingDays - c.dayOffs}日` +
         (c.longestBreak
           ? ` ・ ${c.longestBreak.from}〜${c.longestBreak.to}に${c.longestBreak.days}連休`
           : '') +
