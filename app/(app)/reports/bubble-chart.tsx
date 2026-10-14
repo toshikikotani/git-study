@@ -61,7 +61,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
       </p>
       <div className="mt-3 h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
+          <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
             <XAxis
               type="number"
@@ -81,7 +81,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
               fontSize={11}
               tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
             />
-            <ZAxis type="number" dataKey="totalYen" range={[150, 600]} />
+            <ZAxis type="number" dataKey="totalYen" range={[80, 280]} />
             <Tooltip
               cursor={{ strokeDasharray: '3 3' }}
               content={({ payload }) => {
@@ -117,10 +117,25 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
               >
                 <LabelList
                   dataKey="name"
-                  position="top"
-                  fontSize={10}
+                  position="bottom"
+                  fontSize={9}
                   fill="var(--ink-secondary)"
-                  offset={8}
+                  offset={12}
+                  content={(props: { x?: number; y?: number; value?: string; index?: number }) => {
+                    const { x = 0, y = 0, value, index = 0 } = props;
+                    const isEven = index % 2 === 0;
+                    return (
+                      <text
+                        x={x}
+                        y={y + (isEven ? 16 : 28)}
+                        textAnchor="middle"
+                        fontSize={9}
+                        fill="var(--ink-secondary)"
+                      >
+                        {value}
+                      </text>
+                    );
+                  }}
                 />
               </Scatter>
             ))}
