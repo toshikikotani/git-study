@@ -2,9 +2,11 @@
  * 色のテーマ(設定 › 色)。背景・カード・文字・強調・サブの5色から、画面で使う色の役割
  * (補足の文字・線・帯・影・強調の上の文字など)をまとめて作る(ADR-079)。
  *
- * どのプリセットも、文字のコントラストは WCAG 2.1 の AA(4.5:1)以上、グラフの色は 3:1 以上
+ * どのプリセットも、文字のコントラストは WCAG 2.1 の AA(4.5:1)以上
  * (tests/color-presets.test.ts で全部の組み合わせを確かめる)。収入の緑・超過の赤・注意の黄は
- * 意味の色なので変えない。
+ * 意味の色なので、テーマでは変えず、明るい・暗いでだけ切り替える(SEMANTIC)。
+ *
+ * プリセットの値は「配色見本帳」(50色、アプリのカードの形で読めることを確かめたもの)から。
  */
 
 export const THEME_KEY = 'git-study-color-theme';
@@ -20,6 +22,43 @@ export type ThemeColors = {
   accent: string;
   /** サブの色(見込みの帯・余裕の印など、強調と並ぶ2つめの色)。無ければ強調と同じ。 */
   sub?: string;
+  /** 補足の文字。無ければ文字から作る。 */
+  inkSub?: string;
+  /** 強調の色で書く文字(リンクなど)。淡い強調の色でも読めるよう、別に持つ。無ければ強調と同じ。 */
+  accentText?: string;
+  /** 強調の塗りの上の文字(ボタンの文字)。無ければ白か文字の色を選ぶ。 */
+  onAccent?: string;
+  /** サブの色の線・文字(帯のふちなど)。淡いサブの色でも見えるよう、別に持つ。無ければサブと同じ。 */
+  subLine?: string;
+};
+
+/** 意味の色(収入・超過・注意)。どのテーマでも同じで、明るい・暗いでだけ変える。 */
+export const SEMANTIC = {
+  light: {
+    income: '#278445',
+    incomeBg: '#dcf7e1',
+    over: '#c13c36',
+    overBg: '#fee9e6',
+    caution: '#9c6306',
+    cautionBg: '#ffebd5',
+  },
+  dark: {
+    income: '#7cd591',
+    incomeBg: '#1a3520',
+    over: '#fea196',
+    overBg: '#442320',
+    caution: '#f3ae58',
+    cautionBg: '#3e290f',
+  },
+} as const;
+
+/** なくしたプリセットの id → 近い今のプリセット(選んでいた人の色を引き継ぐ)。 */
+export const MIGRATED_PRESETS: Readonly<Record<string, string>> = {
+  latte: 'ruri',
+  coral: 'miru',
+  racer: 'shiden',
+  ice: 'copper',
+  gale: 'mist',
 };
 
 export type ThemeGroup = 'light' | 'dark';
@@ -41,66 +80,27 @@ export type ColorTheme =
   | { id: string; colors: ThemeColors; tokens?: Record<string, string>; style?: ThemeStyle };
 
 /**
- * 20のプリセット。日本の伝統色、よく使われている配色(Rosé Pine・Nord・Solarized・
- * Catppuccin・Everforest・Kanagawa)、Pantone のカラー・オブ・ザ・イヤーから選び、
- * 画面で読める濃さに整えた(調べた元と整え方は docs/decisions.md の ADR-079)。
+ * 50のプリセット(シンプル・スタイリッシュ・キュート・クール・大人 を各10)。値は「配色見本帳」から。
+ * 調べた元と整え方は docs/decisions.md の ADR-079・ADR-087。
  */
 export const PRESETS: readonly ThemePreset[] = [
-  // ── 明るい ──
+  // ── シンプル ──
   {
     id: 'kinari',
     label: '生成り',
     style: 'simple',
     group: 'light',
-    note: '生成りの紙に、茶とセージ。類似色の組み合わせ',
+    note: '生成りの紙に、茶とセージ。あたたかい定番',
     colors: {
-      plane: '#fcfbf8',
+      plane: '#f7f6f3',
       surface: '#ffffff',
       ink: '#312826',
+      inkSub: '#7a6f6d',
       accent: '#8a6840',
+      accentText: '#8a6840',
+      onAccent: '#ffffff',
       sub: '#5f7d62',
-    },
-  },
-  {
-    id: 'ai',
-    label: '藍',
-    style: 'stylish',
-    group: 'light',
-    note: '薄い藍に、藍と砂色。補色に近い組み合わせ',
-    colors: {
-      plane: '#fafcfd',
-      surface: '#ffffff',
-      ink: '#21283b',
-      accent: '#245488',
-      sub: '#8a6844',
-    },
-  },
-  {
-    id: 'koke',
-    label: '苔',
-    style: 'stylish',
-    group: 'light',
-    note: '苔の緑と金茶。隣接色の組み合わせ',
-    colors: {
-      plane: '#fafcfa',
-      surface: '#ffffff',
-      ink: '#212d2a',
-      accent: '#2f7358',
-      sub: '#a08a4a',
-    },
-  },
-  {
-    id: 'sakura',
-    label: '桜鼠',
-    style: 'stylish',
-    group: 'light',
-    note: '灰みの桜と、藍鼠。補色の組み合わせ',
-    colors: {
-      plane: '#fcfafa',
-      surface: '#ffffff',
-      ink: '#3d2a33',
-      accent: '#9a4d60',
-      sub: '#6d8794',
+      subLine: '#5f7d62',
     },
   },
   {
@@ -108,13 +108,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '北欧の雪',
     style: 'simple',
     group: 'light',
-    note: '雪の白に、青と若緑。隣接色の組み合わせ',
+    note: '雪の白に、青と若緑。すっきり静か',
     colors: {
-      plane: '#fafbfc',
+      plane: '#f5f6f7',
       surface: '#ffffff',
       ink: '#313343',
-      accent: '#3d5c86',
+      inkSub: '#6e7083',
+      accent: '#56708a',
+      accentText: '#56708a',
+      onAccent: '#ffffff',
       sub: '#4f7d70',
+      subLine: '#4f7d70',
     },
   },
   {
@@ -122,112 +126,53 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '陽だまり',
     style: 'simple',
     group: 'light',
-    note: 'クリームに、青と黄土。補色の組み合わせ',
+    note: 'クリームに、青緑と黄土。やわらかい日なた',
     colors: {
-      plane: '#fcfaf7',
+      plane: '#f7f5f2',
       surface: '#ffffff',
       ink: '#273743',
-      accent: '#245a88',
-      sub: '#8a6a18',
-    },
-  },
-  {
-    id: 'latte',
-    label: 'ラテ',
-    style: 'stylish',
-    group: 'light',
-    note: '淡い灰に、藤と青緑。補色の組み合わせ',
-    colors: {
-      plane: '#fafafc',
-      surface: '#ffffff',
-      ink: '#393850',
-      accent: '#7648c0',
-      sub: '#3d8f98',
-    },
-  },
-  {
-    id: 'mocha-mousse',
-    label: 'モカムース',
-    style: 'stylish',
-    group: 'light',
-    note: 'モカに、セージ。類似色ではなく別の色を添える',
-    colors: {
-      plane: '#fcf9f8',
-      surface: '#ffffff',
-      ink: '#382b2a',
-      accent: '#7a5846',
-      sub: '#6d8a72',
+      inkSub: '#627481',
+      accent: '#1f6f8b',
+      accentText: '#1f6f8b',
+      onAccent: '#ffffff',
+      sub: '#867046',
+      subLine: '#867046',
     },
   },
   {
     id: 'cloud-dancer',
-    label: 'クラウドダンサー',
+    label: '雲',
     style: 'simple',
     group: 'light',
-    note: '白い雲に、石板とセージ。寒色同士の組み合わせ',
+    note: '白い雲に、石板とセージ。くすんだ寒色',
     colors: {
-      plane: '#fcfbfa',
+      plane: '#f6f5f4',
       surface: '#ffffff',
       ink: '#2d2a33',
+      inkSub: '#736f7a',
       accent: '#3e5462',
+      accentText: '#3e5462',
+      onAccent: '#ffffff',
       sub: '#5f7c64',
-    },
-  },
-  {
-    id: 'terracotta',
-    label: 'テラコッタ',
-    style: 'stylish',
-    group: 'light',
-    note: 'テラコッタと青緑。補色の組み合わせ',
-    colors: {
-      plane: '#fdfaf8',
-      surface: '#ffffff',
-      ink: '#3a2727',
-      accent: '#a84e38',
-      sub: '#5d8a84',
-    },
-  },
-  {
-    id: 'lavender',
-    label: 'ラベンダー',
-    style: 'stylish',
-    group: 'light',
-    note: '藤と薔薇。類似色の組み合わせ',
-    colors: {
-      plane: '#fcfbfd',
-      surface: '#ffffff',
-      ink: '#312a43',
-      accent: '#6e52b4',
-      sub: '#b56d84',
-    },
-  },
-  // ── 暗い ──
-  {
-    id: 'sumi',
-    label: '墨',
-    style: 'simple',
-    group: 'dark',
-    note: '墨に、象牙と青磁',
-    colors: {
-      plane: '#1a1e24',
-      surface: '#2c3036',
-      ink: '#f4f1ea',
-      accent: '#d7c4a3',
-      sub: '#8fb8a0',
+      subLine: '#5f7c64',
     },
   },
   {
     id: 'day',
-    label: '昼の白',
+    label: '白紙',
     style: 'simple',
     group: 'light',
-    note: 'ブラウザの昼間。白地に墨と藍',
+    note: '真っ白な紙に、墨だけ。色を使わない',
     colors: {
-      plane: '#ffffff',
+      plane: '#f6f6f6',
       surface: '#ffffff',
       ink: '#1b191f',
-      accent: '#2f4f6f',
+      inkSub: '#737179',
+      accent: '#1b191f',
+      accentText: '#1b191f',
+      onAccent: '#ffffff',
       sub: '#8a5a3c',
+      subLine: '#8a5a3c',
     },
   },
   {
@@ -235,27 +180,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '白磁',
     style: 'simple',
     group: 'light',
-    note: '白磁に、藍と金',
+    note: '白磁に、呉須の藍と金',
     colors: {
-      plane: '#fcfcfb',
+      plane: '#f6f6f5',
       surface: '#ffffff',
       ink: '#262326',
-      accent: '#2c5278',
-      sub: '#a6843e',
-    },
-  },
-  {
-    id: 'coral',
-    label: '珊瑚',
-    style: 'stylish',
-    group: 'light',
-    note: '珊瑚と青緑。補色の組み合わせ',
-    colors: {
-      plane: '#fdfbfa',
-      surface: '#ffffff',
-      ink: '#332326',
-      accent: '#a44c3e',
-      sub: '#3f7d78',
+      inkSub: '#747074',
+      accent: '#2a5fa0',
+      accentText: '#2a5fa0',
+      onAccent: '#ffffff',
+      sub: '#9e8658',
+      subLine: '#9e8658',
     },
   },
   {
@@ -263,41 +198,53 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '亜麻',
     style: 'simple',
     group: 'light',
-    note: '亜麻に、臙脂とオリーブ',
+    note: '亜麻に、葡萄色とオリーブ',
     colors: {
-      plane: '#fcfaf8',
+      plane: '#f7f5f3',
       surface: '#ffffff',
       ink: '#312a29',
-      accent: '#8a3e4a',
+      inkSub: '#786f6e',
+      accent: '#873e58',
+      accentText: '#873e58',
+      onAccent: '#ffffff',
       sub: '#6a7a38',
+      subLine: '#6a7a38',
+    },
+  },
+  {
+    id: 'sumi',
+    label: '墨',
+    style: 'simple',
+    group: 'dark',
+    note: '墨に、象牙と青磁。夜に静か',
+    colors: {
+      plane: '#1a1e24',
+      surface: '#2c3036',
+      ink: '#f4f1ea',
+      inkSub: '#9f9c96',
+      accent: '#d7c4a3',
+      accentText: '#d7c4a3',
+      onAccent: '#1a1e24',
+      sub: '#8fb8a0',
+      subLine: '#8fb8a0',
     },
   },
   {
     id: 'night',
-    label: '夜の黒',
+    label: '漆黒',
     style: 'simple',
     group: 'dark',
-    note: 'ブラウザの夜間。黒地に象牙と青磁',
+    note: '真っ黒に、月白と象牙。有機ELで電池にやさしい',
     colors: {
       plane: '#000000',
-      surface: '#141414',
+      surface: '#1c1c1e',
       ink: '#f4f1ea',
-      accent: '#d7c4a3',
-      sub: '#8fb8a0',
-    },
-  },
-  {
-    id: 'ebony',
-    label: '黒檀',
-    style: 'stylish',
-    group: 'dark',
-    note: '黒檀に、金と緑青',
-    colors: {
-      plane: '#14110e',
-      surface: '#272421',
-      ink: '#f3eadc',
-      accent: '#e0c07a',
-      sub: '#7dbaa4',
+      inkSub: '#8b8982',
+      accent: '#a8c0e8',
+      accentText: '#a8c0e8',
+      onAccent: '#000000',
+      sub: '#d7c4a3',
+      subLine: '#d7c4a3',
     },
   },
   {
@@ -305,13 +252,180 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '炭',
     style: 'simple',
     group: 'dark',
-    note: '炭に、錆と若草',
+    note: '炭に、若草と素焼き',
     colors: {
       plane: '#161616',
       surface: '#292929',
       ink: '#f0f0ea',
-      accent: '#e09878',
-      sub: '#b0c888',
+      inkSub: '#959590',
+      accent: '#b0c888',
+      accentText: '#b0c888',
+      onAccent: '#161616',
+      sub: '#e0a078',
+      subLine: '#e0a078',
+    },
+  },
+  // ── スタイリッシュ ──
+  {
+    id: 'ai',
+    label: '藍',
+    style: 'stylish',
+    group: 'light',
+    note: '藍染めに、砂色',
+    colors: {
+      plane: '#f4f6f7',
+      surface: '#ffffff',
+      ink: '#21283b',
+      inkSub: '#697288',
+      accent: '#24406e',
+      accentText: '#24406e',
+      onAccent: '#ffffff',
+      sub: '#8a6844',
+      subLine: '#8a6844',
+    },
+  },
+  {
+    id: 'koke',
+    label: '苔',
+    style: 'stylish',
+    group: 'light',
+    note: '苔むす庭に、青竹と金茶',
+    colors: {
+      plane: '#f4f6f4',
+      surface: '#ffffff',
+      ink: '#212d2a',
+      inkSub: '#677572',
+      accent: '#2a6e66',
+      accentText: '#2a6e66',
+      onAccent: '#ffffff',
+      sub: '#a08a4a',
+      subLine: '#a08a4a',
+    },
+  },
+  {
+    id: 'sakura',
+    label: '桜鼠',
+    style: 'stylish',
+    group: 'light',
+    note: '灰みの桜に、藍鼠',
+    colors: {
+      plane: '#f7f5f5',
+      surface: '#ffffff',
+      ink: '#3d2a33',
+      inkSub: '#826c76',
+      accent: '#984d67',
+      accentText: '#984d67',
+      onAccent: '#ffffff',
+      sub: '#6d8794',
+      subLine: '#6d8794',
+    },
+  },
+  {
+    id: 'ruri',
+    label: '瑠璃',
+    style: 'stylish',
+    group: 'light',
+    note: '瑠璃の深い青に、金',
+    colors: {
+      plane: '#f5f5f7',
+      surface: '#ffffff',
+      ink: '#252a40',
+      inkSub: '#6b718b',
+      accent: '#3d48b0',
+      accentText: '#3d48b0',
+      onAccent: '#ffffff',
+      sub: '#a88c5f',
+      subLine: '#a88c5f',
+    },
+  },
+  {
+    id: 'mocha-mousse',
+    label: 'ココア',
+    style: 'stylish',
+    group: 'light',
+    note: 'ココアに、くすんだ青',
+    colors: {
+      plane: '#f8f5f4',
+      surface: '#ffffff',
+      ink: '#382b2a',
+      inkSub: '#7d6e6d',
+      accent: '#7a5846',
+      accentText: '#7a5846',
+      onAccent: '#ffffff',
+      sub: '#6a7f96',
+      subLine: '#6a7f96',
+    },
+  },
+  {
+    id: 'terracotta',
+    label: 'テラコッタ',
+    style: 'stylish',
+    group: 'light',
+    note: '素焼きの赤土に、青緑',
+    colors: {
+      plane: '#f8f5f3',
+      surface: '#ffffff',
+      ink: '#3a2727',
+      inkSub: '#826c6b',
+      accent: '#985438',
+      accentText: '#985438',
+      onAccent: '#ffffff',
+      sub: '#5d8a84',
+      subLine: '#5d8a84',
+    },
+  },
+  {
+    id: 'lavender',
+    label: 'ラベンダー',
+    style: 'stylish',
+    group: 'light',
+    note: '藤と薔薇。やさしい紫',
+    colors: {
+      plane: '#f6f5f7',
+      surface: '#ffffff',
+      ink: '#312a43',
+      inkSub: '#766e8b',
+      accent: '#6e52b4',
+      accentText: '#6e52b4',
+      onAccent: '#ffffff',
+      sub: '#b56d84',
+      subLine: '#b56d84',
+    },
+  },
+  {
+    id: 'miru',
+    label: '海松',
+    style: 'stylish',
+    group: 'light',
+    note: '海松色のオリーブに、藤',
+    colors: {
+      plane: '#f5f6f1',
+      surface: '#ffffff',
+      ink: '#2a2e22',
+      inkSub: '#6f7466',
+      accent: '#5f6a2a',
+      accentText: '#5f6a2a',
+      onAccent: '#ffffff',
+      sub: '#9a88b8',
+      subLine: '#9a88b8',
+    },
+  },
+  {
+    id: 'ebony',
+    label: '黒檀',
+    style: 'stylish',
+    group: 'dark',
+    note: '黒檀に、金茶と緑青',
+    colors: {
+      plane: '#14110e',
+      surface: '#272421',
+      ink: '#f3eadc',
+      inkSub: '#978f82',
+      accent: '#d8b888',
+      accentText: '#d8b888',
+      onAccent: '#14110e',
+      sub: '#7dbaa4',
+      subLine: '#7dbaa4',
     },
   },
   {
@@ -319,28 +433,36 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '月下',
     style: 'stylish',
     group: 'dark',
-    note: '月下に、銀と藤',
+    note: '月夜に、銀と藤',
     colors: {
       plane: '#14161a',
       surface: '#27292c',
       ink: '#eef0f4',
+      inkSub: '#939599',
       accent: '#d0d6e0',
+      accentText: '#d0d6e0',
+      onAccent: '#14161a',
       sub: '#c0a8d8',
+      subLine: '#c0a8d8',
     },
   },
-
+  // ── キュート ──
   {
     id: 'strawberry',
     label: 'いちご',
     style: 'cute',
     group: 'light',
-    note: 'クリームに、薄いいちご',
+    note: 'ミルクに、いちご',
     colors: {
-      plane: '#fff5f6',
+      plane: '#fdf3f4',
       surface: '#ffffff',
       ink: '#1a1020',
+      inkSub: '#796d81',
       accent: '#d46d8c',
+      accentText: '#b65473',
+      onAccent: '#1a1020',
       sub: '#f7d5e0',
+      subLine: '#a98a94',
     },
   },
   {
@@ -348,13 +470,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'キャンディ',
     style: 'cute',
     group: 'light',
-    note: '綿あめに、薄いミント',
+    note: '綿あめに、ミント',
     colors: {
-      plane: '#f3fffb',
+      plane: '#fdf3f7',
       surface: '#ffffff',
-      ink: '#102018',
-      accent: '#7ed9c8',
-      sub: '#f8a0b8',
+      ink: '#1a1020',
+      inkSub: '#796d81',
+      accent: '#7ed6d9',
+      accentText: '#218184',
+      onAccent: '#1a1020',
+      sub: '#f8b4c8',
+      subLine: '#bf7f93',
     },
   },
   {
@@ -362,13 +488,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '桃',
     style: 'cute',
     group: 'light',
-    note: '薄い桃に、空',
+    note: '桃に、空色',
     colors: {
-      plane: '#fff6f1',
+      plane: '#fdf4ef',
       surface: '#ffffff',
       ink: '#1a1020',
-      accent: '#f0b48f',
+      inkSub: '#796d81',
+      accent: '#f3b295',
+      accentText: '#a1664b',
+      onAccent: '#1a1020',
       sub: '#b5e1f7',
+      subLine: '#6e98ac',
     },
   },
   {
@@ -376,13 +506,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'レモン',
     style: 'cute',
     group: 'light',
-    note: 'バタークリームに、藤',
+    note: 'レモンクリームに、藤と空',
     colors: {
-      plane: '#fffbe8',
+      plane: '#f8f5e6',
       surface: '#fffefb',
       ink: '#1a1020',
-      accent: '#f0d15a',
-      sub: '#e3b1e2',
+      inkSub: '#796d81',
+      accent: '#d9a6dc',
+      accentText: '#936496',
+      onAccent: '#1a1020',
+      sub: '#9ccbe8',
+      subLine: '#6a97b2',
     },
   },
   {
@@ -390,13 +524,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'ソーダ',
     style: 'cute',
     group: 'light',
-    note: '薄い空に、珊瑚',
+    note: 'ソーダ水に、藤',
     colors: {
-      plane: '#f3fbff',
+      plane: '#eff7fb',
       surface: '#ffffff',
       ink: '#102028',
+      inkSub: '#62747e',
       accent: '#7ec8ea',
-      sub: '#ffb2b2',
+      accentText: '#317d9d',
+      onAccent: '#102028',
+      sub: '#c8b4f0',
+      subLine: '#9c89c2',
     },
   },
   {
@@ -404,13 +542,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'マカロン',
     style: 'cute',
     group: 'light',
-    note: '薄い藤に、ミント',
+    note: '藤のマカロンに、ミント',
     colors: {
       plane: '#f7f3ff',
       surface: '#ffffff',
       ink: '#1a1028',
+      inkSub: '#786d8b',
       accent: '#9a6ec4',
-      sub: '#7dcaa0',
+      accentText: '#8c61b4',
+      onAccent: '#1a1028',
+      sub: '#6ccbb3',
+      subLine: '#40a28b',
     },
   },
   {
@@ -418,13 +560,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'プリン',
     style: 'cute',
     group: 'light',
-    note: 'カスタードに、レモネード',
+    note: 'カスタードに、カラメルと苺ミルク',
     colors: {
-      plane: '#fff8ee',
+      plane: '#fbf4ea',
       surface: '#fffefb',
       ink: '#1a1020',
-      accent: '#e8b65a',
-      sub: '#f0a4b4',
+      inkSub: '#796d81',
+      accent: '#c88d73',
+      accentText: '#9e664d',
+      onAccent: '#1a1020',
+      sub: '#f4c0cc',
+      subLine: '#b4838f',
     },
   },
   {
@@ -432,27 +578,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '風船',
     style: 'cute',
     group: 'light',
-    note: 'キウイに、楽園ピンク',
+    note: 'キウイに、ピンクの風船',
     colors: {
-      plane: '#f4fff6',
+      plane: '#eef9f0',
       surface: '#ffffff',
       ink: '#102018',
-      accent: '#8fce73',
+      inkSub: '#64766c',
+      accent: '#acc75c',
+      accentText: '#677d09',
+      onAccent: '#102018',
       sub: '#f08ab4',
-    },
-  },
-  {
-    id: 'night-pop',
-    label: '夜のポップ',
-    style: 'cute',
-    group: 'dark',
-    note: '夜に、電光ピンクと空',
-    colors: {
-      plane: '#241828',
-      surface: '#322034',
-      ink: '#ffeef6',
-      accent: '#ff8ec4',
-      sub: '#7ed0ea',
+      subLine: '#cf769b',
     },
   },
   {
@@ -460,27 +596,54 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'うさぎ',
     style: 'cute',
     group: 'light',
-    note: '白に、ミント',
+    note: '白うさぎに、ミルクティーとミント',
     colors: {
-      plane: '#f4f8f4',
+      plane: '#f7f6f4',
       surface: '#ffffff',
-      ink: '#142018',
-      accent: '#5eae86',
-      sub: '#b7a98e',
+      ink: '#201a18',
+      inkSub: '#78706e',
+      accent: '#a08a78',
+      accentText: '#86715f',
+      onAccent: '#201a18',
+      sub: '#a8dcc4',
+      subLine: '#6a9c86',
     },
   },
+  {
+    id: 'night-pop',
+    label: '夜のポップ',
+    style: 'cute',
+    group: 'dark',
+    note: '夜に、ネオンピンクと空色',
+    colors: {
+      plane: '#241828',
+      surface: '#362438',
+      ink: '#ffeef6',
+      inkSub: '#a19299',
+      accent: '#ff8ec4',
+      accentText: '#ff8ec4',
+      onAccent: '#241828',
+      sub: '#7ed0ea',
+      subLine: '#7ed0ea',
+    },
+  },
+  // ── クール ──
   {
     id: 'steel',
     label: '鋼',
     style: 'cool',
     group: 'dark',
-    note: '鋼に、赤',
+    note: '鋼に、青鈍と銀',
     colors: {
       plane: '#121416',
       surface: '#252729',
       ink: '#e8eef2',
+      inkSub: '#8e9397',
       accent: '#7aa8bc',
-      sub: '#e05050',
+      accentText: '#7aa8bc',
+      onAccent: '#121416',
+      sub: '#c8d4dc',
+      subLine: '#c8d4dc',
     },
   },
   {
@@ -493,8 +656,12 @@ export const PRESETS: readonly ThemePreset[] = [
       plane: '#0e1012',
       surface: '#212325',
       ink: '#e6f2f2',
+      inkSub: '#869191',
       accent: '#5ec8d0',
-      sub: '#d0d8dc',
+      accentText: '#5ec8d0',
+      onAccent: '#0e1012',
+      sub: '#8890a0',
+      subLine: '#8890a0',
     },
   },
   {
@@ -502,13 +669,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '真夜中',
     style: 'cool',
     group: 'dark',
-    note: '真夜中に、電光',
+    note: '真夜中に、電光の青と紫',
     colors: {
       plane: '#0c1020',
       surface: '#1f2332',
       ink: '#e8eeff',
+      inkSub: '#8a909f',
       accent: '#6aa0ff',
-      sub: '#f0c040',
+      accentText: '#6aa0ff',
+      onAccent: '#0c1020',
+      sub: '#b8a0ff',
+      subLine: '#b8a0ff',
     },
   },
   {
@@ -516,27 +687,35 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '刃',
     style: 'cool',
     group: 'dark',
-    note: '黒に、銀',
+    note: '黒に、白銀。色を抑えた刃物',
     colors: {
       plane: '#101214',
       surface: '#232527',
       ink: '#f0f4f6',
-      accent: '#c8d4dc',
+      inkSub: '#8d9193',
+      accent: '#e0e6ea',
+      accentText: '#e0e6ea',
+      onAccent: '#101214',
       sub: '#7a98b0',
+      subLine: '#7a98b0',
     },
   },
   {
-    id: 'racer',
-    label: 'レーサー',
+    id: 'shiden',
+    label: '紫電',
     style: 'cool',
     group: 'dark',
-    note: '黒に、赤と白',
+    note: '黒に、紫の稲妻とシアン',
     colors: {
-      plane: '#120e0e',
-      surface: '#252121',
-      ink: '#f6eeee',
-      accent: '#ff6a6a',
-      sub: '#d8d8d8',
+      plane: '#100e16',
+      surface: '#232029',
+      ink: '#f0ecf8',
+      inkSub: '#8f8b96',
+      accent: '#9a7aff',
+      accentText: '#9a7aff',
+      onAccent: '#100e16',
+      sub: '#5ec8d0',
+      subLine: '#5ec8d0',
     },
   },
   {
@@ -544,13 +723,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '電圧',
     style: 'cool',
     group: 'dark',
-    note: '黒に、黄',
+    note: '黒に、蛍光ライム',
     colors: {
       plane: '#121208',
       surface: '#25251c',
       ink: '#f6f6e4',
-      accent: '#c4b420',
+      inkSub: '#919180',
+      accent: '#b8e050',
+      accentText: '#b8e050',
+      onAccent: '#121208',
       sub: '#d8d8c8',
+      subLine: '#d8d8c8',
     },
   },
   {
@@ -558,27 +741,35 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '深淵',
     style: 'cool',
     group: 'dark',
-    note: '深い藍に、金',
+    note: '深い藍に、青緑と砂金',
     colors: {
       plane: '#0c1420',
       surface: '#1f2732',
       ink: '#e8eef8',
-      accent: '#7eb0ee',
-      sub: '#e0c070',
+      inkSub: '#8c929b',
+      accent: '#4fc0b0',
+      accentText: '#4fc0b0',
+      onAccent: '#0c1420',
+      sub: '#d8c8a0',
+      subLine: '#d8c8a0',
     },
   },
   {
-    id: 'ice',
-    label: '氷',
+    id: 'copper',
+    label: '銅',
     style: 'cool',
     group: 'dark',
-    note: '炭に、氷',
+    note: '黒に、銅と緑青',
     colors: {
-      plane: '#12181c',
-      surface: '#252a2e',
-      ink: '#e8f4f6',
-      accent: '#5eb0c0',
-      sub: '#c8d8e0',
+      plane: '#141210',
+      surface: '#27241f',
+      ink: '#f4eee8',
+      inkSub: '#95908a',
+      accent: '#d4a084',
+      accentText: '#d4a084',
+      onAccent: '#141210',
+      sub: '#6ab0b8',
+      subLine: '#6ab0b8',
     },
   },
   {
@@ -586,56 +777,72 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'ネオン',
     style: 'cool',
     group: 'dark',
-    note: '夜に、マゼンタ',
+    note: '夜の街に、マゼンタと水色',
     colors: {
       plane: '#140e18',
       surface: '#27212a',
       ink: '#f8e8f4',
+      inkSub: '#998a95',
       accent: '#e060c0',
+      accentText: '#e060c0',
+      onAccent: '#140e18',
       sub: '#60d0e0',
+      subLine: '#60d0e0',
     },
   },
   {
-    id: 'gale',
-    label: '疾風',
+    id: 'mist',
+    label: '夜霧',
     style: 'cool',
     group: 'dark',
-    note: '墨に、青白',
+    note: '夜霧に、緑灰と藤',
     colors: {
-      plane: '#101418',
-      surface: '#23272a',
-      ink: '#e8f0f4',
-      accent: '#8ec0e0',
-      sub: '#d8e4ec',
+      plane: '#121516',
+      surface: '#25282a',
+      ink: '#ecf0ee',
+      inkSub: '#919593',
+      accent: '#a0b8b0',
+      accentText: '#a0b8b0',
+      onAccent: '#121516',
+      sub: '#d8c8e0',
+      subLine: '#d8c8e0',
     },
   },
-
+  // ── 大人 ──
   {
     id: 'otona-rose',
-    label: '薔薇煤',
+    label: '薔薇',
     style: 'adult',
     group: 'light',
-    note: 'サイトの01。薔薇',
+    note: 'くすんだ薔薇',
     colors: {
-      plane: '#fff5f5',
+      plane: '#fdf3f3',
       surface: '#ffffff',
       ink: '#3a2a2c',
+      inkSub: '#806d6f',
       accent: '#f4acb7',
+      accentText: '#a3626d',
+      onAccent: '#3a2a2c',
       sub: '#e8d6d7',
+      subLine: '#9e8e8f',
     },
   },
   {
     id: 'otona-girl',
-    label: '乙女',
+    label: '清涼',
     style: 'adult',
     group: 'light',
-    note: 'サイトの02。清涼',
+    note: '薄荷と水色の涼しさ',
     colors: {
-      plane: '#f2f2ec',
+      plane: '#f2f6f6',
       surface: '#ffffff',
-      ink: '#243028',
-      accent: '#aad1b0',
+      ink: '#243034',
+      inkSub: '#677479',
+      accent: '#adc0d4',
+      accentText: '#657689',
+      onAccent: '#243034',
       sub: '#c3dbc5',
+      subLine: '#829884',
     },
   },
   {
@@ -643,41 +850,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: 'リゾート',
     style: 'adult',
     group: 'light',
-    note: 'サイトの03。透明',
+    note: '白砂に、浅瀬の青緑',
     colors: {
       plane: '#f7f3f3',
       surface: '#ffffff',
       ink: '#2e3030',
+      inkSub: '#707272',
       accent: '#8eb8b8',
+      accentText: '#547c7c',
+      onAccent: '#2e3030',
       sub: '#f0d4d4',
-    },
-  },
-  {
-    id: 'otona-retro',
-    label: '杏',
-    style: 'adult',
-    group: 'light',
-    note: 'サイトの06。空と檸檬',
-    colors: {
-      plane: '#f7f4ef',
-      surface: '#ffffff',
-      ink: '#243038',
-      accent: '#6f98b4',
-      sub: '#c9b45a',
-    },
-  },
-  {
-    id: 'otona-grace',
-    label: '気品',
-    style: 'adult',
-    group: 'light',
-    note: 'サイトの09。気品',
-    colors: {
-      plane: '#f5eff2',
-      surface: '#ffffff',
-      ink: '#322830',
-      accent: '#a88894',
-      sub: '#8eaeae',
+      subLine: '#a68c8c',
     },
   },
   {
@@ -685,27 +868,53 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '癒し',
     style: 'adult',
     group: 'light',
-    note: 'サイトの04。癒し',
+    note: 'くすみ藤に、ローズ',
     colors: {
-      plane: '#f4faf7',
+      plane: '#f6f5fa',
       surface: '#ffffff',
-      ink: '#243028',
-      accent: '#5eaea0',
+      ink: '#2a2836',
+      inkSub: '#716f80',
+      accent: '#9a92c0',
+      accentText: '#766e9a',
+      onAccent: '#2a2836',
       sub: '#d4a0a0',
+      subLine: '#b78585',
     },
   },
   {
-    id: 'otona-soft',
-    label: '調和',
+    id: 'otona-retro',
+    label: 'レトロ',
     style: 'adult',
     group: 'light',
-    note: 'サイトの11。杏と藤',
+    note: '昭和の空と檸檬',
     colors: {
-      plane: '#f8f3ef',
+      plane: '#f7f4ef',
+      surface: '#ffffff',
+      ink: '#243038',
+      inkSub: '#66747d',
+      accent: '#759eba',
+      accentText: '#507893',
+      onAccent: '#243038',
+      sub: '#c9b45a',
+      subLine: '#a59033',
+    },
+  },
+  {
+    id: 'otona-grace',
+    label: '気品',
+    style: 'adult',
+    group: 'light',
+    note: 'モーヴと青磁',
+    colors: {
+      plane: '#f5eff2',
       surface: '#ffffff',
       ink: '#322830',
-      accent: '#d4b09e',
-      sub: '#d4c6e2',
+      inkSub: '#7a6e78',
+      accent: '#8a6c77',
+      accentText: '#8a6c77',
+      onAccent: '#ffffff',
+      sub: '#8eaeae',
+      subLine: '#799898',
     },
   },
   {
@@ -713,13 +922,35 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '知的',
     style: 'adult',
     group: 'light',
-    note: 'サイトの12。都会',
+    note: 'グレージュに、紺',
     colors: {
-      plane: '#f5f2f2',
+      plane: '#f4f3f1',
       surface: '#ffffff',
-      ink: '#2e2a2c',
-      accent: '#a88898',
-      sub: '#8eb0b0',
+      ink: '#2a2a2c',
+      inkSub: '#717174',
+      accent: '#6e6a64',
+      accentText: '#6e6a64',
+      onAccent: '#ffffff',
+      sub: '#5a6a88',
+      subLine: '#5a6a88',
+    },
+  },
+  {
+    id: 'otona-soft',
+    label: '調和',
+    style: 'adult',
+    group: 'light',
+    note: '杏と藤',
+    colors: {
+      plane: '#f8f3ef',
+      surface: '#ffffff',
+      ink: '#322830',
+      inkSub: '#7a6e78',
+      accent: '#d4b09e',
+      accentText: '#8e6d5d',
+      onAccent: '#322830',
+      sub: '#d4c6e2',
+      subLine: '#9a8ca7',
     },
   },
   {
@@ -727,13 +958,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '粘土',
     style: 'adult',
     group: 'light',
-    note: 'サイトの14。砂とセージ',
+    note: '砂とセージ',
     colors: {
       plane: '#f2f2ec',
       surface: '#ffffff',
       ink: '#2e342e',
+      inkSub: '#6d746d',
       accent: '#bccfc5',
+      accentText: '#67786f',
+      onAccent: '#2e342e',
       sub: '#e2d5d5',
+      subLine: '#9a8e8e',
     },
   },
   {
@@ -741,13 +976,17 @@ export const PRESETS: readonly ThemePreset[] = [
     label: '格式',
     style: 'adult',
     group: 'light',
-    note: 'サイトの15。水',
+    note: '江戸紫と真鍮',
     colors: {
-      plane: '#f2f7f7',
+      plane: '#f3f4f7',
       surface: '#ffffff',
-      ink: '#243438',
-      accent: '#5e9aa6',
-      sub: '#d4b8b8',
+      ink: '#2a2434',
+      inkSub: '#756f82',
+      accent: '#46335a',
+      accentText: '#46335a',
+      onAccent: '#ffffff',
+      sub: '#bda980',
+      subLine: '#a49068',
     },
   },
 ];
@@ -868,6 +1107,23 @@ function softenedInk(ink: string, plane: string, surface: string, target: number
   return ink;
 }
 
+/**
+ * 背景・カードのどちらの上でも target 以上のコントラストになるまで、色を文字の色へ少しずつ寄せる
+ * (見本の色をできるだけ変えずに、読める濃さを保つ)。
+ */
+function ensureContrast(
+  color: string,
+  toward: string,
+  backgrounds: readonly string[],
+  target: number,
+): string {
+  for (let t = 0; t <= 1.0001; t += 0.02) {
+    const c = t === 0 ? color : mixHex(toward, color, t);
+    if (backgrounds.every((bg) => contrast(c, bg) >= target)) return c;
+  }
+  return toward;
+}
+
 /** ジャンル別だけは色相を分ける。明るいテーマは薄く、暗いテーマは濃く。 */
 function genrePalette(dark: boolean): string[] {
   return dark
@@ -897,12 +1153,36 @@ function genrePalette(dark: boolean): string[] {
       ];
 }
 
-/** テーマの5色から、画面で使う色の役割(CSS 変数)をまとめて作る。 */
+/**
+ * テーマの色から、画面で使う色の役割(CSS 変数)をまとめて作る。
+ * 強調・サブは「塗り」と「文字・線」を分ける(淡い色の塗りでも、文字と線は読める濃さにする)。
+ */
 export function themeTokens(colors: ThemeColors): Record<string, string> {
   const { plane, surface, ink, accent } = colors;
   const sub = colors.sub ?? accent;
   const dark = isDark(plane);
-  const onAccent = contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink;
+  const sem = dark ? SEMANTIC.dark : SEMANTIC.light;
+  const readable = (color: string, track: string) =>
+    ensureContrast(color, ink, [plane, surface, track], 4.5);
+  const semantic = {
+    ...sem,
+    income: readable(sem.income, sem.incomeBg),
+    over: readable(sem.over, sem.overBg),
+    caution: readable(sem.caution, sem.cautionBg),
+  };
+  const accentText = colors.accentText
+    ? ensureContrast(colors.accentText, ink, [plane, surface], 4.5)
+    : accent;
+  const subLine = colors.subLine ? ensureContrast(colors.subLine, ink, [plane, surface], 3) : sub;
+  const onAction =
+    colors.onAccent ?? (contrast('#ffffff', accent) >= 4.5 ? '#ffffff' : dark ? plane : ink);
+  const onAccent = contrast('#ffffff', accentText) >= 4.5 ? '#ffffff' : dark ? plane : ink;
+  const inkMuted = colors.inkSub
+    ? ensureContrast(colors.inkSub, ink, [plane, surface], 4.5)
+    : softenedInk(ink, plane, surface, 5.4);
+  const inkSecondary = colors.inkSub
+    ? mixHex(ink, inkMuted, 0.35)
+    : softenedInk(ink, plane, surface, 6.4);
   const hueE = themeHues(colors)[4];
 
   return {
@@ -910,25 +1190,28 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--surface': surface,
     '--surface-raised': surface,
     '--ink': ink,
-    '--ink-secondary': softenedInk(ink, plane, surface, 6.4),
-    '--ink-muted': softenedInk(ink, plane, surface, 5.4),
+    '--ink-secondary': inkSecondary,
+    '--ink-muted': inkMuted,
     '--hairline': rgba(ink, dark ? 0.14 : 0.1),
-    '--accent': accent,
+    '--accent': accentText,
     '--action': accent,
     '--on-accent': onAccent,
-    '--on-action': onAccent,
-    '--accent-track': rgba(accent, dark ? 0.12 : 0.07),
+    '--on-action': onAction,
+    '--accent-track': rgba(accent, dark ? 0.16 : 0.1),
     '--mark': hueE,
-    '--state-ok': sub,
-    '--state-ok-track': mixHex(sub, surface, dark ? 0.18 : 0.1),
-    '--income': sub,
-    '--income-track': mixHex(sub, surface, dark ? 0.18 : 0.08),
-    '--over-track': mixHex('#b82b2b', surface, dark ? 0.2 : 0.08),
-    '--attention-track': mixHex(accent, surface, dark ? 0.16 : 0.08),
-    '--state-caution': accent,
-    '--state-caution-track': mixHex(accent, surface, dark ? 0.16 : 0.08),
-    '--state-over-track': mixHex('#b82b2b', surface, dark ? 0.2 : 0.08),
-    '--state-none': softenedInk(ink, plane, surface, 5.4),
+    '--state-ok': subLine,
+    '--state-ok-track': mixHex(sub, surface, dark ? 0.22 : 0.16),
+    '--income': semantic.income,
+    '--income-track': semantic.incomeBg,
+    '--over': semantic.over,
+    '--over-track': semantic.overBg,
+    '--attention': semantic.caution,
+    '--attention-track': semantic.cautionBg,
+    '--state-caution': semantic.caution,
+    '--state-caution-track': semantic.cautionBg,
+    '--state-over': semantic.over,
+    '--state-over-track': semantic.overBg,
+    '--state-none': inkMuted,
     '--state-none-track': mixHex(ink, surface, dark ? 0.2 : 0.08),
     '--genre-1': genrePalette(dark)[0]!,
     '--genre-2': genrePalette(dark)[1]!,
@@ -940,7 +1223,7 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--genre-8': genrePalette(dark)[7]!,
     '--genre-9': genrePalette(dark)[8]!,
     '--genre-10': genrePalette(dark)[9]!,
-    '--genre-none': softenedInk(ink, plane, surface, 5.4),
+    '--genre-none': inkMuted,
     '--hero-glow': rgba(accent, dark ? 0.1 : 0.05),
     '--card-shadow': dark
       ? '0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -20px rgba(0, 0, 0, 0.6)'
@@ -1021,16 +1304,18 @@ export const THEME_BOOT = `(function(){try{var raw=localStorage.getItem('${THEME
 
 /**
  * 以前の保存(4色だけ・tokens なし)を、今のプリセットと色の役割に置き換える(アプリを開いたときに1回)。
- * プリセットを選んでいたなら、そのプリセットの今の色にそろえる。
+ * プリセットを選んでいたなら、そのプリセットの今の色にそろえる(なくしたプリセットは近いものへ)。
  */
 export function upgradeStoredTheme(): void {
   const theme = readColorTheme();
   if (theme.id === 'system' || !('colors' in theme)) return;
-  const preset = PRESETS.find((p) => p.id === theme.id);
+  const id = MIGRATED_PRESETS[theme.id] ?? theme.id;
+  const preset = PRESETS.find((p) => p.id === id);
   const current = preset ? preset.colors : theme.colors;
   const upToDate =
+    id === theme.id &&
     theme.tokens !== undefined &&
     JSON.stringify(theme.tokens) === JSON.stringify(themeTokens(current));
   if (upToDate) return;
-  writeColorTheme({ id: theme.id, colors: current });
+  writeColorTheme({ id, colors: current });
 }
