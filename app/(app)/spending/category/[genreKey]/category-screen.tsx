@@ -2,35 +2,63 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
+import { updateCategoryBudgetAction } from '../actions';
 import { useRouter } from 'next/navigation';
+import { updateCategoryBudgetAction } from '../actions';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { updateCategoryBudgetAction } from '../actions';
 import { buildCategorySummary, buildInsights, type Insight } from '@/features/category/insights';
+import { updateCategoryBudgetAction } from '../actions';
 import { buildCumulative, categoryAllowanceYen, goalOverlaps } from '@/features/category/pace';
+import { updateCategoryBudgetAction } from '../actions';
 import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/series';
 import type { CategoryDetailData } from '@/features/category/loader';
+import { updateCategoryBudgetAction } from '../actions';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
+import { updateCategoryBudgetAction } from '../actions';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { updateCategoryBudgetAction } from '../actions';
 import { Yen } from '@/components/ui/money';
+import { updateCategoryBudgetAction } from '../actions';
 import { CONFIDENT, predictGenres, type GenrePrediction } from '@/domain/genre-prediction';
+import { updateCategoryBudgetAction } from '../actions';
 import { suggestRule, type RuleSuggestion } from '@/domain/rule-match';
+import { updateCategoryBudgetAction } from '../actions';
 import { hapticFor } from '@/lib/haptics';
+import { updateCategoryBudgetAction } from '../actions';
 import { pickQuickDestination, useMoveCounts } from '@/features/category/destinations';
+import { updateCategoryBudgetAction } from '../actions';
 import { genreIdOfKey } from '@/features/category/model';
+import { updateCategoryBudgetAction } from '../actions';
 import { formatMonthJa } from '@/lib/date';
+import { updateCategoryBudgetAction } from '../actions';
 import { prefersReducedMotion } from '@/lib/motion';
+import { updateCategoryBudgetAction } from '../actions';
 import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
+import { updateCategoryBudgetAction } from '../actions';
 import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
+import { updateCategoryBudgetAction } from '../actions';
 import { CategoryChart, type ChartMode } from './category-chart';
+import { updateCategoryBudgetAction } from '../actions';
 import { CategoryHeader } from './category-header';
+import { updateCategoryBudgetAction } from '../actions';
 import { CategoryPicker } from './category-picker';
+import { updateCategoryBudgetAction } from '../actions';
 import { setCategoryFixedAction, setCategoryForecastClosedAction } from '../actions';
+import { updateCategoryBudgetAction } from '../actions';
 import { CategorySettings } from './category-settings';
+import { updateCategoryBudgetAction } from '../actions';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
+import { updateCategoryBudgetAction } from '../actions';
 import { EditSheet } from './edit-sheet';
+import { updateCategoryBudgetAction } from '../actions';
 import { RuleSheet } from './rule-sheet';
+import { updateCategoryBudgetAction } from '../actions';
 import { useCategoryEdits } from './use-category-edits';
+import { updateCategoryBudgetAction } from '../actions';
 import { InsightsSection } from './insights-section';
+import { updateCategoryBudgetAction } from '../actions';
 import { SummarySection } from './summary-section';
 
 /**
@@ -448,6 +476,10 @@ function CategoryScreenInner({
         today={data.today}
       />
 
+      {data.goal?.row?.targetYen != null ? (
+        <BudgetEditBlock genreId={currentGenreId} currentBudget={data.goal.row.targetYen} />
+      ) : null}
+
       {whatIf}
 
       <InsightsSection insights={insights} onFocus={focusInsight} />
@@ -752,5 +784,71 @@ function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
         </ul>
       )}
     </section>
+  );
+}
+
+function BudgetEditBlock({
+  genreId,
+  currentBudget,
+}: {
+  genreId: string | null;
+  currentBudget: number;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(currentBudget));
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!genreId) return;
+    setSaving(true);
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num >= 0) {
+      await updateCategoryBudgetAction(genreId, num);
+      router.refresh();
+    }
+    setSaving(false);
+    setEditing(false);
+  };
+
+  return (
+    <div className="rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
+      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+        このカテゴリの目標
+      </p>
+      {editing ? (
+        <div className="mt-2 flex gap-2">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="min-h-11 flex-1 rounded-xl px-3 text-lg font-semibold"
+            style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+          />
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving}
+            className="min-h-11 rounded-xl px-4 text-sm font-semibold"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            {saving ? '...' : '保存'}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="mt-1 flex items-baseline gap-2"
+        >
+          <span className="text-2xl font-bold" style={{ color: 'var(--ink)' }}>
+            {currentBudget.toLocaleString()}円
+          </span>
+          <span className="text-sm" style={{ color: 'var(--accent)' }}>
+            編集
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
