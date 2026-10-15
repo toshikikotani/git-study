@@ -84,11 +84,11 @@
   /* 役割の色 */
   --accent: #0a1020; /* 選択中・リンクの文字(青ではない。青は --action だけ) */
   --accent-track: rgba(10, 16, 32, 0.07); /* 帯・トラック(中立) */
-  --income: #0f8f60; /* 収入 */
-  --income-track: #d9f2e6;
-  --over: #b82b2b; /* 超過・支出(白・薄い赤の面の上で 4.5:1 以上) */
-  --over-track: #f9dfdf;
-  --attention: #8a6400; /* 閾値到達(白・薄い黄の面の上で 4.5:1 以上)。必ず文字を伴う */
+  --income: #278445; /* 収入 */
+  --income-track: #dcf7e1;
+  --over: #c13c36; /* 超過・支出(白・薄い赤の面の上で 4.5:1 以上) */
+  --over-track: #fee9e6;
+  --attention: #9c6306; /* 閾値到達(白・薄い黄の面の上で 4.5:1 以上)。必ず文字を伴う */
 
   --hero-glow: rgba(10, 16, 32, 0.03);
   --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
@@ -111,11 +111,11 @@
      色だけに頼らず、必ずアイコン・ラベルを併用する(domain/budget-state.ts)。 */
   --state-ok: #4a5568;
   --state-ok-track: #e6e9ef;
-  --state-caution: #8a6400;
-  --state-caution-track: #f8edc6;
-  --attention-track: #f8edc6;
-  --state-over: #b82b2b;
-  --state-over-track: #f9dfdf;
+  --state-caution: #9c6306;
+  --state-caution-track: #ffebd5;
+  --attention-track: #ffebd5;
+  --state-over: #c13c36;
+  --state-over-track: #fee9e6;
   --state-none: #78849b;
   --state-none-track: #e6e9ef;
 }
@@ -139,11 +139,11 @@
     --accent-track: rgba(255, 255, 255, 0.08);
     --action: #d4d4d4;
     --on-action: #111111;
-    --income: #199e70;
-    --income-track: #163829;
-    --over: #e66767;
-    --over-track: #3d2027;
-    --attention: #fab219;
+    --income: #7cd591;
+    --income-track: #1a3520;
+    --over: #fea196;
+    --over-track: #442320;
+    --attention: #f3ae58;
 
     --hero-glow: rgba(255, 255, 255, 0.04);
     --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -162,11 +162,11 @@
 
     --state-ok: #a3adbd;
     --state-ok-track: #232b3d;
-    --state-caution: #fab219;
-    --state-caution-track: #3a3013;
-    --attention-track: #3a3013;
-    --state-over: #e66767;
-    --state-over-track: #3d2027;
+    --state-caution: #f3ae58;
+    --state-caution-track: #3e290f;
+    --attention-track: #3e290f;
+    --state-over: #fea196;
+    --state-over-track: #442320;
     --state-none: #6b7791;
     --state-none-track: #232b3d;
   }
@@ -187,11 +187,11 @@
   --accent: #f2f5fa;
   --on-accent: #0b1b3a;
   --accent-track: rgba(255, 255, 255, 0.08);
-  --income: #199e70;
-  --income-track: #163829;
-  --over: #e66767;
-  --over-track: #3d2027;
-  --attention: #fab219;
+  --income: #7cd591;
+  --income-track: #1a3520;
+  --over: #fea196;
+  --over-track: #442320;
+  --attention: #f3ae58;
 
   --hero-glow: rgba(255, 255, 255, 0.04);
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -210,11 +210,11 @@
 
   --state-ok: #a3adbd;
   --state-ok-track: #232b3d;
-  --state-caution: #fab219;
-  --state-caution-track: #3a3013;
-  --attention-track: #3a3013;
-  --state-over: #e66767;
-  --state-over-track: #3d2027;
+  --state-caution: #f3ae58;
+  --state-caution-track: #3e290f;
+  --attention-track: #3e290f;
+  --state-over: #fea196;
+  --state-over-track: #442320;
   --state-none: #6b7791;
   --state-none-track: #232b3d;
 }

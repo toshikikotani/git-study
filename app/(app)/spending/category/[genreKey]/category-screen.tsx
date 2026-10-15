@@ -142,11 +142,11 @@ function CategoryScreenInner({
   );
 
   // 目標期間中の、このカテゴリの1日の目安(全カテゴリ合計の目安ではない)。表示中の期間が
-  // 目標期間と重なるときだけ。
+  // 目標期間と重なるときだけ。グラフは表示中の期間(目標期間なら目標の初日から)で描く。
   const categoryAllowance = useMemo(() => {
     const g = data.goal;
     if (!g || !g.active || !g.row || g.row.targetYen === null) return null;
-    if (!goalOverlaps(g.range, data.monthStart, data.range.to)) return null;
+    if (!goalOverlaps(g.range, data.range.from, data.range.to)) return null;
     return categoryAllowanceYen({
       budgetYen: g.row.targetYen,
       scheduledYen: g.row.scheduledYen,
@@ -154,31 +154,32 @@ function CategoryScreenInner({
       goalRange: g.range,
       today: data.today,
     });
-  }, [data.goal, data.monthStart, data.range.to, data.today, historyLines]);
+  }, [data.goal, data.range.from, data.range.to, data.today, historyLines]);
 
   const series = useMemo(
     () =>
       buildSeries({
         lines: historyLines,
         unit,
-        monthStart: data.monthStart,
+        monthStart: data.range.from,
         monthEnd: data.range.to,
         today: data.today,
         dailyAllowanceYen: categoryAllowance,
       }),
-    [historyLines, unit, data.monthStart, data.range.to, data.today, categoryAllowance],
+    [historyLines, unit, data.range.from, data.range.to, data.today, categoryAllowance],
   );
 
   const cumulative = useMemo(
     () =>
       buildCumulative({
         lines: historyLines,
-        monthStart: data.monthStart,
+        monthStart: data.range.from,
         monthEnd: data.range.to,
         today: data.today,
         recordStart: series.recordStart,
+        // 目標の予算と理想の線は、目標期間で見ているときだけ(月で見るときは期間が合わない)。
         goal:
-          data.goal?.active && data.goal.row && data.goal.row.targetYen !== null
+          data.isGoalPeriod && data.goal?.row && data.goal.row.targetYen !== null
             ? { range: data.goal.range, budgetYen: data.goal.row.targetYen }
             : null,
         holdForecast: data.forecastClosed,
@@ -186,11 +187,12 @@ function CategoryScreenInner({
       }),
     [
       historyLines,
-      data.monthStart,
+      data.range.from,
       data.range.to,
       data.today,
       series.recordStart,
       data.goal,
+      data.isGoalPeriod,
       data.forecastClosed,
       data.remaining,
     ],
@@ -354,8 +356,8 @@ function CategoryScreenInner({
         isCurrentMonth={data.isCurrentMonth}
         todayMonthKey={data.today.slice(0, 7)}
         totalYen={totalYen}
-        goalPeriod={data.goal?.range ?? null}
-        isGoalPeriod={data.range.from !== data.monthStart}
+        goalPeriod={data.goal?.active ? data.goal.range : null}
+        isGoalPeriod={data.isGoalPeriod}
         onBack={() => router.back()}
         menu={
           <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
@@ -413,8 +415,6 @@ function CategoryScreenInner({
         />
       ) : null}
 
-      {whatIf}
-
       <InsightsSection insights={insights} onFocus={focusInsight} />
 
       <CategoryChart
@@ -423,14 +423,20 @@ function CategoryScreenInner({
         mode={chartMode}
         onMode={setChartMode}
         genreName={data.genreName}
-        monthLabel={`${data.monthStart.slice(0, 4)}年${formatMonthJa(data.monthKey)}`}
+        monthLabel={
+          data.isGoalPeriod
+            ? '目標期間'
+            : `${data.monthStart.slice(0, 4)}年${formatMonthJa(data.monthKey)}`
+        }
         showPrevious={showPrevious}
         onShowPrevious={setShowPrevious}
         onUnit={setUnit}
         onPick={pickBucket}
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
-        budgetYen={data.goal?.row?.targetYen ?? null}
+        budgetYen={data.isGoalPeriod ? (data.goal?.row?.targetYen ?? null) : null}
       />
+
+      {whatIf}
 
       <CategoryTabs
         genreKey={data.genreKey}

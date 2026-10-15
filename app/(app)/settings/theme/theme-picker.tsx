@@ -5,7 +5,6 @@ import { useState } from 'react';
 import {
   DEFAULT_CUSTOM,
   PRESETS,
-  themeHues,
   applyColorTheme,
   readColorTheme,
   writeColorTheme,
@@ -16,10 +15,10 @@ import {
 
 const GROUPS = [
   { style: 'simple', title: 'シンプル' },
-  { style: 'stylish', title: 'おしゃれ' },
-  { style: 'adult', title: '大人可愛い' },
-  { style: 'cute', title: 'かわいい' },
-  { style: 'cool', title: 'かっこいい' },
+  { style: 'stylish', title: 'スタイリッシュ' },
+  { style: 'cute', title: 'キュート' },
+  { style: 'cool', title: 'クール' },
+  { style: 'adult', title: '大人' },
 ] as const;
 
 export function ThemePicker() {
@@ -112,7 +111,7 @@ export function ThemePicker() {
   );
 }
 
-/** プリセットの見本:背景の上にカード、文字・強調・サブを小さく並べる。 */
+/** プリセットの見本:背景の上にカード、文字・強調のボタン・サブの印を小さく並べる。 */
 function PresetButton({
   preset,
   selected,
@@ -123,7 +122,11 @@ function PresetButton({
   onChoose: () => void;
 }) {
   const { plane, surface, ink, accent } = preset.colors;
-  const hues = themeHues(preset.colors);
+  const accentText = preset.colors.accentText ?? accent;
+  const onAccent = preset.colors.onAccent ?? surface;
+  const sub = preset.colors.sub ?? accent;
+  const subLine = preset.colors.subLine ?? sub;
+  const inkSub = preset.colors.inkSub ?? ink;
   return (
     <button
       type="button"
@@ -133,7 +136,7 @@ function PresetButton({
       className="glass min-h-11 w-full overflow-hidden rounded-2xl text-left"
       style={{
         background: plane,
-        boxShadow: selected ? `0 0 0 3px ${accent}` : 'var(--card-shadow)',
+        boxShadow: selected ? `0 0 0 3px ${accentText}` : 'var(--card-shadow)',
       }}
     >
       <span className="block p-3">
@@ -145,10 +148,17 @@ function PresetButton({
           <span className="text-base font-semibold" style={{ color: ink }}>
             Aa
           </span>
-          <span className="flex items-center gap-1">
-            {hues.map((hue) => (
-              <span key={hue} className="size-3 rounded-full" style={{ background: hue }} />
-            ))}
+          <span className="flex items-center gap-2">
+            <span
+              className="size-3 rounded-full"
+              style={{ background: sub, boxShadow: `inset 0 0 0 1.5px ${subLine}` }}
+            />
+            <span
+              className="rounded-full px-2 py-1 text-xs font-semibold"
+              style={{ background: accent, color: onAccent }}
+            >
+              記録
+            </span>
           </span>
         </span>
         <span className="mt-2 flex items-center gap-1">
@@ -156,12 +166,12 @@ function PresetButton({
             {preset.label}
           </span>
           {selected ? (
-            <span className="text-xs font-semibold" style={{ color: accent }}>
+            <span className="text-xs font-semibold" style={{ color: accentText }}>
               選択中
             </span>
           ) : null}
         </span>
-        <span className="mt-1 block text-xs leading-snug" style={{ color: ink }}>
+        <span className="mt-1 block text-xs leading-snug" style={{ color: inkSub }}>
           {preset.note}
         </span>
       </span>

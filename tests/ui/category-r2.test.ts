@@ -149,6 +149,7 @@ describe('R2 画面の初期表示は「累計」', () => {
       monthStart: '2026-09-01',
       today: TODAY,
       isCurrentMonth: true,
+      isGoalPeriod: false,
       range: { from: '2026-09-01', to: '2026-09-30' },
       windowFrom: '2026-03-01',
       transactions: txs,

@@ -87,10 +87,18 @@ export function CategoryHeader({
     return () => io.disconnect();
   }, []);
 
+  // 月を選んだら月で見る(今月は目標期間が既定なので、月で見ると明示する)。
   const go = (target: string) => {
     hapticFor('tabChange');
-    startTransition(() => router.replace(monthHref(genreKey, target) as Route, { scroll: false }));
+    const href = goalPeriod
+      ? `${monthHref(genreKey, target)}&period=month`
+      : monthHref(genreKey, target);
+    startTransition(() => router.replace(href as Route, { scroll: false }));
   };
+  const periodLabel =
+    isGoalPeriod && goalPeriod
+      ? `目標期間 ${shortDate(goalPeriod.from)}〜${shortDate(goalPeriod.to)}`
+      : monthLabel;
 
   return (
     <>
@@ -174,12 +182,12 @@ export function CategoryHeader({
             type="button"
             aria-haspopup="dialog"
             aria-expanded={menuOpen}
-            aria-label={`期間、${monthLabel}。タップで期間を選ぶ`}
+            aria-label={`期間、${periodLabel}。タップで期間を選ぶ`}
             onClick={() => setMenuOpen(true)}
             className="tabular inline-flex min-h-11 items-center gap-1 text-sm font-semibold whitespace-nowrap"
             style={{ color: 'var(--ink-secondary)', opacity: pending ? 0.5 : 1 }}
           >
-            <span aria-live="polite">{isGoalPeriod ? '目標期間' : monthLabel}</span>
+            <span aria-live="polite">{periodLabel}</span>
             <span aria-hidden>▾</span>
           </button>
           {goalPeriod ? (
@@ -187,9 +195,10 @@ export function CategoryHeader({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                // 今月は目標期間で開くのが既定。月で見るときだけ period=month を付ける。
                 const href = isGoalPeriod
-                  ? monthHref(genreKey, monthStart.slice(0, 7))
-                  : `${monthHref(genreKey, monthStart.slice(0, 7))}?period=${goalPeriod.from}_${goalPeriod.to}`;
+                  ? `${monthHref(genreKey, todayMonthKey)}&period=month`
+                  : monthHref(genreKey, todayMonthKey);
                 startTransition(() => router.replace(href as Route, { scroll: false }));
               }}
               className="min-h-11 text-xs font-semibold"
@@ -212,20 +221,25 @@ export function CategoryHeader({
               key={m.key}
               type="button"
               role="option"
-              aria-selected={m.key === monthKey}
+              aria-selected={!isGoalPeriod && m.key === monthKey}
               onClick={() => {
                 setMenuOpen(false);
-                if (m.key !== monthKey) go(m.key);
+                if (m.key !== monthKey || isGoalPeriod) go(m.key);
               }}
               className="flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-base font-semibold"
               style={{ color: 'var(--ink)' }}
             >
               <span className="tabular">{m.label}</span>
-              {m.key === monthKey ? <span aria-hidden>✓</span> : null}
+              {!isGoalPeriod && m.key === monthKey ? <span aria-hidden>✓</span> : null}
             </button>
           ))}
         </div>
       </BottomSheet>
     </>
   );
+}
+
+/** 2026-10-05 → 10/5 */
+function shortDate(date: string): string {
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 }

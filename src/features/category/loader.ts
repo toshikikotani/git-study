@@ -39,7 +39,9 @@ export type CategoryDetailData = {
   monthStart: string;
   today: string;
   isCurrentMonth: boolean;
-  /** 選んだ月の範囲(月末まで。今日より先は予定)。 */
+  /** 表示している期間が目標期間か(目標の期間中は、今月を開くと目標期間で見せる)。 */
+  isGoalPeriod: boolean;
+  /** 表示している期間(月、または目標期間。今日より先は予定)。 */
   range: LedgerRange;
   /** 読み込んだ範囲(履歴を含む)。 */
   windowFrom: string;
@@ -77,25 +79,50 @@ export function parseMonthKey(value: string | undefined, today: string): string 
   return today.slice(0, 7);
 }
 
+/**
+ * 表示する期間。今月を開いて目標の期間中なら目標期間(「月に切替」で period='month' のときは月)。
+ * ほかの月は、その月。
+ */
+export function pickCategoryRange(input: {
+  monthKey: string;
+  today: string;
+  goalRange: { from: string; to: string } | null;
+  period?: 'goal' | 'month' | undefined;
+}): { range: LedgerRange; isGoalPeriod: boolean } {
+  const { monthKey, today, goalRange } = input;
+  if (goalRange !== null && monthKey === today.slice(0, 7) && input.period !== 'month') {
+    return { range: goalRange, isGoalPeriod: true };
+  }
+  return { range: monthRange(monthKey), isGoalPeriod: false };
+}
+
 export async function loadCategoryDetail(input: {
   genreKey: string;
   month?: string | undefined;
   now?: Date;
-  /** 目標期間で表示する場合の期間。 */
-  goalPeriod?: { from: string; to: string };
+  /**
+   * 表示する期間。省くと、今月で目標の期間中なら目標期間、それ以外は月。
+   * 'month' は目標の期間中でも月で見る(「月に切替」)。
+   */
+  period?: 'goal' | 'month';
 }): Promise<CategoryDetailData | null> {
   const now = input.now ?? new Date();
   const today = todayJst(now);
   const monthKey = parseMonthKey(input.month, today);
   const monthStart = `${monthKey}-01`;
-  const range = input.goalPeriod ?? monthRange(monthKey);
+  const goalLoaded = await loadGoalView(now).catch(() => null);
+  const { range, isGoalPeriod } = pickCategoryRange({
+    monthKey,
+    today,
+    goalRange: goalLoaded?.view.active ? goalLoaded.view.range : null,
+    period: input.period,
+  });
   const windowFrom = nthDayOfMonth(addMonths(monthStart, -HISTORY_MONTHS), 1);
 
   const genreId = genreIdOfKey(input.genreKey);
-  const [loaded, accounts, goalLoaded, genres, remaining] = await Promise.all([
+  const [loaded, accounts, genres, remaining] = await Promise.all([
     loadLedgerTransactions({ from: windowFrom, to: range.to }, today),
     listAccounts(),
-    loadGoalView(now).catch(() => null),
     listGenres().catch(() => []),
     // グラフの予測の線は、レポートと同じ確率予測から描く(日平均の延長はしない)。
     monthKey === today.slice(0, 7) && genreId !== null
@@ -137,6 +164,7 @@ export async function loadCategoryDetail(input: {
     monthStart,
     today,
     isCurrentMonth: monthKey === today.slice(0, 7),
+    isGoalPeriod,
     range,
     windowFrom,
     transactions: withThumbs.map((t) => ({ ...t, items: items.get(t.id) ?? [] })),
