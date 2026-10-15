@@ -96,3 +96,34 @@ export function landingRowsFrom(input: {
     .slice(0, input.limit ?? Number.MAX_SAFE_INTEGER);
   return rows.map(({ row }) => row);
 }
+
+export type LandingRowGroups = {
+  /** 使った額(決まっている額)だけで、もう予算を超えた。 */
+  over: LandingRow[];
+  /** 見込み(中央)が予算を超えそう。 */
+  likely: LandingRow[];
+  /** 予算内に収まりそう。 */
+  within: LandingRow[];
+  /** 予算のないカテゴリ。 */
+  noBudget: LandingRow[];
+};
+
+/**
+ * 予算の画面のカテゴリ一覧の分け方:超えた → 超えそう → 予算内 → 予算なし。
+ * それぞれ、予算を超える額(超えそうな額)の大きい順。予算内・予算なしは見込みの大きい順。
+ */
+export function groupLandingRows(rows: readonly LandingRow[]): LandingRowGroups {
+  const groups: LandingRowGroups = { over: [], likely: [], within: [], noBudget: [] };
+  for (const row of rows) {
+    if (row.targetYen === null) groups.noBudget.push(row);
+    else if (row.baseYen > row.targetYen) groups.over.push(row);
+    else if (row.p50 > row.targetYen) groups.likely.push(row);
+    else groups.within.push(row);
+  }
+  const overshoot = (r: LandingRow, yen: number) => yen - (r.targetYen ?? 0);
+  groups.over.sort((a, b) => overshoot(b, b.baseYen) - overshoot(a, a.baseYen));
+  groups.likely.sort((a, b) => overshoot(b, b.p50) - overshoot(a, a.p50));
+  groups.within.sort((a, b) => b.p50 - a.p50);
+  groups.noBudget.sort((a, b) => b.p50 - a.p50);
+  return groups;
+}

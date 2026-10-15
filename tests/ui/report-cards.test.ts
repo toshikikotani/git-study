@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { InsightsList } from '../../app/(app)/reports/insights-card';
-import { LandingRangesCard } from '../../app/(app)/reports/landing-ranges-card';
+import { BudgetCategoryGroups } from '../../app/(app)/plan/category-groups';
 import { VerificationCard } from '../../app/(app)/reports/verification-card';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '');
@@ -17,132 +17,90 @@ describe('レポートの着地まわりのカード', () => {
     cutPerWeekYen: null,
   };
 
-  it('変えられる支出:範囲・目標・超える見込みを文字でも出し、注意は形と文字で', () => {
+  const row = (over: Record<string, unknown>) => ({
+    ...base,
+    genreId: 'dining',
+    name: '外食',
+    baseYen: 22752,
+    p10: 35000,
+    p50: 45000,
+    p90: 63000,
+    targetYen: 42500,
+    exceedance: 0.7,
+    status: 'forecast' as const,
+    ...over,
+  });
+
+  it('予算のカテゴリ:超えた → 超えそう → 予算内(畳む)の順に、見込み / 予算と80%の幅を出す', () => {
     const html = visible(
       renderToString(
-        h(LandingRangesCard, {
-          periodLabel: '今月',
+        h(BudgetCategoryGroups, {
+          monthKey: '2026-10',
           rows: [
-            {
-              ...base,
-              genreId: 'dining',
-              name: '外食',
-              baseYen: 12000,
-              p10: 33000,
-              p50: 50000,
-              p90: 80000,
-              targetYen: 42000,
-              exceedance: 0.7,
-              status: 'forecast',
-              caution: {
-                categoryId: 'dining',
-                kind: 'likely',
-                overshootYen: 8800,
-                probability: 0.7,
-              },
-              cutPerWeekYen: 6200,
-            },
+            row({}),
+            row({
+              genreId: 'daily',
+              name: '日用品',
+              baseYen: 1878,
+              p10: 2200,
+              p50: 5500,
+              p90: 25000,
+              targetYen: 916,
+            }),
+            row({
+              genreId: 'liquor',
+              name: '酒',
+              baseYen: 1175,
+              p10: 1400,
+              p50: 2400,
+              p90: 5000,
+              targetYen: 2600,
+            }),
           ],
         }),
       ),
     );
-    // デザインの「見通し」のジャンル別(ADR-085):見込み / 目標、超える確率と1行の提案。
-    expect(html).toContain('カテゴリ別');
-    expect(html).toContain('約5.0万円');
-    expect(html).toContain('/ 目標 4.2万円');
-    expect(html).toContain('70%の確率で 目標を超えます · 週1回へらすと約6,200円減');
-    expect(html).toContain('変えられる支出');
-    expect(html).not.toContain('決まった支出');
-    // 読み上げ(3.10)。
-    expect(html).toContain(
-      'aria-label="外食、月末の見込み約5.0万円、10回中8回は3.3万〜8.0万円、目標4.2万円を超える見込み 10回中7回"',
-    );
-    // 行を開くと「なぜ」。
-    expect(html).toContain('<details');
-    expect(html).toContain('この先の見込み(中央)');
-    expect(html).toContain('>目標<');
-    expect(html).toContain('塗った帯は使った額');
+    expect(html).toContain('カテゴリ');
+    expect(html.indexOf('超えた')).toBeLessThan(html.indexOf('超えそう'));
+    expect(html.indexOf('超えそう')).toBeLessThan(html.indexOf('予算内'));
+    expect(html).toContain('約4.5万円');
+    expect(html).toContain('/ 42,500円');
+    expect(html).toContain('使った額 22,752円 · 80%の確率で 3.5万〜6.3万円');
+    // 予算内は畳んで、名前だけ先に見せる
+    expect(html).toMatch(/<details[^>]*>.*予算内.*酒.*表示/s);
+    // 行を押すと、そのカテゴリの詳細へ
+    expect(html).toContain('href="/spending/category/dining?month=2026-10"');
+    expect(html).toContain('aria-label="外食、見込み約4.5万円、予算42,500円。');
   });
 
-  it('決まった支出は1行に畳み、見込みの無いカテゴリは言葉で出す', () => {
+  it('予測を止めた・確定したカテゴリは、言葉で出す', () => {
     const html = visible(
       renderToString(
-        h(LandingRangesCard, {
-          periodLabel: '今月',
+        h(BudgetCategoryGroups, {
+          monthKey: '2026-10',
           rows: [
-            {
-              ...base,
-              genreId: 'hobby',
-              name: '娯楽・趣味',
-              baseYen: 36940,
-              p10: 36940,
-              p50: 36940,
-              p90: 36940,
-              targetYen: 42940,
-              exceedance: 0,
-              excludedYen: 3000,
-              status: 'settled',
-              group: 'fixed',
-            },
-            {
-              ...base,
+            row({ genreId: 'hobby', name: '娯楽・趣味', status: 'closed', p50: 33940, p90: 33940 }),
+            row({
               genreId: 'tax',
-              name: '保険・税金・手数料',
+              name: '税金',
+              status: 'settled',
               baseYen: 32000,
               p10: 32000,
               p50: 32000,
               p90: 32000,
-              targetYen: 30000,
-              exceedance: 1,
-              status: 'closed',
-              type: 'fixed',
-              group: 'fixed',
-              caution: { categoryId: 'tax', kind: 'over', overshootYen: 2000, probability: 1 },
-            },
-          ],
-        }),
-      ),
-    );
-    expect(html).toContain('保険・税金・手数料');
-    expect(html).toContain('確定(この先の見込みなし)');
-    expect(html).toContain('うち 3,000円 は特別費だった記録(今は目標に含む)');
-    expect(html).toContain('予測を止めています');
-    // 赤は、決まっている額だけで超えたときだけ(形と文字も付ける)。
-    expect(html).toContain('決まっている額だけで、目標を2,000円超えています');
-    expect(html).toContain('var(--state-over)');
-    expect(html).not.toContain('36,940円〜36,940円');
-  });
-
-  it('「これ以上は使わない」のカテゴリは、守れたら・いつもの守り方なら の2つを出す(設計書 v3 4.7)', () => {
-    const html = visible(
-      renderToString(
-        h(LandingRangesCard, {
-          periodLabel: '今月',
-          rows: [
-            {
-              ...base,
-              genreId: 'hobby',
-              name: '娯楽・趣味',
-              baseYen: 33940,
-              p10: 33940,
-              p50: 36000,
-              p90: 40000,
               targetYen: null,
-              exceedance: null,
-              status: 'closed',
-              type: 'fixed',
-              group: 'fixed',
-            },
+            }),
           ],
         }),
       ),
     );
     expect(html).toContain('予測を止めています');
-    expect(html).toContain('守れたら 33,940円、いつもの守り方なら 約3.6万円');
+    expect(html).toContain('確定(この先の見込みなし)');
+    expect(html).toContain('予算なし');
   });
 
   it('行が無ければ何も出さない', () => {
-    expect(renderToString(h(LandingRangesCard, { periodLabel: '今月', rows: [] }))).toBe('');
+    expect(renderToString(h(BudgetCategoryGroups, { monthKey: '2026-10', rows: [] }))).toBe('');
   });
 
   it('検証カード:検証できたときは的中率と補正を、できないときは理由を出す', () => {

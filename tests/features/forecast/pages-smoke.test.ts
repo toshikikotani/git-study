@@ -123,27 +123,36 @@ async function render(
 }
 
 describe('主要ページがサーバー描画でエラーにならない(Supabase を代用)', () => {
-  it('レポート', async () => {
+  it('レポート(振り返り)', async () => {
     const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('着地');
-    // どの範囲の数字かを、画面の上に名前で出す。目標があれば「ぜんぶ」へ切り替えられる。
-    expect(html).toContain('見通し');
-    expect(html).toContain('今月(すべての支出)');
+    expect(html).toContain('レポート');
+    // 着地の見込みは「予算」へ移した(ADR-088)。
+    expect(html).toContain('href="/plan"');
   }, 60000);
 
-  it('レポート(全部)', async () => {
-    const html = (
-      await render(() => import('../../../app/(app)/reports/page'), { scope: 'all' })
-    ).replace(/<!-- -->/g, '');
-    expect(html).toContain('見通し');
+  it('予算(目標と見通しを1つに)', async () => {
+    const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
+      /<!-- -->/g,
+      '',
+    );
+    expect(html).toContain('予算');
+    expect(html).toContain('href="/plan/edit"');
+    // 着地の見込み → カテゴリ → なぜ → AIの分析 の順
+    expect(html).toContain('カテゴリごとの見込み');
+    expect(html.indexOf('カテゴリごとの見込み')).toBeLessThan(html.indexOf('AIの分析'));
   }, 60000);
 
-  it('目標', async () => {
-    const html = await render(() => import('../../../app/(app)/plan/page'));
-    expect(html.length).toBeGreaterThan(100);
+  it('予算を編集', async () => {
+    const html = (await render(() => import('../../../app/(app)/plan/edit/page'))).replace(
+      /<!-- -->/g,
+      '',
+    );
+    expect(html).toContain('予算を編集');
+    expect(html).toContain('期間と金額');
+    expect(html).toContain('予算のないカテゴリ');
   }, 60000);
 
   const planRow = () => tables.spending_plans![0]!;
@@ -183,16 +192,19 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     ],
   ];
   for (const [name, apply] of variants) {
-    it(`目標:${name}`, async () => {
+    it(`予算:${name}`, async () => {
       planRow().period_start = original.start;
       planRow().period_end = original.end;
       apply();
-      const html = await render(() => import('../../../app/(app)/plan/page'));
-      expect(html).toContain('今の目標');
+      const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
+        /<!-- -->/g,
+        '',
+      );
+      expect(html).toMatch(/カテゴリごとの見込み|から始まります|新しい目標を立てる|次の目標を予約/);
     }, 60000);
   }
 
-  it('目標:明細の読み込みが失敗しても、ページは落ちず、原因を見せる', async () => {
+  it('予算:明細の読み込みが失敗しても、ページは落ちず、原因を見せる', async () => {
     planRow().period_start = original.start;
     planRow().period_end = original.end;
     failures.transactions = {
@@ -204,9 +216,9 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
         /<!-- -->/g,
         '',
       );
-      expect(html).toContain('今の目標を読み込めませんでした');
+      expect(html).toContain('予算の見込みを読み込めませんでした');
       expect(html).toContain('statement timeout');
-      expect(html).toMatch(/新しい目標を立てる|次の目標を予約/);
+      expect(html).toContain('href="/plan/edit"');
     } finally {
       delete failures.transactions;
     }

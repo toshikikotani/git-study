@@ -41,10 +41,7 @@ import { LedgerList } from '../../app/(app)/spending/ledger-list';
 import { SpendingMonthProvider } from '../../app/(app)/spending/spending-month-provider';
 import { SummaryCard } from '../../app/(app)/spending/summary-card';
 import { CaptureEntry } from '../../app/(app)/transactions/receipt/[id]/capture-entry';
-import { GoalCard } from '../../app/(app)/plan/goal-card';
-import { buildGoalCard } from '@/features/goals/card';
-import { buildGoalView } from '@/features/goals/view';
-import { buildLedgerViews, toLedgerEntries } from '@/features/spending/views';
+import { buildLedgerViews } from '@/features/spending/views';
 import type { CaptureView } from '@/features/receipt-captures/types';
 import { ledgerTx } from '../helpers/ledger';
 
@@ -135,30 +132,6 @@ describe('F7 入力待ち(受け入れ基準13)', () => {
     // 合計の表示は同じ。入力待ちの金額は0円(まだ金額が無い)
     expect(views.totals.spentYen).toBe(3000);
     expect(without).not.toContain('入力待ち');
-  });
-
-  it('目標カードにも「入力待ちのレシート n件(目標に未反映)」が出る', () => {
-    const goalTxs = [
-      ledgerTx({ id: 't', occurredOn: '2026-09-29', genreId: 'dining', amountYen: -636 }),
-    ];
-    const view = buildGoalView({
-      plan: {
-        id: 'p',
-        periodStart: '2026-09-29',
-        periodEnd: '2026-10-06',
-        items: [{ genreId: 'dining', genreName: '外食', targetYen: 20000 }],
-      },
-      entries: toLedgerEntries(goalTxs),
-      genreNames: new Map([['dining', '外食']]),
-      today: '2026-09-29',
-      transactions: goalTxs,
-    });
-    const html = visible(
-      renderToString(
-        h(GoalCard, { model: buildGoalCard(view, '2026-09-29', { pendingCount: 2 }) }),
-      ),
-    );
-    expect(html).toContain('入力待ちのレシート 2件(目標に未反映)');
   });
 });
 
