@@ -210,15 +210,17 @@ function Donut<T extends { key: string; name: string; spentYen: number }>({
   colorOf: (row: T) => string;
   grow: boolean;
 }) {
-  let offset = 0;
   const segments = rows
     .filter((r) => r.spentYen > 0)
-    .map((r) => {
-      const dash = (r.spentYen / Math.max(total, 1)) * CIRCUMFERENCE;
-      const seg = { row: r, dash, offset };
-      offset += dash;
-      return seg;
-    });
+    .reduce<{ row: T; dash: number; offset: number }[]>((acc, r) => {
+      const prev = acc.at(-1);
+      acc.push({
+        row: r,
+        dash: (r.spentYen / Math.max(total, 1)) * CIRCUMFERENCE,
+        offset: prev ? prev.offset + prev.dash : 0,
+      });
+      return acc;
+    }, []);
   return (
     <div className="flex justify-center">
       <div className="relative" style={{ width: SIZE, height: SIZE }}>
