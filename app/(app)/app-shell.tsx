@@ -17,7 +17,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
-import { GoalIcon, LedgerIcon, OutlookIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
+import { BudgetIcon, LedgerIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
@@ -36,13 +36,12 @@ import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
-// デザインのボトムナビ(ADR-085):今日・見通し・家計簿・目標と、右に記録する(＋)。
+// デザインのボトムナビ:今日・予算・家計簿と、右に記録する(＋)。目標と見通しは「予算」1つに(ADR-088)。
 // アイコンの下に名前(色だけで選択中を示さない)。給料日と「その他」はホームの右上へ。
 const NAV = [
   { href: '/', label: '今日', Icon: TodayIcon },
-  { href: '/reports', label: '見通し', Icon: OutlookIcon },
+  { href: '/plan', label: '予算', Icon: BudgetIcon },
   { href: '/spending', label: '家計簿', Icon: LedgerIcon },
-  { href: '/plan', label: '目標', Icon: GoalIcon },
 ] as const;
 
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */

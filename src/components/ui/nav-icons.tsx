@@ -23,25 +23,6 @@ export function TodayIcon({ size = 22 }: IconProps) {
   );
 }
 
-export function OutlookIcon({ size = 22 }: IconProps) {
-  return (
-    <svg
-      aria-hidden
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 19l5-6 4 3 4-7 5 4" />
-      <path d="M16 9l5-4" strokeDasharray="2 2.5" />
-    </svg>
-  );
-}
-
 export function LedgerIcon({ size = 22 }: IconProps) {
   return (
     <svg
@@ -57,24 +38,6 @@ export function LedgerIcon({ size = 22 }: IconProps) {
     >
       <rect x="4" y="3" width="16" height="18" rx="3" />
       <path d="M8 8h8M8 12h8M8 16h5" />
-    </svg>
-  );
-}
-
-export function GoalIcon({ size = 22 }: IconProps) {
-  return (
-    <svg
-      aria-hidden
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-    >
-      <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="4.5" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" />
     </svg>
   );
 }
@@ -110,6 +73,26 @@ export function ChevronRightIcon({ size = 14 }: IconProps) {
       strokeLinejoin="round"
     >
       <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+/** 予算(目標と見通しを1つに):円と、期間の進み具合の針。 */
+export function BudgetIcon({ size = 22 }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 3.5V12l6 6" />
     </svg>
   );
 }
