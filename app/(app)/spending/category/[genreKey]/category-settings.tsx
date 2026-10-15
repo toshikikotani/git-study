@@ -7,7 +7,6 @@ import { MdCheck } from 'react-icons/md';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { GenreBadge, ICONS } from '@/components/ui/genre-badge';
 import { useGenreOverride, useGenreOverrides } from '@/components/ui/genre-style-context';
-import { Yen } from '@/components/ui/money';
 import {
   ICON_LABELS,
   SELECTABLE_ICONS,
