@@ -24,11 +24,11 @@ export default async function CategoryPage({
   const periodStr = Array.isArray(period) ? period[0] : period;
   const goalPeriod = periodStr?.includes('_')
     ? { from: periodStr.split('_')[0]!, to: periodStr.split('_')[1]! }
-    : undefined;
+    : null;
   const data = await loadCategoryDetail({
     genreKey,
     month: Array.isArray(month) ? month[0] : month,
-    goalPeriod,
+    ...(goalPeriod !== null ? { goalPeriod } : {}),
   });
   if (data === null) notFound();
   // 「もし、へらしたら」は今月のジャンルだけ(予測を止めたジャンル・未分類は出さない)。
