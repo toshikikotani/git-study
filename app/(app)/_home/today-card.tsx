@@ -313,9 +313,18 @@ function DistributionChart({
   const chartH = height - padding.top - padding.bottom;
 
   const sigma = (p90 - p10) / 2.56;
-  const mean = p50;
-  const min = mean - 3 * sigma;
-  const max = mean + 3 * sigma;
+  // 予算以下の面積が actualProb になるように平均をずらす
+  const erfInv = (x: number) => {
+    const a = 0.147;
+    const ln = Math.log(1 - x * x);
+    const t1 = 2 / (Math.PI * a) + ln / 2;
+    const t2 = ln / a;
+    return Math.sign(x) * Math.sqrt(Math.sqrt(t1 * t1 - t2) - t1);
+  };
+  const z = erfInv(2 * actualProb - 1);
+  const mean = budget - z * sigma * Math.SQRT2;
+  const min = Math.min(mean - 3 * sigma, budget - sigma);
+  const max = Math.max(mean + 3 * sigma, budget + sigma);
 
   const points = 60;
   const path: string[] = [];
