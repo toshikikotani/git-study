@@ -22,19 +22,20 @@ export default async function CategoryPage({
   const { genreKey } = await params;
   const { month, period } = await searchParams;
   const periodStr = Array.isArray(period) ? period[0] : period;
-  const goalPeriod = periodStr?.includes('_')
-    ? { from: periodStr.split('_')[0]!, to: periodStr.split('_')[1]! }
-    : null;
   const data = await loadCategoryDetail({
     genreKey,
     month: Array.isArray(month) ? month[0] : month,
-    ...(goalPeriod !== null ? { goalPeriod } : {}),
+    ...(periodStr === 'month' || periodStr === 'goal' ? { period: periodStr } : {}),
   });
   if (data === null) notFound();
-  // 「もし、へらしたら」は今月のジャンルだけ(予測を止めたジャンル・未分類は出さない)。
+  // 「もし、へらしたら」は目標の期間中だけ(目標のあるカテゴリ。予測を止めたものと未分類は出さない)。
   const genreId = genreIdOfKey(genreKey);
   const whatIf =
-    data.isCurrentMonth && genreId !== null && !data.forecastClosed ? (
+    data.isCurrentMonth &&
+    data.goal?.active &&
+    data.goal.row?.targetYen != null &&
+    genreId !== null &&
+    !data.forecastClosed ? (
       <Suspense fallback={null}>
         <WhatIfSection
           genreId={genreId}

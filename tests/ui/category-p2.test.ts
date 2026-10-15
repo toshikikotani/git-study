@@ -16,7 +16,7 @@ import { CategoryHeader } from '../../app/(app)/spending/category/[genreKey]/cat
 import { GenreBreakdown } from '../../app/(app)/spending/genre-breakdown';
 import { SpendingMonthProvider } from '../../app/(app)/spending/spending-month-provider';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
-import { parseMonthKey } from '@/features/category/loader';
+import { parseMonthKey, pickCategoryRange } from '@/features/category/loader';
 import {
   EDGE_BACK_PX,
   categoryHref,
@@ -102,6 +102,50 @@ describe('P2 遷移の入り口(受け入れ基準1)', () => {
     expect(parseMonthKey('bogus', '2026-09-29')).toBe('2026-09');
     expect(parseMonthKey(undefined, '2026-09-29')).toBe('2026-09');
     expect(parseMonthKey('2026-13', '2026-09-29')).toBe('2026-09');
+  });
+});
+
+describe('表示する期間(目標の期間中は目標期間が既定)', () => {
+  const goalRange = { from: '2026-10-01', to: '2026-11-05' };
+
+  it('今月を開いて目標の期間中なら、目標期間', () => {
+    expect(pickCategoryRange({ monthKey: '2026-10', today: '2026-10-15', goalRange })).toEqual({
+      range: goalRange,
+      isGoalPeriod: true,
+    });
+  });
+
+  it('「月に切替」なら月。ほかの月や、目標が無いときも月', () => {
+    const october = { from: '2026-10-01', to: '2026-10-31' };
+    expect(
+      pickCategoryRange({ monthKey: '2026-10', today: '2026-10-15', goalRange, period: 'month' }),
+    ).toEqual({ range: october, isGoalPeriod: false });
+    expect(
+      pickCategoryRange({ monthKey: '2026-09', today: '2026-10-15', goalRange }).isGoalPeriod,
+    ).toBe(false);
+    expect(
+      pickCategoryRange({ monthKey: '2026-10', today: '2026-10-15', goalRange: null }),
+    ).toEqual({ range: october, isGoalPeriod: false });
+  });
+
+  it('目標期間で見ているときは、見出しに目標の期間を出し、「月に切替」を置く', () => {
+    const html = visible(
+      renderToString(
+        h(CategoryHeader, {
+          genreKey: 'dining',
+          genreName: '外食',
+          monthStart: '2026-10-01',
+          isCurrentMonth: true,
+          todayMonthKey: '2026-10',
+          totalYen: 13870,
+          goalPeriod: goalRange,
+          isGoalPeriod: true,
+          onBack: () => {},
+        }),
+      ),
+    );
+    expect(html).toContain('目標期間 10/1〜11/5');
+    expect(html).toContain('月に切替');
   });
 });
 

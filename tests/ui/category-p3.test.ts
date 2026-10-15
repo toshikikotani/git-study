@@ -31,6 +31,7 @@ const base: CategoryDetailData = {
   monthStart: '2026-09-01',
   today: '2026-09-29',
   isCurrentMonth: true,
+  isGoalPeriod: false,
   range: { from: '2026-09-01', to: '2026-09-30' },
   windowFrom: '2026-03-01',
   transactions: [
