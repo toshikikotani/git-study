@@ -81,12 +81,14 @@ export async function loadCategoryDetail(input: {
   genreKey: string;
   month?: string | undefined;
   now?: Date;
+  /** 目標期間で表示する場合の期間。 */
+  goalPeriod?: { from: string; to: string };
 }): Promise<CategoryDetailData | null> {
   const now = input.now ?? new Date();
   const today = todayJst(now);
   const monthKey = parseMonthKey(input.month, today);
   const monthStart = `${monthKey}-01`;
-  const range = monthRange(monthKey);
+  const range = input.goalPeriod ?? monthRange(monthKey);
   const windowFrom = nthDayOfMonth(addMonths(monthStart, -HISTORY_MONTHS), 1);
 
   const genreId = genreIdOfKey(input.genreKey);
