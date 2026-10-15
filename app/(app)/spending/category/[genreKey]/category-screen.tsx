@@ -356,6 +356,8 @@ function CategoryScreenInner({
         isCurrentMonth={data.isCurrentMonth}
         todayMonthKey={data.today.slice(0, 7)}
         totalYen={totalYen}
+        goalPeriod={data.goal?.range ?? null}
+        isGoalPeriod={data.range.from !== data.monthStart}
         onBack={() => router.back()}
         menu={
           <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
