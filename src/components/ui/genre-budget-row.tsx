@@ -37,6 +37,7 @@ export function GenreBudgetRow({
   href,
   sharedKey,
   hideName = false,
+  shareRatio = null,
   children,
 }: {
   name: string;
@@ -56,6 +57,8 @@ export function GenreBudgetRow({
   sharedKey?: string;
   /** 名前を見た目では出さない(名前が画面の見出しにあるとき)。読み上げには残す。 */
   hideName?: boolean;
+  /** 全体に占める割合(0〜1)。渡すと金額の右に「31%」と出す。 */
+  shareRatio?: number | null;
   /** 行の下に足す補足(目標画面の一言など)。 */
   children?: React.ReactNode;
 }) {
@@ -110,6 +113,14 @@ export function GenreBudgetRow({
             </span>
           ) : null}
         </span>
+        {shareRatio !== null ? (
+          <span
+            className="tabular w-10 shrink-0 text-right text-xs"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            {Math.round(shareRatio * 100)}%
+          </span>
+        ) : null}
       </div>
       <div
         aria-hidden

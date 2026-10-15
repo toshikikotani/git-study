@@ -38,7 +38,7 @@ export function YearNetBarChart({ trend }: { trend: IncomeExpenseTrend }) {
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          年間の収支(月ごと)
+          月ごとの収支
         </h2>
       </div>
 

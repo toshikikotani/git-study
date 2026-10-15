@@ -116,10 +116,11 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
             className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            <span className="tabular">
-              入力待ち {captures.length}件{'(集計に入っていません'}
-              {hasGoal ? '・目標に未反映' : ''}
-              {')'}
+            <span className="tabular flex flex-col">
+              <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                入力待ちのレシートが{captures.length}件あります
+              </span>
+              <span>入力すると、集計{hasGoal ? 'と予算の見込み' : ''}に入ります</span>
             </span>
             <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
               入力する →

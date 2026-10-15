@@ -42,7 +42,10 @@ export function PeriodSwitcher() {
         >
           {isCurrentMonth ? `${month}月1日〜${todayDay}日` : `${yearPrefix}${month}月`}
         </p>
-        <h1 className="text-xl font-bold tracking-[-0.02em]" style={{ color: 'var(--ink)' }}>
+        <h1
+          className="text-[34px] leading-none font-bold tracking-[-0.03em]"
+          style={{ color: 'var(--ink)' }}
+        >
           家計簿
         </h1>
         {!isCurrentMonth ? (

@@ -23,6 +23,7 @@ import { categoryHref, isEdgeBackSwipe } from '@/lib/category-nav';
 import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
+import { CategoryLandingCard, WeekdayCard } from './category-landing';
 import { CategoryPicker } from './category-picker';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
@@ -383,6 +384,15 @@ function CategoryScreenInner({
           </div>
         }
       />
+
+      {/* デザインの「カテゴリの詳細」:着地の見込み → なぜ(曜日)を上に。下はこれまでの機能。 */}
+      {!isUncategorizedScreen && data.isCurrentMonth ? (
+        <CategoryLandingCard
+          cumulative={cumulative}
+          targetYen={data.isGoalPeriod ? (data.goal?.row?.targetYen ?? null) : null}
+        />
+      ) : null}
+      {!isUncategorizedScreen ? <WeekdayCard lines={lines} genreName={data.genreName} /> : null}
 
       {isUncategorizedScreen ? <UncategorizedMonths lines={historyLines} /> : null}
 

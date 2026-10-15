@@ -13,7 +13,7 @@ import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
 import { useSpendingMonth } from './spending-month-provider';
 
 /**
- * ジャンル内訳(積み上げバー + 一覧)。既存の「明細サマリーカード」は廃止し、
+ * カテゴリ別(デザインの「家計簿」:ドーナツ + 一覧、上位5つと「ほかNカテゴリ」)。既存の「明細サマリーカード」は廃止し、
  * 内訳はここ1つに統一した。数字は domain/ledger.ts の集計(ヘッダーと同じ値)。
  * 行をタップすると、明細リストがそのジャンルに絞り込まれる(もう一度で解除)。
  *
@@ -66,6 +66,32 @@ export function GenreBreakdown({
 
   const total = rows.reduce((a, r) => a + r.spentYen, 0);
   const maxYen = Math.max(...rows.map((r) => r.spentYen), 1);
+  const sorted = [...rows].sort((a, b) => b.spentYen - a.spentYen);
+  const top = sorted.slice(0, TOP_COUNT);
+  const rest = sorted.slice(TOP_COUNT);
+  const restYen = rest.reduce((a, r) => a + r.spentYen, 0);
+  const monthNumber = Number(visibleMonth.slice(5, 7));
+
+  const row = (r: (typeof rows)[number]) => {
+    const selected =
+      filter.genreId === (r.genreId === null ? 'none' : r.genreId) && filter.genreId !== null;
+    return (
+      <li key={r.key}>
+        <GenreBudgetRow
+          name={r.name}
+          spentYen={r.spentYen}
+          budgetYen={r.budgetYen}
+          idealYen={r.idealYen}
+          scheduledYen={r.scheduledYen}
+          maxYen={maxYen}
+          selected={selected}
+          href={categoryHref(r.key, visibleMonth)}
+          sharedKey={r.key}
+          shareRatio={total > 0 ? r.spentYen / total : null}
+        />
+      </li>
+    );
+  };
 
   return (
     <section aria-label="カテゴリ別の内訳" className="space-y-3">
@@ -122,50 +148,37 @@ export function GenreBreakdown({
           </p>
         ) : (
           <>
-            <div
-              role="img"
-              aria-label={`内訳:${rows
-                .map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`)
-                .join('、')}`}
-              className={`flex h-3 w-full overflow-hidden rounded-full ${justSaved ? 'bar-grow' : ''}`}
-              style={{ background: 'var(--state-none-track)' }}
-            >
-              {rows.map((r) => (
-                <span
-                  key={r.key}
-                  style={{
-                    width: `${(r.spentYen / Math.max(total, 1)) * 100}%`,
-                    background: genreBarColor(
-                      r.genreId === null ? null : r.name,
-                      r.genreId === null ? null : overrides[r.name],
-                    ),
-                  }}
-                />
-              ))}
-            </div>
+            <Donut
+              rows={sorted}
+              total={total}
+              label={`${monthNumber}月の支出`}
+              colorOf={(r) =>
+                genreBarColor(
+                  r.genreId === null ? null : r.name,
+                  r.genreId === null ? null : overrides[r.name],
+                )
+              }
+              grow={justSaved}
+            />
 
-            <ul className="mt-2 space-y-1">
-              {rows.map((r) => {
-                const selected =
-                  filter.genreId === (r.genreId === null ? 'none' : r.genreId) &&
-                  filter.genreId !== null;
-                return (
-                  <li key={r.key}>
-                    <GenreBudgetRow
-                      name={r.name}
-                      spentYen={r.spentYen}
-                      budgetYen={r.budgetYen}
-                      idealYen={r.idealYen}
-                      scheduledYen={r.scheduledYen}
-                      maxYen={maxYen}
-                      selected={selected}
-                      href={categoryHref(r.key, visibleMonth)}
-                      sharedKey={r.key}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
+            <ul className="mt-3 space-y-1">{top.map(row)}</ul>
+            {rest.length > 0 ? (
+              <details className="mt-1" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <summary
+                  className="tabular flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-2 text-sm"
+                  style={{ color: 'var(--ink)' }}
+                >
+                  <span>ほか{rest.length}カテゴリ</span>
+                  <span className="flex items-center gap-3">
+                    {formatYen(restYen, { sign: 'never' })}
+                    <span className="w-10 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
+                      {total > 0 ? Math.round((restYen / total) * 100) : 0}%
+                    </span>
+                  </span>
+                </summary>
+                <ul className="space-y-1 pb-1">{rest.map(row)}</ul>
+              </details>
+            ) : null}
             <p className="tabular mt-2 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
               合計 {formatYen(total, { sign: 'never' })}
             </p>
@@ -173,5 +186,85 @@ export function GenreBreakdown({
         )}
       </div>
     </section>
+  );
+}
+
+/** 上位の数(残りは「ほかNカテゴリ」に畳む)。 */
+const TOP_COUNT = 5;
+const SIZE = 168;
+const STROKE = 22;
+const RADIUS = (SIZE - STROKE) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+/** ドーナツ(中央に月の支出)。一覧と同じ色・同じ順。 */
+function Donut<T extends { key: string; name: string; spentYen: number }>({
+  rows,
+  total,
+  label,
+  colorOf,
+  grow,
+}: {
+  rows: readonly T[];
+  total: number;
+  label: string;
+  colorOf: (row: T) => string;
+  grow: boolean;
+}) {
+  const segments = rows
+    .filter((r) => r.spentYen > 0)
+    .reduce<{ row: T; dash: number; offset: number }[]>((acc, r) => {
+      const prev = acc.at(-1);
+      acc.push({
+        row: r,
+        dash: (r.spentYen / Math.max(total, 1)) * CIRCUMFERENCE,
+        offset: prev ? prev.offset + prev.dash : 0,
+      });
+      return acc;
+    }, []);
+  return (
+    <div className="flex justify-center">
+      <div className="relative" style={{ width: SIZE, height: SIZE }}>
+        <svg
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          width={SIZE}
+          height={SIZE}
+          role="img"
+          aria-label={`内訳:${rows.map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`).join('、')}`}
+          className={grow ? 'bar-grow' : undefined}
+        >
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            fill="none"
+            stroke="var(--state-none-track)"
+            strokeWidth={STROKE}
+          />
+          <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
+            {segments.map(({ row, dash, offset: o }) => (
+              <circle
+                key={row.key}
+                cx={SIZE / 2}
+                cy={SIZE / 2}
+                r={RADIUS}
+                fill="none"
+                stroke={colorOf(row)}
+                strokeWidth={STROKE}
+                strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
+                strokeDashoffset={-o}
+              />
+            ))}
+          </g>
+        </svg>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            {label}
+          </span>
+          <span className="tabular text-lg font-bold" style={{ color: 'var(--ink)' }}>
+            {formatYen(total, { sign: 'never' })}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }

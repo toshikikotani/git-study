@@ -151,7 +151,7 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
       '',
     );
     expect(html).toContain('予算を編集');
-    expect(html).toContain('期間と金額');
+    expect(html).toContain('総額とカテゴリへの配分');
     expect(html).toContain('予算のないカテゴリ');
   }, 60000);
 

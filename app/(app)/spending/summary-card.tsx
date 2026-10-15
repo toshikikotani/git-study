@@ -165,13 +165,16 @@ function MonthPane({
 
   return (
     <section aria-label="使った額のサマリー" className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div
+        className="glass grid grid-cols-3 gap-2 rounded-[28px] px-5 py-4"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      >
         <Tile label="支出">
           {waiting && error === null ? (
             <span
               role="status"
               aria-label="読み込み中"
-              className="block h-8 w-28 animate-pulse rounded-lg"
+              className="block h-6 w-20 animate-pulse rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
           ) : waiting ? (
@@ -189,11 +192,24 @@ function MonthPane({
             <Link
               href="/transactions/new?type=income"
               prefetch={false}
-              className="inline-flex min-h-11 items-center text-base font-semibold"
+              className="inline-flex min-h-11 items-center text-sm font-semibold"
               style={{ color: 'var(--accent)' }}
             >
               手取りを入れる
             </Link>
+          )}
+        </Tile>
+        <Tile label={isCurrentMonth ? '今日まで' : '収支'}>
+          {waiting || !incomeRegistered ? (
+            '—'
+          ) : (
+            <span
+              style={{
+                color: totals.incomeYen - totals.spentYen >= 0 ? 'var(--income)' : 'var(--ink)',
+              }}
+            >
+              {formatSignedYen(totals.incomeYen - totals.spentYen)}
+            </span>
           )}
         </Tile>
       </div>
@@ -210,6 +226,9 @@ function MonthPane({
         >
           {split && splitTotal > 0 ? (
             <>
+              <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>
+                固定費と変えられる支出
+              </h2>
               <div
                 role="img"
                 aria-label={`固定費 ${formatYen(split.fixedYen, { sign: 'never' })}、変えられる支出 ${formatYen(split.variableYen, { sign: 'never' })}`}
@@ -221,11 +240,11 @@ function MonthPane({
                     background: 'var(--ink)',
                   }}
                 />
-                <span className="flex-1" style={{ background: 'var(--accent)' }} />
+                <span className="flex-1" style={{ background: 'var(--action)' }} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <SplitLegend color="var(--ink)" label="固定費" yen={split.fixedYen} />
-                <SplitLegend color="var(--accent)" label="変えられる支出" yen={split.variableYen} />
+                <SplitLegend color="var(--action)" label="変えられる支出" yen={split.variableYen} />
               </div>
             </>
           ) : null}
@@ -233,9 +252,6 @@ function MonthPane({
             {totals.scheduledYen > 0
               ? `予定 ${formatYen(totals.scheduledYen)} は入っていない。`
               : '予定は入っていない。'}
-            {incomeRegistered
-              ? ` 収入との差は ${formatSignedYen(totals.incomeYen - totals.spentYen)}。`
-              : ''}
           </p>
           {isCurrentMonth ? <PaceLine pace={pace} /> : null}
           {isCurrentMonth && forecast.projectedTotalYen !== null ? (
@@ -249,15 +265,12 @@ function MonthPane({
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div
-      className="glass flex flex-col gap-1 rounded-[22px] p-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-    >
+    <div className="flex min-w-0 flex-col gap-1">
       <span className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </span>
       <span
-        className="tabular text-xl font-bold tracking-[-0.02em]"
+        className="tabular truncate text-base font-bold tracking-[-0.02em]"
         style={{ color: 'var(--ink)' }}
       >
         {children}
