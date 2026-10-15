@@ -91,6 +91,13 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
                 p90: forecast.total.p90,
                 budgetYen: goal.budgetYen,
                 outside,
+                overages: forecast.byCategory
+                  .filter((c) => c.targetYen !== null && c.landing.p50 > c.targetYen)
+                  .map((c) => ({
+                    name: c.categoryName,
+                    overYen: Math.round(c.landing.p50 - (c.targetYen ?? 0)),
+                  }))
+                  .sort((a, b) => b.overYen - a.overYen),
               }
             : null
         }

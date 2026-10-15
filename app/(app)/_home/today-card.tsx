@@ -26,6 +26,8 @@ export type TodayOutlook = {
   budgetYen: number;
   /** 目標に入っていないジャンル(すべての支出の着地)。 */
   outside?: { name: string; p50: number }[];
+  /** カテゴリ別の超過(予算を超える見込みのカテゴリ)。 */
+  overages?: { name: string; overYen: number }[];
 };
 
 export type TodayCardProps = {
@@ -173,6 +175,7 @@ function TodayHero({
  * 1本の帯に、その下に予算を超える確率。
  */
 function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithin: number }) {
+  const [showOverages, setShowOverages] = useState(false);
   const overYen = outlook.p50 - outlook.budgetYen;
   const max = Math.max(outlook.p90, outlook.budgetYen, outlook.spentYen, 1) * 1.02;
   const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / max) * 100))}%`;
@@ -191,7 +194,9 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
         <h2 className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
           {outlook.label}
         </h2>
-        <span
+        <button
+          type="button"
+          onClick={() => outlook.overages && outlook.overages.length > 0 && setShowOverages(true)}
           className="rounded-full px-3 py-1 text-sm font-semibold"
           style={
             overYen > 0
@@ -200,7 +205,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           }
         >
           {overYen > 0 ? `${formatEstimate(overYen)} 超えそう` : '予算内の見込み'}
-        </span>
+        </button>
       </div>
       <p className="tabular flex flex-wrap items-baseline gap-2">
         <span className="text-3xl font-bold tracking-[-0.02em]" style={{ color: 'var(--ink)' }}>
@@ -288,6 +293,41 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           actualProb={probWithin}
         />
       </div>
+      {showOverages && outlook.overages ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setShowOverages(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl p-4"
+            style={{ background: 'var(--surface)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
+              カテゴリ別の超過
+            </h3>
+            <ul className="mt-3 space-y-2">
+              {outlook.overages.map((o, i) => (
+                <li key={i} className="flex justify-between text-sm">
+                  <span style={{ color: 'var(--ink)' }}>{o.name}</span>
+                  <span className="font-semibold" style={{ color: 'var(--state-caution)' }}>
+                    +{o.overYen.toLocaleString()}円
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setShowOverages(false)}
+              className="mt-4 w-full min-h-11 rounded-full text-sm font-semibold"
+              style={{ background: 'var(--plane)', color: 'var(--ink)' }}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
