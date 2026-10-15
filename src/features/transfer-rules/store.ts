@@ -83,7 +83,7 @@ export async function listCategoryOptions(): Promise<CategoryOption[]> {
     .select('id, name')
     .order('sort_order', { ascending: true });
 
-  if (error) throw new TransferRuleStoreError(`ジャンルを取得できませんでした: ${error.message}`);
+  if (error) throw new TransferRuleStoreError(`カテゴリを取得できませんでした: ${error.message}`);
   return data;
 }
 

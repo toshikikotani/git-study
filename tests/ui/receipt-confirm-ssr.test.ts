@@ -58,7 +58,7 @@ describe('レシート確認画面(サーバー描画のスモークテスト)',
     const html = render(1500, null);
     expect(html).toContain('撮影したレシート');
     expect(html).toContain('一致しています');
-    expect(html).toContain('カフェ・飲料'); // ジャンルのチップ
+    expect(html).toContain('カフェ・飲料'); // カテゴリのチップ
     expect(html).toContain('underline'); // 低信頼(店名 0.4・品目 0.5)の黄色の下線
     expect(html).toContain('標準税率 10%');
     expect(html).toContain('内税');
@@ -78,6 +78,6 @@ describe('レシート確認画面(サーバー描画のスモークテスト)',
     expect(html).toContain('端数として調整');
     expect(html).toContain('目標への影響');
     // 品目がカフェ・飲料になっていない(未選択)ので、影響の行は出ない=クラッシュしないこと
-    expect(html).toContain('明細のジャンル');
+    expect(html).toContain('明細のカテゴリ');
   });
 });

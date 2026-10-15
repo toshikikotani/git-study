@@ -81,7 +81,7 @@ export async function listTransactions(): Promise<StoredTransaction[]> {
   if (rowsError)
     throw new TransactionStoreError(`明細を取得できませんでした: ${rowsError.message}`);
   if (genresError) {
-    throw new TransactionStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new TransactionStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
 
   const genreNameById = new Map(genres.map((g) => [g.id, g.name]));

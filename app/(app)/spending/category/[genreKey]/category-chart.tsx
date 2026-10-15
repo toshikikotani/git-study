@@ -70,8 +70,6 @@ export function CategoryChart({
   onPick,
   selectedIndex,
   budgetYen,
-  holdForecast,
-  onHoldForecast,
 }: {
   series: Series;
   cumulative: CumulativeChart;
@@ -86,8 +84,6 @@ export function CategoryChart({
   selectedIndex: number | null;
   /** このカテゴリの予算。あるときは縦軸の上限。予測の帯では伸ばさない。 */
   budgetYen: number | null;
-  holdForecast?: boolean;
-  onHoldForecast?: () => void;
 }) {
   const plot = useRef<HTMLDivElement>(null);
   const fontScale = useFontScale();
@@ -709,20 +705,6 @@ export function CategoryChart({
           音で聞く
         </button>
       </div>
-      {onHoldForecast ? (
-        <button
-          type="button"
-          onClick={onHoldForecast}
-          className="min-h-11 w-full rounded-2xl text-sm font-semibold"
-          style={{
-            background: holdForecast ? 'var(--action)' : 'var(--surface-raised)',
-            color: holdForecast ? 'var(--on-action)' : 'var(--ink)',
-            border: '1px solid var(--line)',
-          }}
-        >
-          {holdForecast ? 'これ以上は予測しない' : 'これ以上は使わない'}
-        </button>
-      ) : null}
       {audioNote ? (
         <p role="status" className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {audioNote}

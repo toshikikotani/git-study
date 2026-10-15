@@ -39,7 +39,7 @@ function parsed() {
 }
 
 describe('buildReceiptSavePlan', () => {
-  it('店名を正規化して保存し、分割の合計は親の金額に一致、子のジャンルは親を引き継ぐ', () => {
+  it('店名を正規化して保存し、分割の合計は親の金額に一致、子のカテゴリは親を引き継ぐ', () => {
     const t = parsed();
     const plan = buildReceiptSavePlan({
       parsed: t,

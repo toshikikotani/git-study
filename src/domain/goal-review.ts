@@ -49,9 +49,9 @@ export function buildGoalReview(input: {
   const met = rows.filter((r) => r.met).sort((a, b) => a.diffYen - b.diffYen);
   let goodPoint: string;
   if (rows.length === 0) {
-    goodPoint = '目標のあるジャンルがありませんでした。';
+    goodPoint = '目標のあるカテゴリがありませんでした。';
   } else if (met.length === rows.length) {
-    goodPoint = `すべてのジャンルが目標内に収まりました(合計 ${formatYen(targetYen - actualYen, { sign: 'never' })} の余り)。`;
+    goodPoint = `すべてのカテゴリが目標内に収まりました(合計 ${formatYen(targetYen - actualYen, { sign: 'never' })} の余り)。`;
   } else if (met.length > 0) {
     const best = met[0]!;
     goodPoint = `${best.genreName}は目標より${formatYen(-best.diffYen, { sign: 'never' })}少なく収まりました。`;
@@ -77,7 +77,7 @@ export function buildGoalReview(input: {
     reviewGenre = {
       genreId: tight.genreId,
       genreName: tight.genreName,
-      reason: `目標の${Math.round((tight.actualYen / tight.targetYen) * 100)}%まで使いました(いちばん余裕が少ないジャンル)`,
+      reason: `目標の${Math.round((tight.actualYen / tight.targetYen) * 100)}%まで使いました(いちばん余裕が少ないカテゴリ)`,
     };
   }
   return { rows, targetYen, actualYen, goodPoint, reviewGenre };

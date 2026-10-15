@@ -81,7 +81,7 @@ export async function loadLedgerTransactions(
     query(`${BASE_COLUMNS}, kind, branch_name, reconcile_diff_yen`),
   ]);
   if (genresResult.error) {
-    throw new LedgerLoadError(`ジャンルを取得できませんでした: ${genresResult.error.message}`);
+    throw new LedgerLoadError(`カテゴリを取得できませんでした: ${genresResult.error.message}`);
   }
   let rows = withKind.data as unknown as RawRow[] | null;
   if (withKind.error) {

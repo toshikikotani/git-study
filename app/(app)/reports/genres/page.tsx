@@ -1,13 +1,8 @@
 import Link from 'next/link';
 
-import {
-  countUngenredSpendTargetsAllPeriods,
-  listGenres,
-  loadGenreAnalysisView,
-} from '@/features/genre/store';
+import { countUngenredSpendTargetsAllPeriods, loadGenreAnalysisView } from '@/features/genre/store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GenreBreakdownCard } from './genre-breakdown-card';
-import { GenreManageCard } from './genre-manage-card';
 import { RiskyRulesCard } from './risky-rules-card';
 
 /**
@@ -19,6 +14,9 @@ import { RiskyRulesCard } from './risky-rules-card';
  * など)を置き換える唯一の分類になった。旧 /rules(カテゴリ管理)・
  * /reports/categories(カテゴリの掘り下げ)はどちらも廃止し、ジャンルの
  * 管理(追加削除・予算・ホーム表示)と分析をこの1画面に統合した。
+ *
+ * その後、カテゴリの管理は「設定 > カテゴリ」(/settings/categories)へ一本化し、
+ * この画面は分析だけにした(設定の入口が散らばっていたため)。
  */
 
 export const dynamic = 'force-dynamic';
@@ -26,8 +24,8 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export default async function GenresPage() {
-  const [view, genres, allPendingCount] = await withMinDuration(
-    Promise.all([loadGenreAnalysisView(), listGenres(), countUngenredSpendTargetsAllPeriods()]),
+  const [view, allPendingCount] = await withMinDuration(
+    Promise.all([loadGenreAnalysisView(), countUngenredSpendTargetsAllPeriods()]),
   );
 
   return (
@@ -35,13 +33,21 @@ export default async function GenresPage() {
       <header className="flex items-baseline justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
-            ジャンル管理・分析
+            カテゴリ分析
           </h1>
-          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            唯一の分類。追加削除・予算はここで、分類はAIが行う
-          </p>
+          <Link
+            href="/settings/categories"
+            className="inline-flex min-h-11 items-center text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            カテゴリの追加・名前・目標額などは「設定 &gt; カテゴリ」へ
+          </Link>
         </div>
-        <Link href="/reports" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+        <Link
+          href="/reports"
+          className="inline-flex min-h-11 shrink-0 items-center text-xs"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           レポートへ →
         </Link>
       </header>
@@ -51,8 +57,6 @@ export default async function GenresPage() {
         initialPendingCount={view.pendingCount}
         initialAllPendingCount={allPendingCount}
       />
-
-      <GenreManageCard genres={genres} />
 
       <RiskyRulesCard />
     </div>

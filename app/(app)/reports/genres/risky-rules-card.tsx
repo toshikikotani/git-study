@@ -28,7 +28,7 @@ export function RiskyRulesCard() {
         危険な支払方法の検知(変更不可)
       </h2>
       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        見逃しが致命的なため、固定のルールで常に検知します。ジャンルとは独立
+        見逃しが致命的なため、固定のルールで常に検知します。カテゴリとは独立
         していて、会話やここからも変更できません。
       </p>
 

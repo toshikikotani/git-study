@@ -251,7 +251,7 @@ describe('P9 性能(受け入れ基準14)', () => {
     expect(ms).toBeLessThanOrEqual(100);
   });
 
-  it('1万件でも合計は集計関数と一致する(行の合計 = 家計簿のジャンル内訳)', () => {
+  it('1万件でも合計は集計関数と一致する(行の合計 = 家計簿のカテゴリ内訳)', () => {
     const txs = make(10_000);
     const { lines, spent } = pipeline(txs);
     expect(-actualSpentYen(lines)).toBe(-spent);

@@ -381,7 +381,7 @@ export default function ImportPage() {
 
           {preview.length > 6 ? (
             <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              ほか {preview.length - 6} 件(ジャンルは取り込み後に編集できます)
+              ほか {preview.length - 6} 件(カテゴリは取り込み後に編集できます)
             </p>
           ) : null}
 

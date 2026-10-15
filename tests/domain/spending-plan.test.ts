@@ -33,7 +33,7 @@ describe('baselineForPeriod', () => {
 });
 
 describe('fallbackTarget', () => {
-  it('課題のあるジャンルだけ、削れる部分をstepPercent削る', () => {
+  it('課題のあるカテゴリだけ、削れる部分をstepPercent削る', () => {
     expect(fallbackTarget({ baselineYen: 30000, mustPayShare: 0, isIssue: true }, 10)).toBe(27000);
     expect(fallbackTarget({ baselineYen: 30000, mustPayShare: 0, isIssue: false }, 10)).toBe(30000);
   });
@@ -135,13 +135,13 @@ describe('rebalanceToTotal', () => {
     expect(rebalanceToTotal([0, 0], 10000, [3, 1])).toEqual([7500, 2500]);
   });
 
-  it('100円未満の端数は重みが最大のジャンルに載せる', () => {
+  it('100円未満の端数は重みが最大のカテゴリに載せる', () => {
     const result = rebalanceToTotal([10000, 10000], 20050, [1, 2]);
     expect(sum(result)).toBe(20050);
     expect(result[1]! - 10000).toBeGreaterThan(result[0]! - 10000);
   });
 
-  it('減らしても0円未満にせず、足りない分は他のジャンルから引く', () => {
+  it('減らしても0円未満にせず、足りない分は他のカテゴリから引く', () => {
     const result = rebalanceToTotal([1000, 50000], 30000, [100, 1]);
     expect(sum(result)).toBe(30000);
     expect(result.every((x) => x >= 0)).toBe(true);
@@ -199,7 +199,7 @@ describe('planGuidance', () => {
     expect(g.elapsedDays).toBe(0);
   });
 
-  it('ペースが速いジャンルは期間末の超過見込みと1日の使える額を出す', () => {
+  it('ペースが速いカテゴリは期間末の超過見込みと1日の使える額を出す', () => {
     // 10日経過(10/10): 外食は2000円/日 → 期間末60000円見込み(目標30000円)
     const g = planGuidance({ ...base, today: '2026-10-10', items });
     const dining = g.genres.find((x) => x.genreId === 'g1')!;
@@ -211,7 +211,7 @@ describe('planGuidance', () => {
     expect(g.actions[0]).toContain('外食');
   });
 
-  it('順調なジャンルは行動指針に出さない', () => {
+  it('順調なカテゴリは行動指針に出さない', () => {
     const g = planGuidance({ ...base, today: '2026-10-10', items });
     expect(g.genres.find((x) => x.genreId === 'g2')!.status).toBe('on_track');
     expect(g.actions.some((a) => a.startsWith('食料品'))).toBe(false);
@@ -336,7 +336,7 @@ describe('forecastLine(結果予想の一言、N5)', () => {
 describe('planGuidance(目標との連携の規則)', () => {
   const period = { periodStart: '2026-09-29', periodEnd: '2026-10-05' }; // 7日間
 
-  it('予算0円のジャンルに「順調です」「1日0円まで」を出さない(受け入れ基準6)', () => {
+  it('予算0円のカテゴリに「順調です」「1日0円まで」を出さない(受け入れ基準6)', () => {
     const g = planGuidance({
       ...period,
       today: '2026-10-02',
@@ -357,7 +357,7 @@ describe('planGuidance(目標との連携の規則)', () => {
     expect(all).not.toMatch(/酒|旅行/);
   });
 
-  it('予算なしのジャンルは、目標の合計にも実績の合計にも入れない', () => {
+  it('予算なしのカテゴリは、目標の合計にも実績の合計にも入れない', () => {
     const g = planGuidance({
       ...period,
       today: '2026-10-02',
@@ -423,7 +423,7 @@ describe('planGuidance(目標との連携の規則)', () => {
     expect(g.scheduledYen).toBe(26540);
   });
 
-  it('行動指針は要対応ジャンルの上位2件だけ', () => {
+  it('行動指針は要対応カテゴリの上位2件だけ', () => {
     const g = planGuidance({
       ...period,
       today: '2026-10-03',
@@ -438,7 +438,7 @@ describe('planGuidance(目標との連携の規則)', () => {
 });
 
 describe('emptyPlanReason', () => {
-  it('分類済みの実績があるジャンルが1つでもあれば作れる', () => {
+  it('分類済みの実績があるカテゴリが1つでもあれば作れる', () => {
     expect(emptyPlanReason({ genreBaselines: [0, 12000], uncategorizedYen: 5000 })).toBeNull();
   });
 
@@ -460,11 +460,11 @@ describe('planTotalChange', () => {
     { genreId: 'daily', yen: 5000 },
   ];
 
-  it('変えたジャンルの差額だけ総額が動く(増やす)', () => {
+  it('変えたカテゴリの差額だけ総額が動く(増やす)', () => {
     expect(planTotalChange(rows, 'cafe', 2000)).toEqual({ beforeYen: 35302, afterYen: 37000 });
   });
 
-  it('変えたジャンルの差額だけ総額が動く(減らす・0円)', () => {
+  it('変えたカテゴリの差額だけ総額が動く(減らす・0円)', () => {
     expect(planTotalChange(rows, 'food', 0)).toEqual({ beforeYen: 35302, afterYen: 5302 });
   });
 

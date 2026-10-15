@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 describe('loadLedgerTransactions', () => {
-  it('分割の子のジャンルが未設定なら親のジャンルを引き継ぐ(「未分類」の子を作らない)', async () => {
+  it('分割の子のカテゴリが未設定なら親のカテゴリを引き継ぐ(「未分類」の子を作らない)', async () => {
     tables = {
       genres: { data: genres, error: null },
       transactions: {
@@ -130,7 +130,7 @@ describe('loadLedgerTransactions', () => {
 });
 
 describe('loadGenreSpend(目標の実績、受け入れ基準2)', () => {
-  it('未来日は予定に分け、特別費も実績のジャンルに入れる', async () => {
+  it('未来日は予定に分け、特別費も実績のカテゴリに入れる', async () => {
     tables = {
       genres: { data: genres, error: null },
       transactions: {

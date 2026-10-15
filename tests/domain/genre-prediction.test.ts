@@ -35,7 +35,7 @@ describe('predictGenres(未分類の予測上位3件)', () => {
     expect(new Set(r.map((p) => p.genreId)).size).toBe(3);
   });
 
-  it('存在しないジャンル(削除済み)は候補に出さない', () => {
+  it('存在しないカテゴリ(削除済み)は候補に出さない', () => {
     const r = predictGenres({
       storeName: 'ローソン',
       genres,
@@ -44,7 +44,7 @@ describe('predictGenres(未分類の予測上位3件)', () => {
     expect(r.every((p) => genres.some((g) => g.id === p.genreId))).toBe(true);
   });
 
-  it('ジャンルが3件未満なら、あるだけ出す', () => {
+  it('カテゴリが3件未満なら、あるだけ出す', () => {
     expect(predictGenres({ storeName: 'x', genres: genres.slice(0, 2), history: [] })).toHaveLength(
       2,
     );

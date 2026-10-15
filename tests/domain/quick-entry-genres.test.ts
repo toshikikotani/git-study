@@ -5,7 +5,7 @@ import { sortQuickEntryGenres, type QuickEntryGenreInput } from '@/domain/quick-
 function genre(overrides: Partial<QuickEntryGenreInput>): QuickEntryGenreInput {
   return {
     id: 'g1',
-    name: 'ジャンル',
+    name: 'カテゴリ',
     quickEntryOrder: null,
     hiddenInQuickEntry: false,
     usageCount: 0,
@@ -32,7 +32,7 @@ describe('sortQuickEntryGenres(N2本人要件)', () => {
     expect(result.map((g) => g.id)).toEqual(['c', 'b', 'a']);
   });
 
-  it('hiddenInQuickEntry のジャンルは結果に含めない', () => {
+  it('hiddenInQuickEntry のカテゴリは結果に含めない', () => {
     const result = sortQuickEntryGenres([
       genre({ id: 'a', name: 'A', hiddenInQuickEntry: true, usageCount: 100 }),
       genre({ id: 'b', name: 'B', usageCount: 1 }),

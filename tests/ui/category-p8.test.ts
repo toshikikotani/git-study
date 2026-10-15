@@ -17,23 +17,24 @@ vi.mock('../../app/(app)/spending/category/actions', () => ({
   saveCategoryStyleAction: vi.fn(),
   updateCategoryBudgetAction: vi.fn(),
   updateRuleGenreAction: vi.fn(),
-  updatePlanAllocationAction: vi.fn(),
+  setCategoryFixedAction: vi.fn(),
+  setCategoryForecastClosedAction: vi.fn(),
+  deleteCategoryAction: vi.fn(),
 }));
 vi.mock('../../app/(app)/plan/actions', () => ({
   updatePlanAllocationAction: vi.fn(),
   planLandingAction: vi.fn(),
 }));
 
-import { SettingsBody } from '../../app/(app)/spending/category/[genreKey]/category-settings';
+import { SettingsBody } from '../../app/(app)/settings/categories/[genreId]/settings-body';
 import { GenreStyleProvider } from '../../src/components/ui/genre-style-context';
 import { GenreBadge } from '../../src/components/ui/genre-badge';
 import { selectableColorIndexes } from '../../src/domain/genre-style';
-import type { CategoryDetailData } from '../../src/features/category/loader';
+import type { CategorySettingsData } from '../../src/features/category/settings-loader';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '');
 
-const data = {
-  genreKey: 'dining',
+const data: CategorySettingsData = {
   genreName: '外食',
   genreBudgetYen: 30000,
   forecastClosed: false,
@@ -43,18 +44,21 @@ const data = {
     { id: 'cafe', name: 'カフェ' },
   ],
   goal: null,
-} as unknown as CategoryDetailData;
+};
 
 describe('P8 カテゴリ設定', () => {
-  it('名前・アイコン・色・予算・ルールがあり、削除は無効(理由つき)', () => {
-    const html = visible(
-      renderToString(h(SettingsBody, { data, genreId: 'dining', onClose: () => {} })),
-    );
-    for (const t of ['名前', 'アイコン', '色', '予算', 'このカテゴリのルール', '見た目を保存']) {
+  it('名前・アイコンと色・月の目安・扱い・ルール・削除がそろい、保存は「保存」ボタン', () => {
+    const html = visible(renderToString(h(SettingsBody, { data, genreId: 'dining' })));
+    for (const t of ['名前', 'アイコンと色', '月の目安', '扱い', 'このカテゴリのルール']) {
       expect(html).toContain(t);
     }
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>このカテゴリを削除/);
-    expect(html).toContain('今後対応します');
+    expect(html).not.toContain('見た目を保存');
+    // 固定費と見込みはスイッチ(押したら保存)。固定費にすると見込みも止まることを書く。
+    expect(html.match(/role="switch"/g)?.length).toBe(2);
+    expect(html).toContain('固定費にすると、月末の見込みも出しません');
+    // 削除はここでできる(確かめてから)。
+    expect(html).toMatch(/<button[^>]*>このカテゴリを削除/);
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>このカテゴリを削除/);
     // 色は候補の数だけ。選択中は「(選択中)」で色以外にも伝える。
     expect(html.match(/aria-label="色\d+/g)?.length).toBe(selectableColorIndexes().length);
     expect(html).toContain('(選択中)');
@@ -62,26 +66,12 @@ describe('P8 カテゴリ設定', () => {
   });
 
   it('目標が無いときは月の目安を入力、目標中は「配分・総額を調整する」を出す', () => {
-    const noGoal = visible(
-      renderToString(h(SettingsBody, { data, genreId: 'dining', onClose: () => {} })),
-    );
+    const noGoal = visible(renderToString(h(SettingsBody, { data, genreId: 'dining' })));
     expect(noGoal).toContain('月の目安');
     expect(noGoal).not.toContain('配分・総額を調整する');
     const withGoal = {
       ...data,
       goal: {
-        range: { from: '2026-09-25', to: '2026-10-05' },
-        dailyAllowanceYen: 1000,
-        active: true,
-        row: {
-          genreId: 'dining',
-          genreName: '外食',
-          spentYen: 0,
-          targetYen: 8000,
-          idealYen: 0,
-          scheduledYen: 0,
-          reserved: false,
-        },
         plan: {
           id: 'p1',
           periodStart: '2026-09-25',
@@ -91,15 +81,14 @@ describe('P8 カテゴリ設定', () => {
           ],
         },
       },
-    } as unknown as CategoryDetailData;
-    const html = visible(
-      renderToString(h(SettingsBody, { data: withGoal, genreId: 'dining', onClose: () => {} })),
-    );
-    expect(html).toContain('配分・総額を調整する');
-    // 目標中の「予算」は目標額を変える(月の目安の入力欄は出さない)。
+    };
+    const html = visible(renderToString(h(SettingsBody, { data: withGoal, genreId: 'dining' })));
+    expect(html).toContain('目標額');
     expect(html).toContain('このカテゴリの目標');
     expect(html).toContain('8,000円');
-    expect(html).not.toContain('月の目安(円)');
+    // 目標全体の配分・期間は目標画面へ(ここでは1カテゴリの目標額だけ)。
+    expect(html).toContain('href="/plan"');
+    expect(html).not.toContain('配分・総額を調整する');
     // 月の目安が残っていれば、目標中は使わないことを示し、消せるようにする。
     expect(html).toContain('目標が無いときの月の目安(30,000円)は、目標の期間中は使いません。');
     expect(html).toContain('目安を消す');
@@ -109,7 +98,6 @@ describe('P8 カテゴリ設定', () => {
         h(SettingsBody, {
           data: { ...withGoal, genreBudgetYen: null },
           genreId: 'dining',
-          onClose: () => {},
         }),
       ),
     );

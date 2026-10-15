@@ -16,17 +16,17 @@ const base = {
 };
 
 describe('classifySpending(設計書 v3 4.1)', () => {
-  it('予測を止めたジャンルは決まった型', () => {
+  it('予測を止めたカテゴリは決まった型', () => {
     expect(
       classifySpending({ ...base, closed: true, eventDates: every('2026-06-01', 2, 50) }),
     ).toBe('fixed');
   });
 
-  it('請求だけのジャンルは決まった型', () => {
+  it('請求だけのカテゴリは決まった型', () => {
     expect(classifySpending({ ...base, hasBills: true })).toBe('fixed');
   });
 
-  it('月に何度も、規則的に使うジャンルは定常型', () => {
+  it('月に何度も、規則的に使うカテゴリは定常型', () => {
     expect(classifySpending({ ...base, eventDates: every('2026-06-01', 3, 40) })).toBe('steady');
   });
 

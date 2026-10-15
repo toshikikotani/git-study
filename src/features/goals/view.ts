@@ -103,7 +103,7 @@ export function buildGoalView(input: {
     if (spentYen <= 0) continue;
     noBudget.push({
       genreId,
-      genreName: genreId === null ? '未分類' : (genreNames.get(genreId) ?? '不明なジャンル'),
+      genreName: genreId === null ? '未分類' : (genreNames.get(genreId) ?? '不明なカテゴリ'),
       spentYen,
     });
   }

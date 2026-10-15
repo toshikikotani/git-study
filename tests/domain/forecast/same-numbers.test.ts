@@ -82,7 +82,7 @@ describe('同じ範囲の同じ数字(P0)', () => {
     expect(known + last.highYen).toBe(forecast.total.p90);
   });
 
-  it('ジャンルの着地は、家計簿の使った額を下回らない(外した額は行で出す)', () => {
+  it('カテゴリの着地は、家計簿の使った額を下回らない(外した額は行で出す)', () => {
     const rows = landingRowsFrom({
       forecast,
       excludedByCategory: excludedSpend(transactions, period, scope),
@@ -103,7 +103,7 @@ describe('同じ範囲の同じ数字(P0)', () => {
     expect(tax.p50).toBe(32000);
   });
 
-  it('カテゴリ画面(そのジャンルだけの予測)は、そのジャンルの線をそのまま使う', () => {
+  it('カテゴリ画面(そのカテゴリだけの予測)は、そのカテゴリの線をそのまま使う', () => {
     const only = buildForecast({
       ...base,
       budgetYen: null,
@@ -137,7 +137,7 @@ describe('同じ範囲の同じ数字(P0)', () => {
     }
   });
 
-  it('提案は定常型のジャンルで、減らせば収まる確率が下がらない(P1)', () => {
+  it('提案は定常型のカテゴリで、減らせば収まる確率が下がらない(P1)', () => {
     const s = forecast.suggestion;
     expect(s).not.toBeNull();
     expect(forecast.byCategory.find((c) => c.categoryId === s!.categoryId)!.type).toBe('steady');
@@ -146,7 +146,7 @@ describe('同じ範囲の同じ数字(P0)', () => {
     expect(s!.savedYen).toBeGreaterThan(0);
   });
 
-  it('「もし、へらしたら」の「いつも通り」は、ジャンル行・見出しと同じ数字', () => {
+  it('「もし、へらしたら」の「いつも通り」は、カテゴリ行・見出しと同じ数字', () => {
     const w = forecast.whatIf.find((x) => x.categoryId === 'dining')!;
     expect(w).toBeDefined();
     const row = forecast.byCategory.find((c) => c.categoryId === 'dining')!;
@@ -261,7 +261,7 @@ describe('同じ範囲の同じ数字(P0)', () => {
     expect(lowKeep.total.p50).toBeGreaterThan(stopped.total.p50);
   });
 
-  it('予測を止めたジャンル・残りが1週間未満の期間には「もし」を出さない', () => {
+  it('予測を止めたカテゴリ・残りが1週間未満の期間には「もし」を出さない', () => {
     expect(forecast.whatIf.some((x) => x.categoryId === 'tax')).toBe(false);
     const late = buildForecast({ ...base, today: '2026-10-27', budgetYen: 120000 });
     expect(late.whatIf).toEqual([]);

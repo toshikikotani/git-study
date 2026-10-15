@@ -89,7 +89,7 @@ export function NewTransactionForm({
     setSaveError(null);
 
     if (mode === 'refund' && values.genreId === null) {
-      setSaveError('返金は、どのジャンルの支出から差し引くかを選んでください。');
+      setSaveError('返金は、どのカテゴリの支出から差し引くかを選んでください。');
       return;
     }
     const amountYen = (mode === 'expense' ? -1 : 1) * (values.amountYen ?? 0);
@@ -187,7 +187,7 @@ export function NewTransactionForm({
       </div>
       {mode === 'refund' ? (
         <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          返品・返金は、選んだジャンルの使った額から差し引かれます(収入にはなりません)。
+          返品・返金は、選んだカテゴリの使った額から差し引かれます(収入にはなりません)。
         </p>
       ) : null}
 

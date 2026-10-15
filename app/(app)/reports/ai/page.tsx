@@ -46,12 +46,12 @@ export default async function AiReportPage() {
       {/* ジャンル別の内訳(家計簿と同じ集計・同じ行の部品) */}
       {ledger.genreBreakdown.length > 0 ? (
         <section
-          aria-label="ジャンル別の内訳"
+          aria-label="カテゴリ別の内訳"
           className="glass rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <h2 className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-            ジャンル別の内訳
+            カテゴリ別の内訳
           </h2>
           <ul className="mt-2 space-y-1">
             {ledger.genreBreakdown.map((r) => (

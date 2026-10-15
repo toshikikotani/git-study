@@ -76,7 +76,7 @@ describe('ホームの「今日」(デザイン、ADR-085)', () => {
         provisional: false,
       }),
     );
-    expect(visible(html)).toContain('目標(ジャンルごとの予算)を決めると');
+    expect(visible(html)).toContain('目標(カテゴリごとの予算)を決めると');
     expect(html).toContain('href="/plan"');
   });
 

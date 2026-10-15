@@ -109,7 +109,7 @@ export async function listUndiagnosedTransactions(
     .from('genres')
     .select('id, name, budget_yen');
   if (genresError) {
-    throw new DiagnosisStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new DiagnosisStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
   const genreById = new Map(genres.map((g) => [g.id, g]));
 

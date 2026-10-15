@@ -670,7 +670,7 @@ function headlineMessage(x: {
       : `残り${x.remainingDays}日は1日${yen(x.dailyAllowanceYen)}まで`;
   switch (x.status) {
     case 'no_budget':
-      return '目標額が決まっているジャンルがありません';
+      return '目標額が決まっているカテゴリがありません';
     case 'reserved':
       return '予定で確保済みです';
     case 'not_started':

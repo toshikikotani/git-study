@@ -37,7 +37,7 @@ function labelFor(input: {
 }): string {
   const scheduled =
     input.scheduledYen > 0 ? `予定 ${input.scheduledYen.toLocaleString('ja-JP')} 円を含む。` : '';
-  if (input.verdict === 'unknown') return 'まだ判断できない。このジャンルの支出が少ない。';
+  if (input.verdict === 'unknown') return 'まだ判断できない。このカテゴリの支出が少ない。';
   if (input.verdict === 'unreachable') {
     return `届かない。使った額と予定だけで目標を超える。${scheduled}`;
   }
@@ -292,7 +292,7 @@ export function landingReport(input: {
   return {
     summary:
       known.length === 0
-        ? 'まだ判断できるジャンルがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
+        ? 'まだ判断できるカテゴリがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
         : `抑えてほしい額の合計は ${yen(proposed)} 円。着地ではなく、この額を目標案にする。`,
     proposedTotalYen: known.length === 0 ? null : proposed,
     forecasts,

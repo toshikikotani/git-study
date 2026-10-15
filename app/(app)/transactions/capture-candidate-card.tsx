@@ -145,7 +145,7 @@ export function CaptureCandidateCard({
       </div>
 
       <select
-        aria-label="ジャンル"
+        aria-label="カテゴリ"
         value={candidate.genreId ?? ''}
         onChange={(e) =>
           onChange({ ...candidate, genreId: e.target.value === '' ? null : e.target.value })
@@ -153,7 +153,7 @@ export function CaptureCandidateCard({
         className="min-h-11 w-full rounded-xl px-3 text-sm outline-none"
         style={{ background: 'var(--plane)', color: 'var(--ink)' }}
       >
-        <option value="">ジャンルを選ぶ</option>
+        <option value="">カテゴリを選ぶ</option>
         {genres.map((g) => (
           <option key={g.id} value={g.id}>
             {g.name}

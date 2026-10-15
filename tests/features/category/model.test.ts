@@ -102,8 +102,8 @@ const txs: CategoryTx[] = [
   }),
 ];
 
-describe('P5 返品・返金は、収入ではなく同じジャンルの支出から差し引く', () => {
-  it('summarizeLedger:ジャンル別・日別・使った額がすべて純額になる。収入には入らない', () => {
+describe('P5 返品・返金は、収入ではなく同じカテゴリの支出から差し引く', () => {
+  it('summarizeLedger:カテゴリ別・日別・使った額がすべて純額になる。収入には入らない', () => {
     const s = summarizeLedger(toLedgerEntries(txs.filter((t) => !t.needsInput)), RANGE, TODAY);
     // 外食: 1200+800+500+1000 − 300(返金)
     expect(s.byGenre.get('dining')).toBe(3200);
@@ -113,7 +113,7 @@ describe('P5 返品・返金は、収入ではなく同じジャンルの支出�
     expect(s.byGenrePace.get('dining')).toBe(3200);
   });
 
-  it('返品でない正の額(ジャンル付きの収入)は、これまでどおり収入', () => {
+  it('返品でない正の額(カテゴリ付きの収入)は、これまでどおり収入', () => {
     const s = summarizeLedger(
       toLedgerEntries([tx({ id: 'x', genreId: 'dining', amountYen: 4000 })]),
       RANGE,
@@ -124,12 +124,12 @@ describe('P5 返品・返金は、収入ではなく同じジャンルの支出�
   });
 });
 
-describe('P5 取引・品目・店の3つの見方は、合計が家計簿のジャンル内訳と一致する(受け入れ基準2・3)', () => {
+describe('P5 取引・品目・店の3つの見方は、合計が家計簿のカテゴリ内訳と一致する(受け入れ基準2・3)', () => {
   const lines = buildCategoryLines(txs, 'dining', RANGE, TODAY);
   const views = buildLedgerViews({ genres, transactions: txs, range: RANGE, today: TODAY });
   const breakdownYen = views.genreBreakdown.find((r) => r.genreId === 'dining')!.spentYen;
 
-  it('家計簿のジャンル内訳(buildLedgerViews)と、カテゴリの合計が一致する', () => {
+  it('家計簿のカテゴリ内訳(buildLedgerViews)と、カテゴリの合計が一致する', () => {
     expect(breakdownYen).toBe(3200);
     expect(actualSpentYen(lines)).toBe(breakdownYen);
     expect(categorySpentFromLedger(txs, 'dining', RANGE, TODAY)).toBe(breakdownYen);

@@ -150,7 +150,7 @@ describe('backupTransactionsToSheetAsAdmin', () => {
       'sheet-123',
       '2026-09!A1',
       expect.arrayContaining([
-        ['日付', '摘要', '金額', 'ジャンル', '口座', '状態'],
+        ['日付', '摘要', '金額', 'カテゴリ', '口座', '状態'],
         ['2026-09-05', 'コンビニ', 500, '未分類', '銀行', 'confirmed'],
       ]),
     );

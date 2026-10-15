@@ -76,7 +76,7 @@ describe('buildListModel(明細リスト)', () => {
 });
 
 describe('filterLedger', () => {
-  it('ジャンルで絞る(分割の子のジャンルも見る)/未分類/日付/検索', () => {
+  it('カテゴリで絞る(分割の子のカテゴリも見る)/未分類/日付/検索', () => {
     expect(filterLedger(txs, { ...EMPTY_FILTER, genreId: 'cafe' }).map((t) => t.id)).toEqual(['a']);
     expect(filterLedger(txs, { ...EMPTY_FILTER, genreId: 'none' }).map((t) => t.id)).toEqual([
       'b',
@@ -106,7 +106,7 @@ describe('filterLedger', () => {
 });
 
 describe('splitShares / rowSubtitle', () => {
-  it('分割した明細はジャンル比率(大きい順)、分割なしは空', () => {
+  it('分割した明細はカテゴリ比率(大きい順)、分割なしは空', () => {
     expect(splitShares(txs[0]!).map((s) => [s.genreName, Math.round(s.ratio * 100)])).toEqual([
       ['カフェ・飲料', 60],
       ['日用品', 40],

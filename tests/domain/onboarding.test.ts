@@ -15,7 +15,7 @@ describe('starterTargetYen', () => {
     expect(starterTargetYen(250_000, 0.12, 0)).toBe(0);
   });
 
-  it('最初のジャンルは手取りの一部だけ(合計が手取りを超えない)', () => {
+  it('最初のカテゴリは手取りの一部だけ(合計が手取りを超えない)', () => {
     const total = STARTER_GENRES.reduce((sum, g) => sum + g.shareOfTakeHome, 0);
     expect(total).toBeLessThan(1);
   });

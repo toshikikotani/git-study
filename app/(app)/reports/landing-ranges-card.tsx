@@ -34,10 +34,10 @@ export function LandingRangesCard({
   return (
     <div className="space-y-3">
       <h2 className="px-1 pt-2 text-xl font-bold" style={{ color: 'var(--ink)' }}>
-        ジャンル別
+        カテゴリ別
       </h2>
       <section
-        aria-label={`${periodLabel}のジャンルごとの見込み`}
+        aria-label={`${periodLabel}のカテゴリごとの見込み`}
         className="glass rounded-[28px] px-5 py-2"
         style={{
           background: 'var(--surface)',
@@ -291,7 +291,7 @@ function GenreWhy({ row }: { row: LandingRow }) {
       ) : null}
       <dd className="col-span-2" style={{ color: 'var(--ink-muted)' }}>
         {row.type === 'lumpy'
-          ? 'まとめて払うことの多いジャンルなので、「このままだと」は出していない。'
+          ? 'まとめて払うことの多いカテゴリなので、「このままだと」は出していない。'
           : 'この先の見込みは、曜日・給料日・今月のペースから出している。'}
       </dd>
     </dl>

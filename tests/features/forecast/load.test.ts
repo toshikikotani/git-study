@@ -77,7 +77,7 @@ describe('loadForecast(Supabase の読み込みを通した予測)', () => {
     expect(view.forecast.visits.merchants.some((m) => m.label === 'スーパーさくら')).toBe(true);
   });
 
-  it('目標の期間・ジャンル・目標額で、ジャンルごとの超過確率が出る', async () => {
+  it('目標の期間・カテゴリ・目標額で、カテゴリごとの超過確率が出る', async () => {
     const view = await loadForecast({
       period: { from: '2026-10-07', to: '2026-11-05' },
       budgetYen: 60000,

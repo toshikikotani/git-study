@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Suspense } from 'react';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { formatYen } from '@/domain/money';
@@ -162,13 +163,13 @@ async function SpentRows({ today }: { today: string }) {
           </span>
         </p>
         <div className="mt-3 flex justify-end">
-          <a
-            href="/reports/genres"
-            className="min-h-11 text-xs font-semibold"
+          <Link
+            href="/settings/categories"
+            className="inline-flex min-h-11 items-center text-xs font-semibold"
             style={{ color: 'var(--accent)' }}
           >
-            カテゴリを追加・削除
-          </a>
+            カテゴリの設定
+          </Link>
         </div>
         <ul className="mt-1 space-y-1">
           {view.breakdown

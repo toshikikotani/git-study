@@ -153,7 +153,7 @@ function TodayHero({
             今日 使えるのは
           </p>
           <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
-            目標(ジャンルごとの予算)を決めると、今日使える額を出せます。
+            目標(カテゴリごとの予算)を決めると、今日使える額を出せます。
           </p>
           <Link
             href="/plan"

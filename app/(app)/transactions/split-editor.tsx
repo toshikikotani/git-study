@@ -400,7 +400,7 @@ export function TransactionRowWithSplit({
     setGenreId(newGenreId);
     if (result.previous) {
       const previous = result.previous;
-      pushUndo('ジャンルを変更しました', async () => {
+      pushUndo('カテゴリを変更しました', async () => {
         const r = await restoreRowFieldsAction(previous);
         if (r.error) return r.error;
         setGenreId(prevGenreId);
@@ -594,7 +594,7 @@ export function TransactionRowWithSplit({
                 <>
                   <div
                     role="img"
-                    aria-label={`ジャンルの内訳:${shares
+                    aria-label={`カテゴリの内訳:${shares
                       .map(
                         (sh) =>
                           `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
@@ -654,7 +654,7 @@ export function TransactionRowWithSplit({
               className="min-h-11 rounded-full border px-4 text-sm font-semibold"
               style={{ borderColor: 'var(--ink-muted)', color: 'var(--ink)' }}
             >
-              ジャンルを選ぶ
+              カテゴリを選ぶ
             </button>
           </div>
         ) : null}
@@ -1005,7 +1005,7 @@ export function TransactionRowWithSplit({
       <BottomSheet open={pickOpen} onClose={() => setPickOpen(false)} role="dialog">
         <div className="space-y-2 px-2 pb-2">
           <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {display?.name ?? transaction.description} のジャンル
+            {display?.name ?? transaction.description} のカテゴリ
           </p>
           <ul className="space-y-2">
             {predictions.map((p) => (
@@ -1043,7 +1043,7 @@ export function TransactionRowWithSplit({
             className="min-h-11 text-sm font-semibold"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            ほかのジャンルから選ぶ →
+            ほかのカテゴリから選ぶ →
           </button>
         </div>
       </BottomSheet>
@@ -1169,7 +1169,7 @@ export function TransactionRowWithSplit({
         <ul className="px-2 pb-2">
           {[
             {
-              label: 'ジャンルを変更',
+              label: 'カテゴリを変更',
               run: () => {
                 setMenuOpen(false);
                 setGenreSheetOpen(true);
@@ -1228,7 +1228,7 @@ export function TransactionRowWithSplit({
       <BottomSheet open={genreSheetOpen} onClose={() => setGenreSheetOpen(false)} role="dialog">
         <div className="space-y-2 px-2 pb-2">
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            ジャンルを変更
+            カテゴリを変更
           </p>
           <div className="flex flex-wrap gap-2">
             {categories.map((c) => (

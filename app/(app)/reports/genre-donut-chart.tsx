@@ -47,7 +47,7 @@ export function GenreDonutChart({
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          ジャンル別の内訳
+          カテゴリ別の内訳
         </h2>
         <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
           この月の支出はありません。
@@ -78,7 +78,7 @@ export function GenreDonutChart({
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        ジャンル別の内訳
+        カテゴリ別の内訳
       </h2>
 
       <div className="mt-3 flex justify-center">
@@ -88,7 +88,7 @@ export function GenreDonutChart({
             width={SIZE}
             height={SIZE}
             role="img"
-            aria-label={`${monthKey}のジャンル別内訳:${sorted.map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`).join('、')}`}
+            aria-label={`${monthKey}のカテゴリ別内訳:${sorted.map((r) => `${r.name} ${formatYen(r.spentYen, { sign: 'never' })}`).join('、')}`}
           >
             <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
               {segments.map((seg) => {

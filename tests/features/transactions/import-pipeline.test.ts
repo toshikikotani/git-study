@@ -30,7 +30,7 @@ describe('buildPreview', () => {
     expect(tx?.paymentMethod).toBe('revolving');
   });
 
-  it('ジャンルは付けない。本人が選ぶかAIジャンル分類に任せる(ADR-057)', () => {
+  it('カテゴリは付けない。本人が選ぶかAIカテゴリ分類に任せる(ADR-057)', () => {
     const row: ImportableRow = { ...ROW, description: 'リボ払いのご案内' };
     const [tx] = buildPreview([row], 'acc-1', (i) => `${i}`);
     expect(tx?.genreId).toBeNull();

@@ -62,7 +62,7 @@ describe('buildGoalView(目標の表示)', () => {
     expect(view.guidance.todayAllowanceYen).toBe(0);
   });
 
-  it('予算0円・目標外のジャンルと未分類は「予算なし」に分け、目標の合計に入れない', () => {
+  it('予算0円・目標外のカテゴリと未分類は「予算なし」に分け、目標の合計に入れない', () => {
     expect(view.noBudget.map((r) => [r.genreName, r.spentYen])).toEqual([
       ['酒', 1200],
       ['未分類', 700],
@@ -80,7 +80,7 @@ describe('buildGoalView(目標の表示)', () => {
     expect(view.review).toBeNull();
   });
 
-  it('期間が終わると、ジャンルごとの目標と実績の振り返りが出る', () => {
+  it('期間が終わると、カテゴリごとの目標と実績の振り返りが出る', () => {
     const ended = buildGoalView({
       plan,
       entries: toLedgerEntries([
@@ -160,14 +160,14 @@ describe('F1:予定支出を予算から控除する(受け入れ基準1)', () =
     });
   });
 
-  it('予定が一部だけのジャンル(外食:予定5,000円)は、予定と自由に使える残りに分ける', () => {
+  it('予定が一部だけのカテゴリ(外食:予定5,000円)は、予定と自由に使える残りに分ける', () => {
     const dining = v.guidance.genres.find((g) => g.genreId === 'dining')!;
     expect(dining.status).not.toBe('reserved');
     expect(dining.scheduledYen).toBe(5000);
     expect(dining.freeYen).toBe(20000 - 5000 - 636);
   });
 
-  it('未分類の支出は総額の実績に含め、ジャンル別には含めない', () => {
+  it('未分類の支出は総額の実績に含め、カテゴリ別には含めない', () => {
     const withUncat = buildGoalView({
       plan: plan1,
       entries: toLedgerEntries([

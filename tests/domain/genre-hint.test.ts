@@ -8,7 +8,7 @@ const GENRES = [
 ];
 
 describe('resolveGenreHint', () => {
-  it('一致するジャンル名をidに解決する', () => {
+  it('一致するカテゴリ名をidに解決する', () => {
     expect(resolveGenreHint('食費', GENRES)).toBe('g1');
   });
   it('nullはnullのまま', () => {

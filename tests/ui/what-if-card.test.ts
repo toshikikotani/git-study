@@ -63,7 +63,7 @@ const view: CategoryWhatIfView = {
   ],
 };
 
-describe('ジャンル画面の「もし、へらしたら」', () => {
+describe('カテゴリ画面の「もし、へらしたら」', () => {
   it('いつも通りの数字で、選択肢・目標を超える回数・予算に収まる回数・収支を出す', () => {
     const html = visible(renderToString(h(WhatIfCard, { view })));
     expect(html).toContain('もし、外食をへらしたら');

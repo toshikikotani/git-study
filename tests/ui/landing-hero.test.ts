@@ -57,7 +57,7 @@ describe('月末の見込みの見出し(デザインの「月末の支出」)',
     expect(none).not.toContain('予算');
   });
 
-  it('次の一手:へらすと月末の支出がどれだけ減るかと、そのジャンルの見通しへの入口', () => {
+  it('次の一手:へらすと月末の支出がどれだけ減るかと、そのカテゴリの見通しへの入口', () => {
     const html = visible(
       renderToString(
         h(NextStepCard, {

@@ -127,7 +127,7 @@ describe('F2 目標カード(受け入れ基準2)', () => {
     expect(html).toContain(over.summary);
   });
 
-  it('予定の行は展開でき、日付・名前・金額・ジャンルを一覧で見せる', () => {
+  it('予定の行は展開でき、日付・名前・金額・カテゴリを一覧で見せる', () => {
     const html = renderToString(
       h(GoalCard, { model: buildGoalCard(view(base), '2026-09-29') }),
     ).replace(/<!-- -->/g, '');

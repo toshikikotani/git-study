@@ -79,7 +79,7 @@ export async function loadPlanContext(
     getLatestPlan(),
   ]);
   if (genresError) {
-    throw new SpendingPlanStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new SpendingPlanStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
 
   // 家計簿と同じ集計の入力(分割の子へ展開済み)。予定と特別費はペースの基準に

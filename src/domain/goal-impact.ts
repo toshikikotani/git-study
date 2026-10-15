@@ -115,7 +115,7 @@ const REASON_TEXT: Record<Exclude<ImpactReason, 'included'>, string> = {
   special: '特別費として別枠にしたので、目標のペースには含めません',
   scheduled: '今日より先の予定なので、目標のペースには含めません',
   outside_period: '目標の期間の外なので、目標には含めません',
-  no_target: '目標のあるジャンルではないので、目標には含めません',
+  no_target: '目標のあるカテゴリではないので、目標には含めません',
 };
 
 /**

@@ -139,7 +139,7 @@ async function loadMonthTransactionRows(
   ]);
   if (error) throw new GoogleSheetsBackupError(`明細を取得できませんでした: ${error.message}`);
   if (genresError) {
-    throw new GoogleSheetsBackupError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new GoogleSheetsBackupError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
   if (accountsError) {
     throw new GoogleSheetsBackupError(`口座を取得できませんでした: ${accountsError.message}`);
@@ -148,7 +148,7 @@ async function loadMonthTransactionRows(
   const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
   const accountNameById = new Map(accounts.map((a) => [a.id, a.name]));
 
-  const header = ['日付', '摘要', '金額', 'ジャンル', '口座', '状態'];
+  const header = ['日付', '摘要', '金額', 'カテゴリ', '口座', '状態'];
   const dataRows = rows.map((row) => [
     row.occurred_on,
     row.merchant_name ?? row.description,

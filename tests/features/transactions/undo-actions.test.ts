@@ -80,7 +80,7 @@ beforeEach(() => {
 });
 
 describe('変更の Undo(変更前の値を返し、そのまま書き戻せる)', () => {
-  it('ジャンル・金額・日付の変更は、変更前の値を返す', async () => {
+  it('カテゴリ・金額・日付の変更は、変更前の値を返す', async () => {
     const r = await updateTransactionAction('t1', 'g-new');
     expect(r.error).toBeNull();
     expect(r.previous).toEqual([
@@ -96,7 +96,7 @@ describe('変更の Undo(変更前の値を返し、そのまま書き戻せる)
     expect((await resolveReconcileAction(['t1'])).previous?.[0]?.reconcile_diff_yen).toBe(30);
   });
 
-  it('書き戻すと、変更前の列(ジャンル・分類者・金額・日付・メモ・種別・差額)で更新される', async () => {
+  it('書き戻すと、変更前の列(カテゴリ・分類者・金額・日付・メモ・種別・差額)で更新される', async () => {
     const { previous } = await updateTransactionAction('t1', 'g-new');
     calls.length = 0;
     const r = await restoreRowFieldsAction(previous!);

@@ -170,7 +170,7 @@ async function loadBudgetedGenreStatuses(
     .select('id, name, budget_yen')
     .eq('user_id', userId)
     .not('budget_yen', 'is', null);
-  if (error) throw new AlertStoreError(`ジャンルを取得できませんでした: ${error.message}`);
+  if (error) throw new AlertStoreError(`カテゴリを取得できませんでした: ${error.message}`);
   if (genres.length === 0) return [];
 
   const monthStart = monthStartJst(0, now);

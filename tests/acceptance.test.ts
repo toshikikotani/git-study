@@ -59,7 +59,7 @@ const ledger: LedgerTransaction[] = [
   }),
 ];
 
-describe('受け入れ基準1:ヘッダー・ジャンル内訳・明細・カレンダー・目標で、同じ期間なら合計が一致する', () => {
+describe('受け入れ基準1:ヘッダー・カテゴリ内訳・明細・カレンダー・目標で、同じ期間なら合計が一致する', () => {
   const views = buildLedgerViews({ genres, transactions: ledger, range: month, today: TODAY });
   const expected = 7900 + 4379 + 6000 + 663 + 9000;
 
@@ -88,7 +88,7 @@ describe('受け入れ基準1:ヘッダー・ジャンル内訳・明細・カ�
     expect([header, breakdown, list, calendar, goal]).toEqual(Array(5).fill(expected));
   });
 
-  it('同じジャンルの金額が内訳と目標で一致する(外食 12,279円)', () => {
+  it('同じカテゴリの金額が内訳と目標で一致する(外食 12,279円)', () => {
     expect(views.genreBreakdown.find((r) => r.genreId === 'dining')?.spentYen).toBe(12279);
   });
 });
@@ -264,7 +264,7 @@ describe('受け入れ基準5:記録開始から9日目の時点で、前月比�
   });
 });
 
-describe('受け入れ基準6:予算0円のジャンルに「順調です」「1日0円まで」が表示されない', () => {
+describe('受け入れ基準6:予算0円のカテゴリに「順調です」「1日0円まで」が表示されない', () => {
   it('予算なしはグレー・文言なし', () => {
     const g = planGuidance({
       periodStart: '2026-09-29',
@@ -302,7 +302,7 @@ describe('受け入れ基準7:「残りN日」の表記が全画面で一致す�
 });
 
 describe('受け入れ基準8:レシート保存時に、目標の残り予算の変化が確認画面に出る', () => {
-  it('保存前 → 保存後の残り予算(ジャンルごと)', () => {
+  it('保存前 → 保存後の残り予算(カテゴリごと)', () => {
     const snapshot = {
       range: { from: '2026-09-29', to: '2026-10-05' },
       genres: [{ genreId: 'dining', genreName: '外食', targetYen: 7900, spentYen: 5000 }],

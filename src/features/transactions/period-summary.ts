@@ -67,7 +67,7 @@ export async function loadPaydayPeriodSummary(
     throw new PeriodSummaryError(`口座を取得できませんでした: ${accountsError.message}`);
   }
   if (genresError) {
-    throw new PeriodSummaryError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new PeriodSummaryError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
 
   const transactions: PeriodTransaction[] = rows.map((row) => ({

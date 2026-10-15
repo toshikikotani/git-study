@@ -110,7 +110,7 @@ async function loadPlan(planId: string): Promise<SpendingPlan | null> {
     throw new SpendingPlanStoreError(`目標の内訳を取得できませんでした: ${itemsError.message}`);
   }
   if (genresError) {
-    throw new SpendingPlanStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new SpendingPlanStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
   const orderById = new Map(genres.map((g, i) => [g.id, i]));
   const nameById = new Map(genres.map((g) => [g.id, g.name]));

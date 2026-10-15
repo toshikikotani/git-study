@@ -124,7 +124,7 @@ export async function listSplitsForDisplay(
 
   const { data: genres, error: genresError } = await supabase.from('genres').select('id, name');
   if (genresError) {
-    throw new TransactionSplitStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new TransactionSplitStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
 
   const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
