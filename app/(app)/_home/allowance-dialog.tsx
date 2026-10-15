@@ -10,6 +10,10 @@ export type AllowanceExplain = {
   spentTodayYen: number;
   remainingDays: number;
   capYen: number;
+  /** 予定の額。 */
+  scheduledYen?: number;
+  /** 固定費。 */
+  fixedYen?: number;
   /** 予算に収まる確率(今の状態)。 */
   probWithinBudget?: number | null;
   /** 残りの休日数(土日祝)。 */
@@ -123,7 +127,11 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               style={{ color: 'var(--ink-secondary)' }}
             >
               <li>
-                1. 残り予算 = {yen(explain.budgetYen)} − {yen(spentBefore)} = {yen(leftBudget)}
+                1. 残り予算 = {yen(explain.budgetYen)} − {yen(spentBefore)}
+                {(explain.scheduledYen ?? 0) > 0 ? ` − 予定${yen(explain.scheduledYen!)}` : ''}
+                {(explain.fixedYen ?? 0) > 0 ? ` − 固定費${yen(explain.fixedYen!)}` : ''}
+                {' = '}
+                {yen(leftBudget)}
               </li>
               <li>
                 2. 単純な1日あたり = {yen(leftBudget)} ÷ {explain.remainingDays}日 ={' '}
