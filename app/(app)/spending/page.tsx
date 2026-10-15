@@ -79,7 +79,8 @@ export default async function SpendingPage() {
     projectedTotalYen: canShowForecast(ledger.record.recordedDaysThisMonth)
       ? ledger.forecast.projectedTotalYen
       : null,
-    totalBudgetYen: ledger.forecast.totalBudgetYen,
+    // ジャンルの月の目安は目標が無いときだけのもの。目標の期間中は合計と比べない。
+    totalBudgetYen: goalGenreIds !== null ? null : ledger.forecast.totalBudgetYen,
   };
 
   const overviewProps = {
@@ -122,7 +123,7 @@ export default async function SpendingPage() {
         <Suspense fallback={<OverviewChart {...overviewProps} holdForecast />}>
           <OverviewChartSection {...overviewProps} scopeGenreIds={goalGenreIds} />
         </Suspense>
-        <GenreBreakdown goalRows={null} />
+        <GenreBreakdown goalRows={null} goalActive={goalGenreIds !== null} />
         <CalendarHeatmap goal={null} />
         <LedgerList
           goalRange={null}

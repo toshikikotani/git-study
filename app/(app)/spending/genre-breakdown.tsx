@@ -19,8 +19,17 @@ import { useSpendingMonth } from './spending-month-provider';
  *
  * 目標があるときは「今月 / 目標期間」を切り替えられ、目標期間では目標画面と共通の
  * 行(実績バー + 今日時点の理想ラインの目印 + 状態色)で見せる。
+ *
+ * ジャンルの月の目安(genres.budget_yen)は目標が無いときだけのものなので、目標の期間中は
+ * 出さない(目標額と食い違う目安が一部の行にだけ付き、バーの基準もそろわないため)。
  */
-export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownRow[] | null }) {
+export function GenreBreakdown({
+  goalRows,
+  goalActive = false,
+}: {
+  goalRows: readonly GoalBreakdownRow[] | null;
+  goalActive?: boolean;
+}) {
   const overrides = useGenreOverrides();
   const { genreBreakdown, filter, isCurrentMonth, loading, visibleMonth } = useSpendingMonth();
   const [scope, setScope] = useState<'month' | 'goal'>('month');
@@ -50,7 +59,7 @@ export function GenreBreakdown({ goalRows }: { goalRows: readonly GoalBreakdownR
         genreId: r.genreId,
         name: r.genreName,
         spentYen: r.spentYen,
-        budgetYen: r.budgetYen,
+        budgetYen: goalActive ? null : r.budgetYen,
         idealYen: null,
         scheduledYen: 0,
       }));

@@ -96,7 +96,24 @@ describe('P8 カテゴリ設定', () => {
       renderToString(h(SettingsBody, { data: withGoal, genreId: 'dining', onClose: () => {} })),
     );
     expect(html).toContain('配分・総額を調整する');
-    expect(html).not.toContain('月の目安');
+    // 目標中の「予算」は目標額を変える(月の目安の入力欄は出さない)。
+    expect(html).toContain('このカテゴリの目標');
+    expect(html).toContain('8,000円');
+    expect(html).not.toContain('月の目安(円)');
+    // 月の目安が残っていれば、目標中は使わないことを示し、消せるようにする。
+    expect(html).toContain('目標が無いときの月の目安(30,000円)は、目標の期間中は使いません。');
+    expect(html).toContain('目安を消す');
+
+    const withoutGuide = visible(
+      renderToString(
+        h(SettingsBody, {
+          data: { ...withGoal, genreBudgetYen: null },
+          genreId: 'dining',
+          onClose: () => {},
+        }),
+      ),
+    );
+    expect(withoutGuide).not.toContain('月の目安');
   });
 
   it('選んだ見た目は、どこのバッジにも出る(コンテキスト)', () => {
