@@ -169,33 +169,36 @@ export function CategoryHeader({
           </SharedElement>
         </p>
 
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={menuOpen}
-          aria-label={`期間、${monthLabel}。タップで期間を選ぶ`}
-          onClick={() => setMenuOpen(true)}
-          className="tabular mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold whitespace-nowrap"
-          style={{ color: 'var(--ink-secondary)', opacity: pending ? 0.5 : 1 }}
-        >
-          <span aria-live="polite">{isGoalPeriod ? '目標期間' : monthLabel}</span>
+        <div className="mt-1 flex items-center gap-2">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            aria-label={`期間、${monthLabel}。タップで期間を選ぶ`}
+            onClick={() => setMenuOpen(true)}
+            className="tabular inline-flex min-h-11 items-center gap-1 text-sm font-semibold whitespace-nowrap"
+            style={{ color: 'var(--ink-secondary)', opacity: pending ? 0.5 : 1 }}
+          >
+            <span aria-live="polite">{isGoalPeriod ? '目標期間' : monthLabel}</span>
+            <span aria-hidden>▾</span>
+          </button>
           {goalPeriod ? (
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 const href = isGoalPeriod
                   ? monthHref(genreKey, monthStart.slice(0, 7))
                   : `${monthHref(genreKey, monthStart.slice(0, 7))}?period=${goalPeriod.from}_${goalPeriod.to}`;
                 startTransition(() => router.replace(href as Route, { scroll: false }));
               }}
-              className="ml-2 text-xs font-semibold"
+              className="min-h-11 text-xs font-semibold"
               style={{ color: 'var(--accent)' }}
             >
               {isGoalPeriod ? '月に切替' : '目標期間に切替'}
             </button>
           ) : null}
-          <span aria-hidden>▾</span>
-        </button>
+        </div>
       </header>
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} role="dialog">
