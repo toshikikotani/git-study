@@ -136,7 +136,7 @@ export default async function ReportsPage() {
     from: ledger.period.from,
     to: addDays(addMonths(ledger.period.from, 1), -1),
   };
-  const period = monthPeriod;
+  const period = plan ? { from: plan.periodStart, to: plan.periodEnd } : monthPeriod;
   const goalItems = plan ? plan.items.filter((item) => item.targetYen > 0) : [];
   const settle = <T,>(promise: Promise<T>) =>
     promise.then(
