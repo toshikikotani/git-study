@@ -263,7 +263,10 @@ export async function loadForecast(args: {
   const dailyLimit =
     args.budgetYen != null && averages.weekdayPerDayYen != null
       ? computeDailyLimit({
-          leftBudgetYen: Math.max(0, (args.budgetYen ?? 0) - forecast.actualYen),
+          leftBudgetYen: Math.max(
+            0,
+            (args.budgetYen ?? 0) - forecast.actualYen - (forecast.committed?.scheduledYen ?? 0),
+          ),
           remainingDayOffs: dayOffs,
           remainingWeekdays: weekdays,
           dayOffMedianYen: averages.dayOffPerDayYen,
