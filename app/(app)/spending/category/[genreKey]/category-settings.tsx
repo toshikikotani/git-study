@@ -283,14 +283,33 @@ export function SettingsBody({
         {data.goal?.plan ? (
           <div className="space-y-2">
             <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              目標の期間中は、目標の配分で決まります。
-              {data.goal.row ? (
-                <>
-                  {' '}
-                  いまの配分は <Yen value={data.goal.row.targetYen ?? 0} /> です。
-                </>
-              ) : null}
+              このカテゴリの予算を変更すると、目標の総額も変わります。
             </p>
+            <div className="flex gap-2">
+              <input
+                aria-labelledby="cs-budget"
+                inputMode="numeric"
+                value={budget}
+                placeholder="このカテゴリの予算(円)"
+                onChange={(e) => setBudget(e.target.value.replace(/[^\d]/g, ''))}
+                className="min-h-11 flex-1 rounded-xl px-3 text-base"
+                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+              />
+              <button
+                type="button"
+                disabled={busy || !budgetValid}
+                onClick={() =>
+                  void run(
+                    () => updateCategoryBudgetAction(genreId, budgetNumber),
+                    '予算を変えました',
+                  )
+                }
+                className="min-h-11 rounded-xl px-4 text-sm font-semibold disabled:opacity-40"
+                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              >
+                保存
+              </button>
+            </div>
             <EditPlanSection
               planId={data.goal.plan.id}
               periodStart={data.goal.plan.periodStart}
