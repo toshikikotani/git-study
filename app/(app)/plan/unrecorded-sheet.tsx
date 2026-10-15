@@ -53,21 +53,23 @@ export function UnrecordedSheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="glass min-h-11 flex w-full items-center justify-between px-4 py-3 text-sm font-semibold"
+        className="glass min-h-12 flex w-full items-center justify-between px-4 py-3 text-base"
         style={{
-          borderRadius: 'var(--radius-full)',
+          borderRadius: 22,
           background: 'var(--surface)',
           boxShadow: 'var(--card-shadow)',
           color: 'var(--ink)',
         }}
       >
-        <span>カテゴリを足す</span>
-        <span>{rows.length > 0 ? `未収録 ${rows.length}件` : `${addable.length}件`}</span>
+        <span>予算のないカテゴリ</span>
+        <span style={{ color: 'var(--ink-secondary)' }}>
+          {rows.length > 0 ? rows.length : addable.length} ›
+        </span>
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)}>
         <div className="px-2 pb-2">
           <h2 className="px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            目標に加える
+            予算に加える
           </h2>
           <ul className="mt-3 space-y-3">
             {addable.map((genre) => (
