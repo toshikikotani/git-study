@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { updateCategoryBudgetAction } from '../actions';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -15,6 +14,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
 import { CONFIDENT, predictGenres, type GenrePrediction } from '@/domain/genre-prediction';
 import { suggestRule, type RuleSuggestion } from '@/domain/rule-match';
+import { planTotalChange } from '@/domain/spending-plan';
 import { hapticFor } from '@/lib/haptics';
 import { pickQuickDestination, useMoveCounts } from '@/features/category/destinations';
 import { genreIdOfKey } from '@/features/category/model';
@@ -26,6 +26,7 @@ import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
 import { setCategoryFixedAction, setCategoryForecastClosedAction } from '../actions';
+import { updatePlanAllocationAction } from '../../../plan/actions';
 import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
@@ -449,8 +450,13 @@ function CategoryScreenInner({
         today={data.today}
       />
 
-      {data.goal?.row?.targetYen != null ? (
-        <BudgetEditBlock genreId={currentGenreId} currentBudget={data.goal.row.targetYen} />
+      {data.goal?.plan && currentGenreId !== null ? (
+        <GoalTargetEditBlock
+          key={data.goal.plan.id}
+          planId={data.goal.plan.id}
+          genreId={currentGenreId}
+          rows={data.goal.plan.rows}
+        />
       ) : null}
 
       {whatIf}
@@ -760,28 +766,63 @@ function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
   );
 }
 
-function BudgetEditBlock({
+/**
+ * 進行中の目標の、このカテゴリの目標額を変える。目標の総額は配分の合計なので、
+ * 変えると総額も動く。保存の前に、総額がいくらからいくらになるかを確かめてもらう。
+ */
+function GoalTargetEditBlock({
+  planId,
   genreId,
-  currentBudget,
+  rows,
 }: {
-  genreId: string | null;
-  currentBudget: number;
+  planId: string;
+  genreId: string;
+  rows: readonly { genreId: string; yen: number }[];
 }) {
   const router = useRouter();
+  const currentYen = rows.find((row) => row.genreId === genreId)?.yen ?? null;
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(String(currentBudget));
+  const [value, setValue] = useState('');
+  const [pendingYen, setPendingYen] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const save = async () => {
-    if (!genreId) return;
-    setSaving(true);
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      await updateCategoryBudgetAction(genreId, num);
-      router.refresh();
+  if (currentYen === null) return null;
+
+  const change = pendingYen === null ? null : planTotalChange(rows, genreId, pendingYen);
+
+  const startEdit = () => {
+    setValue(String(currentYen));
+    setError(null);
+    setEditing(true);
+  };
+
+  const review = () => {
+    const yen = Number(value.replace(/[,\s]/g, ''));
+    if (value.trim() === '' || !Number.isInteger(yen) || yen < 0) {
+      setError('0円以上の整数で入れてください');
+      return;
     }
+    setError(null);
+    if (yen === currentYen) {
+      setEditing(false);
+      return;
+    }
+    setPendingYen(yen);
+  };
+
+  const confirm = async () => {
+    if (pendingYen === null) return;
+    setSaving(true);
+    const result = await updatePlanAllocationAction(planId, [{ genreId, targetYen: pendingYen }]);
     setSaving(false);
+    setPendingYen(null);
+    if (result.error !== null) {
+      setError(result.error);
+      return;
+    }
     setEditing(false);
+    router.refresh();
   };
 
   return (
@@ -792,36 +833,97 @@ function BudgetEditBlock({
       {editing ? (
         <div className="mt-2 flex gap-2">
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            aria-label="このカテゴリの目標額(円)"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="min-h-11 flex-1 rounded-xl px-3 text-lg font-semibold"
+            className="min-h-11 min-w-0 flex-1 rounded-xl px-3 text-lg font-semibold"
             style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
           />
           <button
             type="button"
-            onClick={() => void save()}
-            disabled={saving}
+            onClick={() => setEditing(false)}
+            className="min-h-11 rounded-xl px-3 text-sm font-semibold"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            やめる
+          </button>
+          <button
+            type="button"
+            onClick={review}
             className="min-h-11 rounded-xl px-4 text-sm font-semibold"
             style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
-            {saving ? '...' : '保存'}
+            保存
           </button>
         </div>
       ) : (
         <button
           type="button"
-          onClick={() => setEditing(true)}
-          className="mt-1 flex items-baseline gap-2"
+          onClick={startEdit}
+          className="mt-1 flex min-h-11 items-baseline gap-2"
         >
           <span className="text-2xl font-bold" style={{ color: 'var(--ink)' }}>
-            {currentBudget.toLocaleString()}円
+            {currentYen.toLocaleString()}円
           </span>
           <span className="text-sm" style={{ color: 'var(--accent)' }}>
             編集
           </span>
         </button>
       )}
+      {error ? (
+        <p role="alert" className="mt-2 text-xs" style={{ color: 'var(--state-caution)' }}>
+          {error}
+        </p>
+      ) : null}
+
+      <BottomSheet
+        open={change !== null}
+        onClose={() => {
+          if (!saving) setPendingYen(null);
+        }}
+        role="alertdialog"
+        label="目標の総額が変わります"
+      >
+        {change !== null && pendingYen !== null ? (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
+              目標の総額が変わります
+            </h2>
+            <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+              このカテゴリの目標を {currentYen.toLocaleString()}円 から{' '}
+              {pendingYen.toLocaleString()}円 にすると、目標の総額は
+            </p>
+            <p className="text-xl font-bold" style={{ color: 'var(--ink)' }}>
+              {change.beforeYen.toLocaleString()}円 → {change.afterYen.toLocaleString()}円
+            </p>
+            <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+              に変わります。ほかのカテゴリの目標はそのままです。
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingYen(null)}
+                disabled={saving}
+                className="min-h-11 flex-1 rounded-full text-sm font-semibold"
+                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+              >
+                やめる
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirm()}
+                disabled={saving}
+                className="min-h-11 flex-1 rounded-full text-sm font-semibold disabled:opacity-40"
+                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              >
+                {saving ? '変更しています' : '変更する'}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }
