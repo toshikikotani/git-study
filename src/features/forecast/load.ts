@@ -265,7 +265,10 @@ export async function loadForecast(args: {
       ? computeDailyLimit({
           leftBudgetYen: Math.max(
             0,
-            (args.budgetYen ?? 0) - forecast.actualYen - (forecast.committed?.scheduledYen ?? 0),
+            (args.budgetYen ?? 0) -
+              forecast.actualYen -
+              (forecast.committed?.scheduledYen ?? 0) -
+              (forecast.committed?.fixedYen ?? 0),
           ),
           remainingDayOffs: dayOffs,
           remainingWeekdays: weekdays,
