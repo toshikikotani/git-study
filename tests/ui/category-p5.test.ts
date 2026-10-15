@@ -132,8 +132,8 @@ const totalOf = (html: string): number => {
   return Number(m![1]!.replace(/,/g, ''));
 };
 
-describe('P5 3つのタブの合計は、家計簿のジャンル内訳と一致する(受け入れ基準3)', () => {
-  it('取引・品目・店の合計が、すべて家計簿のジャンル内訳の金額', () => {
+describe('P5 3つのタブの合計は、家計簿のカテゴリ内訳と一致する(受け入れ基準3)', () => {
+  it('取引・品目・店の合計が、すべて家計簿のカテゴリ内訳の金額', () => {
     expect(breakdownYen).toBe(1200 + 800 + 1000 - 300);
     expect(totalOf(render('tx'))).toBe(breakdownYen);
     expect(totalOf(render('items'))).toBe(breakdownYen);

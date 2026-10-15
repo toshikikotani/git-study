@@ -400,7 +400,7 @@ export default async function ReportsPage() {
         className="block text-xs font-medium"
         style={{ color: 'var(--accent)' }}
       >
-        AIによる客観的なジャンルで見る →
+        AIによる客観的なカテゴリで見る →
       </Link>
 
       <MerchantRankingCard ranking={merchantRanking} />

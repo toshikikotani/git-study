@@ -108,7 +108,7 @@ export async function listGenres(): Promise<Genre[]> {
     .order('name', { ascending: true });
   if (error) {
     if (isMissingTableError(error)) return [];
-    throw new GenreStoreError(`ジャンルを取得できませんでした: ${error.message}`);
+    throw new GenreStoreError(`カテゴリを取得できませんでした: ${error.message}`);
   }
   if (data.length > 0) return data.map(fromRow);
 
@@ -121,7 +121,7 @@ export async function listGenres(): Promise<Genre[]> {
   );
   if (insertError) {
     if (isMissingTableError(insertError)) return [];
-    throw new GenreStoreError(`ジャンルの初期値を作成できませんでした: ${insertError.message}`);
+    throw new GenreStoreError(`カテゴリの初期値を作成できませんでした: ${insertError.message}`);
   }
 
   return listGenres();
@@ -129,7 +129,7 @@ export async function listGenres(): Promise<Genre[]> {
 
 export async function createGenre(name: string): Promise<Genre> {
   const trimmed = name.trim();
-  if (trimmed === '') throw new GenreStoreError('ジャンル名を入力してください');
+  if (trimmed === '') throw new GenreStoreError('カテゴリ名を入力してください');
 
   const supabase = await createClient();
   const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -150,9 +150,9 @@ export async function createGenre(name: string): Promise<Genre> {
     .select('id, name, sort_order, budget_yen, show_on_home, forecast_closed')
     .single();
   if (error) {
-    if (isMissingTableError(error)) throw new GenreStoreError('ジャンル機能はまだ利用できません');
-    if (error.code === '23505') throw new GenreStoreError('同じ名前のジャンルが既にあります');
-    throw new GenreStoreError(`ジャンルを作成できませんでした: ${error.message}`);
+    if (isMissingTableError(error)) throw new GenreStoreError('カテゴリ機能はまだ利用できません');
+    if (error.code === '23505') throw new GenreStoreError('同じ名前のカテゴリが既にあります');
+    throw new GenreStoreError(`カテゴリを作成できませんでした: ${error.message}`);
   }
   return fromRow(data);
 }
@@ -189,7 +189,7 @@ export async function setGenreShowOnHome(id: string, showOnHome: boolean): Promi
 export async function deleteGenre(id: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from('genres').delete().eq('id', id);
-  if (error) throw new GenreStoreError(`ジャンルを削除できませんでした: ${error.message}`);
+  if (error) throw new GenreStoreError(`カテゴリを削除できませんでした: ${error.message}`);
 }
 
 export type GenreTarget =
@@ -311,7 +311,7 @@ export async function saveGenres(
       .from('receipt_items')
       .update({ genre_id: r.genreId })
       .eq('id', r.id);
-    if (error) throw new GenreStoreError(`品目のジャンルを保存できませんでした: ${error.message}`);
+    if (error) throw new GenreStoreError(`品目のカテゴリを保存できませんでした: ${error.message}`);
   }
 
   for (const r of results.filter((r) => r.kind === 'transaction')) {
@@ -319,7 +319,7 @@ export async function saveGenres(
       .from('transactions')
       .update({ genre_id: r.genreId, classified_by: 'ai', confidence: r.confidence })
       .eq('id', r.id);
-    if (error) throw new GenreStoreError(`明細のジャンルを保存できませんでした: ${error.message}`);
+    if (error) throw new GenreStoreError(`明細のカテゴリを保存できませんでした: ${error.message}`);
   }
 }
 
@@ -395,7 +395,7 @@ export async function loadGenreAnalysisView(now: Date = new Date()): Promise<Gen
       .select('id, name')
       .in('id', [...genreIds]);
     if (genresError)
-      throw new GenreStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+      throw new GenreStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
     for (const g of genres) genreNameById.set(g.id, g.name);
   }
 
@@ -460,7 +460,7 @@ async function computeQuickEntryInputs(now: Date): Promise<QuickEntryGenreInput[
   }
   if (error) {
     if (isMissingTableError(error)) return [];
-    throw new GenreStoreError(`ジャンルを取得できませんでした: ${error.message}`);
+    throw new GenreStoreError(`カテゴリを取得できませんでした: ${error.message}`);
   }
   if (genres === null) return [];
 

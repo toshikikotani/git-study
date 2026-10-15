@@ -33,7 +33,7 @@ describe('entryStatus', () => {
 });
 
 describe('summarizeLedger', () => {
-  it('実績の支出・収入・ジャンル別・日別を出す', () => {
+  it('実績の支出・収入・カテゴリ別・日別を出す', () => {
     const s = summarizeLedger(
       [
         entry({ id: 'a', amountYen: -1200, occurredOn: '2026-09-10' }),
@@ -110,7 +110,7 @@ describe('expandLedger(分割の子)', () => {
     expect(expandLedger([parent], new Map())).toEqual([parent]);
   });
 
-  it('子のジャンルが未設定なら親のジャンルを引き継ぎ、個別に付けたものは活かす', () => {
+  it('子のカテゴリが未設定なら親のカテゴリを引き継ぎ、個別に付けたものは活かす', () => {
     const children = expandLedger(
       [parent],
       new Map([

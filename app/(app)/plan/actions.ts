@@ -75,7 +75,7 @@ export async function suggestPlanAction(
     if (empty === 'unclassified') {
       return {
         error:
-          '記録されている支出がまだジャンルに分類されていないため、ジャンルごとの目標案を作れません。先にジャンル分類をすると作れます。',
+          '記録されている支出がまだカテゴリに分類されていないため、カテゴリごとの目標案を作れません。先にカテゴリ分類をすると作れます。',
         needsGenres: true,
       };
     }

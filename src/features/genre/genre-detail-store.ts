@@ -38,7 +38,7 @@ export async function loadGenreMonthDetail(
     .eq('id', genreId)
     .maybeSingle();
   if (genreError) {
-    throw new GenreDetailError(`ジャンルを取得できませんでした: ${genreError.message}`);
+    throw new GenreDetailError(`カテゴリを取得できませんでした: ${genreError.message}`);
   }
   if (!genre) return null;
 

@@ -139,7 +139,7 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
       '表示する月',
       '使った額のサマリー',
       '要確認',
-      'ジャンル別の内訳',
+      'カテゴリ別の内訳',
       'カレンダー',
       '明細',
     ].map((k) => html.indexOf(`aria-label="${k}`));
@@ -165,7 +165,7 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
   });
 
   it('分割した明細は、子の羅列ではなく比率のバー(role=img)', () => {
-    expect(html).toContain('ジャンルの内訳:カフェ・飲料 2,000円、外食 1,000円');
+    expect(html).toContain('カテゴリの内訳:カフェ・飲料 2,000円、外食 1,000円');
     expect(html).toContain('阪神大阪梅田駅店');
   });
 
@@ -192,10 +192,10 @@ describe('F4 明細の行', () => {
     ),
   );
 
-  it('未分類の行は、「?」やグレーのバーではなく、行の中の「ジャンルを選ぶ」チップ(受け入れ基準5)', () => {
-    expect(html).toContain('ジャンルを選ぶ');
+  it('未分類の行は、「?」やグレーのバーではなく、行の中の「カテゴリを選ぶ」チップ(受け入れ基準5)', () => {
+    expect(html).toContain('カテゴリを選ぶ');
     // 未分類は1件だけ → チップも1つ
-    expect(html.match(/ジャンルを選ぶ/g)).toHaveLength(1);
+    expect(html.match(/カテゴリを選ぶ/g)).toHaveLength(1);
     expect(html).not.toContain('未分類</span>'); // 「未分類」ラベルのバッジを出さない
   });
 
@@ -216,7 +216,7 @@ describe('F4 明細の行', () => {
   });
 });
 
-describe('ジャンル行(目標画面と共通)', () => {
+describe('カテゴリ行(目標画面と共通)', () => {
   it('予算あり:状態とアイコン・ラベル、読み上げ。予算なし:状態を出さない', () => {
     const withBudget = renderToString(
       h(GenreBudgetRow, {
@@ -297,7 +297,7 @@ describe('F5 カレンダー', () => {
   });
 });
 
-describe('ジャンル内訳と、ジャンルの月の目安', () => {
+describe('カテゴリ内訳と、カテゴリの月の目安', () => {
   const render = (goalActive: boolean) =>
     visible(
       renderToString(

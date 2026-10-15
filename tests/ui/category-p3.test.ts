@@ -88,7 +88,7 @@ describe('P3 サマリー(画面)', () => {
     expect(noPrev).not.toContain('目標期間 ');
   });
 
-  it('目標期間中は、共通のジャンル行(予算バー・理想ライン・状態)を出す', () => {
+  it('目標期間中は、共通のカテゴリ行(予算バー・理想ライン・状態)を出す', () => {
     const withGoal = visible(
       renderToString(
         h(CategoryScreen, {

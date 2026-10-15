@@ -34,7 +34,7 @@ describe('P2 遷移の入り口(受け入れ基準1)', () => {
     expect(categoryHref('none', '2026-08')).toBe('/spending/category/none?month=2026-08');
   });
 
-  it('ジャンル行(目標・家計簿で共通)は、href があるとリンクになり、詳細を開くと読み上げる', () => {
+  it('カテゴリ行(目標・家計簿で共通)は、href があるとリンクになり、詳細を開くと読み上げる', () => {
     const html = visible(
       renderToString(
         h(GenreBudgetRow, {
@@ -52,7 +52,7 @@ describe('P2 遷移の入り口(受け入れ基準1)', () => {
     expect(html).toContain('min-h-11');
   });
 
-  it('家計簿のジャンル内訳の各行は、絞り込みではなくカテゴリ詳細へのリンク(未分類も)', () => {
+  it('家計簿のカテゴリ内訳の各行は、絞り込みではなくカテゴリ詳細へのリンク(未分類も)', () => {
     const txs = [
       {
         ...ledgerTx({ id: 'a', occurredOn: '2026-09-05', genreId: 'dining', amountYen: -1200 }),

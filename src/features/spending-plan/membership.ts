@@ -15,7 +15,7 @@ async function userId() {
 export async function listGenreOptions(): Promise<{ genreId: string; genreName: string }[]> {
   const { supabase } = await userId();
   const { data, error } = await supabase.from('genres').select('id, name').order('sort_order');
-  if (error) throw new PlanMembershipError(`ジャンルを取得できませんでした: ${error.message}`);
+  if (error) throw new PlanMembershipError(`カテゴリを取得できませんでした: ${error.message}`);
   return (data ?? []).map((genre) => ({ genreId: genre.id, genreName: genre.name }));
 }
 

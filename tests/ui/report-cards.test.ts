@@ -47,7 +47,7 @@ describe('レポートの着地まわりのカード', () => {
       ),
     );
     // デザインの「見通し」のジャンル別(ADR-085):見込み / 目標、超える確率と1行の提案。
-    expect(html).toContain('ジャンル別');
+    expect(html).toContain('カテゴリ別');
     expect(html).toContain('約5.0万円');
     expect(html).toContain('/ 目標 4.2万円');
     expect(html).toContain('70%の確率で 目標を超えます · 週1回へらすと約6,200円減');
@@ -64,7 +64,7 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).toContain('塗った帯は使った額');
   });
 
-  it('決まった支出は1行に畳み、見込みの無いジャンルは言葉で出す', () => {
+  it('決まった支出は1行に畳み、見込みの無いカテゴリは言葉で出す', () => {
     const html = visible(
       renderToString(
         h(LandingRangesCard, {
@@ -113,7 +113,7 @@ describe('レポートの着地まわりのカード', () => {
     expect(html).not.toContain('36,940円〜36,940円');
   });
 
-  it('「これ以上は使わない」のジャンルは、守れたら・いつもの守り方なら の2つを出す(設計書 v3 4.7)', () => {
+  it('「これ以上は使わない」のカテゴリは、守れたら・いつもの守り方なら の2つを出す(設計書 v3 4.7)', () => {
     const html = visible(
       renderToString(
         h(LandingRangesCard, {

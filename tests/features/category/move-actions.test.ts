@@ -110,7 +110,7 @@ describe('P6 カテゴリの移動の保存', () => {
     });
   });
 
-  it('Undo:移す前のジャンル・分類者・分割・品目のジャンルを書き戻す', async () => {
+  it('Undo:移す前のカテゴリ・分類者・分割・品目のカテゴリを書き戻す', async () => {
     const { previous } = await moveTransactionsAction({
       ids: ['t1'],
       fromGenreId: 'dining',

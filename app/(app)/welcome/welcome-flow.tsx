@@ -82,7 +82,7 @@ export function WelcomeFlow({
     }
     if (step === 2) {
       if (chosen.length === 0) {
-        setError('目標にするジャンルを1つ以上選んでください');
+        setError('目標にするカテゴリを1つ以上選んでください');
         return;
       }
       if (chosen.some((r) => r.yen === null)) {
@@ -141,7 +141,7 @@ export function WelcomeFlow({
           {step === 1
             ? '使える額と、給料日までの期間を出すのに使います。あとから設定で変えられます。'
             : step === 2
-              ? '今日から、よく使うジャンルにいくらまで使うかを決めます。額は手取りからの目安です。自由に直してください。'
+              ? '今日から、よく使うカテゴリにいくらまで使うかを決めます。額は手取りからの目安です。自由に直してください。'
               : '何のために、いくら貯めたいかを決めると、毎月いくら残せばいいかが見えます。'}
         </p>
       </header>
@@ -203,7 +203,7 @@ export function WelcomeFlow({
 
             {rows.length === 0 ? (
               <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-                ジャンルを読み込めませんでした。目標の画面から立ててください。
+                カテゴリを読み込めませんでした。目標の画面から立ててください。
               </p>
             ) : (
               <ul className="space-y-2">

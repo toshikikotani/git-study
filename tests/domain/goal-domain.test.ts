@@ -21,7 +21,7 @@ const goal: GoalSnapshot = {
 const TODAY = '2026-09-30';
 
 describe('goalImpact(受け入れ基準8:保存前 → 保存後の残り予算)', () => {
-  it('影響するジャンルの、保存前と保存後の残りを出す', () => {
+  it('影響するカテゴリの、保存前と保存後の残りを出す', () => {
     const r = goalImpact(goal, {
       occurredOn: TODAY,
       today: TODAY,
@@ -38,7 +38,7 @@ describe('goalImpact(受け入れ基準8:保存前 → 保存後の残り予算)
     });
   });
 
-  it('目標のないジャンル(予算0円)は影響の行に出さない', () => {
+  it('目標のないカテゴリ(予算0円)は影響の行に出さない', () => {
     const r = goalImpact(goal, {
       occurredOn: TODAY,
       today: TODAY,
@@ -64,7 +64,7 @@ describe('goalImpact(受け入れ基準8:保存前 → 保存後の残り予算)
 });
 
 describe('needsKindChoice(含める/特別費を選ばせる条件)', () => {
-  it('未来日、またはそのジャンルの予算の50%以上なら選ばせる', () => {
+  it('未来日、またはそのカテゴリの予算の50%以上なら選ばせる', () => {
     const t = { today: TODAY };
     expect(
       needsKindChoice(goal, {
@@ -146,13 +146,13 @@ describe('振り返り', () => {
   ]);
   const review = buildGoalReview({ items, actualByGenre: actual });
 
-  it('うまくいった点1つと、次に見直すジャンル1つ', () => {
+  it('うまくいった点1つと、次に見直すカテゴリ1つ', () => {
     expect(review.goodPoint).toBe('食料品は目標より5,000円少なく収まりました。');
     expect(review.reviewGenre).toMatchObject({ genreName: '外食' });
     expect(review.reviewGenre!.reason).toContain('2,000円多く');
   });
 
-  it('全部達成なら、余りを伝え、いちばん余裕の少ないジャンルを次の見直しに', () => {
+  it('全部達成なら、余りを伝え、いちばん余裕の少ないカテゴリを次の見直しに', () => {
     const r = buildGoalReview({
       items,
       actualByGenre: new Map([
@@ -161,7 +161,7 @@ describe('振り返り', () => {
         ['cafe', 3000],
       ]),
     });
-    expect(r.goodPoint).toContain('すべてのジャンルが目標内');
+    expect(r.goodPoint).toContain('すべてのカテゴリが目標内');
     expect(r.reviewGenre!.genreName).toBe('カフェ・飲料');
   });
 

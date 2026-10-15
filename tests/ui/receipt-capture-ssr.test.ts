@@ -176,10 +176,10 @@ describe('F7 手入力の画面(受け入れ基準14・15・17)', () => {
       ),
     );
 
-  it('画像とフォームが同じ画面にあり、入力順は 金額 → 日付 → 店名 → ジャンル → 口座 → メモ', () => {
+  it('画像とフォームが同じ画面にあり、入力順は 金額 → 日付 → 店名 → カテゴリ → 口座 → メモ', () => {
     const html = render(capture());
     expect(html).toContain('src="https://example.test/receipt.jpg"');
-    const order = ['金額', '日付', '店名', 'ジャンル', '口座', 'メモ'].map((k) =>
+    const order = ['金額', '日付', '店名', 'カテゴリ', '口座', 'メモ'].map((k) =>
       html.indexOf(`>${k}</label>`) >= 0 ? html.indexOf(`>${k}</label>`) : html.indexOf(`>${k}</`),
     );
     expect(order.every((i) => i >= 0)).toBe(true);

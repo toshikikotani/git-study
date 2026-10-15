@@ -128,7 +128,7 @@ describe('入力して保存(受け入れ基準14)', () => {
     memo: '夜食',
   };
 
-  it('金額・日付・店名・ジャンルを入力して保存すると、支出の明細になり、入力待ちが片付く', async () => {
+  it('金額・日付・店名・カテゴリを入力して保存すると、支出の明細になり、入力待ちが片付く', async () => {
     store.getCapture.mockResolvedValue({ id: 'cap-1', status: 'needs_input' });
     saveBatch.mockResolvedValue({
       imported: 1,
@@ -153,7 +153,7 @@ describe('入力して保存(受け入れ基準14)', () => {
     expect(store.resolveCapture).toHaveBeenCalledWith('cap-1', 'tx-1');
   });
 
-  it('店名とジャンルを、分類の履歴(学習)へ反映する', async () => {
+  it('店名とカテゴリを、分類の履歴(学習)へ反映する', async () => {
     store.getCapture.mockResolvedValue({ id: 'cap-1', status: 'needs_input' });
     saveBatch.mockResolvedValue({
       imported: 1,

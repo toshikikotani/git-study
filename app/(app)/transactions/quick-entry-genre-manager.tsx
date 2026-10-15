@@ -97,7 +97,7 @@ export function QuickEntryGenreManager({
           カテゴリの並べ替え・非表示
         </p>
         <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          ▲▼で並べ替え、目のアイコンで格子から隠せます(ジャンル自体は残ります)。
+          ▲▼で並べ替え、目のアイコンで格子から隠せます(カテゴリ自体は残ります)。
         </p>
 
         {items === null ? (
@@ -188,13 +188,13 @@ export function QuickEntryGenreManager({
 
         <div className="mt-5">
           <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
-            新しいジャンルを追加
+            新しいカテゴリを追加
           </p>
           <div className="flex gap-2">
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="ジャンル名"
+              placeholder="カテゴリ名"
               disabled={saving}
               className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm outline-none"
               style={{

@@ -125,7 +125,7 @@ describe('H フィルター(ボトムシート)', () => {
     expect(html).not.toContain('ローソン');
   });
 
-  it('横スクロールのチップ行(口座・ジャンル・期間のセレクト)はなくなった', () => {
+  it('横スクロールのチップ行(口座・カテゴリ・期間のセレクト)はなくなった', () => {
     const html = render({}, [h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 })]);
     expect(html).not.toContain('口座で絞り込む');
     expect(html).toContain('明細を検索');
@@ -151,11 +151,11 @@ describe('H 手入力(レシートなし)と共通のフォーム', () => {
     recentStores: ['ローソン', 'ファミリーマート'],
   };
 
-  it('quick: 金額 → ジャンル(アイコンの格子)→ 最近使った店 → 日付 → 口座 → メモ', () => {
+  it('quick: 金額 → カテゴリ(アイコンの格子)→ 最近使った店 → 日付 → 口座 → メモ', () => {
     const html = visible(renderToString(h(ManualEntryForm, { ...props, variant: 'quick' })));
     const order = [
       '>金額</label>',
-      '>ジャンル</label>',
+      '>カテゴリ</label>',
       '>店名</label>',
       '>日付</label>',
       '>口座</label>',
@@ -167,13 +167,13 @@ describe('H 手入力(レシートなし)と共通のフォーム', () => {
     expect(html).toContain('ローソン'); // 最近使った店
   });
 
-  it('receipt(F7の画面)は 金額 → 日付 → 店名 → ジャンル → 口座 → メモ。同じ部品', () => {
+  it('receipt(F7の画面)は 金額 → 日付 → 店名 → カテゴリ → 口座 → メモ。同じ部品', () => {
     const html = visible(renderToString(h(ManualEntryForm, { ...props })));
     const order = [
       '>金額</label>',
       '>日付</label>',
       '>店名</label>',
-      '>ジャンル</label>',
+      '>カテゴリ</label>',
       '>口座</label>',
       '>メモ</label>',
     ].map((k) => html.indexOf(k));

@@ -11,7 +11,7 @@ vi.mock('../../app/(app)/plan/actions', () => ({
 }));
 
 describe('F6 動きと細部', () => {
-  it('バーの色はジャンルの色を灰に寄せて落ち着かせる(アイコン色はそのまま)', () => {
+  it('バーの色はカテゴリの色を灰に寄せて落ち着かせる(アイコン色はそのまま)', () => {
     expect(genreBarColor('外食')).toContain('light-dark');
     expect(genreBarColor('外食')).toContain('#f0d09a');
     expect(genreBarColor(null)).toContain('--ink-muted');

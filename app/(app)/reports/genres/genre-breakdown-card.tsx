@@ -84,15 +84,15 @@ export function GenreBreakdownCard({
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        今月のジャンル別支出
+        今月のカテゴリ別支出
       </h2>
       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        本人が付けたカテゴリとは別に、AIが内容から機械的に割り当てた客観的なジャンルです。
+        まだ分類していない支出は、「カテゴリ分類する」でAIが内容から客観的に割り当てます。
       </p>
 
       {genreTotals.length === 0 ? (
         <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          まだジャンル分類された支出がありません。
+          まだカテゴリ分類された支出がありません。
         </p>
       ) : (
         <>
@@ -139,7 +139,7 @@ export function GenreBreakdownCard({
             >
               <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
                 明細1件ごとに本人が付けた「絶対払わざるを得ないもの」のラベル
-                (ジャンルとは独立)で、今月の支出を分けています。
+                (カテゴリとは独立)で、今月の支出を分けています。
               </p>
 
               <div
@@ -194,7 +194,7 @@ export function GenreBreakdownCard({
         >
           {running && progressScope === 'month'
             ? `分類しています…(${progressCount ?? 0}件済み)`
-            : `今月の${pendingCount}件をジャンル分類する`}
+            : `今月の${pendingCount}件をカテゴリ分類する`}
         </button>
       ) : null}
 

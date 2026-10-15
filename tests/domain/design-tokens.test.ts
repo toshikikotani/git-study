@@ -13,7 +13,7 @@ function definedInAllThemes(token: string): boolean {
 }
 
 describe('デザイントークン', () => {
-  it('ジャンルの色 10 色 + 未分類のグレーが、light / dark の全テーマで定義されている', () => {
+  it('カテゴリの色 10 色 + 未分類のグレーが、light / dark の全テーマで定義されている', () => {
     for (let i = 1; i <= GENRE_COLOR_COUNT; i += 1) {
       expect(definedInAllThemes(`--genre-${i}`), `--genre-${i}`).toBe(true);
     }
@@ -27,13 +27,13 @@ describe('デザイントークン', () => {
     }
   });
 
-  it('既定のジャンルはすべて色とアイコンを持ち、色の割り当ては決定的', () => {
+  it('既定のカテゴリはすべて色とアイコンを持ち、色の割り当ては決定的', () => {
     for (const name of ['食料品', '外食', 'カフェ・飲料', '日用品', '旅行', 'その他']) {
       const style = genreStyle(name);
       expect(style.colorIndex).toBeGreaterThanOrEqual(1);
       expect(style.colorIndex).toBeLessThanOrEqual(GENRE_COLOR_COUNT);
     }
-    expect(genreColorVar('自作のジャンル')).toBe(genreColorVar('自作のジャンル'));
+    expect(genreColorVar('自作のカテゴリ')).toBe(genreColorVar('自作のカテゴリ'));
     expect(genreColorVar(null)).toBe('var(--genre-none)');
     expect(genreStyle(null).icon).toBe('uncategorized');
   });

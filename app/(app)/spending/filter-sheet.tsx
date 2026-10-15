@@ -87,7 +87,7 @@ export function FilterSheet({ goalRange }: { goalRange: { from: string; to: stri
             ) : null}
           </Group>
 
-          <Group label="ジャンル">
+          <Group label="カテゴリ">
             <Choice on={filter.genreId === null} onClick={() => setFilter({ genreId: null })}>
               すべて
             </Choice>
@@ -214,7 +214,7 @@ export function ActiveFilterChips({
     const name =
       filter.genreId === 'none'
         ? '未分類'
-        : (genres.find((g) => g.id === filter.genreId)?.name ?? 'ジャンル');
+        : (genres.find((g) => g.id === filter.genreId)?.name ?? 'カテゴリ');
     chips.push({
       key: 'genre',
       label: `${name}で絞り込み中`,

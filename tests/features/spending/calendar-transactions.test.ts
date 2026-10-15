@@ -123,13 +123,13 @@ describe('loadCalendarMonth', () => {
     expect(result.map((t) => t.label)).toEqual(['一蘭', 'コンビニ']);
   });
 
-  it('明細本体のジャンルが空でも、品目から決めた代表ジャンルを使う', async () => {
+  it('明細本体のカテゴリが空でも、品目から決めた代表カテゴリを使う', async () => {
     const { transactions: result } = await loadCalendarMonth('2026-10-01', NOW);
     expect(result.find((t) => t.id === 't1')).toMatchObject({ genreId: 'g1', genreName: '外食' });
     expect(result.find((t) => t.id === 't3')).toMatchObject({ genreId: 'g2', genreName: '食料品' });
   });
 
-  it('ジャンル別の内訳もその月のものを、金額の大きい順・予算つきで返す', async () => {
+  it('カテゴリ別の内訳もその月のものを、金額の大きい順・予算つきで返す', async () => {
     const { genreBreakdown } = await loadCalendarMonth('2026-10-01', NOW);
     expect(genreBreakdown.map((r) => [r.genreName, r.spentYen, r.budgetYen])).toEqual([
       ['外食', 900, 1000],

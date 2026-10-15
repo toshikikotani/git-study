@@ -47,12 +47,12 @@ describe('outingShockOf', () => {
     expect(shock!.shape).toBeGreaterThanOrEqual(3);
   });
 
-  it('外出でないジャンルには入れない', () => {
+  it('外出でないカテゴリには入れない', () => {
     expect(outingShockOf([days((i) => (i % 4 === 0 ? 4 : 0), '食料品')])).toBeNull();
   });
 });
 
-describe('ジャンルごとの今月の水準 M_g', () => {
+describe('カテゴリごとの今月の水準 M_g', () => {
   // 外食と食料品を毎日1回ずつ。今月は外食だけ1日3回に増えている。
   const history = eachDay('2026-06-01', '2026-09-30').flatMap((d) => [
     tx({ occurredOn: d, amountYen: -1000 }),

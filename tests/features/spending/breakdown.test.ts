@@ -31,7 +31,7 @@ function tx(
 }
 
 describe('buildGenreBreakdown', () => {
-  it('指定した月の支出だけをジャンルごとに集め、金額の大きい順に並べる', () => {
+  it('指定した月の支出だけをカテゴリごとに集め、金額の大きい順に並べる', () => {
     const result = buildGenreBreakdown(
       genres,
       [
@@ -49,7 +49,7 @@ describe('buildGenreBreakdown', () => {
     ]);
   });
 
-  it('支出の無いジャンルは出さない', () => {
+  it('支出の無いカテゴリは出さない', () => {
     const result = buildGenreBreakdown(genres, [tx({ categoryId: 'g1' })], '2026-08', TODAY);
     expect(result.map((r) => r.genreName)).toEqual(['外食']);
   });

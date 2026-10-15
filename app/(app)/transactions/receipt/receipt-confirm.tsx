@@ -461,13 +461,13 @@ export function ReceiptConfirm({
             <div className="rounded-2xl p-3" style={{ background: 'var(--plane)' }}>
               <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
                 {selected.size > 0
-                  ? `${selected.size}件を選択中 ─ ジャンルをタップで一括変更`
-                  : '品目をタップして選ぶと、ジャンルを一括で変えられます'}
+                  ? `${selected.size}件を選択中 ─ カテゴリをタップで一括変更`
+                  : '品目をタップして選ぶと、カテゴリを一括で変えられます'}
               </p>
               <div
                 className="mt-2 flex gap-2 overflow-x-auto pb-1"
                 role="group"
-                aria-label="ジャンル"
+                aria-label="カテゴリ"
               >
                 {genres.map((g) => (
                   <button
@@ -533,7 +533,7 @@ export function ReceiptConfirm({
         <div className="grid grid-cols-2 gap-2">
           <label className="col-span-2 block">
             <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-              明細のジャンル
+              明細のカテゴリ
             </span>
             <select
               value={parentGenreId ?? ''}
@@ -591,7 +591,7 @@ export function ReceiptConfirm({
             <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
               {choice.reason === 'scheduled'
                 ? '今日より先の日付です。'
-                : 'このジャンルの予算の半分以上になる支払いです。'}
+                : 'このカテゴリの予算の半分以上になる支払いです。'}
               目標の扱いを選んでください
             </p>
             <div className="mt-2 flex gap-2">
@@ -898,7 +898,7 @@ const IMPACT_REASON: Record<string, string> = {
   special: '特別費として別枠にするので、目標のペースには含めません。',
   scheduled: '今日より先の予定なので、目標のペースには含めません。',
   outside_period: '目標の期間の外なので、目標には含めません。',
-  no_target: '目標のあるジャンルではないので、目標には含めません。',
+  no_target: '目標のあるカテゴリではないので、目標には含めません。',
 };
 
 /** 保存前 → 保存後の残り予算を、影響のあるジャンルごとにミニバーで見せる。 */

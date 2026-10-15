@@ -47,7 +47,7 @@ describe('なぜこの見込み?(わかりやすい言葉で、決まってい�
     expect(html).toContain('残り25日・1日 約3,700円');
   });
 
-  it('「残りの変動費」ではなく、ふだんの買い物として、ジャンルと1日あたりで出す', () => {
+  it('「残りの変動費」ではなく、ふだんの買い物として、カテゴリと1日あたりで出す', () => {
     expect(html).not.toContain('残りの変動費');
     expect(html).toContain('ふだんの買い物 約8.3万円');
     expect(html).toContain('外食');

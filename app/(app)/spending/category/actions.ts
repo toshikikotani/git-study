@@ -38,7 +38,14 @@ import {
 import { recordCorrection } from '@/features/genre/memory-store';
 import { deletePromise, savePromise } from '@/features/forecast/promise-store';
 import { promiseAmountsFor } from '@/features/forecast/what-if';
-import { listGenres, setGenreForecastClosed, updateGenreBudget } from '@/features/genre/store';
+import {
+  createGenre,
+  deleteGenre,
+  listGenres,
+  setGenreForecastClosed,
+  setGenreShowOnHome,
+  updateGenreBudget,
+} from '@/features/genre/store';
 import { renameGenre, saveGenreStyle } from '@/features/genre/style-store';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { describeUserError } from '@/lib/errors';
@@ -596,6 +603,43 @@ export async function setCategoryForecastClosedAction(
   } catch (error) {
     return { error: error instanceof Error ? error.message : '予測の停止を保存できませんでした' };
   }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** カテゴリを足す(一覧の末尾に入る)。 */
+export async function createCategoryAction(name: string): Promise<{ error: string | null }> {
+  try {
+    await createGenre(name);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** カテゴリを消す。使った明細・品目は「未分類」に戻る。 */
+export async function deleteCategoryAction(genreId: string): Promise<{ error: string | null }> {
+  try {
+    await deleteGenre(genreId);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** ホームに残額を出すカテゴリか。 */
+export async function setCategoryShowOnHomeAction(
+  genreId: string,
+  showOnHome: boolean,
+): Promise<{ error: string | null }> {
+  try {
+    await setGenreShowOnHome(genreId, showOnHome);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
   return { error: null };
 }
 
@@ -637,7 +681,7 @@ export async function decideCategoryPromiseAction(
         return { error: '回数を選び直してください' };
       }
       const genre = (await listGenres()).find((g) => g.id === genreId);
-      if (genre === undefined) return { error: 'ジャンルが見つかりませんでした' };
+      if (genre === undefined) return { error: 'カテゴリが見つかりませんでした' };
       const amounts = await promiseAmountsFor({
         genreId,
         genreName: genre.name,
@@ -645,7 +689,7 @@ export async function decideCategoryPromiseAction(
         perWeek,
       });
       if (amounts === null) {
-        return { error: 'このジャンルは、今は約束の見込みを出せません' };
+        return { error: 'このカテゴリは、今は約束の見込みを出せません' };
       }
       await savePromise({
         genreId,

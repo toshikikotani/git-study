@@ -190,13 +190,13 @@ export function AllocationEditor({
         </label>
       </div>
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        総額を書き換えて確定すると、全ジャンルの配分が比率で自動的に増減します。
+        総額を書き換えて確定すると、全カテゴリの配分が比率で自動的に増減します。
       </p>
       <label className="flex items-center justify-between gap-3 text-xs">
         <span style={{ color: 'var(--ink-secondary)' }}>
           {lockTotal
-            ? '総額を固定する(ジャンルを動かしても総額は変わらない)'
-            : '総額を固定しない(ジャンルを動かすと総額が増減する)'}
+            ? '総額を固定する(カテゴリを動かしても総額は変わらない)'
+            : '総額を固定しない(カテゴリを動かすと総額が増減する)'}
         </span>
         <input
           type="checkbox"
@@ -217,7 +217,7 @@ export function AllocationEditor({
         {!allValid
           ? '金額を0円以上の整数で入力してください'
           : !lockTotal
-            ? `ジャンルの合計 ${formatYen(allocated, { sign: 'never' })} がそのまま総額になります`
+            ? `カテゴリの合計 ${formatYen(allocated, { sign: 'never' })} がそのまま総額になります`
             : unallocated === null
               ? '総額を数字で入力してください'
               : unallocated === 0

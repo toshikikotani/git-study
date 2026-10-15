@@ -1,0 +1,50 @@
+import { createElement as h } from 'react';
+import { renderToString } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
+    h('a', { href }, children),
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  usePathname: () => '/settings/categories',
+}));
+vi.mock('../../app/(app)/spending/category/actions', () => ({
+  createCategoryAction: vi.fn(),
+  setCategoryShowOnHomeAction: vi.fn(),
+}));
+
+import { CategoryList } from '../../app/(app)/settings/categories/category-list';
+
+const visible = (html: string) => html.replace(/<!-- -->/g, '');
+
+describe('設定 > カテゴリ', () => {
+  const html = visible(
+    renderToString(
+      h(CategoryList, {
+        categories: [
+          { id: 'dining', name: '外食', showOnHome: true },
+          { id: 'cafe', name: 'カフェ', showOnHome: false },
+        ],
+      }),
+    ),
+  );
+
+  it('行を開くと、そのカテゴリの設定ページへ行く', () => {
+    expect(html).toContain('href="/settings/categories/dining"');
+    expect(html).toContain('href="/settings/categories/cafe"');
+  });
+
+  it('ホームに出すかはスイッチで、状態を文字でも示す', () => {
+    expect(html.match(/role="switch"/g)?.length).toBe(2);
+    expect(html).toContain('aria-checked="true"');
+    expect(html).toContain('ホームに表示');
+    expect(html).toContain('ホームに出さない');
+  });
+
+  it('カテゴリを追加できる', () => {
+    expect(html).toContain('カテゴリを追加');
+    expect(html).toContain('新しいカテゴリ名');
+  });
+});

@@ -162,7 +162,7 @@ export function PlanBuilder({
         ) : null}
       </summary>
       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        カレンダーで期間を選ぶと、AIが過去の支出と課題から、ジャンルごとの目標を提案します。
+        カレンダーで期間を選ぶと、AIが過去の支出と課題から、カテゴリごとの目標を提案します。
         提案は目安なので、あとから自由に直せます。
       </p>
 
@@ -215,7 +215,7 @@ export function PlanBuilder({
 
       <div className="mt-3">
         <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          改善の強さ(課題のあるジャンルを、今回どこまで削るか)
+          改善の強さ(課題のあるカテゴリを、今回どこまで削るか)
         </p>
         <div className="mt-2 flex gap-2">
           {PLAN_STEP_OPTIONS.map((option) => (
@@ -293,22 +293,22 @@ export function PlanBuilder({
           {suggestion.uncategorizedYen > 0 ? (
             <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               未分類の支出が{formatYen(suggestion.uncategorizedYen, { sign: 'never' })}
-              。分類すると目標に入ります あり、目標に含まれていません。先に
+              あり、目標に含まれていません。先に
               <Link
                 href="/reports/genres"
                 className="min-h-11 inline-flex items-center font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
-                ジャンル分類
+                カテゴリ分類
               </Link>
-              すると、より正確な案になります。
+              すると目標に入り、より正確な案になります。
             </p>
           ) : null}
 
           {suggestion.noRecord.length > 0 ? (
             <details className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               <summary className="min-h-11 cursor-pointer font-semibold">
-                予算なし({suggestion.noRecord.length}件・記録がないジャンル)
+                予算なし({suggestion.noRecord.length}件・記録がないカテゴリ)
               </summary>
               <p className="mt-1 leading-relaxed">{suggestion.noRecord.join('、')}</p>
             </details>
@@ -340,7 +340,7 @@ export function PlanBuilder({
               className="min-h-11 ml-1 inline-flex items-center font-semibold"
               style={{ color: 'var(--accent)' }}
             >
-              ジャンル分類へ
+              カテゴリ分類へ
             </Link>
           ) : null}
         </p>

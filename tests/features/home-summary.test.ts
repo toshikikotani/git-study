@@ -40,7 +40,7 @@ describe('buildHomeTiles — 表示名はデータから来る(ADR-016)', () => 
     expect(renamedAgain[0]!.label).toBe('たのしみ枠');
   });
 
-  it('日本語のジャンル名がコードに直書きされていない', async () => {
+  it('日本語のカテゴリ名がコードに直書きされていない', async () => {
     // 表示名を1つも渡さなければ、画面に出せるラベルは1つも無いはず。
     // ここで何か出てくるなら、どこかに名前が焼き付いている。
     expect(buildHomeTiles([], [])).toEqual([]);
@@ -98,7 +98,7 @@ describe('buildHomeTiles — 残額', () => {
     expect(tile!.usageRatio).toBeCloseTo(0.75);
   });
 
-  it('他ジャンルの支出は混ざらない', () => {
+  it('他カテゴリの支出は混ざらない', () => {
     const [tile] = buildHomeTiles([genre()], [spend('genre-living', -50_000)]);
     expect(tile!.spentYen).toBe(0);
   });

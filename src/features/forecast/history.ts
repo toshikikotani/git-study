@@ -28,7 +28,7 @@ export async function loadForecastHistory(range: {
 
   const genres = await supabase.from('genres').select('id, name');
   if (genres.error) {
-    throw new ForecastHistoryError(`ジャンルを取得できませんでした: ${genres.error.message}`);
+    throw new ForecastHistoryError(`カテゴリを取得できませんでした: ${genres.error.message}`);
   }
   const nameById = new Map(genres.data.map((g) => [g.id, g.name]));
 

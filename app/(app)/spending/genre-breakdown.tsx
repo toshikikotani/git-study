@@ -68,10 +68,10 @@ export function GenreBreakdown({
   const maxYen = Math.max(...rows.map((r) => r.spentYen), 1);
 
   return (
-    <section aria-label="ジャンル別の内訳" className="space-y-3">
+    <section aria-label="カテゴリ別の内訳" className="space-y-3">
       <div className="flex items-baseline justify-between gap-3 px-1 pt-2">
         <h2 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>
-          ジャンル別
+          カテゴリ別
         </h2>
         {goalRows !== null && isCurrentMonth ? (
           <div role="radiogroup" aria-label="集計の範囲" className="flex gap-1 text-xs">

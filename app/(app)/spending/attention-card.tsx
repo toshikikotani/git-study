@@ -181,7 +181,7 @@ function AttentionFixer({
     markHandled(key);
     if (result.previous) {
       const previous = result.previous;
-      pushUndo(`${current.tx.label} のジャンルを変更しました`, async () => {
+      pushUndo(`${current.tx.label} のカテゴリを変更しました`, async () => {
         const r = await restoreRowFieldsAction(previous);
         if (r.error) return r.error;
         setHandled((prev) => {
@@ -276,7 +276,7 @@ function AttentionFixer({
             {current.reason === 'uncategorized' ? (
               <div>
                 <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                  ジャンルを選んでください
+                  カテゴリを選んでください
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {genres.map((g) => (

@@ -165,7 +165,7 @@ export async function listReceiptItemsForTransactionIds(
 
   const { data: genres, error: genresError } = await supabase.from('genres').select('id, name');
   if (genresError) {
-    throw new ReceiptItemStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new ReceiptItemStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
   const genreNameById = new Map(genres.map((g) => [g.id, g.name]));
 

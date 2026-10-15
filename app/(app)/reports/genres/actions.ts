@@ -1,30 +1,25 @@
 'use server';
 
 /**
- * 支出ジャンル分析(/reports/genres)の Server Action(本人発案、ADR-056)。
+ * カテゴリ分析(/reports/genres)の Server Action(本人発案、ADR-056)。
  *
- * 「ジャンル分類する」は AI家計診断(ADR-030)の diagnoseSpendingAction() と
- * 同じ、本人がボタンを押した時だけ AI を呼ぶ唯一の入り口。ジャンルの追加・
- * 削除は /rules の createCategoryAction()/deleteCategoryAction() と同じ形。
+ * 「カテゴリ分類する」は AI家計診断(ADR-030)の diagnoseSpendingAction() と
+ * 同じ、本人がボタンを押した時だけ AI を呼ぶ唯一の入り口。カテゴリの追加・削除などの
+ * 管理は「設定 > カテゴリ」(/settings/categories)に一本化した。
  */
 
 import { revalidatePath } from 'next/cache';
 
 import { ClaudeGenreClassifier } from '@/features/genre/genre-ai';
 import {
-  createGenre,
-  deleteGenre,
   GenreStoreError,
   listGenres,
   listUngenredSpendTargets,
   listUngenredSpendTargetsAllPeriods,
   MAX_BATCH_SIZE,
   saveGenres,
-  setGenreShowOnHome,
-  updateGenreBudget,
 } from '@/features/genre/store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
-import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
 
 export type ClassifyGenresActionResult = {
@@ -46,7 +41,7 @@ export async function classifyGenresAction(
       classifiedCount: 0,
       hasMore: false,
       warnings: [],
-      error: apiKeyMissingMessage('AIによるジャンル分類'),
+      error: apiKeyMissingMessage('AIによるカテゴリ分類'),
     };
   }
 
@@ -104,66 +99,4 @@ export async function classifyGenresAction(
     warnings: outcome.warnings,
     error: null,
   };
-}
-
-export async function createGenreAction(
-  _prev: { error: string | null },
-  formData: FormData,
-): Promise<{ error: string | null }> {
-  try {
-    await createGenre(String(formData.get('name') ?? ''));
-  } catch (error) {
-    return { error: describeUserError(error) };
-  }
-  revalidatePath('/reports/genres');
-  return { error: null };
-}
-
-export async function deleteGenreAction(id: string): Promise<{ error: string | null }> {
-  try {
-    await deleteGenre(id);
-  } catch (error) {
-    return { error: describeUserError(error) };
-  }
-  revalidatePath('/reports/genres');
-  return { error: null };
-}
-
-/**
- * 月次予算(本人発案「カテゴリのそれぞれの値段設定」)を変更する。
- * 空文字は「無制限」(budget_yen = null)として扱う。
- */
-export async function updateGenreBudgetAction(
-  id: string,
-  budgetYenInput: string,
-): Promise<{ error: string | null }> {
-  const trimmed = budgetYenInput.trim();
-  const budgetYen = trimmed === '' ? null : Number(trimmed);
-  if (budgetYen !== null && !Number.isInteger(budgetYen)) {
-    return { error: '予算は整数円で入力してください' };
-  }
-  try {
-    await updateGenreBudget(id, budgetYen);
-  } catch (error) {
-    return { error: describeUserError(error) };
-  }
-  revalidatePath('/reports/genres');
-  revalidatePath('/');
-  revalidatePath('/spending');
-  return { error: null };
-}
-
-/** ホーム画面に残額を出すジャンルか(FR-14, FR-61)。 */
-export async function setGenreShowOnHomeAction(
-  id: string,
-  showOnHome: boolean,
-): Promise<{ error: string | null }> {
-  try {
-    await setGenreShowOnHome(id, showOnHome);
-  } catch (error) {
-    return { error: describeUserError(error) };
-  }
-  revalidatePath('/reports/genres');
-  revalidatePath('/');
-  return { error: null };
 }

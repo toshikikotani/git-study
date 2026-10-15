@@ -46,7 +46,7 @@ export function SwipeableRow({
   onSwipeRight,
   onLongPress,
   actions,
-  rightLabel = 'ジャンル',
+  rightLabel = 'カテゴリ',
   children,
 }: {
   onSwipeRight?: () => void;

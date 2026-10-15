@@ -42,7 +42,7 @@ describe('summarizeBudgets', () => {
     expect(status!.usageRatio).toBeCloseTo(0.75);
   });
 
-  it('支出が無いジャンルも結果に残す(枠の有無と未使用を区別する)', () => {
+  it('支出が無いカテゴリも結果に残す(枠の有無と未使用を区別する)', () => {
     const [status] = summarizeBudgets([WASTE], []);
     expect(status!.spentYen).toBe(0);
     expect(status!.remainingYen).toBe(20_000);
@@ -103,7 +103,7 @@ describe('summarizeBudgets', () => {
     expect(status!.spentYen).toBe(25_000);
   });
 
-  it('未分類の明細はどのジャンルにも入れない', () => {
+  it('未分類の明細はどのカテゴリにも入れない', () => {
     const [status] = summarizeBudgets([SANCTUARY], [spend(null, -30_000)]);
     expect(status!.spentYen).toBe(0);
   });
@@ -122,14 +122,14 @@ describe('summarizeBudgets', () => {
     expect(status!.remainingYen).toBe(15_000);
   });
 
-  it('予算未設定のジャンルは残額も消化率も null', () => {
+  it('予算未設定のカテゴリは残額も消化率も null', () => {
     const [status] = summarizeBudgets([REPAYMENT], [spend('genre-repayment', -100_000)]);
     expect(status!.spentYen).toBe(100_000);
     expect(status!.remainingYen).toBeNull();
     expect(status!.usageRatio).toBeNull();
   });
 
-  it('複数ジャンルを取り違えない', () => {
+  it('複数カテゴリを取り違えない', () => {
     const statuses = summarizeBudgets(
       [SANCTUARY, WASTE],
       [spend('genre-sanctuary', -30_000), spend('genre-waste', -8_000)],
@@ -142,7 +142,7 @@ describe('summarizeBudgets', () => {
 });
 
 describe('budgetStatusFor', () => {
-  it('1ジャンル分だけを返す', () => {
+  it('1カテゴリ分だけを返す', () => {
     const status = budgetStatusFor(SANCTUARY, [
       spend('genre-sanctuary', -12_000),
       spend('genre-waste', -8_000),
@@ -163,7 +163,7 @@ describe('hasReachedAlertThreshold(FR-20)', () => {
     expect(hasReachedAlertThreshold(status, 0.7)).toBe(false);
   });
 
-  it('予算未設定のジャンルでは発火しない', () => {
+  it('予算未設定のカテゴリでは発火しない', () => {
     const status = budgetStatusFor(REPAYMENT, [spend('genre-repayment', -100_000)]);
     expect(hasReachedAlertThreshold(status, 0.7)).toBe(false);
   });

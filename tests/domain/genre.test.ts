@@ -8,7 +8,7 @@ import {
 } from '@/domain/genre';
 
 describe('summarizeByGenre', () => {
-  it('ジャンルごとに合計し、金額の大きい順に並べる', () => {
+  it('カテゴリごとに合計し、金額の大きい順に並べる', () => {
     const entries: GenredEntry[] = [
       { genreId: 'g1', genreName: '外食', amountYen: 1000, mustPay: false },
       { genreId: 'g2', genreName: '食料品', amountYen: 3000, mustPay: false },
@@ -44,11 +44,11 @@ describe('summarizeMustPaySplit', () => {
 });
 
 describe('effectiveGenreId', () => {
-  it('明細本体にジャンルがあればそれを優先する', () => {
+  it('明細本体にカテゴリがあればそれを優先する', () => {
     expect(effectiveGenreId('g1', [{ genreId: 'g2', amountYen: 500 }])).toBe('g1');
   });
 
-  it('品目がすべて分類済みなら金額が最大のジャンルを代表にする', () => {
+  it('品目がすべて分類済みなら金額が最大のカテゴリを代表にする', () => {
     expect(
       effectiveGenreId(null, [
         { genreId: 'g1', amountYen: 150 },

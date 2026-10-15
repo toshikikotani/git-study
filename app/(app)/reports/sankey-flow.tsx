@@ -122,7 +122,7 @@ export function SankeyFlow({
       </h2>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        左が{sourceLabel}、右がジャンル別支出です。線の太さは金額の比率を表しています。
+        左が{sourceLabel}、右がカテゴリ別支出です。線の太さは金額の比率を表しています。
       </p>
 
       <div className="w-full overflow-x-auto">
@@ -131,7 +131,7 @@ export function SankeyFlow({
           width="100%"
           height={height}
           role="img"
-          aria-label={`${sourceLabel}からジャンル別支出への流れ`}
+          aria-label={`${sourceLabel}からカテゴリ別支出への流れ`}
           style={{ display: 'block', maxWidth: '100%' }}
         >
           {links.map((link, i) => (

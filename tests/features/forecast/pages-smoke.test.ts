@@ -164,19 +164,19 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
       },
     ],
     [
-      '目標0円のジャンルがある',
+      '目標0円のカテゴリがある',
       () => {
         tables.spending_plan_items![1]!.target_yen = 0;
       },
     ],
     [
-      '存在しないジャンルの目標行がある',
+      '存在しないカテゴリの目標行がある',
       () => {
         tables.spending_plan_items![1]!.genre_id = 'gone';
       },
     ],
     [
-      '予測を止めたジャンルがある',
+      '予測を止めたカテゴリがある',
       () => {
         tables.genres![3]!.forecast_closed = true;
       },

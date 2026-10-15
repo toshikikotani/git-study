@@ -24,7 +24,7 @@ describe('P6 カテゴリの移動(分割なしの明細)', () => {
     items: [item('a', -700, 'dining'), item('b', -500, 'dining')],
   };
 
-  it('明細のジャンルが移り、そのカテゴリの品目のジャンルも一緒に移る', () => {
+  it('明細のカテゴリが移り、そのカテゴリの品目のカテゴリも一緒に移る', () => {
     const plan = planCategoryMove(tx, 'dining', 'cafe');
     expect(plan.genreId).toBe('cafe');
     expect(plan.splits).toEqual([]);
@@ -63,13 +63,13 @@ describe('P6 カテゴリの移動(分割したレシート)', () => {
       { genreId: 'hobby', amountYen: -1000, note: 'サンドイッチ' },
       { genreId: 'cafe', amountYen: -2000, note: 'コーヒー豆' },
     ]);
-    expect(plan.genreId).toBe('cafe'); // 代表ジャンルだった dining が無くなるので、最大の分割に
+    expect(plan.genreId).toBe('cafe'); // 代表カテゴリだった dining が無くなるので、最大の分割に
     expect(splitsAreConsistent(-3000, plan)).toBe(true);
     expect(plan.itemGenres.get('s')).toBe('hobby');
     expect(plan.itemGenres.has('c')).toBe(false);
   });
 
-  it('移した先に同じジャンルの分割があれば1つにまとめる。1つだけになれば分割を解除する', () => {
+  it('移した先に同じカテゴリの分割があれば1つにまとめる。1つだけになれば分割を解除する', () => {
     const plan = planCategoryMove(tx, 'dining', 'cafe');
     expect(plan.splits).toEqual([]);
     expect(plan.genreId).toBe('cafe');
@@ -100,13 +100,13 @@ describe('P6 分割したレシートの品目1つだけを移す(受け入れ�
     expect(plan.itemGenres.get('s')).toBe('hobby');
   });
 
-  it('すべての品目を同じカテゴリへ集めると、分割は解除されて明細のジャンルになる', () => {
+  it('すべての品目を同じカテゴリへ集めると、分割は解除されて明細のカテゴリになる', () => {
     const plan = planItemMove(tx, 's', 'cafe');
     expect(plan.splits).toEqual([]);
     expect(plan.genreId).toBe('cafe');
   });
 
-  it('品目に載っていない額(合計との差)は、明細本体のジャンルに残る', () => {
+  it('品目に載っていない額(合計との差)は、明細本体のカテゴリに残る', () => {
     const t: MoveInput = {
       amountYen: -1500,
       genreId: 'dining',

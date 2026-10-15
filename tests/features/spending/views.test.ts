@@ -62,7 +62,7 @@ describe('全画面の合計が一致する(受け入れ基準1)', () => {
     expect(views.totals.spentYen).toBe(expected);
   });
 
-  it('ジャンル内訳の合計(未分類を含む)= ヘッダー', () => {
+  it('カテゴリ内訳の合計(未分類を含む)= ヘッダー', () => {
     expect(views.genreBreakdown.reduce((acc, r) => acc + r.spentYen, 0)).toBe(expected);
   });
 
@@ -75,19 +75,19 @@ describe('全画面の合計が一致する(受け入れ基準1)', () => {
     expect(days.reduce((acc, v) => acc + v, 0)).toBe(expected);
   });
 
-  it('目標側のジャンル別実績 + 未分類 + 特別費 = ヘッダー', () => {
+  it('目標側のカテゴリ別実績 + 未分類 + 特別費 = ヘッダー', () => {
     const s = summarizeLedger(toLedgerEntries(transactions), range, TODAY);
     const byGenre = [...s.byGenrePace.values()].reduce((acc, v) => acc + v, 0);
     expect(byGenre + s.specialYen).toBe(expected);
   });
 
-  it('同じジャンルの金額が、内訳と目標で一致する(外食 12,279円)', () => {
+  it('同じカテゴリの金額が、内訳と目標で一致する(外食 12,279円)', () => {
     const s = summarizeLedger(toLedgerEntries(transactions), range, TODAY);
     expect(views.genreBreakdown.find((r) => r.genreId === 'dining')?.spentYen).toBe(12279);
     expect(s.byGenrePace.get('dining')).toBe(12279);
   });
 
-  it('分割の子が親のジャンルを引き継ぎ、未分類が増えない', () => {
+  it('分割の子が親のカテゴリを引き継ぎ、未分類が増えない', () => {
     expect(views.genreBreakdown.find((r) => r.genreId === 'drug')?.spentYen).toBe(1200);
     expect(views.genreBreakdown.find((r) => r.genreId === 'cafe')?.spentYen).toBe(1800);
     expect(views.summary.uncategorizedYen).toBe(663);

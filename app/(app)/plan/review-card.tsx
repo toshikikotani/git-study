@@ -47,11 +47,11 @@ export function ReviewCard({ planId, review }: { planId: string; review: GoalRev
       </p>
 
       <table className="mt-3 w-full text-xs">
-        <caption className="sr-only">ジャンルごとの目標と実績</caption>
+        <caption className="sr-only">カテゴリごとの目標と実績</caption>
         <thead>
           <tr style={{ color: 'var(--ink-muted)' }}>
             <th scope="col" className="pb-1 text-left font-medium">
-              ジャンル
+              カテゴリ
             </th>
             <th scope="col" className="pb-1 text-right font-medium">
               目標

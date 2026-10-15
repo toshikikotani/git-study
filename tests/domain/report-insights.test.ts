@@ -95,7 +95,7 @@ describe('reportInsights', () => {
     expect(budget.text).not.toMatch(/ダメ|失敗|使いすぎ/);
   });
 
-  it('先の期間より増えるジャンルを、増える額と前後の額で示す', () => {
+  it('先の期間より増えるカテゴリを、増える額と前後の額で示す', () => {
     const out = reportInsights({
       forecast: forecast(),
       budgetYen: null,
@@ -108,7 +108,7 @@ describe('reportInsights', () => {
     expect(inc.text).toContain('20,000円 → 約3.0万円');
   });
 
-  it('増え方が小さいジャンルは出さない', () => {
+  it('増え方が小さいカテゴリは出さない', () => {
     const out = reportInsights({
       forecast: forecast(),
       budgetYen: null,

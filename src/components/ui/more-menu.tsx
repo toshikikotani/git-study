@@ -52,11 +52,7 @@ const GROUPS = [
     items: [
       { href: '/reports', label: 'レポート' },
       { href: '/reports/ai', label: 'AIレポート', dek: '日次・月次の気づき・アドバイス' },
-      {
-        href: '/reports/genres',
-        label: 'ジャンル管理・分析',
-        dek: 'ジャンルの追加削除・予算設定、AIによる客観的な支出分類',
-      },
+      { href: '/reports/genres', label: 'カテゴリ分析', dek: 'AIによる客観的な支出の分類' },
       { href: '/briefs', label: '朝配信', ownerOnly: true },
     ],
   },
@@ -64,6 +60,11 @@ const GROUPS = [
     title: '設定',
     items: [
       { href: '/welcome', label: 'はじめての設定', dek: '手取り・今日からの目標・貯金目標' },
+      {
+        href: '/settings/categories',
+        label: 'カテゴリ',
+        dek: '追加・名前・アイコンと色・目標額・固定費',
+      },
       { href: '/settings/theme', label: '色', dek: '背景・文字・強調を変える' },
       { href: '/settings/ai', label: 'AI機能', dek: 'AIをまとめてオン/オフ' },
       { href: '/settings/gmail', label: 'Gmail連携', ownerOnly: true },

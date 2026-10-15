@@ -44,7 +44,7 @@ const data = [
 ];
 
 describe('buildForecast の範囲(scope)と目標(categoryTargets)', () => {
-  it('ジャンルを指定すると、そのジャンルだけを数える', () => {
+  it('カテゴリを指定すると、そのカテゴリだけを数える', () => {
     const all = buildForecast({ ...base, transactions: data });
     const only = buildForecast({
       ...base,
@@ -65,7 +65,7 @@ describe('buildForecast の範囲(scope)と目標(categoryTargets)', () => {
     expect(without.total.p50).toBeLessThan(withSpecial.total.p50);
   });
 
-  it('目標を渡すと、ジャンルごとに「超える確率」が出て、目標が低いほど高い', () => {
+  it('目標を渡すと、カテゴリごとに「超える確率」が出て、目標が低いほど高い', () => {
     const run = (target: number) =>
       buildForecast({
         ...base,
@@ -80,7 +80,7 @@ describe('buildForecast の範囲(scope)と目標(categoryTargets)', () => {
     expect(low.targetYen).toBe(20000);
   });
 
-  it('実績・予定・固定費の内訳と、着地(実績+残り)をジャンルごとに返す', () => {
+  it('実績・予定・固定費の内訳と、着地(実績+残り)をカテゴリごとに返す', () => {
     const withScheduled = [
       ...data,
       tx({
@@ -191,7 +191,7 @@ describe('buildForecast の金額は整数の円(画面の formatYen は小数�
   });
 });
 
-describe('「予測を止める」にしたジャンル', () => {
+describe('「予測を止める」にしたカテゴリ', () => {
   const input = {
     ...base,
     budgetYen: 60000,
@@ -201,7 +201,7 @@ describe('「予測を止める」にしたジャンル', () => {
     ],
   };
 
-  it('予測を止めたジャンルは、残りの変動費を足さない。実績は数える', () => {
+  it('予測を止めたカテゴリは、残りの変動費を足さない。実績は数える', () => {
     const open = buildForecast(input).byCategory.find((c) => c.categoryId === 'tax')!;
     const f = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
     const tax = f.byCategory.find((c) => c.categoryId === 'tax')!;
@@ -223,7 +223,7 @@ describe('「予測を止める」にしたジャンル', () => {
     expect(share(stopped)).toBeLessThan(share(open));
   });
 
-  it('止めていないジャンルの予測は、そのまま出る', () => {
+  it('止めていないカテゴリの予測は、そのまま出る', () => {
     const f = buildForecast({ ...input, noForecastGenreIds: new Set(['tax']) });
     const dining = f.byCategory.find((c) => c.categoryId === 'dining')!;
     expect(dining.landing.p90).toBeGreaterThan(dining.baseYen);

@@ -57,7 +57,7 @@ export async function loadCategorySpendingTrend(
         .lt('occurred_on', rangeEnd),
     ]);
   if (genresError) {
-    throw new ReportStoreError(`ジャンルを取得できませんでした: ${genresError.message}`);
+    throw new ReportStoreError(`カテゴリを取得できませんでした: ${genresError.message}`);
   }
   if (rowsError) throw new ReportStoreError(`明細を取得できませんでした: ${rowsError.message}`);
 

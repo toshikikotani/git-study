@@ -268,8 +268,8 @@ export function ManualEntryForm({
       </Field>
     ),
     genre: (
-      <Field label="ジャンル" tone="plain">
-        <div role="group" aria-label="ジャンル" className="flex flex-wrap gap-2">
+      <Field label="カテゴリ" tone="plain">
+        <div role="group" aria-label="カテゴリ" className="flex flex-wrap gap-2">
           {genres.map((g) => {
             const on = values.genreId === g.id;
             return (
@@ -295,7 +295,7 @@ export function ManualEntryForm({
       </Field>
     ),
     quickGenre: (
-      <Field label="ジャンル" tone="plain">
+      <Field label="カテゴリ" tone="plain">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
             長押しで並び替え・非表示
@@ -309,7 +309,7 @@ export function ManualEntryForm({
             編集
           </button>
         </div>
-        <div role="group" aria-label="ジャンル" className="mt-1 grid grid-cols-4 gap-2">
+        <div role="group" aria-label="カテゴリ" className="mt-1 grid grid-cols-4 gap-2">
           {genres.map((g) => {
             const on = values.genreId === g.id;
             return (

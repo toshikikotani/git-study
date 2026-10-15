@@ -131,7 +131,7 @@ async function listHomeGenres(
     .eq('user_id', userId)
     .eq('show_on_home', true)
     .order('sort_order');
-  if (error) throw new Error(`ジャンルを取得できませんでした: ${error.message}`);
+  if (error) throw new Error(`カテゴリを取得できませんでした: ${error.message}`);
 
   return genres.map((g) => ({
     categoryId: g.id,

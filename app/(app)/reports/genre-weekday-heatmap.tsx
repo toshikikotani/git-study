@@ -66,7 +66,7 @@ export function GenreWeekdayHeatmap({ cells }: { cells: readonly GenreWeekdayCel
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-        曜日とジャンルの傾向
+        曜日とカテゴリの傾向
       </h2>
 
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

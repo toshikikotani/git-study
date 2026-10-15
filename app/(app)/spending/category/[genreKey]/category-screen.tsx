@@ -24,8 +24,6 @@ import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryPicker } from './category-picker';
-import { setCategoryFixedAction, setCategoryForecastClosedAction } from '../actions';
-import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
 import { GoalTargetEdit } from './goal-target-edit';
@@ -85,7 +83,6 @@ function CategoryScreenInner({
   });
   const counts = useMoveCounts();
   const [movePicker, setMovePicker] = useState<CategoryLine | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const online = useOnline();
   const [focus, setFocus] = useState<LineFocus | null>(null);
   const [unit, setUnit] = useState<ChartUnit>('day');
@@ -372,56 +369,14 @@ function CategoryScreenInner({
               {selectMode ? '完了' : '選択'}
             </button>
             {currentGenreId !== null ? (
-              <button
-                type="button"
-                onClick={() =>
-                  void setCategoryFixedAction(currentGenreId, !data.isFixed).then(() =>
-                    router.refresh(),
-                  )
-                }
-                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
-                style={{
-                  background: 'var(--surface-raised)',
-                  color: data.isFixed ? 'var(--income)' : 'var(--ink)',
-                }}
-              >
-                {data.isFixed ? '固定費' : '固定費にする'}
-              </button>
-            ) : null}
-            {currentGenreId !== null && !data.isFixed ? (
-              <button
-                type="button"
-                onClick={() =>
-                  void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
-                    () => router.refresh(),
-                  )
-                }
-                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
-                style={{
-                  background: 'var(--surface-raised)',
-                  color: data.forecastClosed ? 'var(--income)' : 'var(--ink)',
-                }}
-              >
-                {data.forecastClosed ? '予測しない' : '予測を止める'}
-              </button>
-            ) : null}
-            <a
-              href="/reports/genres"
-              className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold whitespace-nowrap"
-              style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
-            >
-              カテゴリ
-            </a>
-            {currentGenreId !== null ? (
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
+              <Link
+                href={`/settings/categories/${currentGenreId}` as Route}
                 aria-label={`${data.genreName}の設定`}
-                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+                className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold whitespace-nowrap"
                 style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
               >
                 設定
-              </button>
+              </Link>
             ) : null}
           </div>
         }
@@ -475,15 +430,6 @@ function CategoryScreenInner({
         onPick={pickBucket}
         selectedIndex={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
         budgetYen={data.goal?.row?.targetYen ?? null}
-        holdForecast={data.forecastClosed}
-        {...(currentGenreId
-          ? {
-              onHoldForecast: () =>
-                void setCategoryForecastClosedAction(currentGenreId, !data.forecastClosed).then(
-                  () => router.refresh(),
-                ),
-            }
-          : {})}
       />
 
       <CategoryTabs
@@ -691,15 +637,6 @@ function CategoryScreenInner({
           </div>
         </div>
       </BottomSheet>
-
-      {currentGenreId !== null ? (
-        <CategorySettings
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          data={data}
-          genreId={currentGenreId}
-        />
-      ) : null}
 
       <RuleSheet
         suggestion={rule?.suggestion ?? null}
