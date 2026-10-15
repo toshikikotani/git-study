@@ -207,6 +207,26 @@ export async function savePlan(input: SpendingPlanInput): Promise<void> {
  * 保存済みの目標のジャンルごとの金額だけを直す(配分の微調整)。期間・提案額・
  * 理由は変えない。計画に無いジャンルは触らない。
  */
+export async function updatePlanPeriod(
+  planId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const start = assertDateOnly(periodStart);
+  const end = assertDateOnly(periodEnd);
+  if (start > end) throw new SpendingPlanStoreError('開始日は終了日より前にしてください');
+  const days = planPeriodDays(start, end);
+  if (days > MAX_PERIOD_DAYS)
+    throw new SpendingPlanStoreError(`期間は${MAX_PERIOD_DAYS}日以内にしてください`);
+
+  const { error } = await supabase
+    .from('spending_plans')
+    .update({ period_start: start, period_end: end })
+    .eq('id', planId);
+  if (error) throw new SpendingPlanStoreError(error.message);
+}
+
 export async function updatePlanTargets(
   planId: string,
   items: readonly { genreId: string; targetYen: number }[],

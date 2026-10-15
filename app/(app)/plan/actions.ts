@@ -12,6 +12,7 @@ import { listGenres } from '@/features/genre/store';
 import {
   deletePlan,
   savePlan,
+  updatePlanPeriod,
   updatePlanTargets,
   loadGenreSpend,
 } from '@/features/spending-plan/store';
@@ -248,5 +249,18 @@ export async function loadGoalSnapshotAction(): Promise<{
     return { snapshot: loaded.view.snapshot, today };
   } catch {
     return { snapshot: null, today };
+  }
+}
+
+export async function updatePlanPeriodAction(
+  planId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<{ error: string | null }> {
+  try {
+    await updatePlanPeriod(planId, periodStart, periodEnd);
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : '更新できませんでした' };
   }
 }
