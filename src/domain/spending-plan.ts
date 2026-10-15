@@ -207,6 +207,20 @@ export function rebalanceToTotal(
   return result;
 }
 
+/**
+ * 1つのジャンルの目標額を変えたとき、目標の総額(配分の合計)がどう変わるか。
+ * 他のジャンルはそのままなので、総額は差額のぶんだけ動く。
+ */
+export function planTotalChange(
+  rows: readonly { genreId: string; yen: number }[],
+  genreId: string,
+  nextYen: number,
+): { beforeYen: number; afterYen: number } {
+  const beforeYen = rows.reduce((acc, row) => acc + row.yen, 0);
+  const currentYen = rows.find((row) => row.genreId === genreId)?.yen ?? 0;
+  return { beforeYen, afterYen: beforeYen - currentYen + nextYen };
+}
+
 /** 線形の外挿(このペースが続くと…)を出すのに必要な経過日数。これ未満は理想ペースとの差だけを見せる。 */
 export const MIN_DAYS_FOR_PROJECTION = 3;
 

@@ -171,18 +171,7 @@ export function ReceiptConfirm({
   const groups = draft ? linesByTaxRate(draft) : [];
   const status = reconcile?.status ?? null;
 
-  // 一致していて信頼度が高ければ自動保存
   const [autoSaved, setAutoSaved] = useState(false);
-  useEffect(() => {
-    if (autoSaved || saving || savedLabel !== null) return;
-    if (status !== 'ok') return;
-    if (lowStore || lowDate || lowTotal) return;
-    if (duplicates > 0) return;
-    if (draft !== null && draft.paidYen <= 0) return;
-    setAutoSaved(true);
-    const timer = window.setTimeout(() => save(), 300);
-    return () => window.clearTimeout(timer);
-  }, [status, lowStore, lowDate, lowTotal, duplicates, saving, savedLabel]);
 
   // 目標への影響:この支払いがジャンルごとに動かす額(品目のジャンル、無ければ明細のジャンル)。
   const deltas = useMemo<ImpactDelta[]>(() => {
@@ -249,6 +238,20 @@ export function ReceiptConfirm({
           : null,
     });
   };
+
+  // 一致していて信頼度が高ければ自動保存
+  useEffect(() => {
+    if (autoSaved || saving || savedLabel !== null) return;
+    if (status !== 'ok') return;
+    if (lowStore || lowDate || lowTotal) return;
+    if (duplicates > 0) return;
+    if (draft !== null && draft.paidYen <= 0) return;
+    const timer = window.setTimeout(() => {
+      setAutoSaved(true);
+      save();
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [status, lowStore, lowDate, lowTotal, duplicates, saving, savedLabel]);
 
   const field = 'mt-1 min-h-11 w-full rounded-xl px-3 text-sm';
   const fieldStyle = {

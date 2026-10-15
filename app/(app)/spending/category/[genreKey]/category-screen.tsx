@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { updateCategoryBudgetAction } from '../actions';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -29,6 +28,7 @@ import { setCategoryFixedAction, setCategoryForecastClosedAction } from '../acti
 import { CategorySettings } from './category-settings';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
+import { GoalTargetEdit } from './goal-target-edit';
 import { RuleSheet } from './rule-sheet';
 import { useCategoryEdits } from './use-category-edits';
 import { InsightsSection } from './insights-section';
@@ -449,8 +449,13 @@ function CategoryScreenInner({
         today={data.today}
       />
 
-      {data.goal?.row?.targetYen != null ? (
-        <BudgetEditBlock genreId={currentGenreId} currentBudget={data.goal.row.targetYen} />
+      {data.goal?.plan && currentGenreId !== null ? (
+        <GoalTargetEdit
+          key={data.goal.plan.id}
+          planId={data.goal.plan.id}
+          genreId={currentGenreId}
+          rows={data.goal.plan.rows}
+        />
       ) : null}
 
       {whatIf}
@@ -757,71 +762,5 @@ function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
         </ul>
       )}
     </section>
-  );
-}
-
-function BudgetEditBlock({
-  genreId,
-  currentBudget,
-}: {
-  genreId: string | null;
-  currentBudget: number;
-}) {
-  const router = useRouter();
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(String(currentBudget));
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    if (!genreId) return;
-    setSaving(true);
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      await updateCategoryBudgetAction(genreId, num);
-      router.refresh();
-    }
-    setSaving(false);
-    setEditing(false);
-  };
-
-  return (
-    <div className="rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
-      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        このカテゴリの目標
-      </p>
-      {editing ? (
-        <div className="mt-2 flex gap-2">
-          <input
-            type="number"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="min-h-11 flex-1 rounded-xl px-3 text-lg font-semibold"
-            style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
-          />
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving}
-            className="min-h-11 rounded-xl px-4 text-sm font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-          >
-            {saving ? '...' : '保存'}
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="mt-1 flex items-baseline gap-2"
-        >
-          <span className="text-2xl font-bold" style={{ color: 'var(--ink)' }}>
-            {currentBudget.toLocaleString()}円
-          </span>
-          <span className="text-sm" style={{ color: 'var(--accent)' }}>
-            編集
-          </span>
-        </button>
-      )}
-    </div>
   );
 }

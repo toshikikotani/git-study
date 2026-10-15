@@ -96,7 +96,7 @@ export function EditPlanSection({
             type="button"
             onClick={() => void savePeriod()}
             disabled={saving}
-            className="min-h-10 self-start rounded-full px-4 text-sm font-semibold disabled:opacity-40"
+            className="min-h-11 self-start rounded-full px-4 text-sm font-semibold disabled:opacity-40"
             style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
             {saving ? '保存中…' : '期間を更新する'}

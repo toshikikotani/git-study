@@ -27,6 +27,7 @@ import {
   updateRuleGenreAction,
 } from '../actions';
 import { EditPlanSection } from '../../../plan/edit-plan-section';
+import { GoalTargetEdit } from './goal-target-edit';
 
 type Rule = { id: string; storeKey: string; itemKey: string; hits: number };
 
@@ -282,33 +283,35 @@ export function SettingsBody({
         {data.goal?.plan ? (
           <div className="space-y-2">
             <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              このカテゴリの予算を変更すると、目標の総額も変わります。
+              このカテゴリの目標額を変えると、目標の総額も変わります。
             </p>
-            <div className="flex gap-2">
-              <input
-                aria-labelledby="cs-budget"
-                inputMode="numeric"
-                value={budget}
-                placeholder="このカテゴリの予算(円)"
-                onChange={(e) => setBudget(e.target.value.replace(/[^\d]/g, ''))}
-                className="min-h-11 flex-1 rounded-xl px-3 text-base"
-                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
-              />
-              <button
-                type="button"
-                disabled={busy || !budgetValid}
-                onClick={() =>
-                  void run(
-                    () => updateCategoryBudgetAction(genreId, budgetNumber),
-                    '予算を変えました',
-                  )
-                }
-                className="min-h-11 rounded-xl px-4 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-              >
-                保存
-              </button>
-            </div>
+            <GoalTargetEdit
+              planId={data.goal.plan.id}
+              genreId={genreId}
+              rows={data.goal.plan.rows}
+            />
+            {data.genreBudgetYen !== null ? (
+              <div className="flex items-center gap-3">
+                <p className="flex-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+                  目標が無いときの月の目安({data.genreBudgetYen.toLocaleString()}
+                  円)は、目標の期間中は使いません。
+                </p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () => updateCategoryBudgetAction(genreId, null),
+                      '月の目安を消しました',
+                    )
+                  }
+                  className="min-h-11 shrink-0 rounded-xl px-3 text-xs font-semibold disabled:opacity-40"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  目安を消す
+                </button>
+              </div>
+            ) : null}
             <EditPlanSection
               planId={data.goal.plan.id}
               periodStart={data.goal.plan.periodStart}

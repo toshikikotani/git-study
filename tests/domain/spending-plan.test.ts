@@ -9,6 +9,7 @@ import {
   nextPlanRange,
   planGuidance,
   planPeriodDays,
+  planTotalChange,
   rebalanceToTotal,
   planProgress,
 } from '@/domain/spending-plan';
@@ -449,5 +450,25 @@ describe('emptyPlanReason', () => {
 
   it('分類済みも未分類も無ければ no-spend', () => {
     expect(emptyPlanReason({ genreBaselines: [0], uncategorizedYen: 0 })).toBe('no-spend');
+  });
+});
+
+describe('planTotalChange', () => {
+  const rows = [
+    { genreId: 'food', yen: 30000 },
+    { genreId: 'cafe', yen: 302 },
+    { genreId: 'daily', yen: 5000 },
+  ];
+
+  it('変えたジャンルの差額だけ総額が動く(増やす)', () => {
+    expect(planTotalChange(rows, 'cafe', 2000)).toEqual({ beforeYen: 35302, afterYen: 37000 });
+  });
+
+  it('変えたジャンルの差額だけ総額が動く(減らす・0円)', () => {
+    expect(planTotalChange(rows, 'food', 0)).toEqual({ beforeYen: 35302, afterYen: 5302 });
+  });
+
+  it('同じ額なら総額は変わらない', () => {
+    expect(planTotalChange(rows, 'daily', 5000)).toEqual({ beforeYen: 35302, afterYen: 35302 });
   });
 });

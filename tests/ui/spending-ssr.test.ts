@@ -296,3 +296,29 @@ describe('F5 カレンダー', () => {
     expect(render(null, false)).not.toContain('で絞り込み中');
   });
 });
+
+describe('ジャンル内訳と、ジャンルの月の目安', () => {
+  const render = (goalActive: boolean) =>
+    visible(
+      renderToString(
+        h(SpendingMonthProvider, {
+          today: '2026-09-29',
+          currentMonthStart: '2026-09-01',
+          currentTransactions: txs,
+          currentGenreBreakdown: views.genreBreakdown,
+          currentTotals: views.totals,
+          genres,
+          accounts: [{ id: 'a', name: '現金' }],
+          children: h(GenreBreakdown, { goalRows: null, goalActive }),
+        }),
+      ),
+    );
+
+  it('目標が無いときは、月の目安を「使った額 / 目安」で出す', () => {
+    expect(render(false)).toContain(' / 8,000円');
+  });
+
+  it('目標の期間中は、月の目安を出さない(目標額と食い違わせない)', () => {
+    expect(render(true)).not.toContain('8,000円');
+  });
+});

@@ -203,7 +203,8 @@ export async function updatePlanAllocationAction(
   } catch (error) {
     return { error: describeUserError(error) };
   }
-  revalidatePath('/plan');
+  // 目標額はホーム・家計簿・レポートの目標表示にも出るので、全画面を出し直す。
+  revalidatePath('/', 'layout');
   return { error: null };
 }
 
