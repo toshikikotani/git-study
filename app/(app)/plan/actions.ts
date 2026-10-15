@@ -259,6 +259,10 @@ export async function updatePlanPeriodAction(
 ): Promise<{ error: string | null }> {
   try {
     await updatePlanPeriod(planId, periodStart, periodEnd);
+    revalidatePath('/plan');
+    revalidatePath('/reports');
+    revalidatePath('/spending');
+    revalidatePath('/');
     return { error: null };
   } catch (e) {
     return { error: e instanceof Error ? e.message : '更新できませんでした' };
