@@ -30,6 +30,8 @@ export function CategoryHeader({
   totalYen,
   onBack,
   menu,
+  goalPeriod,
+  isGoalPeriod,
 }: {
   genreKey: string;
   genreName: string;
@@ -42,6 +44,10 @@ export function CategoryHeader({
   onBack: () => void;
   /** ヘッダー右の操作(選択・…)。 */
   menu?: React.ReactNode;
+  /** 目標期間。 */
+  goalPeriod?: { from: string; to: string } | null;
+  /** 現在目標期間で表示中か。 */
+  isGoalPeriod?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -172,7 +178,22 @@ export function CategoryHeader({
           className="tabular mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold whitespace-nowrap"
           style={{ color: 'var(--ink-secondary)', opacity: pending ? 0.5 : 1 }}
         >
-          <span aria-live="polite">{monthLabel}</span>
+          <span aria-live="polite">{isGoalPeriod ? '目標期間' : monthLabel}</span>
+          {goalPeriod ? (
+            <button
+              type="button"
+              onClick={() => {
+                const href = isGoalPeriod
+                  ? monthHref(genreKey, monthStart.slice(0, 7))
+                  : `${monthHref(genreKey, monthStart.slice(0, 7))}?period=${goalPeriod.from}_${goalPeriod.to}`;
+                startTransition(() => router.replace(href as Route, { scroll: false }));
+              }}
+              className="ml-2 text-xs font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              {isGoalPeriod ? '月に切替' : '目標期間に切替'}
+            </button>
+          ) : null}
           <span aria-hidden>▾</span>
         </button>
       </header>
