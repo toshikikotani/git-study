@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   ZAxis,
   LabelList,
+  type LabelProps,
 } from 'recharts';
 import { genreColorVar } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
@@ -121,7 +122,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
                   fontSize={9}
                   fill="var(--ink-secondary)"
                   offset={8}
-                  content={(props: any) => {
+                  content={(props: LabelProps & { index?: number }) => {
                     const x = Number(props.x ?? 0);
                     const y = Number(props.y ?? 0);
                     const index = props.index ?? 0;
