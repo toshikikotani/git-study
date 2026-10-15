@@ -311,11 +311,24 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
               {outlook.overages.map((o, i) => (
                 <li key={i} className="flex justify-between text-sm">
                   <span style={{ color: 'var(--ink)' }}>{o.name}</span>
-                  <span className="font-semibold" style={{ color: 'var(--state-caution)' }}>
-                    +{o.overYen.toLocaleString()}円
+                  <span
+                    className="font-semibold"
+                    style={{ color: o.overYen > 0 ? 'var(--state-caution)' : 'var(--state-ok)' }}
+                  >
+                    {o.overYen > 0 ? '+' : ''}
+                    {o.overYen.toLocaleString()}円
                   </span>
                 </li>
               ))}
+              <li
+                className="flex justify-between border-t pt-2 text-sm font-semibold"
+                style={{ borderColor: 'var(--hairline)' }}
+              >
+                <span style={{ color: 'var(--ink)' }}>合計</span>
+                <span style={{ color: 'var(--state-caution)' }}>
+                  +{outlook.overages.reduce((s, o) => s + o.overYen, 0).toLocaleString()}円
+                </span>
+              </li>
             </ul>
             <button
               type="button"
