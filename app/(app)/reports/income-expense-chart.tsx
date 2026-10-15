@@ -31,7 +31,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          年間収支サマリー
+          月ごとの収入と支出
         </h2>
         <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
           直近12ヶ月に収支の記録がありません。
@@ -69,7 +69,7 @@ export function IncomeExpenseChart({ trend }: { trend: IncomeExpenseTrend }) {
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          年間収支サマリー
+          月ごとの収入と支出
         </h2>
         <span className="tabular text-xs" style={{ color: 'var(--ink-muted)' }}>
           {formatMonthJa(monthKeys[monthKeys.length - 1]!)}の貯蓄率{' '}

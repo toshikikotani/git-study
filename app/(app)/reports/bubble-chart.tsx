@@ -40,7 +40,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          頻度と単価
+          回数と1回の金額
         </h2>
         <p className="mt-2 text-sm" style={{ color: 'var(--ink-secondary)' }}>
           表示する支出がありません。
@@ -55,10 +55,10 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        頻度と単価
+        回数と1回の金額
       </h2>
       <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
-        横軸は月間の回数、縦軸は1回あたりの平均。大きいほど合計が多い。
+        右ほど回数が多く、上ほど1回が高い。円の大きさは合計です。
       </p>
       <div className="mt-3 h-64">
         <ResponsiveContainer width="100%" height="100%">

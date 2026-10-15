@@ -119,8 +119,8 @@ describe('F7 入力待ち(受け入れ基準13)', () => {
     expect(html).toContain('入力待ち');
     expect(html).toContain('src="https://example.test/receipt.jpg"');
     expect(html).toContain('href="/transactions/receipt/cap-1"');
-    expect(html).toContain('入力待ち 1件');
-    expect(html).toContain('集計に入っていません');
+    expect(html).toContain('入力待ちのレシートが1件あります');
+    expect(html).toContain('入力すると、集計と予算の見込みに入ります');
     expect(html).toContain('集計に未反映');
   });
 
