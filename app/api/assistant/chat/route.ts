@@ -26,7 +26,7 @@ import {
   type ScreenLink,
 } from '@/features/assistant/screens';
 import { apiKeyMissingMessage, describeAnthropicError } from '@/lib/anthropic';
-import { ChatToolError, parseChatMessages } from '@/lib/chat-tools';
+import { ChatToolError, parseChatMessages, toAlternatingTurns } from '@/lib/chat-tools';
 import { todayJst } from '@/lib/date';
 import { readAnthropicApiKey } from '@/lib/env';
 import { describeUserError } from '@/lib/errors';
@@ -319,10 +319,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'JSON として読めませんでした' }, { status: 400 });
   }
 
-  const messages = parseChatMessages(payload.messages);
-  if (messages === null) {
+  const parsed = parseChatMessages(payload.messages);
+  if (parsed === null) {
     return NextResponse.json({ error: '会話の形式が正しくありません' }, { status: 400 });
   }
+  const messages = toAlternatingTurns(parsed);
   if (messages.length === 0) {
     return NextResponse.json({ error: 'メッセージがありません' }, { status: 400 });
   }
@@ -335,12 +336,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       question: null,
     } satisfies AssistantReply);
   }
+  // 混み合い・読み込みの失敗・AIの呼び出しの失敗は、返事ではなく「送れなかった」として返す。
+  // 画面はその発言に「もう一度送る」を出す(失敗の文が会話に混ざって次の文脈にならない、ADR-105)。
   if (!takeAiCallSlot()) {
-    return NextResponse.json({
-      reply: 'AIの呼び出しが混み合っています。時間をおいて試してください。',
-      proposal: null,
-      question: null,
-    } satisfies AssistantReply);
+    return NextResponse.json(
+      { error: 'AIの呼び出しが混み合っています。少し時間をおいて、もう一度送ってください。' },
+      { status: 429 },
+    );
   }
 
   let planContext: PlanContext;
@@ -352,11 +354,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       buildAdvisorContextText().catch(() => ''),
     ]);
   } catch (error) {
-    return NextResponse.json({
-      reply: describeUserError(error, '読み込みに失敗しました。'),
-      proposal: null,
-      question: null,
-    } satisfies AssistantReply);
+    return NextResponse.json(
+      { error: describeUserError(error, '読み込みに失敗しました。') },
+      { status: 503 },
+    );
   }
 
   const client = new Anthropic({ apiKey });
@@ -421,6 +422,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       anthropicMessages.push({ role: 'user', content: toolResults });
     }
   } catch (error) {
+    // 途中まで案ができていれば、それは出す(作った案を捨てない)。何もできていなければ送れなかった扱い。
+    if (proposed.length === 0 && links.length === 0) {
+      return NextResponse.json({ error: describeAnthropicError(error) }, { status: 502 });
+    }
     return NextResponse.json({
       reply: describeAnthropicError(error),
       proposal: proposed.length > 0 ? { changes: proposed } : null,

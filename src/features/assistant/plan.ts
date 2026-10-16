@@ -32,6 +32,7 @@ import { resolveTransactionById } from '@/features/transactions/chat-tools';
 import type { StoredTransaction } from '@/features/transactions/types';
 import { ChatToolError } from '@/lib/chat-tools';
 import { addDays, assertDateOnly, todayJst } from '@/lib/date';
+import { recordChangeOf, recordNameOf, type ProposedRecord } from './record-change';
 
 export { ChatToolError };
 
@@ -71,6 +72,8 @@ export type ProposedChange = {
   target: string;
   /** 変更前→変更後が分かる短い日本語。 */
   detail: string;
+  /** 記録の案(add_transaction)の中身。確認カードの上で直すときに使う(ADR-105)。 */
+  record?: ProposedRecord;
 };
 
 export type GoalRef = { id: string; title: string };
@@ -369,12 +372,10 @@ function planGenreShowOnHome(input: unknown, ctx: PlanContext): PlannedChange {
   };
 }
 
-/** 記録の種類(支出・収入・返金)。 */
-const ADD_KINDS = { expense: '支出', income: '収入', refund: '返金' } as const;
-
 /**
  * 記録する(add_transaction、ADR-103)。日付・金額・名前・カテゴリ・種類を確かめ、確認カードに出す。
  * 日付は1年前〜1年先まで(先の日付は「予定」として記録される)。返金はカテゴリが要る。
+ * 確認カードには中身(record)もつけ、本人が「記録する」と同じ画面で直せるようにする(ADR-105)。
  */
 function planAddTransaction(input: unknown, ctx: PlanContext): PlannedChange {
   const args = asRecord(input);
@@ -393,37 +394,26 @@ function planAddTransaction(input: unknown, ctx: PlanContext): PlannedChange {
   if (kind === 'refund' && genre === null) {
     throw new ChatToolError('返金は、どのカテゴリの支出から差し引くか(genre_name)が要ります。');
   }
-  const name =
-    typeof args.store_name === 'string' && args.store_name.trim() !== ''
-      ? args.store_name.trim().slice(0, 60)
-      : kind === 'income'
-        ? '収入'
-        : (genre?.name ?? '手入力');
-  const memo =
-    typeof args.memo === 'string' && args.memo.trim() !== ''
-      ? args.memo.trim().slice(0, 200)
-      : null;
-  const scheduled = occurredOn > today;
-  const [, m, d] = occurredOn.split('-');
+  const record: ProposedRecord = {
+    kind,
+    amountYen: amount,
+    genreId: genre?.id ?? null,
+    genreName: genre?.name ?? null,
+    date: occurredOn,
+    name: typeof args.store_name === 'string' ? args.store_name.trim().slice(0, 60) : '',
+    memo: typeof args.memo === 'string' ? args.memo.trim().slice(0, 200) : '',
+  };
   return {
-    change: {
-      tool: 'add_transaction',
-      input: args,
-      kind: 'created',
-      target: name,
-      detail: `${Number(m)}月${Number(d)}日 ${ADD_KINDS[kind]} ${yen(amount)}${
-        genre ? ` · ${genre.name}` : ''
-      }${scheduled ? ' · 予定' : ''}${memo ? ` · メモ「${memo}」` : ''}`,
-    },
+    change: recordChangeOf(record, today),
     operation: {
       op: 'add_transaction',
       occurredOn,
       amountYen: kind === 'expense' ? -amount : amount,
-      description: name,
+      description: recordNameOf(record),
       genreId: genre?.id ?? null,
       genreName: genre?.name ?? null,
       kind: kind === 'refund' ? 'refund' : 'normal',
-      memo,
+      memo: record.memo === '' ? null : record.memo,
     },
   };
 }
