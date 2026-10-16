@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import type { AskUserQuestion } from '@/features/assistant/plan';
-import { recordFromEdit } from '@/features/assistant/record-change';
+import { recordFromEdit, type StoreCandidate } from '@/features/assistant/record-change';
+import { comparableKey } from '@/domain/store-name';
 import { useSpeechInput } from '@/lib/speech-input';
 import { RecordSheet } from '../record-sheet';
 import { refreshAllAction } from '../refresh-actions';
@@ -13,6 +14,7 @@ import {
   applyProposal,
   cancelProposal,
   editRecord,
+  pickStore,
   resetChat,
   retry,
   send,
@@ -181,6 +183,7 @@ export function AssistantChat({
               onAnswer={(labels) => answerQuestion(i, labels)}
               onToggle={(changeIndex) => toggleChange(i, changeIndex)}
               onEdit={(changeIndex) => setEditing({ message: i, change: changeIndex })}
+              onPickStore={(changeIndex, store) => pickStore(i, changeIndex, store)}
               onApply={() => void applyProposal(i, applied)}
               onCancel={() => cancelProposal(i)}
               onGo={go}
@@ -274,6 +277,7 @@ export function Bubble({
   onAnswer,
   onToggle,
   onEdit,
+  onPickStore,
   onApply,
   onCancel,
   onGo,
@@ -284,6 +288,7 @@ export function Bubble({
   onAnswer: (labels: string[]) => void;
   onToggle: (changeIndex: number) => void;
   onEdit: (changeIndex: number) => void;
+  onPickStore: (changeIndex: number, store: StoreCandidate) => void;
   onApply: () => void;
   onCancel: () => void;
   onGo: (href: string) => void;
@@ -345,6 +350,7 @@ export function Bubble({
             proposal={message.proposal}
             onToggle={onToggle}
             onEdit={onEdit}
+            onPickStore={onPickStore}
             onApply={onApply}
             onCancel={onCancel}
           />
@@ -443,6 +449,7 @@ function ProposalCard({
   proposal,
   onToggle,
   onEdit,
+  onPickStore,
   onApply,
   onCancel,
 }: {
@@ -450,6 +457,8 @@ function ProposalCard({
   onToggle: (changeIndex: number) => void;
   /** 記録の案を直す(記録すると同じ画面で、ADR-105)。 */
   onEdit: (changeIndex: number) => void;
+  /** お店の候補を選ぶ(ADR-107)。 */
+  onPickStore: (changeIndex: number, store: StoreCandidate) => void;
   onApply: () => void;
   onCancel: () => void;
 }) {
@@ -492,37 +501,60 @@ function ProposalCard({
       <p className="text-[14px] font-semibold">確認({changes.length}件)— 反映するものにチェック</p>
       <ul className="space-y-2">
         {changes.map((c, i) => (
-          <li
-            key={i}
-            className="flex items-stretch rounded-xl"
-            style={{ background: 'var(--surface)' }}
-          >
-            <label className="flex min-h-11 min-w-0 flex-1 items-start gap-3 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={selected[i] ?? false}
-                disabled={locked}
-                onChange={() => onToggle(i)}
-                className="mt-1 size-5"
-              />
-              <span className="min-w-0 text-[14px]">
-                <span className="font-semibold">{c.target}</span>
-                <span className="block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                  {c.detail}
+          <li key={i} className="rounded-xl" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-stretch">
+              <label className="flex min-h-11 min-w-0 flex-1 items-start gap-3 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={selected[i] ?? false}
+                  disabled={locked}
+                  onChange={() => onToggle(i)}
+                  className="mt-1 size-5"
+                />
+                <span className="min-w-0 text-[14px]">
+                  <span className="font-semibold">{c.target}</span>
+                  <span className="block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                    {c.detail}
+                  </span>
                 </span>
-              </span>
-            </label>
-            {/* AIが出した記録の案は、記録すると同じ画面で直せる(金額・日付・名前・カテゴリ・メモ) */}
-            {c.record && !locked ? (
-              <button
-                type="button"
-                onClick={() => onEdit(i)}
-                aria-label={`${c.target}を直す`}
-                className="flex min-h-11 shrink-0 items-center px-3 text-[14px] font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
-                直す
-              </button>
+              </label>
+              {/* AIが出した記録の案は、記録すると同じ画面で直せる(金額・日付・名前・カテゴリ・メモ) */}
+              {c.record && !locked ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(i)}
+                  aria-label={`${c.target}を直す`}
+                  className="flex min-h-11 shrink-0 items-center px-3 text-[14px] font-semibold"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  直す
+                </button>
+              ) : null}
+            </div>
+            {/* お店の候補(過去の記録から)。押すと名前とカテゴリがそのお店に変わる(ADR-107) */}
+            {c.candidates && c.candidates.length >= 2 && !locked ? (
+              <div role="group" aria-label="お店の候補" className="flex flex-wrap gap-2 px-3 pb-3">
+                {c.candidates.map((store) => {
+                  const on = comparableKey(store.name) === comparableKey(c.target);
+                  return (
+                    <button
+                      key={store.name}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => onPickStore(i, store)}
+                      className="min-h-11 max-w-full truncate rounded-full px-3 text-[13px]"
+                      style={{
+                        background: on ? 'var(--note)' : 'var(--plane)',
+                        boxShadow: on ? 'inset 0 0 0 2px var(--accent)' : 'none',
+                        color: 'var(--ink)',
+                        fontWeight: on ? 600 : 400,
+                      }}
+                    >
+                      {store.name}
+                    </button>
+                  );
+                })}
+              </div>
             ) : null}
           </li>
         ))}

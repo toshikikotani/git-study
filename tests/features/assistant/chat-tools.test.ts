@@ -153,3 +153,31 @@ describe('pickRecentTransactions(今日の記録を先の予定で押し出さ�
     expect(dates).toEqual([...dates].sort().reverse());
   });
 });
+
+describe('よく使うお店をAIに見せる(ADR-107)', () => {
+  it('お店がおおまかなら、よく使うお店から選び、ほかの候補も出すよう伝える', () => {
+    const prompt = buildAssistantSystemPrompt({
+      genres: [GENRE],
+      settings: SETTINGS,
+      recentTransactions: [],
+      goals: [],
+      latestPlan: null,
+      stores: [
+        {
+          name: 'セブン-イレブン 渋谷道玄坂店',
+          key: 'k',
+          chain: 'c',
+          type: 'convenience',
+          count: 12,
+          lastOn: '2026-10-16',
+          genreId: 'g1',
+          genreName: '浪費',
+        },
+      ],
+      situationText: '',
+    });
+    expect(prompt).toContain('### よく使うお店');
+    expect(prompt).toContain('- "セブン-イレブン 渋谷道玄坂店"(12回 · 浪費)');
+    expect(prompt).toContain('store_candidates');
+  });
+});

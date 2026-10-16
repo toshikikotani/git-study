@@ -21,6 +21,12 @@ export type ProposedRecord = {
   memo: string;
 };
 
+/**
+ * お店の候補(過去の記録から、ADR-107)。確認カードのボタンを押すと、記録の名前をこのお店にし、
+ * カテゴリはこのお店でいつも使うものにする(無ければそのまま)。
+ */
+export type StoreCandidate = { name: string; genreId: string | null; genreName: string | null };
+
 const KIND_LABELS = { expense: '支出', income: '収入', refund: '返金' } as const;
 
 /**
@@ -94,4 +100,15 @@ export function recordFromEdit(
   // レシート名を空のまま終えると、画面が記録すると同じ名前を入れて返す。空に戻しておき、
   // あとでカテゴリを変えたら名前もついてくるようにする。
   return next.name === recordNameOf({ ...next, name: '' }) ? { ...next, name: '' } : next;
+}
+
+/** お店の候補を選んだ記録(名前をそのお店に、カテゴリはそのお店でいつも使うもの)。 */
+export function recordWithStore(r: ProposedRecord, store: StoreCandidate): ProposedRecord {
+  return {
+    ...r,
+    name: store.name,
+    ...(store.genreId !== null && store.genreName !== null
+      ? { genreId: store.genreId, genreName: store.genreName }
+      : {}),
+  };
 }

@@ -2,7 +2,12 @@ import { useSyncExternalStore } from 'react';
 
 import type { AssistantChange } from '@/features/assistant/chat-tools';
 import type { AskUserQuestion, ProposedChange } from '@/features/assistant/plan';
-import { recordChangeOf, type ProposedRecord } from '@/features/assistant/record-change';
+import {
+  recordChangeOf,
+  recordWithStore,
+  type ProposedRecord,
+  type StoreCandidate,
+} from '@/features/assistant/record-change';
 import type { ScreenLink } from '@/features/assistant/screens';
 import { todayJst } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
@@ -228,11 +233,24 @@ export function editRecord(index: number, changeIndex: number, record: ProposedR
   const m = chat.messages[index];
   if (!m?.proposal || m.proposal.status !== 'pending') return;
   if (m.proposal.changes[changeIndex]?.tool !== 'add_transaction') return;
+  // お店の候補のボタンは、直したあとも残す(選び直せるように)。
   const changes = m.proposal.changes.map((c, j) =>
-    j === changeIndex ? recordChangeOf(record, todayJst()) : c,
+    j === changeIndex
+      ? {
+          ...recordChangeOf(record, todayJst()),
+          ...(c.candidates ? { candidates: c.candidates } : {}),
+        }
+      : c,
   );
   const selected = m.proposal.selected.map((v, j) => (j === changeIndex ? true : v));
   patchMessage(index, { proposal: { ...m.proposal, changes, selected } });
+}
+
+/** お店の候補のボタンを押した:名前をそのお店に、カテゴリはそのお店でいつも使うものにする(ADR-107)。 */
+export function pickStore(index: number, changeIndex: number, store: StoreCandidate): void {
+  const record = chat.messages[index]?.proposal?.changes[changeIndex]?.record;
+  if (record === undefined) return;
+  editRecord(index, changeIndex, recordWithStore(record, store));
 }
 
 export function answerQuestion(index: number, labels: string[]): void {

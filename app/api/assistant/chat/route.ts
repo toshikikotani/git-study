@@ -19,6 +19,7 @@ import {
   type PlanContext,
   type ProposedChange,
 } from '@/features/assistant/plan';
+import { withStoreCandidates } from '@/features/assistant/store-candidates';
 import {
   ASSISTANT_SCREEN_KEYS,
   MAX_SCREEN_LINKS,
@@ -93,7 +94,17 @@ const TOOLS: Tool[] = [
           enum: ['expense', 'income', 'refund'],
           description: '支出 / 収入 / 返金。既定は支出',
         },
-        store_name: { type: 'string', description: '店名・内容(レシート名)。無ければ省く' },
+        store_name: {
+          type: 'string',
+          description:
+            '店名・内容(レシート名)。「コンビニ」「セブン」のようにおおまかなら、「よく使うお店」から一番ありそうな1つ。無ければ省く',
+        },
+        store_candidates: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            '「よく使うお店」の一覧から、ほかに当てはまりそうなお店(最大4つ、よく使う順)。本人がボタンで選び直せる。一覧に無い名前は入れない',
+        },
         genre_name: { type: 'string', description: 'ジャンル一覧にあるジャンル名。返金では必須' },
         memo: { type: 'string', description: 'メモ(任意)' },
       },
@@ -371,6 +382,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     recentTransactions: planContext.transactions,
     goals: planContext.goals,
     latestPlan: planContext.latestPlan,
+    stores: planContext.stores ?? [],
     situationText,
     today: todayJst(),
   });
@@ -492,7 +504,12 @@ function handleToolUse(
         question: null,
       };
     }
-    const { change } = planToolCall(toolUse.name, toolUse.input, planContext);
+    const planned = planToolCall(toolUse.name, toolUse.input, planContext).change;
+    // 記録の案には、よく行くお店の候補をつける(いちばんありそうなお店で作り、ほかはボタンで、ADR-107)。
+    const change =
+      toolUse.name === 'add_transaction'
+        ? withStoreCandidates(planned, toolUse.input, planContext, todayJst())
+        : planned;
     proposed.push(change);
     return {
       message: `変更案として受け付けました(${change.target}: ${change.detail})。本人が承認するまで反映されません。`,

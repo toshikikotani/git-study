@@ -32,7 +32,13 @@ import { resolveTransactionById } from '@/features/transactions/chat-tools';
 import type { StoredTransaction } from '@/features/transactions/types';
 import { ChatToolError } from '@/lib/chat-tools';
 import { addDays, assertDateOnly, todayJst } from '@/lib/date';
-import { recordChangeOf, recordNameOf, type ProposedRecord } from './record-change';
+import {
+  recordChangeOf,
+  recordNameOf,
+  type ProposedRecord,
+  type StoreCandidate,
+} from './record-change';
+import type { StoreSummary } from './store-candidates';
 
 export { ChatToolError };
 
@@ -74,6 +80,8 @@ export type ProposedChange = {
   detail: string;
   /** 記録の案(add_transaction)の中身。確認カードの上で直すときに使う(ADR-105)。 */
   record?: ProposedRecord;
+  /** お店の候補(過去の記録から。押すと名前とカテゴリが変わる、ADR-107)。 */
+  candidates?: StoreCandidate[];
 };
 
 export type GoalRef = { id: string; title: string };
@@ -89,6 +97,8 @@ export type PlanContext = {
   goals: readonly GoalRef[];
   /** 直近に立てた支出目標。無ければ null。 */
   latestPlan: PlanRef | null;
+  /** よく使うお店(過去1年の記録から、回数の多い順、ADR-107)。 */
+  stores?: readonly StoreSummary[];
 };
 
 /** planToolCall() が返す、実行に必要な情報だけを持つデータ(副作用を持たない)。 */

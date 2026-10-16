@@ -18,6 +18,7 @@ import type { AppSettings } from '@/features/settings/store';
 import { formatTransactionContextLines } from '@/features/transactions/chat-tools';
 import type { StoredTransaction } from '@/features/transactions/types';
 import { MAX_CHANGES_PER_PROPOSAL, type GoalRef, type PlanRef } from './plan';
+import { formatStoreLines, STORES_IN_PROMPT, type StoreSummary } from './store-candidates';
 
 /** 会話に添える直近の明細の件数。多すぎるとコストが跳ねるため絞る。 */
 export const RECENT_TRANSACTIONS_LIMIT = 40;
@@ -61,6 +62,8 @@ export type AssistantChatContext = {
   recentTransactions: readonly StoredTransaction[];
   goals: readonly GoalRef[];
   latestPlan: PlanRef | null;
+  /** よく使うお店(過去1年の記録から、ADR-107)。 */
+  stores?: readonly StoreSummary[];
   /** features/advisor/context.ts の「今の状況」。取得に失敗したときは空文字。 */
   situationText: string;
   /** 今日の日付(YYYY-MM-DD)。「昨日」「先週の金曜」を日付に直すため。 */
@@ -100,6 +103,9 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '- 記録したい(「コンビニで500円」「昨日ランチ1200円」「給料25万入った」)と言われたら、add_transaction で',
     '  記録の案を作る。登録は必ず確認カードで本人が承認してから(ツールを呼んだ時点では記録されていない)。',
     '  何件かまとめて言われたら、1件ずつ add_transaction を呼ぶ。',
+    '  「コンビニで500円」「セブンで300円」のようにお店がおおまかなら、下の「よく使うお店」から一番ありそうな',
+    '  お店を store_name に、ほかに当てはまりそうなお店を store_candidates に入れる(本人が確認カードのボタンで',
+    '  選び直せる)。カテゴリは、そのお店でいつも使うものにする。一覧に無いお店の名前は作らない。',
     '- 数字や記録のことを聞かれたら、下の「今の状況」「直近の明細一覧」で答えられるなら、その数字で答える。',
     '  これらは本人が発言するたびにアプリが明細から計算し直した最新の値。会話の前のほうに出た数字',
     '  (あなたの前の返事を含む)は古いことがあるので使わず、必ず下の値を使う。',
@@ -149,6 +155,9 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '',
     '### 直近に立てた支出目標(ジャンルごと)',
     formatPlanLines(context.latestPlan),
+    '',
+    `### よく使うお店(過去1年の記録から、回数の多い順に最大${STORES_IN_PROMPT}件)`,
+    formatStoreLines(context.stores ?? []),
     '',
     `### 直近の明細一覧(最大${RECENT_TRANSACTIONS_LIMIT}件。今日より先の日付は予定)`,
     formatTransactionContextLines(context.recentTransactions),

@@ -12,6 +12,7 @@ vi.mock('../../app/(app)/refresh-actions', () => ({ refreshAllAction: vi.fn() })
 import { AssistantChat, Bubble } from '../../app/(app)/assistant/assistant-chat';
 import {
   editRecord,
+  pickStore,
   readChat,
   resetChat,
   retry,
@@ -70,6 +71,7 @@ const bubble = (message: Message) =>
         onAnswer: noop,
         onToggle: noop,
         onEdit: noop,
+        onPickStore: noop,
         onApply: noop,
         onCancel: noop,
         onGo: noop,
@@ -239,5 +241,86 @@ describe('AIが出した記録の案は「直す」で直せる(ADR-105)', () =>
     expect(chatSource).toContain('記録されるのは、カードの「反映」を押したときです。');
     const sheetSource = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
     expect(sheetSource).toContain("{edit?.saveLabel ?? '保存'}");
+  });
+});
+
+describe('お店の候補をボタンで出し、押すと選び直せる(ADR-107)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetChat();
+  });
+
+  const record = {
+    kind: 'expense' as const,
+    amountYen: 500,
+    genreId: 'g-food',
+    genreName: '食料品',
+    date: '2026-10-17',
+    name: 'セブン-イレブン 渋谷道玄坂店',
+    memo: '',
+  };
+  const candidates = [
+    { name: 'セブン-イレブン 渋谷道玄坂店', genreId: 'g-food', genreName: '食料品' },
+    { name: 'ローソン 神泉町店', genreId: 'g-daily', genreName: '日用品' },
+    { name: 'コンビニ', genreId: null, genreName: null },
+  ];
+  const message: Message = {
+    role: 'assistant',
+    content: '案を作りました。',
+    proposal: {
+      changes: [
+        {
+          tool: 'add_transaction',
+          input: {},
+          kind: 'created',
+          target: record.name,
+          detail: '10月17日 支出 500円 · 食料品',
+          record,
+          candidates,
+        },
+      ],
+      selected: [true],
+      status: 'pending',
+    },
+  };
+
+  it('記録の案の下に、お店の候補のボタンを並べ、いまのお店を選んだ形にする', () => {
+    const raw = renderToString(
+      h(Bubble, {
+        message,
+        busy: false,
+        onRetry: noop,
+        onAnswer: noop,
+        onToggle: noop,
+        onEdit: noop,
+        onPickStore: noop,
+        onApply: noop,
+        onCancel: noop,
+        onGo: noop,
+      }),
+    );
+    expect(raw).toContain('aria-label="お店の候補"');
+    expect(visible(raw)).toContain('ローソン 神泉町店');
+    expect(raw).toMatch(/aria-pressed="true"[^>]*>セブン-イレブン 渋谷道玄坂店</);
+    expect(raw).toMatch(/aria-pressed="false"[^>]*>ローソン 神泉町店</);
+  });
+
+  it('ボタンを押すと、名前とカテゴリがそのお店に変わり、候補は残る', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => reply({ reply: '案を作りました。', proposal: message.proposal, question: null })),
+    );
+    await send('コンビニで500円');
+    const index = readChat().messages.length - 1;
+    pickStore(index, 0, candidates[1]!);
+    let change = readChat().messages[index]!.proposal!.changes[0]!;
+    expect(change.target).toBe('ローソン 神泉町店');
+    expect(change.input).toMatchObject({ store_name: 'ローソン 神泉町店', genre_name: '日用品' });
+    expect(change.candidates).toEqual(candidates);
+    // 元の言い方(カテゴリなし)に戻すと、カテゴリはそのまま
+    pickStore(index, 0, candidates[2]!);
+    change = readChat().messages[index]!.proposal!.changes[0]!;
+    expect(change.target).toBe('コンビニ');
+    expect(change.input).toMatchObject({ store_name: 'コンビニ', genre_name: '日用品' });
   });
 });
