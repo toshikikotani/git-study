@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CategorySheetProvider } from './category-sheet';
-import { RecordSheet } from './record-sheet';
+import { OpenRecordProvider, RecordSheet, type RecordOptions } from './record-sheet';
+import { parseDateOnlyOr, todayJst } from '@/lib/date';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
@@ -65,30 +66,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
+  // 記録する(＋)のシート。開いているときは初期値(日付・支出か収入か)、閉じているときは null。
+  // ＋のほか、明細のカレンダーの「この日に手で記録」や、ホーム画面のショートカット
+  // (?record=1、旧 /transactions/new からも転送)から開く(ADR-096)。
+  const [record, setRecord] = useState<RecordOptions | null>(null);
+  const openRecord = useCallback((options?: RecordOptions) => setRecord(options ?? {}), []);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('record') !== '1') return;
+    const type = url.searchParams.get('type');
+    const date = url.searchParams.get('date');
+    for (const key of ['record', 'type', 'date']) url.searchParams.delete(key);
+    window.history.replaceState(null, '', url.pathname + url.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
+    setRecord({
+      date: parseDateOnlyOr(date, todayJst()),
+      kind: type === 'income' ? 'income' : 'expense',
+    });
+  }, [pathname]);
+
   return (
     <CategorySheetProvider>
-      <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-        <div aria-hidden className="status-blur" />
-        <PullToRefresh>
-          <main
-            className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
-            aria-busy={navigating}
-          >
-            {children}
-          </main>
-        </PullToRefresh>
-        <UndoToastHost />
-        {isClient ? (
-          createPortal(<BottomBar onNavigate={beginNavigate} />, document.body)
-        ) : (
-          <BottomBar onNavigate={beginNavigate} />
-        )}
-      </div>
+      <OpenRecordProvider value={openRecord}>
+        <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
+          <div aria-hidden className="status-blur" />
+          <PullToRefresh>
+            <main
+              className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
+              aria-busy={navigating}
+            >
+              {children}
+            </main>
+          </PullToRefresh>
+          <UndoToastHost />
+          {isClient ? (
+            createPortal(
+              <BottomBar onNavigate={beginNavigate} record={record} onRecordChange={setRecord} />,
+              document.body,
+            )
+          ) : (
+            <BottomBar onNavigate={beginNavigate} record={record} onRecordChange={setRecord} />
+          )}
+        </div>
+      </OpenRecordProvider>
     </CategorySheetProvider>
   );
 }
 
-function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
+function BottomBar({
+  onNavigate,
+  record,
+  onRecordChange,
+}: {
+  onNavigate: (href: string) => void;
+  record: RecordOptions | null;
+  onRecordChange: (next: RecordOptions | null) => void;
+}) {
   const pathname = usePathname();
   const isClient = useIsClient();
   const jobs = useReceiptJobs();
@@ -125,8 +158,14 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
   }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<'single' | 'continuous'>('single');
-  const [fabMenuOpen, setFabMenuOpen] = useState(false);
-  const longPress = useMemo(() => createLongPress({ onLongPress: () => setFabMenuOpen(true) }), []);
+  const setFabMenuOpen = useCallback(
+    (open: boolean) => onRecordChange(open ? {} : null),
+    [onRecordChange],
+  );
+  const longPress = useMemo(
+    () => createLongPress({ onLongPress: () => setFabMenuOpen(true) }),
+    [setFabMenuOpen],
+  );
   const reading = countReading(jobs);
   const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
   const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
@@ -185,7 +224,7 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
         />
       ) : null}
       <BottomSheet
-        open={fabMenuOpen}
+        open={record !== null}
         onClose={() => setFabMenuOpen(false)}
         role="dialog"
         label="記録する"
@@ -203,6 +242,8 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
             setFabMenuOpen(false);
           }}
           canStream={canStream}
+          initialDate={record?.date}
+          initialKind={record?.kind}
         />
       </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>

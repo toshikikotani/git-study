@@ -1,13 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { genreSwatch } from '@/domain/genre-style';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
-import { fetchAccounts } from '@/features/transactions/accounts-client';
+import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
 import { addDays, splitDateOnly, todayJst, weekdayOf } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
@@ -20,8 +20,22 @@ import { fetchQuickEntryGenresAction } from './transactions/new/actions';
 const KINDS = [
   { value: 'expense', label: '支出' },
   { value: 'income', label: '収入' },
+  { value: 'refund', label: '返金' },
 ] as const;
 type Kind = (typeof KINDS)[number]['value'];
+
+/** 記録するを開くときの初期値(明細のカレンダーの「この日に手で記録」など)。 */
+export type RecordOptions = { date?: string; kind?: 'expense' | 'income' };
+
+const OpenRecordContext = createContext<((options?: RecordOptions) => void) | null>(null);
+
+/** アプリの外枠(AppShell)が、記録するのシートを開く関数を配る。 */
+export const OpenRecordProvider = OpenRecordContext.Provider;
+
+/** 記録するのシートを開く。外枠の外(テストなど)では null。 */
+export function useOpenRecord(): ((options?: RecordOptions) => void) | null {
+  return useContext(OpenRecordContext);
+}
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
@@ -33,33 +47,41 @@ function dateLabel(date: string, today: string): string {
 }
 
 /**
- * 記録する(デザイン仕様書の⑤、ADR-091):できるのは3つだけ ── 記録する・カテゴリを足す・固定費にする。
- * 支出 / 収入、レシートで入力、金額と日付、レシート名(空ならカテゴリ名、ADR-092)、
- * カテゴリ(押して選ぶ・「追加」で足す)、固定費にする。
- * 日付を今日より先にすると「予定」として記録する(使った額には入らない)。
- * 保存は取り込みと同じ経路(saveImportBatchAction、ADR-033)。口座は1つめの口座。
+ * 記録する(デザイン仕様書の⑤、ADR-091)。手で記録するのはここだけ(ADR-096。旧「手入力」の画面をまとめた)。
+ * 支出 / 収入 / 返金、レシートで入力、金額と日付、レシート名(空ならカテゴリ名、ADR-092)、
+ * カテゴリ(押して選ぶ・「追加」で足す)、固定費にする、口座(2つ以上あるとき)とメモ。
+ * 日付を今日より先にすると「予定」として記録する(使った額には入らない)。返金は、選んだカテゴリの
+ * 使った額から差し引く(収入にはならない)。
+ * 保存は取り込みと同じ経路(saveImportBatchAction、ADR-033)。口座の既定は1つめの口座。
  */
 export function RecordSheet({
   onClose,
   onCamera,
   onFiles,
   canStream,
+  initialDate,
+  initialKind = 'expense',
 }: {
   onClose: () => void;
   /** 自前のカメラ(連続撮影・写真ライブラリもその中にある)を開く。 */
   onCamera: (mode: 'single' | 'continuous') => void;
   onFiles: (files: File[]) => void;
   canStream: boolean;
+  /** 日付の初期値(無ければ今日)。 */
+  initialDate?: string | undefined;
+  initialKind?: 'expense' | 'income' | undefined;
 }) {
   const router = useRouter();
   const today = todayJst();
-  const [kind, setKind] = useState<Kind>('expense');
+  const [kind, setKind] = useState<Kind>(initialKind);
   const [amount, setAmount] = useState('');
   const [genreId, setGenreId] = useState<string | null>(null);
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(initialDate ?? today);
   const [name, setName] = useState('');
+  const [memo, setMemo] = useState('');
   const [fixed, setFixed] = useState(false);
   const [genres, setGenres] = useState<readonly { id: string; name: string }[]>([]);
+  const [accounts, setAccounts] = useState<readonly AccountOption[]>([]);
   const [accountId, setAccountId] = useState('');
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -68,7 +90,10 @@ export function RecordSheet({
 
   useEffect(() => {
     void fetchQuickEntryGenresAction().then(setGenres);
-    void fetchAccounts().then((accounts) => setAccountId(accounts[0]?.id ?? ''));
+    void fetchAccounts().then((fetched) => {
+      setAccounts(fetched);
+      setAccountId(fetched[0]?.id ?? '');
+    });
   }, []);
 
   const amountYen = Number(amount.replace(/[^\d]/g, ''));
@@ -91,13 +116,28 @@ export function RecordSheet({
     setAdding(false);
   };
 
+  const selectedGenre = kind === 'income' ? undefined : genres.find((g) => g.id === genreId);
+  /** レシート名が空のときに入る名前(入力欄の薄い文字にも出す)。 */
+  const fallbackName =
+    kind === 'income'
+      ? '収入'
+      : kind === 'refund'
+        ? selectedGenre
+          ? `${selectedGenre.name}の返金`
+          : '返金'
+        : (selectedGenre?.name ?? '手入力');
+
   const save = async () => {
     if (!canSave) return;
+    if (kind === 'refund' && genreId === null) {
+      setError('返金は、どのカテゴリの支出から差し引くかを選んでください。');
+      return;
+    }
     setSaving(true);
     setError(null);
-    const signed = kind === 'income' ? amountYen : -amountYen;
-    const genre = kind === 'income' ? undefined : genres.find((g) => g.id === genreId);
-    const label = name.trim() || (kind === 'income' ? '収入' : (genre?.name ?? '手入力'));
+    const signed = kind === 'expense' ? -amountYen : amountYen;
+    const genre = selectedGenre;
+    const label = name.trim() || fallbackName;
     const preview: StoredTransaction = {
       id: 'manual-0',
       accountId,
@@ -112,12 +152,12 @@ export function RecordSheet({
       confidence: null,
       reviewStatus: 'auto_ok',
       mustPay: false,
-      kind: 'normal',
+      kind: kind === 'refund' ? 'refund' : 'normal',
       source: 'manual',
       fingerprint: fingerprintOf({ occurredOn: date, amountYen: signed, description: label }),
       batchId: null,
       sourceRef: null,
-      memo: null,
+      memo: memo.trim() === '' ? null : memo.trim(),
     };
     const outcome = await saveImportBatchAction([preview], {
       fileName: '手入力',
@@ -146,6 +186,7 @@ export function RecordSheet({
     }
     setAmount('');
     setName('');
+    setMemo('');
     setFixed(false);
     router.refresh();
     onClose();
@@ -270,9 +311,7 @@ export function RecordSheet({
           value={name}
           maxLength={60}
           placeholder={
-            kind === 'income'
-              ? '収入'
-              : (genres.find((g) => g.id === genreId)?.name ?? '店名など（任意）')
+            kind === 'expense' && selectedGenre === undefined ? '店名など（任意）' : fallbackName
           }
           onChange={(e) => setName(e.target.value)}
           className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
@@ -280,7 +319,7 @@ export function RecordSheet({
         />
       </label>
 
-      {kind === 'expense' ? (
+      {kind !== 'income' ? (
         <section
           className="flex flex-col gap-3 rounded-[20px] px-3 py-3"
           style={{ background: 'var(--surface)' }}
@@ -394,13 +433,48 @@ export function RecordSheet({
           </label>
         </div>
       ) : null}
+      <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
+        {accounts.length >= 2 ? (
+          <label className="flex min-h-13 items-center gap-3 px-4">
+            <span className="shrink-0 text-[16px]">口座</span>
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+              style={{ color: 'var(--ink)' }}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <label
+          className="flex min-h-13 items-center gap-3 px-4"
+          style={accounts.length >= 2 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+        >
+          <span className="shrink-0 text-[16px]">メモ</span>
+          <input
+            value={memo}
+            maxLength={200}
+            placeholder="任意"
+            onChange={(e) => setMemo(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+            style={{ color: 'var(--ink)' }}
+          />
+        </label>
+      </div>
       {error ? (
         <p role="alert" className="px-1 text-[13px]" style={{ color: 'var(--over)' }}>
           {error}
         </p>
       ) : null}
       <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
-        日付を先にすると「予定」として記録され、使った額には入りません。
+        {kind === 'refund'
+          ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'
+          : '日付を先にすると「予定」として記録され、使った額には入りません。'}
       </p>
     </div>
   );

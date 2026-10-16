@@ -12,6 +12,7 @@ import {
   type CalendarView,
 } from '@/lib/calendar-view';
 import { formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
+import { useOpenRecord } from '../record-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -64,6 +65,7 @@ export function CalendarHeatmap({
   initialView?: CalendarView;
 } = {}) {
   const { visibleMonth, totals, today, filter, setFilter, isCurrentMonth } = useSpendingMonth();
+  const openRecord = useOpenRecord();
   const expanded = useSyncExternalStore(subscribeView, readView, () => initialView) === 'month';
 
   const monthKey = visibleMonth.slice(0, 7);
@@ -184,14 +186,26 @@ export function CalendarHeatmap({
         style={{ color: 'var(--ink-muted)' }}
       >
         {filter.date !== null ? (
-          <Link
-            href={`/transactions/new?date=${filter.date}`}
-            prefetch={false}
-            className="mr-auto inline-flex min-h-11 items-center text-[13px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            {formatDateJa(filter.date)}に手で記録
-          </Link>
+          // 手で記録するのは「記録する」のシートだけ(ADR-096)。その日を日付にして開く。
+          openRecord ? (
+            <button
+              type="button"
+              onClick={() => filter.date && openRecord({ date: filter.date })}
+              className="mr-auto inline-flex min-h-11 items-center text-[13px] font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              {formatDateJa(filter.date)}に手で記録
+            </button>
+          ) : (
+            <Link
+              href={`/spending?record=1&date=${filter.date}`}
+              prefetch={false}
+              className="mr-auto inline-flex min-h-11 items-center text-[13px] font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              {formatDateJa(filter.date)}に手で記録
+            </Link>
+          )
         ) : null}
         <span className="flex items-center gap-1">
           <span

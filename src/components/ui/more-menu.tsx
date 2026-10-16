@@ -13,11 +13,6 @@ const GROUPS = [
     items: [
       { href: '/payday', label: '給料日', dek: '入った額を入れて、振り分けを確かめる' },
       {
-        href: '/transactions/new',
-        label: 'くわしく入力',
-        dek: '口座・品目・返金・特別費まで決めて1件記録',
-      },
-      {
         href: '/transactions/capture-text',
         label: '話して・文字で記録',
         dek: '声や文章から明細にする',

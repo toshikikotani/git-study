@@ -32,7 +32,7 @@ export default function manifest(): MetadataRoute.Manifest {
         name: '手入力',
         short_name: '手入力',
         description: 'レシートなしで1件記録する',
-        url: '/transactions/new',
+        url: '/spending?record=1',
       },
       {
         name: '話して記録・文字で記録',

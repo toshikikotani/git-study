@@ -272,10 +272,10 @@ describe('P5 品目の詳細の表示(受け入れ基準7)', () => {
 });
 
 describe('P5 返金の入力(返品・返金は「返金」として登録できる)', () => {
-  it('新規入力に「返金」がある。支出・収入・返金の3つ', async () => {
+  it('記録する(手で記録する唯一の画面、ADR-096)に「返金」がある。支出・収入・返金の3つ', async () => {
     const { readFileSync } = await import('node:fs');
-    const src = readFileSync('app/(app)/transactions/new/new-transaction-form.tsx', 'utf8');
-    expect(src).toContain("['refund', '返金']");
-    expect(src).toContain("kind: mode === 'refund' ? 'refund'");
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src).toContain("{ value: 'refund', label: '返金' }");
+    expect(src).toContain("kind: kind === 'refund' ? 'refund' : 'normal'");
   });
 });
