@@ -237,12 +237,19 @@ export function splitShares(t: LedgerTransaction): GenreShare[] {
     .sort((a, b) => b.amountYen - a.amountYen);
 }
 
-/** 行の2行目:支店名と品目のプレビュー。 */
+/** 行の2行目:支店名と品目。品目は省略せず、すべて並べる(本人の要望「省略はなし」、ADR-095)。 */
+export function subtitleOf(
+  branch: string | null | undefined,
+  itemNames: readonly string[],
+): string {
+  return [branch ?? null, itemNames.join('、')]
+    .filter((x): x is string => x !== null && x !== '')
+    .join(' ・ ');
+}
+
+/** 明細の行の2行目(subtitleOf)。 */
 export function rowSubtitle(t: LedgerTransaction, itemNames: readonly string[]): string {
-  const preview =
-    itemNames.slice(0, 3).join('、') +
-    (itemNames.length > 3 ? ` ほか${itemNames.length - 3}点` : '');
-  return [t.branchName, preview].filter((x): x is string => x !== null && x !== '').join(' ・ ');
+  return subtitleOf(t.branchName, itemNames);
 }
 
 export type AttentionSummary = {

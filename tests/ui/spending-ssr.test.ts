@@ -306,3 +306,52 @@ describe('分析のカテゴリ(デザイン仕様書)', () => {
     expect(html).toMatch(/\d+%/);
   });
 });
+
+describe('明細は省略しない(本人の要望「省略はなし」、ADR-095)', () => {
+  const names = ['ファミリーマート', 'マツモトキヨシ', '耳鼻咽喉科', 'スギ薬局', 'ローソン'];
+  const many = names.map((label, i) => ({
+    ...ledgerTx({ id: `d${i}`, occurredOn: '2026-09-15', label, amountYen: -100 * (i + 1) }),
+    items:
+      i === 3
+        ? ['野菜', 'レジ袋', '牛乳', '卵', 'ライオンキャラメル'].map((name, j) => ({
+            id: `it${j}`,
+            name,
+            amountYen: 100,
+            genreId: null,
+            genreName: null,
+            productType: null,
+          }))
+        : [],
+    expenseSubtype: null,
+  }));
+  const manyViews = buildLedgerViews({
+    genres: genres.map((g) => ({ ...g, budget_yen: null })),
+    transactions: many,
+    range: { from: '2026-09-01', to: '2026-09-30' },
+    today: '2026-09-29',
+  });
+  const html = visible(
+    renderToString(
+      h(SpendingMonthProvider, {
+        today: '2026-09-29',
+        currentMonthStart: '2026-09-01',
+        currentTransactions: many,
+        currentGenreBreakdown: manyViews.genreBreakdown,
+        currentTotals: manyViews.totals,
+        genres,
+        accounts: [{ id: 'a', name: '現金' }],
+        children: h(LedgerList, { goalRange: null, duplicateCount: 0 }),
+      }),
+    ),
+  );
+
+  it('1日に4件以上あっても、たたまずにすべて出す', () => {
+    for (const name of names) expect(html).toContain(name);
+    expect(html).not.toContain('この日のほかの記録');
+  });
+
+  it('品目はすべて並べ、「ほか○点」や「…」で切らない', () => {
+    expect(html).toContain('野菜、レジ袋、牛乳、卵、ライオンキャラメル');
+    expect(html).not.toMatch(/ほか\d+点/);
+  });
+});

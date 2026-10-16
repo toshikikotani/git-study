@@ -15,7 +15,7 @@ import { predictGenres, type GenreHistoryEntry } from '@/domain/genre-prediction
 import { MdReceiptLong } from 'react-icons/md';
 import { ReceiptImageViewer } from '@/components/receipt/receipt-image-viewer';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
-import type { GenreShare } from '@/features/spending/views';
+import { subtitleOf, type GenreShare } from '@/features/spending/views';
 import type { GenreOption } from '@/features/genre/store';
 import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
@@ -378,15 +378,7 @@ export function TransactionRowWithSplit({
       })
     : [];
   const shares = display?.shares ?? [];
-  const subtitle = [
-    display?.branch ?? null,
-    itemNames.length > 0
-      ? itemNames.slice(0, 3).join('、') +
-        (itemNames.length > 3 ? ` ほか${itemNames.length - 3}点` : '')
-      : null,
-  ]
-    .filter((x): x is string => x !== null && x !== '')
-    .join(' ・ ');
+  const subtitle = subtitleOf(display?.branch, itemNames);
   const rowAriaLabel = `${display?.name ?? transaction.description}、${transaction.genreName ?? '未分類'}、${isIncome ? '収入' : '支出'}${formatYen(targetAbsYen)}${display?.scheduled ? '、予定' : ''}`;
 
   async function changeGenre(newGenreId: string): Promise<void> {
@@ -591,9 +583,9 @@ export function TransactionRowWithSplit({
                   </span>
                 ) : null}
               </p>
-              {/* 2行目:支店名と品目のプレビュー(分割は品目の羅列ではなく比率の細いバー) */}
+              {/* 2行目:支店名と品目(省略せず折り返す、ADR-095。分割は比率の細いバーも出す) */}
               {subtitle !== '' ? (
-                <p className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                <p className="text-[13px] break-words" style={{ color: 'var(--ink-muted)' }}>
                   {subtitle}
                 </p>
               ) : null}

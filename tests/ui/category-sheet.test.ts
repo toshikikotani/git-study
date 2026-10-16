@@ -116,6 +116,29 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
     expect(html).not.toContain('スクショから記録');
   });
 
+  it('手で記録するのはここだけ:返金・メモもここで入れる(ADR-096)', () => {
+    expect(html).toContain('返金');
+    expect(html).toContain('メモ');
+  });
+
+  it('開くときの日付と、収入から始めるかを受け取る(カレンダーの「この日に手で記録」など)', () => {
+    const opened = visible(
+      renderToString(
+        h(RecordSheet, {
+          onClose: () => {},
+          onCamera: () => {},
+          onFiles: () => {},
+          canStream: true,
+          initialDate: '2026-10-14',
+          initialKind: 'income',
+        }),
+      ),
+    );
+    expect(opened).toContain('10月14日（水）');
+    // 収入ではカテゴリのタイルを出さない
+    expect(opened).not.toContain('固定費にする');
+  });
+
   it('レシート名を入れられる。空ならカテゴリ名で記録する(ADR-092)', () => {
     const raw = renderToString(
       h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {}, canStream: true }),

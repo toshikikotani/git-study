@@ -154,7 +154,8 @@ describe('H ウィジェット・ショートカット(代替の実装)', () => 
     const m = manifest();
     const urls = (m.shortcuts ?? []).map((s) => s.url);
     expect(urls).toContain('/spending?capture=1');
-    expect(urls).toContain('/transactions/new');
+    // 手入力は「記録する」のシートを開く(ADR-096)
+    expect(urls).toContain('/spending?record=1');
     expect(m.display).toBe('standalone');
   });
 });
