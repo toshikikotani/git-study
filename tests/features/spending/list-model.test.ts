@@ -114,9 +114,9 @@ describe('splitShares / rowSubtitle', () => {
     expect(splitShares(txs[1]!)).toEqual([]);
   });
 
-  it('2行目は支店名 + 品目のプレビュー', () => {
+  it('2行目は支店名 + 品目。品目は省略せず、すべて並べる(ADR-095)', () => {
     expect(rowSubtitle(txs[0]!, ['ラテ', 'ハンドクリーム', 'メモ帳', '電池'])).toBe(
-      '阪神大阪梅田駅店 ・ ラテ、ハンドクリーム、メモ帳 ほか1点',
+      '阪神大阪梅田駅店 ・ ラテ、ハンドクリーム、メモ帳、電池',
     );
     expect(rowSubtitle(txs[1]!, [])).toBe('');
   });

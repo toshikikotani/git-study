@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/money';
@@ -172,7 +172,6 @@ export function LedgerList({
               heading={dayHeading(g.date)}
               total={g.spentYen}
               transactions={g.transactions}
-              collapseAfter={DAY_ROWS}
             />
           ))}
           <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -186,9 +185,6 @@ export function LedgerList({
   );
 }
 
-/** 1日に最初から出す件数(残りは「この日のほかの記録」にたたむ)。 */
-const DAY_ROWS = 3;
-
 /** 2026-10-15 → 10月15日（木） */
 function dayHeading(date: string): string {
   return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${WEEKDAYS[weekdayOf(date)]}）`;
@@ -196,24 +192,21 @@ function dayHeading(date: string): string {
 
 /**
  * 日付・予定・固定費の区切り(デザイン仕様書の「明細」):白い面の上に見出しと合計、その下に行。
- * collapseAfter があれば、それより後の行は「この日のほかの記録」を押すと出る。
+ * その日の記録はたたまず、すべて出す(本人の要望「省略はなし」、ADR-095)。
  */
 function DaySection({
   id,
   heading,
   total,
   transactions,
-  collapseAfter,
 }: {
   id?: string;
   heading: string;
   total?: number;
   transactions: DrilldownTransaction[];
-  collapseAfter?: number;
 }) {
   const { genres, transactions: monthTransactions } = useSpendingMonth();
   const justSavedIds = useJustSaved();
-  const [showAll, setShowAll] = useState(false);
   const history = useMemo(
     () =>
       monthTransactions
@@ -229,13 +222,6 @@ function DaySection({
         ),
     [monthTransactions],
   );
-  const limit =
-    collapseAfter !== undefined && !showAll && transactions.length > collapseAfter
-      ? collapseAfter
-      : transactions.length;
-  const shown = transactions.slice(0, limit);
-  const rest = transactions.slice(limit);
-  const restYen = rest.reduce((sum, t) => sum + Math.abs(t.amountYen), 0);
 
   return (
     <section id={id} aria-label={heading} className="scroll-mt-16 flex flex-col gap-1">
@@ -248,7 +234,7 @@ function DaySection({
       </div>
       <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
         <ul className="divider-list">
-          {shown.map((t) => (
+          {transactions.map((t) => (
             <div key={t.id} className="relative">
               <TransactionRowWithSplit
                 transaction={t}
@@ -276,22 +262,6 @@ function DaySection({
             </div>
           ))}
         </ul>
-        {rest.length > 0 ? (
-          <>
-            <div className="ml-16 h-px" style={{ background: 'var(--hairline)' }} />
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="tabular flex min-h-12 w-full items-center justify-between pr-4 pl-16 text-[15px] font-semibold"
-              style={{ color: 'var(--accent)' }}
-            >
-              <span>この日のほかの記録</span>
-              <span className="font-normal" style={{ color: 'var(--ink-muted)' }}>
-                <Yen value={restYen} />
-              </span>
-            </button>
-          </>
-        ) : null}
       </div>
     </section>
   );

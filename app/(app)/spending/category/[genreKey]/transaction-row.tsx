@@ -5,15 +5,13 @@ import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { MdReceiptLong } from 'react-icons/md';
 import type { CategoryLine } from '@/features/category/model';
 
-/** 品目のプレビュー(先頭3件 + ほか○点)。 */
+/** 品目(省略せず、すべて並べる。ADR-095)。 */
 export function itemsPreview(line: CategoryLine): string {
-  const names = line.tx.items.map((i) => i.name);
-  if (names.length === 0) return '';
-  return names.slice(0, 3).join('、') + (names.length > 3 ? ` ほか${names.length - 3}点` : '');
+  return line.tx.items.map((i) => i.name).join('、');
 }
 
 /**
- * カテゴリ詳細の取引の行。店名(切れないように折り返す)、支店名と品目のプレビュー、
+ * カテゴリ詳細の取引の行。店名(切れないように折り返す)、支店名と品目(省略せず折り返す)、
  * 分割したレシートは「レシート全体 ○円のうち」、返品・返金は緑の「+」。
  * 家計簿の明細の行と同じ見た目の部品(LedgerAmount・区切り線)を使う。
  */
@@ -105,7 +103,7 @@ export function CategoryTransactionRow({
             ) : null}
           </p>
           {subtitle !== '' ? (
-            <p className="mt-1 truncate text-xs" style={{ color: 'var(--ink-secondary)' }}>
+            <p className="mt-1 text-xs break-words" style={{ color: 'var(--ink-secondary)' }}>
               {subtitle}
             </p>
           ) : null}
