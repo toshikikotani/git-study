@@ -34,7 +34,8 @@ function dateLabel(date: string, today: string): string {
 
 /**
  * 記録する(デザイン仕様書の⑤、ADR-091):できるのは3つだけ ── 記録する・カテゴリを足す・固定費にする。
- * 支出 / 収入、レシートで入力、金額と日付、カテゴリ(押して選ぶ・「追加」で足す)、固定費にする。
+ * 支出 / 収入、レシートで入力、金額と日付、レシート名(空ならカテゴリ名、ADR-092)、
+ * カテゴリ(押して選ぶ・「追加」で足す)、固定費にする。
  * 日付を今日より先にすると「予定」として記録する(使った額には入らない)。
  * 保存は取り込みと同じ経路(saveImportBatchAction、ADR-033)。口座は1つめの口座。
  */
@@ -56,6 +57,7 @@ export function RecordSheet({
   const [amount, setAmount] = useState('');
   const [genreId, setGenreId] = useState<string | null>(null);
   const [date, setDate] = useState(today);
+  const [name, setName] = useState('');
   const [fixed, setFixed] = useState(false);
   const [genres, setGenres] = useState<readonly { id: string; name: string }[]>([]);
   const [accountId, setAccountId] = useState('');
@@ -95,7 +97,7 @@ export function RecordSheet({
     setError(null);
     const signed = kind === 'income' ? amountYen : -amountYen;
     const genre = kind === 'income' ? undefined : genres.find((g) => g.id === genreId);
-    const label = kind === 'income' ? '収入' : (genre?.name ?? '手入力');
+    const label = name.trim() || (kind === 'income' ? '収入' : (genre?.name ?? '手入力'));
     const preview: StoredTransaction = {
       id: 'manual-0',
       accountId,
@@ -143,6 +145,7 @@ export function RecordSheet({
       });
     }
     setAmount('');
+    setName('');
     setFixed(false);
     router.refresh();
     onClose();
@@ -257,6 +260,25 @@ export function RecordSheet({
           />
         </label>
       </section>
+
+      <label
+        className="flex min-h-13 items-center gap-3 rounded-2xl px-4"
+        style={{ background: 'var(--surface)' }}
+      >
+        <span className="shrink-0 text-[16px]">レシート名</span>
+        <input
+          value={name}
+          maxLength={60}
+          placeholder={
+            kind === 'income'
+              ? '収入'
+              : (genres.find((g) => g.id === genreId)?.name ?? '店名など（任意）')
+          }
+          onChange={(e) => setName(e.target.value)}
+          className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+          style={{ color: 'var(--ink)' }}
+        />
+      </label>
 
       {kind === 'expense' ? (
         <section
