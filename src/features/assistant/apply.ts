@@ -6,6 +6,7 @@
  * ロジックは持たない(各ストアが自分の検証・RLS を持つ)。
  */
 
+import { listAccounts } from '@/features/accounts/store';
 import {
   createGenre,
   listGenres,
@@ -18,10 +19,12 @@ import { replaceReceiptItems } from '@/features/receipts/items-store';
 import { getAppSettings, updateAppSettings } from '@/features/settings/store';
 import { getLatestPlan, updatePlanTargets } from '@/features/spending-plan/store';
 import {
+  importTransactions,
   listTransactions,
   updateTransaction,
   updateTransactionMemo,
 } from '@/features/transactions/store';
+import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
 import { RECENT_TRANSACTIONS_LIMIT } from './chat-tools';
 import type { Operation, PlanContext } from './plan';
 
@@ -56,6 +59,45 @@ export async function loadPlanContext(): Promise<PlanContext> {
 /** 検証済みの Operation を1件実行する。失敗は各ストアが投げる例外のまま伝える。 */
 export async function executeOperation(operation: Operation): Promise<void> {
   switch (operation.op) {
+    case 'add_transaction': {
+      // 記録すると同じ形で1件取り込む(口座は1つめ、ADR-096・103)。
+      const accounts = await listAccounts();
+      const accountId = accounts[0]?.id;
+      if (!accountId)
+        throw new Error('口座がまだありません。「…」› 口座 から1つ登録してください。');
+      const preview: StoredTransaction = {
+        id: 'ai-0',
+        accountId,
+        occurredOn: operation.occurredOn,
+        description: operation.description,
+        merchantName: operation.description,
+        amountYen: operation.amountYen,
+        paymentMethod: 'one_time',
+        genreId: operation.genreId,
+        genreName: operation.genreName,
+        classifiedBy: operation.genreId ? 'manual' : 'unclassified',
+        confidence: null,
+        reviewStatus: 'auto_ok',
+        mustPay: false,
+        kind: operation.kind,
+        source: 'manual',
+        fingerprint: fingerprintOf({
+          occurredOn: operation.occurredOn,
+          amountYen: operation.amountYen,
+          description: operation.description,
+        }),
+        batchId: null,
+        sourceRef: null,
+        memo: operation.memo,
+      };
+      await importTransactions([preview], {
+        fileName: 'AI',
+        source: 'manual',
+        accountId,
+        failedCount: 0,
+      });
+      return;
+    }
     case 'update_settings':
       await updateAppSettings(operation.patch);
       return;

@@ -97,3 +97,23 @@ export function AnalysisIcon({ size = 22 }: IconProps) {
     </svg>
   );
 }
+
+/** AI(下のメニューのAIボタン、ADR-103)。きらめきの形。 */
+export function AiIcon({ size = 22 }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1-5.1-1.9 5.1-1.9z" />
+      <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+    </svg>
+  );
+}
