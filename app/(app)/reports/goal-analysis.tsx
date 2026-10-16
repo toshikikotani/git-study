@@ -126,14 +126,23 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
     to: today < period.to ? today : period.to,
   });
 
-  // ペース:1日ごとの支出(固定費をのぞく)。
+  // ペース:1日ごとの支出(固定費をのぞく)。今日の分から固定費として除いた額と、その元(カテゴリ・記録)も
+  // 数えておき、グラフの下に出す(今日の棒が明細の合計より小さい理由がわかるように、ADR-102)。
   const daySpend: Record<string, number> = {};
+  let todayFixedYen = 0;
+  const todayFixedNames = new Set<string>();
   for (const tx of loaded.transactions) {
     if (tx.occurredOn > today) continue;
     if (tx.amountYen >= 0 || tx.isTransfer || tx.reviewStatus === 'ignored' || tx.needsInput)
       continue;
-    if (tx.mustPay || (tx.genreId !== null && (closed.has(tx.genreId) || fixedIds.has(tx.genreId))))
+    const fixedGenre = tx.genreId !== null && (closed.has(tx.genreId) || fixedIds.has(tx.genreId));
+    if (tx.mustPay || fixedGenre) {
+      if (tx.occurredOn === today) {
+        todayFixedYen += -tx.amountYen;
+        todayFixedNames.add(fixedGenre ? (tx.genreName ?? '未分類') : tx.label);
+      }
       continue;
+    }
     daySpend[tx.occurredOn] = (daySpend[tx.occurredOn] ?? 0) + -tx.amountYen;
   }
   const variableSpent = Object.entries(daySpend)
@@ -197,6 +206,9 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
             fixedYen={fixedYen}
             from={period.from}
             to={period.to}
+            todayFixed={
+              todayFixedYen > 0 ? { yen: todayFixedYen, names: [...todayFixedNames] } : null
+            }
             budgetPerDayYen={variableBudget > 0 ? Math.round(variableBudget / totalDays) : null}
             remainingPerDayYen={
               variableBudget > 0 && remainingDays > 0

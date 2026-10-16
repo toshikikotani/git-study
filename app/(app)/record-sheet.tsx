@@ -18,7 +18,7 @@ import { fingerprintOf, type StoredTransaction } from '@/features/transactions/t
 import { addDays, splitDateOnly, todayJst, weekdayOf } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
 import { pushUndo } from '@/lib/undo';
-import { confirmFixedCostAction } from './reports/fixed-cost-actions';
+import { markRecordFixedAction } from './reports/fixed-cost-actions';
 import { createCategoryAction } from './spending/category/actions';
 import { saveImportBatchAction, undoReceiptSaveAction } from './transactions/actions';
 import { fetchQuickEntryGenresAction } from './transactions/new/actions';
@@ -332,8 +332,12 @@ export function RecordSheet({
       failed(snapshot, outcome.error);
       return;
     }
+    // 固定費にする:この記録だけを固定費にする(カテゴリ全体は変えない、ADR-102)。
     if (fixed && kind === 'expense') {
-      await confirmFixedCostAction(subscriptionKeyOf(label, label, signed)).catch(() => {});
+      await markRecordFixedAction(
+        outcome.insertedIds,
+        subscriptionKeyOf(label, label, signed),
+      ).catch(() => {});
     }
     if (outcome.insertedIds.length > 0) {
       const ids = outcome.insertedIds;

@@ -22,7 +22,10 @@ vi.mock('../../app/(app)/transactions/actions', () => ({
 vi.mock('../../app/(app)/transactions/new/actions', () => ({
   fetchQuickEntryGenresAction: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({ confirmFixedCostAction: vi.fn() }));
+vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({
+  confirmFixedCostAction: vi.fn(),
+  markRecordFixedAction: vi.fn(),
+}));
 
 import { CategorySheetBody } from '../../app/(app)/category-sheet';
 import { RecordSheet } from '../../app/(app)/record-sheet';

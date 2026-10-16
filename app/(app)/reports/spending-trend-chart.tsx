@@ -46,6 +46,7 @@ export function SpendingTrendChart({
   to: toProp,
   budgetPerDayYen,
   remainingPerDayYen,
+  todayFixed = null,
 }: {
   /** 日次の実績支出（正の数・固定費を除いたもの） */
   daySpend: Readonly<Record<string, number>>;
@@ -59,6 +60,8 @@ export function SpendingTrendChart({
   budgetPerDayYen?: number | null;
   /** 残り使える額の1日あたり平均(横線)。 */
   remainingPerDayYen?: number | null;
+  /** 今日の支出のうち、固定費として棒から除いた額と、その元(カテゴリ・記録の名前)。 */
+  todayFixed?: { yen: number; names: readonly string[] } | null;
 }) {
   const today = todayJst();
   const displayFrom = fromProp ?? addDays(today, -(LOOKBACK_DAYS - 1));
@@ -303,6 +306,16 @@ export function SpendingTrendChart({
           </span>
         ) : null}
       </div>
+      {todayFixed && todayFixed.yen > 0 ? (
+        <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
+          今日の支出のうち{' '}
+          <strong style={{ color: 'var(--ink)' }}>
+            {formatYen(todayFixed.yen, { sign: 'never' })}
+          </strong>
+          （{todayFixed.names.join('・')}
+          ）は固定費として、今日の棒に入れていません。カテゴリを開くと 「固定費にする」を外せます。
+        </p>
+      ) : null}
       {fixedYen > 0 ? (
         <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
           この期間の固定費（家賃・サブスクなど）は{' '}
