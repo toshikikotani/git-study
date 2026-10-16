@@ -111,7 +111,8 @@ function TodayHero({
         className="tabular mt-1 flex items-baseline gap-1"
         style={{ color: left ? 'var(--ink)' : 'var(--state-caution)' }}
       >
-        <span className="text-[68px] leading-none font-bold tracking-[-0.02em]">
+        {/* 68px は大きすぎた(本人の指摘「8950がちょっとでかい」)。56px にした。 */}
+        <span className="text-[56px] leading-none font-bold tracking-[-0.02em]">
           {(left ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
         </span>
         <span className="text-[24px] font-semibold">{left ? '円' : '円 超え'}</span>
