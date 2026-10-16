@@ -123,12 +123,13 @@ async function render(
 }
 
 describe('主要ページがサーバー描画でエラーにならない(Supabase を代用)', () => {
-  it('分析(デザイン仕様書、ADR-090)', async () => {
-    const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
+  it('分析 › 月のふりかえり(デザイン仕様書、ADR-091)', async () => {
+    const html = (await render(() => import('../../../app/(app)/reports/month/page'))).replace(
       /<!-- -->/g,
       '',
     );
     expect(html).toContain('分析');
+    expect(html).toContain('月のふりかえり');
     expect(html).toContain('貯蓄率');
     expect(html).toContain('href="/reports/frequency"');
     expect(html).toContain('href="/reports/monthly"');
@@ -150,20 +151,22 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(frequency).toContain('回数と1回の金額');
   }, 60000);
 
-  it('見通し(デザイン仕様書、ADR-090)', async () => {
-    const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
+  it('分析 › 目標(デザイン仕様書、ADR-091。旧「見通し」をまとめた)', async () => {
+    const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('見通し');
-    expect(html).toContain('目標を編集');
+    expect(html).toContain('分析');
+    expect(html).toContain('href="/reports/month"');
     expect(html).toContain('href="/plan/edit"');
-    // 見込み → 予算内に収まる確率 → なぜ → 最近の勢い → AIの気づき の順
-    const order = ['10回中8回は', '予算内に収まる確率', '最近の勢い', 'AIの気づき'].map((t) =>
-      html.indexOf(t),
+    // いまの状況 → どこで使っているか → ペース → 次にできること → くわしく の順
+    const order = ['いまの状況', 'どこで使っているか', 'ペース', '次にできること', 'くわしく'].map(
+      (t) => html.indexOf(t),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(html).toContain('着地見込み');
+    expect(html).toContain('カテゴリの進み具合');
   }, 60000);
 
   it('今期の目標(デザイン仕様書、ADR-090)', async () => {
@@ -217,19 +220,19 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     ],
   ];
   for (const [name, apply] of variants) {
-    it(`予算:${name}`, async () => {
+    it(`分析 › 目標:${name}`, async () => {
       planRow().period_start = original.start;
       planRow().period_end = original.end;
       apply();
-      const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
+      const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
         /<!-- -->/g,
         '',
       );
-      expect(html).toMatch(/予算内に収まる確率|から始まります|新しい目標を立てる|次の目標を予約/);
+      expect(html).toMatch(/着地見込み|から始まります|新しい目標を立てる|次の目標を予約/);
     }, 60000);
   }
 
-  it('予算:明細の読み込みが失敗しても、ページは落ちず、原因を見せる', async () => {
+  it('分析 › 目標:明細の読み込みが失敗しても、ページは落ちず、わけを見せる', async () => {
     planRow().period_start = original.start;
     planRow().period_end = original.end;
     failures.transactions = {
@@ -237,13 +240,12 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
       message: 'canceling statement due to statement timeout',
     };
     try {
-      const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
+      const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
         /<!-- -->/g,
         '',
       );
-      expect(html).toContain('予算の見込みを読み込めませんでした');
-      expect(html).toContain('statement timeout');
-      expect(html).toContain('href="/plan/edit"');
+      expect(html).toMatch(/着地の見込みを計算できませんでした|目標の分析を読み込めませんでした/);
+      expect(html).toContain('href="/reports/month"');
     } finally {
       delete failures.transactions;
     }

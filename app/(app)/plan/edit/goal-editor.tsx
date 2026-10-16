@@ -7,34 +7,14 @@ import { useState } from 'react';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatEstimate, formatProbability } from '@/domain/forecast/format';
-import type { CumulativeDay } from '@/features/category/pace';
+import type { CategoryOutlook } from '@/features/goals/category-outlook';
 import { daysBetween } from '@/lib/date';
-import { Switch } from '../../record-sheet';
+import { Switch } from '@/components/ui/switch';
 import { reserveNextPlanAction, updatePlanAllocationAction } from '../actions';
 import { DeletePlanButton } from '../delete-plan-button';
 import { PlanPeriodForm } from '../edit-plan-section';
 import { UnrecordedSheet, type AddableGenre, type UnrecordedRow } from '../unrecorded-sheet';
-import { CategoryTargetSheet } from './category-target-sheet';
-
-/** カテゴリ1つの、目標額と見通しの材料。 */
-export type GoalCategory = {
-  genreId: string;
-  name: string;
-  /** 保存されている目標額。 */
-  targetYen: number;
-  /** 期間のはじめから今日までに使った額。 */
-  spentYen: number;
-  lastMonthYen: number | null;
-  p10: number | null;
-  p50: number | null;
-  p90: number | null;
-  /** 見直し候補(このままだと目標をこえそう)。probability はこえる確率。 */
-  caution: { probability: number } | null;
-  /** 行の2行目(「先月より大きく増えそう」「いまのペース 1日 約127円」など)。 */
-  sub: string | null;
-  /** 見通しのグラフ(実績・予測の帯)。 */
-  days: readonly CumulativeDay[];
-};
+import { CategorySheetBody } from '../../category-sheet';
 
 /** 総額の − / + の刻み。 */
 const TOTAL_STEP = 1000;
@@ -51,20 +31,32 @@ function dayLabel(date: string): string {
   return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
 }
 
-/** 合計が total になるように、各カテゴリを今の割合で配り直す(端数は大きい順に1円ずつ)。 */
-function scaleTo(amounts: Record<string, number>, total: number): Record<string, number> {
+/**
+ * 合計が total になるように配り直す。各カテゴリは下限(使った額)を下回らない。下限を超える分を、
+ * 今の割合で配る(端数は大きい順に1円ずつ)。total が下限の合計より小さければ、下限の合計にする。
+ */
+function scaleTo(
+  amounts: Record<string, number>,
+  total: number,
+  floors: Record<string, number> = {},
+): Record<string, number> {
   const ids = Object.keys(amounts);
-  const sum = ids.reduce((s, id) => s + amounts[id]!, 0);
   if (ids.length === 0) return amounts;
+  const floorOf = (id: string) => Math.min(floors[id] ?? 0, Number.MAX_SAFE_INTEGER);
+  const floorSum = ids.reduce((s, id) => s + floorOf(id), 0);
+  const room = Math.max(0, total - floorSum);
+  const excess = ids.map((id) => ({ id, yen: Math.max(0, amounts[id]! - floorOf(id)) }));
+  const sum = excess.reduce((s, e) => s + e.yen, 0);
   const base =
     sum > 0
-      ? ids.map((id) => ({ id, exact: (amounts[id]! / sum) * total }))
-      : ids.map((id) => ({ id, exact: total / ids.length }));
+      ? excess.map((e) => ({ id: e.id, exact: (e.yen / sum) * room }))
+      : excess.map((e) => ({ id: e.id, exact: room / ids.length }));
   const out: Record<string, number> = {};
-  let left = total;
+  let left = room;
   for (const b of base) {
-    out[b.id] = Math.floor(b.exact);
-    left -= out[b.id]!;
+    const whole = Math.floor(b.exact);
+    out[b.id] = floorOf(b.id) + whole;
+    left -= whole;
   }
   const order = [...base].sort((a, b) => (b.exact % 1) - (a.exact % 1));
   for (let i = 0; i < left; i += 1) out[order[i % order.length]!.id]! += 1;
@@ -72,8 +64,9 @@ function scaleTo(amounts: Record<string, number>, total: number): Record<string,
 }
 
 /**
- * 今期の目標(デザイン仕様書の「今期の目標」、ADR-090)。変えた額は「保存」でまとめて保存する。
- * 総額の − / + と入力は、カテゴリを今の割合のまま配り直す。カテゴリを押すと目標額のシートを開く。
+ * 今期の目標(デザイン仕様書の「今期の目標」、ADR-090・091)。変えた額は「保存」でまとめて保存する。
+ * 総額の − / + と入力は、カテゴリを今の割合のまま配り直す(使った額と予定より下にはできない)。
+ * カテゴリを押すと⑦カテゴリのシートを開き、「完了」の額がここの配分に入る。
  */
 export function GoalEditor({
   planId,
@@ -86,6 +79,7 @@ export function GoalEditor({
   noBudget,
   addable,
   next,
+  settings,
 }: {
   planId: string;
   periodStart: string;
@@ -94,13 +88,18 @@ export function GoalEditor({
   remainingDays: number;
   /** 保存されている目標での着地(中央)と予算内の確率。出せなければ null。 */
   landing: { p50: number; probWithin: number } | null;
-  categories: readonly GoalCategory[];
+  categories: readonly CategoryOutlook[];
   noBudget: readonly UnrecordedRow[];
   addable: readonly AddableGenre[];
   next: { start: string; reserved: boolean };
+  /** カテゴリの設定(固定費・ホームに表示)。⑦のスイッチの初めの状態。 */
+  settings: Readonly<Record<string, { isFixed: boolean; showOnHome: boolean }>>;
 }) {
   const router = useRouter();
-  const saved = Object.fromEntries(categories.map((c) => [c.genreId, c.targetYen]));
+  const saved = Object.fromEntries(categories.map((c) => [c.genreId, c.targetYen ?? 0]));
+  // 使った額(カテゴリの下限)と、使った額と予定の合計(総額の下限)。
+  const floors = Object.fromEntries(categories.map((c) => [c.genreId, c.spentYen]));
+  const totalFloor = categories.reduce((s, c) => s + c.spentYen + c.scheduledYen, 0);
   const [amounts, setAmounts] = useState<Record<string, number>>(saved);
   const [totalText, setTotalText] = useState<string | null>(null);
   const [fixedTotal, setFixedTotal] = useState(true);
@@ -114,16 +113,20 @@ export function GoalEditor({
 
   const total = Object.values(amounts).reduce((s, v) => s + v, 0);
   const savedTotal = Object.values(saved).reduce((s, v) => s + v, 0);
-  const dirty = categories.some((c) => amounts[c.genreId] !== c.targetYen);
+  const dirty = categories.some((c) => amounts[c.genreId] !== (c.targetYen ?? 0));
+  const overshoot = (c: CategoryOutlook) => (c.p50 ?? 0) - (c.targetYen ?? 0);
   const flagged = categories
-    .filter((c) => c.caution !== null && c.targetYen > 0)
-    .sort((a, b) => (b.p50 ?? 0) - (b.targetYen ?? 0) - ((a.p50 ?? 0) - a.targetYen))
+    .filter((c) => c.caution !== null && (c.targetYen ?? 0) > 0)
+    .sort((a, b) => overshoot(b) - overshoot(a))
     .slice(0, MAX_PROPOSAL);
   const proposal = Object.fromEntries(
-    flagged.map((c) => [c.genreId, Math.round(c.targetYen * (1 - CUT))]),
+    flagged.map((c) => [
+      c.genreId,
+      Math.max(c.spentYen, Math.round((c.targetYen ?? 0) * (1 - CUT))),
+    ]),
   );
   const proposedTotal =
-    savedTotal - flagged.reduce((s, c) => s + c.targetYen - proposal[c.genreId]!, 0);
+    savedTotal - flagged.reduce((s, c) => s + (c.targetYen ?? 0) - proposal[c.genreId]!, 0);
   const ordered = [...categories].sort(
     (a, b) =>
       Number(b.caution !== null) - Number(a.caution !== null) ||
@@ -131,8 +134,8 @@ export function GoalEditor({
   );
 
   const setTotal = (next: number) => {
-    const clamped = Math.max(0, Math.round(next));
-    setAmounts((prev) => scaleTo(prev, clamped));
+    const clamped = Math.max(totalFloor, Math.round(next));
+    setAmounts((prev) => scaleTo(prev, clamped, floors));
   };
 
   const save = async () => {
@@ -147,7 +150,7 @@ export function GoalEditor({
       setError(result.error);
       return;
     }
-    router.push('/plan');
+    router.push('/reports');
     router.refresh();
   };
 
@@ -159,7 +162,7 @@ export function GoalEditor({
     <div className="rise flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
       <div className="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center">
         <Link
-          href="/plan"
+          href="/reports"
           className="flex min-h-11 items-center justify-self-start text-[17px]"
           style={{ color: 'var(--accent)' }}
         >
@@ -243,7 +246,12 @@ export function GoalEditor({
       <Caption>使っていい総額</Caption>
       <div className="-mt-1 flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         <div className="flex items-center gap-3 px-4 py-3">
-          <RoundButton label="1,000円へらす" onClick={() => setTotal(total - TOTAL_STEP)} minus />
+          <RoundButton
+            label="1,000円へらす"
+            onClick={() => setTotal(total - TOTAL_STEP)}
+            disabled={total <= totalFloor}
+            minus
+          />
           <label className="flex flex-1 items-baseline justify-center gap-1">
             <span className="sr-only">総額</span>
             <input
@@ -274,6 +282,9 @@ export function GoalEditor({
           <Switch checked={fixedTotal} onChange={setFixedTotal} label="総額を固定" />
         </label>
       </div>
+      <p className="-mt-1 px-4 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        使った額と予定（{yen(totalFloor)}）より下にはできません。
+      </p>
 
       {flagged.length > 0 && applied === null ? (
         <section
@@ -318,7 +329,7 @@ export function GoalEditor({
               <span key={c.genreId} className="flex justify-between gap-2">
                 <span>{c.name}</span>
                 <span>
-                  {num(c.targetYen)} → <strong>{yen(proposal[c.genreId]!)}</strong>
+                  {num(c.targetYen ?? 0)} → <strong>{yen(proposal[c.genreId]!)}</strong>
                 </span>
               </span>
             ))}
@@ -519,30 +530,38 @@ export function GoalEditor({
       <BottomSheet
         open={editingCategory !== null}
         onClose={() => setEditing(null)}
-        label={editingCategory ? `${editingCategory.name}の目標額` : 'カテゴリの目標額'}
+        label={editingCategory ? editingCategory.name : 'カテゴリ'}
         tall
       >
         {editingCategory ? (
-          <CategoryTargetSheet
+          <CategorySheetBody
             key={editingCategory.genreId}
-            category={editingCategory}
+            data={{
+              outlook: editingCategory,
+              planId,
+              periodStart,
+              periodEnd,
+              today,
+              remainingDays,
+              isFixed: settings[editingCategory.genreId]?.isFixed ?? false,
+              showOnHome: settings[editingCategory.genreId]?.showOnHome ?? false,
+            }}
             amountYen={amounts[editingCategory.genreId] ?? 0}
-            today={today}
-            periodStart={periodStart}
-            periodEnd={periodEnd}
-            remainingDays={remainingDays}
-            lowersTotalDefault={!fixedTotal}
             onCancel={() => setEditing(null)}
-            onDone={(value, lowersTotal) => {
+            onDone={(value) => {
+              if (value === null) {
+                setEditing(null);
+                return;
+              }
               setAmounts((prev) => {
                 const id = editingCategory.genreId;
-                if (lowersTotal) return { ...prev, [id]: value };
-                // 総額はそのまま、差額をほかのカテゴリへ今の割合で配り直す。
+                if (!fixedTotal) return { ...prev, [id]: value };
+                // 総額を固定:差額をほかのカテゴリへ今の割合で配り直す(下限は守る)。
                 const others = Object.fromEntries(
                   Object.entries(prev).filter(([key]) => key !== id),
                 );
                 const rest = Object.values(prev).reduce((s, v) => s + v, 0) - value;
-                return { ...scaleTo(others, Math.max(0, rest)), [id]: value };
+                return { ...scaleTo(others, Math.max(0, rest), floors), [id]: value };
               });
               setEditing(null);
             }}
@@ -570,19 +589,20 @@ export function RoundButton({
   label,
   onClick,
   minus = false,
-  size = 11,
+  disabled = false,
 }: {
   label: string;
   onClick: () => void;
   minus?: boolean;
-  size?: 11 | 12;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`flex min-h-11 shrink-0 items-center justify-center rounded-full ${size === 12 ? 'size-12' : 'size-11'}`}
+      disabled={disabled}
+      className="flex size-11 min-h-11 shrink-0 items-center justify-center rounded-full disabled:opacity-35"
       style={{ background: 'var(--plane)', color: 'var(--ink)' }}
     >
       <svg

@@ -1,12 +1,12 @@
 import Link from 'next/link';
 
-import { GenreBadge } from '@/components/ui/genre-badge';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { addDays, todayJst } from '@/lib/date';
+import { CategoryMark } from '../category-sheet';
 
 /** 出す件数(デザイン仕様書は3件)。 */
 const COUNT = 3;
@@ -26,7 +26,7 @@ function isListed(t: LedgerTransaction): boolean {
 
 /**
  * 最近の記録(デザイン仕様書の「今日」、ADR-090):新しい順に3件。この先の予定は「まだ使った額に
- * 入りません」、固定費は「固定費 · 10月分」と添える。「すべて」で明細へ。
+ * 入りません」、固定費は「固定費 · 10月分」と添える。「すべて」で明細へ。マークを押すとそのカテゴリ(⑦)。
  */
 export async function RecentRecords() {
   const today = todayJst();
@@ -78,8 +78,8 @@ export async function RecentRecords() {
               {i > 0 ? (
                 <div className="ml-16 h-px" style={{ background: 'var(--hairline)' }} />
               ) : null}
-              <div className="flex items-center gap-3 px-4 py-3">
-                <GenreBadge name={t.genreName} size={36} />
+              <div className="flex items-center gap-3 py-2 pr-4 pl-2">
+                <CategoryMark genreId={t.genreId} name={t.genreName} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span
                     className="truncate text-[16px] font-medium"

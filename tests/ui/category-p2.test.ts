@@ -52,7 +52,7 @@ describe('P2 遷移の入り口(受け入れ基準1)', () => {
     expect(html).toContain('min-h-11');
   });
 
-  it('家計簿のカテゴリ内訳の各行は、絞り込みではなくカテゴリ詳細へのリンク(未分類も)', () => {
+  it('月のふりかえりのカテゴリの行は、押すとカテゴリ(⑦)。未分類は分けるための一覧へのリンク', () => {
     const txs = [
       {
         ...ledgerTx({ id: 'a', occurredOn: '2026-09-05', genreId: 'dining', amountYen: -1200 }),
@@ -87,11 +87,12 @@ describe('P2 遷移の入り口(受け入れ基準1)', () => {
           currentTotals: views.totals,
           genres: [{ id: 'dining', name: '外食' }],
           accounts: [],
-          children: [h(GenreBreakdown, { key: 'g', goalRows: null })],
+          children: [h(GenreBreakdown, { key: 'g' })],
         }),
       ),
     );
-    expect(html).toContain('href="/spending/category/dining?month=2026-09"');
+    // ⑦はシートなのでリンクにしない(ADR-091)
+    expect(html).not.toContain('href="/spending/category/dining');
     expect(html).toContain('href="/spending/category/none?month=2026-09"');
     expect(html).not.toContain('aria-pressed');
   });

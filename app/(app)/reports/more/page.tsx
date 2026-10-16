@@ -45,7 +45,10 @@ export default async function MoreReportsPage() {
   const outcome = await loadForecast({ period: monthPeriod }).catch(() => null);
   return (
     <div className="rise flex flex-col gap-4">
-      <BackHeader back={{ href: '/reports', label: '分析' }} title="そのほかの分析" />
+      <BackHeader
+        back={{ href: '/reports/month', label: '月のふりかえり' }}
+        title="そのほかの分析"
+      />
       <FixedVariableCard
         fixedYen={fixedVariable.fixedYen}
         variableYen={fixedVariable.variableYen}

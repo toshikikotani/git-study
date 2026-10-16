@@ -16,8 +16,8 @@ function md(date: string): string {
 const yen = (v: number) => formatYen(Math.round(v), { sign: 'never' });
 
 /**
- * 最近の勢い(デザイン仕様書の「見通し」、ADR-090):期間のはじめから今日までの1日ごとの支出(固定費を
- * のぞく)。予算ペースを超えた日は濃く、点線が予算ペース。下に直近7日・21日の平均、予算ペース、残りの目安。
+ * 最近の勢い(デザイン仕様書の「分析 › 目標」のペース、ADR-091):期間のはじめから今日までの1日ごとの
+ * 支出(固定費をのぞく)。目標ペースを超えた日は濃く、点線が目標ペース。下に直近7日・21日の平均、目標ペース、残りの目安。
  */
 export function MomentumCard({
   daySpend,
@@ -56,9 +56,9 @@ export function MomentumCard({
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 id="momentum" className="text-[17px] font-semibold">
+        <h3 id="momentum" className="text-[17px] font-semibold">
           最近の勢い
-        </h2>
+        </h3>
         <span
           className="rounded-full px-3 py-1 text-[13px] font-semibold"
           style={
@@ -74,7 +74,7 @@ export function MomentumCard({
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         role="img"
-        aria-label={`${md(from)}から${md(today)}までの1日ごとの支出。${pace > 0 ? `予算ペース${yen(pace)}を超えた日が${overDays}日。` : ''}`}
+        aria-label={`${md(from)}から${md(today)}までの1日ごとの支出。${pace > 0 ? `目標ペース${yen(pace)}を超えた日が${overDays}日。` : ''}`}
         className="mt-3"
       >
         <line x1="0" y1={base} x2={W} y2={base} stroke="var(--bar-quiet)" />
@@ -109,15 +109,28 @@ export function MomentumCard({
           {md(today)}
         </text>
       </svg>
+      <div className="mt-2 flex gap-4 text-[12px]" style={{ color: 'var(--ink-secondary)' }}>
+        <span className="flex items-center gap-2">
+          <span aria-hidden className="size-3 rounded-sm" style={{ background: 'var(--accent)' }} />
+          目標ペースより多い日
+        </span>
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className="w-4"
+            style={{ borderTop: '2px dashed var(--caution-mark)' }}
+          />
+          目標ペース
+        </span>
+      </div>
       <div className="tabular mt-4 grid grid-cols-2 gap-3">
         <Stat label={`直近${SHORT_WINDOW}日の平均`} value={trend.latestShortMa} big />
-        <Stat label="予算ペース" value={budgetPerDayYen} big caution />
+        <Stat label="目標ペース" value={budgetPerDayYen} big caution />
         <Stat label={`直近${LONG_WINDOW}日の平均`} value={trend.latestLongMa} />
         <Stat label="残りの目安" value={remainingPerDayYen} />
       </div>
       <p className="mt-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
-        {fixedYen > 0 ? `固定費（${yen(fixedYen)}）はこのグラフに含めていません。` : ''}
-        点線は予算ペースです。
+        1日あたり。{fixedYen > 0 ? `固定費（${yen(fixedYen)}）は含めていません。` : ''}
       </p>
     </section>
   );

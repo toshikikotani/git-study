@@ -9,7 +9,7 @@ import { BackHeader } from '@/components/ui/back-header';
 import { genreSwatch } from '@/domain/genre-style';
 import { similarCategories } from '@/domain/genre-similarity';
 import { hapticFor } from '@/lib/haptics';
-import { Switch } from '../../record-sheet';
+import { Switch } from '@/components/ui/switch';
 import {
   createCategoryAction,
   mergeCategoryAction,

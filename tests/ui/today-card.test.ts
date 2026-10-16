@@ -81,7 +81,7 @@ describe('ホームの「今日」(デザイン仕様書、ADR-090)', () => {
     expect(visible(html)).toContain(
       '目標(カテゴリごとの予算)を決めると、今日使える目安を出せます。',
     );
-    expect(html).toContain('href="/plan"');
+    expect(html).toContain('href="/reports"');
   });
 
   it('見通しの名前:暦の1か月なら「10月の見通し」、それ以外は終わりの日まで', () => {

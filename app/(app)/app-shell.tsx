@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { CategorySheetProvider } from './category-sheet';
 import { RecordSheet } from './record-sheet';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
@@ -29,7 +30,7 @@ import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
-// デザイン仕様書のボトムナビ(ADR-090):今日・明細・分析と、右に記録する(＋)。
+// デザイン仕様書のボトムナビ(ADR-090):今日・明細・分析と、右に記録する(＋)。分析は「目標」から開く(ADR-091)。
 // 見通しと目標は「今日」から開く。アイコンの下に名前(色だけで選択中を示さない)。
 const NAV = [
   { href: '/', label: '今日', Icon: TodayIcon },
@@ -40,9 +41,9 @@ const NAV = [
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */
 
 function isSameTab(pathname: string, href: string): boolean {
-  // 見通し・目標(/plan)は「今日」から開く画面なので、今日のタブを選択中にする。
-  if (href === '/')
-    return pathname === '/' || pathname === '/plan' || pathname.startsWith('/plan/');
+  if (href === '/') return pathname === '/';
+  // 今期の目標(/plan/edit)は「分析 › 目標」から開く画面なので、分析のタブを選択中にする(ADR-091)。
+  if (href === '/reports' && (pathname === '/plan' || pathname.startsWith('/plan/'))) return true;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -65,23 +66,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-      <div aria-hidden className="status-blur" />
-      <PullToRefresh>
-        <main
-          className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
-          aria-busy={navigating}
-        >
-          {children}
-        </main>
-      </PullToRefresh>
-      <UndoToastHost />
-      {isClient ? (
-        createPortal(<BottomBar onNavigate={beginNavigate} />, document.body)
-      ) : (
-        <BottomBar onNavigate={beginNavigate} />
-      )}
-    </div>
+    <CategorySheetProvider>
+      <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
+        <div aria-hidden className="status-blur" />
+        <PullToRefresh>
+          <main
+            className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
+            aria-busy={navigating}
+          >
+            {children}
+          </main>
+        </PullToRefresh>
+        <UndoToastHost />
+        {isClient ? (
+          createPortal(<BottomBar onNavigate={beginNavigate} />, document.body)
+        ) : (
+          <BottomBar onNavigate={beginNavigate} />
+        )}
+      </div>
+    </CategorySheetProvider>
   );
 }
 
@@ -200,7 +203,6 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
             setFabMenuOpen(false);
           }}
           canStream={canStream}
-          onNavigate={onNavigate}
         />
       </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
