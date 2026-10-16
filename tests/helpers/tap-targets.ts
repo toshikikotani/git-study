@@ -9,7 +9,7 @@ import ts from 'typescript';
  */
 const TAPPABLE = new Set(['button', 'Link', 'a', 'summary']);
 const OK_CLASS =
-  /(?:^|\s)(?:min-h-(?:11|12|14|16|20|24)|size-(?:11|12|14|16)|h-(?:11|12|14|16|20|24)|min-h-\[(?:4[4-9]|[5-9]\d)px\])(?:\s|$)/;
+  /(?:^|\s)(?:min-h-(?:11|12|13|14|16|20|24)|size-(?:11|12|13|14|16)|h-(?:11|12|13|14|16|20|24)|min-h-\[(?:4[4-9]|[5-9]\d)px\])(?:\s|$)/;
 
 export type TapTargetIssue = { file: string; line: number; tag: string; snippet: string };
 

@@ -135,6 +135,7 @@
   --danger: #c62828; /* 削除 */
   --notify: #d9480f; /* お知らせの印 */
   --suggest-line: #f2c99a; /* 提案の枠 */
+  --switch-on: #34a853; /* スイッチのオン */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -201,6 +202,7 @@
     --danger: #ff6b5e;
     --notify: #ff7a45;
     --suggest-line: #6a4520;
+    --switch-on: #30d158;
   }
 }
 
@@ -264,6 +266,7 @@
   --danger: #ff6b5e;
   --notify: #ff7a45;
   --suggest-line: #6a4520;
+  --switch-on: #30d158;
 }
 
 /* =============================================================================

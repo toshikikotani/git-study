@@ -1,199 +1,134 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { formatEstimate } from '@/domain/forecast/format';
+import { landingRowsFrom } from '@/domain/forecast/landing-rows';
+import { remainingOfCategory } from '@/domain/forecast/remaining';
 import { planPeriodDays } from '@/domain/spending-plan';
+import { buildCategoryLines } from '@/features/category/model';
+import { buildCumulative, linesForGoal } from '@/features/category/pace';
+import { goalForecastArgs } from '@/features/forecast/goal';
+import { loadForecast } from '@/features/forecast/load';
 import { loadGoalView } from '@/features/goals/loader';
-import { getAppSettings } from '@/features/settings/store';
+import { listGenres } from '@/features/genre/store';
+import { loadCategorySpendingTrend } from '@/features/reports/store';
 import { listGenreOptions } from '@/features/spending-plan/membership';
 import { getCurrentPlan, listPlanRanges } from '@/features/spending-plan/store';
-import { formatDateJa, todayJst } from '@/lib/date';
-import { DeletePlanButton } from '../delete-plan-button';
-import { PlanAllocationForm, PlanPeriodForm } from '../edit-plan-section';
-import { PlanBuilder } from '../plan-builder';
-import { UnrecordedSheet } from '../unrecorded-sheet';
-
-const DEFAULT_PAYDAY = 25;
+import { loadLedgerTransactions } from '@/features/spending/entries';
+import { addDays, daysBetween, todayJst } from '@/lib/date';
+import { GoalEditor, type GoalCategory } from './goal-editor';
 
 export const dynamic = 'force-dynamic';
-
-const group = 'glass overflow-hidden rounded-[22px]';
-const groupStyle = { background: 'var(--surface)', boxShadow: 'var(--card-shadow)' } as const;
-const caption = 'px-4 text-sm';
+export const maxDuration = 60;
 
 /**
- * 予算を編集(デザインの「予算を編集」、ADR-088):行の一覧(期間・金額・次の期間・削除)。
- * 行を押すと、その場で編集欄が開く。カテゴリ1つの目標額は、カテゴリの設定からも変えられる。
+ * 今期の目標(デザイン仕様書の「今期の目標」「カテゴリの目標額」、ADR-090):この目標で着地すると →
+ * 期間 → 使っていい総額 → 提案 → カテゴリへの配分(押すとカテゴリの目標額)→ そのほか → 削除。
+ * 数字は見通しと同じ、目標の期間の1つの確率予測から出す。
  */
-export default async function BudgetEditPage() {
+export default async function GoalEditPage() {
   const today = todayJst();
   const plan = await getCurrentPlan(today);
   if (plan === null) redirect('/plan');
-  const [settings, ranges, genres, loaded] = await Promise.all([
-    getAppSettings().catch(() => null),
+  const period = { from: plan.periodStart, to: plan.periodEnd };
+  const goal = goalForecastArgs(plan);
+  const [ranges, genreOptions, loaded, genres, trend, ledger, view] = await Promise.all([
     listPlanRanges().catch(() => []),
     listGenreOptions().catch(() => []),
+    loadForecast(goal ?? { period }).catch(() => null),
+    listGenres().catch(() => []),
+    loadCategorySpendingTrend().catch(() => null),
+    loadLedgerTransactions(period, today).catch(() => null),
     loadGoalView().catch(() => null),
   ]);
-  const items = plan.items.filter((item) => item.targetYen > 0);
-  const total = items.reduce((sum, item) => sum + item.targetYen, 0);
-  const taken = new Set(items.map((item) => item.genreId));
-  const addable = genres.filter((genre) => !taken.has(genre.genreId));
-  const ended = today > plan.periodEnd;
-  const allocationRows = plan.items.map((item) => ({
-    genreId: item.genreId,
-    genreName: item.genreName,
-    baselineYen: null,
-    note: item.reason,
-    yen: item.targetYen,
-  }));
+  const forecast = loaded?.forecast ?? null;
+  const closedGenreIds = new Set(genres.filter((g) => g.forecastClosed).map((g) => g.id));
+  const rows = forecast
+    ? landingRowsFrom({
+        forecast,
+        excludedByCategory: loaded?.excludedByCategory ?? new Map(),
+        closedGenreIds,
+        cautionPrecision: loaded?.cautionPrecision ?? null,
+        limit: Number.MAX_SAFE_INTEGER,
+      })
+    : [];
+  const rowById = new Map(rows.map((row) => [row.genreId, row]));
 
-  return (
-    <div className="rise space-y-6">
-      <header className="grid grid-cols-3 items-center">
-        <Link
-          href="/plan"
-          className="inline-flex min-h-11 items-center justify-self-start text-base"
-          style={{ color: 'var(--accent)' }}
-        >
-          ‹ 予算
-        </Link>
-        <h1
-          className="justify-self-center text-base font-semibold whitespace-nowrap"
-          style={{ color: 'var(--ink)' }}
-        >
-          予算を編集
-        </h1>
-        <Link
-          href="/plan"
-          className="inline-flex min-h-11 items-center justify-self-end text-base font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          完了
-        </Link>
-      </header>
-
-      <section aria-labelledby="edit-period" className="space-y-2">
-        <h2 id="edit-period" className={caption} style={{ color: 'var(--ink-secondary)' }}>
-          期間
-        </h2>
-        <div className={group} style={groupStyle}>
-          <Row
-            label="期間"
-            value={`${formatDateJa(plan.periodStart)}〜${formatDateJa(plan.periodEnd)}`}
-          >
-            <PlanPeriodForm
-              planId={plan.id}
-              periodStart={plan.periodStart}
-              periodEnd={plan.periodEnd}
-            />
-          </Row>
-        </div>
-        <p className={caption} style={{ color: 'var(--ink-secondary)' }}>
-          {planPeriodDays(plan.periodStart, plan.periodEnd)}日間。給料日に合わせるのがおすすめです。
-        </p>
-      </section>
-
-      <section aria-labelledby="edit-money" className="space-y-2">
-        <h2 id="edit-money" className={caption} style={{ color: 'var(--ink-secondary)' }}>
-          金額
-        </h2>
-        <div className={group} style={groupStyle}>
-          <Row
-            label="総額とカテゴリへの配分"
-            value={`${formatEstimate(total, { approx: false })} · ${items.length}`}
-          >
-            <PlanAllocationForm
-              planId={plan.id}
-              periodStart={plan.periodStart}
-              periodEnd={plan.periodEnd}
-              rows={allocationRows}
-            />
-          </Row>
-          <Divider />
-          <Link
-            href="/settings/categories"
-            className="flex min-h-12 items-center justify-between gap-3 px-4 text-base"
-            style={{ color: 'var(--ink)' }}
-          >
-            <span>カテゴリの設定</span>
-            <Chevron />
-          </Link>
-        </div>
-        {loaded?.view && !loaded.view.ended ? (
-          <UnrecordedSheet planId={plan.id} rows={loaded.view.noBudget} addable={addable} />
-        ) : null}
-      </section>
-
-      <section aria-labelledby="edit-next" className="space-y-2">
-        <h2 id="edit-next" className={caption} style={{ color: 'var(--ink-secondary)' }}>
-          次の期間
-        </h2>
-        <PlanBuilder
-          today={today}
-          payday={settings?.payday ?? DEFAULT_PAYDAY}
-          ranges={ranges}
-          activeEnd={ended ? null : plan.periodEnd}
-        />
-      </section>
-
-      <div className={`${group} py-1 text-center`} style={groupStyle}>
-        <DeletePlanButton planId={plan.id} />
-      </div>
-    </div>
+  const monthKey = today.slice(0, 7);
+  const previousMonthKey = trend?.monthKeys.filter((key) => key < monthKey).at(-1);
+  const lastMonth = new Map(
+    (trend?.rows ?? [])
+      .filter((row) => row.monthKey === previousMonthKey)
+      .map((row) => [row.categoryId, row.spentYen] as const),
   );
-}
 
-/** 押すとその場で開く行(左に名前、右に今の値と ›)。 */
-function Row({
-  label,
-  value,
-  children,
-}: {
-  label: string;
-  value: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <details className="group">
-      <summary
-        className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-base"
-        style={{ color: 'var(--ink)' }}
-      >
-        <span>{label}</span>
-        <span
-          className="tabular flex min-w-0 items-center gap-2 truncate"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
-          {value}
-          <Chevron />
-        </span>
-      </summary>
-      <div className="px-4 pt-1 pb-4">{children}</div>
-    </details>
+  const started = today >= period.from;
+  const elapsedDays = started ? Math.max(1, daysBetween(period.from, today) + 1) : 1;
+  const remainingDays = started
+    ? Math.max(0, daysBetween(today, period.to) + 1)
+    : planPeriodDays(period.from, period.to);
+  const txs = (ledger?.transactions ?? []).map((tx) => ({ ...tx, items: [] }));
+
+  const categories: GoalCategory[] = plan.items.map((item) => {
+    const row = rowById.get(item.genreId);
+    const remaining = forecast ? remainingOfCategory(forecast, item.genreId) : null;
+    const days = buildCumulative({
+      lines: linesForGoal(buildCategoryLines(txs, item.genreId, period, today), period),
+      monthStart: period.from,
+      monthEnd: period.to,
+      today,
+      recordStart: period.from,
+      goal: { range: period, budgetYen: item.targetYen },
+      remaining,
+    }).days;
+    let spent = 0;
+    for (const d of days) if (d.actualYen !== null) spent = d.actualYen;
+    const prev = lastMonth.get(item.genreId) ?? null;
+    const p50 = row?.p50 ?? null;
+    const caution = row?.caution ?? null;
+    const sub = caution
+      ? prev !== null && p50 !== null && p50 > prev * 1.3
+        ? '先月より大きく増えそう'
+        : 'このままだと目標をこえそう'
+      : started && spent > 0
+        ? `いまのペース 1日 約${Math.round(spent / elapsedDays).toLocaleString('ja-JP')}円`
+        : (item.reason ?? null);
+    return {
+      genreId: item.genreId,
+      name: item.genreName,
+      targetYen: item.targetYen,
+      spentYen: spent,
+      lastMonthYen: prev,
+      p10: row?.p10 ?? null,
+      p50,
+      p90: row?.p90 ?? null,
+      caution: caution ? { probability: caution.probability } : null,
+      sub,
+      days,
+    };
+  });
+
+  const nextStart = addDays(plan.periodEnd, 1);
+  const nextEnd = addDays(nextStart, planPeriodDays(plan.periodStart, plan.periodEnd) - 1);
+  const reserved = ranges.some(
+    (r) => r.id !== plan.id && r.periodStart <= nextEnd && r.periodEnd >= nextStart,
   );
-}
+  const taken = new Set(plan.items.filter((i) => i.targetYen > 0).map((i) => i.genreId));
 
-function Divider() {
-  return <div className="ml-4 h-px" style={{ background: 'var(--hairline)' }} />;
-}
-
-function Chevron() {
   return (
-    <svg
-      aria-hidden
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0 transition-transform group-open:rotate-90"
-      style={{ color: 'var(--ink-muted)' }}
-    >
-      <path d="M9 6l6 6-6 6" />
-    </svg>
+    <GoalEditor
+      planId={plan.id}
+      periodStart={plan.periodStart}
+      periodEnd={plan.periodEnd}
+      today={today}
+      remainingDays={remainingDays}
+      landing={
+        forecast && forecast.probWithinBudget !== null
+          ? { p50: forecast.total.p50, probWithin: forecast.probWithinBudget }
+          : null
+      }
+      categories={categories}
+      noBudget={view?.view && !view.view.ended ? view.view.noBudget : []}
+      addable={genreOptions.filter((g) => !taken.has(g.genreId))}
+      next={{ start: nextStart, reserved }}
+    />
   );
 }

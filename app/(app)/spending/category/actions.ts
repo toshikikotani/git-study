@@ -41,6 +41,8 @@ import { promiseAmountsFor } from '@/features/forecast/what-if';
 import {
   createGenre,
   deleteGenre,
+  mergeGenres,
+  reorderGenres,
   listGenres,
   setGenreForecastClosed,
   setGenreShowOnHome,
@@ -611,6 +613,33 @@ export async function setCategoryForecastClosedAction(
 export async function createCategoryAction(name: string): Promise<{ error: string | null }> {
   try {
     await createGenre(name);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** カテゴリの並び順を保存する(設定の「並べ替え」)。 */
+export async function reorderCategoriesAction(
+  orderedIds: string[],
+): Promise<{ error: string | null }> {
+  try {
+    await reorderGenres(orderedIds);
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+/** 似たカテゴリをまとめる(設定の「まとめる」)。from の明細・目標は into へ移り、from は消える。 */
+export async function mergeCategoryAction(
+  fromId: string,
+  intoId: string,
+): Promise<{ error: string | null }> {
+  try {
+    await mergeGenres(fromId, intoId);
   } catch (error) {
     return { error: describeUserError(error) };
   }

@@ -3,8 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { updatePlanAllocationAction, updatePlanPeriodAction } from './actions';
-import { AllocationEditor, type AllocationRow } from './allocation-editor';
+import { updatePlanPeriodAction } from './actions';
 
 /** 予算の期間(はじまり・おわり)を直す。 */
 export function PlanPeriodForm({
@@ -70,33 +69,5 @@ export function PlanPeriodForm({
         {saving ? '保存しています' : '期間を保存'}
       </button>
     </div>
-  );
-}
-
-/** 総額とカテゴリへの配分を直す(手動・AI相談)。 */
-export function PlanAllocationForm({
-  planId,
-  periodStart,
-  periodEnd,
-  rows,
-}: {
-  planId: string;
-  periodStart: string;
-  periodEnd: string;
-  rows: readonly AllocationRow[];
-}) {
-  const router = useRouter();
-  return (
-    <AllocationEditor
-      periodStart={periodStart}
-      periodEnd={periodEnd}
-      rows={rows}
-      saveLabel="この配分で保存"
-      onSave={async (items) => {
-        const result = await updatePlanAllocationAction(planId, items);
-        if (result.error === null) router.refresh();
-        return result;
-      }}
-    />
   );
 }

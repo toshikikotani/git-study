@@ -192,6 +192,64 @@ export async function deleteGenre(id: string): Promise<void> {
   if (error) throw new GenreStoreError(`カテゴリを削除できませんでした: ${error.message}`);
 }
 
+/** カテゴリの並び順(設定の「並べ替え」)。渡した順に sort_order を振り直す。 */
+export async function reorderGenres(orderedIds: readonly string[]): Promise<void> {
+  const supabase = await createClient();
+  for (const [index, id] of orderedIds.entries()) {
+    const { error } = await supabase
+      .from('genres')
+      .update({ sort_order: (index + 1) * 10 })
+      .eq('id', id);
+    if (error) throw new GenreStoreError(`並び順を保存できませんでした: ${error.message}`);
+  }
+}
+
+/**
+ * カテゴリ from を into にまとめる(設定の「まとめる」)。明細・分割・品目・振替のルール・知らせ・
+ * 覚えた分類を into へ付け替え、目標の額は into へ足してから、from を消す。
+ */
+export async function mergeGenres(fromId: string, intoId: string): Promise<void> {
+  if (fromId === intoId) throw new GenreStoreError('同じカテゴリにはまとめられません');
+  const supabase = await createClient();
+  for (const table of [
+    'transactions',
+    'transaction_splits',
+    'receipt_items',
+    'transfer_rules',
+    'alerts',
+    'genre_memory',
+  ] as const) {
+    const { error } = await supabase
+      .from(table)
+      .update({ genre_id: intoId })
+      .eq('genre_id', fromId);
+    if (error) throw new GenreStoreError(`カテゴリをまとめられませんでした: ${error.message}`);
+  }
+  const { data: items, error: itemsError } = await supabase
+    .from('spending_plan_items')
+    .select('plan_id, genre_id, target_yen')
+    .in('genre_id', [fromId, intoId]);
+  if (itemsError) {
+    throw new GenreStoreError(`目標をまとめられませんでした: ${itemsError.message}`);
+  }
+  for (const item of items.filter((i) => i.genre_id === fromId)) {
+    const into = items.find((i) => i.plan_id === item.plan_id && i.genre_id === intoId);
+    const { error } = into
+      ? await supabase
+          .from('spending_plan_items')
+          .update({ target_yen: into.target_yen + item.target_yen })
+          .eq('plan_id', item.plan_id)
+          .eq('genre_id', intoId)
+      : await supabase
+          .from('spending_plan_items')
+          .update({ genre_id: intoId })
+          .eq('plan_id', item.plan_id)
+          .eq('genre_id', fromId);
+    if (error) throw new GenreStoreError(`目標をまとめられませんでした: ${error.message}`);
+  }
+  await deleteGenre(fromId);
+}
+
 export type GenreTarget =
   | { kind: 'item'; id: string; label: string; amountYen: number }
   | { kind: 'transaction'; id: string; label: string; amountYen: number };

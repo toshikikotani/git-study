@@ -12,6 +12,8 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('../../app/(app)/spending/category/actions', () => ({
   createCategoryAction: vi.fn(),
+  mergeCategoryAction: vi.fn(),
+  reorderCategoriesAction: vi.fn(),
   setCategoryShowOnHomeAction: vi.fn(),
 }));
 
@@ -36,11 +38,13 @@ describe('設定 > カテゴリ', () => {
     expect(html).toContain('href="/settings/categories/cafe"');
   });
 
-  it('ホームに出すかはスイッチで、状態を文字でも示す', () => {
+  it('ホームに出すかはスイッチで、「ホームに表示」と「そのほか」に分けて数も出す(デザイン仕様書)', () => {
     expect(html.match(/role="switch"/g)?.length).toBe(2);
-    expect(html).toContain('aria-checked="true"');
-    expect(html).toContain('ホームに表示');
-    expect(html).toContain('ホームに出さない');
+    expect(html.match(/checked=""/g)?.length).toBe(1);
+    expect(html).toContain('ホームに表示 · 1');
+    expect(html).toContain('そのほか · 1');
+    expect(html).toContain('外食をホームに表示');
+    expect(html).toContain('並べ替え');
   });
 
   it('カテゴリを追加できる', () => {

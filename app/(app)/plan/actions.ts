@@ -11,6 +11,7 @@ import { loadForecast } from '@/features/forecast/load';
 import { listGenres } from '@/features/genre/store';
 import {
   deletePlan,
+  getCurrentPlan,
   savePlan,
   updatePlanPeriod,
   updatePlanTargets,
@@ -236,6 +237,36 @@ export async function createNextPlanAction(planId: string): Promise<{ error: str
   }
   revalidatePath('/plan');
   revalidatePath('/spending');
+  return { error: null };
+}
+
+/**
+ * 次の期間の目標を予約(デザイン仕様書の「今期の目標」、ADR-090):今の目標の終わりの翌日から、
+ * 同じ日数・同じカテゴリの目標額で作る。その期間に目標がもうあれば、作らずに理由を返す。
+ */
+export async function reserveNextPlanAction(planId: string): Promise<{ error: string | null }> {
+  try {
+    const plan = await getCurrentPlan(todayJst());
+    if (plan === null || plan.id !== planId) return { error: '今の目標が見つかりません。' };
+    const days = planPeriodDays(plan.periodStart, plan.periodEnd);
+    const start = addDays(plan.periodEnd, 1);
+    await savePlan({
+      periodStart: start,
+      periodEnd: addDays(start, days - 1),
+      stepPercent: plan.stepPercent,
+      items: plan.items
+        .filter((i) => i.targetYen > 0)
+        .map((i) => ({
+          genreId: i.genreId,
+          targetYen: i.targetYen,
+          aiSuggestedYen: null,
+          reason: '前の目標を引き継いで作成',
+        })),
+    });
+  } catch (error) {
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
   return { error: null };
 }
 

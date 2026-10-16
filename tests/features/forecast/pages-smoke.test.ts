@@ -166,14 +166,18 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(order).toEqual([...order].sort((a, b) => a - b));
   }, 60000);
 
-  it('予算を編集', async () => {
+  it('今期の目標(デザイン仕様書、ADR-090)', async () => {
     const html = (await render(() => import('../../../app/(app)/plan/edit/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('予算を編集');
-    expect(html).toContain('総額とカテゴリへの配分');
-    expect(html).toContain('予算のないカテゴリ');
+    expect(html).toContain('今期の目標');
+    expect(html).toContain('この目標で着地すると');
+    expect(html).toContain('使っていい総額');
+    expect(html).toContain('カテゴリへの配分');
+    expect(html).toContain('目標のないカテゴリ');
+    expect(html).toContain('次の期間の目標を予約');
+    expect(html).toContain('この目標を削除');
   }, 60000);
 
   const planRow = () => tables.spending_plans![0]!;

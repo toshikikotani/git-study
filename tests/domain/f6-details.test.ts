@@ -48,7 +48,7 @@ describe('F6 動きと細部', () => {
   it('目標の削除ボタンは確認ダイアログの前では削除しない(押すまでシートは出ない)', async () => {
     const { DeletePlanButton } = await import('../../app/(app)/plan/delete-plan-button');
     const html = renderToString(h(DeletePlanButton, { planId: 'p1' }));
-    expect(html).toContain('この目標を削除する');
+    expect(html).toContain('この目標を削除');
     expect(html).not.toContain('削除しますか');
   });
 });

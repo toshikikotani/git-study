@@ -389,7 +389,7 @@ export function Switch({
   return (
     <span
       className="relative h-8 w-13 shrink-0 rounded-full transition-colors"
-      style={{ background: checked ? 'var(--income)' : 'var(--field)' }}
+      style={{ background: checked ? 'var(--switch-on)' : 'var(--field)' }}
     >
       <span
         aria-hidden
