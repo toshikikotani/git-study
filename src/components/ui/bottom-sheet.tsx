@@ -5,6 +5,11 @@ import { Drawer } from 'vaul';
 /**
  * 下から出るシート。開閉の追従と下引きは vaul に任せる。
  * 閉じているあいだは vaul(Radix)が中身を描かない。
+ *
+ * 縦長のシート(tall:記録する・カテゴリなど、入力欄のあるもの)は、上のつまみでだけ引っぱれるようにし、
+ * vaul の入力欄まわりの手当て(キーボードに合わせた高さの変更・iPhone で入力欄を押したときの独自のフォーカス)
+ * を止める。シートのどこを押しても「引っぱり」が始まり、入力欄でカーソルが思った所に置けない・
+ * キーボードが出るとシートが動く、という入力しづらさの元になっていたため(ADR-097)。
  */
 export function BottomSheet({
   open,
@@ -33,12 +38,17 @@ export function BottomSheet({
         if (!next) onClose();
       }}
       dismissible
+      handleOnly={tall}
+      repositionInputs={!tall}
     >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-[rgba(10,16,32,0.45)]" />
         <Drawer.Content
           role={role}
           aria-describedby={undefined}
+          // vaul はシート全体を touch-action: none にする。つまみでだけ引っぱるシートでは、中の操作
+          // (入力欄のカーソル・スクロール)をブラウザに任せる。
+          style={tall ? { touchAction: 'manipulation' } : undefined}
           className={
             tall
               ? 'fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl outline-none'
