@@ -31,10 +31,12 @@ import {
   replaceReceiptItemsAction,
   replaceSplitsAction,
   restoreDeletedTransactionAction,
+  editTransactionAction,
   restoreRowFieldsAction,
   updateTransactionAction,
   updateTransactionMemoAction,
 } from './actions';
+import { RecordSheet, type RecordEditValues } from '../record-sheet';
 import { ReceiptItemsPanel } from './receipt-items-panel';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
@@ -131,6 +133,8 @@ export type RowDisplay = {
   shares: readonly GenreShare[];
   scheduled: boolean;
   special: boolean;
+  /** 返品・返金の記録(直すときに「返金」で開く)。 */
+  refund?: boolean;
 };
 
 export function TransactionRowWithSplit({
@@ -169,12 +173,13 @@ export function TransactionRowWithSplit({
   const [genreId, setGenreId] = useState(transaction.genreId ?? '');
   // 金額・日付の編集(本人発案「今金額と日付が一切編集できない」)。
   // カテゴリ変更と同じフォームにまとめる(下の canSaveSimpleEdit 参照)。
-  const [splitYenInput, setSplitYenInput] = useState('');
+  // 割り勘・名前は「記録を直す」(記録すると同じ画面、ADR-101)で直す。ここ(行の中の簡単な編集)では変えない。
+  const splitYenInput = '';
   const [amountAbsYenInput, setAmountAbsYenInput] = useState(
     String(Math.abs(transaction.amountYen)),
   );
   const [occurredOnInput, setOccurredOnInput] = useState(transaction.occurredOn);
-  const [nameInput, setNameInput] = useState(display?.name ?? transaction.description);
+  const nameInput = display?.name ?? transaction.description;
   // 明細への自由記述メモ(本人発案、issue #95)。カテゴリ・金額・日付とは
   // 独立した操作のため、別の開閉状態・別のServer Actionにした。
   const [memo, setMemo] = useState(transaction.memo);
@@ -216,6 +221,66 @@ export function TransactionRowWithSplit({
   const risky = isRiskyPaymentMethod(transaction.paymentMethod);
   const methodLabel = METHOD_LABEL[transaction.paymentMethod];
   const targetAbsYen = Math.abs(transaction.amountYen);
+
+  // 「記録を直す」(記録すると同じ画面、ADR-101)。直せなかったら、入れた値と理由をつけて開き直す。
+  const [editOpenId, setEditOpenId] = useState(0);
+  const [editRetry, setEditRetry] = useState<{ values: RecordEditValues; error: string } | null>(
+    null,
+  );
+  const startKind: RecordEditValues['kind'] = display?.refund
+    ? 'refund'
+    : isIncome
+      ? 'income'
+      : 'expense';
+  const editStart: RecordEditValues = {
+    kind: startKind,
+    amountYen: targetAbsYen,
+    genreId: transaction.genreId,
+    date: transaction.occurredOn,
+    name: display?.name ?? transaction.description,
+    memo: memo ?? '',
+  };
+  const closeEdit = () => {
+    setEditSheetOpen(false);
+    setEditRetry(null);
+  };
+  const saveEdit = (v: RecordEditValues) => {
+    setEditRetry(null);
+    const prevMemo = memo;
+    void (async () => {
+      const signed = v.kind === 'expense' ? -v.amountYen : v.amountYen;
+      const refundChanged = (v.kind === 'refund') !== (startKind === 'refund');
+      let result: Awaited<ReturnType<typeof editTransactionAction>>;
+      try {
+        result = await editTransactionAction(transaction.id, {
+          genreId: v.genreId,
+          amountYen: signed,
+          occurredOn: v.date,
+          description: v.name,
+          memo: v.memo,
+          ...(refundChanged ? { kind: v.kind === 'refund' ? 'refund' : 'normal' } : {}),
+        });
+      } catch {
+        result = { error: '直せませんでした。電波のよい所で、もう一度「保存」を押してください。' };
+      }
+      if (result.error) {
+        setEditRetry({ values: v, error: result.error });
+        setEditOpenId((n) => n + 1);
+        setEditSheetOpen(true);
+        return;
+      }
+      setMemo(v.memo === '' ? null : v.memo);
+      const previous = result.previous;
+      if (previous) {
+        pushUndo(`${v.name} を直しました`, async () => {
+          const r = await restoreRowFieldsAction(previous);
+          if (r.error) return r.error;
+          setMemo(prevMemo);
+          return null;
+        });
+      }
+    })();
+  };
   const sumAbsYen = rows.reduce((acc, r) => acc + (Number(r.amountYen) || 0), 0);
   const canSave =
     rows.length >= 2 && rows.every((r) => Number(r.amountYen) > 0) && sumAbsYen === targetAbsYen;
@@ -1071,123 +1136,35 @@ export function TransactionRowWithSplit({
         </div>
       </BottomSheet>
 
-      <BottomSheet open={editSheetOpen} onClose={() => setEditSheetOpen(false)} role="dialog">
-        <div className="space-y-3 px-3 pb-3">
-          <div className="flex items-start justify-between gap-3 px-1 pt-1">
-            <h2 className="text-base font-semibold break-words" style={{ color: 'var(--ink)' }}>
-              {display?.name ?? transaction.description}
-            </h2>
-          </div>
-          {/* 「名前」だと iPhone が人の名前の欄と見て「連絡先を自動入力」を出すため、レシート名と呼び、
-              自動入力も止める(ADR-099) */}
-          <input
-            type="text"
-            aria-label="レシート名"
-            autoComplete="off"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            className="min-h-11 w-full rounded-xl px-3 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          />
-          <div className="flex gap-2">
-            <input
-              type="date"
-              aria-label="日付"
-              value={occurredOnInput}
-              onChange={(e) => setOccurredOnInput(e.target.value)}
-              className="min-h-11 flex-1 rounded-xl px-3 text-sm"
-              style={{
-                background: 'var(--plane)',
-                color: 'var(--ink)',
-                border: '1px solid var(--hairline)',
-              }}
-            />
-            <input
-              type="text"
-              inputMode="numeric"
-              aria-label="金額"
-              value={amountAbsYenInput}
-              onChange={(e) => setAmountAbsYenInput(e.target.value.replace(/[^0-9]/g, ''))}
-              className="min-h-11 w-28 rounded-xl px-3 text-sm"
-              style={{
-                background: 'var(--plane)',
-                color: 'var(--ink)',
-                border: '1px solid var(--hairline)',
-              }}
-            />
-          </div>
-          <input
-            type="text"
-            inputMode="numeric"
-            aria-label="割り勘でもらった額"
-            placeholder="割り勘でもらった額"
-            autoComplete="off"
-            value={splitYenInput}
-            onChange={(e) => setSplitYenInput(e.target.value.replace(/[^0-9]/g, ''))}
-            className="min-h-11 w-full rounded-xl px-3 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          />
-          <select
-            aria-label="カテゴリ"
-            value={genreId}
-            onChange={(e) => setGenreId(e.target.value)}
-            className="min-h-11 w-full rounded-xl px-3 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            <option value="" disabled>
-              カテゴリを選ぶ
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void saveSimpleEdit()}
-            className="min-h-11 w-full rounded-full text-sm font-semibold"
-            style={{
-              background: 'var(--action)',
-              color: 'var(--on-action)',
-              opacity: saving ? 0.6 : 1,
-            }}
-          >
-            {saving ? '保存中…' : simpleEditUnchanged ? '閉じる' : '保存'}
-          </button>
-          {error ? (
-            <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
-              {error}
-            </p>
-          ) : null}
-          <ReceiptItemsPanel
-            transaction={{
-              id: transaction.id,
-              occurredOn: transaction.occurredOn,
-              accountId: transaction.accountId,
-              paymentMethod: transaction.paymentMethod,
-              amountYen: transaction.amountYen,
-            }}
-            categories={categories}
-            items={items}
-            onItemsReplaced={setItems}
-            subtype={subtype}
-            onSubtypeReplaced={setSubtype}
-            openRequest={itemEditRequest}
-          />
-        </div>
+      {/* 行を押すと「記録を直す」(記録すると同じ画面、ADR-101)。保存は押したらすぐ閉じ、うしろで続ける。 */}
+      <BottomSheet open={editSheetOpen} onClose={closeEdit} role="dialog" label="記録を直す" tall>
+        <RecordSheet
+          key={editOpenId}
+          onClose={closeEdit}
+          onFiles={() => {}}
+          initialError={editRetry?.error}
+          edit={{
+            initial: editRetry?.values ?? editStart,
+            onSave: saveEdit,
+            footer: (
+              <ReceiptItemsPanel
+                transaction={{
+                  id: transaction.id,
+                  occurredOn: transaction.occurredOn,
+                  accountId: transaction.accountId,
+                  paymentMethod: transaction.paymentMethod,
+                  amountYen: transaction.amountYen,
+                }}
+                categories={categories}
+                items={items}
+                onItemsReplaced={setItems}
+                subtype={subtype}
+                onSubtypeReplaced={setSubtype}
+                openRequest={itemEditRequest}
+              />
+            ),
+          }}
+        />
       </BottomSheet>
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} role="menu">

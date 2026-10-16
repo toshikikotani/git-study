@@ -61,6 +61,9 @@ export type RowFields = {
   note: string | null;
   kind: string | null;
   reconcile_diff_yen: number | null;
+  /** 名前(店名)。直したあと「元に戻す」で戻せるように(ADR-101)。 */
+  description: string | null;
+  merchant_name: string | null;
 };
 
 export type DeletedSnapshot = {
@@ -90,6 +93,8 @@ async function readRowFields(ids: readonly string[]): Promise<RowFields[]> {
       note: r.note,
       kind: (row.kind as string | null) ?? null,
       reconcile_diff_yen: (row.reconcile_diff_yen as number | null) ?? null,
+      description: (row.description as string | null) ?? null,
+      merchant_name: (row.merchant_name as string | null) ?? null,
     };
   });
 }
@@ -201,6 +206,53 @@ export async function updateTransactionAction(
     await updateTransaction(id, genreId ?? '', storePatch);
   } catch (error) {
     return { error: describeUserError(error, '更新できませんでした。') };
+  }
+  revalidatePath('/spending');
+  return { error: null, previous };
+}
+
+/**
+ * 記録を直す(明細の行から開く「記録を直す」、記録すると同じ画面、ADR-101)。名前・金額(符号つき)・日付・
+ * カテゴリ・メモを1回で直す。kind は支出/収入 ↔ 返金を切り替えたときだけ渡す(特別費などはそのまま)。
+ * 戻す前の値を返す(「元に戻す」用)。
+ */
+export async function editTransactionAction(
+  id: string,
+  input: {
+    genreId: string | null;
+    amountYen: number;
+    occurredOn: string;
+    description: string;
+    memo: string;
+    kind?: 'normal' | 'refund';
+  },
+): Promise<{ error: string | null; previous?: RowFields[] }> {
+  let previous: RowFields[] = [];
+  try {
+    previous = await readRowFields([id]);
+    const occurredOn = assertDateOnly(input.occurredOn);
+    const amountYen = assertYen(input.amountYen, '金額');
+    if (amountYen === 0) throw new MoneyError('金額を入れてください。');
+    const description = input.description.trim();
+    const memo = input.memo.trim();
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        genre_id: input.genreId,
+        classified_by: input.genreId ? 'manual' : 'unclassified',
+        review_status: 'corrected',
+        reviewed_at: new Date().toISOString(),
+        amount_yen: amountYen,
+        occurred_on: occurredOn,
+        ...(description !== '' ? { description, merchant_name: description } : {}),
+        note: memo === '' ? null : memo,
+        ...(input.kind ? { kind: input.kind } : {}),
+      } as never)
+      .eq('id', id);
+    if (error) return { error: '直せませんでした。もう一度「保存」を押してください。' };
+  } catch (error) {
+    return { error: describeUserError(error, '直せませんでした。') };
   }
   revalidatePath('/spending');
   return { error: null, previous };
@@ -410,6 +462,8 @@ export async function restoreRowFieldsAction(
           note: row.note,
           kind: row.kind ?? undefined,
           reconcile_diff_yen: row.reconcile_diff_yen,
+          ...(row.description !== undefined ? { description: row.description } : {}),
+          ...(row.merchant_name !== undefined ? { merchant_name: row.merchant_name } : {}),
         } as never)
         .eq('id', row.id);
       if (error) return { error: '元に戻せませんでした。' };

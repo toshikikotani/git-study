@@ -29,6 +29,28 @@ const KINDS = [
   { value: 'refund', label: '返金' },
 ] as const;
 type Kind = (typeof KINDS)[number]['value'];
+export type RecordKind = Kind;
+
+/** 記録を直すときの値(明細の行から開く、ADR-101)。amountYen は割り勘を引いたあとの額(正の数)。 */
+export type RecordEditValues = {
+  kind: Kind;
+  amountYen: number;
+  genreId: string | null;
+  date: string;
+  name: string;
+  memo: string;
+};
+
+/**
+ * 既にある記録を、記録すると同じ画面で直す(ADR-101)。保存は押したらすぐ閉じ、onSave はうしろで続ける。
+ * 直せなかったときは、呼んだ側が入れた値(initial)と理由(initialError)をつけて開き直す。
+ */
+export type RecordEdit = {
+  initial: RecordEditValues;
+  onSave: (values: RecordEditValues) => void;
+  /** シートの下に足すもの(レシートの品目)。 */
+  footer?: React.ReactNode;
+};
 
 /**
  * 記録するを開くときの初期値(明細のカレンダーの「この日に手で記録」など)。
@@ -86,6 +108,8 @@ function dateLabel(date: string, today: string): string {
  * 日付を今日より先にすると「予定」として記録する(使った額には入らない)。返金は、選んだカテゴリの
  * 使った額から差し引く(収入にはならない)。
  * 保存は取り込みと同じ経路(saveImportBatchAction、ADR-033)。口座の既定は1つめの口座。
+ * 明細の行から開いたときは「記録を直す」として同じ画面を使う(edit、ADR-101。画像から入力・固定費・口座は
+ * 出さず、下にレシートの品目を出す)。
  */
 export function RecordSheet({
   onClose,
@@ -93,6 +117,7 @@ export function RecordSheet({
   initialDate,
   initialKind,
   initialError,
+  edit,
 }: {
   onClose: () => void;
   /** 選んだ画像(撮った写真・写真ライブラリのレシートやスクショ)を読み取りへ回す。 */
@@ -102,18 +127,27 @@ export function RecordSheet({
   initialKind?: 'expense' | 'income' | undefined;
   /** 保存できなかった理由(開き直したとき)。 */
   initialError?: string | undefined;
+  /** 既にある記録を直すとき。 */
+  edit?: RecordEdit | undefined;
 }) {
   const router = useRouter();
   const openRecord = useOpenRecord();
   const today = todayJst();
   // 保存せずに閉じた入力(下書き)があれば戻す。カレンダーから日付を指定して開いたら、その日にする。
-  const [restored] = useState(() => peekDraft());
-  const [kind, setKind] = useState<Kind>(initialKind ?? restored?.kind ?? 'expense');
-  const [amount, setAmount] = useState(restored?.amount ?? '');
-  const [genreId, setGenreId] = useState<string | null>(restored?.genreId ?? null);
-  const [date, setDate] = useState(initialDate ?? restored?.date ?? today);
-  const [name, setName] = useState(restored?.name ?? '');
-  const [memo, setMemo] = useState(restored?.memo ?? '');
+  // 記録を直すときは下書きを使わない(直す前の値から始める)。
+  const [restored] = useState(() => (edit ? null : peekDraft()));
+  const start = edit?.initial;
+  const [kind, setKind] = useState<Kind>(start?.kind ?? initialKind ?? restored?.kind ?? 'expense');
+  const [amount, setAmount] = useState(
+    start ? start.amountYen.toLocaleString('ja-JP') : (restored?.amount ?? ''),
+  );
+  const [genreId, setGenreId] = useState<string | null>(
+    start ? start.genreId : (restored?.genreId ?? null),
+  );
+  const [date, setDate] = useState(start?.date ?? initialDate ?? restored?.date ?? today);
+  const [name, setName] = useState(start?.name ?? restored?.name ?? '');
+  const [memo, setMemo] = useState(start?.memo ?? restored?.memo ?? '');
+  const [split, setSplit] = useState(restored?.split ?? '');
   const [fixed, setFixed] = useState(restored?.fixed ?? false);
   const [genres, setGenres] = useState<readonly GenreTile[]>(genreCache ?? []);
   const [accounts, setAccounts] = useState<readonly AccountOption[]>(accountCache ?? []);
@@ -134,15 +168,19 @@ export function RecordSheet({
   }, []);
 
   // 入れるたびに下書きに残す。保存せずに閉じても(どの閉じ方でも)、次に開くと戻る(ADR-098)。
-  const current: RecordDraft = { kind, amount, genreId, date, name, memo, fixed, accountId };
+  const current: RecordDraft = { kind, amount, genreId, date, name, memo, fixed, accountId, split };
   const finished = useRef(false);
+  const editing = edit !== undefined;
   useEffect(() => {
-    if (!finished.current) {
-      keepDraft({ kind, amount, genreId, date, name, memo, fixed, accountId });
+    if (!finished.current && !editing) {
+      keepDraft({ kind, amount, genreId, date, name, memo, fixed, accountId, split });
     }
-  }, [kind, amount, genreId, date, name, memo, fixed, accountId]);
+  }, [kind, amount, genreId, date, name, memo, fixed, accountId, split, editing]);
 
-  const amountYen = Number(amount.replace(/[^\d]/g, ''));
+  // 割り勘でもらった額は、金額から引いて記録する(払った額 − もらった額 = 自分の分)。
+  const grossYen = Number(amount.replace(/[^\d]/g, ''));
+  const splitYen = Number(split.replace(/[^\d]/g, '')) || 0;
+  const amountYen = grossYen - splitYen;
   const canSave = amountYen > 0;
   const scheduled = date > today;
 
@@ -152,6 +190,7 @@ export function RecordSheet({
     setGenreId(null);
     setName('');
     setMemo('');
+    setSplit('');
     setFixed(false);
     setDate(initialDate ?? today);
     setShowRestored(false);
@@ -189,8 +228,17 @@ export function RecordSheet({
   // 下書きに戻して、理由をつけてシートを開き直す。二度押ししても1回だけ。
   const save = () => {
     if (finished.current) return;
+    if (edit && unchangedEdit(edit.initial)) {
+      finished.current = true;
+      onClose();
+      return;
+    }
     if (!canSave) {
-      setError('金額を入れてください。');
+      setError(
+        grossYen > 0 && splitYen >= grossYen
+          ? '割り勘でもらった額は、金額より小さくしてください。'
+          : '金額を入れてください。',
+      );
       return;
     }
     if (kind === 'refund' && genreId === null) {
@@ -198,10 +246,35 @@ export function RecordSheet({
       return;
     }
     finished.current = true;
-    clearDraft();
     hapticFor('save');
     onClose();
+    if (edit) {
+      edit.onSave(editValues());
+      return;
+    }
+    clearDraft();
     void persist(current);
+  };
+
+  const editValues = (): RecordEditValues => ({
+    kind,
+    amountYen,
+    genreId,
+    date,
+    name: name.trim() || fallbackName,
+    memo: memo.trim(),
+  });
+
+  const unchangedEdit = (initial: RecordEditValues): boolean => {
+    const v = editValues();
+    return (
+      v.kind === initial.kind &&
+      v.amountYen === initial.amountYen &&
+      v.genreId === initial.genreId &&
+      v.date === initial.date &&
+      v.name === initial.name &&
+      v.memo === initial.memo.trim()
+    );
   };
 
   const failed = (snapshot: RecordDraft, message: string) => {
@@ -303,7 +376,7 @@ export function RecordSheet({
         >
           キャンセル
         </button>
-        <span className="text-[17px] font-semibold">記録する</span>
+        <span className="text-[17px] font-semibold">{edit ? '記録を直す' : '記録する'}</span>
         {/* 金額が無くても押せる(押したら何が足りないかを出す。黙って効かないボタンにしない、ADR-098) */}
         <button
           type="button"
@@ -347,24 +420,27 @@ export function RecordSheet({
         <div className="flex items-center justify-between gap-2">
           <Segmented value={kind} options={KINDS} onChange={setKind} label="種類" />
           {/* 押すと iPhone の選択画面(写真を撮る / 写真ライブラリ)が出る。レシートの写真でも
-              決済アプリ・通販・カード通知のスクショでも、同じ読み取りに回す(ADR-100)。 */}
-          <label
-            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
-            style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
-          >
-            {imageIcon}
-            画像から入力
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                onFiles(Array.from(e.target.files ?? []));
-                e.target.value = '';
-              }}
-            />
-          </label>
+              決済アプリ・通販・カード通知のスクショでも、同じ読み取りに回す(ADR-100)。
+              直すときは出さない(レシートの画像は下の「レシートの品目」から)。 */}
+          {edit ? null : (
+            <label
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
+              style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+            >
+              {imageIcon}
+              画像から入力
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  onFiles(Array.from(e.target.files ?? []));
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
         </div>
         <label className="flex items-baseline justify-center gap-2 pt-3">
           <span className="sr-only">金額</span>
@@ -520,7 +596,7 @@ export function RecordSheet({
         </section>
       ) : null}
 
-      {kind === 'expense' ? (
+      {kind === 'expense' && !edit ? (
         <div className="rounded-2xl" style={{ background: 'var(--surface)' }}>
           <label className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
             <span className="flex flex-col">
@@ -534,7 +610,7 @@ export function RecordSheet({
         </div>
       ) : null}
       <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
-        {accounts.length >= 2 ? (
+        {accounts.length >= 2 && !edit ? (
           <label className="flex min-h-13 items-center gap-3 px-4">
             <span className="shrink-0 text-[16px]">口座</span>
             <select
@@ -551,9 +627,36 @@ export function RecordSheet({
             </select>
           </label>
         ) : null}
+        {kind === 'expense' ? (
+          <label
+            className="flex min-h-13 items-center gap-3 px-4"
+            style={
+              accounts.length >= 2 && !edit ? { borderTop: '1px solid var(--hairline)' } : undefined
+            }
+          >
+            <span className="shrink-0 text-[16px]">割り勘でもらった額</span>
+            <input
+              inputMode="numeric"
+              value={split}
+              placeholder="0"
+              autoComplete="off"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/[^\d]/g, '');
+                setSplit(digits === '' ? '' : Number(digits).toLocaleString('ja-JP'));
+              }}
+              aria-label="割り勘でもらった額(円)"
+              className="tabular min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+              style={{ color: 'var(--ink)' }}
+            />
+          </label>
+        ) : null}
         <label
           className="flex min-h-13 items-center gap-3 px-4"
-          style={accounts.length >= 2 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+          style={
+            kind === 'expense' || (accounts.length >= 2 && !edit)
+              ? { borderTop: '1px solid var(--hairline)' }
+              : undefined
+          }
         >
           <span className="shrink-0 text-[16px]">メモ</span>
           <input
@@ -570,8 +673,11 @@ export function RecordSheet({
       <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
         {kind === 'refund'
           ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'
-          : '日付を先にすると「予定」として記録され、使った額には入りません。'}
+          : splitYen > 0 && amountYen > 0
+            ? `${amountYen.toLocaleString('ja-JP')}円（自分の分）として記録します。`
+            : '日付を先にすると「予定」として記録され、使った額には入りません。'}
       </p>
+      {edit?.footer ?? null}
     </div>
   );
 }

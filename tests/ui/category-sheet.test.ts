@@ -204,3 +204,43 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     expect(save).not.toContain('disabled');
   });
 });
+
+describe('記録を直す:記録すると同じ画面(ADR-101)', () => {
+  const raw = renderToString(
+    h(RecordSheet, {
+      onClose: () => {},
+      onFiles: () => {},
+      edit: {
+        initial: {
+          kind: 'expense',
+          amountYen: 6000,
+          genreId: null,
+          date: '2026-10-23',
+          name: 'ハンブレッターズ',
+          memo: '',
+        },
+        onSave: () => {},
+        footer: h('p', null, 'レシートの品目'),
+      },
+    }),
+  );
+  const text = visible(raw);
+
+  it('題は「記録を直す」で、直す前の値から始める', () => {
+    expect(text).toContain('記録を直す');
+    expect(raw).toContain('value="6,000"');
+    expect(raw).toContain('value="ハンブレッターズ"');
+    expect(text).toContain('10月23日');
+  });
+
+  it('画像から入力・固定費・下書きの案内は出さず、下にレシートの品目を出す', () => {
+    expect(text).not.toContain('画像から入力');
+    expect(text).not.toContain('固定費にする');
+    expect(text).not.toContain('前に入れかけた内容を戻しました');
+    expect(text).toContain('レシートの品目');
+  });
+
+  it('割り勘でもらった額を入れられる(記録するでも同じ)', () => {
+    expect(text).toContain('割り勘でもらった額');
+  });
+});
