@@ -44,6 +44,12 @@
  * (buildFromAiRows)自体はレシートと振込を区別しない——どちらも
  * 「日付・金額・相手・内訳」の同じ形に落とし込めるため、違いはモデルへの
  * 指示(プロンプト)だけで吸収する。
+ *
+ * ── 決済アプリ・通販・カード利用通知のスクリーンショットも対象にする(本人発案、ADR-100) ──
+ * 記録するの「画像から入力」は、レシートの写真かスクショかを選ばせない(どちらでもよい)。
+ * PayPay などの支払い完了画面、通販の注文完了・注文履歴、カードの利用通知も同じ形
+ * (日付・金額・支払先・内訳)に落とし込む。スクショは年が書かれていないことが多いため、
+ * スクショに限り「今日の日付」(呼び出しのたびに渡す)から年を補う(紙のレシートは従来どおり補わない)。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -59,7 +65,7 @@ import {
   type TaxRate,
 } from '@/domain/receipt-reconcile';
 import { parseStructured } from '@/lib/anthropic';
-import type { DateOnly } from '@/lib/date';
+import { todayJst, type DateOnly } from '@/lib/date';
 import { readPaymentMethod, type PaymentMethod } from './adapters';
 import { parseDateOnly } from './date-parse';
 
@@ -179,18 +185,23 @@ const itemSchema = z.object({
 const rowSchema = z.object({
   occurred_on: z
     .string()
-    .describe('レシートの日付、または振込の送金日。YYYY-MM-DD 形式。時刻は含めない。'),
+    .describe(
+      'レシートの日付、振込の送金日、または決済・注文・カード利用の日付。YYYY-MM-DD 形式。' +
+        '時刻は含めない。',
+    ),
   amount_yen: z
     .number()
     .describe(
       '実際に支払った、または送金した合計金額(レシートなら「合計」「お会計」' +
-        '「お預り」ではなく実際の支払額。振込なら「送金金額」)。' +
+        '「お預り」ではなく実際の支払額。振込なら「送金金額」。決済アプリ・通販・カード通知なら' +
+        '支払額・注文の合計・利用額)。' +
         '小計・税抜金額ではなく、最終的に動いた金額を返す。手数料は含めない。円単位の整数。',
     ),
   store_name: z
     .string()
     .describe(
-      '店名・発行元。振込の場合は送金先(受取人)の名前。書かれていた表記のまま。' +
+      '店名・発行元。振込の場合は送金先(受取人)の名前。決済アプリ・通販・カード通知なら' +
+        '支払先・出店者・加盟店名。書かれていた表記のまま。' +
         '読み取れなければ空文字。',
     ),
   payment_method_text: z
@@ -202,8 +213,9 @@ const rowSchema = z.object({
   items: z
     .array(itemSchema)
     .describe(
-      'レシートに印字された商品行。小計・合計・お預り・お釣り・消費税・ポイントの行は' +
-        '含めない。内訳が印字されていない、商品が1点しかない、または振込明細の場合は空配列。',
+      'レシートに印字された商品行(通販の注文画面なら注文した商品)。小計・合計・お預り・' +
+        'お釣り・消費税・ポイントの行は含めない。内訳が無い、商品が1点しかない、振込明細、' +
+        '決済アプリの支払い完了画面・カード通知の場合は空配列。',
     ),
   price_basis: z
     .enum(['tax_included', 'tax_excluded'])
@@ -228,7 +240,8 @@ const extractionSchema = z.object({
   is_recognized: z
     .boolean()
     .describe(
-      'この画像がレシート・領収書、または振込/送金の完了画面であれば true。' +
+      'この画像がレシート・領収書、振込/送金の完了画面、または決済アプリの支払い完了・' +
+        '通販の注文完了や注文履歴・カードの利用明細や利用通知の画面であれば true。' +
         '無関係な写真や読み取れない画像は false。',
     ),
   transactions: z
@@ -256,8 +269,12 @@ export type ExtractionRow = Omit<ExtractionRowFull, 'items' | keyof NewRowFields
   Partial<NewRowFields> & { items: ItemInput[] };
 
 const SYSTEM_PROMPT = [
-  'あなたはレシート・領収書、または銀行アプリの振込/送金完了画面の画像から、',
-  'お金の動きを書き写す担当です。',
+  'あなたはレシート・領収書の写真、または次のようなスクリーンショットから、',
+  'お金の動きを書き写す担当です。どちらが来るかは分かりません(どちらでもよい)。',
+  '- 銀行アプリの振込/送金の完了画面',
+  '- 決済アプリ(PayPay・楽天ペイ等)の支払い完了・送金完了画面',
+  '- ネット通販(Amazon・楽天市場等)の注文完了・注文履歴画面',
+  '- クレジットカードのアプリ・利用通知(プッシュ通知のスクリーンショットを含む)の利用明細',
   '',
   '守ること:',
   '- 画像に写っていることだけを返す。推測で補わない。',
@@ -265,9 +282,13 @@ const SYSTEM_PROMPT = [
   '  レシートなら小計や税抜額ではなく実際に支払った合計を、振込なら送金金額を返す',
   '  (振込手数料は含めない)。',
   '- 日付は YYYY-MM-DD。和暦(令和・平成)や「9/3」のような表記、',
-  '  「2026年09月23日(水)」のような曜日付きの表記も西暦の日付だけに直すが、',
-  '  年が画像のどこにも無ければその明細は返さない。',
-  '- store_name はレシートなら店名・発行元、振込なら送金先(受取人)の名前を写す。',
+  '  「2026年09月23日(水)」のような曜日付きの表記も西暦の日付だけに直す。',
+  '  紙のレシート・領収書で年が画像のどこにも無ければ、その明細は返さない。',
+  '  スクリーンショット(決済アプリ・通販・カード通知・振込)で年が無いときは、指示された',
+  '  「今日の日付」の年を使う(それで今日より先の日付になるなら、前の年にする)。',
+  '  「今日」「たった今」「◯分前」のように日付が無いときは「今日の日付」を使う。',
+  '- store_name はレシートなら店名・発行元、振込なら送金先(受取人)の名前、',
+  '  決済アプリ・通販・カード通知なら支払先・出店者・加盟店名を写す。',
   '- payment_method_text はレシートに書かれていた支払方法の文字列をそのまま写す。',
   '  「クレジット」を「credit card」に直すようなことはしない。振込の場合は空文字にする。',
   '- items には商品行を1行ずつ書き写す。小計・合計・お預り・お釣り・消費税・',
@@ -282,10 +303,9 @@ const SYSTEM_PROMPT = [
   '  実際の支払額(カード・現金で払った額)。',
   '- 各行の confidence(0〜1)と y_ratio(画像上の縦位置、上端0〜下端1)、',
   '  store_confidence / date_confidence / total_confidence も返す。',
-  '- 1枚に複数のレシート・振込明細が写っていれば、すべて返す。',
-  '- レシート・領収書でも振込/送金の完了画面でもない画像(無関係な写真、',
-  '  読み取れないほど不鮮明な画像など)は is_recognized を false にして',
-  '  transactions を空にする。',
+  '- 1枚に複数のレシート・振込明細・通知・注文が写っていれば、すべて返す。',
+  '- 上のどれでもない画像(無関係な写真、読み取れないほど不鮮明な画像など)は',
+  '  is_recognized を false にして transactions を空にする。',
   '',
   '例外(ここだけは推測してよい):',
   '- product_type(商品の種類)と expense_subtype(生活費の何系か)は、',
@@ -321,7 +341,10 @@ export class ClaudeReceiptExtractor implements AiReceiptExtractor {
               type: 'image',
               source: { type: 'base64', media_type: input.mediaType, data: input.imageBase64 },
             },
-            { type: 'text', text: '上の画像から支払い明細を書き写してください。' },
+            {
+              type: 'text',
+              text: `今日の日付は ${todayJst()} です。上の画像から支払い明細を書き写してください。`,
+            },
           ],
         },
       ],
@@ -333,7 +356,9 @@ export class ClaudeReceiptExtractor implements AiReceiptExtractor {
     if (!parsed.is_recognized) {
       return {
         transactions: [],
-        warnings: ['レシート・領収書、または振込明細として認識できませんでした。'],
+        warnings: [
+          'レシート・領収書、振込明細、決済や注文・カード利用の画面として認識できませんでした。',
+        ],
       };
     }
 

@@ -161,7 +161,6 @@ function BottomBar({
   onCloseRecord: () => void;
 }) {
   const pathname = usePathname();
-  const isClient = useIsClient();
   const jobs = useReceiptJobs();
   useEffect(() => {
     void restoreWaitingReceipts();
@@ -195,7 +194,6 @@ function BottomBar({
     };
   }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraMode, setCameraMode] = useState<'single' | 'continuous'>('single');
   const setFabMenuOpen = useCallback(
     (open: boolean) => (open ? onOpenRecord() : onCloseRecord()),
     [onOpenRecord, onCloseRecord],
@@ -218,7 +216,6 @@ function BottomBar({
       setCameraOpen(true);
     }
   }, []);
-  const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
   // 右の＋は、押すと「記録する」のシートを開く(デザイン仕様書、ADR-090:撮る・写真から・手で入力)。
   // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じシート。
   const fab = (
@@ -256,7 +253,7 @@ function BottomBar({
       ) : null}
       {cameraOpen ? (
         <ReceiptCamera
-          initialMode={cameraMode}
+          initialMode="single"
           onCapture={(files) => enqueueReceiptFiles(files)}
           onClose={() => setCameraOpen(false)}
         />
@@ -271,16 +268,10 @@ function BottomBar({
         <RecordSheet
           key={record?.openId ?? 0}
           onClose={() => setFabMenuOpen(false)}
-          onCamera={(mode) => {
-            setFabMenuOpen(false);
-            setCameraMode(mode);
-            setCameraOpen(true);
-          }}
           onFiles={(files) => {
             enqueueReceiptFiles(files);
             setFabMenuOpen(false);
           }}
-          canStream={canStream}
           initialDate={record?.date}
           initialKind={record?.kind}
           initialError={record?.error}

@@ -98,16 +98,14 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
 });
 
 describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
-  const html = visible(
-    renderToString(
-      h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {}, canStream: true }),
-    ),
-  );
+  const html = visible(renderToString(h(RecordSheet, { onClose: () => {}, onFiles: () => {} })));
 
   it('できるのは 記録する・カテゴリを足す・固定費にする の3つだけ', () => {
     expect(html).toContain('支出');
     expect(html).toContain('収入');
-    expect(html).toContain('レシートで入力');
+    // 画像から入力(レシートの写真でもスクショでもよい、ADR-100)
+    expect(html).toContain('画像から入力');
+    expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
     expect(html).toContain('固定費にする');
@@ -127,9 +125,7 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
       renderToString(
         h(RecordSheet, {
           onClose: () => {},
-          onCamera: () => {},
           onFiles: () => {},
-          canStream: true,
           initialDate: '2026-10-14',
           initialKind: 'income',
         }),
@@ -141,9 +137,7 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
   });
 
   it('レシート名を入れられる。空ならカテゴリ名で記録する(ADR-092)', () => {
-    const raw = renderToString(
-      h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {}, canStream: true }),
-    );
+    const raw = renderToString(h(RecordSheet, { onClose: () => {}, onFiles: () => {} }));
     expect(html).toContain('レシート名');
     expect(raw).toContain('placeholder="店名など（任意）"');
     expect(raw).toContain('maxLength="60"');
@@ -155,9 +149,7 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     renderToString(
       h(RecordSheet, {
         onClose: () => {},
-        onCamera: () => {},
         onFiles: () => {},
-        canStream: true,
         ...props,
       }),
     );
@@ -191,6 +183,13 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     const raw = sheet({ initialError: '保存できませんでした。' });
     expect(raw).toContain('role="alert"');
     expect(visible(raw)).toContain('保存できませんでした。');
+  });
+
+  it('画像から入力は、カメラを決め打ちせず画像を選ばせる(写真を撮る / 写真ライブラリのどちらでも)', () => {
+    const raw = sheet();
+    const input = raw.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? '';
+    expect(input).toContain('accept="image/*"');
+    expect(input).not.toContain('capture');
   });
 
   it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {

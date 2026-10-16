@@ -442,6 +442,27 @@ describe('ClaudeReceiptExtractor — 失敗を握り潰さない', () => {
     expect(imageBlock?.source?.media_type).toBe('image/png');
   });
 
+  it('スクショ(決済アプリ・通販・カード通知)も同じ読み取りに乗せ、年を補うため今日の日付を渡す(ADR-100)', async () => {
+    const { ClaudeReceiptExtractor } = await import('@/features/import/receipt-ai');
+    const parse = vi.fn().mockResolvedValue({
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 0, output_tokens: 0 },
+      parsed_output: { is_recognized: false, transactions: [] },
+    });
+    const extractor = new ClaudeReceiptExtractor('sk-ant-test', { messages: { parse } } as never);
+    await extractor.extract({ imageBase64: 'AAA', mediaType: 'image/png' });
+
+    const call = parse.mock.calls[0]![0] as {
+      system: string;
+      messages: Array<{ content: Array<{ type: string; text?: string }> }>;
+    };
+    expect(call.system).toContain('決済アプリ');
+    expect(call.system).toContain('ネット通販');
+    expect(call.system).toContain('利用通知');
+    const text = call.messages[0]!.content.find((c) => c.type === 'text')?.text ?? '';
+    expect(text).toMatch(/今日の日付は \d{4}-\d{2}-\d{2} です。/);
+  });
+
   it('振込/送金完了画面も読み取れる(受取人名を店名として、金額を送金額として扱う)', async () => {
     const { ClaudeReceiptExtractor } = await import('@/features/import/receipt-ai');
     const parse = vi.fn().mockResolvedValue({
