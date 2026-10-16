@@ -19,8 +19,15 @@ import {
   type PlanContext,
   type ProposedChange,
 } from '@/features/assistant/plan';
+import {
+  ASSISTANT_SCREEN_KEYS,
+  MAX_SCREEN_LINKS,
+  screenLinkOf,
+  type ScreenLink,
+} from '@/features/assistant/screens';
 import { apiKeyMissingMessage, describeAnthropicError } from '@/lib/anthropic';
 import { ChatToolError, parseChatMessages } from '@/lib/chat-tools';
+import { todayJst } from '@/lib/date';
 import { readAnthropicApiKey } from '@/lib/env';
 import { describeUserError } from '@/lib/errors';
 
@@ -70,6 +77,46 @@ function takeAiCallSlot(): boolean {
 }
 
 const TOOLS: Tool[] = [
+  {
+    name: 'add_transaction',
+    description:
+      '記録(支出・収入・返金)を1件作る案を出す。本人が確認カードで承認してから記録される。' +
+      '「コンビニで500円」「昨日ランチ1200円」のような話から作る。日付が無ければ今日。' +
+      'カテゴリはジャンル一覧から最も近いものを選ぶ(無理に選ばなくてよい)。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        occurred_on: { type: 'string', description: '日付(YYYY-MM-DD)。先の日付は予定になる' },
+        amount_yen: { type: 'number', description: '金額(円の正の整数)' },
+        kind: {
+          type: 'string',
+          enum: ['expense', 'income', 'refund'],
+          description: '支出 / 収入 / 返金。既定は支出',
+        },
+        store_name: { type: 'string', description: '店名・内容(レシート名)。無ければ省く' },
+        genre_name: { type: 'string', description: 'ジャンル一覧にあるジャンル名。返金では必須' },
+        memo: { type: 'string', description: 'メモ(任意)' },
+      },
+      required: ['occurred_on', 'amount_yen'],
+    },
+  },
+  {
+    name: 'show_screen',
+    description:
+      'アプリの画面へ移るボタンを本人に出す。会話で答えられない・画面で見るほうが分かりやすい・' +
+      '会話ではできない操作(削除など)のときに使う。1回の返事で3つまで。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        screen: {
+          type: 'string',
+          enum: [...ASSISTANT_SCREEN_KEYS],
+          description: '行き先の画面',
+        },
+      },
+      required: ['screen'],
+    },
+  },
   {
     name: 'update_settings',
     description:
@@ -260,6 +307,8 @@ export type AssistantReply = {
   reply: string;
   proposal: { changes: ProposedChange[] } | null;
   question: AskUserQuestion | null;
+  /** 画面へ移るボタン(show_screen、ADR-103)。 */
+  links?: ScreenLink[];
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -322,9 +371,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     goals: planContext.goals,
     latestPlan: planContext.latestPlan,
     situationText,
+    today: todayJst(),
   });
 
   const proposed: ProposedChange[] = [];
+  const links: ScreenLink[] = [];
   let question: AskUserQuestion | null = null;
   let finalText = '';
 
@@ -357,7 +408,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const toolResults: ToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const outcome = handleToolUse(toolUse, planContext, proposed);
+        const outcome = handleToolUse(toolUse, planContext, proposed, links);
         if (outcome.question !== null) question = outcome.question;
         toolResults.push({
           type: 'tool_result',
@@ -374,6 +425,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       reply: describeAnthropicError(error),
       proposal: proposed.length > 0 ? { changes: proposed } : null,
       question: null,
+      links,
     } satisfies AssistantReply);
   }
 
@@ -381,12 +433,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     question !== null
       ? '選んでください。'
       : proposed.length > 0
-        ? '変更案を作りました。内容を確認して反映してください。'
-        : '完了しました。';
+        ? '案を作りました。内容を確かめて、よければ反映してください。'
+        : links.length > 0
+          ? 'この画面で見られます。'
+          : '完了しました。';
   return NextResponse.json({
     reply: finalText !== '' ? finalText : fallback,
     proposal: proposed.length > 0 ? { changes: proposed } : null,
     question,
+    links,
   } satisfies AssistantReply);
 }
 
@@ -396,8 +451,28 @@ function handleToolUse(
   toolUse: ToolUseBlock,
   planContext: PlanContext,
   proposed: ProposedChange[],
+  links: ScreenLink[],
 ): ToolOutcome {
   try {
+    if (toolUse.name === 'show_screen') {
+      const link = screenLinkOf((toolUse.input as { screen?: unknown } | null)?.screen);
+      if (link === null) {
+        return {
+          message: '知らない画面です。一覧から選んでください。',
+          isError: true,
+          question: null,
+        };
+      }
+      if (links.length >= MAX_SCREEN_LINKS) {
+        return { message: 'ボタンは1回3つまでです。', isError: true, question: null };
+      }
+      if (!links.some((l) => l.href === link.href)) links.push(link);
+      return {
+        message: `「${link.label}」へのボタンを本人に出しました。`,
+        isError: false,
+        question: null,
+      };
+    }
     if (toolUse.name === 'ask_user') {
       const question = parseAskUser(toolUse.input);
       return { message: '選択肢を本人に表示しました。', isError: false, question };

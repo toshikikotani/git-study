@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -17,7 +17,7 @@ import { parseDateOnlyOr, todayJst } from '@/lib/date';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
-import { AnalysisIcon, ListIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
+import { AiIcon, AnalysisIcon, ListIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
@@ -31,6 +31,7 @@ import {
 import { nextChromeCompact } from '@/lib/chrome';
 import { upgradeStoredTheme } from '@/lib/color-theme';
 import { scrollToTop, tabTapAction } from '@/lib/scroll';
+import { AssistantChat } from './assistant/assistant-chat';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
 import './liquid-tab.css';
 
@@ -202,6 +203,9 @@ function BottomBar({
     () => createLongPress({ onLongPress: () => setFabMenuOpen(true) }),
     [setFabMenuOpen],
   );
+  // AI(下のメニューのAIボタン、ADR-103)。どの画面でもシートで開き、画面へのボタンを押すと閉じて移る。
+  const router = useRouter();
+  const [aiOpen, setAiOpen] = useState(false);
   const reading = countReading(jobs);
   const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
   const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
@@ -277,6 +281,17 @@ function BottomBar({
           initialError={record?.error}
         />
       </BottomSheet>
+      <BottomSheet open={aiOpen} onClose={() => setAiOpen(false)} role="dialog" label="AI" tall>
+        <AssistantChat
+          variant="sheet"
+          onClose={() => setAiOpen(false)}
+          onNavigate={(href) => {
+            setAiOpen(false);
+            onNavigate(href);
+            router.push(href as never);
+          }}
+        />
+      </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
         <nav aria-label="メイン" className="min-w-0 flex-1">
           <ul className="tabbar-pill liquid-capsule flex items-center">
@@ -307,6 +322,23 @@ function BottomBar({
                 </li>
               );
             })}
+            <li className="flex-1">
+              <button
+                type="button"
+                onClick={() => setAiOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={aiOpen}
+                className="flex min-h-11 w-full flex-col items-center"
+              >
+                <span
+                  className={`liquid-tab text-[11px] font-semibold whitespace-nowrap${aiOpen ? ' is-active' : ''}`}
+                  style={{ flexDirection: 'column', gap: 2 }}
+                >
+                  <AiIcon />
+                  AI
+                </span>
+              </button>
+            </li>
           </ul>
         </nav>
         <div

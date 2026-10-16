@@ -11,7 +11,9 @@ import {
 import type { Genre } from '@/features/genre/store';
 import type { AppSettings } from '@/features/settings/store';
 import type { StoredTransaction } from '@/features/transactions/types';
+import { screenLinkOf } from '@/features/assistant/screens';
 import { ChatToolError } from '@/lib/chat-tools';
+import { addDays, todayJst } from '@/lib/date';
 
 /**
  * AIの窓口の「計画層」(ADR-059)。モデルの出力・承認時にクライアントから戻ってきた
@@ -360,5 +362,75 @@ describe('parseAskUser', () => {
     expect(() => parseAskUser({ question: '', options: [opt('a'), opt('b')] })).toThrow(
       ChatToolError,
     );
+  });
+});
+
+describe('AIで記録する add_transaction(ADR-103)', () => {
+  const today = todayJst();
+
+  it('支出の記録案:確認カードに日付・金額・カテゴリが出て、金額は負で記録する', () => {
+    const { change, operation } = planToolCall(
+      'add_transaction',
+      { occurred_on: today, amount_yen: 500, store_name: 'セブン', genre_name: '食料品' },
+      CTX,
+    );
+    expect(change.kind).toBe('created');
+    expect(change.target).toBe('セブン');
+    expect(change.detail).toContain('支出 500円 · 食料品');
+    expect(operation).toMatchObject({ op: 'add_transaction', amountYen: -500, kind: 'normal' });
+  });
+
+  it('名前が無ければカテゴリ名、収入なら「収入」で記録する', () => {
+    expect(
+      planToolCall(
+        'add_transaction',
+        { occurred_on: today, amount_yen: 800, genre_name: '外食' },
+        CTX,
+      ).change.target,
+    ).toBe('外食');
+    const income = planToolCall(
+      'add_transaction',
+      { occurred_on: today, amount_yen: 250000, kind: 'income' },
+      CTX,
+    );
+    expect(income.change.target).toBe('収入');
+    expect(income.operation).toMatchObject({ amountYen: 250000 });
+  });
+
+  it('返金はカテゴリが要る。金額0・1年より前の日付・知らないカテゴリは受け付けない', () => {
+    expect(() =>
+      planToolCall('add_transaction', { occurred_on: today, amount_yen: 300, kind: 'refund' }, CTX),
+    ).toThrow(ChatToolError);
+    expect(() =>
+      planToolCall('add_transaction', { occurred_on: today, amount_yen: 0 }, CTX),
+    ).toThrow(ChatToolError);
+    expect(() =>
+      planToolCall('add_transaction', { occurred_on: addDays(today, -400), amount_yen: 100 }, CTX),
+    ).toThrow(ChatToolError);
+    expect(() =>
+      planToolCall(
+        'add_transaction',
+        { occurred_on: today, amount_yen: 100, genre_name: '存在しない' },
+        CTX,
+      ),
+    ).toThrow(ChatToolError);
+  });
+
+  it('先の日付は「予定」と書く', () => {
+    const { change } = planToolCall(
+      'add_transaction',
+      { occurred_on: addDays(today, 7), amount_yen: 5000, genre_name: '外食' },
+      CTX,
+    );
+    expect(change.detail).toContain('予定');
+  });
+});
+
+describe('AIが出す画面へのボタン show_screen(ADR-103)', () => {
+  it('決まった画面だけをボタンにする(知らない名前は出さない)', () => {
+    expect(screenLinkOf('spending')).toEqual({ href: '/spending', label: '明細' });
+    expect(screenLinkOf('month_review')?.href).toBe('/reports/month');
+    expect(screenLinkOf('https://example.com')).toBeNull();
+    expect(screenLinkOf(undefined)).toBeNull();
   });
 });

@@ -31,7 +31,7 @@ import type { AppSettings, AppSettingsPatch } from '@/features/settings/store';
 import { resolveTransactionById } from '@/features/transactions/chat-tools';
 import type { StoredTransaction } from '@/features/transactions/types';
 import { ChatToolError } from '@/lib/chat-tools';
-import { assertDateOnly } from '@/lib/date';
+import { addDays, assertDateOnly, todayJst } from '@/lib/date';
 
 export { ChatToolError };
 
@@ -45,6 +45,7 @@ export const MAX_GOAL_AMOUNT_YEN = 100_000_000;
 export const MAX_RECEIPT_ITEMS = 50;
 
 export const WRITE_TOOL_NAMES = [
+  'add_transaction',
   'update_settings',
   'update_transaction',
   'update_receipt_items',
@@ -89,6 +90,18 @@ export type PlanContext = {
 
 /** planToolCall() が返す、実行に必要な情報だけを持つデータ(副作用を持たない)。 */
 export type Operation =
+  | {
+      /** 記録する(下のAIボタンから、ADR-103)。承認されてから記録する。 */
+      op: 'add_transaction';
+      occurredOn: string;
+      /** 符号つき(支出は負、収入・返金は正)。 */
+      amountYen: number;
+      description: string;
+      genreId: string | null;
+      genreName: string | null;
+      kind: 'normal' | 'refund';
+      memo: string | null;
+    }
   | { op: 'update_settings'; patch: AppSettingsPatch }
   | {
       op: 'update_transaction';
@@ -356,6 +369,65 @@ function planGenreShowOnHome(input: unknown, ctx: PlanContext): PlannedChange {
   };
 }
 
+/** 記録の種類(支出・収入・返金)。 */
+const ADD_KINDS = { expense: '支出', income: '収入', refund: '返金' } as const;
+
+/**
+ * 記録する(add_transaction、ADR-103)。日付・金額・名前・カテゴリ・種類を確かめ、確認カードに出す。
+ * 日付は1年前〜1年先まで(先の日付は「予定」として記録される)。返金はカテゴリが要る。
+ */
+function planAddTransaction(input: unknown, ctx: PlanContext): PlannedChange {
+  const args = asRecord(input);
+  const occurredOn = assertDateOnly(typeof args.occurred_on === 'string' ? args.occurred_on : '');
+  const today = todayJst();
+  if (occurredOn < addDays(today, -366) || occurredOn > addDays(today, 366)) {
+    throw new ChatToolError('日付は1年前から1年先までで指定してください。');
+  }
+  const amount = requireAmount(args.amount_yen, '金額', MAX_AMOUNT_YEN);
+  if (amount === 0) throw new ChatToolError('金額は1円以上で指定してください。');
+  const kind = args.kind === 'income' || args.kind === 'refund' ? args.kind : ('expense' as const);
+  const genre =
+    typeof args.genre_name === 'string' && args.genre_name.trim() !== ''
+      ? resolveGenreByName(args.genre_name, ctx.genres)
+      : null;
+  if (kind === 'refund' && genre === null) {
+    throw new ChatToolError('返金は、どのカテゴリの支出から差し引くか(genre_name)が要ります。');
+  }
+  const name =
+    typeof args.store_name === 'string' && args.store_name.trim() !== ''
+      ? args.store_name.trim().slice(0, 60)
+      : kind === 'income'
+        ? '収入'
+        : (genre?.name ?? '手入力');
+  const memo =
+    typeof args.memo === 'string' && args.memo.trim() !== ''
+      ? args.memo.trim().slice(0, 200)
+      : null;
+  const scheduled = occurredOn > today;
+  const [, m, d] = occurredOn.split('-');
+  return {
+    change: {
+      tool: 'add_transaction',
+      input: args,
+      kind: 'created',
+      target: name,
+      detail: `${Number(m)}月${Number(d)}日 ${ADD_KINDS[kind]} ${yen(amount)}${
+        genre ? ` · ${genre.name}` : ''
+      }${scheduled ? ' · 予定' : ''}${memo ? ` · メモ「${memo}」` : ''}`,
+    },
+    operation: {
+      op: 'add_transaction',
+      occurredOn,
+      amountYen: kind === 'expense' ? -amount : amount,
+      description: name,
+      genreId: genre?.id ?? null,
+      genreName: genre?.name ?? null,
+      kind: kind === 'refund' ? 'refund' : 'normal',
+      memo,
+    },
+  };
+}
+
 function planCreateGenre(input: unknown, ctx: PlanContext): PlannedChange {
   const args = asRecord(input);
   const name = typeof args.name === 'string' ? args.name.trim() : '';
@@ -468,6 +540,8 @@ function planPlanTargets(input: unknown, ctx: PlanContext): PlannedChange {
  */
 export function planToolCall(name: string, input: unknown, ctx: PlanContext): PlannedChange {
   switch (name) {
+    case 'add_transaction':
+      return planAddTransaction(input, ctx);
     case 'update_settings':
       return planUpdateSettings(input, ctx);
     case 'update_transaction':
