@@ -34,35 +34,28 @@ const forecast = {
   },
 } as unknown as Forecast;
 
-describe('なぜこの見込み?(わかりやすい言葉で、決まっている額とこれからに分ける)', () => {
-  const html = visible(renderToString(h(WhyCard, { forecast, endLabel: '月末' })));
+describe('なぜ約X円？(デザイン仕様書の「見通し」:決まっている額とこれからに分ける)', () => {
+  const html = visible(renderToString(h(WhyCard, { forecast })));
 
-  it('「もう決まっている」と「これから使いそうな額」に分け、足すと見込みになる', () => {
-    expect(html).toContain('月末の見込み');
-    expect(html).toContain('約19.4万円');
+  it('見出しは見込みの額。「もう決まっている」と「これから使いそう」に分け、足すと見込みになる', () => {
+    expect(html).toContain('なぜ約19.4万円？');
     expect(html).toContain('もう決まっている');
     expect(html).toContain('101,540円');
-    expect(html).toContain('これから使いそうな額');
+    expect(html).toContain('使った額');
+    expect(html).toContain('90,540円');
+    expect(html).toContain('これから使いそう');
     expect(html).toContain('約9.2万円');
-    expect(html).toContain('残り25日・1日 約3,700円');
   });
 
-  it('「残りの変動費」ではなく、ふだんの買い物として、カテゴリと1日あたりで出す', () => {
+  it('ふだんの買い物は、カテゴリと1日あたりで出し、残りは「そのほか」', () => {
     expect(html).not.toContain('残りの変動費');
-    expect(html).toContain('ふだんの買い物 約8.3万円');
-    expect(html).toContain('外食');
-    expect(html).toContain('1日 約1,400円');
-    expect(html).toContain('そのほか');
+    expect(html).toContain('外食 · 1日 約1,400円');
+    expect(html).toContain('そのほか · 1日');
   });
 
-  it('来店・特別費も、ふだんの言葉で出どころを添える', () => {
+  it('来店・特別費も、ふだんの言葉で出す', () => {
     expect(html).toContain('いつも通う店');
-    expect(html).toContain('ファミリーマートなど');
-    expect(html).toContain('大きめの出費');
+    expect(html).toContain('ときどきある大きめの出費');
     expect(html).not.toContain('平均の比');
-  });
-
-  it('直近のペースと、この先のペースを並べる', () => {
-    expect(html).toContain('直近2週間は1日 約7,400円、この先は1日 約3,700円で見ています');
   });
 });

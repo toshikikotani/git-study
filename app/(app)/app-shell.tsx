@@ -4,20 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  MdBurstMode,
-  MdCameraAlt,
-  MdEdit,
-  MdMic,
-  MdPhotoLibrary,
-  MdScreenshot,
-} from 'react-icons/md';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { RecordSheet } from './record-sheet';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
-import { BudgetIcon, LedgerIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
+import { AnalysisIcon, ListIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
@@ -36,22 +29,20 @@ import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
-// デザインのボトムナビ:今日・予算・家計簿と、右に記録する(＋)。目標と見通しは「予算」1つに(ADR-088)。
-// アイコンの下に名前(色だけで選択中を示さない)。給料日と「その他」はホームの右上へ。
+// デザイン仕様書のボトムナビ(ADR-090):今日・明細・分析と、右に記録する(＋)。
+// 見通しと目標は「今日」から開く。アイコンの下に名前(色だけで選択中を示さない)。
 const NAV = [
   { href: '/', label: '今日', Icon: TodayIcon },
-  { href: '/plan', label: '予算', Icon: BudgetIcon },
-  { href: '/spending', label: '家計簿', Icon: LedgerIcon },
+  { href: '/spending', label: '明細', Icon: ListIcon },
+  { href: '/reports', label: '分析', Icon: AnalysisIcon },
 ] as const;
 
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */
-const MENU_TILE_STYLE: React.CSSProperties = {
-  background: 'var(--accent-track)',
-  color: 'var(--ink)',
-};
 
 function isSameTab(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
+  // 見通し・目標(/plan)は「今日」から開く画面なので、今日のタブを選択中にする。
+  if (href === '/')
+    return pathname === '/' || pathname === '/plan' || pathname.startsWith('/plan/');
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -148,17 +139,13 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
     }
   }, []);
   const canStream = isClient && Boolean(navigator.mediaDevices?.getUserMedia);
-  // 中央のボタンは、押すと記録のしかたを選ぶメニューを開く(カメラ・写真から・手入力)。
-  // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じメニュー。
+  // 右の＋は、押すと「記録する」のシートを開く(デザイン仕様書、ADR-090:撮る・写真から・手で入力)。
+  // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じシート。
   const fab = (
-    <Fab label="記録する(カメラ・写真・手入力)" onPress={() => setFabMenuOpen(true)}>
+    <Fab label="記録する" size="large" onPress={() => setFabMenuOpen(true)}>
       <PlusIcon />
     </Fab>
   );
-  const closeMenuAnd = (fn: () => void) => () => {
-    setFabMenuOpen(false);
-    fn();
-  };
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {reading + waiting + offlineWaiting + needInput > 0 ? (
@@ -197,133 +184,28 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
       <BottomSheet
         open={fabMenuOpen}
         onClose={() => setFabMenuOpen(false)}
-        role="menu"
+        role="dialog"
         label="記録する"
+        tall
       >
-        <div className="space-y-3 px-3 pb-3">
-          <h2 className="px-1 text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            記録する
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {canStream ? (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={closeMenuAnd(() => {
-                  setCameraMode('single');
-                  setCameraOpen(true);
-                })}
-                className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl px-2 text-center text-sm font-semibold"
-                style={MENU_TILE_STYLE}
-              >
-                <MdCameraAlt aria-hidden size={28} />
-                カメラで撮る
-              </button>
-            ) : (
-              <label
-                role="menuitem"
-                className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl px-2 text-center text-sm font-semibold"
-                style={MENU_TILE_STYLE}
-              >
-                <MdCameraAlt aria-hidden size={28} />
-                カメラで撮る
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  onChange={(e) => {
-                    enqueueReceiptFiles(Array.from(e.target.files ?? []));
-                    e.target.value = '';
-                    setFabMenuOpen(false);
-                  }}
-                />
-              </label>
-            )}
-            <label
-              role="menuitem"
-              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl px-2 text-center text-sm font-semibold"
-              style={MENU_TILE_STYLE}
-            >
-              <MdPhotoLibrary aria-hidden size={28} />
-              写真から選ぶ
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  enqueueReceiptFiles(Array.from(e.target.files ?? []));
-                  e.target.value = '';
-                  setFabMenuOpen(false);
-                }}
-              />
-            </label>
-            <Link
-              href="/transactions/new"
-              prefetch={false}
-              role="menuitem"
-              onPointerDown={() => onNavigate('/transactions/new')}
-              onClick={() => setFabMenuOpen(false)}
-              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl px-2 text-center text-sm font-semibold"
-              style={MENU_TILE_STYLE}
-            >
-              <MdEdit aria-hidden size={28} />
-              手入力
-            </Link>
-          </div>
-          <ul className="overflow-hidden rounded-2xl" style={{ background: 'var(--plane)' }}>
-            {canStream ? (
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={closeMenuAnd(() => {
-                    setCameraMode('continuous');
-                    setCameraOpen(true);
-                  })}
-                  className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-semibold"
-                  style={{ color: 'var(--ink)' }}
-                >
-                  <MdBurstMode aria-hidden size={20} />
-                  何枚か続けて撮る
-                </button>
-              </li>
-            ) : null}
-            <li>
-              <Link
-                href="/transactions/capture-text"
-                prefetch={false}
-                role="menuitem"
-                onPointerDown={() => onNavigate('/transactions/capture-text')}
-                onClick={() => setFabMenuOpen(false)}
-                className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-semibold"
-                style={{ color: 'var(--ink)' }}
-              >
-                <MdMic aria-hidden size={20} />
-                話して記録・文字で記録
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/transactions/capture-screenshot"
-                prefetch={false}
-                role="menuitem"
-                onPointerDown={() => onNavigate('/transactions/capture-screenshot')}
-                onClick={() => setFabMenuOpen(false)}
-                className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm font-semibold"
-                style={{ color: 'var(--ink)' }}
-              >
-                <MdScreenshot aria-hidden size={20} />
-                スクショから記録
-              </Link>
-            </li>
-          </ul>
-        </div>
+        <RecordSheet
+          onClose={() => setFabMenuOpen(false)}
+          onCamera={(mode) => {
+            setFabMenuOpen(false);
+            setCameraMode(mode);
+            setCameraOpen(true);
+          }}
+          onFiles={(files) => {
+            enqueueReceiptFiles(files);
+            setFabMenuOpen(false);
+          }}
+          canStream={canStream}
+          onNavigate={onNavigate}
+        />
       </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
         <nav aria-label="メイン" className="min-w-0 flex-1">
-          <ul className="tabbar-pill liquid-capsule flex items-center gap-1">
+          <ul className="tabbar-pill liquid-capsule flex items-center">
             {NAV.map((item) => {
               const isActive = isSameTab(pathname, item.href);
               return (
@@ -338,14 +220,14 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
                         scrollToTop();
                       }
                     }}
-                    className="min-h-11 flex flex-col items-center gap-1 py-1"
+                    className="flex min-h-11 flex-col items-center"
                   >
                     <span
-                      className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                      className={`liquid-tab text-[11px] font-semibold whitespace-nowrap${isActive ? ' is-active' : ''}`}
                       style={{ flexDirection: 'column', gap: 2 }}
                     >
                       <item.Icon />
-                      <span className="font-semibold">{item.label}</span>
+                      {item.label}
                     </span>
                   </Link>
                 </li>

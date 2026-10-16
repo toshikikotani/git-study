@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/money';
@@ -15,11 +15,10 @@ import {
   splitShares,
 } from '@/features/spending/views';
 import { useJustSaved } from '@/lib/just-saved';
-import { formatDateJa, weekdayOf } from '@/lib/date';
+import { weekdayOf } from '@/lib/date';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
-import { LedgerMenu } from './ledger-menu';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -85,7 +84,7 @@ export function LedgerList({
         .filter((g) => g.transactions.length > 0),
     [model.dayGroups, isFixed],
   );
-  const monthLabel = `${Number(visibleMonth.slice(5, 7))}月 固定費`;
+  const monthLabel = `${Number(visibleMonth.slice(5, 7))}月の固定費`;
   const risky = useMemo(
     () => transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod)),
     [transactions],
@@ -93,39 +92,20 @@ export function LedgerList({
   const active = isFilterActive(filter);
 
   return (
-    <section id="ledger" aria-label="明細" className="scroll-mt-16 space-y-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          明細
-        </h2>
-        <LedgerMenu />
-      </div>
-      <input
-        type="search"
-        value={filter.search ?? ''}
-        onChange={(e) => setFilter({ search: e.target.value })}
-        placeholder="店名・品目・メモを検索"
-        aria-label="明細を検索"
-        className="min-h-11 w-full rounded-xl px-3 text-sm"
-        style={{
-          background: 'var(--surface-raised)',
-          color: 'var(--ink)',
-          border: '1px solid var(--hairline)',
-        }}
-      />
+    <section id="ledger" aria-label="明細" className="scroll-mt-16 flex flex-col gap-3">
       <ActiveFilterChips goalRange={goalRange} />
       <PendingReceiptRows />
       {risky.length > 0 ? (
         <Link
           href="/transactions/reconcile"
           className="flex min-h-11 items-center justify-between rounded-2xl px-4 py-3"
-          style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+          style={{ background: 'var(--surface)' }}
         >
-          <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
             二重に入っていそうな明細が {duplicateCount} 組
           </p>
-          <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-            確認する →
+          <span className="text-[15px] font-semibold" style={{ color: 'var(--accent)' }}>
+            確認する
           </span>
         </Link>
       ) : null}
@@ -170,29 +150,29 @@ export function LedgerList({
         </div>
       ) : (
         <>
+          {model.scheduled.some((t) => !isFixed(t)) ? (
+            <DaySection
+              key="scheduled"
+              heading="予定 · 使った額には入りません"
+              transactions={model.scheduled.filter((t) => !isFixed(t))}
+            />
+          ) : null}
           {fixed.length > 0 ? (
             <DaySection
               key="fixed"
+              id="fixed-costs"
               heading={monthLabel}
-              sub="日付ではなく、この月の固定費です"
               total={fixed.reduce((sum, t) => sum - t.amountYen, 0)}
               transactions={fixed}
-            />
-          ) : null}
-          {model.scheduled.length > 0 ? (
-            <DaySection
-              key="scheduled"
-              heading="予定"
-              sub="今日より先の日付(使った額には入りません)"
-              transactions={model.scheduled.filter((t) => !isFixed(t))}
             />
           ) : null}
           {dayGroups.map((g) => (
             <DaySection
               key={g.date}
-              heading={`${formatDateJa(g.date)}(${WEEKDAYS[weekdayOf(g.date)]})`}
+              heading={dayHeading(g.date)}
               total={g.spentYen}
               transactions={g.transactions}
+              collapseAfter={DAY_ROWS}
             />
           ))}
           <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -206,19 +186,34 @@ export function LedgerList({
   );
 }
 
+/** 1日に最初から出す件数(残りは「この日のほかの記録」にたたむ)。 */
+const DAY_ROWS = 3;
+
+/** 2026-10-15 → 10月15日（木） */
+function dayHeading(date: string): string {
+  return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${WEEKDAYS[weekdayOf(date)]}）`;
+}
+
+/**
+ * 日付・予定・固定費の区切り(デザイン仕様書の「明細」):白い面の上に見出しと合計、その下に行。
+ * collapseAfter があれば、それより後の行は「この日のほかの記録」を押すと出る。
+ */
 function DaySection({
+  id,
   heading,
-  sub,
   total,
   transactions,
+  collapseAfter,
 }: {
+  id?: string;
   heading: string;
-  sub?: string;
   total?: number;
   transactions: DrilldownTransaction[];
+  collapseAfter?: number;
 }) {
   const { genres, transactions: monthTransactions } = useSpendingMonth();
   const justSavedIds = useJustSaved();
+  const [showAll, setShowAll] = useState(false);
   const history = useMemo(
     () =>
       monthTransactions
@@ -234,61 +229,106 @@ function DaySection({
         ),
     [monthTransactions],
   );
+  const limit =
+    collapseAfter !== undefined && !showAll && transactions.length > collapseAfter
+      ? collapseAfter
+      : transactions.length;
+  const shown = transactions.slice(0, limit);
+  const rest = transactions.slice(limit);
+  const restYen = rest.reduce((sum, t) => sum + Math.abs(t.amountYen), 0);
 
   return (
-    <section
-      className="overflow-hidden rounded-2xl"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
-    >
+    <section id={id} aria-label={heading} className="scroll-mt-16 flex flex-col gap-1">
       <div
-        className="sticky z-10 flex items-baseline justify-between rounded-t-2xl px-4 py-2"
-        style={{
-          top: 'var(--sticky-top, env(safe-area-inset-top))',
-          background: 'var(--surface)',
-          color: 'var(--ink-muted)',
-          borderBottom: '1px solid var(--hairline)',
-        }}
+        className="tabular flex items-baseline justify-between px-4 pt-2 text-[13px]"
+        style={{ color: 'var(--ink-muted)' }}
       >
-        <span className="text-xs font-medium">
-          {heading}
-          {sub ? <span className="ml-2 text-xs font-normal">{sub}</span> : null}
-        </span>
-        {total !== undefined && total > 0 ? (
-          <span className="tabular text-xs">
-            <Yen value={total} />
-          </span>
+        <span>{heading}</span>
+        {total !== undefined && total > 0 ? <Yen value={total} /> : null}
+      </div>
+      <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
+        <ul className="divider-list">
+          {shown.map((t) => (
+            <div key={t.id} className="relative">
+              <TransactionRowWithSplit
+                transaction={t}
+                categories={genres}
+                initialSplits={t.splits.map((s) => ({
+                  id: s.id,
+                  genreId: s.genreId,
+                  genreName: s.genreName,
+                  amountYen: s.amountYen,
+                  note: s.note,
+                }))}
+                genreHistory={history}
+                justSaved={justSavedIds.includes(t.id)}
+                receiptItems={t.items}
+                expenseSubtype={t.expenseSubtype}
+                display={{
+                  name: t.label,
+                  branch: t.branchName,
+                  thumbnailUrl: t.thumbnailUrl,
+                  shares: splitShares(t),
+                  scheduled: t.status === 'scheduled',
+                  special: t.kind === 'special',
+                }}
+              />
+            </div>
+          ))}
+        </ul>
+        {rest.length > 0 ? (
+          <>
+            <div className="ml-16 h-px" style={{ background: 'var(--hairline)' }} />
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="tabular flex min-h-12 w-full items-center justify-between pr-4 pl-16 text-[15px] font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              <span>この日のほかの記録</span>
+              <span className="font-normal" style={{ color: 'var(--ink-muted)' }}>
+                <Yen value={restYen} />
+              </span>
+            </button>
+          </>
         ) : null}
       </div>
-      <ul className="divider-list">
-        {transactions.map((t) => (
-          <div key={t.id} className="relative">
-            <TransactionRowWithSplit
-              transaction={t}
-              categories={genres}
-              initialSplits={t.splits.map((s) => ({
-                id: s.id,
-                genreId: s.genreId,
-                genreName: s.genreName,
-                amountYen: s.amountYen,
-                note: s.note,
-              }))}
-              genreHistory={history}
-              justSaved={justSavedIds.includes(t.id)}
-              receiptItems={t.items}
-              expenseSubtype={t.expenseSubtype}
-              display={{
-                name: t.label,
-                branch: t.branchName,
-                thumbnailUrl: t.thumbnailUrl,
-                shares: splitShares(t),
-                scheduled: t.status === 'scheduled',
-                special: t.kind === 'special',
-              }}
-            />
-          </div>
-        ))}
-      </ul>
     </section>
+  );
+}
+
+/** 検索(デザイン仕様書の「明細」:灰色の面に虫眼鏡と「店名・品目・メモ」)。 */
+export function LedgerSearch() {
+  const { filter, setFilter } = useSpendingMonth();
+  return (
+    <label
+      className="flex h-11 items-center gap-2 rounded-xl px-3"
+      style={{ background: 'var(--field)', color: 'var(--ink-muted)' }}
+    >
+      <svg
+        aria-hidden
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      >
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4 4" />
+      </svg>
+      <span className="sr-only">検索</span>
+      <input
+        type="search"
+        value={filter.search ?? ''}
+        onChange={(e) => setFilter({ search: e.target.value })}
+        placeholder="店名・品目・メモ"
+        aria-label="明細を検索"
+        className="min-w-0 flex-1 bg-transparent text-[17px] outline-none"
+        style={{ color: 'var(--ink)' }}
+      />
+    </label>
   );
 }
 

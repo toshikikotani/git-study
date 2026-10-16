@@ -70,28 +70,29 @@
 :root {
   color-scheme: light;
 
-  /* 面(青みを含んだ階調) */
-  --plane: #ffffff;
-  --surface: #f7f7f5;
-  --surface-raised: #f4f6fa;
-  --hairline: rgba(10, 16, 32, 0.06);
+  /* 面(デザイン仕様書「家計簿 リデザイン」の色、ADR-090) */
+  --plane: #f2f2f7;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --hairline: #e5e5ea;
 
   /* 文字 */
-  --ink: #0a1020;
-  --ink-secondary: #4a5568;
-  --ink-muted: #5b667a;
+  --ink: #1c1c1e;
+  --ink-secondary: #3a3a3c;
+  --ink-muted: #6e6e73;
 
   /* 役割の色 */
-  --accent: #0a1020; /* 選択中・リンクの文字(青ではない。青は --action だけ) */
-  --accent-track: rgba(10, 16, 32, 0.07); /* 帯・トラック(中立) */
-  --income: #278445; /* 収入 */
-  --income-track: #dcf7e1;
+  --accent: #5c5853; /* 選択中・リンクの文字(仕様書の accent) */
+  --accent-track: #eeedeb; /* 選択中の面・帯 */
+  --income: #2e7d4f; /* 収入・プラス */
+  --income-track: #e8f2ec;
   --over: #c13c36; /* 超過・支出(白・薄い赤の面の上で 4.5:1 以上) */
   --over-track: #fee9e6;
-  --attention: #9c6306; /* 閾値到達(白・薄い黄の面の上で 4.5:1 以上)。必ず文字を伴う */
+  --attention: #9a4a06; /* 閾値到達(白・薄い黄の面の上で 4.5:1 以上)。必ず文字を伴う */
 
   --hero-glow: rgba(10, 16, 32, 0.03);
-  --card-shadow: 0 1px 2px rgba(10, 16, 32, 0.05), 0 12px 32px -20px rgba(10, 16, 32, 0.25);
+  /* 仕様書のカードは影なしの白い面 */
+  --card-shadow: none;
 
   /* ジャンルの色(10色)。赤・青・黄・灰は状態色に予約してあるので使わない。
      色だけで区別させず、アイコンと名前を必ず併記する(domain/genre-style.ts)。 */
@@ -111,13 +112,30 @@
      色だけに頼らず、必ずアイコン・ラベルを併用する(domain/budget-state.ts)。 */
   --state-ok: #4a5568;
   --state-ok-track: #e6e9ef;
-  --state-caution: #9c6306;
-  --state-caution-track: #ffebd5;
-  --attention-track: #ffebd5;
+  --state-caution: #9a4a06;
+  --state-caution-track: #fff1e0;
+  --attention-track: #fff1e0;
   --state-over: #c13c36;
   --state-over-track: #fee9e6;
   --state-none: #78849b;
   --state-none-track: #e6e9ef;
+
+  /* デザイン仕様書の帯・グラフ・ボタンの色(ADR-090) */
+  --track: #ededf0; /* 帯の地 */
+  --caution-zone: #fad9b5; /* 予算を超える側の帯 */
+  --caution-mark: #b45309; /* 見込み(中央)の印・レシートの印 */
+  --band-outer: #f8e1c6; /* 10回中8回の幅 */
+  --band-inner: #efc79a; /* 10回中5回の幅 */
+  --future-fill: #e8b98a; /* これから使いそう */
+  --note: #f6f5f3; /* 補足の面 */
+  --button-quiet: #efeeec; /* 灰色のボタン */
+  --bar-quiet: #d1d1d6; /* 予算ペースより少ない日の棒 */
+  --ideal: #8e8e93; /* 予算までの理想の線 */
+  --field: #e3e3e8; /* 検索欄 */
+  --danger: #c62828; /* 削除 */
+  --notify: #d9480f; /* お知らせの印 */
+  --suggest-line: #f2c99a; /* 提案の枠 */
+  --switch-on: #34a853; /* スイッチのオン */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -169,6 +187,22 @@
     --state-over-track: #442320;
     --state-none: #6b7791;
     --state-none-track: #232b3d;
+
+    --track: #2c2c2e;
+    --caution-zone: #4a3018;
+    --caution-mark: #f3ae58;
+    --band-outer: #3e2c18;
+    --band-inner: #6a4520;
+    --future-fill: #8a5a2c;
+    --note: #1f1f1f;
+    --button-quiet: #2c2c2e;
+    --bar-quiet: #48484a;
+    --ideal: #8e8e93;
+    --field: #1c1c1e;
+    --danger: #ff6b5e;
+    --notify: #ff7a45;
+    --suggest-line: #6a4520;
+    --switch-on: #30d158;
   }
 }
 
@@ -217,6 +251,22 @@
   --state-over-track: #442320;
   --state-none: #6b7791;
   --state-none-track: #232b3d;
+
+  --track: #2c2c2e;
+  --caution-zone: #4a3018;
+  --caution-mark: #f3ae58;
+  --band-outer: #3e2c18;
+  --band-inner: #6a4520;
+  --future-fill: #8a5a2c;
+  --note: #1f1f1f;
+  --button-quiet: #2c2c2e;
+  --bar-quiet: #48484a;
+  --ideal: #8e8e93;
+  --field: #1c1c1e;
+  --danger: #ff6b5e;
+  --notify: #ff7a45;
+  --suggest-line: #6a4520;
+  --switch-on: #30d158;
 }
 
 /* =============================================================================
@@ -290,7 +340,7 @@
 
   /* 青は主要な操作(撮影・保存・AIで目標案を作る)だけに使う。ほかの色の役割は上の
      --accent(中立の選択色)・--state-*(状態)・--income(収入)。 */
-  --action: #3a3a3a;
+  --action: #5c5853;
   --on-action: #ffffff;
 
   /* 余白は4の倍数。画面の左右は16。 */

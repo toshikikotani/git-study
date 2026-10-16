@@ -39,7 +39,7 @@ vi.mock('next/navigation', () => ({
 import { AttentionCard } from '../../app/(app)/spending/attention-card';
 import { LedgerList } from '../../app/(app)/spending/ledger-list';
 import { SpendingMonthProvider } from '../../app/(app)/spending/spending-month-provider';
-import { SummaryCard } from '../../app/(app)/spending/summary-card';
+import { MonthSummary } from '../../app/(app)/spending/month-summary';
 import { CaptureEntry } from '../../app/(app)/transactions/receipt/[id]/capture-entry';
 import { buildLedgerViews } from '@/features/spending/views';
 import type { CaptureView } from '@/features/receipt-captures/types';
@@ -99,13 +99,7 @@ const ledgerHtml = (captures: CaptureView[]) =>
         accounts: [{ id: 'a', name: '現金' }],
         captures,
         children: [
-          h(SummaryCard, {
-            key: 's',
-            pace: { kind: 'since_start', days: 9 },
-            forecast: { projectedTotalYen: null, totalBudgetYen: null },
-            hasIncomeRegistered: false,
-            goal: null,
-          }),
+          h(MonthSummary, { key: 's' }),
           h(AttentionCard, { key: 'at', hasGoal: true }),
           h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
         ],
@@ -114,14 +108,13 @@ const ledgerHtml = (captures: CaptureView[]) =>
   );
 
 describe('F7 入力待ち(受け入れ基準13)', () => {
-  it('読み取れなかったレシートは、明細に画像つきの「入力待ち」で出て、要確認にも数が出る', () => {
+  it('読み取れなかったレシートは、明細に画像つきの「入力待ちのレシート」で出る(デザイン仕様書)', () => {
     const html = ledgerHtml([capture()]);
-    expect(html).toContain('入力待ち');
+    expect(html).toContain('入力待ちのレシート');
     expect(html).toContain('src="https://example.test/receipt.jpg"');
     expect(html).toContain('href="/transactions/receipt/cap-1"');
-    expect(html).toContain('入力待ちのレシートが1件あります');
-    expect(html).toContain('入力すると、集計と予算の見込みに入ります');
-    expect(html).toContain('集計に未反映');
+    expect(html).toContain('まだ集計に入っていません');
+    expect(html).toContain('入力');
   });
 
   it('入力待ちは集計に入らない(使った額は入力待ちの有無で変わらない)', () => {

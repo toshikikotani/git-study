@@ -1,28 +1,25 @@
 import { formatEstimate } from '@/domain/forecast/format';
 import type { Forecast } from '@/domain/forecast/types';
 import { formatYen } from '@/domain/money';
-import { paceReason } from '@/domain/report-insights';
 
-/** ふだんの買い物のうち、ジャンル名で出す数(残りは「そのほか」にまとめる)。 */
+/** ふだんの買い物のうち、カテゴリ名で出す数(残りは「そのほか」にまとめる)。 */
 const MAX_GENRES = 3;
 
-type Line = { key: string; label: string; note?: string | undefined; yen: number };
+type Line = { key: string; label: string; yen: number };
 
 /**
- * なぜこの見込み?(設計書 v3 3.5)。月末の見込みを「もう決まっている」と「これから使いそうな額」の
- * 2つに分けて見せる。これからの分は、ふだんの買い物(ジャンル別・1日あたり)・いつも通う店・
- * 請求・まだ記録していない分・大きめの出費に分ける。
+ * なぜ約19.0万円？(デザイン仕様書の「見通し」、ADR-090)。見込みを「もう決まっている」と
+ * 「これから使いそう」の2色の棒に分け、それぞれの内訳を出す。これからの分は、ふだんの買い物
+ * (カテゴリ · 1日あたり)・いつも通う店・請求・まだ記録していない分・ときどきある大きめの出費。
  *
  * 中央値どうしは足し算にならないので、これからの合計は中央の見込みから出し、その内訳は
  * それぞれの平均の割合で分けた目安(forecast.breakdown)。合計は見出しの数字と必ず一致する。
  */
 export function WhyCard({
   forecast,
-  endLabel,
   closedGenreIds,
 }: {
   forecast: Forecast;
-  endLabel: string;
   closedGenreIds?: ReadonlySet<string>;
 }) {
   const b = forecast.breakdown;
@@ -30,230 +27,91 @@ export function WhyCard({
   const decided = b.actualYen + b.committedYen;
   const ahead = Math.max(0, b.totalYen - decided);
   const days = forecast.remainingDays;
-  const perDay = (yen: number) => (days > 0 ? `1日 ${formatEstimate(yen / days)}` : undefined);
+  const perDay = (yen: number) => (days > 0 ? ` · 1日 ${formatEstimate(yen / days)}` : '');
 
   const genres = b.variableByCategory.filter(
     (c) => c.yen > 0 && !closedGenreIds?.has(c.categoryId),
   );
   const shown = genres.slice(0, MAX_GENRES);
   const restYen = b.variableYen - shown.reduce((sum, c) => sum + c.yen, 0);
-  const daily: Line[] = [
+  const scheduled = Math.min(b.committedYen, forecast.committed?.scheduledYen ?? 0);
+  const fixed = Math.max(0, b.committedYen - scheduled);
+  const decidedLines: Line[] = [
+    { key: 'actual', label: '使った額', yen: b.actualYen },
+    { key: 'scheduled', label: '予定', yen: scheduled },
+    { key: 'fixed', label: 'これからの固定費', yen: fixed },
+  ].filter((l) => l.key === 'actual' || l.yen > 0);
+  const aheadLines: Line[] = [
     ...shown.map((c) => ({
       key: `g-${c.categoryId}`,
-      label: c.categoryName,
-      note: perDay(c.yen),
+      label: `${c.categoryName}${perDay(c.yen)}`,
       yen: c.yen,
     })),
-    ...(restYen > 0
-      ? [{ key: 'g-rest', label: 'そのほか', note: perDay(restYen), yen: restYen }]
-      : []),
-  ];
-  const merchants = forecast.visits.merchants.map((m) => m.label).slice(0, 2);
-  const bills = forecast.bills.items.map((i) => i.label).slice(0, 2);
-  const others: Line[] = [
-    {
-      key: 'visits',
-      label: 'いつも通う店',
-      note: merchants.length > 0 ? `${merchants.join('・')}など` : undefined,
-      yen: b.visitsYen,
-    },
-    {
-      key: 'bills',
-      label: '請求・期ごとの支払い',
-      note: bills.length > 0 ? `${bills.join('・')}など` : undefined,
-      yen: b.billsYen,
-    },
-    {
-      key: 'unrecorded',
-      label: 'まだ記録していない分',
-      note: 'いつもの記録の遅れから',
-      yen: b.unrecordedYen,
-    },
-    {
-      key: 'special',
-      label: '大きめの出費',
-      note: 'ふだんより高い買い物が、これまでの頻度で起きるとして',
-      yen: b.specialYen,
-    },
+    ...(restYen > 0 ? [{ key: 'g-rest', label: `そのほか${perDay(restYen)}`, yen: restYen }] : []),
+    { key: 'visits', label: 'いつも通う店', yen: b.visitsYen },
+    { key: 'bills', label: '請求・期ごとの支払い', yen: b.billsYen },
+    { key: 'unrecorded', label: 'まだ記録していない分', yen: b.unrecordedYen },
+    { key: 'special', label: 'ときどきある大きめの出費', yen: b.specialYen },
   ].filter((l) => l.yen > 0);
-
-  const pace = paceReason(forecast);
-  const recent = forecast.pace.recentPerDayYen;
-  const share = (yen: number) => `${Math.max(0, Math.min(100, (yen / b.totalYen) * 100))}%`;
-  const spoken = `${endLabel}の見込み${formatEstimate(b.totalYen)}。もう決まっている${formatYen(decided, { sign: 'never' })}、これから使いそうな額${formatEstimate(ahead)}。`;
 
   return (
     <section
-      aria-label="なぜこの見込み?"
-      className="glass rounded-[22px] px-4 py-4"
-      style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
+      aria-labelledby="why-card"
+      className="flex flex-col rounded-[22px] px-4 pt-5 pb-2"
+      style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
-      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        なぜこの見込み?
-      </p>
-      <p className="tabular mt-2 text-sm" style={{ color: 'var(--ink)' }}>
-        {endLabel}の見込み{' '}
-        <span className="text-lg font-semibold">{formatEstimate(b.totalYen)}</span> の内訳
-      </p>
-
-      {/* 決まっている額(濃い)と、これから(薄い)の2色の棒。 */}
+      <h2 id="why-card" className="text-[17px] font-semibold">
+        なぜ{formatEstimate(b.totalYen)}？
+      </h2>
       <div
         role="img"
-        aria-label={spoken}
-        className="mt-3 flex h-3 w-full overflow-hidden rounded-full"
-        style={{ background: 'var(--hairline)' }}
+        aria-label={`もう決まっている${formatYen(decided, { sign: 'never' })}、これから使いそう${formatEstimate(ahead)}`}
+        className="mt-4 flex h-3 overflow-hidden rounded-full"
+        style={{ gap: 2 }}
       >
-        <span style={{ width: share(decided), background: 'var(--ink-muted)', opacity: 0.75 }} />
-        <span style={{ width: share(ahead), background: 'var(--income)', opacity: 0.45 }} />
+        <span style={{ flex: Math.max(decided, 0), background: 'var(--accent)' }} />
+        <span style={{ flex: Math.max(ahead, 0), background: 'var(--future-fill)' }} />
       </div>
-
-      <Group
-        title="もう決まっている"
-        total={formatYen(decided, { sign: 'never' })}
-        swatch="decided"
-        lines={[
-          { key: 'actual', label: '使った額', yen: b.actualYen },
-          { key: 'committed', label: '予定・固定費', yen: b.committedYen },
-        ].filter((l) => l.key === 'actual' || l.yen > 0)}
-        fact
-      />
-
-      <Group
-        title="これから使いそうな額"
-        total={formatEstimate(ahead)}
-        note={days > 0 ? `残り${days}日・${perDay(ahead)}` : undefined}
-        swatch="ahead"
-      >
-        {daily.length > 0 ? (
-          <div className="mt-2">
-            <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-              ふだんの買い物 {formatEstimate(b.variableYen)}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              外食や食料品を、いつものペースで続けたとき
-            </p>
-            <Lines lines={daily} max={b.variableYen} indent />
-          </div>
-        ) : null}
-        {others.length > 0 ? <Lines lines={others} /> : null}
-      </Group>
-
-      {pace && recent !== null ? (
-        <p
-          className="mt-4 rounded-2xl px-3 py-2 text-xs leading-relaxed"
-          style={{
-            background: pace.tone === 'caution' ? 'var(--attention-track)' : 'var(--surface)',
-            color: 'var(--ink)',
-          }}
-        >
-          直近2週間は1日 {formatEstimate(recent)}、この先は1日{' '}
-          {formatEstimate(forecast.pace.perDayYen ?? 0)}で見ています。
-          {pace.tone === 'caution'
-            ? '直近が高いのが、大きな買い物が続いただけならこのくらいに落ち着きます。ふだんの買い物が増えているなら、もっと多くなります。'
-            : ''}
-        </p>
-      ) : null}
-
-      <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        「これから」の内訳は目安です(合計は{endLabel}の見込みと同じになるように分けています)。
-      </p>
+      <div className="mt-2 flex flex-col">
+        <Head
+          color="var(--accent)"
+          title="もう決まっている"
+          value={formatYen(decided, { sign: 'never' })}
+        />
+        {decidedLines.map((l) => (
+          <Sub key={l.key} label={l.label} value={formatYen(l.yen, { sign: 'never' })} />
+        ))}
+        <div className="my-2 h-px" style={{ background: 'var(--hairline)' }} />
+        <Head color="var(--future-fill)" title="これから使いそう" value={formatEstimate(ahead)} />
+        {aheadLines.map((l) => (
+          <Sub key={l.key} label={l.label} value={formatEstimate(l.yen)} />
+        ))}
+        <div className="h-2" />
+      </div>
     </section>
   );
 }
 
-function Group({
-  title,
-  total,
-  note,
-  swatch,
-  lines,
-  fact = false,
-  children,
-}: {
-  title: string;
-  total: string;
-  note?: string | undefined;
-  swatch: 'decided' | 'ahead';
-  lines?: Line[];
-  fact?: boolean;
-  children?: React.ReactNode;
-}) {
+function Head({ color, title, value }: { color: string; title: string; value: string }) {
   return (
-    <div className="mt-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          <span
-            aria-hidden
-            className="mr-2 inline-block size-3 rounded-full align-middle"
-            style={{
-              background: swatch === 'decided' ? 'var(--ink-muted)' : 'var(--income)',
-              opacity: swatch === 'decided' ? 0.75 : 0.45,
-            }}
-          />
-          {title}
-        </p>
-        <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          {total}
-        </p>
-      </div>
-      {note ? (
-        <p className="tabular mt-1 text-right text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {note}
-        </p>
-      ) : null}
-      {lines ? <Lines lines={lines} fact={fact} /> : null}
-      {children}
+    <div className="tabular flex min-h-11 items-center justify-between text-[15px] font-semibold">
+      <span className="flex items-center gap-2">
+        <span aria-hidden className="size-3 rounded-full" style={{ background: color }} />
+        {title}
+      </span>
+      <span>{value}</span>
     </div>
   );
 }
 
-function Lines({
-  lines,
-  max,
-  indent = false,
-  fact = false,
-}: {
-  lines: Line[];
-  /** あれば、各行にこの額に対する割合の細い棒を付ける。 */
-  max?: number;
-  indent?: boolean;
-  fact?: boolean;
-}) {
+function Sub({ label, value }: { label: string; value: string }) {
   return (
-    <ul className={`mt-2 space-y-2 ${indent ? 'pl-3' : ''}`}>
-      {lines.map((l) => (
-        <li key={l.key} className="text-xs">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0" style={{ color: 'var(--ink-secondary)' }}>
-              {l.label}
-              {l.note ? (
-                <span className="ml-2" style={{ color: 'var(--ink-muted)' }}>
-                  {l.note}
-                </span>
-              ) : null}
-            </span>
-            <span className="tabular shrink-0" style={{ color: 'var(--ink)' }}>
-              {fact ? formatYen(l.yen, { sign: 'never' }) : formatEstimate(l.yen)}
-            </span>
-          </div>
-          {max ? (
-            <div
-              aria-hidden
-              className="mt-1 h-1 w-full overflow-hidden rounded-full"
-              style={{ background: 'var(--hairline)' }}
-            >
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${Math.max(0, Math.min(100, (l.yen / max) * 100))}%`,
-                  background: 'var(--income)',
-                  opacity: 0.45,
-                }}
-              />
-            </div>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+    <div
+      className="tabular flex justify-between gap-3 pb-2 pl-5 text-[14px]"
+      style={{ color: 'var(--ink-muted)' }}
+    >
+      <span className="min-w-0">{label}</span>
+      <span className="shrink-0">{value}</span>
+    </div>
   );
 }

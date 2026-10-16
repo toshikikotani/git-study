@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
-import { formatYen } from '@/domain/money';
 import { nextGoal } from '@/domain/savings';
 import { recordCheckin } from '@/features/checkins/store';
 import { shouldShowOnboarding } from '@/features/onboarding/store';
 import { loadSavingsSummary, type SavingsSummary } from '@/features/savings/store';
+import { HomeBanners } from './_home/home-banners';
 import { HomeHeader } from './_home/home-header';
-import type { HomeListProps } from './_home/home-list';
+import { RecentRecords } from './_home/recent-records';
+import type { SavingsCardProps } from './_home/savings-card';
 import { TodaySection } from './_home/today-section';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
@@ -17,9 +18,8 @@ import { TodaySection } from './_home/today-section';
 export const dynamic = 'force-dynamic';
 
 /**
- * ホーム(デザインの「今日」、ADR-085):見出し → 今日使える額 → 見通し → 次の一手 → 一覧
- * (月末に残る見込み・確認待ち・貯金)。予算の残額タイルと下のボタンは、デザインに合わせて外した
- * (ジャンルは「見通し」、レポートとAI相談はナビと「その他」から)。
+ * ホーム(デザイン仕様書の「今日」、ADR-090):見出し → 入力待ちの知らせ → 今日使える目安 →
+ * 今期の見通し → 次の一手 → 貯金 → 最近の記録。
  */
 export default async function HomePage() {
   // 目標も明細もまだ無い新しい人は、はじめての設定へ(ADR-084)。
@@ -32,39 +32,42 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-4">
       <HomeHeader />
+      <Suspense fallback={null}>
+        <HomeBanners />
+      </Suspense>
       <Suspense fallback={<TodaySkeleton />}>
-        <TodaySection savings={savingsRow(savings)} />
+        <TodaySection savingsGoal={savingsGoal(savings)} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <RecentRecords />
       </Suspense>
     </div>
   );
 }
 
-/** 一覧の「貯金」の行(本人の選択で、デザインの一覧に足した)。 */
-function savingsRow(savings: SavingsSummary | null): HomeListProps['savings'] {
+/** 貯金カードの目標(次の目標。無ければ null)。 */
+function savingsGoal(savings: SavingsSummary | null): SavingsCardProps['goal'] {
   if (savings === null) return null;
   const next = nextGoal(savings.goals);
-  if (next === null) return { title: '貯金', detail: '目標をつくる' };
-  return {
-    title: `貯金 · ${next.goal.title}`,
-    detail: formatYen(savings.totalYen, { sign: 'never' }),
-  };
+  if (next === null) return null;
+  return { title: next.goal.title, savedYen: next.savedYen, targetYen: next.goal.targetAmountYen };
 }
 
-/** 今日使える額を読み込んでいる間の枠(高さを先に取り、下の段がずれないようにする)。 */
+/** 今日使える目安を読み込んでいる間の枠(高さを先に取り、下の段がずれないようにする)。 */
 function TodaySkeleton() {
   return (
     <section
-      aria-label="今日使える額"
+      aria-label="今日使える目安"
       aria-busy="true"
-      className="glass rounded-[28px] p-6 pb-7"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      className="rounded-[22px] px-5 pt-6 pb-6"
+      style={{ background: 'var(--surface)' }}
     >
-      <p className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
-        今日 使えるのは
+      <p className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+        今日使える目安
       </p>
-      <p className="mt-3 text-sm" style={{ color: 'var(--ink-muted)' }}>
+      <p className="mt-3 text-[15px]" style={{ color: 'var(--ink-muted)' }}>
         見込みを計算しています…
       </p>
     </section>

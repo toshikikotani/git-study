@@ -58,9 +58,7 @@ describe('H 家計簿タブ・概要/明細(受け入れ基準10)', () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
   });
 
-  it('家計簿のページに「概要/明細」の切り替えと、明細のアンカーがある', () => {
-    const page = readFileSync('app/(app)/spending/page.tsx', 'utf8');
-    expect(page).toContain('<ViewSwitch />');
+  it('明細のページに明細のアンカーがあり、タブをもう一度押すと先頭へ戻る', () => {
     expect(readFileSync('app/(app)/spending/ledger-list.tsx', 'utf8')).toContain('id="ledger"');
     expect(readFileSync('app/(app)/app-shell.tsx', 'utf8')).toContain(
       'tabTapAction(pathname, item.href)',

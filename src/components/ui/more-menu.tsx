@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { MdMoreHoriz } from 'react-icons/md';
 
 import { signOutAction } from '@/features/auth/actions';
 import { BottomSheet } from './bottom-sheet';
@@ -18,6 +17,7 @@ const GROUPS = [
         label: '明細を手で登録する',
         dek: '現金払いなど、取り込みに乗らない明細を1件だけ記録',
       },
+      { href: '/transactions/import', label: 'CSVを取り込む', dek: '銀行・カードの明細をまとめて' },
       {
         href: '/transactions/paste',
         label: 'メールを貼り付ける',
@@ -50,7 +50,11 @@ const GROUPS = [
   {
     title: '振り返る',
     items: [
-      { href: '/reports', label: 'レポート' },
+      {
+        href: '/reports/more',
+        label: 'そのほかの分析',
+        dek: '固定費の候補・お店・資産・予測の当たり具合',
+      },
       { href: '/reports/ai', label: 'AIレポート', dek: '日次・月次の気づき・アドバイス' },
       { href: '/reports/genres', label: 'カテゴリ分析', dek: 'AIによる客観的な支出の分類' },
       { href: '/briefs', label: '朝配信', ownerOnly: true },
@@ -121,17 +125,20 @@ export function MoreMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="その他の機能(給料日・設定・ログアウトなど)"
+        aria-label="設定(給料日・カテゴリ・色・ログアウトなど)"
         className="flex size-11 min-h-11 shrink-0 items-center justify-center"
         style={{
           borderRadius: 'var(--radius-full)',
           background: open ? 'var(--accent-track)' : 'var(--surface)',
           color: open ? 'var(--accent)' : 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
           transition: `background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)`,
         }}
       >
-        <MdMoreHoriz aria-hidden size={22} />
+        <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="5" cy="12" r="1.8" />
+          <circle cx="12" cy="12" r="1.8" />
+          <circle cx="19" cy="12" r="1.8" />
+        </svg>
       </button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">

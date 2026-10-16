@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatYen } from '@/domain/money';
 import { addGoalGenreAction } from './membership-actions';
 
@@ -16,7 +17,7 @@ export type UnrecordedRow = {
 
 export type AddableGenre = { genreId: string; genreName: string };
 
-/** 支出が無いジャンルも含めて、目標に足せる。 */
+/** 目標のないカテゴリ(デザイン仕様書の「今期の目標」の「そのほか」)。支出が無いカテゴリも含めて、目標に足せる。 */
 export function UnrecordedSheet({
   planId,
   rows,
@@ -53,23 +54,21 @@ export function UnrecordedSheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="glass min-h-12 flex w-full items-center justify-between px-4 py-3 text-base"
-        style={{
-          borderRadius: 22,
-          background: 'var(--surface)',
-          boxShadow: 'var(--card-shadow)',
-          color: 'var(--ink)',
-        }}
+        className="flex min-h-13 w-full items-center gap-2 px-4 text-left"
+        style={{ color: 'var(--ink)' }}
       >
-        <span>予算のないカテゴリ</span>
-        <span style={{ color: 'var(--ink-secondary)' }}>
-          {rows.length > 0 ? rows.length : addable.length} ›
+        <span className="flex-1 text-[16px]">目標のないカテゴリ</span>
+        <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
+          {addable.length}件
+        </span>
+        <span style={{ color: 'var(--ideal)' }}>
+          <ChevronRightIcon />
         </span>
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)}>
         <div className="px-2 pb-2">
           <h2 className="px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            予算に加える
+            目標に加える
           </h2>
           <ul className="mt-3 space-y-3">
             {addable.map((genre) => (

@@ -13,3 +13,17 @@ export async function countPendingReview(): Promise<number> {
     return 0;
   }
 }
+
+/** 入力待ちのレシート(読み取れなかったもの)の件数。数えられなければ 0。 */
+export async function countNeedsInputCaptures(): Promise<number> {
+  try {
+    const supabase = await createClient();
+    const { count, error } = await supabase
+      .from('receipt_captures')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'needs_input');
+    return error ? 0 : (count ?? 0);
+  } catch {
+    return 0;
+  }
+}

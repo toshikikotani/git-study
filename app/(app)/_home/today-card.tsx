@@ -1,57 +1,48 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
 
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
-import { TenDots } from '@/components/ui/ten-dots';
 import { formatEstimate, formatProbability } from '@/domain/forecast/format';
 import type { TodayAllowance } from '@/domain/forecast/today';
-import { AllowanceDialog, type AllowanceExplain } from './allowance-dialog';
 import type { ForecastSuggestion } from '@/domain/forecast/types';
-import { NextStepCard } from '../reports/landing-hero';
+import { NextStepCard } from '../reports/next-step-card';
+import { AllowanceDialog, type AllowanceExplain } from './allowance-dialog';
 
-/** 今日あと使える額は「予算に収まるのが80%になる額」から出している(点の数)。 */
-const SAFE_ALLOWANCE_PROB = 1;
-
-/** 目標の期間の見通し(見込みの幅・予算・使った額)。 */
+/** 今期(目標の期間)の見通し。数字は「見通し」の画面と同じ予測。 */
 export type TodayOutlook = {
-  /** 「10月の見通し」「10月14日までの見通し」 */
-  label: string;
+  /** 「10/1〜11/5 · 残り21日」 */
+  periodLabel: string;
   /** これまでに使った額(事実)。 */
   spentYen: number;
   p10: number;
   p50: number;
   p90: number;
   budgetYen: number;
-  /** 目標に入っていないジャンル(すべての支出の着地)。 */
-  outside?: { name: string; p50: number }[];
-  /** カテゴリ別の超過(予算を超える見込みのカテゴリ)。 */
-  overages?: { name: string; overYen: number }[];
 };
 
 export type TodayCardProps = {
-  /** 目標が無ければ null(今日あと使える額は出せない)。 */
+  /** 目標が無ければ null(今日使える目安は出せない)。 */
   today: TodayAllowance | null;
   outlook: TodayOutlook | null;
   suggestion: ForecastSuggestion | null;
-  /** 予算に収まる確率(目標の範囲)。 */
+  /** 予算内に収まる確率(目標の範囲)。 */
   probWithinBudget: number | null;
   provisional: boolean;
-  /** 今日の上限の内訳。見通しとは別の説明。 */
+  /** 今日の目安の内訳(「なぜこの額？」)。 */
   allowanceExplain?: AllowanceExplain | null;
-  /** 「2026-10」(次の一手からジャンル画面へ) */
+  /** 「2026-10」(次の一手からカテゴリの画面へ) */
   monthKey?: string;
 };
 
+const card = 'flex flex-col rounded-[22px]';
+const cardStyle = { background: 'var(--surface)', color: 'var(--ink)' } as const;
+
 /**
- * ホームの先頭(デザインの「今日」、ADR-085):今日使える額(大きな数字は1つだけ)→
- * 見通し(月末の見込みと予算)→ 次の一手。
+ * ホームの「今日」(デザイン仕様書、ADR-090):今日使える目安 → 今期の見通し(押すと見通しへ)→ 次の一手。
  */
 export function TodayCard(props: TodayCardProps) {
   const { today, outlook, suggestion, probWithinBudget } = props;
   return (
-    <div className="space-y-3">
+    <>
       <TodayHero
         today={today}
         provisional={props.provisional}
@@ -63,8 +54,17 @@ export function TodayCard(props: TodayCardProps) {
       {suggestion && props.monthKey ? (
         <NextStepCard suggestion={suggestion} monthKey={props.monthKey} />
       ) : null}
-    </div>
+    </>
   );
+}
+
+/** 今日の目安が、いつもの1日(平日・休日の別)の何%か。 */
+function usualPercent(explain: AllowanceExplain | null): number | null {
+  const limit = explain?.dailyLimit;
+  if (!explain || !limit) return null;
+  const usual = limit.todayIsDayOff ? explain.dayOffPerDayYen : explain.weekdayPerDayYen;
+  if (usual && usual > 0) return Math.round((limit.todayLimitYen / usual) * 100);
+  return Math.round(limit.safetyFactor * 100);
 }
 
 function TodayHero({
@@ -76,470 +76,163 @@ function TodayHero({
   provisional: boolean;
   allowanceExplain: AllowanceExplain | null;
 }) {
+  if (!today) {
+    return (
+      <section
+        aria-label="今日使える目安"
+        className={`${card} gap-2 px-5 pt-6 pb-2`}
+        style={cardStyle}
+      >
+        <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+          今日使える目安
+        </span>
+        <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          目標(カテゴリごとの予算)を決めると、今日使える目安を出せます。
+        </p>
+        <div className="mt-2 h-px" style={{ background: 'var(--hairline)' }} />
+        <Link
+          href="/plan"
+          className="flex min-h-12 items-center justify-between text-[15px] font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          目標を決める
+          <ChevronRightIcon />
+        </Link>
+      </section>
+    );
+  }
+  const left = today.kind === 'left';
+  const pct = usualPercent(allowanceExplain);
   return (
-    <section
-      aria-label="今日使える額"
-      className="glass rise flex flex-col gap-1 rounded-[28px] px-6 pt-6 pb-5"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',
-        boxShadow: 'var(--card-shadow)',
-      }}
-    >
-      {today ? (
-        <>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
-              {today.kind === 'left' ? '今日 使えるのは' : '今日は上限を'}
-            </p>
-            {provisional ? (
-              <span
-                className="rounded-full px-3 py-1 text-xs font-semibold"
-                style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
-              >
-                目安
-              </span>
-            ) : null}
-          </div>
-          <p
-            className="tabular mt-1 flex items-baseline gap-1"
-            style={{ color: today.kind === 'left' ? 'var(--ink)' : 'var(--state-caution)' }}
-          >
-            <span className="text-4xl leading-none font-bold tracking-[-0.04em]">
-              {(today.kind === 'left' ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
-            </span>
-            <span className="text-base font-bold">{today.kind === 'left' ? '円' : '円 超え'}</span>
-          </p>
-          {today.spentYen > 0 ? (
-            <p className="mt-1 text-sm tabular" style={{ color: 'var(--ink-secondary)' }}>
-              今日使った額: {today.spentYen.toLocaleString('ja-JP')}円
-            </p>
-          ) : null}
-          {allowanceExplain?.dailyLimit ? (
-            <p className="mt-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              {(() => {
-                const isDayOff = allowanceExplain.dailyLimit.todayIsDayOff;
-                const avg = isDayOff
-                  ? allowanceExplain.dayOffPerDayYen
-                  : allowanceExplain.weekdayPerDayYen;
-                const limit = allowanceExplain.dailyLimit.todayLimitYen;
-                if (avg && avg > 0) {
-                  const pct = Math.round((limit / avg) * 100);
-                  return `普段の${pct}%くらいに抑えてください`;
-                }
-                return `普段の${Math.round(allowanceExplain.dailyLimit.safetyFactor * 100)}%くらいに抑えてください`;
-              })()}
-            </p>
-          ) : null}
-          <div className="my-4 h-px" style={{ background: 'var(--hairline)' }} />
-          <TenDots probability={allowanceExplain?.probWithinBudget ?? SAFE_ALLOWANCE_PROB} />
-          <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
-            平日と休日の重みを入れ、毎日この額までなら、
-            <strong style={{ color: 'var(--ink)' }}>
-              {formatProbability(allowanceExplain?.probWithinBudget ?? SAFE_ALLOWANCE_PROB)}の確率
-            </strong>
-            で予算内に収まります。
-          </p>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            使わなかった分は、明日に回ります。
-          </p>
-          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            確率はモンテカルロ法により算出。
-          </p>
-        </>
+    <section aria-label="今日使える目安" className={`${card} px-5 pt-6 pb-2`} style={cardStyle}>
+      <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+        {left ? '今日使える目安' : '今日は目安を'}
+        {provisional ? '(記録が少ないので仮)' : ''}
+      </span>
+      <p
+        className="tabular mt-1 flex items-baseline gap-1"
+        style={{ color: left ? 'var(--ink)' : 'var(--state-caution)' }}
+      >
+        <span className="text-[68px] leading-none font-bold tracking-[-0.02em]">
+          {(left ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
+        </span>
+        <span className="text-[24px] font-semibold">{left ? '円' : '円 超え'}</span>
+      </p>
+      <p className="mt-2 text-[15px] leading-normal" style={{ color: 'var(--ink-secondary)' }}>
+        {pct !== null ? `いつもの1日の約${pct}%。` : ''}
+        使わなかった分は明日に回ります。
+      </p>
+      <div className="mt-4 h-px" style={{ background: 'var(--hairline)' }} />
+      {allowanceExplain ? (
+        <AllowanceDialog explain={allowanceExplain} />
       ) : (
-        <>
-          <p className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
-            今日 使えるのは
-          </p>
-          <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--ink)' }}>
-            目標(カテゴリごとの予算)を決めると、今日使える額を出せます。
-          </p>
-          <Link
-            href="/plan"
-            className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-semibold"
-            style={{ color: 'var(--ink)' }}
-          >
-            目標を決める
-            <ChevronRightIcon />
-          </Link>
-        </>
+        <div className="min-h-2" />
       )}
-      {today && allowanceExplain ? <AllowanceDialog explain={allowanceExplain} /> : null}
     </section>
   );
+}
+
+/** 2026-10-01 → 10/1 */
+export function shortDate(date: string): string {
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 }
 
 /**
- * 見通しのカード(デザイン):月末の見込み(中央)と予算、使った額・10回中8回の幅・中央の点・予算の線を
- * 1本の帯に、その下に予算を超える確率。
+ * 今期の見通し(デザイン仕様書):見込み(中央)と予算、1本の帯(使った額・予算を超える側・予算の目盛り・
+ * 見込みの印)、使った額と予算内に収まる確率。押すと「見通し」へ。
  */
 function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithin: number }) {
-  const [showOverages, setShowOverages] = useState(false);
   const overYen = outlook.p50 - outlook.budgetYen;
-  const max = Math.max(outlook.p90, outlook.budgetYen, outlook.spentYen, 1) * 1.02;
-  const pct = (yen: number) => `${Math.min(100, Math.max(0, (yen / max) * 100))}%`;
+  const max = Math.max(outlook.p90, outlook.budgetYen, outlook.spentYen, outlook.p50, 1);
+  const pct = (yen: number) => Math.min(100, Math.max(0, (yen / max) * 100));
   const caution = probWithin < 0.5;
   return (
-    <section
-      aria-label={outlook.label}
-      className="glass flex flex-col gap-3 rounded-[28px] p-6"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid color-mix(in srgb, var(--accent) 32%, transparent)',
-        boxShadow: 'var(--card-shadow)',
-      }}
+    <Link
+      href="/plan"
+      aria-label={`今期の見通し。${formatEstimate(outlook.p50)}、予算 ${formatEstimate(outlook.budgetYen, { approx: false })}。詳しい見通しへ`}
+      className={`${card} min-h-11 px-5 pt-5 pb-2`}
+      style={cardStyle}
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-medium" style={{ color: 'var(--ink-secondary)' }}>
-          {outlook.label}
-        </h2>
-        <button
-          type="button"
-          onClick={() => outlook.overages && outlook.overages.length > 0 && setShowOverages(true)}
-          className="rounded-full px-3 py-1 text-sm font-semibold"
+        <span className="flex flex-col">
+          <span className="text-[17px] font-semibold">今期の見通し</span>
+          <span className="tabular text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            {outlook.periodLabel}
+          </span>
+        </span>
+        <span
+          className="shrink-0 rounded-full px-3 py-1 text-[13px] font-semibold whitespace-nowrap"
           style={
             overYen > 0
               ? { background: 'var(--state-caution-track)', color: 'var(--state-caution)' }
-              : { background: 'var(--state-ok-track)', color: 'var(--state-ok)' }
+              : { background: 'var(--income-track)', color: 'var(--income)' }
           }
         >
           {overYen > 0 ? `${formatEstimate(overYen)} 超えそう` : '予算内の見込み'}
-        </button>
+        </span>
       </div>
-      <p className="tabular flex flex-wrap items-baseline gap-2">
-        <span className="text-3xl font-bold tracking-[-0.02em]" style={{ color: 'var(--ink)' }}>
+      <p className="tabular mt-4 flex flex-wrap items-baseline gap-2">
+        <span className="text-[34px] leading-tight font-bold tracking-[-0.01em]">
           {formatEstimate(outlook.p50)}
         </span>
-        <span className="text-base" style={{ color: 'var(--ink-secondary)' }}>
+        <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
           / 予算 {formatEstimate(outlook.budgetYen, { approx: false })}
         </span>
       </p>
-      <p className="text-sm tabular" style={{ color: 'var(--ink-secondary)' }}>
-        これまで使った額:{' '}
-        <strong style={{ color: 'var(--ink)' }}>
-          {formatEstimate(outlook.spentYen, { approx: false })}
-        </strong>
-      </p>
-      {outlook.outside && outlook.outside.length > 0 ? (
-        <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          目標に入っていない:{' '}
-          {outlook.outside
-            .map((c) => `${c.name} ${formatEstimate(c.p50, { approx: false })}`)
-            .join('、')}
-        </p>
-      ) : null}
-      <div aria-hidden className="relative h-10">
-        <div
-          className="absolute inset-x-0 top-[18px] h-2.5 rounded-full"
-          style={{ background: 'var(--plane)' }}
-        />
-        <div
-          className="absolute top-[18px] left-0 h-2.5 rounded-full"
-          style={{ width: pct(outlook.spentYen), background: 'var(--accent)' }}
-        />
-        <div
-          className="absolute top-[18px] h-2.5 rounded-full"
-          style={{
-            left: pct(outlook.p10),
-            width: `calc(${pct(outlook.p90)} - ${pct(outlook.p10)})`,
-            background: 'transparent',
-            border: '1.5px solid var(--mark, var(--accent))',
-            boxSizing: 'border-box',
-          }}
-        />
-        <div
-          className="absolute top-[15px] size-4 -translate-x-1/2 rounded-full"
-          style={{
-            left: pct(outlook.p50),
-            background: 'var(--mark, var(--accent))',
-            boxShadow: '0 0 0 3px var(--surface)',
-          }}
-        />
-        <div
-          className="absolute top-2.5 h-6 w-0.5 -translate-x-1/2"
-          style={{ left: pct(outlook.budgetYen), background: 'var(--ink)' }}
+      <div aria-hidden className="relative mt-4 h-7">
+        <span
+          className="absolute inset-x-0 top-2 h-3 rounded-full"
+          style={{ background: 'var(--track)' }}
         />
         <span
-          className="absolute -top-1.5 -translate-x-1/2 text-xs font-semibold"
-          style={{ left: pct(outlook.budgetYen), color: 'var(--ink)' }}
-        >
-          予算
-        </span>
+          className="absolute top-2 right-0 h-3 rounded-r-full"
+          style={{ left: `${pct(outlook.budgetYen)}%`, background: 'var(--caution-zone)' }}
+        />
+        <span
+          className="absolute top-2 left-0 h-3 rounded-full"
+          style={{ width: `${pct(outlook.spentYen)}%`, background: 'var(--accent)' }}
+        />
+        <span
+          className="absolute top-0 h-6 w-0.5 rounded-sm"
+          style={{ left: `${pct(outlook.budgetYen)}%`, background: 'var(--ink)' }}
+        />
+        <span
+          className="absolute top-1 size-4 -translate-x-1/2 rounded-full"
+          style={{
+            left: `${pct(outlook.p50)}%`,
+            background: 'var(--surface)',
+            border: '3px solid var(--caution-mark)',
+          }}
+        />
       </div>
       <div
-        className="tabular -mt-1 flex justify-between gap-2 text-xs"
-        style={{ color: 'var(--ink-secondary)' }}
+        className="tabular mt-1 flex justify-between gap-2 text-[13px]"
+        style={{ color: 'var(--ink-muted)' }}
       >
-        <span>使った額 {formatEstimate(outlook.spentYen, { approx: false })}</span>
         <span>
-          80%の確率で {formatEstimate(outlook.p10, { approx: false }).replace('円', '')}〜
-          {formatEstimate(outlook.p90, { approx: false })}
+          使った額{' '}
+          <strong className="font-semibold" style={{ color: 'var(--ink)' }}>
+            {formatEstimate(outlook.spentYen, { approx: false })}
+          </strong>
         </span>
-      </div>
-      <div className="h-px" style={{ background: 'var(--hairline)' }} />
-      <div className="flex flex-col gap-2">
-        <p className="text-base" style={{ color: 'var(--ink)' }}>
-          <strong style={{ color: caution ? 'var(--state-caution)' : 'var(--ink)' }}>
+        <span>
+          予算内に収まる確率{' '}
+          <strong
+            className="font-semibold"
+            style={{ color: caution ? 'var(--state-caution)' : 'var(--income)' }}
+          >
             {formatProbability(probWithin)}
           </strong>
-          の確率で 予算内に収まります
-        </p>
-        <DistributionChart
-          p10={outlook.p10}
-          p50={outlook.p50}
-          p90={outlook.p90}
-          budget={outlook.budgetYen}
-          actualProb={probWithin}
-        />
+        </span>
       </div>
-      {showOverages && outlook.overages ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          style={{ background: 'rgba(0,0,0,0.4)' }}
-          onClick={() => setShowOverages(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-t-3xl p-4"
-            style={{ background: 'var(--surface)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
-              カテゴリ別の超過
-            </h3>
-            <ul className="mt-3 space-y-2">
-              {outlook.overages.map((o, i) => (
-                <li key={i} className="flex justify-between text-sm">
-                  <span style={{ color: 'var(--ink)' }}>{o.name}</span>
-                  <span
-                    className="font-semibold"
-                    style={{ color: o.overYen > 0 ? 'var(--state-caution)' : 'var(--state-ok)' }}
-                  >
-                    {o.overYen > 0 ? '+' : ''}
-                    {o.overYen.toLocaleString()}円
-                  </span>
-                </li>
-              ))}
-              <li
-                className="flex justify-between border-t pt-2 text-sm font-semibold"
-                style={{ borderColor: 'var(--hairline)' }}
-              >
-                <span style={{ color: 'var(--ink)' }}>合計</span>
-                <span style={{ color: 'var(--state-caution)' }}>
-                  +{outlook.overages.reduce((s, o) => s + o.overYen, 0).toLocaleString()}円
-                </span>
-              </li>
-            </ul>
-            <button
-              type="button"
-              onClick={() => setShowOverages(false)}
-              className="mt-4 w-full min-h-11 rounded-full text-sm font-semibold"
-              style={{ background: 'var(--plane)', color: 'var(--ink)' }}
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function DistributionChart({
-  p10,
-  p50,
-  p90,
-  budget,
-  actualProb,
-}: {
-  p10: number;
-  p50: number;
-  p90: number;
-  budget: number;
-  actualProb: number;
-}) {
-  const [tapX, setTapX] = useState<number | null>(null);
-  const width = 300;
-  const height = 110;
-  const padding = { left: 32, right: 8, top: 8, bottom: 20 };
-  const chartW = width - padding.left - padding.right;
-  const chartH = height - padding.top - padding.bottom;
-
-  const sigma = (p90 - p10) / 2.56;
-  const mean = p50;
-  const min = mean - 3 * sigma;
-  const max = mean + 3 * sigma;
-
-  const points = 60;
-  const path: string[] = [];
-  for (let i = 0; i <= points; i++) {
-    const x = min + ((max - min) * i) / points;
-    const z = (x - mean) / sigma;
-    const y = Math.exp(-0.5 * z * z);
-    const px = padding.left + (i / points) * chartW;
-    const py = padding.top + chartH - y * chartH;
-    path.push(`${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`);
-  }
-
-  const budgetX = padding.left + ((budget - min) / (max - min)) * chartW;
-  const underPath = path.filter((_, i) => {
-    const x = min + ((max - min) * i) / points;
-    return x <= budget;
-  });
-
-  const formatMan = (n: number) => `${(n / 10000).toFixed(1)}万`;
-  const xLabels = [min, p10, p50, p90, max].map((v) => ({
-    x: padding.left + ((v - min) / (max - min)) * chartW,
-    label: formatMan(v),
-  }));
-
-  const erf = (x: number) => {
-    const a1 = 0.254829592,
-      a2 = -0.284496736,
-      a3 = 1.421413741,
-      a4 = -1.453152027,
-      a5 = 1.061405429,
-      p = 0.3275911;
-    const sign = x < 0 ? -1 : 1;
-    const t = 1 / (1 + p * Math.abs(x));
-    const y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-    return sign * y;
-  };
-
-  const cdf = (x: number) => 0.5 * (1 + erf((x - mean) / (sigma * Math.sqrt(2))));
-
-  const updateFromEvent = (clientX: number, svg: SVGSVGElement) => {
-    const rect = svg.getBoundingClientRect();
-    const relX = ((clientX - rect.left) / rect.width) * width;
-    const chartRelX = (relX - padding.left) / chartW;
-    if (chartRelX >= 0 && chartRelX <= 1) {
-      setTapX(chartRelX);
-    }
-  };
-
-  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    updateFromEvent(e.clientX, e.currentTarget);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (e.buttons === 0) return;
-    e.preventDefault();
-    updateFromEvent(e.clientX, e.currentTarget);
-  };
-
-  const tapYen = tapX !== null ? min + tapX * (max - min) : null;
-  const tapProb = tapYen !== null ? cdf(tapYen) : null;
-  const tapPx = tapX !== null ? padding.left + tapX * chartW : null;
-
-  return (
-    <div className="flex flex-col gap-1">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-28 cursor-pointer select-none"
-        style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
+      <div className="mt-4 h-px" style={{ background: 'var(--hairline)' }} />
+      <span
+        className="flex min-h-12 items-center justify-between text-[15px] font-semibold"
+        style={{ color: 'var(--accent)' }}
       >
-        <defs>
-          <linearGradient id="underGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--state-ok)" stopOpacity="0.6" />
-            <stop offset="100%" stopColor="var(--state-ok)" stopOpacity="0.1" />
-          </linearGradient>
-          <linearGradient id="overGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--state-caution)" stopOpacity="0.6" />
-            <stop offset="100%" stopColor="var(--state-caution)" stopOpacity="0.1" />
-          </linearGradient>
-        </defs>
-        <line
-          x1={padding.left}
-          y1={padding.top + chartH}
-          x2={padding.left + chartW}
-          y2={padding.top + chartH}
-          stroke="var(--hairline)"
-        />
-        <line
-          x1={padding.left}
-          y1={padding.top}
-          x2={padding.left}
-          y2={padding.top + chartH}
-          stroke="var(--hairline)"
-        />
-        <path
-          d={`${path.join(' ')} L${padding.left + chartW},${padding.top + chartH} L${padding.left},${padding.top + chartH} Z`}
-          fill="url(#overGrad)"
-        />
-        {underPath.length > 1 && (
-          <path
-            d={`${underPath.join(' ')} L${budgetX},${padding.top + chartH} L${padding.left},${padding.top + chartH} Z`}
-            fill="url(#underGrad)"
-          />
-        )}
-        <path d={path.join(' ')} fill="none" stroke="var(--ink)" strokeWidth="1.5" />
-        <line
-          x1={budgetX}
-          y1={padding.top}
-          x2={budgetX}
-          y2={padding.top + chartH}
-          stroke="var(--state-ok)"
-          strokeWidth="1"
-          strokeDasharray="2 2"
-        />
-        {tapPx !== null && (
-          <line
-            x1={tapPx}
-            y1={padding.top}
-            x2={tapPx}
-            y2={padding.top + chartH}
-            stroke="var(--ink)"
-            strokeWidth="1"
-          />
-        )}
-        {xLabels.map((l, i) => (
-          <text
-            key={i}
-            x={l.x}
-            y={height - 4}
-            textAnchor="middle"
-            fontSize="7"
-            fill="var(--ink-muted)"
-          >
-            {l.label}
-          </text>
-        ))}
-        <text
-          x={padding.left - 2}
-          y={padding.top + 8}
-          textAnchor="end"
-          fontSize="7"
-          fill="var(--ink-muted)"
-        >
-          高い
-        </text>
-        <text
-          x={padding.left - 2}
-          y={padding.top + chartH}
-          textAnchor="end"
-          fontSize="7"
-          fill="var(--ink-muted)"
-        >
-          低い
-        </text>
-      </svg>
-      {tapYen !== null && tapProb !== null ? (
-        <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-          {formatMan(tapYen)}以下になる確率:{' '}
-          {Math.abs(tapYen - budget) < (p90 - p10) * 0.05
-            ? Math.round(actualProb * 100)
-            : Math.round(tapProb * 100)}
-          %
-        </p>
-      ) : (
-        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          タップすると、その金額以下になる確率を表示します。
-        </p>
-      )}
-    </div>
+        詳しい見通し
+        <ChevronRightIcon />
+      </span>
+    </Link>
   );
 }

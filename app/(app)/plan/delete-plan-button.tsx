@@ -21,10 +21,10 @@ export function DeletePlanButton({ planId }: { planId: string }) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="min-h-11 text-xs font-semibold"
-        style={{ color: 'var(--over)' }}
+        className="min-h-13 w-full text-[16px]"
+        style={{ color: 'var(--danger)' }}
       >
-        この目標を削除する
+        この目標を削除
       </button>
       <BottomSheet
         open={confirming}

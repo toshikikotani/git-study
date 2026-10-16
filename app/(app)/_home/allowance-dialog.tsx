@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { ChevronRightIcon } from '@/components/ui/nav-icons';
 
 export type AllowanceExplain = {
   budgetYen: number;
@@ -70,10 +71,11 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 inline-flex min-h-11 items-center text-base font-semibold"
-        style={{ color: 'var(--ink)' }}
+        className="flex min-h-12 w-full items-center justify-between text-[15px] font-semibold"
+        style={{ color: 'var(--accent)' }}
       >
-        なぜこの額?
+        なぜこの額？
+        <ChevronRightIcon />
       </button>
       <BottomSheet
         open={open}

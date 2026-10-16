@@ -123,36 +123,61 @@ async function render(
 }
 
 describe('主要ページがサーバー描画でエラーにならない(Supabase を代用)', () => {
-  it('レポート(振り返り)', async () => {
+  it('分析(デザイン仕様書、ADR-090)', async () => {
     const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('レポート');
-    // 着地の見込みは「予算」へ移した(ADR-088)。
-    expect(html).toContain('href="/plan"');
+    expect(html).toContain('分析');
+    expect(html).toContain('貯蓄率');
+    expect(html).toContain('href="/reports/frequency"');
+    expect(html).toContain('href="/reports/monthly"');
+    expect(html).toContain('href="/reports/ai"');
   }, 60000);
 
-  it('予算(目標と見通しを1つに)', async () => {
+  it('そのほかの分析', async () => {
+    const html = (await render(() => import('../../../app/(app)/reports/more/page'))).replace(
+      /<!-- -->/g,
+      '',
+    );
+    expect(html).toContain('そのほかの分析');
+  }, 60000);
+
+  it('月ごとの表・回数と1回の金額', async () => {
+    const monthly = await render(() => import('../../../app/(app)/reports/monthly/page'));
+    expect(monthly).toContain('月ごとの表');
+    const frequency = await render(() => import('../../../app/(app)/reports/frequency/page'));
+    expect(frequency).toContain('回数と1回の金額');
+  }, 60000);
+
+  it('見通し(デザイン仕様書、ADR-090)', async () => {
     const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('予算');
+    expect(html).toContain('見通し');
+    expect(html).toContain('目標を編集');
     expect(html).toContain('href="/plan/edit"');
-    // 着地の見込み → カテゴリ → なぜ → AIの分析 の順
-    expect(html).toContain('カテゴリごとの見込み');
-    expect(html.indexOf('カテゴリごとの見込み')).toBeLessThan(html.indexOf('AIの分析'));
+    // 見込み → 予算内に収まる確率 → なぜ → 最近の勢い → AIの気づき の順
+    const order = ['10回中8回は', '予算内に収まる確率', '最近の勢い', 'AIの気づき'].map((t) =>
+      html.indexOf(t),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   }, 60000);
 
-  it('予算を編集', async () => {
+  it('今期の目標(デザイン仕様書、ADR-090)', async () => {
     const html = (await render(() => import('../../../app/(app)/plan/edit/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('予算を編集');
-    expect(html).toContain('総額とカテゴリへの配分');
-    expect(html).toContain('予算のないカテゴリ');
+    expect(html).toContain('今期の目標');
+    expect(html).toContain('この目標で着地すると');
+    expect(html).toContain('使っていい総額');
+    expect(html).toContain('カテゴリへの配分');
+    expect(html).toContain('目標のないカテゴリ');
+    expect(html).toContain('次の期間の目標を予約');
+    expect(html).toContain('この目標を削除');
   }, 60000);
 
   const planRow = () => tables.spending_plans![0]!;
@@ -200,7 +225,7 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
         /<!-- -->/g,
         '',
       );
-      expect(html).toMatch(/カテゴリごとの見込み|から始まります|新しい目標を立てる|次の目標を予約/);
+      expect(html).toMatch(/予算内に収まる確率|から始まります|新しい目標を立てる|次の目標を予約/);
     }, 60000);
   }
 
