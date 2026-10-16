@@ -14,13 +14,21 @@ export type RecordDraft = {
   memo: string;
   fixed: boolean;
   accountId: string;
+  /** 割り勘でもらった額(「3,000」のような形)。無ければ省略。 */
+  split?: string;
 };
 
 let draft: RecordDraft | null = null;
 
 /** 何か入れてあるか(金額・カテゴリ・レシート名・メモ)。種類や日付だけなら下書きにしない。 */
 export function hasDraftContent(d: RecordDraft): boolean {
-  return d.amount !== '' || d.genreId !== null || d.name.trim() !== '' || d.memo.trim() !== '';
+  return (
+    d.amount !== '' ||
+    d.genreId !== null ||
+    d.name.trim() !== '' ||
+    d.memo.trim() !== '' ||
+    (d.split ?? '') !== ''
+  );
 }
 
 /** 入れるたびに残す。何も入れていなければ残さない。 */

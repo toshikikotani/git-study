@@ -257,6 +257,7 @@ function DaySection({
                   shares: splitShares(t),
                   scheduled: t.status === 'scheduled',
                   special: t.kind === 'special',
+                  refund: t.kind === 'refund',
                 }}
               />
             </div>

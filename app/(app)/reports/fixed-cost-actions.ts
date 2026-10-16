@@ -54,3 +54,32 @@ export async function unconfirmFixedCostAction(
   revalidatePath('/reports');
   return { error: null };
 }
+
+/**
+ * 記録するの「固定費にする」(ADR-102)。その記録だけを固定費にする(must_pay)。同じ店・同じ額の支払いを
+ * 固定費と覚えておく(固定費の確認)が、カテゴリ全体は固定費にしない。以前は confirmFixedCostAction で
+ * カテゴリごと固定費(予測を止める)にしていたため、1件の記録のつもりが、そのカテゴリの支出がすべて
+ * 「最近の支出の勢い」などから外れていた。
+ */
+export async function markRecordFixedAction(
+  transactionIds: readonly string[],
+  subscriptionKey: string,
+): Promise<{ error: string | null }> {
+  try {
+    await confirmFixedCost(subscriptionKey);
+    if (transactionIds.length > 0) {
+      const supabase = await createClient();
+      const { error } = await supabase
+        .from('transactions')
+        .update({ must_pay: true })
+        .in('id', [...transactionIds]);
+      if (error) return { error: '固定費にできませんでした。' };
+    }
+  } catch (error) {
+    return {
+      error: error instanceof FixedCostStoreError ? error.message : '固定費にできませんでした。',
+    };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}

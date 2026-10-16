@@ -22,7 +22,10 @@ vi.mock('../../app/(app)/transactions/actions', () => ({
 vi.mock('../../app/(app)/transactions/new/actions', () => ({
   fetchQuickEntryGenresAction: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({ confirmFixedCostAction: vi.fn() }));
+vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({
+  confirmFixedCostAction: vi.fn(),
+  markRecordFixedAction: vi.fn(),
+}));
 
 import { CategorySheetBody } from '../../app/(app)/category-sheet';
 import { RecordSheet } from '../../app/(app)/record-sheet';
@@ -98,16 +101,14 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
 });
 
 describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
-  const html = visible(
-    renderToString(
-      h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {}, canStream: true }),
-    ),
-  );
+  const html = visible(renderToString(h(RecordSheet, { onClose: () => {}, onFiles: () => {} })));
 
   it('できるのは 記録する・カテゴリを足す・固定費にする の3つだけ', () => {
     expect(html).toContain('支出');
     expect(html).toContain('収入');
-    expect(html).toContain('レシートで入力');
+    // 画像から入力(レシートの写真でもスクショでもよい、ADR-100)
+    expect(html).toContain('画像から入力');
+    expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
     expect(html).toContain('固定費にする');
@@ -127,9 +128,7 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
       renderToString(
         h(RecordSheet, {
           onClose: () => {},
-          onCamera: () => {},
           onFiles: () => {},
-          canStream: true,
           initialDate: '2026-10-14',
           initialKind: 'income',
         }),
@@ -141,9 +140,7 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
   });
 
   it('レシート名を入れられる。空ならカテゴリ名で記録する(ADR-092)', () => {
-    const raw = renderToString(
-      h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {}, canStream: true }),
-    );
+    const raw = renderToString(h(RecordSheet, { onClose: () => {}, onFiles: () => {} }));
     expect(html).toContain('レシート名');
     expect(raw).toContain('placeholder="店名など（任意）"');
     expect(raw).toContain('maxLength="60"');
@@ -155,9 +152,7 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     renderToString(
       h(RecordSheet, {
         onClose: () => {},
-        onCamera: () => {},
         onFiles: () => {},
-        canStream: true,
         ...props,
       }),
     );
@@ -193,6 +188,13 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     expect(visible(raw)).toContain('保存できませんでした。');
   });
 
+  it('画像から入力は、カメラを決め打ちせず画像を選ばせる(写真を撮る / 写真ライブラリのどちらでも)', () => {
+    const raw = sheet();
+    const input = raw.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? '';
+    expect(input).toContain('accept="image/*"');
+    expect(input).not.toContain('capture');
+  });
+
   it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {
     const raw = sheet();
     expect(raw.match(/autoComplete="off"/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
@@ -203,5 +205,45 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     const save = raw.match(/<button[^>]*>保存<\/button>/)?.[0] ?? '';
     expect(save).not.toBe('');
     expect(save).not.toContain('disabled');
+  });
+});
+
+describe('記録を直す:記録すると同じ画面(ADR-101)', () => {
+  const raw = renderToString(
+    h(RecordSheet, {
+      onClose: () => {},
+      onFiles: () => {},
+      edit: {
+        initial: {
+          kind: 'expense',
+          amountYen: 6000,
+          genreId: null,
+          date: '2026-10-23',
+          name: 'ハンブレッターズ',
+          memo: '',
+        },
+        onSave: () => {},
+        footer: h('p', null, 'レシートの品目'),
+      },
+    }),
+  );
+  const text = visible(raw);
+
+  it('題は「記録を直す」で、直す前の値から始める', () => {
+    expect(text).toContain('記録を直す');
+    expect(raw).toContain('value="6,000"');
+    expect(raw).toContain('value="ハンブレッターズ"');
+    expect(text).toContain('10月23日');
+  });
+
+  it('画像から入力・固定費・下書きの案内は出さず、下にレシートの品目を出す', () => {
+    expect(text).not.toContain('画像から入力');
+    expect(text).not.toContain('固定費にする');
+    expect(text).not.toContain('前に入れかけた内容を戻しました');
+    expect(text).toContain('レシートの品目');
+  });
+
+  it('割り勘でもらった額を入れられる(記録するでも同じ)', () => {
+    expect(text).toContain('割り勘でもらった額');
   });
 });

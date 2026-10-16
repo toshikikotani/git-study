@@ -1,9 +1,9 @@
-import { CaptureScreenshotForm } from './capture-screenshot-form';
+import { redirect } from 'next/navigation';
 
 /**
- * 「スクショから記録」(N3)。決済アプリ・通販の注文完了・カード利用通知の
- * スクリーンショットから取引の候補を作る。
+ * 旧「スクショから記録」。スクショはレシートの写真と同じく、記録するの「画像から入力」で読み取る
+ * ようにした(ADR-100)ので、明細へ移って記録するを開く。
  */
 export default function CaptureScreenshotPage() {
-  return <CaptureScreenshotForm />;
+  redirect('/spending?record=1');
 }

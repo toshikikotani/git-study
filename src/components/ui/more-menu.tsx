@@ -17,11 +17,6 @@ const GROUPS = [
         label: '話して・文字で記録',
         dek: '声や文章から明細にする',
       },
-      {
-        href: '/transactions/capture-screenshot',
-        label: 'スクショから記録',
-        dek: '決済画面のスクリーンショットから',
-      },
       { href: '/transactions/import', label: 'CSVを取り込む', dek: '銀行・カードの明細をまとめて' },
       {
         href: '/transactions/paste',

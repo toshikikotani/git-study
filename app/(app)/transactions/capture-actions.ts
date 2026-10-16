@@ -2,23 +2,14 @@
 
 /**
  * N3(AIによる入力)の抽出 Server Action。保存自体は既存の
- * saveImportBatchAction(actions.ts)をそのまま使う——ここでは
- * 「文章・画像 → 候補」の変換と、スクショの重複チェックだけを担う。
+ * saveImportBatchAction(actions.ts)をそのまま使う——ここでは「文章 → 候補」の変換だけを担う。
+ * スクショは記録するの「画像から入力」でレシートと同じ読み取りに乗せた(ADR-100)。
  */
 
 import {
   ClaudeNaturalTextCaptureAnalyzer,
   type NaturalTextCandidate,
 } from '@/features/import/natural-text-ai';
-import {
-  ClaudeScreenshotCaptureAnalyzer,
-  type ScreenshotCandidate,
-  type ScreenshotMediaType,
-} from '@/features/import/screenshot-ai';
-import {
-  findPossibleDuplicate,
-  type PossibleDuplicate,
-} from '@/features/transactions/duplicate-check';
 import { listGenres } from '@/features/genre/store';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { readAnthropicApiKey } from '@/lib/env';
@@ -47,42 +38,6 @@ export async function extractFromTextAction(
     };
   }
   return { candidates: outcome.candidates, warnings: outcome.warnings, error: null };
-}
-
-export type ScreenshotCandidateWithDuplicate = ScreenshotCandidate & {
-  possibleDuplicate: PossibleDuplicate | null;
-};
-
-export async function extractFromScreenshotAction(
-  imageBase64: string,
-  mediaType: ScreenshotMediaType,
-): Promise<CaptureActionResult<ScreenshotCandidateWithDuplicate>> {
-  const apiKey = readAnthropicApiKey();
-  if (apiKey === null) {
-    return { candidates: [], warnings: [], error: apiKeyMissingMessage('スクショから記録') };
-  }
-  const genres = await listGenres();
-  const outcome = await new ClaudeScreenshotCaptureAnalyzer(apiKey).extract({
-    imageBase64,
-    mediaType,
-    today: todayJst(),
-    genreNames: genres.map((g) => g.name),
-  });
-  if (outcome.candidates === null) {
-    return {
-      candidates: [],
-      warnings: outcome.warnings,
-      error: outcome.warnings[0] ?? 'AIの呼び出しに失敗しました。',
-    };
-  }
-
-  const withDuplicates = await Promise.all(
-    outcome.candidates.map(async (c) => ({
-      ...c,
-      possibleDuplicate: await findPossibleDuplicate(c.occurredOn, c.amountYen),
-    })),
-  );
-  return { candidates: withDuplicates, warnings: outcome.warnings, error: null };
 }
 
 export type GenreNameOption = { id: string; name: string };
