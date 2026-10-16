@@ -34,7 +34,6 @@ vi.mock('next/navigation', () => ({
 import { ActiveFilterChips, FilterSheet } from '../../app/(app)/spending/filter-sheet';
 import { LedgerList } from '../../app/(app)/spending/ledger-list';
 import { SpendingMonthProvider } from '../../app/(app)/spending/spending-month-provider';
-import { ViewSwitch } from '../../app/(app)/spending/view-switch';
 import { ManualEntryForm } from '../../app/(app)/transactions/manual-entry-form';
 import { emptyManualValues } from '@/domain/receipt-capture';
 import { buildLedgerViews } from '@/features/spending/views';
@@ -128,17 +127,6 @@ describe('H フィルター(ボトムシート)', () => {
   it('横スクロールのチップ行(口座・カテゴリ・期間のセレクト)はなくなった', () => {
     const html = render({}, [h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 })]);
     expect(html).not.toContain('口座で絞り込む');
-    expect(html).toContain('明細を検索');
-  });
-});
-
-describe('H 概要/明細の切り替え', () => {
-  it('概要・明細の2つのタブが、44pt以上で出る', () => {
-    const html = visible(renderToString(h(ViewSwitch)));
-    expect(html).toContain('概要');
-    expect(html).toContain('明細');
-    expect(html).toContain('role="tablist"');
-    expect((html.match(/min-h-11/g) ?? []).length).toBe(2);
   });
 });
 

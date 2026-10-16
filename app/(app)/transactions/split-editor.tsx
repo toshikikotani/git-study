@@ -565,15 +565,18 @@ export function TransactionRowWithSplit({
               // 未分類は「?」やグレーではなく、点線の空の丸。ジャンルは行の中のチップで選ぶ。
               <span
                 aria-hidden
-                className="size-8 shrink-0 rounded-full border border-dashed"
+                className="size-9 shrink-0 rounded-full border border-dashed"
                 style={{ borderColor: 'var(--ink-muted)' }}
               />
             ) : (
-              <GenreBadge name={transaction.genreName} />
+              <GenreBadge name={transaction.genreName} size={36} />
             )}
             <div className="min-w-0 flex-1">
               {/* 1行目:正規化した店名(切れないように折り返す) */}
-              <p className="text-sm leading-snug break-words" style={{ color: 'var(--ink)' }}>
+              <p
+                className="text-[16px] leading-snug font-medium break-words"
+                style={{ color: 'var(--ink)' }}
+              >
                 {display?.name ?? transaction.description}
                 {risky && methodLabel ? (
                   <span
@@ -586,7 +589,7 @@ export function TransactionRowWithSplit({
               </p>
               {/* 2行目:支店名と品目のプレビュー(分割は品目の羅列ではなく比率の細いバー) */}
               {subtitle !== '' ? (
-                <p className="mt-1 truncate text-xs" style={{ color: 'var(--ink-muted)' }}>
+                <p className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                   {subtitle}
                 </p>
               ) : null}
@@ -629,7 +632,8 @@ export function TransactionRowWithSplit({
 
             <LedgerAmount
               amountYen={isIncome ? targetAbsYen : -targetAbsYen}
-              className="shrink-0 text-sm font-semibold"
+              className={`shrink-0 text-[16px] ${display?.scheduled ? 'font-normal' : 'font-semibold'}`}
+              muted={display?.scheduled ?? false}
             />
           </button>
           {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
@@ -639,9 +643,9 @@ export function TransactionRowWithSplit({
               aria-label="レシート画像を見る"
               onClick={() => setViewerOpen(true)}
               className="flex size-11 shrink-0 items-center justify-center rounded-full"
-              style={{ color: 'var(--ink-muted)' }}
+              style={{ color: 'var(--ideal)' }}
             >
-              <MdReceiptLong aria-hidden size={20} />
+              <MdReceiptLong aria-hidden size={16} />
             </button>
           ) : null}
         </div>

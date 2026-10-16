@@ -1,126 +1,86 @@
+import type { Route } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-import { CategoryTrendChart } from './category-trend-chart';
-import { VerificationCard } from './verification-card';
-import { loadForecast } from '@/features/forecast/load';
-import { addDays, addMonths } from '@/lib/date';
-import { FixedVariableCard } from './fixed-variable-card';
-import { MerchantRankingCard } from './merchant-ranking-card';
-import { MonthSummaryRow } from './month-summary-row';
-import { NetWorthChart } from './net-worth-chart';
-import { PurposeBalanceCard } from './purpose-balance-card';
-import { hasIncome } from '@/domain/summary-rules';
-import {
-  loadAccountBalanceByPurpose,
-  loadCategorySpendingTrend,
-  loadMerchantSpendingRanking,
-} from '@/features/reports/store';
-import { loadNetWorthTrend } from '@/features/net-worth/store';
-import { loadMonthlyLedger } from '@/features/spending/store';
-import {
-  listConfirmedFixedCostKeys,
-  loadFixedVariableSplit,
-} from '@/features/subscriptions/fixed-cost-store';
-import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
-import { withMinDuration } from '@/lib/min-loading-duration';
+import { ChevronRightIcon } from '@/components/ui/nav-icons';
+import { GenreBreakdown } from '../spending/genre-breakdown';
+import { loadSpendingMonthData } from '../spending/month-data';
+import { PeriodSwitcher } from '../spending/period-switcher';
+import { SpendingMonthProvider } from '../spending/spending-month-provider';
+import { AnalysisSummary } from './analysis-summary';
+import { frequencyPoints, frequencySummary } from './frequency';
+import { WeekdayHabit } from './weekday-habit';
+import { YearFlowCard } from './year-flow-card';
 
 /**
- * レポート(振り返り)。着地の見込み・カテゴリごとの見込み・なぜ・AIの分析は「予算」へ移した(ADR-088)。
- * カテゴリの割合・回数と1回の金額・1年の流れは「家計簿」へ移した(ADR-089)。
- * ここには、今月の収支・固定費の確認・カテゴリの推移・お店・資産・予測の検証を置く。
+ * 分析(デザイン仕様書の「分析」、ADR-090):月の切り替え → 支出・収入・貯蓄率 → カテゴリ →
+ * 曜日のくせ → 1年の流れ → 回数と1回の金額・月ごとの表・AIレポート。
+ * 着地の見込みは「見通し」、そのほかの分析(固定費の候補・お店・資産・予測の当たり具合)は
+ * 「…」の「そのほかの分析」へ。
  */
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 export default async function ReportsPage() {
-  const [
-    trend,
-    netWorthPoints,
-    merchantRanking,
-    purposeBalances,
-    ledger,
-    fixedVariable,
-    subscriptionCandidates,
-    confirmedKeys,
-  ] = await withMinDuration(
-    Promise.all([
-      loadCategorySpendingTrend(),
-      loadNetWorthTrend().catch(() => []),
-      loadMerchantSpendingRanking(),
-      loadAccountBalanceByPurpose(),
-      loadMonthlyLedger(),
-      loadFixedVariableSplit(),
-      loadDetectedSubscriptions(),
-      listConfirmedFixedCostKeys(),
-    ]),
-  );
-  const monthPeriod = {
-    from: ledger.period.from,
-    to: addDays(addMonths(ledger.period.from, 1), -1),
-  };
-  // 今月の収支の見込みと、予測の当たり具合(検証)だけは今月の予測から出す。
-  const outcome = await loadForecast({ period: monthPeriod }).catch((error: unknown) => {
-    console.error('[reports] 今月の予測を読み込めませんでした', error);
-    return null;
-  });
+  const data = await loadSpendingMonthData();
+  const summary = frequencySummary(frequencyPoints(data.ledger.transactions));
 
   return (
-    <div className="rise space-y-4">
-      <header className="space-y-1 px-1">
-        <h1
-          className="text-[34px] leading-none font-bold tracking-[-0.03em]"
-          style={{ color: 'var(--ink)' }}
-        >
-          レポート
-        </h1>
-        <Link
-          href="/plan"
-          className="inline-flex min-h-11 items-center text-sm font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          着地の見込みとカテゴリごとの様子は「予算」へ
-        </Link>
-      </header>
-
-      <MonthSummaryRow
-        spentYen={ledger.totalSpentYen}
-        incomeYen={ledger.totalIncomeYen}
-        incomeRegistered={hasIncome(ledger.totalIncomeYen)}
-        balance={outcome?.forecast.balance ?? null}
-      />
-
-      <FixedVariableCard
-        fixedYen={fixedVariable.fixedYen}
-        variableYen={fixedVariable.variableYen}
-        candidates={subscriptionCandidates}
-        confirmedKeys={[...confirmedKeys]}
-      />
-
-      {trend.categories.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
-          直近6ヶ月に支出の記録がありません。
-        </p>
-      ) : (
-        <CategoryTrendChart trend={trend} />
-      )}
-
-      <Link
-        href="/reports/genres"
-        className="flex min-h-11 items-center text-xs font-medium"
-        style={{ color: 'var(--accent)' }}
+    <div className="rise flex flex-col gap-4">
+      <SpendingMonthProvider
+        today={data.ledger.period.to}
+        currentMonthStart={data.ledger.period.from}
+        currentTransactions={data.transactions}
+        currentGenreBreakdown={data.ledger.genreBreakdown}
+        currentTotals={data.ledger.totals}
+        genres={data.genres}
+        accounts={data.accounts}
+        captures={data.captures}
       >
-        AIによる客観的なカテゴリで見る →
-      </Link>
-
-      <MerchantRankingCard ranking={merchantRanking} />
-
-      <NetWorthChart points={netWorthPoints} />
-
-      <PurposeBalanceCard balances={purposeBalances} />
-
-      {outcome ? (
-        <VerificationCard verification={outcome.verification} monthStart={ledger.period.from} />
-      ) : null}
+        <PeriodSwitcher title="分析" />
+        <AnalysisSummary />
+        <GenreBreakdown />
+        <WeekdayHabit />
+      </SpendingMonthProvider>
+      <Suspense fallback={null}>
+        <YearFlowCard />
+      </Suspense>
+      <nav
+        aria-label="ほかの分析"
+        className="overflow-hidden rounded-2xl"
+        style={{ background: 'var(--surface)' }}
+      >
+        <Row href="/reports/frequency" title="回数と1回の金額" sub={summary} />
+        <Divider />
+        <Row href="/reports/monthly" title="月ごとの表" />
+        <Divider />
+        <Row href="/reports/ai" title="日次・月次のAIレポート" />
+      </nav>
     </div>
+  );
+}
+
+function Divider() {
+  return <div className="ml-4 h-px" style={{ background: 'var(--hairline)' }} />;
+}
+
+function Row({ href, title, sub }: { href: string; title: string; sub?: string | null }) {
+  return (
+    <Link
+      href={href as Route}
+      className="flex min-h-14 items-center gap-3 px-4"
+      style={{ color: 'var(--ink)' }}
+    >
+      <span className="flex min-w-0 flex-1 flex-col py-2">
+        <span className="text-[16px]">{title}</span>
+        {sub ? (
+          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            {sub}
+          </span>
+        ) : null}
+      </span>
+      <span style={{ color: 'var(--ideal)' }}>
+        <ChevronRightIcon />
+      </span>
+    </Link>
   );
 }

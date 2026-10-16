@@ -28,7 +28,8 @@ import { GenreBreakdown } from '../../app/(app)/spending/genre-breakdown';
 import { LedgerList } from '../../app/(app)/spending/ledger-list';
 import { PeriodSwitcher } from '../../app/(app)/spending/period-switcher';
 import { SpendingMonthProvider } from '../../app/(app)/spending/spending-month-provider';
-import { SummaryCard } from '../../app/(app)/spending/summary-card';
+import { LedgerSearch } from '../../app/(app)/spending/ledger-list';
+import { MonthSummary } from '../../app/(app)/spending/month-summary';
 import { budgetSpokenLabel } from '@/domain/budget-state';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { buildLedgerViews } from '@/features/spending/views';
@@ -118,46 +119,39 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
         accounts: [{ id: 'a', name: '現金' }],
         children: [
           h(PeriodSwitcher, { key: 'p' }),
-          h(SummaryCard, {
-            key: 's',
-            pace: { kind: 'since_start', days: 9 },
-            forecast: { projectedTotalYen: null, totalBudgetYen: null },
-            hasIncomeRegistered: false,
-            goal: null,
-          }),
+          h(MonthSummary, { key: 's' }),
+          h(LedgerSearch, { key: 'q' }),
+          h(CalendarHeatmap, { key: 'c' }),
           h(AttentionCard, { key: 'at', hasGoal: true }),
-          h(GenreBreakdown, { key: 'g', goalRows: null }),
-          h(CalendarHeatmap, { key: 'c', goal: null }),
           h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
+          h(GenreBreakdown, { key: 'g' }),
         ],
       }),
     ),
   );
 
-  it('上から 期間切り替え → サマリー → 要確認 → 内訳 → カレンダー → 明細 の順に並ぶ', () => {
-    const order = [
-      '表示する月',
-      '使った額のサマリー',
-      '要確認',
-      'カテゴリ別の内訳',
-      'カレンダー',
-      '明細',
-    ].map((k) => html.indexOf(`aria-label="${k}`));
+  it('上から 月の切り替え → 合計 → 検索 → カレンダー → 要確認 → 明細 の順に並ぶ(デザイン仕様書)', () => {
+    const order = ['表示する月', 'この月の合計', '明細を検索', 'カレンダー', '要確認', '明細'].map(
+      // 要確認は件数つきの読み上げ(「要確認 1件。…」)なので前方一致
+      (k) => html.indexOf(k === '要確認' ? `aria-label="${k}` : `aria-label="${k}"`),
+    );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
   });
 
-  it('前月データが無いときは「記録開始からN日」、収入未登録は「手取りを入れる」で、赤字の差額は出ない', () => {
-    expect(html).toContain('記録開始から9日');
-    expect(html).toContain('手取りを入れる');
-    expect(html).toContain('href="/transactions/new?type=income"');
-    expect(html).not.toContain('先月の29日時点');
-    expect(html).not.toMatch(/円 (多い|少ない)/);
-    expect(html).not.toContain('このペースが続くと');
+  it('合計は 支出・収入・差額 の3列', () => {
+    expect(html).toContain('支出');
+    expect(html).toContain('収入');
+    expect(html).toContain('差額');
+  });
+
+  it('カテゴリはドーナツと、名前・金額・割合の行', () => {
+    expect(html).toContain('9月の支出');
+    expect(html).toMatch(/外食[\s\S]{0,200}%/);
   });
 
   it('予定は「予定」セクション、使った額に入らない。要確認に未分類が出る', () => {
-    expect(html).toContain('予定');
+    expect(html).toContain('予定 · 使った額には入りません');
     expect(html).toContain('3,400円'); // 使った額(3,000 + 400)。26,540円は入らない
     expect(html).not.toContain('29,940円');
     expect(html).toContain('未分類 1件');
@@ -210,8 +204,8 @@ describe('F4 明細の行', () => {
     expect(html).not.toContain('<img');
   });
 
-  it('見出し右側の「口座・突き合わせ・取り込む」は1つの「…」メニューにまとまっている', () => {
-    expect(html).toContain('明細のメニュー');
+  it('明細には「…」メニューを置かない(取り込む・突き合わせ・口座は今日の「…」から、ADR-090)', () => {
+    expect(html).not.toContain('明細のメニュー');
     expect(html).not.toContain('突き合わせ');
   });
 });
@@ -239,7 +233,7 @@ describe('カテゴリ行(目標画面と共通)', () => {
 });
 
 describe('F5 カレンダー', () => {
-  const render = (date: string | null, goal: boolean) =>
+  const render = (date: string | null) =>
     visible(
       renderToString(
         h(SpendingMonthProvider, {
@@ -255,70 +249,50 @@ describe('F5 カレンダー', () => {
           accounts: [{ id: 'a', name: '現金' }],
           initialFilter: date !== null ? { date } : {},
           children: [
-            h(CalendarHeatmap, {
-              key: 'c',
-              goal: goal
-                ? {
-                    range: { from: '2026-09-25', to: '2026-10-05' },
-                    dailyAllowanceYen: 2300,
-                  }
-                : null,
-            }),
+            h(CalendarHeatmap, { key: 'c' }),
             h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
           ],
         }),
       ),
     );
 
-  it('凡例は「少〜多」の1行だけで、目標期間の凡例(●余裕 ▲注意 !超過)は無い', () => {
-    const html = render(null, true);
-    expect(html).toContain('少');
-    expect(html).not.toContain('下の帯=目標期間');
-    expect(html).not.toContain('●余裕');
+  it('凡例は「点が濃いほど多い」と「予定あり」(デザイン仕様書)', () => {
+    const html = render(null);
+    expect(html).toContain('点が濃いほど多い');
+    expect(html).toContain('予定あり');
+    expect(html).toContain('9月27日〜10月3日');
+    expect(html).toContain('月で見る');
   });
 
-  it('目標期間は週の行の背後に帯として描かれる', () => {
-    expect(render(null, true)).toContain('data-goal-band');
-    expect(render(null, false)).not.toContain('data-goal-band');
-  });
-
-  it('状態の印は注意・超過の日だけ(余裕の日に ● は付かない)', () => {
-    const html = render(null, true);
-    expect(html).not.toContain('●');
-  });
-
-  it('予定のある日にはカレンダーのマークが付く', () => {
-    expect(render(null, false)).toContain('data-scheduled-mark');
+  it('予定のある日には輪の点が付く', () => {
+    expect(render(null)).toContain('data-scheduled-mark');
   });
 
   it('日付で絞り込み中は「9/29で絞り込み中 ×」のチップが出る', () => {
-    expect(render('2026-09-29', false)).toContain('9/29で絞り込み中');
-    expect(render(null, false)).not.toContain('で絞り込み中');
+    expect(render('2026-09-29')).toContain('9/29で絞り込み中');
+    expect(render(null)).not.toContain('で絞り込み中');
   });
 });
 
-describe('カテゴリ内訳と、カテゴリの月の目安', () => {
-  const render = (goalActive: boolean) =>
-    visible(
-      renderToString(
-        h(SpendingMonthProvider, {
-          today: '2026-09-29',
-          currentMonthStart: '2026-09-01',
-          currentTransactions: txs,
-          currentGenreBreakdown: views.genreBreakdown,
-          currentTotals: views.totals,
-          genres,
-          accounts: [{ id: 'a', name: '現金' }],
-          children: h(GenreBreakdown, { goalRows: null, goalActive }),
-        }),
-      ),
-    );
+describe('分析のカテゴリ(デザイン仕様書)', () => {
+  const html = visible(
+    renderToString(
+      h(SpendingMonthProvider, {
+        today: '2026-09-29',
+        currentMonthStart: '2026-09-01',
+        currentTransactions: txs,
+        currentGenreBreakdown: views.genreBreakdown,
+        currentTotals: views.totals,
+        genres,
+        accounts: [{ id: 'a', name: '現金' }],
+        children: h(GenreBreakdown),
+      }),
+    ),
+  );
 
-  it('目標が無いときは、月の目安を「使った額 / 目安」で出す', () => {
-    expect(render(false)).toContain(' / 8,000円');
-  });
-
-  it('目標の期間中は、月の目安を出さない(目標額と食い違わせない)', () => {
-    expect(render(true)).not.toContain('8,000円');
+  it('行は色の点・名前・金額・割合だけで、月の目安(使った額 / 目安)は出さない', () => {
+    expect(html).toContain('カテゴリ');
+    expect(html).not.toContain(' / 8,000円');
+    expect(html).toMatch(/\d+%/);
   });
 });

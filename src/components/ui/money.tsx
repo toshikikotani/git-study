@@ -33,16 +33,19 @@ export function YenText({ text }: { text: string }) {
 export function LedgerAmount({
   amountYen,
   className,
+  muted = false,
 }: {
   /** 支出が負、収入が正(ADR-008)。 */
   amountYen: number;
   className?: string;
+  /** 予定(まだ使った額に入らない)は灰色。 */
+  muted?: boolean;
 }) {
   const income = amountYen > 0;
   return (
     <span
       className={`tabular ${className ?? ''}`}
-      style={{ color: income ? 'var(--income)' : 'var(--ink)' }}
+      style={{ color: muted ? 'var(--ink-muted)' : income ? 'var(--income)' : 'var(--ink)' }}
     >
       {income ? '+' : ''}
       <Yen value={Math.abs(amountYen)} />

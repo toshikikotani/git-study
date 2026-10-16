@@ -123,14 +123,31 @@ async function render(
 }
 
 describe('主要ページがサーバー描画でエラーにならない(Supabase を代用)', () => {
-  it('レポート(振り返り)', async () => {
+  it('分析(デザイン仕様書、ADR-090)', async () => {
     const html = (await render(() => import('../../../app/(app)/reports/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('レポート');
-    // 着地の見込みは「予算」へ移した(ADR-088)。
-    expect(html).toContain('href="/plan"');
+    expect(html).toContain('分析');
+    expect(html).toContain('貯蓄率');
+    expect(html).toContain('href="/reports/frequency"');
+    expect(html).toContain('href="/reports/monthly"');
+    expect(html).toContain('href="/reports/ai"');
+  }, 60000);
+
+  it('そのほかの分析', async () => {
+    const html = (await render(() => import('../../../app/(app)/reports/more/page'))).replace(
+      /<!-- -->/g,
+      '',
+    );
+    expect(html).toContain('そのほかの分析');
+  }, 60000);
+
+  it('月ごとの表・回数と1回の金額', async () => {
+    const monthly = await render(() => import('../../../app/(app)/reports/monthly/page'));
+    expect(monthly).toContain('月ごとの表');
+    const frequency = await render(() => import('../../../app/(app)/reports/frequency/page'));
+    expect(frequency).toContain('回数と1回の金額');
   }, 60000);
 
   it('見通し(デザイン仕様書、ADR-090)', async () => {

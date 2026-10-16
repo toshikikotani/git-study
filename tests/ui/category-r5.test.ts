@@ -154,10 +154,10 @@ describe('R5 角丸は入れ子の関係を保つ(外側 = 内側 + 余白)', ()
     expect(card).toBe(inner + unit);
   });
 
-  it('セグメントの溝(内側の角丸)の中の選択面は、溝の角丸 − 溝の余白(4px)', () => {
+  it('セグメントの溝(角丸10・余白2)の中の選択面は、角丸8(デザイン仕様書、ADR-090)', () => {
     const seg = readFileSync('src/components/ui/segmented.tsx', 'utf8');
-    expect(seg).toContain('p-1');
-    expect(seg).toContain('calc(var(--radius-inner) - 4px)');
+    expect(seg).toContain('borderRadius: 10, padding: 2');
+    expect(seg).toContain('borderRadius: 8');
   });
 });
 

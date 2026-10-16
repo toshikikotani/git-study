@@ -17,6 +17,7 @@ const GROUPS = [
         label: '明細を手で登録する',
         dek: '現金払いなど、取り込みに乗らない明細を1件だけ記録',
       },
+      { href: '/transactions/import', label: 'CSVを取り込む', dek: '銀行・カードの明細をまとめて' },
       {
         href: '/transactions/paste',
         label: 'メールを貼り付ける',
@@ -49,7 +50,11 @@ const GROUPS = [
   {
     title: '振り返る',
     items: [
-      { href: '/reports', label: 'レポート' },
+      {
+        href: '/reports/more',
+        label: 'そのほかの分析',
+        dek: '固定費の候補・お店・資産・予測の当たり具合',
+      },
       { href: '/reports/ai', label: 'AIレポート', dek: '日次・月次の気づき・アドバイス' },
       { href: '/reports/genres', label: 'カテゴリ分析', dek: 'AIによる客観的な支出の分類' },
       { href: '/briefs', label: '朝配信', ownerOnly: true },

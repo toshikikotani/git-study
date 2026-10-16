@@ -28,7 +28,7 @@ import { useSpendingMonth } from './spending-month-provider';
  * 目標のジャンル別の実績に入らないため)。
  */
 export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
-  const { transactions, today, reloadVisibleMonth, captures, visibleMonth } = useSpendingMonth();
+  const { transactions, today, reloadVisibleMonth, visibleMonth } = useSpendingMonth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -47,84 +47,67 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
     return items;
   }, [attention, transactions]);
 
-  if (queue.length === 0 && captures.length === 0) return null;
+  if (queue.length === 0) return null;
 
   return (
     <>
       <div
-        className="glass w-full rounded-2xl p-4"
-        style={{
-          background: 'var(--attention-track)',
-          boxShadow: 'var(--card-shadow)',
-          border: '1px solid var(--state-caution)',
-        }}
+        className="flex flex-col rounded-2xl px-4 py-3"
+        style={{ background: 'var(--surface)', color: 'var(--ink)' }}
       >
-        {queue.length > 0 ? (
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-11 shrink-0 items-center justify-center rounded-[10px]"
+            style={{ background: 'var(--state-caution-track)', color: 'var(--caution-mark)' }}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 4l9 16H3z" />
+              <path d="M12 10v4M12 17v.5" />
+            </svg>
+          </span>
+          <span className="tabular flex min-w-0 flex-1 flex-col">
+            <span className="text-[15px] font-semibold">確認が要る記録 {queue.length}件</span>
+            <span className="text-[13px]" style={{ color: 'var(--state-caution)' }}>
+              {[
+                attention.uncategorized.count > 0
+                  ? `未分類 ${attention.uncategorized.count}件・${formatYen(attention.uncategorized.yen)}${hasGoal ? '(目標に未反映)' : ''}`
+                  : '',
+                attention.mismatch.count > 0
+                  ? `金額不一致 ${attention.mismatch.count}件・差額 ${formatYen(attention.mismatch.yen)}`
+                  : '',
+              ]
+                .filter((t) => t !== '')
+                .join(' / ')}
+            </span>
+          </span>
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="block min-h-11 w-full text-left"
             aria-label={`要確認 ${queue.length}件。タップして順番に直す`}
+            className="min-h-11 shrink-0 rounded-full px-4 text-[14px] font-semibold"
+            style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
           >
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                <span aria-hidden>▲ </span>要確認
-              </p>
-              <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                順番に直す →
-              </span>
-            </div>
-            <ul
-              className="tabular mt-2 space-y-1 text-xs"
-              style={{ color: 'var(--ink-secondary)' }}
-            >
-              {attention.uncategorized.count > 0 ? (
-                <li>
-                  未分類 {attention.uncategorized.count}件・{formatYen(attention.uncategorized.yen)}
-                  {hasGoal ? '(目標に未反映)' : ''}
-                </li>
-              ) : null}
-              {attention.mismatch.count > 0 ? (
-                <li>
-                  金額不一致 {attention.mismatch.count}件・差額 {formatYen(attention.mismatch.yen)}
-                </li>
-              ) : null}
-            </ul>
+            直す
           </button>
-        ) : (
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            <span aria-hidden>▲ </span>要確認
-          </p>
-        )}
+        </div>
         {attention.uncategorized.count > 0 ? (
           <Link
             href={categoryHref('none', visibleMonth) as Route}
             prefetch={false}
-            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
-            style={{ color: 'var(--ink-secondary)' }}
+            className="flex min-h-11 items-center pl-14 text-[13px] font-semibold"
+            style={{ color: 'var(--accent)' }}
           >
-            <span>未分類の明細を一覧で分類する</span>
-            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
-              開く →
-            </span>
-          </Link>
-        ) : null}
-        {captures.length > 0 ? (
-          <Link
-            href={`/transactions/receipt/${captures[0]!.id}` as Route}
-            prefetch={false}
-            className="mt-1 flex min-h-11 items-center justify-between gap-3 text-xs"
-            style={{ color: 'var(--ink-secondary)' }}
-          >
-            <span className="tabular flex flex-col">
-              <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                入力待ちのレシートが{captures.length}件あります
-              </span>
-              <span>入力すると、集計{hasGoal ? 'と予算の見込み' : ''}に入ります</span>
-            </span>
-            <span className="shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
-              入力する →
-            </span>
+            未分類の明細を一覧で分ける
           </Link>
         ) : null}
       </div>

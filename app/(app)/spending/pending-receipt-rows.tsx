@@ -36,15 +36,7 @@ export function PendingReceiptRows() {
   if (shownJobs.length === 0 && captures.length === 0) return null;
 
   return (
-    <ul
-      aria-label="読み取り中・入力待ちのレシート"
-      className="glass divider-list overflow-hidden rounded-2xl"
-      style={{
-        background: 'var(--surface)',
-        boxShadow: 'var(--card-shadow)',
-        borderColor: 'var(--hairline)',
-      }}
-    >
+    <ul aria-label="読み取り中・入力待ちのレシート" className="flex flex-col gap-2">
       {captures.map((c) => (
         <CaptureRow key={c.id} capture={c} />
       ))}
@@ -55,14 +47,45 @@ export function PendingReceiptRows() {
   );
 }
 
-const ROW = 'flex min-h-14 items-center gap-3 px-4 py-3';
+const ROW = 'flex min-h-14 w-full items-center gap-3 rounded-2xl px-4 py-3';
+const ROW_STYLE = { background: 'var(--surface)', color: 'var(--ink)' } as const;
 
 function Thumb({ src }: { src: string | null }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" className="size-10 rounded-lg object-cover" />
+    <img src={src} alt="" className="h-13 w-11 shrink-0 rounded-lg object-cover" />
   ) : (
-    <span aria-hidden className="size-10 rounded-lg" style={{ background: 'var(--hairline)' }} />
+    <span
+      aria-hidden
+      className="flex h-13 w-11 shrink-0 items-center justify-center rounded-lg"
+      style={{ background: 'var(--note)', color: 'var(--ideal)' }}
+    >
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+        <path d="M9 8h6M9 12h6M9 16h3" />
+      </svg>
+    </span>
+  );
+}
+
+/** 右の小さな丸いボタン(「入力」「確認」)。 */
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="flex min-h-9 shrink-0 items-center rounded-full px-4 text-[14px] font-semibold"
+      style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -74,29 +97,20 @@ function CaptureRow({ capture }: { capture: CaptureView }) {
       <Link
         href={`/transactions/receipt/${capture.id}` as Route}
         prefetch={false}
-        className={`min-h-11 inline-flex items-center ${ROW}`}
+        className={`min-h-11 ${ROW}`}
+        style={ROW_STYLE}
         aria-label={`入力待ちのレシート、${Number(m)}月${Number(d)}日に撮影。タップして入力する`}
       >
         <Thumb src={capture.imageUrl} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm" style={{ color: 'var(--ink)' }}>
-            入力待ち
-            <span
-              className="ml-2 rounded-full px-2 py-1 text-xs font-semibold"
-              style={{ background: 'var(--attention-track)', color: 'var(--ink)' }}
-            >
-              <span aria-hidden>▲ </span>集計に未反映
-            </span>
-          </p>
-          <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="truncate text-[15px] font-semibold">入力待ちのレシート</p>
+          <p className="text-[13px]" style={{ color: 'var(--state-caution)' }}>
             {capture.receiptStatus === 'partial'
-              ? '一部だけ読み取れました。残りを入力してください'
-              : '読み取れませんでした。画像を見て入力できます'}
+              ? '一部だけ読み取れました。まだ集計に入っていません'
+              : 'まだ集計に入っていません'}
           </p>
         </div>
-        <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-          入力する →
-        </span>
+        <Pill>入力</Pill>
       </Link>
     </li>
   );
@@ -110,7 +124,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
       : '/transactions/receipt';
   return (
     <li>
-      <Link href={href} prefetch={false} className={`min-h-11 inline-flex items-center ${ROW}`}>
+      <Link href={href} prefetch={false} className={`min-h-11 ${ROW}`} style={ROW_STYLE}>
         <Thumb src={job.previewUrl} />
         <div className="min-w-0 flex-1">
           {job.status === 'reading' ? (
@@ -125,7 +139,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
             </>
           ) : (
             <>
-              <p className="truncate text-sm" style={{ color: 'var(--ink)' }}>
+              <p className="truncate text-[15px] font-semibold">
                 {job.status === 'ready'
                   ? (job.parsed[0]?.storeName ?? job.parsed[0]?.description ?? 'レシート')
                   : job.status === 'waiting'
@@ -134,7 +148,7 @@ function JobRow({ job }: { job: ReceiptJob }) {
                       ? '入力待ち'
                       : 'レシート'}
               </p>
-              <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
+              <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                 {job.status === 'ready'
                   ? '確認して保存する'
                   : job.status === 'waiting'
@@ -146,13 +160,9 @@ function JobRow({ job }: { job: ReceiptJob }) {
             </>
           )}
         </div>
-        <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-          {job.status === 'reading' || job.status === 'waiting'
-            ? ''
-            : job.status === 'needs_input'
-              ? '入力する →'
-              : '確認 →'}
-        </span>
+        {job.status === 'reading' || job.status === 'waiting' ? null : (
+          <Pill>{job.status === 'needs_input' ? '入力' : '確認'}</Pill>
+        )}
       </Link>
     </li>
   );
