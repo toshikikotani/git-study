@@ -21,6 +21,30 @@ import { MAX_CHANGES_PER_PROPOSAL, type GoalRef, type PlanRef } from './plan';
 
 /** 会話に添える直近の明細の件数。多すぎるとコストが跳ねるため絞る。 */
 export const RECENT_TRANSACTIONS_LIMIT = 40;
+/** そのうち、これからの予定(今日より先)に使う件数の上限と、見る先の日数。 */
+const UPCOMING_LIMIT = 10;
+const UPCOMING_DAYS = 31;
+
+/**
+ * 会話に添える明細を選ぶ(ADR-106)。日付の新しい順に並んだ明細から、今日と今日までの記録を優先し、
+ * これからの予定は31日先までを10件まで入れる。先の予定が多くても、今日の記録が押し出されないように。
+ * 並びは日付の新しい順のまま。
+ */
+export function pickRecentTransactions(
+  transactions: readonly StoredTransaction[],
+  today: string,
+): StoredTransaction[] {
+  const until = new Date(`${today}T00:00:00Z`);
+  until.setUTCDate(until.getUTCDate() + UPCOMING_DAYS);
+  const horizon = until.toISOString().slice(0, 10);
+  const upcoming = transactions
+    .filter((t) => t.occurredOn > today && t.occurredOn <= horizon)
+    .slice(-UPCOMING_LIMIT);
+  const past = transactions
+    .filter((t) => t.occurredOn <= today)
+    .slice(0, RECENT_TRANSACTIONS_LIMIT - upcoming.length);
+  return [...upcoming, ...past];
+}
 
 /** 承認後に実際に反映した結果1件(画面の「変更」バッジ表示用)。 */
 export type AssistantChange = {
@@ -77,6 +101,11 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '  記録の案を作る。登録は必ず確認カードで本人が承認してから(ツールを呼んだ時点では記録されていない)。',
     '  何件かまとめて言われたら、1件ずつ add_transaction を呼ぶ。',
     '- 数字や記録のことを聞かれたら、下の「今の状況」「直近の明細一覧」で答えられるなら、その数字で答える。',
+    '  これらは本人が発言するたびにアプリが明細から計算し直した最新の値。会話の前のほうに出た数字',
+    '  (あなたの前の返事を含む)は古いことがあるので使わず、必ず下の値を使う。',
+    '- 「使っても大丈夫？」「やばい？」には、ホームと同じ「今日使える目安」「今期の見通し」(予算・着地見込み・',
+    '  予算内に収まる確率)「月末に残る見込み」を根拠にする。「今月これまで」の貯金は今日までの収入 − 支出で、',
+    '  月末の見込みではないので、それだけで大丈夫とは言わない。これから使う額は、着地見込みに上乗せして考える。',
     '- 答えられないとき・画面で見るほうが分かりやすいとき・会話ではできない操作(削除など)は、',
     '  show_screen でその画面へのボタンを出し、「ここで見られます」のように案内する。',
     '',
@@ -121,10 +150,10 @@ export function buildAssistantSystemPrompt(context: AssistantChatContext): strin
     '### 直近に立てた支出目標(ジャンルごと)',
     formatPlanLines(context.latestPlan),
     '',
-    `### 直近の明細一覧(最大${RECENT_TRANSACTIONS_LIMIT}件)`,
+    `### 直近の明細一覧(最大${RECENT_TRANSACTIONS_LIMIT}件。今日より先の日付は予定)`,
     formatTransactionContextLines(context.recentTransactions),
     '',
-    '### 今の状況(アプリが計算した正確な数字。これ以外の金額は本人に聞かれても断定しない)',
+    '### 今の状況(この発言を受け取ったときにアプリが計算し直した数字。これ以外の金額は本人に聞かれても断定しない)',
     context.situationText === '' ? '(取得できませんでした)' : context.situationText,
   ].join('\n');
 }

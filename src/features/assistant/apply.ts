@@ -25,7 +25,8 @@ import {
   updateTransactionMemo,
 } from '@/features/transactions/store';
 import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
-import { RECENT_TRANSACTIONS_LIMIT } from './chat-tools';
+import { todayJst } from '@/lib/date';
+import { pickRecentTransactions } from './chat-tools';
 import type { Operation, PlanContext } from './plan';
 
 /** 会話・承認の両方が使う、検証用の現在値をまとめて読む。 */
@@ -40,7 +41,7 @@ export async function loadPlanContext(): Promise<PlanContext> {
   return {
     genres,
     settings,
-    transactions: transactions.slice(0, RECENT_TRANSACTIONS_LIMIT),
+    transactions: pickRecentTransactions(transactions, todayJst()),
     goals: goals.map((g) => ({ id: g.id, title: g.title })),
     latestPlan:
       latestPlan === null
