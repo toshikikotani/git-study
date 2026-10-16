@@ -17,7 +17,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
-import { BudgetIcon, LedgerIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
+import { AnalysisIcon, ListIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
@@ -36,12 +36,12 @@ import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
-// デザインのボトムナビ:今日・予算・家計簿と、右に記録する(＋)。目標と見通しは「予算」1つに(ADR-088)。
-// アイコンの下に名前(色だけで選択中を示さない)。給料日と「その他」はホームの右上へ。
+// デザイン仕様書のボトムナビ(ADR-090):今日・明細・分析と、右に記録する(＋)。
+// 見通しと目標は「今日」から開く。アイコンの下に名前(色だけで選択中を示さない)。
 const NAV = [
   { href: '/', label: '今日', Icon: TodayIcon },
-  { href: '/plan', label: '予算', Icon: BudgetIcon },
-  { href: '/spending', label: '家計簿', Icon: LedgerIcon },
+  { href: '/spending', label: '明細', Icon: ListIcon },
+  { href: '/reports', label: '分析', Icon: AnalysisIcon },
 ] as const;
 
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */
@@ -51,7 +51,9 @@ const MENU_TILE_STYLE: React.CSSProperties = {
 };
 
 function isSameTab(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
+  // 見通し・目標(/plan)は「今日」から開く画面なので、今日のタブを選択中にする。
+  if (href === '/')
+    return pathname === '/' || pathname === '/plan' || pathname.startsWith('/plan/');
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -151,7 +153,7 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
   // 中央のボタンは、押すと記録のしかたを選ぶメニューを開く(カメラ・写真から・手入力)。
   // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じメニュー。
   const fab = (
-    <Fab label="記録する(カメラ・写真・手入力)" onPress={() => setFabMenuOpen(true)}>
+    <Fab label="記録する" size="large" onPress={() => setFabMenuOpen(true)}>
       <PlusIcon />
     </Fab>
   );
@@ -323,7 +325,7 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
       </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
         <nav aria-label="メイン" className="min-w-0 flex-1">
-          <ul className="tabbar-pill liquid-capsule flex items-center gap-1">
+          <ul className="tabbar-pill liquid-capsule flex items-center">
             {NAV.map((item) => {
               const isActive = isSameTab(pathname, item.href);
               return (
@@ -338,14 +340,14 @@ function BottomBar({ onNavigate }: { onNavigate: (href: string) => void }) {
                         scrollToTop();
                       }
                     }}
-                    className="min-h-11 flex flex-col items-center gap-1 py-1"
+                    className="flex min-h-11 flex-col items-center"
                   >
                     <span
-                      className={`label-text liquid-tab text-xs whitespace-nowrap${isActive ? ' is-active' : ''}`}
+                      className={`liquid-tab text-[11px] font-semibold whitespace-nowrap${isActive ? ' is-active' : ''}`}
                       style={{ flexDirection: 'column', gap: 2 }}
                     >
                       <item.Icon />
-                      <span className="font-semibold">{item.label}</span>
+                      {item.label}
                     </span>
                   </Link>
                 </li>

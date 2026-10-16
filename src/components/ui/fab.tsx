@@ -31,6 +31,8 @@ type CommonProps = {
   /** スクリーンリーダー向け。アイコンだけで文字を出さないため必須。 */
   label: string;
   children: React.ReactNode;
+  /** 'large' はボトムナビの記録する(＋、64px。デザイン仕様書、ADR-090)。 */
+  size?: 'regular' | 'large';
 };
 
 type FabAsLink = CommonProps & {
@@ -56,12 +58,13 @@ const SHARED_STYLE: React.CSSProperties = {
   borderRadius: 'var(--radius-full)',
   background: 'var(--action)',
   color: 'var(--on-action)',
-  boxShadow: `0 10px 24px color-mix(in srgb, var(--action) 35%, transparent), var(--shadow-1)`,
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)',
   transition: 'transform var(--duration-medium) var(--ease-spring)',
 };
 
 export function Fab(props: FabAsLink | FabAsCapture | FabAsButton) {
   const { label, children } = props;
+  const sizeClass = props.size === 'large' ? 'size-16' : 'size-14';
 
   if (props.onPress !== undefined) {
     return (
@@ -69,7 +72,7 @@ export function Fab(props: FabAsLink | FabAsCapture | FabAsButton) {
         type="button"
         aria-label={label}
         onClick={props.onPress}
-        className="active:scale-[0.92] flex size-14 shrink-0 items-center justify-center"
+        className={`active:scale-[0.92] flex min-h-11 ${sizeClass} shrink-0 items-center justify-center`}
         style={SHARED_STYLE}
       >
         {children}
@@ -82,7 +85,7 @@ export function Fab(props: FabAsLink | FabAsCapture | FabAsButton) {
       <Link
         href={props.href as Route}
         aria-label={label}
-        className="active:scale-[0.92] flex size-14 shrink-0 items-center justify-center"
+        className={`active:scale-[0.92] flex min-h-11 ${sizeClass} shrink-0 items-center justify-center`}
         style={SHARED_STYLE}
       >
         {children}
@@ -93,7 +96,7 @@ export function Fab(props: FabAsLink | FabAsCapture | FabAsButton) {
   return (
     <label
       aria-label={label}
-      className="active:scale-[0.92] flex size-14 shrink-0 cursor-pointer items-center justify-center"
+      className={`active:scale-[0.92] flex min-h-11 ${sizeClass} shrink-0 cursor-pointer items-center justify-center`}
       style={SHARED_STYLE}
     >
       <input

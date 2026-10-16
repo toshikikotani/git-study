@@ -2,12 +2,18 @@ import { todayAllowance } from '@/domain/forecast/today';
 import { calendarContext } from '@/domain/forecast/calendar';
 import { goalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast } from '@/features/forecast/load';
-import { countPendingReview } from '@/features/home/pending';
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { getAppSettings } from '@/features/settings/store';
-import { addDays, addMonths, monthStartJst, splitDateOnly, todayJst } from '@/lib/date';
-import { HomeList, type HomeListProps } from './home-list';
-import { TodayCard } from './today-card';
+import {
+  addDays,
+  addMonths,
+  daysBetween,
+  monthStartJst,
+  splitDateOnly,
+  todayJst,
+} from '@/lib/date';
+import { SavingsCard, type SavingsCardProps } from './savings-card';
+import { shortDate, TodayCard } from './today-card';
 
 /** 「10月の見通し」(暦の1か月の目標)/「10月14日までの見通し」(それ以外)。 */
 export function outlookLabel(period: { from: string; to: string }): string {
@@ -18,18 +24,22 @@ export function outlookLabel(period: { from: string; to: string }): string {
   return `${tm}月${td}日までの見通し`;
 }
 
+/** 2026-10-31 → 10月31日 */
+function dayLabel(date: string): string {
+  return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
+}
+
 /**
- * ホームの「今日使える額」から下(デザインの「今日」、ADR-085)を読み込む(重い予測なので、
- * ホームの他の部分を待たせないように Suspense の中で読む)。今日使える額・見通し・次の一手は
- * 見通しは目標の範囲。残る見込みは今月のすべての支出。目標に入っていないジャンルを見通しに出す。
+ * ホームの「今日使える目安」から「貯金」まで(デザイン仕様書の「今日」、ADR-090)を読み込む(重い予測
+ * なので、ホームの他の部分を待たせないように Suspense の中で読む)。今日使える目安・今期の見通し・
+ * 次の一手は目標の範囲。月末に残る見込みは今月のすべての支出と収入。
  */
-export async function TodaySection({ savings }: { savings: HomeListProps['savings'] }) {
+export async function TodaySection({ savingsGoal }: { savingsGoal: SavingsCardProps['goal'] }) {
   const today = todayJst();
   const monthFrom = monthStartJst();
   const monthPeriod = { from: monthFrom, to: addDays(addMonths(monthFrom, 1), -1) };
-  const [plan, pendingCount, settings] = await Promise.all([
+  const [plan, settings] = await Promise.all([
     getCurrentPlan(today).catch(() => null),
-    countPendingReview(),
     getAppSettings().catch(() => null),
   ]);
   const goal = goalForecastArgs(plan);
@@ -39,21 +49,12 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
   ]);
   const forecast = goalView?.forecast ?? null;
   const balance = monthView?.forecast.balance ?? null;
-  const goalIds = goal?.scope.genreIds;
-  const outside =
-    goalIds && monthView
-      ? monthView.forecast.byCategory
-          .filter((c) => !goalIds.has(c.categoryId) && c.landing.p50 > 0)
-          .map((c) => ({ name: c.categoryName, p50: c.landing.p50 }))
-          .sort((a, b) => b.p50 - a.p50)
-      : [];
-
   // 残りの休日数を計算
   const periodTo = goal?.period.to ?? monthPeriod.to;
   const cal = forecast ? calendarContext(today, periodTo, settings?.payday ?? null) : null;
 
   return (
-    <div className="space-y-3">
+    <>
       <TodayCard
         today={
           forecast && goal
@@ -84,20 +85,12 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
         outlook={
           goal && forecast
             ? {
-                label: outlookLabel(goal.period),
+                periodLabel: `${shortDate(goal.period.from)}〜${shortDate(goal.period.to)} · 残り${Math.max(0, daysBetween(today, goal.period.to) + 1)}日`,
                 spentYen: forecast.breakdown.actualYen,
                 p10: forecast.total.p10,
                 p50: forecast.total.p50,
                 p90: forecast.total.p90,
                 budgetYen: goal.budgetYen,
-                outside,
-                overages: forecast.byCategory
-                  .filter((c) => c.targetYen !== null && c.landing.p50 > c.targetYen)
-                  .map((c) => ({
-                    name: c.categoryName,
-                    overYen: Math.round(c.landing.p50 - (c.targetYen ?? 0)),
-                  }))
-                  .sort((a, b) => b.overYen - a.overYen),
               }
             : null
         }
@@ -106,11 +99,11 @@ export async function TodaySection({ savings }: { savings: HomeListProps['saving
         provisional={forecast?.provisional ?? false}
         monthKey={monthFrom.slice(0, 7)}
       />
-      <HomeList
+      <SavingsCard
+        untilLabel={`${dayLabel(monthPeriod.to)}まで`}
         balance={balance ? { p50: balance.p50, incomeYen: balance.incomeYen } : null}
-        pendingCount={pendingCount}
-        savings={savings}
+        goal={savingsGoal}
       />
-    </div>
+    </>
   );
 }

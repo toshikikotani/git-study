@@ -133,16 +133,20 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(html).toContain('href="/plan"');
   }, 60000);
 
-  it('予算(目標と見通しを1つに)', async () => {
+  it('見通し(デザイン仕様書、ADR-090)', async () => {
     const html = (await render(() => import('../../../app/(app)/plan/page'))).replace(
       /<!-- -->/g,
       '',
     );
-    expect(html).toContain('予算');
+    expect(html).toContain('見通し');
+    expect(html).toContain('目標を編集');
     expect(html).toContain('href="/plan/edit"');
-    // 着地の見込み → カテゴリ → なぜ → AIの分析 の順
-    expect(html).toContain('カテゴリごとの見込み');
-    expect(html.indexOf('カテゴリごとの見込み')).toBeLessThan(html.indexOf('AIの分析'));
+    // 見込み → 予算内に収まる確率 → なぜ → 最近の勢い → AIの気づき の順
+    const order = ['10回中8回は', '予算内に収まる確率', '最近の勢い', 'AIの気づき'].map((t) =>
+      html.indexOf(t),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   }, 60000);
 
   it('予算を編集', async () => {
@@ -200,7 +204,7 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
         /<!-- -->/g,
         '',
       );
-      expect(html).toMatch(/カテゴリごとの見込み|から始まります|新しい目標を立てる|次の目標を予約/);
+      expect(html).toMatch(/予算内に収まる確率|から始まります|新しい目標を立てる|次の目標を予約/);
     }, 60000);
   }
 

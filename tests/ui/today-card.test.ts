@@ -7,14 +7,14 @@ import { outlookLabel } from '../../app/(app)/_home/today-section';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
 
-describe('ホームの「今日」(デザイン、ADR-085)', () => {
-  it('今日使える額 → 見通し → 次の一手 の順に出す', () => {
+describe('ホームの「今日」(デザイン仕様書、ADR-090)', () => {
+  it('今日使える目安 → 今期の見通し → 次の一手 の順に出す', () => {
     const text = visible(
       renderToString(
         h(TodayCard, {
           today: { kind: 'left', capYen: 2400, spentYen: 500, leftYen: 1900 },
           outlook: {
-            label: '10月の見通し',
+            periodLabel: '10/1〜11/5 · 残り21日',
             spentYen: 95000,
             p10: 160000,
             p50: 190000,
@@ -35,17 +35,19 @@ describe('ホームの「今日」(デザイン、ADR-085)', () => {
         }),
       ),
     );
-    expect(text).toContain('今日 使えるのは');
+    expect(text).toContain('今日使える目安');
     expect(text).toContain('1,900円');
-    expect(text).toContain('毎日この額までなら、99%以上の確率で予算内に収まります。');
-    expect(text).toContain('使わなかった分は、明日に回ります。');
-    expect(text).toContain('10月の見通し');
+    expect(text).toContain('使わなかった分は明日に回ります。');
+    expect(text).toContain('今期の見通し');
+    expect(text).toContain('10/1〜11/5 · 残り21日');
     expect(text).toContain('約2.0万円 超えそう');
     expect(text).toContain('約19.0万円');
     expect(text).toContain('/ 予算 17.0万円');
-    expect(text).toContain('25%の確率で 予算内に収まります');
-    expect(text).toContain('外食を週1回へらすと');
-    const order = ['今日 使えるのは', '10月の見通し', '次の一手'].map((s) => text.indexOf(s));
+    expect(text).toContain('使った額 9.5万円');
+    expect(text).toContain('予算内に収まる確率 25%');
+    expect(text).toContain('詳しい見通し');
+    expect(text).toContain('外食を週1回へらす');
+    const order = ['今日使える目安', '今期の見通し', '次の一手'].map((s) => text.indexOf(s));
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
@@ -61,9 +63,9 @@ describe('ホームの「今日」(デザイン、ADR-085)', () => {
         }),
       ),
     );
-    expect(text).toContain('今日は上限を');
+    expect(text).toContain('今日は目安を');
     expect(text).toContain('600円 超え');
-    expect(text).toContain('目安');
+    expect(text).toContain('記録が少ないので仮');
   });
 
   it('目標が無ければ、決め方を案内する', () => {
@@ -76,7 +78,9 @@ describe('ホームの「今日」(デザイン、ADR-085)', () => {
         provisional: false,
       }),
     );
-    expect(visible(html)).toContain('目標(カテゴリごとの予算)を決めると');
+    expect(visible(html)).toContain(
+      '目標(カテゴリごとの予算)を決めると、今日使える目安を出せます。',
+    );
     expect(html).toContain('href="/plan"');
   });
 

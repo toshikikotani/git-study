@@ -18,9 +18,15 @@ const DEFAULT_PAYDAY = 25;
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+/** 2026-10-01 → 10月1日 */
+function dayLabel(date: string): string {
+  return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
+}
+
 /**
- * 予算(目標と見通しを1つにした画面、ADR-088)。上に期間と「編集」、その下に着地の見込みから
- * カテゴリ・なぜ・AIの分析まで。期間・配分・予算のないカテゴリ・削除は「編集」(/plan/edit)へ。
+ * 見通し(デザイン仕様書の「見通し」、ADR-090)。「今日」から開く。上に「‹ 今日」と「目標を編集」、
+ * 期間と残りの日数、その下に見込み・確率・なぜ・勢い・AIの気づき。期間・配分・予算のないカテゴリ・
+ * 削除は「今期の目標」(/plan/edit)へ。
  */
 export default async function BudgetPage() {
   const today = todayJst();
@@ -34,30 +40,47 @@ export default async function BudgetPage() {
           ? 'ended'
           : 'active';
   return (
-    <div className="rise space-y-4">
-      <header className="flex items-end justify-between gap-3 px-1">
-        <div className="min-w-0">
-          {plan ? (
-            <p className="text-sm font-medium" style={{ color: 'var(--ink-secondary)' }}>
-              {formatDateJa(plan.periodStart)}〜{formatDateJa(plan.periodEnd)} ·{' '}
-              {formatRemainingDays(plan.periodStart, plan.periodEnd, today)}
-            </p>
-          ) : null}
-          <h1
-            className="text-[34px] leading-none font-bold tracking-[-0.03em]"
-            style={{ color: 'var(--ink)' }}
+    <div className="rise flex flex-col gap-4">
+      <div className="flex min-h-11 items-center justify-between">
+        <Link
+          href="/"
+          className="flex min-h-11 items-center gap-1 text-[17px] font-medium"
+          style={{ color: 'var(--accent)' }}
+        >
+          <svg
+            aria-hidden
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            予算
-          </h1>
-        </div>
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+          今日
+        </Link>
         {plan && state !== 'ended' ? (
           <Link
             href="/plan/edit"
-            className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold"
-            style={{ background: 'var(--surface)', color: 'var(--accent)' }}
+            className="flex min-h-11 items-center px-1 text-[17px] font-medium"
+            style={{ color: 'var(--accent)' }}
           >
-            編集
+            目標を編集
           </Link>
+        ) : null}
+      </div>
+      <header className="-mt-2 px-1">
+        <h1 className="text-[34px] leading-tight font-bold" style={{ color: 'var(--ink)' }}>
+          見通し
+        </h1>
+        {plan ? (
+          <p className="tabular text-[15px]" style={{ color: 'var(--ink-muted)' }}>
+            {dayLabel(plan.periodStart)}〜{dayLabel(plan.periodEnd)} ·{' '}
+            {formatRemainingDays(plan.periodStart, plan.periodEnd, today)}
+          </p>
         ) : null}
       </header>
 
@@ -106,11 +129,11 @@ function UpcomingPlan({ plan, today }: { plan: SpendingPlan; today: string }) {
   const items = plan.items.filter((item) => item.targetYen > 0);
   return (
     <section
-      aria-label="これから始まる予算"
-      className="glass rounded-[28px] p-5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+      aria-label="これから始まる目標"
+      className="rounded-[22px] p-5"
+      style={{ background: 'var(--surface)' }}
     >
-      <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+      <p className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
         {formatDateJa(plan.periodStart)}
         から始まります。始まると、着地の見込みとカテゴリごとの様子を出します。
       </p>
@@ -144,8 +167,8 @@ async function NoActivePlan({ today, ended }: { today: string; ended: boolean })
         <ReviewCard planId={loaded.plan.id} review={loaded.view.review} />
       ) : null}
       {!ended ? (
-        <p className="px-1 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-          予算はまだありません。期間とカテゴリごとの額を決めると、着地の見込みを出します。
+        <p className="px-1 text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
+          目標はまだありません。期間とカテゴリごとの額を決めると、着地の見込みを出します。
         </p>
       ) : null}
       <PlanBuilder
