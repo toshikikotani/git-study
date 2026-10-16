@@ -193,6 +193,11 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     expect(visible(raw)).toContain('保存できませんでした。');
   });
 
+  it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {
+    const raw = sheet();
+    expect(raw.match(/autoComplete="off"/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
   it('保存は金額が無くても押せる(押すと足りないものを伝える。黙って効かないボタンにしない)', () => {
     const raw = sheet();
     const save = raw.match(/<button[^>]*>保存<\/button>/)?.[0] ?? '';

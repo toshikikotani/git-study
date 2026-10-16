@@ -420,6 +420,7 @@ export function RecordSheet({
         <input
           value={name}
           maxLength={60}
+          autoComplete="off"
           placeholder={
             kind === 'expense' && selectedGenre === undefined ? '店名など（任意）' : fallbackName
           }
@@ -507,6 +508,7 @@ export function RecordSheet({
                 <input
                   value={newName}
                   maxLength={20}
+                  autoComplete="off"
                   placeholder="新しいカテゴリ名"
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => {
@@ -569,6 +571,7 @@ export function RecordSheet({
           <input
             value={memo}
             maxLength={200}
+            autoComplete="off"
             placeholder="任意"
             onChange={(e) => setMemo(e.target.value)}
             className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
