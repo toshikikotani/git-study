@@ -7,22 +7,24 @@ import { todayJst } from '@/lib/date';
 import { homeDateLine } from './date-line';
 
 /**
- * ホームの見出し(デザイン仕様書の「今日」、ADR-090):日付と曜日、大きな「今日」、右上に
- * お知らせ(まだ見ていないものがあれば印)と「…」(設定・給料日・ログアウトなど)。
+ * ホームの見出し(デザイン仕様書の「今日」、ADR-090):大きな「今日」と、その横に日付と曜日
+ * (本人の要望「今日の横に日付が欲しい」)。右上にお知らせ(まだ見ていないものがあれば印)と
+ * 「…」(設定・給料日・ログアウトなど)。
  */
 export async function HomeHeader() {
   const today = todayJst();
   const [unread, account] = await Promise.all([countUnread().catch(() => 0), getCurrentAccount()]);
   return (
-    <header className="flex items-end justify-between gap-2 px-1 pt-2 pb-1">
-      <div className="flex flex-col gap-1">
-        <p className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+    <header className="flex items-center justify-between gap-2 px-1 pt-2 pb-1">
+      <h1
+        className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-[34px] leading-tight font-bold"
+        style={{ color: 'var(--ink)' }}
+      >
+        今日
+        <span className="text-[17px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
           {homeDateLine(today)}
-        </p>
-        <h1 className="text-[34px] leading-tight font-bold" style={{ color: 'var(--ink)' }}>
-          今日
-        </h1>
-      </div>
+        </span>
+      </h1>
       <div className="flex items-center gap-2">
         <Link
           href="/notifications"
