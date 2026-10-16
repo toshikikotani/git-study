@@ -7,6 +7,7 @@ import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import { GenreBadge } from '@/components/ui/genre-badge';
+import { CategoryMark } from '../category-sheet';
 import { LedgerAmount } from '@/components/ui/money';
 import { useGenreOverrides } from '@/components/ui/genre-style-context';
 import { genreBarColor } from '@/domain/genre-style';
@@ -554,23 +555,26 @@ export function TransactionRowWithSplit({
         <div
           className={`flex items-center pr-2 ${flash ? 'row-flash' : ''} ${justSaved ? 'row-insert' : ''}`}
         >
+          {uncategorized ? (
+            // 未分類は「?」やグレーではなく、点線の空の丸。ジャンルは行の中のチップで選ぶ。
+            <span
+              aria-hidden
+              className="ml-4 size-9 shrink-0 rounded-full border border-dashed"
+              style={{ borderColor: 'var(--ink-muted)' }}
+            />
+          ) : (
+            // カテゴリのマークは、押すとそのカテゴリ(⑦)を開く(デザイン仕様書のルール、ADR-091)。
+            <span className="ml-2 flex shrink-0">
+              <CategoryMark genreId={transaction.genreId} name={transaction.genreName} />
+            </span>
+          )}
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setEditSheetOpen(true)}
-            className="min-h-11 flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+            className={`min-h-11 flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 text-left ${uncategorized ? 'pl-3' : 'pl-1'}`}
             aria-label={rowAriaLabel}
           >
-            {uncategorized ? (
-              // 未分類は「?」やグレーではなく、点線の空の丸。ジャンルは行の中のチップで選ぶ。
-              <span
-                aria-hidden
-                className="size-9 shrink-0 rounded-full border border-dashed"
-                style={{ borderColor: 'var(--ink-muted)' }}
-              />
-            ) : (
-              <GenreBadge name={transaction.genreName} size={36} />
-            )}
             <div className="min-w-0 flex-1">
               {/* 1行目:正規化した店名(切れないように折り返す) */}
               <p

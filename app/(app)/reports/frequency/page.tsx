@@ -13,7 +13,7 @@ export default async function FrequencyPage() {
   return (
     <div className="rise flex flex-col gap-4">
       <BackHeader
-        back={{ href: '/reports', label: '分析' }}
+        back={{ href: '/reports/month', label: '月のふりかえり' }}
         title="回数と1回の金額"
         sub={`${Number(ledger.period.from.slice(5, 7))}月${summary ? ` · ${summary}` : ''}`}
       />

@@ -14,8 +14,18 @@ const GROUPS = [
       { href: '/payday', label: '給料日', dek: '入った額を入れて、振り分けを確かめる' },
       {
         href: '/transactions/new',
-        label: '明細を手で登録する',
-        dek: '現金払いなど、取り込みに乗らない明細を1件だけ記録',
+        label: 'くわしく入力',
+        dek: '口座・品目・返金・特別費まで決めて1件記録',
+      },
+      {
+        href: '/transactions/capture-text',
+        label: '話して・文字で記録',
+        dek: '声や文章から明細にする',
+      },
+      {
+        href: '/transactions/capture-screenshot',
+        label: 'スクショから記録',
+        dek: '決済画面のスクリーンショットから',
       },
       { href: '/transactions/import', label: 'CSVを取り込む', dek: '銀行・カードの明細をまとめて' },
       {

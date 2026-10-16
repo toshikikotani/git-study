@@ -1,86 +1,141 @@
-import type { Route } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 
-import { ChevronRightIcon } from '@/components/ui/nav-icons';
-import { GenreBreakdown } from '../spending/genre-breakdown';
-import { loadSpendingMonthData } from '../spending/month-data';
-import { PeriodSwitcher } from '../spending/period-switcher';
-import { SpendingMonthProvider } from '../spending/spending-month-provider';
-import { AnalysisSummary } from './analysis-summary';
-import { frequencyPoints, frequencySummary } from './frequency';
-import { WeekdayHabit } from './weekday-habit';
-import { YearFlowCard } from './year-flow-card';
+import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
+import { loadGoalView } from '@/features/goals/loader';
+import { getAppSettings } from '@/features/settings/store';
+import { getCurrentPlan, listPlanRanges, type SpendingPlan } from '@/features/spending-plan/store';
+import { formatDateJa, todayJst } from '@/lib/date';
+import { PlanBuilder } from '../plan/plan-builder';
+import { ReviewCard } from '../plan/review-card';
+import { AnalysisTabs } from './analysis-tabs';
+import { GoalAnalysis } from './goal-analysis';
+
+/** 設定が読めないときの給料日(期間のプリセットの起点にだけ使う)。 */
+const DEFAULT_PAYDAY = 25;
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /**
- * 分析(デザイン仕様書の「分析」、ADR-090):月の切り替え → 支出・収入・貯蓄率 → カテゴリ →
- * 曜日のくせ → 1年の流れ → 回数と1回の金額・月ごとの表・AIレポート。
- * 着地の見込みは「見通し」、そのほかの分析(固定費の候補・お店・資産・予測の当たり具合)は
- * 「…」の「そのほかの分析」へ。
+ * 分析 › 目標(デザイン仕様書の「4a」、ADR-091)。ナビの「分析」で開く。旧「見通し」をまとめ、
+ * いまの状況・どこで使っているか・ペース・次にできること・くわしく を1画面に並べる。
+ * 目標が無ければ作り方、これから始まる目標ならその予定を出す。
  */
-export const dynamic = 'force-dynamic';
-
-export default async function ReportsPage() {
-  const data = await loadSpendingMonthData();
-  const summary = frequencySummary(frequencyPoints(data.ledger.transactions));
-
+export default async function AnalysisGoalPage() {
+  const today = todayJst();
+  const plan = await getCurrentPlan(today).catch(() => null);
+  const state =
+    plan === null
+      ? 'none'
+      : today < plan.periodStart
+        ? 'upcoming'
+        : today > plan.periodEnd
+          ? 'ended'
+          : 'active';
   return (
-    <div className="rise flex flex-col gap-4">
-      <SpendingMonthProvider
-        today={data.ledger.period.to}
-        currentMonthStart={data.ledger.period.from}
-        currentTransactions={data.transactions}
-        currentGenreBreakdown={data.ledger.genreBreakdown}
-        currentTotals={data.ledger.totals}
-        genres={data.genres}
-        accounts={data.accounts}
-        captures={data.captures}
-      >
-        <PeriodSwitcher title="分析" />
-        <AnalysisSummary />
-        <GenreBreakdown />
-        <WeekdayHabit />
-      </SpendingMonthProvider>
-      <Suspense fallback={null}>
-        <YearFlowCard />
-      </Suspense>
-      <nav
-        aria-label="ほかの分析"
-        className="overflow-hidden rounded-2xl"
-        style={{ background: 'var(--surface)' }}
-      >
-        <Row href="/reports/frequency" title="回数と1回の金額" sub={summary} />
-        <Divider />
-        <Row href="/reports/monthly" title="月ごとの表" />
-        <Divider />
-        <Row href="/reports/ai" title="日次・月次のAIレポート" />
-      </nav>
+    <div className="rise flex flex-col gap-3">
+      <header className="px-1 pt-2">
+        <h1 className="text-[34px] leading-tight font-bold" style={{ color: 'var(--ink)' }}>
+          分析
+        </h1>
+      </header>
+      <AnalysisTabs current="goal" />
+      {state === 'active' && plan ? (
+        <Suspense fallback={<Waiting />}>
+          <SafeAnalysis plan={plan} today={today} />
+        </Suspense>
+      ) : state === 'upcoming' && plan ? (
+        <UpcomingPlan plan={plan} />
+      ) : (
+        <Suspense fallback={null}>
+          <NoActivePlan today={today} ended={state === 'ended'} />
+        </Suspense>
+      )}
     </div>
   );
 }
 
-function Divider() {
-  return <div className="ml-4 h-px" style={{ background: 'var(--hairline)' }} />;
+function Waiting() {
+  return (
+    <p className="px-1 text-[15px]" role="status" style={{ color: 'var(--ink-muted)' }}>
+      見込みを計算しています
+    </p>
+  );
 }
 
-function Row({ href, title, sub }: { href: string; title: string; sub?: string | null }) {
+/** 読み込みに失敗しても、ページ全体は落とさず、原因を見せる(編集やほかの画面は使える)。 */
+async function SafeAnalysis({ plan, today }: { plan: SpendingPlan; today: string }) {
+  try {
+    return await GoalAnalysis({ plan, today });
+  } catch (error) {
+    console.error('[analysis] 目標の分析を読み込めませんでした', error);
+    const message = error instanceof Error ? error.message : String(error);
+    return (
+      <p
+        role="alert"
+        className="px-1 text-[15px] leading-relaxed"
+        style={{ color: 'var(--ink-secondary)' }}
+      >
+        目標の分析を読み込めませんでした。しばらくしてからもう一度開いてください。
+        <span className="tabular mt-1 block text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+          {message}
+        </span>
+      </p>
+    );
+  }
+}
+
+function UpcomingPlan({ plan }: { plan: SpendingPlan }) {
+  const items = plan.items.filter((item) => item.targetYen > 0);
   return (
-    <Link
-      href={href as Route}
-      className="flex min-h-14 items-center gap-3 px-4"
-      style={{ color: 'var(--ink)' }}
+    <section
+      aria-label="これから始まる目標"
+      className="rounded-[22px] p-5"
+      style={{ background: 'var(--surface)' }}
     >
-      <span className="flex min-w-0 flex-1 flex-col py-2">
-        <span className="text-[16px]">{title}</span>
-        {sub ? (
-          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-            {sub}
-          </span>
-        ) : null}
-      </span>
-      <span style={{ color: 'var(--ideal)' }}>
-        <ChevronRightIcon />
-      </span>
-    </Link>
+      <p className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
+        {formatDateJa(plan.periodStart)}
+        から始まります。始まると、着地の見込みとカテゴリごとの様子を出します。
+      </p>
+      <ul className="mt-3 space-y-1">
+        {items.map((item) => (
+          <li key={item.genreId}>
+            <GenreBudgetRow
+              name={item.genreName}
+              spentYen={0}
+              budgetYen={item.targetYen}
+              sharedKey={item.genreId}
+              maxYen={item.targetYen}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+async function NoActivePlan({ today, ended }: { today: string; ended: boolean }) {
+  const [settings, ranges, loaded] = await Promise.all([
+    getAppSettings().catch(() => null),
+    listPlanRanges().catch(() => []),
+    ended ? loadGoalView().catch(() => null) : Promise.resolve(null),
+  ]);
+  return (
+    <>
+      {loaded?.view.review ? (
+        <ReviewCard planId={loaded.plan.id} review={loaded.view.review} />
+      ) : null}
+      {!ended ? (
+        <p className="px-1 text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
+          目標はまだありません。期間とカテゴリごとの額を決めると、着地の見込みを出します。
+        </p>
+      ) : null}
+      <PlanBuilder
+        today={today}
+        payday={settings?.payday ?? DEFAULT_PAYDAY}
+        ranges={ranges}
+        activeEnd={null}
+      />
+    </>
   );
 }

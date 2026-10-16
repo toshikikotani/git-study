@@ -21,7 +21,7 @@ export default async function MonthlyTablePage() {
   const rows = flow ? [...flow.rows].reverse() : [];
   return (
     <div className="rise flex flex-col gap-4">
-      <BackHeader back={{ href: '/reports', label: '分析' }} title="月ごとの表" />
+      <BackHeader back={{ href: '/reports/month', label: '月のふりかえり' }} title="月ごとの表" />
       {rows.length > 0 ? (
         <section
           aria-label="月ごとの収入と支出"

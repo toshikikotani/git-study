@@ -1,21 +1,20 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { generateMonthlyAiReportAction } from '../reports/ai/actions';
+import { generateMonthlyAiReportAction } from './ai/actions';
 
 /**
- * AIの気づき(デザイン仕様書の「見通し」、ADR-090):いつ時点の分析か、箇条書き、「もう一度分析する」と
- * 「全文とレポート」。分析し直すと保存して画面を読み直す。
+ * AIの気づき(デザイン仕様書の「分析 › 目標」、ADR-091):いつ更新した分析か、箇条書き、「もう一度分析する」。
+ * 分析し直すと保存して画面を読み直す。全文は「月のふりかえり」の「日次・月次のAIレポート」。
  */
 export function AiCard({
   asOfLabel,
   bullets,
   analyzed,
 }: {
-  /** 「10月14日時点」。まだ分析していなければ null。 */
+  /** 「今日 8:00 更新」「10月14日 更新」。まだ分析していなければ null。 */
   asOfLabel: string | null;
   bullets: readonly string[];
   /** AIの分析がすでにあるか(ボタンの言い方を変える)。 */
@@ -42,9 +41,9 @@ export function AiCard({
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h2 id="ai-card" className="text-[17px] font-semibold">
+        <h3 id="ai-card" className="text-[17px] font-semibold">
           AIの気づき
-        </h2>
+        </h3>
         {asOfLabel ? (
           <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {asOfLabel}
@@ -70,24 +69,15 @@ export function AiCard({
           {error}
         </p>
       ) : null}
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={busy}
-          className="min-h-11 flex-1 rounded-full text-[15px] font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-        >
-          {busy ? '分析しています…' : analyzed ? 'もう一度分析する' : 'AIに分析させる'}
-        </button>
-        <Link
-          href="/reports/ai"
-          className="flex min-h-11 flex-1 items-center justify-center rounded-full text-[15px] font-semibold"
-          style={{ background: 'var(--button-quiet)', color: 'var(--ink)' }}
-        >
-          全文とレポート
-        </Link>
-      </div>
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={busy}
+        className="mt-4 min-h-11 self-start rounded-full px-5 text-[15px] font-semibold disabled:opacity-40"
+        style={{ background: 'var(--button-quiet)', color: 'var(--ink)' }}
+      >
+        {busy ? '分析しています…' : analyzed ? 'もう一度分析する' : 'AIに分析させる'}
+      </button>
     </section>
   );
 }

@@ -1,14 +1,7 @@
-'use client';
-
-import { useMemo } from 'react';
-
 import { formatYen } from '@/domain/money';
-import { weekdayOf } from '@/lib/date';
-import { useSpendingMonth } from '../spending/spending-month-provider';
+import type { HabitRow } from './weekday-habit-data';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
-/** 出すカテゴリの数(多い順)。 */
-const MAX_GENRES = 6;
 /** 濃さの段階ごとの accent の割合(0 は記録なし)。 */
 const MIX = [0, 12, 24, 45, 75, 100];
 
@@ -20,28 +13,10 @@ function short(yen: number): string {
 }
 
 /**
- * 曜日のくせ(デザイン仕様書の「分析」、ADR-090):その月のカテゴリ × 曜日の支出を濃さで並べ、
+ * 曜日のくせ(デザイン仕様書の「分析 › 目標」、ADR-091):今期のカテゴリ × 曜日の支出を濃さで並べ、
  * いちばん多い曜日と、その曜日に多いカテゴリを1行で言う。
  */
-export function WeekdayHabit() {
-  const { transactions } = useSpendingMonth();
-  const rows = useMemo(() => {
-    const byGenre = new Map<string, number[]>();
-    for (const t of transactions) {
-      if (t.amountYen >= 0 || t.isTransfer || t.reviewStatus === 'ignored' || t.needsInput)
-        continue;
-      if (t.status === 'scheduled') continue;
-      const name = t.genreName ?? '未分類';
-      const days = byGenre.get(name) ?? [0, 0, 0, 0, 0, 0, 0];
-      days[weekdayOf(t.occurredOn)]! += -t.amountYen;
-      byGenre.set(name, days);
-    }
-    return [...byGenre.entries()]
-      .map(([name, days]) => ({ name, days, total: days.reduce((a, b) => a + b, 0) }))
-      .filter((g) => g.total > 0)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, MAX_GENRES);
-  }, [transactions]);
+export function WeekdayHabit({ rows }: { rows: readonly HabitRow[] }) {
   if (rows.length === 0) return null;
 
   const max = Math.max(1, ...rows.flatMap((g) => g.days));
@@ -54,8 +29,11 @@ export function WeekdayHabit() {
     .sort((a, b) => b.days[topDay]! - a.days[topDay]!)
     .slice(0, 2)
     .map((g) => g.name);
+  const weekend = topDay === 0 || topDay === 6;
   const sentence =
-    topGenres.length > 0 ? `${WEEKDAYS[topDay]}曜の${topGenres.join('と')}がいちばん多め。` : '';
+    topGenres.length > 0
+      ? `${WEEKDAYS[topDay]}曜の${topGenres.join('と')}がいちばん多め。${weekend ? '休日の使い方がいちばん効きます。' : ''}`
+      : '';
 
   return (
     <section
@@ -63,9 +41,9 @@ export function WeekdayHabit() {
       className="flex flex-col rounded-[22px] px-4 pt-5 pb-4"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
-      <h2 id="weekday-habit" className="text-[17px] font-semibold">
+      <h3 id="weekday-habit" className="text-[17px] font-semibold">
         曜日のくせ
-      </h2>
+      </h3>
       {sentence ? (
         <p className="mt-1 text-[14px]" style={{ color: 'var(--ink-secondary)' }}>
           {sentence}
@@ -113,6 +91,21 @@ export function WeekdayHabit() {
             })}
           </div>
         ))}
+      </div>
+      <div
+        aria-hidden
+        className="mt-3 flex items-center justify-end gap-1 text-[11px]"
+        style={{ color: 'var(--ink-muted)' }}
+      >
+        少
+        {MIX.slice(1).map((m) => (
+          <span
+            key={m}
+            className="size-3 rounded-sm"
+            style={{ background: `color-mix(in srgb, var(--accent) ${m}%, var(--note))` }}
+          />
+        ))}
+        多
       </div>
     </section>
   );

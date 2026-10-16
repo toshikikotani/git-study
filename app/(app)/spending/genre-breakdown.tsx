@@ -11,15 +11,17 @@ import { formatYen } from '@/domain/money';
 import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
 import { categoryHref } from '@/lib/category-nav';
 import { useJustSaved } from '@/lib/just-saved';
+import { useOpenCategory } from '../category-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
 /**
  * カテゴリ(デザイン仕様書の「分析」、ADR-090):ドーナツ(中央にその月の支出)と、上位5つの
  * 行(色の点・名前・金額・割合)、残りは「ほかNカテゴリ」を押すと開く。数字は domain/ledger.ts の
- * 集計(明細の合計と同じ値)。行を押すと、そのカテゴリの詳細へ。
+ * 集計(明細の合計と同じ値)。行を押すと、そのカテゴリ(⑦、ADR-091)。
  */
 export function GenreBreakdown() {
   const overrides = useGenreOverrides();
+  const openCategory = useOpenCategory();
   const { genreBreakdown, isCurrentMonth, loading, visibleMonth } = useSpendingMonth();
   const [showRest, setShowRest] = useState(false);
   const justSaved = useJustSaved().length > 0;
@@ -43,21 +45,40 @@ export function GenreBreakdown() {
     );
   const pct = (yen: number) => `${total > 0 ? Math.round((yen / total) * 100) : 0}%`;
 
+  const rowClass =
+    'tabular grid w-full grid-cols-[12px_1fr_auto_40px] items-center gap-3 text-left text-[15px]';
+  const rowBody = (r: (typeof rows)[number]) => (
+    <>
+      <span aria-hidden className="size-3 rounded-full" style={{ background: colorOf(r) }} />
+      <span className="min-w-0 truncate">{r.name}</span>
+      <span className="font-semibold">{formatYen(r.spentYen, { sign: 'never' })}</span>
+      <span className="text-right text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        {pct(r.spentYen)}
+      </span>
+    </>
+  );
+  // カテゴリを押すとそのカテゴリ(⑦)。未分類は、分けるための一覧へ。
   const row = (r: (typeof rows)[number], i: number) => (
     <li key={r.key}>
       {i > 0 ? <div className="ml-6 h-px" style={{ background: 'var(--hairline)' }} /> : null}
-      <Link
-        href={categoryHref(r.key, visibleMonth) as Route}
-        className="tabular grid min-h-11 grid-cols-[12px_1fr_auto_40px] items-center gap-3 text-[15px]"
-        style={{ color: 'var(--ink)' }}
-      >
-        <span aria-hidden className="size-3 rounded-full" style={{ background: colorOf(r) }} />
-        <span className="min-w-0 truncate">{r.name}</span>
-        <span className="font-semibold">{formatYen(r.spentYen, { sign: 'never' })}</span>
-        <span className="text-right text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-          {pct(r.spentYen)}
-        </span>
-      </Link>
+      {r.genreId !== null ? (
+        <button
+          type="button"
+          onClick={() => openCategory(r.genreId!)}
+          className={`min-h-11 ${rowClass}`}
+          style={{ color: 'var(--ink)' }}
+        >
+          {rowBody(r)}
+        </button>
+      ) : (
+        <Link
+          href={categoryHref(r.key, visibleMonth) as Route}
+          className={`min-h-11 ${rowClass}`}
+          style={{ color: 'var(--ink)' }}
+        >
+          {rowBody(r)}
+        </Link>
+      )}
     </li>
   );
 

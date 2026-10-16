@@ -51,9 +51,7 @@ export function TodayCard(props: TodayCardProps) {
       {outlook && probWithinBudget !== null ? (
         <OutlookCard outlook={outlook} probWithin={probWithinBudget} />
       ) : null}
-      {suggestion && props.monthKey ? (
-        <NextStepCard suggestion={suggestion} monthKey={props.monthKey} />
-      ) : null}
+      {suggestion ? <NextStepCard suggestion={suggestion} /> : null}
     </>
   );
 }
@@ -91,7 +89,7 @@ function TodayHero({
         </p>
         <div className="mt-2 h-px" style={{ background: 'var(--hairline)' }} />
         <Link
-          href="/plan"
+          href="/reports"
           className="flex min-h-12 items-center justify-between text-[15px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
@@ -139,7 +137,7 @@ export function shortDate(date: string): string {
 
 /**
  * 今期の見通し(デザイン仕様書):見込み(中央)と予算、1本の帯(使った額・予算を超える側・予算の目盛り・
- * 見込みの印)、使った額と予算内に収まる確率。押すと「見通し」へ。
+ * 見込みの印)、使った額と予算内に収まる確率。押すと「分析 › 目標」へ(ADR-091)。
  */
 function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithin: number }) {
   const overYen = outlook.p50 - outlook.budgetYen;
@@ -148,7 +146,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
   const caution = probWithin < 0.5;
   return (
     <Link
-      href="/plan"
+      href="/reports"
       aria-label={`今期の見通し。${formatEstimate(outlook.p50)}、予算 ${formatEstimate(outlook.budgetYen, { approx: false })}。詳しい見通しへ`}
       className={`${card} min-h-11 px-5 pt-5 pb-2`}
       style={cardStyle}
