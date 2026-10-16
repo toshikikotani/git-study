@@ -167,6 +167,9 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain('着地見込み');
     expect(html).toContain('カテゴリの進み具合');
+    // ペースは以前の「最近の支出の勢い」のグラフ(ADR-092)
+    expect(html).toContain('最近の支出の勢い');
+    expect(html.indexOf('最近の支出の勢い')).toBeGreaterThan(html.indexOf('ペース'));
   }, 60000);
 
   it('今期の目標(デザイン仕様書、ADR-090)', async () => {

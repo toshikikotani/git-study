@@ -14,9 +14,9 @@ import { GroupHeading } from './analysis-tabs';
 import { CategoryProgress, type ProgressRow } from './category-progress';
 import { DetailRows } from './detail-rows';
 import { GoalStatusCard } from './goal-status-card';
-import { MomentumCard } from './momentum-card';
 import { NextStepCard } from './next-step-card';
 import { ProbabilityCard } from './probability-card';
+import { SpendingTrendChart } from './spending-trend-chart';
 import { WeekdayHabit } from './weekday-habit';
 import { weekdayHabitRows } from './weekday-habit-data';
 import { WhyCard } from './why-card';
@@ -192,11 +192,11 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
       {today >= period.from ? (
         <>
           <GroupHeading>ペース</GroupHeading>
-          <MomentumCard
+          <SpendingTrendChart
             daySpend={daySpend}
             fixedYen={fixedYen}
             from={period.from}
-            today={today < period.to ? today : period.to}
+            to={period.to}
             budgetPerDayYen={variableBudget > 0 ? Math.round(variableBudget / totalDays) : null}
             remainingPerDayYen={
               variableBudget > 0 && remainingDays > 0

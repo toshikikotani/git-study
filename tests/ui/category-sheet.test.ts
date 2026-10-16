@@ -115,4 +115,13 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
     expect(html).not.toContain('店・メモ');
     expect(html).not.toContain('スクショから記録');
   });
+
+  it('レシート名を入れられる。空ならカテゴリ名で記録する(ADR-092)', () => {
+    const raw = renderToString(
+      h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {}, canStream: true }),
+    );
+    expect(html).toContain('レシート名');
+    expect(raw).toContain('placeholder="店名など（任意）"');
+    expect(raw).toContain('maxLength="60"');
+  });
 });
