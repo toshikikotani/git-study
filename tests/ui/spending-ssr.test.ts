@@ -233,7 +233,7 @@ describe('カテゴリ行(目標画面と共通)', () => {
 });
 
 describe('F5 カレンダー', () => {
-  const render = (date: string | null) =>
+  const render = (date: string | null, initialView?: 'week' | 'month') =>
     visible(
       renderToString(
         h(SpendingMonthProvider, {
@@ -249,12 +249,22 @@ describe('F5 カレンダー', () => {
           accounts: [{ id: 'a', name: '現金' }],
           initialFilter: date !== null ? { date } : {},
           children: [
-            h(CalendarHeatmap, { key: 'c' }),
+            h(CalendarHeatmap, { key: 'c', ...(initialView ? { initialView } : {}) }),
             h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
           ],
         }),
       ),
     );
+
+  it('前回「月で見る」にしていたら、開いたときから月で出す(ADR-093)', () => {
+    const month = render(null, 'month');
+    expect(month).toContain('週で見る');
+    expect(month).not.toContain('9月27日〜10月3日');
+    expect(month).toContain('9月');
+    const week = render(null, 'week');
+    expect(week).toContain('月で見る');
+    expect(week).toContain('9月27日〜10月3日');
+  });
 
   it('凡例は「点が濃いほど多い」と「予定あり」(デザイン仕様書)', () => {
     const html = render(null);

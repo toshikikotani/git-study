@@ -1,10 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 import { formatYen } from '@/domain/money';
 import { heatLevel, monthGrid, weekOf } from '@/features/spending/heatmap';
+import {
+  CALENDAR_VIEW_COOKIE,
+  CALENDAR_VIEW_MAX_AGE,
+  parseCalendarView,
+  type CalendarView,
+} from '@/lib/calendar-view';
 import { formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -21,14 +27,44 @@ function weekLabel(week: readonly string[]): string {
   return m1 === m2 ? `${m1}月${d1}日〜${d2}日` : `${m1}月${d1}日〜${m2}月${d2}日`;
 }
 
+// ---- 週 / 月 の表示を覚えておく(cookie、ADR-093)--------------------------------------------
+const viewListeners = new Set<() => void>();
+/** cookie が使えない端末でも、開いているあいだは選んだ表示を保つ。 */
+let chosenView: CalendarView | null = null;
+
+function subscribeView(cb: () => void): () => void {
+  viewListeners.add(cb);
+  return () => {
+    viewListeners.delete(cb);
+  };
+}
+
+function readView(): CalendarView {
+  if (chosenView !== null) return chosenView;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${CALENDAR_VIEW_COOKIE}=([^;]*)`));
+  return parseCalendarView(match?.[1]);
+}
+
+function saveView(view: CalendarView): void {
+  chosenView = view;
+  document.cookie = `${CALENDAR_VIEW_COOKIE}=${view}; path=/; max-age=${CALENDAR_VIEW_MAX_AGE}; samesite=lax`;
+  for (const cb of viewListeners) cb();
+}
+
 /**
  * カレンダー(デザイン仕様書の「明細」、ADR-090)。既定は今日のある週、「月で見る」で月全体。
+ * 選んだ表示(週 / 月)は覚えておき、次に開いたときも同じにする(ADR-093)。
  * 日付の下の点が濃いほど多く使った日。今日は accent の面、先の日は白い面で、予定がある日は輪の点。
  * 日付をタップすると明細がその日に絞り込まれる(もう一度で解除)。
  */
-export function CalendarHeatmap() {
+export function CalendarHeatmap({
+  initialView = 'week',
+}: {
+  /** サーバーで読んだ、前回の表示(cookie)。 */
+  initialView?: CalendarView;
+} = {}) {
   const { visibleMonth, totals, today, filter, setFilter, isCurrentMonth } = useSpendingMonth();
-  const [expanded, setExpanded] = useState(false);
+  const expanded = useSyncExternalStore(subscribeView, readView, () => initialView) === 'month';
 
   const monthKey = visibleMonth.slice(0, 7);
   const weekAnchor = isCurrentMonth && today.startsWith(monthKey) ? today : visibleMonth;
@@ -50,7 +86,7 @@ export function CalendarHeatmap() {
         <button
           type="button"
           aria-expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => saveView(expanded ? 'week' : 'month')}
           className="min-h-11 rounded-full px-3 text-[13px] font-semibold"
           style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
         >
