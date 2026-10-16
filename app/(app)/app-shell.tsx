@@ -7,7 +7,12 @@ import { createPortal } from 'react-dom';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CategorySheetProvider } from './category-sheet';
-import { OpenRecordProvider, RecordSheet, type RecordOptions } from './record-sheet';
+import {
+  OpenRecordProvider,
+  prefetchRecordData,
+  RecordSheet,
+  type RecordOptions,
+} from './record-sheet';
 import { parseDateOnlyOr, todayJst } from '@/lib/date';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
@@ -41,6 +46,14 @@ const NAV = [
 
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */
 
+/** 記録するのシートの開き方と、開いた回の番号。 */
+type OpenRecord = RecordOptions & { openId: number };
+let openSeq = 0;
+function nextOpenId(): number {
+  openSeq += 1;
+  return openSeq;
+}
+
 function isSameTab(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   // 今期の目標(/plan/edit)は「分析 › 目標」から開く画面なので、分析のタブを選択中にする(ADR-091)。
@@ -69,8 +82,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 記録する(＋)のシート。開いているときは初期値(日付・支出か収入か)、閉じているときは null。
   // ＋のほか、明細のカレンダーの「この日に手で記録」や、ホーム画面のショートカット
   // (?record=1、旧 /transactions/new からも転送)から開く(ADR-096)。
-  const [record, setRecord] = useState<RecordOptions | null>(null);
-  const openRecord = useCallback((options?: RecordOptions) => setRecord(options ?? {}), []);
+  // 開くたびに番号を振り、シートの中身を作り直す(閉じかけのシートをそのまま開き直さない。
+  // 保存できずにすぐ開き直したとき、前の中身のまま「保存」が効かなくなっていた)。
+  const [record, setRecord] = useState<OpenRecord | null>(null);
+  const openRecord = useCallback(
+    (options?: RecordOptions) => setRecord({ ...options, openId: nextOpenId() }),
+    [],
+  );
+  const closeRecord = useCallback(() => setRecord(null), []);
+  // 記録するのカテゴリと口座を先に読んでおく(開いた瞬間からタイルが並ぶように、ADR-098)。
+  // 画面の読み込みを邪魔しないよう、少し待ってから。
+  useEffect(() => {
+    const timer = window.setTimeout(() => void prefetchRecordData(), 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get('record') !== '1') return;
@@ -80,6 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.history.replaceState(null, '', url.pathname + url.search);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
     setRecord({
+      openId: nextOpenId(),
       date: parseDateOnlyOr(date, todayJst()),
       kind: type === 'income' ? 'income' : 'expense',
     });
@@ -101,11 +127,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UndoToastHost />
           {isClient ? (
             createPortal(
-              <BottomBar onNavigate={beginNavigate} record={record} onRecordChange={setRecord} />,
+              <BottomBar
+                onNavigate={beginNavigate}
+                record={record}
+                onOpenRecord={openRecord}
+                onCloseRecord={closeRecord}
+              />,
               document.body,
             )
           ) : (
-            <BottomBar onNavigate={beginNavigate} record={record} onRecordChange={setRecord} />
+            <BottomBar
+              onNavigate={beginNavigate}
+              record={record}
+              onOpenRecord={openRecord}
+              onCloseRecord={closeRecord}
+            />
           )}
         </div>
       </OpenRecordProvider>
@@ -116,11 +152,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function BottomBar({
   onNavigate,
   record,
-  onRecordChange,
+  onOpenRecord,
+  onCloseRecord,
 }: {
   onNavigate: (href: string) => void;
-  record: RecordOptions | null;
-  onRecordChange: (next: RecordOptions | null) => void;
+  record: OpenRecord | null;
+  onOpenRecord: (options?: RecordOptions) => void;
+  onCloseRecord: () => void;
 }) {
   const pathname = usePathname();
   const isClient = useIsClient();
@@ -159,8 +197,8 @@ function BottomBar({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<'single' | 'continuous'>('single');
   const setFabMenuOpen = useCallback(
-    (open: boolean) => onRecordChange(open ? {} : null),
-    [onRecordChange],
+    (open: boolean) => (open ? onOpenRecord() : onCloseRecord()),
+    [onOpenRecord, onCloseRecord],
   );
   const longPress = useMemo(
     () => createLongPress({ onLongPress: () => setFabMenuOpen(true) }),
@@ -231,6 +269,7 @@ function BottomBar({
         tall
       >
         <RecordSheet
+          key={record?.openId ?? 0}
           onClose={() => setFabMenuOpen(false)}
           onCamera={(mode) => {
             setFabMenuOpen(false);
@@ -244,6 +283,7 @@ function BottomBar({
           canStream={canStream}
           initialDate={record?.date}
           initialKind={record?.kind}
+          initialError={record?.error}
         />
       </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>

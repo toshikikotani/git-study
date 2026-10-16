@@ -245,8 +245,28 @@ export function TransactionRowWithSplit({
     nameTrimmed !== '' &&
     !simpleEditUnchanged;
 
+  // 「保存」はいつでも押せる(黙って効かないボタンにしない、ADR-098)。何も変えていなければ閉じるだけ、
+  // 足りないものがあればそれを伝える。
   async function saveSimpleEdit(): Promise<void> {
-    if (!canSaveSimpleEdit) return;
+    if (saving) return;
+    if (simpleEditUnchanged) {
+      setError(null);
+      setEditSheetOpen(false);
+      setCategoryFormOpen(false);
+      return;
+    }
+    if (!canSaveSimpleEdit) {
+      setError(
+        !genreId
+          ? 'カテゴリを選んでください。'
+          : amountAbsYen <= 0
+            ? '金額を入れてください(割り勘でもらった額より大きく)。'
+            : nameTrimmed === ''
+              ? 'レシート名を入れてください。'
+              : '日付を入れてください。',
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     const result = await updateTransactionAction(transaction.id, genreId, {
@@ -844,11 +864,14 @@ export function TransactionRowWithSplit({
               <button
                 type="button"
                 onClick={() => void saveSimpleEdit()}
-                disabled={saving || !canSaveSimpleEdit}
-                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold"
+                style={{
+                  background: 'var(--action)',
+                  color: 'var(--on-action)',
+                  opacity: saving ? 0.6 : 1,
+                }}
               >
-                {saving ? '保存中…' : '保存'}
+                {saving ? '保存中…' : simpleEditUnchanged ? '閉じる' : '保存'}
               </button>
               <button
                 type="button"
@@ -861,7 +884,7 @@ export function TransactionRowWithSplit({
             </div>
 
             {error ? (
-              <p className="text-xs" style={{ color: 'var(--over)' }}>
+              <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
                 {error}
               </p>
             ) : null}
@@ -1055,9 +1078,12 @@ export function TransactionRowWithSplit({
               {display?.name ?? transaction.description}
             </h2>
           </div>
+          {/* 「名前」だと iPhone が人の名前の欄と見て「連絡先を自動入力」を出すため、レシート名と呼び、
+              自動入力も止める(ADR-099) */}
           <input
             type="text"
-            aria-label="名前"
+            aria-label="レシート名"
+            autoComplete="off"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
             className="min-h-11 w-full rounded-xl px-3 text-sm"
@@ -1099,6 +1125,7 @@ export function TransactionRowWithSplit({
             inputMode="numeric"
             aria-label="割り勘でもらった額"
             placeholder="割り勘でもらった額"
+            autoComplete="off"
             value={splitYenInput}
             onChange={(e) => setSplitYenInput(e.target.value.replace(/[^0-9]/g, ''))}
             className="min-h-11 w-full rounded-xl px-3 text-sm"
@@ -1131,19 +1158,17 @@ export function TransactionRowWithSplit({
           <button
             type="button"
             onClick={() => void saveSimpleEdit()}
-            disabled={saving || !canSaveSimpleEdit}
-            className="min-h-11 w-full rounded-full text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="min-h-11 w-full rounded-full text-sm font-semibold"
+            style={{
+              background: 'var(--action)',
+              color: 'var(--on-action)',
+              opacity: saving ? 0.6 : 1,
+            }}
           >
-            {saving ? '保存中…' : '保存'}
+            {saving ? '保存中…' : simpleEditUnchanged ? '閉じる' : '保存'}
           </button>
-          {!canSaveSimpleEdit && !saving ? (
-            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              名前・日付・金額・カテゴリを変えると保存できます
-            </p>
-          ) : null}
           {error ? (
-            <p className="text-xs" style={{ color: 'var(--over)' }}>
+            <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
               {error}
             </p>
           ) : null}
