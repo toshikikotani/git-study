@@ -1,13 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { genreSwatch } from '@/domain/genre-style';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
+import {
+  clearDraft,
+  keepDraft,
+  peekDraft,
+  type RecordDraft,
+} from '@/features/transactions/record-draft';
 import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
 import { addDays, splitDateOnly, todayJst, weekdayOf } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
@@ -24,8 +30,34 @@ const KINDS = [
 ] as const;
 type Kind = (typeof KINDS)[number]['value'];
 
-/** 記録するを開くときの初期値(明細のカレンダーの「この日に手で記録」など)。 */
-export type RecordOptions = { date?: string; kind?: 'expense' | 'income' };
+/**
+ * 記録するを開くときの初期値(明細のカレンダーの「この日に手で記録」など)。
+ * error は、保存できなかったときに開き直して見せる理由(入れた値は下書きから戻る、ADR-098)。
+ */
+export type RecordOptions = { date?: string; kind?: 'expense' | 'income'; error?: string };
+
+// ---- カテゴリと口座を先に読んでおく(開いた瞬間からタイルが並ぶように、ADR-098)------------------
+type GenreTile = { id: string; name: string };
+let genreCache: readonly GenreTile[] | null = null;
+let accountCache: readonly AccountOption[] | null = null;
+let loading: Promise<void> | null = null;
+
+/** カテゴリと口座を読んでおく。アプリを開いたときと、記録するを開くたびに呼ぶ(重ねて呼んでも1回)。 */
+export function prefetchRecordData(): Promise<void> {
+  loading ??= Promise.all([
+    fetchQuickEntryGenresAction()
+      .then((g) => {
+        genreCache = g;
+      })
+      .catch(() => {}),
+    fetchAccounts().then((a) => {
+      if (a.length > 0) accountCache = a;
+    }),
+  ]).then(() => {
+    loading = null;
+  });
+  return loading;
+}
 
 const OpenRecordContext = createContext<((options?: RecordOptions) => void) | null>(null);
 
@@ -60,7 +92,8 @@ export function RecordSheet({
   onFiles,
   canStream,
   initialDate,
-  initialKind = 'expense',
+  initialKind,
+  initialError,
 }: {
   onClose: () => void;
   /** 自前のカメラ(連続撮影・写真ライブラリもその中にある)を開く。 */
@@ -70,35 +103,63 @@ export function RecordSheet({
   /** 日付の初期値(無ければ今日)。 */
   initialDate?: string | undefined;
   initialKind?: 'expense' | 'income' | undefined;
+  /** 保存できなかった理由(開き直したとき)。 */
+  initialError?: string | undefined;
 }) {
   const router = useRouter();
+  const openRecord = useOpenRecord();
   const today = todayJst();
-  const [kind, setKind] = useState<Kind>(initialKind);
-  const [amount, setAmount] = useState('');
-  const [genreId, setGenreId] = useState<string | null>(null);
-  const [date, setDate] = useState(initialDate ?? today);
-  const [name, setName] = useState('');
-  const [memo, setMemo] = useState('');
-  const [fixed, setFixed] = useState(false);
-  const [genres, setGenres] = useState<readonly { id: string; name: string }[]>([]);
-  const [accounts, setAccounts] = useState<readonly AccountOption[]>([]);
-  const [accountId, setAccountId] = useState('');
+  // 保存せずに閉じた入力(下書き)があれば戻す。カレンダーから日付を指定して開いたら、その日にする。
+  const [restored] = useState(() => peekDraft());
+  const [kind, setKind] = useState<Kind>(initialKind ?? restored?.kind ?? 'expense');
+  const [amount, setAmount] = useState(restored?.amount ?? '');
+  const [genreId, setGenreId] = useState<string | null>(restored?.genreId ?? null);
+  const [date, setDate] = useState(initialDate ?? restored?.date ?? today);
+  const [name, setName] = useState(restored?.name ?? '');
+  const [memo, setMemo] = useState(restored?.memo ?? '');
+  const [fixed, setFixed] = useState(restored?.fixed ?? false);
+  const [genres, setGenres] = useState<readonly GenreTile[]>(genreCache ?? []);
+  const [accounts, setAccounts] = useState<readonly AccountOption[]>(accountCache ?? []);
+  const [accountId, setAccountId] = useState(restored?.accountId || (accountCache?.[0]?.id ?? ''));
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
+  const [showRestored, setShowRestored] = useState(restored !== null && !initialError);
 
   useEffect(() => {
-    void fetchQuickEntryGenresAction().then(setGenres);
-    void fetchAccounts().then((fetched) => {
-      setAccounts(fetched);
-      setAccountId(fetched[0]?.id ?? '');
+    void prefetchRecordData().then(() => {
+      if (genreCache) setGenres(genreCache);
+      if (accountCache) {
+        setAccounts(accountCache);
+        setAccountId((prev) => prev || (accountCache?.[0]?.id ?? ''));
+      }
     });
   }, []);
 
+  // 入れるたびに下書きに残す。保存せずに閉じても(どの閉じ方でも)、次に開くと戻る(ADR-098)。
+  const current: RecordDraft = { kind, amount, genreId, date, name, memo, fixed, accountId };
+  const finished = useRef(false);
+  useEffect(() => {
+    if (!finished.current) {
+      keepDraft({ kind, amount, genreId, date, name, memo, fixed, accountId });
+    }
+  }, [kind, amount, genreId, date, name, memo, fixed, accountId]);
+
   const amountYen = Number(amount.replace(/[^\d]/g, ''));
-  const canSave = amountYen > 0 && accountId !== '' && !saving;
+  const canSave = amountYen > 0;
   const scheduled = date > today;
+
+  const resetForm = () => {
+    clearDraft();
+    setAmount('');
+    setGenreId(null);
+    setName('');
+    setMemo('');
+    setFixed(false);
+    setDate(initialDate ?? today);
+    setShowRestored(false);
+    setError(null);
+  };
 
   const addCategory = async () => {
     const name = newName.trim();
@@ -127,20 +188,46 @@ export function RecordSheet({
           : '返金'
         : (selectedGenre?.name ?? '手入力');
 
-  const save = async () => {
-    if (!canSave) return;
+  // 保存:押したらすぐ閉じ、保存はうしろで続ける(待たせない、ADR-098)。保存できなかったら、入れた値を
+  // 下書きに戻して、理由をつけてシートを開き直す。二度押ししても1回だけ。
+  const save = () => {
+    if (finished.current) return;
+    if (!canSave) {
+      setError('金額を入れてください。');
+      return;
+    }
     if (kind === 'refund' && genreId === null) {
       setError('返金は、どのカテゴリの支出から差し引くかを選んでください。');
       return;
     }
-    setSaving(true);
-    setError(null);
+    finished.current = true;
+    clearDraft();
+    hapticFor('save');
+    onClose();
+    void persist(current);
+  };
+
+  const failed = (snapshot: RecordDraft, message: string) => {
+    keepDraft(snapshot);
+    openRecord?.({ error: message });
+  };
+
+  const persist = async (snapshot: RecordDraft) => {
+    let account = snapshot.accountId;
+    if (account === '') {
+      const fetched = await fetchAccounts();
+      account = fetched[0]?.id ?? '';
+    }
+    if (account === '') {
+      failed(snapshot, '口座がまだありません。「…」› 口座 から1つ登録してください。');
+      return;
+    }
     const signed = kind === 'expense' ? -amountYen : amountYen;
     const genre = selectedGenre;
     const label = name.trim() || fallbackName;
     const preview: StoredTransaction = {
       id: 'manual-0',
-      accountId,
+      accountId: account,
       occurredOn: date,
       description: label,
       merchantName: label,
@@ -159,22 +246,25 @@ export function RecordSheet({
       sourceRef: null,
       memo: memo.trim() === '' ? null : memo.trim(),
     };
-    const outcome = await saveImportBatchAction([preview], {
-      fileName: '手入力',
-      source: 'manual',
-      accountId,
-      failedCount: 0,
-    });
+    let outcome: Awaited<ReturnType<typeof saveImportBatchAction>>;
+    try {
+      outcome = await saveImportBatchAction([preview], {
+        fileName: '手入力',
+        source: 'manual',
+        accountId: account,
+        failedCount: 0,
+      });
+    } catch {
+      failed(snapshot, '保存できませんでした。電波のよい所で、もう一度「保存」を押してください。');
+      return;
+    }
     if (outcome.error) {
-      setSaving(false);
-      setError(outcome.error);
+      failed(snapshot, outcome.error);
       return;
     }
     if (fixed && kind === 'expense') {
-      await confirmFixedCostAction(subscriptionKeyOf(label, label, signed));
+      await confirmFixedCostAction(subscriptionKeyOf(label, label, signed)).catch(() => {});
     }
-    setSaving(false);
-    hapticFor('save');
     if (outcome.insertedIds.length > 0) {
       const ids = outcome.insertedIds;
       pushUndo(`${label} を記録しました`, async () => {
@@ -184,12 +274,7 @@ export function RecordSheet({
         return null;
       });
     }
-    setAmount('');
-    setName('');
-    setMemo('');
-    setFixed(false);
     router.refresh();
-    onClose();
   };
 
   const receiptButton =
@@ -224,16 +309,41 @@ export function RecordSheet({
           キャンセル
         </button>
         <span className="text-[17px] font-semibold">記録する</span>
+        {/* 金額が無くても押せる(押したら何が足りないかを出す。黙って効かないボタンにしない、ADR-098) */}
         <button
           type="button"
-          onClick={() => void save()}
-          disabled={!canSave}
-          className="flex min-h-11 items-center justify-self-end text-[17px] font-bold disabled:opacity-40"
-          style={{ color: 'var(--accent)' }}
+          onClick={save}
+          className="flex min-h-11 items-center justify-self-end text-[17px] font-bold"
+          style={{ color: 'var(--accent)', opacity: canSave ? 1 : 0.4 }}
         >
-          {saving ? '保存中' : '保存'}
+          保存
         </button>
       </div>
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-xl px-3 py-2 text-[14px] leading-normal"
+          style={{ background: 'var(--note)', color: 'var(--over)' }}
+        >
+          {error}
+        </p>
+      ) : null}
+      {showRestored ? (
+        <div
+          className="flex items-center justify-between gap-2 rounded-xl px-3 text-[13px]"
+          style={{ background: 'var(--note)', color: 'var(--ink-secondary)' }}
+        >
+          <span>前に入れかけた内容を戻しました</span>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="min-h-11 px-1 font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            消す
+          </button>
+        </div>
+      ) : null}
 
       <section
         className="flex flex-col gap-1 rounded-[20px] px-4 pt-3 pb-4"
@@ -466,11 +576,6 @@ export function RecordSheet({
           />
         </label>
       </div>
-      {error ? (
-        <p role="alert" className="px-1 text-[13px]" style={{ color: 'var(--over)' }}>
-          {error}
-        </p>
-      ) : null}
       <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
         {kind === 'refund'
           ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'

@@ -529,6 +529,17 @@ button {
   user-select: none;
 }
 
+/* 押した瞬間に見た目で応える(雑に押しても、効いたかどうかがすぐわかる、ADR-098)。
+   指で触る端末だけ(マウスのホバーとは重ねない)。 */
+@media (hover: none) {
+  button:not(:disabled):active,
+  a[href]:active,
+  [role='button']:active,
+  label.cursor-pointer:active {
+    opacity: 0.6;
+  }
+}
+
 /* 大きな数字は比例数字で組む。tabular-nums は桁を 0 幅に揃えるため、
    ヒーロー級のサイズだと字間が間延びして見える。等幅が要るのは
    縦に並ぶ表と軸だけ(dataviz: marks-and-anatomy)。 */

@@ -26,6 +26,7 @@ vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({ confirmFixedCostA
 
 import { CategorySheetBody } from '../../app/(app)/category-sheet';
 import { RecordSheet } from '../../app/(app)/record-sheet';
+import { clearDraft, keepDraft } from '@/features/transactions/record-draft';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ');
 
@@ -146,5 +147,56 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
     expect(html).toContain('レシート名');
     expect(raw).toContain('placeholder="店名など（任意）"');
     expect(raw).toContain('maxLength="60"');
+  });
+});
+
+describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
+  const sheet = (props: Record<string, unknown> = {}) =>
+    renderToString(
+      h(RecordSheet, {
+        onClose: () => {},
+        onCamera: () => {},
+        onFiles: () => {},
+        canStream: true,
+        ...props,
+      }),
+    );
+
+  it('保存せずに閉じた入力は、次に開いたときに戻り、「消す」で消せる', () => {
+    keepDraft({
+      kind: 'expense',
+      amount: '1,200',
+      genreId: null,
+      date: '2026-10-16',
+      name: 'ファミリーマート',
+      memo: '',
+      fixed: false,
+      accountId: 'a1',
+    });
+    const raw = sheet();
+    expect(raw).toContain('value="1,200"');
+    expect(raw).toContain('value="ファミリーマート"');
+    expect(visible(raw)).toContain('前に入れかけた内容を戻しました');
+    expect(visible(raw)).toContain('消す');
+    clearDraft();
+  });
+
+  it('何も残っていなければ、空のまま開く', () => {
+    clearDraft();
+    const raw = sheet();
+    expect(visible(raw)).not.toContain('前に入れかけた内容を戻しました');
+  });
+
+  it('保存できなかったときは、理由をつけて開き直す', () => {
+    const raw = sheet({ initialError: '保存できませんでした。' });
+    expect(raw).toContain('role="alert"');
+    expect(visible(raw)).toContain('保存できませんでした。');
+  });
+
+  it('保存は金額が無くても押せる(押すと足りないものを伝える。黙って効かないボタンにしない)', () => {
+    const raw = sheet();
+    const save = raw.match(/<button[^>]*>保存<\/button>/)?.[0] ?? '';
+    expect(save).not.toBe('');
+    expect(save).not.toContain('disabled');
   });
 });
