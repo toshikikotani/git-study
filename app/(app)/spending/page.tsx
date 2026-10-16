@@ -1,6 +1,9 @@
+import { cookies } from 'next/headers';
+
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
+import { CALENDAR_VIEW_COOKIE, parseCalendarView } from '@/lib/calendar-view';
 import { AttentionCard } from './attention-card';
 import { CalendarHeatmap } from './calendar-heatmap';
 import { LedgerList, LedgerSearch } from './ledger-list';
@@ -14,7 +17,7 @@ import { SpendingMonthProvider } from './spending-month-provider';
  *   1. 見出しと月の切り替え(‹ 10月 ›)
  *   2. 支出・収入・差額
  *   3. 検索(店名・品目・メモ)
- *   4. カレンダー(週 ↔ 月。日付タップで明細を絞り込む)
+ *   4. カレンダー(週 ↔ 月。選んだ表示は覚えておく(ADR-093)。日付タップで明細を絞り込む)
  *   5. 確認が要る記録・入力待ちのレシート
  *   6. 予定 → この月の固定費 → 日付ごとの明細
  * カテゴリ・回数と1回の金額・1年の流れは「分析」へ移した。
@@ -27,10 +30,11 @@ import { SpendingMonthProvider } from './spending-month-provider';
 export const dynamic = 'force-dynamic';
 
 export default async function SpendingPage() {
-  const [data, duplicates, fixedKeys] = await Promise.all([
+  const [data, duplicates, fixedKeys, jar] = await Promise.all([
     loadSpendingMonthData(),
     listDuplicateCandidates(),
     listConfirmedFixedCostKeys().catch(() => new Set<string>()),
+    cookies(),
   ]);
   const today = data.ledger.period.to;
   const plan = await getCurrentPlan(today).catch(() => null);
@@ -50,7 +54,7 @@ export default async function SpendingPage() {
         <PeriodSwitcher />
         <MonthSummary />
         <LedgerSearch />
-        <CalendarHeatmap />
+        <CalendarHeatmap initialView={parseCalendarView(jar.get(CALENDAR_VIEW_COOKIE)?.value)} />
         <AttentionCard hasGoal={plan !== null} />
         <LedgerList
           goalRange={null}

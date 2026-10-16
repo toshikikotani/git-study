@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { formatEstimate, formatProbability } from '@/domain/forecast/format';
+import { formatEstimate, formatEstimateRange, formatProbability } from '@/domain/forecast/format';
 import { formatYen } from '@/domain/money';
 import type { CumulativeDay } from '@/features/category/pace';
 
@@ -39,8 +39,8 @@ function axisYen(yen: number): string {
 
 /**
  * いまの状況(デザイン仕様書の「分析 › 目標」、ADR-091):今期の目標と期間・「編集」、着地見込みと
- * 目標内の確率、こえそうな額、累計のグラフ(使った額・見込み・10回中8回の幅・目標までの理想)、
- * 残りの1日あたり、グラフを音で聞く。
+ * 10回中8回の幅の金額(ADR-094)、目標内の確率、こえそうな額、累計のグラフ(使った額・見込み・
+ * 10回中8回の幅・目標までの理想)、残りの1日あたり、グラフを音で聞く。
  */
 export function GoalStatusCard({
   status,
@@ -60,7 +60,8 @@ export function GoalStatusCard({
   const leftYen = status.budgetYen - status.spentYen;
   const perDay = remainingDays > 0 ? Math.round(leftYen / remainingDays) : null;
   const caution = status.probWithin !== null && status.probWithin < 0.5;
-  const spoken = `使った額は${formatYen(status.spentYen, { sign: 'never' })}。${endLabel}には${formatEstimate(status.p50)}の見込みで、目標${formatEstimate(status.budgetYen, { approx: false })}を${overYen > 0 ? 'こえそう' : '下回りそう'}。`;
+  const range = formatEstimateRange(status.p10, status.p90);
+  const spoken = `使った額は${formatYen(status.spentYen, { sign: 'never' })}。${endLabel}には${formatEstimate(status.p50)}の見込みで、10回中8回は${range}の間。目標${formatEstimate(status.budgetYen, { approx: false })}を${overYen > 0 ? 'こえそう' : '下回りそう'}。`;
   const speak = () => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setNote('この環境では読み上げできません。');
@@ -103,6 +104,9 @@ export function GoalStatusCard({
           </span>
           <span className="text-[34px] leading-tight font-bold tracking-[-0.01em]">
             {formatEstimate(status.p50)}
+          </span>
+          <span className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+            10回中8回は {range}
           </span>
         </span>
         {status.probWithin !== null ? (
@@ -148,7 +152,14 @@ export function GoalStatusCard({
         </Legend>
         <Legend
           swatch={
-            <span className="h-3 w-4 rounded-sm" style={{ background: 'var(--band-outer)' }} />
+            <span
+              className="h-3 w-4 rounded-sm"
+              style={{
+                background: 'var(--band-outer)',
+                boxShadow:
+                  'inset 0 0 0 1px color-mix(in srgb, var(--caution-mark) 35%, transparent)',
+              }}
+            />
           }
         >
           10回中8回の幅
@@ -241,14 +252,18 @@ function CumulativeSvg({ data, label }: { data: GoalStatus; label: string }) {
   const nowYen = last >= 0 ? (days[last]?.actualYen ?? 0) : 0;
   const origin = last >= 0 ? pt(last, nowYen) : pt(0, 0);
   const future = days.filter((d) => d.index > last && d.forecastYen !== null);
-  const band = (lo: keyof CumulativeDay, hi: keyof CumulativeDay) => {
-    const rows = future.filter((d) => d[lo] !== null && d[hi] !== null);
-    if (rows.length === 0) return null;
-    const upper = rows.map((d) => pt(d.index, d[hi] as number));
-    const lower = [...rows].reverse().map((d) => pt(d.index, d[lo] as number));
-    return `M${origin} L${upper.join(' L')} L${lower.join(' L')} Z`;
-  };
-  const outer = band('forecastLowYen', 'forecastHighYen');
+  // 10回中8回の幅:今日の点から広がる帯。上下の縁に細い線を引き、帯の形がわかるようにする。
+  const bandRows = future.filter((d) => d.forecastLowYen !== null && d.forecastHighYen !== null);
+  const upperPts = bandRows.map((d) => pt(d.index, d.forecastHighYen as number));
+  const lowerPts = bandRows.map((d) => pt(d.index, d.forecastLowYen as number));
+  const outer =
+    bandRows.length > 0
+      ? `M${origin} L${upperPts.join(' L')} L${[...lowerPts].reverse().join(' L')} Z`
+      : null;
+  const edges =
+    bandRows.length > 0
+      ? [`M${origin} L${upperPts.join(' L')}`, `M${origin} L${lowerPts.join(' L')}`]
+      : [];
   const median =
     future.length > 0
       ? `M${origin} L${future.map((d) => pt(d.index, d.forecastYen as number)).join(' L')}`
@@ -289,13 +304,28 @@ function CumulativeSvg({ data, label }: { data: GoalStatus; label: string }) {
       style={{ overflow: 'visible' }}
     >
       <line x1={X0} y1={bottom} x2={X1} y2={bottom} stroke="var(--bar-quiet)" strokeWidth="1" />
+      {outer ? (
+        <path data-band="outer" d={outer} fill="var(--band-outer)" fillOpacity="0.75" />
+      ) : null}
+      {edges.map((d) => (
+        <path
+          key={d}
+          d={d}
+          fill="none"
+          stroke="var(--caution-mark)"
+          strokeOpacity="0.35"
+          strokeWidth="1"
+        />
+      ))}
+      {/* 目標の線は帯の上に引く(帯に隠れないように、ADR-094) */}
       <line
+        data-line="budget"
         x1={X0}
         y1={y(data.budgetYen)}
         x2={X1}
         y2={y(data.budgetYen)}
         stroke="var(--ink)"
-        strokeWidth="1.2"
+        strokeWidth="1.4"
         strokeDasharray="4 4"
       />
       <text x="298" y={tagY('budget') + 8} fontSize="11" fill="var(--ink)" fontWeight="600">
@@ -304,7 +334,6 @@ function CumulativeSvg({ data, label }: { data: GoalStatus; label: string }) {
       <text x="298" y={tagY('budget') + 22} fontSize="11" fill="var(--ink-secondary)">
         {axisYen(data.budgetYen)}
       </text>
-      {outer ? <path d={outer} fill="var(--band-outer)" /> : null}
       {median ? (
         <path
           d={median}
