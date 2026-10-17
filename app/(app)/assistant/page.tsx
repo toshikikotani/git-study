@@ -1,8 +1,8 @@
 import { AssistantChat } from './assistant-chat';
 
 /**
- * AIの窓口(ADR-054 → 059 → 103)。ふだんは下のAIボタンから、どの画面でもシートで開く。
- * この画面(/assistant)も同じ部品で、同じ会話の続きになる。
+ * AIの窓口(ADR-054 → 059 → 103 → 108)。下のタブの「AI」で開く、ふつうの画面。
+ * 会話はアプリを開いているあいだ残る(ほかの画面へ移って戻っても続きから)。
  */
 export default function AssistantChatPage() {
   return <AssistantChat variant="page" />;

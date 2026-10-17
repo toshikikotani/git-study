@@ -21,6 +21,11 @@ import {
 } from '@/features/assistant/plan';
 import { withStoreCandidates } from '@/features/assistant/store-candidates';
 import {
+  simulateSpendCard,
+  whatIfToolText,
+  type WhatIfCard,
+} from '@/features/assistant/what-if-tool';
+import {
   ASSISTANT_SCREEN_KEYS,
   MAX_SCREEN_LINKS,
   screenLinkOf,
@@ -109,6 +114,22 @@ const TOOLS: Tool[] = [
         memo: { type: 'string', description: 'メモ(任意)' },
       },
       required: ['occurred_on', 'amount_yen'],
+    },
+  },
+  {
+    name: 'simulate_spend',
+    description:
+      '「今日あと3,000円使ったら？」「飲み会で5,000円使う予定、やばい？」のように、これから使う額で見通しが' +
+      'どう変わるかを、アプリの予測(ホームと同じ)で計算する。読むだけで何も記録しない。' +
+      '結果(着地見込み・目標内の確率・明日からの目安・月末の貯金の前→後)は本人の画面にもカードで出る。' +
+      'すでに記録してある支出は足さない(二重に数えない)。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        amount_yen: { type: 'number', description: 'これから使う額(円の正の整数)' },
+        genre_name: { type: 'string', description: 'ジャンル一覧にあるジャンル名(分かれば)' },
+      },
+      required: ['amount_yen'],
     },
   },
   {
@@ -320,6 +341,8 @@ export type AssistantReply = {
   question: AskUserQuestion | null;
   /** 画面へ移るボタン(show_screen、ADR-103)。 */
   links?: ScreenLink[];
+  /** もし使ったらの前 → 後(simulate_spend、ADR-108)。 */
+  whatIf?: WhatIfCard | null;
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -389,6 +412,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const proposed: ProposedChange[] = [];
   const links: ScreenLink[] = [];
+  const found: { whatIf: WhatIfCard | null } = { whatIf: null };
   let question: AskUserQuestion | null = null;
   let finalText = '';
 
@@ -421,7 +445,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const toolResults: ToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const outcome = handleToolUse(toolUse, planContext, proposed, links);
+        const outcome = await handleToolUse(toolUse, planContext, proposed, links, found);
         if (outcome.question !== null) question = outcome.question;
         toolResults.push({
           type: 'tool_result',
@@ -435,7 +459,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   } catch (error) {
     // 途中まで案ができていれば、それは出す(作った案を捨てない)。何もできていなければ送れなかった扱い。
-    if (proposed.length === 0 && links.length === 0) {
+    if (proposed.length === 0 && links.length === 0 && found.whatIf === null) {
       return NextResponse.json({ error: describeAnthropicError(error) }, { status: 502 });
     }
     return NextResponse.json({
@@ -443,6 +467,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       proposal: proposed.length > 0 ? { changes: proposed } : null,
       question: null,
       links,
+      whatIf: found.whatIf,
     } satisfies AssistantReply);
   }
 
@@ -453,24 +478,37 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? '案を作りました。内容を確かめて、よければ反映してください。'
         : links.length > 0
           ? 'この画面で見られます。'
-          : '完了しました。';
+          : found.whatIf !== null
+            ? found.whatIf.verdict
+            : '完了しました。';
   return NextResponse.json({
     reply: finalText !== '' ? finalText : fallback,
     proposal: proposed.length > 0 ? { changes: proposed } : null,
     question,
     links,
+    whatIf: found.whatIf,
   } satisfies AssistantReply);
 }
 
 type ToolOutcome = { message: string; isError: boolean; question: AskUserQuestion | null };
 
-function handleToolUse(
+async function handleToolUse(
   toolUse: ToolUseBlock,
   planContext: PlanContext,
   proposed: ProposedChange[],
   links: ScreenLink[],
-): ToolOutcome {
+  found: { whatIf: WhatIfCard | null },
+): Promise<ToolOutcome> {
   try {
+    if (toolUse.name === 'simulate_spend') {
+      const card = await simulateSpendCard(toolUse.input, planContext);
+      found.whatIf = card;
+      return {
+        message: whatIfToolText(card),
+        isError: false,
+        question: null,
+      };
+    }
     if (toolUse.name === 'show_screen') {
       const link = screenLinkOf((toolUse.input as { screen?: unknown } | null)?.screen);
       if (link === null) {

@@ -10,7 +10,7 @@ vi.mock('next/cache', () => ({
 }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => current.client }));
 
-import { loadForecast, topSpendsOn } from '@/features/forecast/load';
+import { loadForecast, prepareForecast, topSpendsOn } from '@/features/forecast/load';
 
 // 過去の月での検証(半減期の選択を含む)が数秒かかる。
 vi.setConfig({ testTimeout: 60_000 });
@@ -95,6 +95,26 @@ describe('loadForecast(Supabase の読み込みを通した予測)', () => {
     expect(view.tomorrowLimit).not.toBeNull();
     expect(view.tomorrowLimit!.todayLimitYen).toBeGreaterThanOrEqual(0);
     expect(Array.isArray(view.todayTopSpends)).toBe(true);
+  });
+
+  it('もし使ったら(ADR-108):同じ読み込みで、今日の支出を足すと着地が増え、明日からの目安が減る', async () => {
+    const run = await prepareForecast({
+      period: { from: '2026-10-07', to: '2026-11-05' },
+      budgetYen: 60000,
+      scope: {},
+      now: new Date('2026-10-17T03:00:00Z'),
+    });
+    const base = run();
+    const again = run();
+    const spent = run({ amountYen: 8000, genreId: 'dining', genreName: '外食' });
+    expect(again.forecast.total.p50).toBe(base.forecast.total.p50);
+    expect(spent.forecast.total.p50).toBeGreaterThan(base.forecast.total.p50);
+    expect(spent.todaySpentYen).toBe(base.todaySpentYen + 8000);
+    if (base.tomorrowLimit && spent.tomorrowLimit) {
+      expect(spent.tomorrowLimit.todayLimitYen).toBeLessThanOrEqual(
+        base.tomorrowLimit.todayLimitYen,
+      );
+    }
   });
 
   it('明細が無い人でも、エラーにならない', async () => {

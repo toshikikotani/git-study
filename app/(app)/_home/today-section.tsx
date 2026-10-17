@@ -3,6 +3,7 @@ import { calendarContext } from '@/domain/forecast/calendar';
 import { loadTodayForecasts, todayCapYen } from '@/features/home/today-forecasts';
 import { daysBetween, splitDateOnly } from '@/lib/date';
 import { SavingsCard } from './savings-card';
+import { WhatIfButton } from './what-if-sheet';
 import { shortDate, TodayCard } from './today-card';
 
 /** 「10月の見通し」(暦の1か月の目標)/「10月14日までの見通し」(それ以外)。 */
@@ -88,6 +89,7 @@ export async function TodaySection({
         tomorrowYen={goalView?.tomorrowLimit?.todayLimitYen ?? null}
         daysAfterToday={Math.max(0, daysBetween(today, periodTo))}
         todayTopNames={goalView?.todayTopSpends.map((s) => s.name) ?? []}
+        whatIf={goal && forecast ? <WhatIfButton /> : null}
       />
       {upcoming}
       <SavingsCard

@@ -59,13 +59,25 @@ export type RecordEdit = {
  * 記録するを開くときの初期値(明細のカレンダーの「この日に手で記録」など)。
  * error は、保存できなかったときに開き直して見せる理由(入れた値は下書きから戻る、ADR-098)。
  */
-export type RecordOptions = { date?: string; kind?: 'expense' | 'income'; error?: string };
+export type RecordOptions = {
+  date?: string;
+  kind?: 'expense' | 'income';
+  error?: string;
+  /** 金額とカテゴリを入れて開く(「もし使ったら」の「予定に入れる」、ADR-108)。 */
+  amountYen?: number;
+  genreId?: string | null;
+};
 
 // ---- カテゴリと口座を先に読んでおく(開いた瞬間からタイルが並ぶように、ADR-098)------------------
 type GenreTile = { id: string; name: string };
 let genreCache: readonly GenreTile[] | null = null;
 let accountCache: readonly AccountOption[] | null = null;
 let loading: Promise<void> | null = null;
+
+/** 読んでおいたカテゴリ(まだなら null)。「もし使ったら」のカテゴリにも使う。 */
+export function cachedRecordGenres(): readonly GenreTile[] | null {
+  return genreCache;
+}
 
 /** カテゴリと口座を読んでおく。アプリを開いたときと、記録するを開くたびに呼ぶ(重ねて呼んでも1回)。 */
 export function prefetchRecordData(): Promise<void> {
@@ -120,6 +132,8 @@ export function RecordSheet({
   initialDate,
   initialKind,
   initialError,
+  initialAmountYen,
+  initialGenreId,
   edit,
 }: {
   onClose: () => void;
@@ -130,6 +144,9 @@ export function RecordSheet({
   initialKind?: 'expense' | 'income' | undefined;
   /** 保存できなかった理由(開き直したとき)。 */
   initialError?: string | undefined;
+  /** 金額とカテゴリの初期値(「もし使ったら」の「予定に入れる」)。 */
+  initialAmountYen?: number | undefined;
+  initialGenreId?: string | null | undefined;
   /** 既にある記録を直すとき。 */
   edit?: RecordEdit | undefined;
 }) {
@@ -138,14 +155,19 @@ export function RecordSheet({
   const today = todayJst();
   // 保存せずに閉じた入力(下書き)があれば戻す。カレンダーから日付を指定して開いたら、その日にする。
   // 記録を直すときは下書きを使わない(直す前の値から始める)。
-  const [restored] = useState(() => (edit ? null : peekDraft()));
+  const prefilled = initialAmountYen !== undefined;
+  const [restored] = useState(() => (edit || prefilled ? null : peekDraft()));
   const start = edit?.initial;
   const [kind, setKind] = useState<Kind>(start?.kind ?? initialKind ?? restored?.kind ?? 'expense');
   const [amount, setAmount] = useState(
-    start ? start.amountYen.toLocaleString('ja-JP') : (restored?.amount ?? ''),
+    start
+      ? start.amountYen.toLocaleString('ja-JP')
+      : prefilled
+        ? initialAmountYen.toLocaleString('ja-JP')
+        : (restored?.amount ?? ''),
   );
   const [genreId, setGenreId] = useState<string | null>(
-    start ? start.genreId : (restored?.genreId ?? null),
+    start ? start.genreId : prefilled ? (initialGenreId ?? null) : (restored?.genreId ?? null),
   );
   const [date, setDate] = useState(start?.date ?? initialDate ?? restored?.date ?? today);
   const [name, setName] = useState(start?.name ?? restored?.name ?? '');

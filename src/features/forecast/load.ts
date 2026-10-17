@@ -85,6 +85,24 @@ export function spentOn(
   return Math.max(0, yen);
 }
 
+/** 「もし使ったら」の、今日の支出1件(実績として数える)。 */
+function extraSpendRow(extra: ExtraSpend, today: DateOnly): ForecastSourceTransaction {
+  return {
+    occurredOn: today,
+    createdOn: today,
+    genreId: extra.genreId,
+    genreName: extra.genreName,
+    amountYen: -Math.abs(extra.amountYen),
+    status: 'actual',
+    kind: 'normal',
+    isTransfer: false,
+    reviewStatus: 'auto_ok',
+    needsInput: false,
+    merchantName: null,
+    description: 'もし使ったら',
+  };
+}
+
 /** 範囲の、その日の支出の大きいもの(名前と額)。返金・振替・対象外は入れない。 */
 export function topSpendsOn(
   transactions: readonly ForecastSourceTransaction[],
@@ -136,13 +154,29 @@ async function loadTakeHomeYen(): Promise<number | null> {
   return (data as { monthly_take_home_yen: number | null }).monthly_take_home_yen ?? null;
 }
 
-export async function loadForecast(args: {
+export type ForecastArgs = {
   period: { from: DateOnly; to: DateOnly };
   budgetYen?: number | null;
   scope?: ForecastScope;
   categoryTargets?: readonly CategoryTarget[];
   now?: Date;
-}): Promise<ForecastView> {
+};
+
+/** 「もし使ったら」の、今日これから使う額(ADR-108)。 */
+export type ExtraSpend = { amountYen: number; genreId: string | null; genreName: string | null };
+
+export async function loadForecast(args: ForecastArgs): Promise<ForecastView> {
+  return (await prepareForecast(args))();
+}
+
+/**
+ * 予測に使う明細・設定・検証を読み、予測を出す関数を返す(ADR-108)。
+ * 「もし使ったら」は、同じ読み込みで「いつも通り」と「今日これだけ使ったら」を何度か出し比べる
+ * (読み込みは1回。乱数の種も同じなので、差は使った額の分だけになる)。
+ */
+export async function prepareForecast(
+  args: ForecastArgs,
+): Promise<(extra?: ExtraSpend) => ForecastView> {
   const today = todayJst(args.now ?? new Date());
   const supabase = await createClient();
   // 約束(ADR-075)は今日の月のものだけを、今日を含む期間の予測に入れる。これまでの月の約束は、
@@ -237,106 +271,112 @@ export async function loadForecast(args: {
         )()
       : null;
 
-  const forecast = buildForecast({
-    now: args.now ?? new Date(),
-    transactions,
-    period: args.period,
-    today,
-    trainingFrom: historyFrom,
-    recordStart,
-    confirmedFixedKeys: fixedKeys,
-    detectedSubscriptions: subscriptions,
-    budgetYen: args.budgetYen ?? null,
-    payday,
-    dataVersion,
-    noForecastGenreIds: noForecast,
-    promises: promises
-      .filter((p) => p.month === thisMonth && !noForecast.has(p.genreId))
-      .map((p) => ({ categoryId: p.genreId, perWeek: p.perWeek })),
-    promiseKeepRate: promiseKeepRate(
-      promises
-        .filter((p) => p.month < thisMonth)
-        .map((p) => ({
-          kept: promiseKept(
-            genreSpentYen(transactions, p.genreId, {
-              from: p.month,
-              to: addDays(addMonths(p.month, 1), -1),
-            }),
-            p.limitYen,
-          ),
-        })),
-    ),
-    calibration: verification?.calibration ?? null,
-    ...(verification
-      ? {
-          halfLifeDays: verification.halfLifeDays,
-          monthLevelK: verification.monthLevelK ?? Infinity,
-          genreLevelK: verification.genreLevelK ?? Infinity,
-        }
-      : {}),
-    ...(args.scope ? { scope: args.scope } : {}),
-    ...(args.categoryTargets ? { categoryTargets: args.categoryTargets } : {}),
-    income: args.scope ? null : periodIncome({ transactions, period: args.period, takeHomeYen }),
-  });
-  // 直近90日の実績から、休日と平日の1日あたり平均を計算する(残りの日の内訳表示用)。
-  const recentFrom = addDays(today, -90);
-  const recentTo = addDays(today, -1);
-  const averages = computeDayOffWeekdayAverages(transactions, recentFrom, recentTo);
+  return (extra) => {
+    const rows = extra ? [...periodRows, extraSpendRow(extra, today)] : periodRows;
+    const txs = extra ? [...transactions, extraSpendRow(extra, today)] : transactions;
+    const forecast = buildForecast({
+      now: args.now ?? new Date(),
+      transactions: txs,
+      period: args.period,
+      today,
+      trainingFrom: historyFrom,
+      recordStart,
+      confirmedFixedKeys: fixedKeys,
+      detectedSubscriptions: subscriptions,
+      budgetYen: args.budgetYen ?? null,
+      payday,
+      dataVersion,
+      noForecastGenreIds: noForecast,
+      promises: promises
+        .filter((p) => p.month === thisMonth && !noForecast.has(p.genreId))
+        .map((p) => ({ categoryId: p.genreId, perWeek: p.perWeek })),
+      promiseKeepRate: promiseKeepRate(
+        promises
+          .filter((p) => p.month < thisMonth)
+          .map((p) => ({
+            kept: promiseKept(
+              genreSpentYen(txs, p.genreId, {
+                from: p.month,
+                to: addDays(addMonths(p.month, 1), -1),
+              }),
+              p.limitYen,
+            ),
+          })),
+      ),
+      calibration: verification?.calibration ?? null,
+      ...(verification
+        ? {
+            halfLifeDays: verification.halfLifeDays,
+            monthLevelK: verification.monthLevelK ?? Infinity,
+            genreLevelK: verification.genreLevelK ?? Infinity,
+          }
+        : {}),
+      ...(args.scope ? { scope: args.scope } : {}),
+      ...(args.categoryTargets ? { categoryTargets: args.categoryTargets } : {}),
+      income: args.scope
+        ? null
+        : periodIncome({ transactions: txs, period: args.period, takeHomeYen }),
+    });
+    // 直近90日の実績から、休日と平日の1日あたり平均を計算する(残りの日の内訳表示用)。
+    const recentFrom = addDays(today, -90);
+    const recentTo = addDays(today, -1);
+    const averages = computeDayOffWeekdayAverages(txs, recentFrom, recentTo);
 
-  // 今日の上限を、休日軸・確率込みで計算して保存する
-  const cal = calendarContext(today, args.period.to, null);
-  const totalDays = periodDays(args.period.from, args.period.to);
-  const elapsed = periodDays(args.period.from, today);
-  const remainingDays = Math.max(0, totalDays - elapsed + 1);
-  const dayOffs = cal.dayOffs;
-  const weekdays = Math.max(0, remainingDays - dayOffs);
-  const leftBudgetYen = Math.max(
-    0,
-    (args.budgetYen ?? 0) -
-      forecast.actualYen -
-      (forecast.committed?.scheduledYen ?? 0) -
-      (forecast.committed?.fixedYen ?? 0),
-  );
-  const dailyLimit =
-    args.budgetYen != null && averages.weekdayPerDayYen != null
-      ? computeDailyLimit({
-          leftBudgetYen,
-          remainingDayOffs: dayOffs,
-          remainingWeekdays: weekdays,
-          dayOffMedianYen: averages.dayOffPerDayYen,
-          weekdayMedianYen: averages.weekdayPerDayYen,
-          probWithinBudget: forecast.probWithinBudget,
-          todayIsDayOff: isDayOff(today),
-        })
-      : null;
-  // 明日からの目安:今日の分を使ったあとの残り(今日使った額は使った額に入っている)を、明日からの日に配る。
-  const tomorrow = addDays(today, 1);
-  const todayOff = isDayOff(today) ? 1 : 0;
-  const tomorrowLimit =
-    dailyLimit !== null && remainingDays > 1
-      ? computeDailyLimit({
-          leftBudgetYen,
-          remainingDayOffs: Math.max(0, dayOffs - todayOff),
-          remainingWeekdays: Math.max(0, weekdays - (1 - todayOff)),
-          dayOffMedianYen: averages.dayOffPerDayYen,
-          weekdayMedianYen: averages.weekdayPerDayYen,
-          probWithinBudget: forecast.probWithinBudget,
-          todayIsDayOff: isDayOff(tomorrow),
-        })
-      : null;
+    // 今日の上限を、休日軸・確率込みで計算して保存する
+    const cal = calendarContext(today, args.period.to, null);
+    const totalDays = periodDays(args.period.from, args.period.to);
+    const elapsed = periodDays(args.period.from, today);
+    const remainingDays = Math.max(0, totalDays - elapsed + 1);
+    const dayOffs = cal.dayOffs;
+    const weekdays = Math.max(0, remainingDays - dayOffs);
+    const leftBudgetYen = Math.max(
+      0,
+      (args.budgetYen ?? 0) -
+        forecast.actualYen -
+        (forecast.committed?.scheduledYen ?? 0) -
+        (forecast.committed?.fixedYen ?? 0),
+    );
+    const dailyLimit =
+      args.budgetYen != null && averages.weekdayPerDayYen != null
+        ? computeDailyLimit({
+            leftBudgetYen,
+            remainingDayOffs: dayOffs,
+            remainingWeekdays: weekdays,
+            dayOffMedianYen: averages.dayOffPerDayYen,
+            weekdayMedianYen: averages.weekdayPerDayYen,
+            probWithinBudget: forecast.probWithinBudget,
+            todayIsDayOff: isDayOff(today),
+          })
+        : null;
+    // 明日からの目安:今日の分を使ったあとの残り(今日使った額は使った額に入っている)を、明日からの日に配る。
+    const tomorrow = addDays(today, 1);
+    const todayOff = isDayOff(today) ? 1 : 0;
+    const tomorrowLimit =
+      dailyLimit !== null && remainingDays > 1
+        ? computeDailyLimit({
+            leftBudgetYen,
+            remainingDayOffs: Math.max(0, dayOffs - todayOff),
+            remainingWeekdays: Math.max(0, weekdays - (1 - todayOff)),
+            dayOffMedianYen: averages.dayOffPerDayYen,
+            weekdayMedianYen: averages.weekdayPerDayYen,
+            probWithinBudget: forecast.probWithinBudget,
+            todayIsDayOff: isDayOff(tomorrow),
+          })
+        : null;
 
-  return {
-    forecast,
-    period: args.period,
-    verification,
-    today,
-    excludedByCategory: excludedSpend(transactions, args.period, args.scope),
-    cautionPrecision,
-    todaySpentYen: spentOn(periodRows, today, args.scope),
-    dayOffPerDayYen: averages.dayOffPerDayYen,
-    weekdayPerDayYen: averages.weekdayPerDayYen,
-    dailyLimit,
-    tomorrowLimit,
-    todayTopSpends: topSpendsOn(periodRows, today, args.scope),
+    return {
+      forecast,
+      period: args.period,
+      verification,
+      today,
+      excludedByCategory: excludedSpend(txs, args.period, args.scope),
+      cautionPrecision,
+      todaySpentYen: spentOn(rows, today, args.scope),
+      dayOffPerDayYen: averages.dayOffPerDayYen,
+      weekdayPerDayYen: averages.weekdayPerDayYen,
+      dailyLimit,
+      tomorrowLimit,
+      todayTopSpends: topSpendsOn(rows, today, args.scope),
+    };
   };
 }

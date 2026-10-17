@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -31,7 +31,6 @@ import {
 import { nextChromeCompact } from '@/lib/chrome';
 import { upgradeStoredTheme } from '@/lib/color-theme';
 import { scrollToTop, tabTapAction } from '@/lib/scroll';
-import { AssistantChat } from './assistant/assistant-chat';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
 import './liquid-tab.css';
 
@@ -39,10 +38,12 @@ configureReceiptQueue({ createCapture: createCaptureFromReadAction });
 
 // デザイン仕様書のボトムナビ(ADR-090):今日・明細・分析と、右に記録する(＋)。分析は「目標」から開く(ADR-091)。
 // 見通しと目標は「今日」から開く。アイコンの下に名前(色だけで選択中を示さない)。
+// AIはタブなので、ほかのタブと同じふつうの画面(/assistant)で開く(デザイン v3、ADR-108。以前はシートだった)。
 const NAV = [
   { href: '/', label: '今日', Icon: TodayIcon },
   { href: '/spending', label: '明細', Icon: ListIcon },
   { href: '/reports', label: '分析', Icon: AnalysisIcon },
+  { href: '/assistant', label: 'AI', Icon: AiIcon },
 ] as const;
 
 /** 記録メニューの大きなタイル(カメラ・写真から・手入力)の色。 */
@@ -203,9 +204,6 @@ function BottomBar({
     () => createLongPress({ onLongPress: () => setFabMenuOpen(true) }),
     [setFabMenuOpen],
   );
-  // AI(下のメニューのAIボタン、ADR-103)。どの画面でもシートで開き、画面へのボタンを押すと閉じて移る。
-  const router = useRouter();
-  const [aiOpen, setAiOpen] = useState(false);
   const reading = countReading(jobs);
   const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
   const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
@@ -279,17 +277,8 @@ function BottomBar({
           initialDate={record?.date}
           initialKind={record?.kind}
           initialError={record?.error}
-        />
-      </BottomSheet>
-      <BottomSheet open={aiOpen} onClose={() => setAiOpen(false)} role="dialog" label="AI" tall>
-        <AssistantChat
-          variant="sheet"
-          onClose={() => setAiOpen(false)}
-          onNavigate={(href) => {
-            setAiOpen(false);
-            onNavigate(href);
-            router.push(href as never);
-          }}
+          initialAmountYen={record?.amountYen}
+          initialGenreId={record?.genreId}
         />
       </BottomSheet>
       <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
@@ -322,23 +311,6 @@ function BottomBar({
                 </li>
               );
             })}
-            <li className="flex-1">
-              <button
-                type="button"
-                onClick={() => setAiOpen(true)}
-                aria-haspopup="dialog"
-                aria-expanded={aiOpen}
-                className="flex min-h-11 w-full flex-col items-center"
-              >
-                <span
-                  className={`liquid-tab text-[11px] font-semibold whitespace-nowrap${aiOpen ? ' is-active' : ''}`}
-                  style={{ flexDirection: 'column', gap: 2 }}
-                >
-                  <AiIcon />
-                  AI
-                </span>
-              </button>
-            </li>
           </ul>
         </nav>
         <div
