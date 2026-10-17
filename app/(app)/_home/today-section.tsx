@@ -1,7 +1,8 @@
 import { todayAllowance } from '@/domain/forecast/today';
 import { calendarContext } from '@/domain/forecast/calendar';
 import { loadTodayForecasts, todayCapYen } from '@/features/home/today-forecasts';
-import { daysBetween, splitDateOnly } from '@/lib/date';
+import { addDays, daysBetween, splitDateOnly, weekdayOf } from '@/lib/date';
+import { isDayOff, isHoliday } from '@/domain/forecast/holidays';
 import { SavingsCard } from './savings-card';
 import { WhatIfButton } from './what-if-sheet';
 import { shortDate, TodayCard } from './today-card';
@@ -13,6 +14,19 @@ export function outlookLabel(period: { from: string; to: string }): string {
   const lastDay = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
   if (fd === 1 && fm === tm && td === lastDay) return `${tm}月の見通し`;
   return `${tm}月${td}日までの見通し`;
+}
+
+/** 明日から期間の終わりまでの日(休日か・土日でない祝日か)。「なぜこの額？」の日ごとの棒に使う。 */
+function daysAfter(
+  today: string,
+  to: string,
+): { date: string; dayOff: boolean; holiday: boolean }[] {
+  const out: { date: string; dayOff: boolean; holiday: boolean }[] = [];
+  for (let d = addDays(today, 1); d <= to && out.length < 62; d = addDays(d, 1)) {
+    const weekend = [0, 6].includes(weekdayOf(d));
+    out.push({ date: d, dayOff: isDayOff(d), holiday: isHoliday(d) && !weekend });
+  }
+  return out;
 }
 
 /** 2026-10-31 → 10月31日 */
@@ -67,8 +81,11 @@ export async function TodaySection({
                 dayOffPerDayYen: goalView?.dayOffPerDayYen ?? null,
                 weekdayPerDayYen: goalView?.weekdayPerDayYen ?? null,
                 dailyLimit: goalView?.dailyLimit ?? null,
+                tomorrowLimit: goalView?.tomorrowLimit ?? null,
                 scheduledYen: forecast.committed?.scheduledYen ?? 0,
                 fixedYen: forecast.committed?.fixedYen ?? 0,
+                today,
+                days: daysAfter(today, periodTo),
               }
             : null
         }

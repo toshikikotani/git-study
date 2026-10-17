@@ -329,12 +329,19 @@ export async function prepareForecast(
     const remainingDays = Math.max(0, totalDays - elapsed + 1);
     const dayOffs = cal.dayOffs;
     const weekdays = Math.max(0, remainingDays - dayOffs);
+    // 今日の目安は、昨日までに使った額から決める(今日使った額は、目安から引いて「あと・こえ」を出す。
+    // 残りの予算からも引くと二重に数えていた、デザイン v3-9、ADR-109)。明日からの目安は、今日の分を
+    // 使ったあとの残りから。
+    const todaySpentYen = spentOn(rows, today, args.scope);
+    const committedYen =
+      (forecast.committed?.scheduledYen ?? 0) + (forecast.committed?.fixedYen ?? 0);
     const leftBudgetYen = Math.max(
       0,
-      (args.budgetYen ?? 0) -
-        forecast.actualYen -
-        (forecast.committed?.scheduledYen ?? 0) -
-        (forecast.committed?.fixedYen ?? 0),
+      (args.budgetYen ?? 0) - (forecast.actualYen - todaySpentYen) - committedYen,
+    );
+    const leftAfterTodayYen = Math.max(
+      0,
+      (args.budgetYen ?? 0) - forecast.actualYen - committedYen,
     );
     const dailyLimit =
       args.budgetYen != null && averages.weekdayPerDayYen != null
@@ -354,7 +361,7 @@ export async function prepareForecast(
     const tomorrowLimit =
       dailyLimit !== null && remainingDays > 1
         ? computeDailyLimit({
-            leftBudgetYen,
+            leftBudgetYen: leftAfterTodayYen,
             remainingDayOffs: Math.max(0, dayOffs - todayOff),
             remainingWeekdays: Math.max(0, weekdays - (1 - todayOff)),
             dayOffMedianYen: averages.dayOffPerDayYen,
@@ -371,7 +378,7 @@ export async function prepareForecast(
       today,
       excludedByCategory: excludedSpend(txs, args.period, args.scope),
       cautionPrecision,
-      todaySpentYen: spentOn(rows, today, args.scope),
+      todaySpentYen,
       dayOffPerDayYen: averages.dayOffPerDayYen,
       weekdayPerDayYen: averages.weekdayPerDayYen,
       dailyLimit,
