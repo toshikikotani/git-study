@@ -46,6 +46,34 @@ beforeEach(() => {
 });
 
 describe('loadLedgerTransactions', () => {
+  it('月をまたぐ確認待ちはAPIの1回の取得上限を超えてもすべて読み込む', async () => {
+    let page = 0;
+    tables = {
+      genres: { data: genres, error: null },
+      transactions: () => ({
+        data:
+          page++ === 0
+            ? Array.from({ length: 500 }, (_, i) =>
+                row({ id: `recent-${i}`, occurred_on: '2026-10-01', review_status: 'pending' }),
+              )
+            : [row({ id: 'older', occurred_on: '2025-01-03', review_status: 'pending' })],
+        error: null,
+      }),
+    };
+    const { transactions } = await loadLedgerTransactions(
+      { from: '0001-01-01', to: '9999-12-31' },
+      '2026-10-17',
+      { reviewStatus: 'pending' },
+    );
+    expect(page).toBe(2);
+    expect(transactions).toHaveLength(501);
+    expect(transactions.at(-1)).toMatchObject({
+      id: 'older',
+      occurredOn: '2025-01-03',
+      reviewStatus: 'pending',
+    });
+  });
+
   it('分割の子のカテゴリが未設定なら親のカテゴリを引き継ぐ(「未分類」の子を作らない)', async () => {
     tables = {
       genres: { data: genres, error: null },

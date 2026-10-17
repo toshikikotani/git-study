@@ -2,6 +2,7 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { useGenreOverrides } from '@/components/ui/genre-style-context';
@@ -11,7 +12,6 @@ import { formatYen } from '@/domain/money';
 import type { GenreBreakdownRow } from '@/features/spending/ledger-types';
 import { categoryHref } from '@/lib/category-nav';
 import { useJustSaved } from '@/lib/just-saved';
-import { useOpenCategory } from '../category-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
 /**
@@ -21,7 +21,7 @@ import { useSpendingMonth } from './spending-month-provider';
  */
 export function GenreBreakdown() {
   const overrides = useGenreOverrides();
-  const openCategory = useOpenCategory();
+  const pathname = usePathname();
   const { genreBreakdown, isCurrentMonth, loading, visibleMonth } = useSpendingMonth();
   const [showRest, setShowRest] = useState(false);
   const justSaved = useJustSaved().length > 0;
@@ -61,24 +61,18 @@ export function GenreBreakdown() {
   const row = (r: (typeof rows)[number], i: number) => (
     <li key={r.key}>
       {i > 0 ? <div className="ml-6 h-px" style={{ background: 'var(--hairline)' }} /> : null}
-      {r.genreId !== null ? (
-        <button
-          type="button"
-          onClick={() => openCategory(r.genreId!)}
-          className={`min-h-11 ${rowClass}`}
-          style={{ color: 'var(--ink)' }}
-        >
-          {rowBody(r)}
-        </button>
-      ) : (
-        <Link
-          href={categoryHref(r.key, visibleMonth) as Route}
-          className={`min-h-11 ${rowClass}`}
-          style={{ color: 'var(--ink)' }}
-        >
-          {rowBody(r)}
-        </Link>
-      )}
+      <Link
+        href={
+          categoryHref(r.key, visibleMonth, {
+            period: 'month',
+            returnTo: `${pathname}?month=${visibleMonth.slice(0, 7)}`,
+          }) as Route
+        }
+        className={`min-h-11 ${rowClass}`}
+        style={{ color: 'var(--ink)' }}
+      >
+        {rowBody(r)}
+      </Link>
     </li>
   );
 

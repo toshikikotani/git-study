@@ -13,7 +13,7 @@ import {
   inspectCsv,
   type ImportAdapter,
 } from '@/features/import/adapters';
-import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
+import { InputAccountSelector, useInputAccount } from '../input-account';
 import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
 import {
   fetchImportAdapter,
@@ -50,21 +50,13 @@ export default function ImportPage() {
   const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
   /** 行ごとに本人が選び直したジャンル(未選択の行は id をキーに持たない)。 */
   const [genreOverrides, setGenreOverrides] = useState<Map<string, string>>(new Map());
-  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
-  const [accountId, setAccountId] = useState('');
+  const inputAccount = useInputAccount();
+  const accountId = inputAccount.selectedAccount?.id ?? '';
 
   // ジャンル一覧(ADR-057)。取り込み時にAIで確定させることはしない
   // (本人がその場で選ぶか、後からAIジャンル分類にまとめて任せる)。
   useEffect(() => {
     void fetchGenreOptions().then(setGenreOptions);
-  }, []);
-
-  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
-  useEffect(() => {
-    void fetchAccounts().then((fetched) => {
-      setAccounts(fetched);
-      setAccountId((current) => current || (fetched[0]?.id ?? ''));
-    });
   }, []);
 
   const onFile = useCallback(
@@ -187,47 +179,13 @@ export default function ImportPage() {
         </Link>
       </header>
 
-      {/* 0. 口座(M6-2) */}
       <Card>
-        <Step n={1} title="口座を選ぶ" />
-        {accounts === null ? (
-          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            読み込んでいます…
-          </p>
-        ) : accounts.length === 0 ? (
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            口座がまだ登録されていません。
-            <Link
-              href="/accounts"
-              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
-              style={{ color: 'var(--accent)' }}
-            >
-              先に登録する →
-            </Link>
-          </p>
-        ) : (
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <InputAccountSelector inputAccount={inputAccount} />
       </Card>
 
       {/* 2. ファイル */}
       <Card>
-        <Step n={2} title="ファイルを選ぶ" />
+        <Step n={1} title="ファイルを選ぶ" />
         <label
           className="mt-3 block cursor-pointer rounded-2xl border border-dashed px-4 py-8 text-center"
           style={{ borderColor: 'var(--hairline)' }}
@@ -267,65 +225,90 @@ export default function ImportPage() {
       {/* 3. 列の対応 */}
       {loaded ? (
         <Card>
-          <Step n={3} title="列の対応を確かめる" />
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            ヘッダから推測しています。違っていれば選び直してください。
+            日付: {adapter.dateColumn || '未設定'} / 摘要: {adapter.descriptionColumn || '未設定'} /
+            金額:{' '}
+            {adapter.amountColumn ??
+              `${adapter.amountOutColumn || '未設定'}・${adapter.amountInColumn || '未設定'}`}
+            <br />
+            {loaded.encoding} ·{' '}
+            {adapter.amountSign === 'expense_positive'
+              ? '正の金額を支出として読み取り'
+              : '金額の符号をそのまま使用'}
           </p>
-
-          <div className="mt-3 space-y-2">
-            <ColumnSelect
-              label="日付"
-              header={loaded.header}
-              value={adapter.dateColumn}
-              onChange={(v) => setAdapter({ ...adapter, dateColumn: v })}
-            />
-            <ColumnSelect
-              label="摘要"
-              header={loaded.header}
-              value={adapter.descriptionColumn}
-              onChange={(v) => setAdapter({ ...adapter, descriptionColumn: v })}
-            />
-            {adapter.amountColumn !== undefined ? (
-              <>
-                <ColumnSelect
-                  label="金額"
-                  header={loaded.header}
-                  value={adapter.amountColumn}
-                  onChange={(v) => setAdapter({ ...adapter, amountColumn: v })}
-                />
-                <label className="flex items-center gap-2 pt-1 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={adapter.amountSign === 'expense_positive'}
-                    onChange={(e) =>
-                      setAdapter({
-                        ...adapter,
-                        amountSign: e.target.checked ? 'expense_positive' : 'as_is',
-                      })
-                    }
+          <details
+            open={
+              (result !== null &&
+                ('error' in result ||
+                  result.errors.length > 0 ||
+                  result.transactions.length === 0)) ||
+              undefined
+            }
+          >
+            <summary
+              className="min-h-11 cursor-pointer text-sm font-semibold"
+              style={{ color: 'var(--ink)' }}
+            >
+              読み取り設定を確認・変更する
+            </summary>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              前回の設定または列の推測を使っています。違っていれば選び直してください。
+            </p>
+            <div className="mt-3 space-y-2">
+              <ColumnSelect
+                label="日付"
+                header={loaded.header}
+                value={adapter.dateColumn}
+                onChange={(v) => setAdapter({ ...adapter, dateColumn: v })}
+              />
+              <ColumnSelect
+                label="摘要"
+                header={loaded.header}
+                value={adapter.descriptionColumn}
+                onChange={(v) => setAdapter({ ...adapter, descriptionColumn: v })}
+              />
+              {adapter.amountColumn !== undefined ? (
+                <>
+                  <ColumnSelect
+                    label="金額"
+                    header={loaded.header}
+                    value={adapter.amountColumn}
+                    onChange={(v) => setAdapter({ ...adapter, amountColumn: v })}
                   />
-                  <span style={{ color: 'var(--ink-secondary)' }}>
-                    金額が正の数で支出を表している(カード明細に多い)
-                  </span>
-                </label>
-              </>
-            ) : (
-              <>
-                <ColumnSelect
-                  label="出金"
-                  header={loaded.header}
-                  value={adapter.amountOutColumn ?? ''}
-                  onChange={(v) => setAdapter({ ...adapter, amountOutColumn: v })}
-                />
-                <ColumnSelect
-                  label="入金"
-                  header={loaded.header}
-                  value={adapter.amountInColumn ?? ''}
-                  onChange={(v) => setAdapter({ ...adapter, amountInColumn: v })}
-                />
-              </>
-            )}
-          </div>
+                  <label className="flex items-center gap-2 pt-1 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={adapter.amountSign === 'expense_positive'}
+                      onChange={(e) =>
+                        setAdapter({
+                          ...adapter,
+                          amountSign: e.target.checked ? 'expense_positive' : 'as_is',
+                        })
+                      }
+                    />
+                    <span style={{ color: 'var(--ink-secondary)' }}>
+                      金額が正の数で支出を表している(カード明細に多い)
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <ColumnSelect
+                    label="出金"
+                    header={loaded.header}
+                    value={adapter.amountOutColumn ?? ''}
+                    onChange={(v) => setAdapter({ ...adapter, amountOutColumn: v })}
+                  />
+                  <ColumnSelect
+                    label="入金"
+                    header={loaded.header}
+                    value={adapter.amountInColumn ?? ''}
+                    onChange={(v) => setAdapter({ ...adapter, amountInColumn: v })}
+                  />
+                </>
+              )}
+            </div>
+          </details>
         </Card>
       ) : null}
 
@@ -340,7 +323,7 @@ export default function ImportPage() {
 
       {result && !('error' in result) ? (
         <Card>
-          <Step n={4} title="取り込む内容を確かめる" />
+          <Step n={2} title="確認して保存する" />
 
           <div className="mt-3 flex gap-2">
             <Count label="取り込む" value={result.transactions.length} tone="accent" />
@@ -392,7 +375,7 @@ export default function ImportPage() {
                 読めなかった {result.errors.length} 行を見る
               </summary>
               <ul className="mt-2 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-                {result.errors.slice(0, 10).map((e) => (
+                {result.errors.map((e) => (
                   <li key={e.lineNumber}>
                     {e.lineNumber} 行目: {e.message}
                   </li>
@@ -404,7 +387,7 @@ export default function ImportPage() {
           <button
             type="button"
             onClick={() => void save()}
-            disabled={preview.length === 0 || saving}
+            disabled={preview.length === 0 || !accountId || saving}
             className="mt-5 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
             style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >

@@ -31,12 +31,15 @@ export function AllocationEditor({
   rows,
   saveLabel,
   onSave,
+  compact = false,
 }: {
   periodStart: string;
   periodEnd: string;
   rows: readonly AllocationRow[];
   saveLabel: string;
   onSave: (items: { genreId: string; targetYen: number }[]) => Promise<{ error: string | null }>;
+  /** 作成時は提案総額と保存を先に出し、細かい配分は必要なときに開く。 */
+  compact?: boolean;
 }) {
   const [lockTotal, setLockTotal] = useState(true);
   const [committedTotal, setCommittedTotal] = useState(
@@ -192,143 +195,151 @@ export function AllocationEditor({
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         総額を書き換えて確定すると、全カテゴリの配分が比率で自動的に増減します。
       </p>
-      <label className="flex items-center justify-between gap-3 text-xs">
-        <span style={{ color: 'var(--ink-secondary)' }}>
-          {lockTotal
-            ? '総額を固定する(カテゴリを動かしても総額は変わらない)'
-            : '総額を固定しない(カテゴリを動かすと総額が増減する)'}
-        </span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={lockTotal}
-          onChange={toggleLock}
-          aria-label="総額を固定する"
-          className="size-5 shrink-0"
-        />
-      </label>
-      <p
-        className="text-xs"
-        role="status"
-        style={{
-          color: lockTotal ? (balanced ? 'var(--income)' : 'var(--over)') : 'var(--ink-muted)',
-        }}
-      >
-        {!allValid
-          ? '金額を0円以上の整数で入力してください'
-          : !lockTotal
-            ? `カテゴリの合計 ${formatYen(allocated, { sign: 'never' })} がそのまま総額になります`
-            : unallocated === null
-              ? '総額を数字で入力してください'
-              : unallocated === 0
-                ? '配分が総額とぴったり合っています'
-                : unallocated > 0
-                  ? `あと${formatYen(unallocated, { sign: 'never' })}が未配分です`
-                  : `${formatYen(-unallocated, { sign: 'never' })}配りすぎです`}
-      </p>
-      <ul className="space-y-3">
-        {rows.map((row, i) => (
-          <li key={row.genreId}>
-            <div className="flex items-center justify-between gap-2">
-              <span
-                className="min-w-0 truncate text-sm font-medium"
-                style={{ color: 'var(--ink)' }}
-              >
-                {row.genreName}
-                {pinned.has(row.genreId) ? (
-                  <span className="ml-1 text-xs font-normal" style={{ color: 'var(--accent)' }}>
-                    固定
-                  </span>
-                ) : null}
-              </span>
-              <span className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  aria-label={`${row.genreName}を${STEP_YEN}円減らす`}
-                  onClick={() => setYen(row.genreId, (parsed[i] ?? 0) - STEP_YEN, true)}
-                  className="min-h-11 size-8 rounded-full text-base font-semibold"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  −
-                </button>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={inputs[row.genreId] ?? ''}
-                  onChange={(e) => {
-                    setInputs((prev) => ({ ...prev, [row.genreId]: e.target.value }));
-                    setPinned((prev) => new Set(prev).add(row.genreId));
-                    setAiSummary(null);
-                  }}
-                  aria-label={`${row.genreName}の目標額(円)`}
-                  aria-invalid={parsed[i] === null}
-                  className="tabular w-20 rounded-lg px-2 py-1 text-right text-sm"
-                  style={{
-                    background: 'var(--surface-raised)',
-                    color: 'var(--ink)',
-                    border: `1px solid ${parsed[i] === null ? 'var(--over)' : 'var(--hairline)'}`,
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-label={`${row.genreName}を${STEP_YEN}円増やす`}
-                  onClick={() => setYen(row.genreId, (parsed[i] ?? 0) + STEP_YEN, true)}
-                  className="min-h-11 size-8 rounded-full text-base font-semibold"
-                  style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
-                >
-                  ＋
-                </button>
-              </span>
-            </div>
-            {row.baselineYen !== null || row.note ? (
-              <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-                {row.baselineYen !== null
-                  ? `実績ペース ${formatYen(row.baselineYen, { sign: 'never' })}`
-                  : ''}
-                {row.baselineYen !== null && row.note ? ' ・ ' : ''}
-                {row.note ?? ''}
-              </p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {lockTotal && !balanced && unallocated !== null && allValid ? (
-        <Button variant="tonal" className="w-full" onClick={autoBalance}>
-          {pinned.size > 0
-            ? '自分で決めた額はそのまま、残りで総額に合わせる'
-            : '総額に合うよう自動で配分する'}
-        </Button>
-      ) : null}
-      <div className="rounded-xl p-3" style={{ background: 'var(--surface-raised)' }}>
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          このままだと、いくらで着きそうか
-        </p>
-        <Button
-          variant="outlined"
-          className="mt-2 w-full"
-          disabled={total === null || !allValid || busy !== null}
-          onClick={() => void showLanding()}
+      <details open={!compact || !allValid || !canSave} className="space-y-3">
+        <summary
+          className="min-h-11 cursor-pointer py-3 text-sm font-semibold"
+          style={{ color: 'var(--accent)' }}
         >
-          {busy === 'ai' ? '計算しています…' : '着地を見る'}
-        </Button>
-        {aiSummary ? (
-          <ForecastReport
-            summary={aiSummary}
-            proposedTotalYen={proposedTotal}
-            rows={forecasts}
-            onApply={(row) => {
-              if (row.recommendedYen === null) return;
-              const index = rows.findIndex((item) => item.genreId === row.genreId);
-              const previous = parsed[index] ?? 0;
-              setYen(row.genreId, row.recommendedYen, true);
-              setLockTotal(false);
-              setNotice({ genreId: row.genreId, yen: row.recommendedYen, previous });
-            }}
-            onApplyAll={() => void applyAllForecasts()}
-            applying={busy === 'save'}
+          カテゴリへの配分を調整 · {rows.length}件
+        </summary>
+        <label className="flex items-center justify-between gap-3 text-xs">
+          <span style={{ color: 'var(--ink-secondary)' }}>
+            {lockTotal
+              ? '総額を固定する(カテゴリを動かしても総額は変わらない)'
+              : '総額を固定しない(カテゴリを動かすと総額が増減する)'}
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={lockTotal}
+            onChange={toggleLock}
+            aria-label="総額を固定する"
+            className="size-5 shrink-0"
           />
+        </label>
+        <p
+          className="text-xs"
+          role="status"
+          style={{
+            color: lockTotal ? (balanced ? 'var(--income)' : 'var(--over)') : 'var(--ink-muted)',
+          }}
+        >
+          {!allValid
+            ? '金額を0円以上の整数で入力してください'
+            : !lockTotal
+              ? `カテゴリの合計 ${formatYen(allocated, { sign: 'never' })} がそのまま総額になります`
+              : unallocated === null
+                ? '総額を数字で入力してください'
+                : unallocated === 0
+                  ? '配分が総額とぴったり合っています'
+                  : unallocated > 0
+                    ? `あと${formatYen(unallocated, { sign: 'never' })}が未配分です`
+                    : `${formatYen(-unallocated, { sign: 'never' })}配りすぎです`}
+        </p>
+        <ul className="space-y-3">
+          {rows.map((row, i) => (
+            <li key={row.genreId}>
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className="min-w-0 truncate text-sm font-medium"
+                  style={{ color: 'var(--ink)' }}
+                >
+                  {row.genreName}
+                  {pinned.has(row.genreId) ? (
+                    <span className="ml-1 text-xs font-normal" style={{ color: 'var(--accent)' }}>
+                      固定
+                    </span>
+                  ) : null}
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label={`${row.genreName}を${STEP_YEN}円減らす`}
+                    onClick={() => setYen(row.genreId, (parsed[i] ?? 0) - STEP_YEN, true)}
+                    className="min-h-11 size-8 rounded-full text-base font-semibold"
+                    style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={inputs[row.genreId] ?? ''}
+                    onChange={(e) => {
+                      setInputs((prev) => ({ ...prev, [row.genreId]: e.target.value }));
+                      setPinned((prev) => new Set(prev).add(row.genreId));
+                      setAiSummary(null);
+                    }}
+                    aria-label={`${row.genreName}の目標額(円)`}
+                    aria-invalid={parsed[i] === null}
+                    className="tabular w-20 rounded-lg px-2 py-1 text-right text-sm"
+                    style={{
+                      background: 'var(--surface-raised)',
+                      color: 'var(--ink)',
+                      border: `1px solid ${parsed[i] === null ? 'var(--over)' : 'var(--hairline)'}`,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${row.genreName}を${STEP_YEN}円増やす`}
+                    onClick={() => setYen(row.genreId, (parsed[i] ?? 0) + STEP_YEN, true)}
+                    className="min-h-11 size-8 rounded-full text-base font-semibold"
+                    style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
+                  >
+                    ＋
+                  </button>
+                </span>
+              </div>
+              {row.baselineYen !== null || row.note ? (
+                <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+                  {row.baselineYen !== null
+                    ? `実績ペース ${formatYen(row.baselineYen, { sign: 'never' })}`
+                    : ''}
+                  {row.baselineYen !== null && row.note ? ' ・ ' : ''}
+                  {row.note ?? ''}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {lockTotal && !balanced && unallocated !== null && allValid ? (
+          <Button variant="tonal" className="w-full" onClick={autoBalance}>
+            {pinned.size > 0
+              ? '自分で決めた額はそのまま、残りで総額に合わせる'
+              : '総額に合うよう自動で配分する'}
+          </Button>
         ) : null}
-      </div>
+        <div className="rounded-xl p-3" style={{ background: 'var(--surface-raised)' }}>
+          <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+            このままだと、いくらで着きそうか
+          </p>
+          <Button
+            variant="outlined"
+            className="mt-2 w-full"
+            disabled={total === null || !allValid || busy !== null}
+            onClick={() => void showLanding()}
+          >
+            {busy === 'ai' ? '計算しています…' : '着地を見る'}
+          </Button>
+          {aiSummary ? (
+            <ForecastReport
+              summary={aiSummary}
+              proposedTotalYen={proposedTotal}
+              rows={forecasts}
+              onApply={(row) => {
+                if (row.recommendedYen === null) return;
+                const index = rows.findIndex((item) => item.genreId === row.genreId);
+                const previous = parsed[index] ?? 0;
+                setYen(row.genreId, row.recommendedYen, true);
+                setLockTotal(false);
+                setNotice({ genreId: row.genreId, yen: row.recommendedYen, previous });
+              }}
+              onApplyAll={() => void applyAllForecasts()}
+              applying={busy === 'save'}
+            />
+          ) : null}
+        </div>
+      </details>
       <Button
         variant="filled"
         className="w-full"

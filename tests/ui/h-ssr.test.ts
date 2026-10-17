@@ -29,6 +29,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   usePathname: () => '/spending',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { ActiveFilterChips, FilterSheet } from '../../app/(app)/spending/filter-sheet';

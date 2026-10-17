@@ -293,7 +293,10 @@ function BottomBar({
                     prefetch
                     aria-current={isActive ? 'page' : undefined}
                     onClick={(e) => {
-                      if (tabTapAction(pathname, item.href) === 'scroll-top') {
+                      const focusedReview =
+                        item.href === '/spending' &&
+                        new URLSearchParams(window.location.search).has('review');
+                      if (!focusedReview && tabTapAction(pathname, item.href) === 'scroll-top') {
                         e.preventDefault();
                         scrollToTop();
                       }

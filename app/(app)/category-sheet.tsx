@@ -523,7 +523,10 @@ export function CategorySheetBody({
         </section>
       )}
 
-      <Heading>設定</Heading>
+      <Heading>設定 · 変更はすぐ反映</Heading>
+      <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
+        この下の設定はその場で保存されます。キャンセルで取り消すのは目標額の変更だけです。
+      </p>
       <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         <Link
           href={`/settings/categories/${outlook.genreId}` as Route}

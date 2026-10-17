@@ -30,6 +30,7 @@ import {
 } from '@/lib/date';
 import { describeUserError } from '@/lib/errors';
 import { readAnthropicApiKey } from '@/lib/env';
+import { updatePlanDraft, type PlanEditDraft } from '@/features/spending-plan/edit-draft';
 
 const MAX_PERIOD_DAYS = 366;
 
@@ -209,6 +210,22 @@ export async function updatePlanAllocationAction(
   return { error: null };
 }
 
+/** 期間・総額・カテゴリへの配分を同じ編集単位として保存する。 */
+export async function updatePlanDraftAction(
+  planId: string,
+  draft: PlanEditDraft,
+): Promise<{ error: string | null }> {
+  try {
+    await updatePlanDraft(planId, draft);
+  } catch (error) {
+    // 復元ができなかった場合も、再読み込みで実際の保存状態を確認できるようにする。
+    revalidatePath('/', 'layout');
+    return { error: describeUserError(error) };
+  }
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
 export async function createNextPlanAction(planId: string): Promise<{ error: string | null }> {
   try {
     const loaded = await loadGoalView();
@@ -273,6 +290,7 @@ export async function reserveNextPlanAction(planId: string): Promise<{ error: st
 export async function loadGoalSnapshotAction(): Promise<{
   snapshot: GoalSnapshot | null;
   today: string;
+  error?: string;
 }> {
   const today = todayJst();
   try {
@@ -280,7 +298,11 @@ export async function loadGoalSnapshotAction(): Promise<{
     if (loaded === null || !loaded.view.active) return { snapshot: null, today };
     return { snapshot: loaded.view.snapshot, today };
   } catch {
-    return { snapshot: null, today };
+    return {
+      snapshot: null,
+      today,
+      error: '目標への影響を確認できませんでした。もう一度お試しください。',
+    };
   }
 }
 

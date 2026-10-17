@@ -3,7 +3,7 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildCategorySummary, buildInsights, type Insight } from '@/features/category/insights';
 import { buildCumulative, categoryAllowanceYen, goalOverlaps } from '@/features/category/pace';
@@ -32,6 +32,7 @@ import { RuleSheet } from './rule-sheet';
 import { useCategoryEdits } from './use-category-edits';
 import { InsightsSection } from './insights-section';
 import { SummarySection } from './summary-section';
+import { useOpenCategory } from '../../../category-sheet';
 
 /**
  * カテゴリ詳細の画面(クライアント側)。読み込んだ明細をここで持ち、編集・移動は
@@ -41,13 +42,20 @@ import { SummarySection } from './summary-section';
 export function CategoryScreen({
   data,
   whatIf = null,
+  returnTo,
 }: {
   data: CategoryDetailData;
   /** 「もし、へらしたら」(サーバーで読み込む。今月のジャンルだけ)。 */
   whatIf?: React.ReactNode;
+  returnTo?: string | undefined;
 }) {
   return (
-    <CategoryScreenInner key={`${data.genreKey}:${data.monthKey}`} data={data} whatIf={whatIf} />
+    <CategoryScreenInner
+      key={`${data.genreKey}:${data.monthKey}`}
+      data={data}
+      whatIf={whatIf}
+      returnTo={returnTo}
+    />
   );
 }
 
@@ -61,11 +69,18 @@ export type LineFocus = {
 function CategoryScreenInner({
   data,
   whatIf,
+  returnTo,
 }: {
   data: CategoryDetailData;
   whatIf: React.ReactNode;
+  returnTo?: string | undefined;
 }) {
   const router = useRouter();
+  const openCategory = useOpenCategory();
+  const goBack = useCallback(() => {
+    if (returnTo) router.replace(returnTo as Route, { scroll: false });
+    else router.back();
+  }, [router, returnTo]);
   const {
     transactions,
     ghosts,
@@ -289,7 +304,9 @@ function CategoryScreenInner({
   const pickBucket = (b: Bucket) => {
     if (unit === 'month') {
       // 月の棒は、その月のカテゴリ詳細へ移る(別の月のデータを読み直す)。
-      router.replace(categoryHref(data.genreKey, b.from) as Route, { scroll: false });
+      router.replace(categoryHref(data.genreKey, b.from, { period: 'month', returnTo }) as Route, {
+        scroll: false,
+      });
       return;
     }
     const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -308,7 +325,7 @@ function CategoryScreenInner({
     const up = (e: PointerEvent) => {
       const s = edge.current;
       edge.current = null;
-      if (s && isEdgeBackSwipe(s.x, e.clientX - s.x, e.clientY - s.y)) router.back();
+      if (s && isEdgeBackSwipe(s.x, e.clientX - s.x, e.clientY - s.y)) goBack();
     };
     window.addEventListener('pointerdown', down);
     window.addEventListener('pointerup', up);
@@ -316,7 +333,7 @@ function CategoryScreenInner({
       window.removeEventListener('pointerdown', down);
       window.removeEventListener('pointerup', up);
     };
-  }, [router]);
+  }, [goBack]);
 
   const shown: CategoryLine[] = focus
     ? lines.filter(
@@ -359,7 +376,8 @@ function CategoryScreenInner({
         totalYen={totalYen}
         goalPeriod={data.goal?.active ? data.goal.range : null}
         isGoalPeriod={data.isGoalPeriod}
-        onBack={() => router.back()}
+        onBack={goBack}
+        returnTo={returnTo}
         menu={
           <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
             <button
@@ -371,6 +389,16 @@ function CategoryScreenInner({
             >
               {selectMode ? '完了' : '選択'}
             </button>
+            {currentGenreId !== null ? (
+              <button
+                type="button"
+                onClick={() => openCategory(currentGenreId)}
+                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
+                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+              >
+                今期の目標を調整
+              </button>
+            ) : null}
             {currentGenreId !== null ? (
               <Link
                 href={`/settings/categories/${currentGenreId}` as Route}
@@ -394,7 +422,9 @@ function CategoryScreenInner({
       ) : null}
       {!isUncategorizedScreen ? <WeekdayCard lines={lines} genreName={data.genreName} /> : null}
 
-      {isUncategorizedScreen ? <UncategorizedMonths lines={historyLines} /> : null}
+      {isUncategorizedScreen ? (
+        <UncategorizedMonths lines={historyLines} returnTo={returnTo} />
+      ) : null}
 
       {isUncategorizedScreen && confident.length > 0 ? (
         <button
@@ -513,22 +543,27 @@ function CategoryScreenInner({
         line={openLine}
         genres={data.genres}
         suggestedGenreId={quickDestination?.id ?? null}
+        error={banner}
         onClose={() => setOpenLine(null)}
-        onSave={(line, patch) => {
-          setOpenLine(null);
-          void saveEdit(line, patch);
+        onSave={async (line, patch) => {
+          const saved = await saveEdit(line, patch);
+          if (saved) setOpenLine(null);
+          return saved;
         }}
-        onMove={(line, to) => {
-          setOpenLine(null);
-          void moveWithRule([line], to);
+        onMove={async (line, to) => {
+          const moved = await moveWithRule([line], to);
+          if (moved) setOpenLine(null);
+          return moved;
         }}
-        onDelete={(line) => {
-          setOpenLine(null);
-          void deleteLines([line]);
+        onDelete={async (line) => {
+          const deleted = await deleteLines([line]);
+          if (deleted) setOpenLine(null);
+          return deleted;
         }}
-        onMoveItem={(line, itemId, to) => {
-          setOpenLine(null);
-          void moveItemWithRule(line, itemId, to);
+        onMoveItem={async (line, itemId, to) => {
+          const moved = await moveItemWithRule(line, itemId, to);
+          if (moved) setOpenLine(null);
+          return moved;
         }}
       />
 
@@ -664,7 +699,13 @@ function CategoryScreenInner({
   );
 }
 
-function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
+function UncategorizedMonths({
+  lines,
+  returnTo,
+}: {
+  lines: readonly CategoryLine[];
+  returnTo?: string | undefined;
+}) {
   const byMonth = new Map<string, { yen: number; count: number }>();
   for (const line of lines) {
     if (line.status !== 'actual' || line.amountYen >= 0) continue;
@@ -690,7 +731,7 @@ function UncategorizedMonths({ lines }: { lines: readonly CategoryLine[] }) {
           {months.map(([key, row]) => (
             <li key={key}>
               <Link
-                href={`/spending/category/none?month=${key}` as Route}
+                href={categoryHref('none', key, { period: 'month', returnTo }) as Route}
                 className="block min-h-11"
               >
                 <span className="flex items-baseline justify-between gap-3 text-sm">

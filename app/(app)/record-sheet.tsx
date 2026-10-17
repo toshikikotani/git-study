@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 import { Segmented } from '@/components/ui/segmented';
@@ -8,7 +9,6 @@ import { Switch } from '@/components/ui/switch';
 import { genreSwatch } from '@/domain/genre-style';
 import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
-import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import {
   clearDraft,
   keepDraft,
@@ -23,6 +23,7 @@ import { markRecordFixedAction } from './reports/fixed-cost-actions';
 import { createCategoryAction } from './spending/category/actions';
 import { saveImportBatchAction, undoReceiptSaveAction } from './transactions/actions';
 import { fetchQuickEntryGenresAction, fetchStoreGenresAction } from './transactions/new/actions';
+import { InputAccountSelector, useInputAccount } from './transactions/input-account';
 
 /** 記録の種類。返金は支出の「詳細」で選ぶ(デザイン v3-4)。 */
 type Kind = 'expense' | 'income' | 'refund';
@@ -57,6 +58,8 @@ export type RecordEdit = {
   footer?: React.ReactNode;
   /** 右上のボタンの文言(既定は「保存」。AIの案を直すときは「完了」、ADR-105)。 */
   saveLabel?: string;
+  /** 確認待ちの記録では、値が同じでも確認結果を保存する。 */
+  saveUnchanged?: boolean;
 };
 
 /**
@@ -72,12 +75,11 @@ export type RecordOptions = {
   genreId?: string | null;
 };
 
-// ---- カテゴリと口座を先に読んでおく(開いた瞬間からタイルが並ぶように、ADR-098)------------------
+// ---- カテゴリを先に読んでおく(開いた瞬間からタイルが並ぶように、ADR-098)------------------
 type GenreTile = { id: string; name: string };
 let genreCache: readonly GenreTile[] | null = null;
 /** 店名(比較用の形)→ 前回のカテゴリ。店名を入れたら、そのカテゴリを先に選ぶ(ADR-108)。 */
 let storeGenreCache: ReadonlyMap<string, string> | null = null;
-let accountCache: readonly AccountOption[] | null = null;
 let loading: Promise<void> | null = null;
 
 /** 読んでおいたカテゴリ(まだなら null)。「もし使ったら」のカテゴリにも使う。 */
@@ -85,7 +87,7 @@ export function cachedRecordGenres(): readonly GenreTile[] | null {
   return genreCache;
 }
 
-/** カテゴリと口座を読んでおく。アプリを開いたときと、記録するを開くたびに呼ぶ(重ねて呼んでも1回)。 */
+/** カテゴリを読んでおく。アプリを開いたときと、記録するを開くたびに呼ぶ(重ねて呼んでも1回)。 */
 export function prefetchRecordData(): Promise<void> {
   loading ??= Promise.all([
     fetchQuickEntryGenresAction()
@@ -93,9 +95,6 @@ export function prefetchRecordData(): Promise<void> {
         genreCache = g;
       })
       .catch(() => {}),
-    fetchAccounts().then((a) => {
-      if (a.length > 0) accountCache = a;
-    }),
     fetchStoreGenresAction()
       .then((pairs) => {
         storeGenreCache = new Map(pairs);
@@ -203,13 +202,13 @@ export function RecordSheet({
   const [split, setSplit] = useState(restored?.split ?? '');
   const [fixed, setFixed] = useState(restored?.fixed ?? false);
   const [genres, setGenres] = useState<readonly GenreTile[]>(genreCache ?? []);
-  const [accounts, setAccounts] = useState<readonly AccountOption[]>(accountCache ?? []);
-  const [accountId, setAccountId] = useState(restored?.accountId || (accountCache?.[0]?.id ?? ''));
+  const inputAccount = useInputAccount(restored?.accountId ?? '');
+  const { accountId } = inputAccount;
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [allGenres, setAllGenres] = useState(false);
-  // 詳細(割り勘・返金・口座・メモ)は、入っている値があるときだけ開いて始める。
+  // 詳細(割り勘・返金・メモ)は、入っている値があるときだけ開いて始める。
   const [more, setMore] = useState(
     start?.kind === 'refund' ||
       (start?.memo ?? '') !== '' ||
@@ -228,10 +227,6 @@ export function RecordSheet({
   useEffect(() => {
     void prefetchRecordData().then(() => {
       if (genreCache) setGenres(genreCache);
-      if (accountCache) {
-        setAccounts(accountCache);
-        setAccountId((prev) => prev || (accountCache?.[0]?.id ?? ''));
-      }
     });
   }, []);
 
@@ -296,7 +291,7 @@ export function RecordSheet({
   // 下書きに戻して、理由をつけてシートを開き直す。二度押ししても1回だけ。
   const save = () => {
     if (finished.current) return;
-    if (edit && unchangedEdit(edit.initial)) {
+    if (edit && !edit.saveUnchanged && unchangedEdit(edit.initial)) {
       finished.current = true;
       onClose();
       return;
@@ -311,6 +306,10 @@ export function RecordSheet({
     }
     if (kind === 'refund' && genreId === null) {
       setError('返金は、どのカテゴリの支出から差し引くかを選んでください。');
+      return;
+    }
+    if (!edit && inputAccount.selectedAccount === null) {
+      setError('保存先の口座を用意してください。入力内容はそのまま残っています。');
       return;
     }
     finished.current = true;
@@ -351,13 +350,9 @@ export function RecordSheet({
   };
 
   const persist = async (snapshot: RecordDraft) => {
-    let account = snapshot.accountId;
+    const account = snapshot.accountId;
     if (account === '') {
-      const fetched = await fetchAccounts();
-      account = fetched[0]?.id ?? '';
-    }
-    if (account === '') {
-      failed(snapshot, '口座がまだありません。「…」› 口座 から1つ登録してください。');
+      failed(snapshot, '保存先の口座を用意してください。入力内容はそのまま残っています。');
       return;
     }
     const signed = kind === 'expense' ? -amountYen : amountYen;
@@ -464,11 +459,7 @@ export function RecordSheet({
   // カテゴリは、よく使う8個と「すべて」(23個が全部並んで選びにくかった、本人の指摘、デザイン v3-4)。
   // 選んだカテゴリが8個に無ければ、8個目と入れかえて見せる。
   const shownGenres = visibleGenres(genres, genreId, allGenres);
-  const detailSummary = [
-    kind === 'expense' || kind === 'refund' ? '割り勘・返金' : null,
-    accounts.length >= 2 && !edit ? '口座' : null,
-    'メモ',
-  ]
+  const detailSummary = [kind === 'expense' || kind === 'refund' ? '割り勘・返金' : null, 'メモ']
     .filter((x): x is string => x !== null)
     .join('・');
 
@@ -753,7 +744,12 @@ export function RecordSheet({
             <Switch checked={fixed} onChange={setFixed} label="毎月の固定費にする" />
           </label>
         ) : null}
-        {/* 割り勘・返金・口座・メモは「詳細」にたたむ(デザイン v3-4) */}
+        {!edit ? (
+          <div className="px-4 py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <InputAccountSelector inputAccount={inputAccount} />
+          </div>
+        ) : null}
+        {/* 割り勘・返金・メモは「詳細」にたたむ(デザイン v3-4) */}
         <button
           type="button"
           onClick={() => setMore(!more)}
@@ -782,26 +778,6 @@ export function RecordSheet({
         </button>
         {more ? (
           <>
-            {accounts.length >= 2 && !edit ? (
-              <label
-                className="flex min-h-13 items-center gap-3 px-4"
-                style={{ borderTop: '1px solid var(--hairline)' }}
-              >
-                <span className="shrink-0 text-[16px]">口座</span>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
-                  style={{ color: 'var(--ink)' }}
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
             {kind === 'expense' ? (
               <label
                 className="flex min-h-13 items-center gap-3 px-4"
@@ -865,6 +841,39 @@ export function RecordSheet({
             ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'
             : `${amountYen.toLocaleString('ja-JP')}円（自分の分）として記録します。`}
         </p>
+      ) : null}
+      {!edit ? (
+        <details className="rounded-2xl px-4" style={{ background: 'var(--surface)' }}>
+          <summary
+            className="min-h-11 cursor-pointer py-3 text-[14px] font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            ほかの入力方法
+          </summary>
+          <nav aria-label="ほかの入力方法" className="flex flex-col pb-2">
+            {(
+              [
+                { href: '/transactions/capture-text', label: '話して・文字で記録' },
+                { href: '/transactions/import', label: 'CSVを取り込む' },
+                { href: '/transactions/paste', label: 'メールを貼り付ける' },
+              ] as const
+            ).map((entry) => (
+              <Link
+                key={entry.href}
+                href={entry.href}
+                prefetch={false}
+                onClick={() => {
+                  keepDraft(current);
+                  onClose();
+                }}
+                className="flex min-h-11 items-center text-[14px] font-medium"
+                style={{ color: 'var(--ink)' }}
+              >
+                {entry.label} →
+              </Link>
+            ))}
+          </nav>
+        </details>
       ) : null}
       {edit?.footer ?? null}
     </div>

@@ -46,6 +46,49 @@ export type DuplicateCandidate<T extends MatchableTransaction> = {
   dayGap: number;
 };
 
+/** 日付の前後が変わっても、同じ2件を同じ順に識別する。 */
+export function duplicatePairKey(
+  a: Pick<MatchableTransaction, 'id'>,
+  b: Pick<MatchableTransaction, 'id'>,
+): string {
+  return [a.id, b.id].sort().join('|');
+}
+
+/** 判断時の内容。金額・日付・経路が変われば、前の判断では隠さない。 */
+export function duplicatePairSignature(a: MatchableTransaction, b: MatchableTransaction): string {
+  return JSON.stringify(
+    [a, b]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map((tx) => [tx.id, tx.occurredOn, tx.amountYen, tx.source]),
+  );
+}
+
+function duplicateTargets<T extends MatchableTransaction>(transactions: readonly T[]): T[] {
+  return transactions
+    .filter((tx) => isCountable(tx) && tx.amountYen < 0)
+    .sort((a, b) => a.occurredOn.localeCompare(b.occurredOn) || a.id.localeCompare(b.id));
+}
+
+/** 判断済みの照合用。候補を全て配列にためず、一組ずつ読む(古い順)。 */
+export function* iterateDuplicatePairs<T extends MatchableTransaction>(
+  transactions: readonly T[],
+  options: { maxDayGap?: number } = {},
+): Generator<DuplicateCandidate<T>> {
+  const maxDayGap = options.maxDayGap ?? MAX_DAY_GAP;
+  const targets = duplicateTargets(transactions);
+
+  for (let i = 0; i < targets.length; i += 1) {
+    const earlier = targets[i]!;
+    for (let j = i + 1; j < targets.length; j += 1) {
+      const later = targets[j]!;
+      const dayGap = daysBetween(earlier.occurredOn, later.occurredOn);
+      if (dayGap > maxDayGap) break;
+      if (later.amountYen !== earlier.amountYen || later.source === earlier.source) continue;
+      yield { earlier, later, dayGap };
+    }
+  }
+}
+
 /**
  * 同じ買い物の可能性があるペアを返す(新しい順)。
  *
@@ -54,33 +97,26 @@ export type DuplicateCandidate<T extends MatchableTransaction> = {
  */
 export function findDuplicateCandidates<T extends MatchableTransaction>(
   transactions: readonly T[],
-  options: { maxDayGap?: number } = {},
+  options: { maxDayGap?: number; distinctPairSignatures?: ReadonlySet<string> } = {},
 ): DuplicateCandidate<T>[] {
-  const maxDayGap = options.maxDayGap ?? MAX_DAY_GAP;
-
-  const targets = transactions
-    .filter((tx) => isCountable(tx) && tx.amountYen < 0)
-    .sort((a, b) => a.occurredOn.localeCompare(b.occurredOn) || a.id.localeCompare(b.id));
-
   const paired = new Set<string>();
   const candidates: DuplicateCandidate<T>[] = [];
-
+  const targets = duplicateTargets(transactions);
+  const maxDayGap = options.maxDayGap ?? MAX_DAY_GAP;
   for (let i = 0; i < targets.length; i += 1) {
     const earlier = targets[i]!;
     if (paired.has(earlier.id)) continue;
-
     for (let j = i + 1; j < targets.length; j += 1) {
       const later = targets[j]!;
-
-      // 日付順に並んでいるので、ここを超えたら以降も離れる一方。
       const dayGap = daysBetween(earlier.occurredOn, later.occurredOn);
       if (dayGap > maxDayGap) break;
-
-      if (paired.has(later.id)) continue;
-      if (later.amountYen !== earlier.amountYen) continue;
-      // 取り込み経路が同じなら「同じ店で2回買った」の方が起こりやすい。
-      if (later.source === earlier.source) continue;
-
+      if (
+        paired.has(later.id) ||
+        later.amountYen !== earlier.amountYen ||
+        later.source === earlier.source
+      )
+        continue;
+      if (options.distinctPairSignatures?.has(duplicatePairSignature(earlier, later))) continue;
       paired.add(earlier.id);
       paired.add(later.id);
       candidates.push({ earlier, later, dayGap });

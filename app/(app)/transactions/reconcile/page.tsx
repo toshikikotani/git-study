@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { reconcileStatementAction } from './actions';
+import { InputAccountSelector, useInputAccount } from '../input-account';
 import { Card } from '@/components/ui/card';
 import { formatYen } from '@/domain/money';
 import { parseStatementEmail } from '@/features/import/statement-email';
-import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import type { ReconciliationResult } from '@/features/transactions/reconciliation-store';
 import { formatDateJa, type DateOnly } from '@/lib/date';
 
@@ -22,8 +22,8 @@ import { formatDateJa, type DateOnly } from '@/lib/date';
  * 締め日(/accounts)から自動で補う。どちらも無ければ手入力してもらう。
  */
 export default function ReconcilePage() {
-  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
-  const [accountId, setAccountId] = useState('');
+  const inputAccount = useInputAccount();
+  const { accountId, selectedAccount } = inputAccount;
   const [body, setBody] = useState('');
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
   const [announcedTotalYen, setAnnouncedTotalYen] = useState('');
@@ -32,15 +32,6 @@ export default function ReconcilePage() {
   const [result, setResult] = useState<ReconciliationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-
-  useEffect(() => {
-    void fetchAccounts().then((fetched) => {
-      setAccounts(fetched);
-      setAccountId((current) => current || (fetched[0]?.id ?? ''));
-    });
-  }, []);
-
-  const selectedAccount = accounts?.find((a) => a.id === accountId) ?? null;
 
   const readEmail = () => {
     const { statement, warnings } = parseStatementEmail(body);
@@ -64,20 +55,25 @@ export default function ReconcilePage() {
 
     setChecking(true);
     setError(null);
-    const outcome = await reconcileStatementAction({
-      accountId,
-      accountName: selectedAccount.name,
-      closingDay: selectedAccount.closingDay,
-      announcedTotalYen: totalYen,
-      periodStartOn: periodStartOn || null,
-      periodEndOn: periodEndOn || null,
-    });
-    setChecking(false);
-    if (outcome.error) {
-      setError(outcome.error);
-      return;
+    try {
+      const outcome = await reconcileStatementAction({
+        accountId,
+        accountName: selectedAccount.name,
+        closingDay: selectedAccount.closingDay,
+        announcedTotalYen: totalYen,
+        periodStartOn: periodStartOn || null,
+        periodEndOn: periodEndOn || null,
+      });
+      if (outcome.error) {
+        setError(outcome.error);
+        return;
+      }
+      setResult(outcome.result);
+    } catch {
+      setError('通信に失敗しました。入力内容を残したまま再試行できます。');
+    } finally {
+      setChecking(false);
     }
-    setResult(outcome.result);
   };
 
   return (
@@ -102,48 +98,7 @@ export default function ReconcilePage() {
 
       {/* 口座(M6-2) */}
       <Card>
-        <label
-          className="text-xs font-medium tracking-[0.08em] uppercase"
-          style={{ color: 'var(--ink-muted)' }}
-        >
-          口座
-        </label>
-        {accounts === null ? (
-          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            読み込んでいます…
-          </p>
-        ) : accounts.length === 0 ? (
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            口座がまだ登録されていません。
-            <Link
-              href="/accounts"
-              className="min-h-11 inline-flex items-center ml-1 font-semibold underline decoration-dotted underline-offset-4"
-              style={{ color: 'var(--accent)' }}
-            >
-              先に登録する →
-            </Link>
-          </p>
-        ) : (
-          <select
-            value={accountId}
-            onChange={(e) => {
-              setAccountId(e.target.value);
-              setResult(null);
-            }}
-            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <InputAccountSelector inputAccount={inputAccount} onChange={() => setResult(null)} />
         {selectedAccount && selectedAccount.closingDay === null ? (
           <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
             この口座は締め日が未設定です。メールに期間の記載が無い場合は、
@@ -255,7 +210,7 @@ export default function ReconcilePage() {
         <button
           type="button"
           onClick={() => void check()}
-          disabled={!accountId || announcedTotalYen === '' || checking}
+          disabled={!selectedAccount || announcedTotalYen === '' || checking}
           className="min-h-11 mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >

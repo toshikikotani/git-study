@@ -36,7 +36,18 @@ export function tabTapAction(pathname: string, href: string): 'scroll-top' | 'na
 
 export const VIEW_STATE_KEY = 'spending:view-state';
 
-export type ViewState = { filter: LedgerFilter; scrollY: number; savedAt: number };
+export type ViewState = {
+  filter: LedgerFilter;
+  scrollY: number;
+  savedAt: number;
+  /** 旧保存データには無い。復元できるときだけ表示月も戻す。 */
+  monthStart?: string;
+};
+
+/** 明細と月のふりかえりが、互いの位置・条件を上書きしない。 */
+export function viewStateKey(pathname: string): string {
+  return pathname === '/spending' ? VIEW_STATE_KEY : `${VIEW_STATE_KEY}:${pathname}`;
+}
 
 export function serializeViewState(state: ViewState): string {
   return JSON.stringify(state);
@@ -60,6 +71,9 @@ export function parseViewState(raw: string | null, now: number): ViewState | nul
     }
     const f = v.filter as Partial<LedgerFilter>;
     return {
+      ...(typeof v.monthStart === 'string' && /^[1-9]\d{3}-(0[1-9]|1[0-2])-01$/.test(v.monthStart)
+        ? { monthStart: v.monthStart }
+        : {}),
       scrollY: Math.max(0, v.scrollY),
       savedAt: v.savedAt,
       filter: {

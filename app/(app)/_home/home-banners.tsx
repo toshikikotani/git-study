@@ -1,19 +1,26 @@
+import type { Route } from 'next';
 import Link from 'next/link';
 
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
-import { countNeedsInputCaptures, countPendingReview } from '@/features/home/pending';
+import { countPendingReview, needsInputSummary } from '@/features/home/pending';
 
 /**
  * ホームの上の知らせ(デザイン仕様書の「レシート1件が入力待ち」、ADR-090)。押すと明細へ。
  * 確認待ちの記録(自動の分類で確かめが要るもの)も同じ形で出す。どちらも無ければ何も出さない。
  */
 export async function HomeBanners() {
-  const [captures, pending] = await Promise.all([countNeedsInputCaptures(), countPendingReview()]);
+  const [captureSummary, pending] = await Promise.all([needsInputSummary(), countPendingReview()]);
+  const captures = captureSummary.count;
   if (captures === 0 && pending === 0) return null;
   return (
     <div className="flex flex-col gap-2">
       {captures > 0 ? (
         <Banner
+          href={
+            captures === 1 && captureSummary.firstId
+              ? (`/transactions/receipt/${captureSummary.firstId}?returnTo=${encodeURIComponent('/spending?review=input')}` as Route)
+              : '/spending?review=input'
+          }
           title={`レシート${captures}件が入力待ち`}
           detail="読み取れなかったので、画像を見て入力できます"
           icon={
@@ -26,6 +33,7 @@ export async function HomeBanners() {
       ) : null}
       {pending > 0 ? (
         <Banner
+          href="/spending?review=category"
           title={`確認待ちの記録が${pending}件`}
           detail="自動で分けたカテゴリを確かめられます"
           icon={<path d="M5 12l5 5L20 7" />}
@@ -35,10 +43,20 @@ export async function HomeBanners() {
   );
 }
 
-function Banner({ title, detail, icon }: { title: string; detail: string; icon: React.ReactNode }) {
+function Banner({
+  href,
+  title,
+  detail,
+  icon,
+}: {
+  href: Route;
+  title: string;
+  detail: string;
+  icon: React.ReactNode;
+}) {
   return (
     <Link
-      href="/spending"
+      href={href}
       className="flex min-h-11 items-center gap-3 rounded-2xl px-4 py-3"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >

@@ -6,14 +6,22 @@ import { listGenres } from '@/features/genre/store';
 import { recentStoreNames } from '@/features/transactions/recent-stores';
 import { getCapture } from '@/features/receipt-captures/store';
 import { todayJst } from '@/lib/date';
+import { captureReturnTarget } from '@/features/receipt-captures/navigation';
 import { CaptureEntry } from './capture-entry';
 
 /**
  * 入力待ちのレシート(読み取れなかった/一部だけ読めた)を手で入力する画面(F7)。
  * 画像とフォームを同じ画面に置き、見ながら 金額 → 日付 → 店名 → ジャンル と入力する。
  */
-export default async function CapturePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CapturePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ returnTo?: string }>;
+}) {
   const { id } = await params;
+  const target = captureReturnTarget((await searchParams)?.returnTo);
   const capture = await getCapture(id);
   if (capture === null) notFound();
   const [genres, accounts, recentStores] = await Promise.all([
@@ -29,11 +37,11 @@ export default async function CapturePage({ params }: { params: Promise<{ id: st
           レシートを入力
         </h1>
         <Link
-          href="/spending"
+          href={target.href}
           className="min-h-11 inline-flex items-center text-xs"
           style={{ color: 'var(--ink-secondary)' }}
         >
-          家計簿へ →
+          {target.label} →
         </Link>
       </header>
       {capture.status === 'resolved' ? (
@@ -47,6 +55,7 @@ export default async function CapturePage({ params }: { params: Promise<{ id: st
           accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
           recentStores={recentStores}
           today={todayJst()}
+          returnTo={target.href}
         />
       )}
     </div>

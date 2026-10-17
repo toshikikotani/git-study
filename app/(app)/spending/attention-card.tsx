@@ -8,6 +8,11 @@ import { useMemo, useState } from 'react';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { buildAttention } from '@/features/spending/views';
+import {
+  groupAttentionQueue,
+  remainingAttentionQueue,
+  type AttentionQueueItem,
+} from '@/features/spending/attention-queue';
 import { categoryHref } from '@/lib/category-nav';
 import { pushUndo } from '@/lib/undo';
 import { formatDateJa } from '@/lib/date';
@@ -33,19 +38,10 @@ export function AttentionCard({ hasGoal }: { hasGoal: boolean }) {
   const [open, setOpen] = useState(false);
 
   const attention = useMemo(() => buildAttention(transactions, today), [transactions, today]);
-  const queue = useMemo(() => {
-    const byId = new Map(transactions.map((t) => [t.id, t]));
-    const items: { tx: DrilldownTransaction; reason: 'uncategorized' | 'mismatch' }[] = [];
-    for (const id of attention.uncategorized.ids) {
-      const tx = byId.get(id);
-      if (tx) items.push({ tx, reason: 'uncategorized' });
-    }
-    for (const id of attention.mismatch.ids) {
-      const tx = byId.get(id);
-      if (tx) items.push({ tx, reason: 'mismatch' });
-    }
-    return items;
-  }, [attention, transactions]);
+  const queue = useMemo(
+    () => groupAttentionQueue(transactions, attention),
+    [attention, transactions],
+  );
 
   if (queue.length === 0) return null;
 
@@ -131,7 +127,7 @@ function AttentionFixer({
   onClose,
 }: {
   open: boolean;
-  queue: { tx: DrilldownTransaction; reason: 'uncategorized' | 'mismatch' }[];
+  queue: AttentionQueueItem<DrilldownTransaction>[];
   onClose: () => void;
 }) {
   const { genres } = useSpendingMonth();
@@ -139,7 +135,7 @@ function AttentionFixer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const remaining = queue.filter((q) => !handled.has(`${q.reason}:${q.tx.id}`));
+  const remaining = remainingAttentionQueue(queue, handled);
   const current = remaining[0] ?? null;
   const total = queue.length;
   const position = total - remaining.length + 1;
@@ -238,6 +234,11 @@ function AttentionFixer({
               </button>
             </div>
             <div>
+              {current.reasons.length > 1 ? (
+                <p className="mb-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  この記録はカテゴリと差額を続けて確認します。
+                </p>
+              ) : null}
               <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
                 {current.tx.label}
                 {current.tx.branchName ? (

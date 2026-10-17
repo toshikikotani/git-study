@@ -58,16 +58,19 @@ export function AssistantChat({
   variant,
   onClose,
   onNavigate,
+  initialPrompt,
 }: {
   /** sheet:下のAIボタンから開くシート / page:/assistant の画面。 */
   variant: 'sheet' | 'page';
   onClose?: () => void;
   /** 画面へのボタンを押したとき(シートを閉じて移る)。 */
   onNavigate?: (href: string) => void;
+  /** 遷移元の相談目的。本人が編集・送信するまでAIへは送らない。 */
+  initialPrompt?: string | undefined;
 }) {
   const router = useRouter();
   const { messages, sending, error } = useChat();
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialPrompt ?? '');
   const scrollRef = useRef<HTMLDivElement>(null);
   const speech = useSpeechInput((text) => void send(text));
   /** 直している記録の案(どの発言の、何件目か)。 */
