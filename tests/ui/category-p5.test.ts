@@ -272,10 +272,11 @@ describe('P5 品目の詳細の表示(受け入れ基準7)', () => {
 });
 
 describe('P5 返金の入力(返品・返金は「返金」として登録できる)', () => {
-  it('記録する(手で記録する唯一の画面、ADR-096)に「返金」がある。支出・収入・返金の3つ', async () => {
+  it('記録する(手で記録する唯一の画面、ADR-096)の「詳細」に「返金として記録」がある(ADR-108)', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
-    expect(src).toContain("{ value: 'refund', label: '返金' }");
+    expect(src).toContain('label="返金として記録"');
+    expect(src).toContain("onChange={(on) => setKind(on ? 'refund' : 'expense')}");
     expect(src).toContain("kind: kind === 'refund' ? 'refund' : 'normal'");
   });
 });

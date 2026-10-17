@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -28,7 +29,7 @@ vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({
 }));
 
 import { CategorySheetBody } from '../../app/(app)/category-sheet';
-import { RecordSheet } from '../../app/(app)/record-sheet';
+import { RecordSheet, visibleGenres } from '../../app/(app)/record-sheet';
 import { clearDraft, keepDraft } from '@/features/transactions/record-draft';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ');
@@ -111,8 +112,11 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
     expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
-    expect(html).toContain('固定費にする');
-    expect(html).toContain('日付を先にすると「予定」として記録され、使った額には入りません。');
+    expect(html).toContain('毎月の固定費にする');
+    // 種類は支出・収入の2つ。返金・割り勘・メモは「詳細」にたたむ(デザイン v3-4、ADR-108)
+    expect(html).toContain('詳細');
+    expect(html).toContain('割り勘・返金・メモ');
+    expect(html).toContain('よく使う順。店名を入れると、前回のカテゴリを先に選びます。');
     // メモ・ほかの記録のしかたは出さない(「…」のメニューにある)
     expect(html).not.toContain('店・メモ');
     expect(html).not.toContain('スクショから記録');
@@ -197,7 +201,10 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
 
   it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {
     const raw = sheet();
-    expect(raw.match(/autoComplete="off"/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // レシート名(メモ・割り勘は「詳細」を開いたときに出る。どれも自動入力を止める)
+    expect(raw.match(/autoComplete="off"/gi)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src.match(/autoComplete="off"/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 
   it('保存は金額が無くても押せる(押すと足りないものを伝える。黙って効かないボタンにしない)', () => {
@@ -243,7 +250,46 @@ describe('記録を直す:記録すると同じ画面(ADR-101)', () => {
     expect(text).toContain('レシートの品目');
   });
 
-  it('割り勘でもらった額を入れられる(記録するでも同じ)', () => {
-    expect(text).toContain('割り勘でもらった額');
+  it('割り勘でもらった額を入れられる(記録するでも同じ。「詳細」の中)', () => {
+    expect(text).toContain('割り勘・返金・メモ');
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src).toContain('割り勘でもらった額');
+  });
+});
+
+describe('記録するをシンプルに(デザイン v3-4、ADR-108)', () => {
+  const genres = Array.from({ length: 23 }, (_, i) => ({ id: `g${i}`, name: `カテゴリ${i}` }));
+
+  it('カテゴリは、よく使う順の8個と「すべて」', () => {
+    expect(visibleGenres(genres, null, false).map((g) => g.id)).toEqual([
+      'g0',
+      'g1',
+      'g2',
+      'g3',
+      'g4',
+      'g5',
+      'g6',
+      'g7',
+    ]);
+    expect(visibleGenres(genres, null, true)).toHaveLength(23);
+  });
+
+  it('選んだカテゴリが8個に無ければ、8個目と入れかえて見せる', () => {
+    expect(visibleGenres(genres, 'g15', false).map((g) => g.id)).toEqual([
+      'g0',
+      'g1',
+      'g2',
+      'g3',
+      'g4',
+      'g5',
+      'g6',
+      'g15',
+    ]);
+  });
+
+  it('店名を入れると、前回その店で選んだカテゴリを先に選ぶ(本人が選んでいなければ)', () => {
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src).toContain('storeGenreCache?.get(comparableKey(value))');
+    expect(src).toContain("if (genreTouched.current || kind === 'income') return;");
   });
 });
