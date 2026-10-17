@@ -33,3 +33,23 @@ export function parseChatMessages(value: unknown): ChatMessage[] | null {
   }
   return messages;
 }
+
+/**
+ * モデルへ渡せる会話の形にそろえる(ADR-105)。空の発言を捨て、同じ側が続いたら1つにまとめ、
+ * 先頭がAIの発言なら捨てる(履歴を直近分で切ると、AIの発言から始まることがある)。
+ * 送れなかった発言のあとに続けて送ると「本人・本人」と並ぶので、まとめて1つの発言にする。
+ */
+export function toAlternatingTurns(messages: readonly ChatMessage[]): ChatMessage[] {
+  const turns: ChatMessage[] = [];
+  for (const m of messages) {
+    const content = m.content.trim();
+    if (content === '') continue;
+    const last = turns.at(-1);
+    if (last?.role === m.role) {
+      last.content = `${last.content}\n${content}`;
+    } else if (turns.length > 0 || m.role === 'user') {
+      turns.push({ role: m.role, content });
+    }
+  }
+  return turns;
+}

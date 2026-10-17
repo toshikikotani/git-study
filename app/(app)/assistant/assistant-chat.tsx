@@ -1,14 +1,27 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import type { AssistantChange } from '@/features/assistant/chat-tools';
-import type { AskUserQuestion, ProposedChange } from '@/features/assistant/plan';
-import type { ScreenLink } from '@/features/assistant/screens';
-import { hapticFor } from '@/lib/haptics';
+import type { AskUserQuestion } from '@/features/assistant/plan';
+import { recordFromEdit, type StoreCandidate } from '@/features/assistant/record-change';
+import { comparableKey } from '@/domain/store-name';
 import { useSpeechInput } from '@/lib/speech-input';
+import { RecordSheet } from '../record-sheet';
 import { refreshAllAction } from '../refresh-actions';
+import {
+  answerQuestion,
+  applyProposal,
+  cancelProposal,
+  editRecord,
+  pickStore,
+  resetChat,
+  retry,
+  send,
+  toggleChange,
+  useChat,
+  type Message,
+} from './chat-store';
 
 /**
  * AIの窓口(ADR-054 → 059 → 103)。下のAIボタンから、どの画面でもシートで開く(/assistant でも同じ部品)。
@@ -16,29 +29,9 @@ import { refreshAllAction } from '../refresh-actions';
  * 登録・変更は勝手にしない:AIの案は確認カードに出し、本人が反映を押したものだけを反映する。
  * 会話で出せないものは、その画面へのボタン(show_screen)を出す。
  * 会話はアプリを開いているあいだ残る(シートを閉じても続きから。返事を待つあいだに閉じても消えない)。
+ * 送れなかった発言には「もう一度送る」を出す。AIが出した記録の案は「直す」で、記録すると同じ画面で直せる
+ * (ADR-105)。
  */
-
-type Role = 'user' | 'assistant';
-type ProposalStatus = 'pending' | 'applying' | 'applied' | 'cancelled';
-type ApplyResult =
-  { ok: true; change: AssistantChange } | { ok: false; target: string; error: string };
-
-type Message = {
-  role: Role;
-  content: string;
-  question?: AskUserQuestion;
-  /** 選択肢を選び終えたか(選び終えたら押せなくする)。 */
-  answered?: boolean;
-  proposal?: {
-    changes: ProposedChange[];
-    /** 反映する項目(チェックが入っているもの)。 */
-    selected: boolean[];
-    status: ProposalStatus;
-    results?: ApplyResult[];
-  };
-  /** 画面へ移るボタン。 */
-  links?: ScreenLink[];
-};
 
 const SUGGESTIONS = [
   'コンビニで500円使った',
@@ -46,160 +39,6 @@ const SUGGESTIONS = [
   '食費をもう少し抑えたい',
   '固定費を見直したい',
 ];
-
-// ---- 会話(アプリを開いているあいだ残す。シートを閉じても、返事を待つあいだに閉じても続く)--------
-type ChatState = { messages: Message[]; sending: boolean; error: string | null };
-const INITIAL: ChatState = { messages: [], sending: false, error: null };
-let chat: ChatState = INITIAL;
-const listeners = new Set<() => void>();
-
-function update(patch: (s: ChatState) => Partial<ChatState>): void {
-  chat = { ...chat, ...patch(chat) };
-  for (const l of listeners) l();
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function useChat(): ChatState {
-  return useSyncExternalStore(
-    subscribe,
-    () => chat,
-    () => INITIAL,
-  );
-}
-
-function patchMessage(index: number, patch: Partial<Message>): void {
-  update((s) => ({ messages: s.messages.map((m, i) => (i === index ? { ...m, ...patch } : m)) }));
-}
-
-async function send(text: string, base?: Message[]): Promise<void> {
-  const content = text.trim();
-  if (content === '' || chat.sending) return;
-  const next: Message[] = [...(base ?? chat.messages), { role: 'user', content }];
-  update(() => ({ messages: next, sending: true, error: null }));
-  try {
-    const response = await fetch('/api/assistant/chat', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
-    });
-    if (!response.ok) {
-      update(() => ({ error: '送れませんでした。もう一度送ってください。' }));
-      return;
-    }
-    const result = (await response.json()) as {
-      reply?: string;
-      proposal?: { changes: ProposedChange[] } | null;
-      question?: AskUserQuestion | null;
-      links?: ScreenLink[];
-    };
-    const changes = result.proposal?.changes ?? [];
-    const links = result.links ?? [];
-    update((s) => ({
-      messages: [
-        ...s.messages,
-        {
-          role: 'assistant',
-          content: result.reply ?? '',
-          ...(result.question ? { question: result.question } : {}),
-          ...(changes.length > 0
-            ? {
-                proposal: {
-                  changes,
-                  selected: changes.map(() => true),
-                  status: 'pending' as const,
-                },
-              }
-            : {}),
-          ...(links.length > 0 ? { links } : {}),
-        },
-      ],
-    }));
-  } catch {
-    update(() => ({ error: '送れませんでした。電波のよい所で、もう一度送ってください。' }));
-  } finally {
-    update(() => ({ sending: false }));
-  }
-}
-
-async function applyProposal(index: number, onApplied: () => void): Promise<void> {
-  const proposal = chat.messages[index]?.proposal;
-  if (!proposal || proposal.status !== 'pending') return;
-  const chosen = proposal.changes.filter((_, i) => proposal.selected[i]);
-  if (chosen.length === 0) return;
-  patchMessage(index, { proposal: { ...proposal, status: 'applying' } });
-  try {
-    const response = await fetch('/api/assistant/apply', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ changes: chosen.map(({ tool, input }) => ({ tool, input })) }),
-    });
-    if (!response.ok) {
-      patchMessage(index, { proposal: { ...proposal, status: 'pending' } });
-      update(() => ({ error: '反映できませんでした。もう一度「反映」を押してください。' }));
-      return;
-    }
-    const { results } = (await response.json()) as { results: ApplyResult[] };
-    patchMessage(index, { proposal: { ...proposal, status: 'applied', results } });
-    const okCount = results.filter((r) => r.ok).length;
-    const failCount = results.length - okCount;
-    update((s) => ({
-      messages: [
-        ...s.messages,
-        {
-          role: 'assistant',
-          content:
-            failCount === 0
-              ? `${okCount}件を反映しました。`
-              : `${okCount}件を反映しました。${failCount}件は反映できませんでした。`,
-        },
-      ],
-    }));
-    if (okCount > 0) {
-      hapticFor('save');
-      onApplied();
-    }
-  } catch {
-    patchMessage(index, { proposal: { ...proposal, status: 'pending' } });
-    update(() => ({ error: '反映できませんでした。電波のよい所で、もう一度押してください。' }));
-  }
-}
-
-function cancelProposal(index: number): void {
-  const proposal = chat.messages[index]?.proposal;
-  if (!proposal || proposal.status !== 'pending') return;
-  patchMessage(index, { proposal: { ...proposal, status: 'cancelled' } });
-  update((s) => ({
-    messages: [
-      ...s.messages,
-      { role: 'assistant', content: '反映しませんでした。直したいところがあれば教えてください。' },
-    ],
-  }));
-}
-
-function toggleChange(index: number, changeIndex: number): void {
-  const m = chat.messages[index];
-  if (!m?.proposal || m.proposal.status !== 'pending') return;
-  const selected = m.proposal.selected.map((v, j) => (j === changeIndex ? !v : v));
-  patchMessage(index, { proposal: { ...m.proposal, selected } });
-}
-
-function answerQuestion(index: number, labels: string[]): void {
-  if (labels.length === 0) return;
-  const base = chat.messages.map((m, i) => (i === index ? { ...m, answered: true } : m));
-  void send(labels.join('、'), base);
-}
-
-/** 会話を初めからにする。 */
-function resetChat(): void {
-  if (chat.sending) return;
-  update(() => INITIAL);
-}
 
 export function AssistantChat({
   variant,
@@ -217,10 +56,12 @@ export function AssistantChat({
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const speech = useSpeechInput((text) => void send(text));
+  /** 直している記録の案(どの発言の、何件目か)。 */
+  const [editing, setEditing] = useState<{ message: number; change: number } | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, sending, editing]);
 
   const submit = () => {
     if (input.trim() === '' || sending) return;
@@ -235,6 +76,44 @@ export function AssistantChat({
   const applied = () => {
     void refreshAllAction().then(() => router.refresh());
   };
+
+  // AIが出した記録の案を直す:記録すると同じ画面にして、「完了」で確認カードに戻す(ADR-105)。
+  const editingProposal = editing ? messages[editing.message]?.proposal : undefined;
+  const editingRecord =
+    editing && editingProposal?.status === 'pending'
+      ? editingProposal.changes[editing.change]?.record
+      : undefined;
+  if (editing && editingRecord) {
+    const target = editing;
+    const before = editingRecord;
+    return (
+      <div className={variant === 'sheet' ? 'min-h-[84dvh]' : 'rise'}>
+        <RecordSheet
+          key={`${target.message}-${target.change}`}
+          onClose={() => setEditing(null)}
+          onFiles={() => {}}
+          edit={{
+            initial: {
+              kind: before.kind,
+              amountYen: before.amountYen,
+              genreId: before.genreId,
+              date: before.date,
+              name: before.name,
+              memo: before.memo,
+            },
+            saveLabel: '完了',
+            onSave: (values, genreName) =>
+              editRecord(target.message, target.change, recordFromEdit(before, values, genreName)),
+            footer: (
+              <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
+                「完了」で確認カードに戻ります。記録されるのは、カードの「反映」を押したときです。
+              </p>
+            ),
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -300,8 +179,11 @@ export function AssistantChat({
               key={i}
               message={m}
               busy={sending}
+              onRetry={() => void retry()}
               onAnswer={(labels) => answerQuestion(i, labels)}
               onToggle={(changeIndex) => toggleChange(i, changeIndex)}
+              onEdit={(changeIndex) => setEditing({ message: i, change: changeIndex })}
+              onPickStore={(changeIndex, store) => pickStore(i, changeIndex, store)}
               onApply={() => void applyProposal(i, applied)}
               onCancel={() => cancelProposal(i)}
               onGo={go}
@@ -387,19 +269,26 @@ export function AssistantChat({
   );
 }
 
-function Bubble({
+/** 発言1つ(送れなかった発言の「もう一度送る」、選択肢、確認カード、画面へのボタンを含む)。 */
+export function Bubble({
   message,
   busy,
+  onRetry,
   onAnswer,
   onToggle,
+  onEdit,
+  onPickStore,
   onApply,
   onCancel,
   onGo,
 }: {
   message: Message;
   busy: boolean;
+  onRetry: () => void;
   onAnswer: (labels: string[]) => void;
   onToggle: (changeIndex: number) => void;
+  onEdit: (changeIndex: number) => void;
+  onPickStore: (changeIndex: number, store: StoreCandidate) => void;
   onApply: () => void;
   onCancel: () => void;
   onGo: (href: string) => void;
@@ -414,12 +303,39 @@ function Bubble({
           }`}
           style={
             isUser
-              ? { background: 'var(--accent)', color: 'var(--on-accent)' }
+              ? {
+                  background: 'var(--accent)',
+                  color: 'var(--on-accent)',
+                  opacity: message.failed ? 0.6 : 1,
+                }
               : { background: 'var(--surface)', color: 'var(--ink)' }
           }
         >
           {message.content}
         </div>
+
+        {/* 送れなかった発言:理由と「もう一度送る」(同じ発言をそのまま送り直す、ADR-105) */}
+        {message.failed ? (
+          <div className="flex flex-col items-end gap-1">
+            <p
+              role="alert"
+              className="line-clamp-2 text-right text-[13px]"
+              style={{ color: 'var(--over)' }}
+            >
+              {message.failed}
+            </p>
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={busy}
+              className="flex min-h-11 items-center gap-2 rounded-full px-4 text-[14px] font-semibold disabled:opacity-40"
+              style={{ background: 'var(--plane)', color: 'var(--accent)' }}
+            >
+              <RetryIcon />
+              もう一度送る
+            </button>
+          </div>
+        ) : null}
 
         {message.question ? (
           <QuestionCard
@@ -433,6 +349,8 @@ function Bubble({
           <ProposalCard
             proposal={message.proposal}
             onToggle={onToggle}
+            onEdit={onEdit}
+            onPickStore={onPickStore}
             onApply={onApply}
             onCancel={onCancel}
           />
@@ -530,11 +448,17 @@ function QuestionCard({
 function ProposalCard({
   proposal,
   onToggle,
+  onEdit,
+  onPickStore,
   onApply,
   onCancel,
 }: {
   proposal: NonNullable<Message['proposal']>;
   onToggle: (changeIndex: number) => void;
+  /** 記録の案を直す(記録すると同じ画面で、ADR-105)。 */
+  onEdit: (changeIndex: number) => void;
+  /** お店の候補を選ぶ(ADR-107)。 */
+  onPickStore: (changeIndex: number, store: StoreCandidate) => void;
   onApply: () => void;
   onCancel: () => void;
 }) {
@@ -577,25 +501,61 @@ function ProposalCard({
       <p className="text-[14px] font-semibold">確認({changes.length}件)— 反映するものにチェック</p>
       <ul className="space-y-2">
         {changes.map((c, i) => (
-          <li key={i}>
-            <label
-              className="flex min-h-11 items-start gap-3 rounded-xl px-3 py-2"
-              style={{ background: 'var(--surface)' }}
-            >
-              <input
-                type="checkbox"
-                checked={selected[i] ?? false}
-                disabled={locked}
-                onChange={() => onToggle(i)}
-                className="mt-1 size-5"
-              />
-              <span className="min-w-0 text-[14px]">
-                <span className="font-semibold">{c.target}</span>
-                <span className="block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                  {c.detail}
+          <li key={i} className="rounded-xl" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-stretch">
+              <label className="flex min-h-11 min-w-0 flex-1 items-start gap-3 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={selected[i] ?? false}
+                  disabled={locked}
+                  onChange={() => onToggle(i)}
+                  className="mt-1 size-5"
+                />
+                <span className="min-w-0 text-[14px]">
+                  <span className="font-semibold">{c.target}</span>
+                  <span className="block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                    {c.detail}
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              {/* AIが出した記録の案は、記録すると同じ画面で直せる(金額・日付・名前・カテゴリ・メモ) */}
+              {c.record && !locked ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(i)}
+                  aria-label={`${c.target}を直す`}
+                  className="flex min-h-11 shrink-0 items-center px-3 text-[14px] font-semibold"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  直す
+                </button>
+              ) : null}
+            </div>
+            {/* お店の候補(過去の記録から)。押すと名前とカテゴリがそのお店に変わる(ADR-107) */}
+            {c.candidates && c.candidates.length >= 2 && !locked ? (
+              <div role="group" aria-label="お店の候補" className="flex flex-wrap gap-2 px-3 pb-3">
+                {c.candidates.map((store) => {
+                  const on = comparableKey(store.name) === comparableKey(c.target);
+                  return (
+                    <button
+                      key={store.name}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => onPickStore(i, store)}
+                      className="min-h-11 max-w-full truncate rounded-full px-3 text-[13px]"
+                      style={{
+                        background: on ? 'var(--note)' : 'var(--plane)',
+                        boxShadow: on ? 'inset 0 0 0 2px var(--accent)' : 'none',
+                        color: 'var(--ink)',
+                        fontWeight: on ? 600 : 400,
+                      }}
+                    >
+                      {store.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -640,6 +600,24 @@ function MicIcon() {
     >
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    </svg>
+  );
+}
+
+function RetryIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" />
     </svg>
   );
 }

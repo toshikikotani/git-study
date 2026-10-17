@@ -47,9 +47,12 @@ export type RecordEditValues = {
  */
 export type RecordEdit = {
   initial: RecordEditValues;
-  onSave: (values: RecordEditValues) => void;
-  /** シートの下に足すもの(レシートの品目)。 */
+  /** genreName は選んだカテゴリの名前(収入・カテゴリなしは null)。 */
+  onSave: (values: RecordEditValues, genreName: string | null) => void;
+  /** シートの下に足すもの(レシートの品目、AIの案ではその説明)。 */
   footer?: React.ReactNode;
+  /** 右上のボタンの文言(既定は「保存」。AIの案を直すときは「完了」、ADR-105)。 */
+  saveLabel?: string;
 };
 
 /**
@@ -249,7 +252,7 @@ export function RecordSheet({
     hapticFor('save');
     onClose();
     if (edit) {
-      edit.onSave(editValues());
+      edit.onSave(editValues(), selectedGenre?.name ?? null);
       return;
     }
     clearDraft();
@@ -388,7 +391,7 @@ export function RecordSheet({
           className="flex min-h-11 items-center justify-self-end text-[17px] font-bold"
           style={{ color: 'var(--accent)', opacity: canSave ? 1 : 0.4 }}
         >
-          保存
+          {edit?.saveLabel ?? '保存'}
         </button>
       </div>
       {error ? (

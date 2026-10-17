@@ -19,6 +19,7 @@ import {
   type PlanContext,
   type ProposedChange,
 } from '@/features/assistant/plan';
+import { withStoreCandidates } from '@/features/assistant/store-candidates';
 import {
   ASSISTANT_SCREEN_KEYS,
   MAX_SCREEN_LINKS,
@@ -26,7 +27,7 @@ import {
   type ScreenLink,
 } from '@/features/assistant/screens';
 import { apiKeyMissingMessage, describeAnthropicError } from '@/lib/anthropic';
-import { ChatToolError, parseChatMessages } from '@/lib/chat-tools';
+import { ChatToolError, parseChatMessages, toAlternatingTurns } from '@/lib/chat-tools';
 import { todayJst } from '@/lib/date';
 import { readAnthropicApiKey } from '@/lib/env';
 import { describeUserError } from '@/lib/errors';
@@ -93,7 +94,17 @@ const TOOLS: Tool[] = [
           enum: ['expense', 'income', 'refund'],
           description: '支出 / 収入 / 返金。既定は支出',
         },
-        store_name: { type: 'string', description: '店名・内容(レシート名)。無ければ省く' },
+        store_name: {
+          type: 'string',
+          description:
+            '店名・内容(レシート名)。「コンビニ」「セブン」のようにおおまかなら、「よく使うお店」から一番ありそうな1つ。無ければ省く',
+        },
+        store_candidates: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            '「よく使うお店」の一覧から、ほかに当てはまりそうなお店(最大4つ、よく使う順)。本人がボタンで選び直せる。一覧に無い名前は入れない',
+        },
         genre_name: { type: 'string', description: 'ジャンル一覧にあるジャンル名。返金では必須' },
         memo: { type: 'string', description: 'メモ(任意)' },
       },
@@ -319,10 +330,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'JSON として読めませんでした' }, { status: 400 });
   }
 
-  const messages = parseChatMessages(payload.messages);
-  if (messages === null) {
+  const parsed = parseChatMessages(payload.messages);
+  if (parsed === null) {
     return NextResponse.json({ error: '会話の形式が正しくありません' }, { status: 400 });
   }
+  const messages = toAlternatingTurns(parsed);
   if (messages.length === 0) {
     return NextResponse.json({ error: 'メッセージがありません' }, { status: 400 });
   }
@@ -335,12 +347,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       question: null,
     } satisfies AssistantReply);
   }
+  // 混み合い・読み込みの失敗・AIの呼び出しの失敗は、返事ではなく「送れなかった」として返す。
+  // 画面はその発言に「もう一度送る」を出す(失敗の文が会話に混ざって次の文脈にならない、ADR-105)。
   if (!takeAiCallSlot()) {
-    return NextResponse.json({
-      reply: 'AIの呼び出しが混み合っています。時間をおいて試してください。',
-      proposal: null,
-      question: null,
-    } satisfies AssistantReply);
+    return NextResponse.json(
+      { error: 'AIの呼び出しが混み合っています。少し時間をおいて、もう一度送ってください。' },
+      { status: 429 },
+    );
   }
 
   let planContext: PlanContext;
@@ -352,11 +365,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       buildAdvisorContextText().catch(() => ''),
     ]);
   } catch (error) {
-    return NextResponse.json({
-      reply: describeUserError(error, '読み込みに失敗しました。'),
-      proposal: null,
-      question: null,
-    } satisfies AssistantReply);
+    return NextResponse.json(
+      { error: describeUserError(error, '読み込みに失敗しました。') },
+      { status: 503 },
+    );
   }
 
   const client = new Anthropic({ apiKey });
@@ -370,6 +382,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     recentTransactions: planContext.transactions,
     goals: planContext.goals,
     latestPlan: planContext.latestPlan,
+    stores: planContext.stores ?? [],
     situationText,
     today: todayJst(),
   });
@@ -421,6 +434,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       anthropicMessages.push({ role: 'user', content: toolResults });
     }
   } catch (error) {
+    // 途中まで案ができていれば、それは出す(作った案を捨てない)。何もできていなければ送れなかった扱い。
+    if (proposed.length === 0 && links.length === 0) {
+      return NextResponse.json({ error: describeAnthropicError(error) }, { status: 502 });
+    }
     return NextResponse.json({
       reply: describeAnthropicError(error),
       proposal: proposed.length > 0 ? { changes: proposed } : null,
@@ -487,7 +504,12 @@ function handleToolUse(
         question: null,
       };
     }
-    const { change } = planToolCall(toolUse.name, toolUse.input, planContext);
+    const planned = planToolCall(toolUse.name, toolUse.input, planContext).change;
+    // 記録の案には、よく行くお店の候補をつける(いちばんありそうなお店で作り、ほかはボタンで、ADR-107)。
+    const change =
+      toolUse.name === 'add_transaction'
+        ? withStoreCandidates(planned, toolUse.input, planContext, todayJst())
+        : planned;
     proposed.push(change);
     return {
       message: `変更案として受け付けました(${change.target}: ${change.detail})。本人が承認するまで反映されません。`,

@@ -11,6 +11,11 @@ import {
 import type { Genre } from '@/features/genre/store';
 import type { AppSettings } from '@/features/settings/store';
 import type { StoredTransaction } from '@/features/transactions/types';
+import {
+  recordChangeOf,
+  recordFromEdit,
+  type ProposedRecord,
+} from '@/features/assistant/record-change';
 import { screenLinkOf } from '@/features/assistant/screens';
 import { ChatToolError } from '@/lib/chat-tools';
 import { addDays, todayJst } from '@/lib/date';
@@ -423,6 +428,105 @@ describe('AIで記録する add_transaction(ADR-103)', () => {
       CTX,
     );
     expect(change.detail).toContain('予定');
+  });
+});
+
+describe('AIが出した記録の案を確認カードの上で直す(ADR-105)', () => {
+  const today = todayJst();
+
+  it('記録の案には中身(record)がつき、サーバーへ戻す入力はそろえた形になる', () => {
+    const { change } = planToolCall(
+      'add_transaction',
+      { occurred_on: today, amount_yen: 500, store_name: ' セブン ', genre_name: '食料品' },
+      CTX,
+    );
+    expect(change.record).toEqual({
+      kind: 'expense',
+      amountYen: 500,
+      genreId: 'g-food',
+      genreName: '食料品',
+      date: today,
+      name: 'セブン',
+      memo: '',
+    });
+    expect(change.input).toEqual({
+      occurred_on: today,
+      amount_yen: 500,
+      kind: 'expense',
+      store_name: 'セブン',
+      genre_name: '食料品',
+    });
+  });
+
+  it('直した中身から作った案は、サーバーでもう一度確かめると同じ文言・同じ記録になる', () => {
+    const edited: ProposedRecord = {
+      kind: 'expense',
+      amountYen: 1200,
+      genreId: 'g-out',
+      genreName: '外食',
+      date: addDays(today, -1),
+      name: 'ゲーセン',
+      memo: '友だちと',
+    };
+    const local = recordChangeOf(edited, today);
+    const { change, operation } = planToolCall('add_transaction', local.input, CTX);
+    expect(change.target).toBe(local.target);
+    expect(change.detail).toBe(local.detail);
+    expect(local.target).toBe('ゲーセン');
+    expect(local.detail).toContain('支出 1,200円 · 外食 · メモ「友だちと」');
+    expect(operation).toMatchObject({
+      op: 'add_transaction',
+      amountYen: -1200,
+      description: 'ゲーセン',
+      genreId: 'g-out',
+      memo: '友だちと',
+    });
+  });
+
+  it('レシート名を空のまま直したら空に戻す(カテゴリを変えたら名前もついてくる)。収入はカテゴリを持たない', () => {
+    const before: ProposedRecord = {
+      kind: 'expense',
+      amountYen: 800,
+      genreId: 'g-food',
+      genreName: '食料品',
+      date: today,
+      name: '',
+      memo: '',
+    };
+    const toOut = recordFromEdit(
+      before,
+      { kind: 'expense', amountYen: 800, genreId: 'g-out', date: today, name: '外食', memo: '' },
+      '外食',
+    );
+    expect(toOut).toMatchObject({ genreId: 'g-out', genreName: '外食', name: '' });
+    expect(recordChangeOf(toOut, today).target).toBe('外食');
+
+    const income = recordFromEdit(
+      before,
+      { kind: 'income', amountYen: 800, genreId: 'g-food', date: today, name: '収入', memo: '' },
+      null,
+    );
+    expect(income).toMatchObject({ kind: 'income', genreId: null, genreName: null, name: '' });
+    expect(recordChangeOf(income, today).input).not.toHaveProperty('genre_name');
+  });
+
+  it('選べるタイルに無いカテゴリのまま変えなかったときは、前のカテゴリを残す', () => {
+    const before: ProposedRecord = {
+      kind: 'expense',
+      amountYen: 300,
+      genreId: 'g-food',
+      genreName: '食料品',
+      date: today,
+      name: 'パン',
+      memo: '',
+    };
+    expect(
+      recordFromEdit(
+        before,
+        { kind: 'expense', amountYen: 350, genreId: 'g-food', date: today, name: 'パン', memo: '' },
+        null,
+      ),
+    ).toMatchObject({ amountYen: 350, genreId: 'g-food', genreName: '食料品' });
   });
 });
 

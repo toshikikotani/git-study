@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseChatMessages } from '@/lib/chat-tools';
+import { parseChatMessages, toAlternatingTurns } from '@/lib/chat-tools';
 
 /**
  * AIチャットでDBを操作する機能に共通する、会話履歴の検証(ADR-033)。
@@ -48,5 +48,33 @@ describe('parseChatMessages', () => {
     const long = 'あ'.repeat(3000);
     const result = parseChatMessages([{ role: 'user', content: long }]);
     expect(result![0]!.content.length).toBe(2000);
+  });
+});
+
+describe('toAlternatingTurns(送れなかった発言のあとに続けて送っても、AIに渡せる形にする、ADR-105)', () => {
+  it('本人の発言が続いたら1つにまとめる(送れなかった発言も落とさない)', () => {
+    expect(
+      toAlternatingTurns([
+        { role: 'user', content: 'コンビニで500円' },
+        { role: 'user', content: 'あと昼に1000円' },
+      ]),
+    ).toEqual([{ role: 'user', content: 'コンビニで500円\nあと昼に1000円' }]);
+  });
+
+  it('AIの発言から始まっていたら捨て、空の発言は捨てる。AIの発言が続いたらまとめる', () => {
+    expect(
+      toAlternatingTurns([
+        { role: 'assistant', content: '案を作りました。' },
+        { role: 'user', content: '食費をへらしたい' },
+        { role: 'assistant', content: '案を作りました。' },
+        { role: 'assistant', content: '1件を反映しました。' },
+        { role: 'user', content: '  ' },
+        { role: 'user', content: 'ありがとう' },
+      ]),
+    ).toEqual([
+      { role: 'user', content: '食費をへらしたい' },
+      { role: 'assistant', content: '案を作りました。\n1件を反映しました。' },
+      { role: 'user', content: 'ありがとう' },
+    ]);
   });
 });

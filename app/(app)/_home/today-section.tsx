@@ -1,17 +1,7 @@
 import { todayAllowance } from '@/domain/forecast/today';
 import { calendarContext } from '@/domain/forecast/calendar';
-import { goalForecastArgs } from '@/features/forecast/goal';
-import { loadForecast } from '@/features/forecast/load';
-import { getCurrentPlan } from '@/features/spending-plan/store';
-import { getAppSettings } from '@/features/settings/store';
-import {
-  addDays,
-  addMonths,
-  daysBetween,
-  monthStartJst,
-  splitDateOnly,
-  todayJst,
-} from '@/lib/date';
+import { loadTodayForecasts, todayCapYen } from '@/features/home/today-forecasts';
+import { daysBetween, splitDateOnly } from '@/lib/date';
 import { SavingsCard, type SavingsCardProps } from './savings-card';
 import { shortDate, TodayCard } from './today-card';
 
@@ -33,25 +23,17 @@ function dayLabel(date: string): string {
  * ホームの「今日使える目安」から「貯金」まで(デザイン仕様書の「今日」、ADR-090)を読み込む(重い予測
  * なので、ホームの他の部分を待たせないように Suspense の中で読む)。今日使える目安・今期の見通し・
  * 次の一手は目標の範囲。月末に残る見込みは今月のすべての支出と収入。
+ * 予測はAIの窓口と同じところ(loadTodayForecasts、ADR-106)から受け取る。
  */
 export async function TodaySection({ savingsGoal }: { savingsGoal: SavingsCardProps['goal'] }) {
-  const today = todayJst();
-  const monthFrom = monthStartJst();
-  const monthPeriod = { from: monthFrom, to: addDays(addMonths(monthFrom, 1), -1) };
-  const [plan, settings] = await Promise.all([
-    getCurrentPlan(today).catch(() => null),
-    getAppSettings().catch(() => null),
-  ]);
-  const goal = goalForecastArgs(plan);
-  const [goalView, monthView] = await Promise.all([
-    goal ? loadForecast(goal).catch(() => null) : Promise.resolve(null),
-    loadForecast({ period: monthPeriod }).catch(() => null),
-  ]);
+  const { today, monthPeriod, goal, goalView, monthView, payday } = await loadTodayForecasts();
+  const monthFrom = monthPeriod.from;
   const forecast = goalView?.forecast ?? null;
   const balance = monthView?.forecast.balance ?? null;
   // 残りの休日数を計算
   const periodTo = goal?.period.to ?? monthPeriod.to;
-  const cal = forecast ? calendarContext(today, periodTo, settings?.payday ?? null) : null;
+  const cal = forecast ? calendarContext(today, periodTo, payday) : null;
+  const capYen = goalView ? todayCapYen(goalView) : 0;
 
   return (
     <>
@@ -59,7 +41,7 @@ export async function TodaySection({ savingsGoal }: { savingsGoal: SavingsCardPr
         today={
           forecast && goal
             ? todayAllowance({
-                capYen: goalView?.dailyLimit?.todayLimitYen ?? forecast.safeDailyAllowance ?? 0,
+                capYen,
                 spentTodayYen: goalView?.todaySpentYen ?? 0,
               })
             : null
@@ -71,7 +53,7 @@ export async function TodaySection({ savingsGoal }: { savingsGoal: SavingsCardPr
                 spentYen: forecast.breakdown.actualYen,
                 spentTodayYen: goalView?.todaySpentYen ?? 0,
                 remainingDays: forecast.remainingDays,
-                capYen: goalView?.dailyLimit?.todayLimitYen ?? forecast.safeDailyAllowance ?? 0,
+                capYen,
                 probWithinBudget: forecast.probWithinBudget,
                 remainingDayOffs: cal?.dayOffs,
                 dayOffPerDayYen: goalView?.dayOffPerDayYen ?? null,
