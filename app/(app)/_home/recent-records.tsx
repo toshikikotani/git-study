@@ -9,6 +9,7 @@ import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { addDays, daysBetween, todayJst } from '@/lib/date';
 import { CategoryMark } from '../category-sheet';
+import { DirectRecordEditor } from '../transactions/direct-record-editor';
 
 /** これからの支払いに出す件数と、見る先の日数。 */
 const UPCOMING_COUNT = 3;
@@ -75,31 +76,33 @@ export async function UpcomingPayments() {
                   className="flex items-center gap-3 px-4 py-3"
                   style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
                 >
-                  <span className="tabular flex w-11 shrink-0 flex-col items-center">
-                    <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                      {Number(t.occurredOn.slice(5, 7))}月
+                  <DirectRecordEditor transaction={t}>
+                    <span className="tabular flex w-11 shrink-0 flex-col items-center">
+                      <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                        {Number(t.occurredOn.slice(5, 7))}月
+                      </span>
+                      <span className="text-[20px] font-bold" style={{ color: 'var(--ink)' }}>
+                        {Number(t.occurredOn.slice(8, 10))}
+                      </span>
                     </span>
-                    <span className="text-[20px] font-bold" style={{ color: 'var(--ink)' }}>
-                      {Number(t.occurredOn.slice(8, 10))}
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span
+                        className="truncate text-[16px] font-medium"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        {t.label}
+                      </span>
+                      <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                        {isFixed(t) ? '固定費' : '予定'} · {t.genreName ?? '未分類'} · あと{days}日
+                      </span>
                     </span>
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
                     <span
-                      className="truncate text-[16px] font-medium"
+                      className="tabular shrink-0 text-[16px] font-semibold"
                       style={{ color: 'var(--ink)' }}
                     >
-                      {t.label}
+                      {yen(t.amountYen)}
                     </span>
-                    <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                      {isFixed(t) ? '固定費' : '予定'} · {t.genreName ?? '未分類'} · あと{days}日
-                    </span>
-                  </span>
-                  <span
-                    className="tabular shrink-0 text-[16px] font-semibold"
-                    style={{ color: 'var(--ink)' }}
-                  >
-                    {yen(t.amountYen)}
-                  </span>
+                  </DirectRecordEditor>
                 </li>
               );
             })}
@@ -173,24 +176,26 @@ export async function TodayRecords() {
                 ) : null}
                 <div className="flex items-center gap-3 py-2 pr-4 pl-2">
                   <CategoryMark genreId={t.genreId} name={t.genreName} />
-                  <span className="flex min-w-0 flex-1 flex-col">
+                  <DirectRecordEditor transaction={t}>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span
+                        className="truncate text-[16px] font-medium"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        {t.label}
+                      </span>
+                      <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                        {sub}
+                      </span>
+                    </span>
                     <span
-                      className="truncate text-[16px] font-medium"
-                      style={{ color: 'var(--ink)' }}
+                      className="tabular shrink-0 text-[16px] font-semibold"
+                      style={{ color: income ? 'var(--income)' : 'var(--ink)' }}
                     >
-                      {t.label}
+                      {income ? '+' : ''}
+                      {yen(t.amountYen)}
                     </span>
-                    <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                      {sub}
-                    </span>
-                  </span>
-                  <span
-                    className="tabular shrink-0 text-[16px] font-semibold"
-                    style={{ color: income ? 'var(--income)' : 'var(--ink)' }}
-                  >
-                    {income ? '+' : ''}
-                    {yen(t.amountYen)}
-                  </span>
+                  </DirectRecordEditor>
                 </div>
               </li>
             );

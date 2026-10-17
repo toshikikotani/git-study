@@ -1459,6 +1459,45 @@ export type Database = {
           },
         ];
       };
+      duplicate_pair_decisions: {
+        Row: {
+          decided_at: string;
+          signature: string;
+          transaction_a_id: string;
+          transaction_b_id: string;
+          user_id: string;
+        };
+        Insert: {
+          decided_at?: string;
+          signature: string;
+          transaction_a_id: string;
+          transaction_b_id: string;
+          user_id: string;
+        };
+        Update: {
+          decided_at?: string;
+          signature?: string;
+          transaction_a_id?: string;
+          transaction_b_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'duplicate_pair_decisions_transaction_a_id_fkey';
+            columns: ['transaction_a_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'duplicate_pair_decisions_transaction_b_id_fkey';
+            columns: ['transaction_b_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       fixed_cost_confirmations: {
         Row: {
           confirmed_at: string;

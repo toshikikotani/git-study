@@ -9,6 +9,14 @@ import type { CategoryLine } from '@/features/category/model';
 import type { SheetState } from '@/lib/sheet';
 import { CategoryPicker } from './category-picker';
 
+type EditResult = boolean | void | Promise<boolean | void>;
+type EditCallbacks = {
+  onSave: (line: CategoryLine, patch: TxPatch) => EditResult;
+  onMove: (line: CategoryLine, toGenreId: string | null) => EditResult;
+  onMoveItem: (line: CategoryLine, itemId: string, toGenreId: string | null) => EditResult;
+  onDelete: (line: CategoryLine) => EditResult;
+};
+
 /**
  * 取引の編集シート。半分の高さで開き、上へスワイプすると全画面になる。
  * レシート付きの取引は、上部に画像を出す(ピンチ・ダブルタップでズーム)。金額・日付・店名・
@@ -19,6 +27,7 @@ export function EditSheet({
   line,
   genres,
   suggestedGenreId,
+  error = null,
   onClose,
   onSave,
   onMove,
@@ -28,12 +37,9 @@ export function EditSheet({
   line: CategoryLine | null;
   genres: readonly { id: string; name: string }[];
   suggestedGenreId: string | null;
+  error?: string | null;
   onClose: () => void;
-  onSave: (line: CategoryLine, patch: TxPatch) => void;
-  onMove: (line: CategoryLine, toGenreId: string | null) => void;
-  onMoveItem: (line: CategoryLine, itemId: string, toGenreId: string | null) => void;
-  onDelete: (line: CategoryLine) => void;
-}) {
+} & EditCallbacks) {
   const [state, setState] = useState<Exclude<SheetState, 'closed'>>('half');
   return (
     <ExpandableSheet
@@ -52,6 +58,7 @@ export function EditSheet({
           line={line}
           genres={genres}
           suggestedGenreId={suggestedGenreId}
+          error={error}
           full={state === 'full'}
           onSave={onSave}
           onMove={onMove}
@@ -67,6 +74,7 @@ export function EditForm({
   line,
   genres,
   suggestedGenreId,
+  error = null,
   full,
   onSave,
   onMove,
@@ -76,12 +84,9 @@ export function EditForm({
   line: CategoryLine;
   genres: readonly { id: string; name: string }[];
   suggestedGenreId: string | null;
+  error?: string | null;
   full: boolean;
-  onSave: (line: CategoryLine, patch: TxPatch) => void;
-  onMove: (line: CategoryLine, toGenreId: string | null) => void;
-  onMoveItem: (line: CategoryLine, itemId: string, toGenreId: string | null) => void;
-  onDelete: (line: CategoryLine) => void;
-}) {
+} & EditCallbacks) {
   const tx = line.tx;
   const isSplit = tx.splits.length > 0;
   const [amount, setAmount] = useState(String(Math.abs(tx.amountYen)));
@@ -89,6 +94,20 @@ export function EditForm({
   const [store, setStore] = useState(tx.label);
   const [memo, setMemo] = useState(tx.memo ?? '');
   const [picking, setPicking] = useState<null | { itemId: string | null }>(null);
+  const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const run = async (operation: () => EditResult) => {
+    if (busy) return;
+    setBusy(true);
+    setRequestError(null);
+    try {
+      await operation();
+    } catch {
+      setRequestError('保存できませんでした。入力内容は残っています。もう一度お試しください。');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const amountNumber = Number(amount);
   const sign = tx.amountYen < 0 ? -1 : 1;
@@ -109,7 +128,12 @@ export function EditForm({
   const dirty = Object.keys(patch).length > 0;
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={busy} className="min-w-0 space-y-4 border-0 p-0">
+      {requestError || error ? (
+        <p role="alert" className="text-sm" style={{ color: 'var(--over)' }}>
+          {requestError ?? error}
+        </p>
+      ) : null}
       {tx.thumbnailUrl ? (
         <ZoomableImage
           src={tx.thumbnailUrl}
@@ -188,7 +212,7 @@ export function EditForm({
             includeUncategorized
             onPick={(g) => {
               setPicking(null);
-              onMove(line, g);
+              void run(() => onMove(line, g));
             }}
           />
         ) : (
@@ -238,7 +262,7 @@ export function EditForm({
                       currentId={item.genreId ?? tx.genreId}
                       onPick={(g) => {
                         setPicking(null);
-                        onMoveItem(line, item.id, g);
+                        void run(() => onMoveItem(line, item.id, g));
                       }}
                     />
                   </div>
@@ -252,14 +276,14 @@ export function EditForm({
       <button
         type="button"
         disabled={!dirty}
-        onClick={() => onSave(line, patch)}
+        onClick={() => void run(() => onSave(line, patch))}
         className="min-h-12 w-full rounded-2xl text-base font-semibold disabled:opacity-40"
         style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
-        保存する
+        {busy ? '保存しています…' : '保存する'}
       </button>
-      <DeleteRow onDelete={() => onDelete(line)} />
-    </div>
+      <DeleteRow onDelete={() => void run(() => onDelete(line))} />
+    </fieldset>
   );
 }
 

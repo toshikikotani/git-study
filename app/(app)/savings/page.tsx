@@ -81,7 +81,7 @@ export default async function SavingsPage() {
       <NewGoal />
 
       <Link
-        href="/assistant"
+        href="/assistant?context=savings"
         className="block text-xs font-medium"
         style={{ color: 'var(--accent)' }}
       >

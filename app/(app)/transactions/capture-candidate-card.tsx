@@ -28,6 +28,8 @@ export function CaptureCandidateCard({
   onDiscard,
   duplicateOf,
   onLinkExisting,
+  saveDisabled = false,
+  errorMessage,
 }: {
   candidate: EditableCandidate;
   onChange: (next: EditableCandidate) => void;
@@ -39,6 +41,8 @@ export function CaptureCandidateCard({
   /** 重複の疑いがある既存の明細(スクショから記録のときだけ)。 */
   duplicateOf?: { id: string; description: string; occurredOn: DateOnly; amountYen: number } | null;
   onLinkExisting?: () => void;
+  saveDisabled?: boolean;
+  errorMessage?: string | undefined;
 }) {
   const lowConfidence = candidate.confidence < LOW_CONFIDENCE_THRESHOLD;
 
@@ -169,7 +173,7 @@ export function CaptureCandidateCard({
         <button
           type="button"
           onClick={onSave}
-          disabled={status === 'saving' || candidate.amountYen === 0}
+          disabled={saveDisabled || status === 'saving' || candidate.amountYen === 0}
           className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"
           style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >
@@ -187,8 +191,8 @@ export function CaptureCandidateCard({
       </div>
 
       {status === 'error' ? (
-        <p className="text-xs" style={{ color: 'var(--over)' }}>
-          登録に失敗しました。もう一度お試しください。
+        <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
+          {errorMessage ?? '登録に失敗しました。もう一度お試しください。'}
         </p>
       ) : null}
     </div>

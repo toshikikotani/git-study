@@ -3,6 +3,8 @@
 /** AI月次レポートのカード(ADR-031)。押されたときだけ AI を呼ぶ。 */
 
 import { useState } from 'react';
+import type { Route } from 'next';
+import Link from 'next/link';
 
 import { AiLabel } from '@/components/ui/ai-label';
 import { BulletList } from '@/components/ui/bullet-list';
@@ -12,8 +14,9 @@ import { formatYen } from '@/domain/money';
 import { SPENDING_PERSONA_DESCRIPTIONS, SPENDING_PERSONA_LABELS } from '@/domain/persona';
 import type { ForecastReadView } from '@/features/ai-report/forecast-read';
 import type { MonthlyReportForecast } from '@/features/ai-report/monthly-report-ai';
-import type { MonthlyAiReportView } from '@/features/ai-report/store';
-import { formatDateJa } from '@/lib/date';
+import type { MonthlyAiReport, MonthlyAiReportView } from '@/features/ai-report/store';
+import { formatDateJa, todayJst } from '@/lib/date';
+import { monthReviewHref } from '@/lib/period-nav';
 import { generateMonthlyAiReportAction } from './actions';
 
 export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
@@ -59,38 +62,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
           今月の家計データから、支出傾向のタイプ・気づき・アドバイスをAIがまとめます。
         </p>
       ) : (
-        <>
-          <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-              支出傾向のタイプ
-            </p>
-            <p className="mt-1 text-base font-semibold" style={{ color: 'var(--accent)' }}>
-              {SPENDING_PERSONA_LABELS[report.personaType]}
-            </p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              {SPENDING_PERSONA_DESCRIPTIONS[report.personaType]}
-            </p>
-            <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              {report.personaReasoning}
-            </p>
-          </div>
-
-          <ForecastReadSection forecast={input.forecast} read={report.forecastRead} />
-
-          <BulletList
-            heading="気づき"
-            items={report.insights.filter(
-              (line) => !line.includes('未診断') && !line.includes('診断'),
-            )}
-          />
-          <BulletList
-            heading="アドバイス"
-            items={report.advice.filter(
-              (line) => !line.includes('未診断') && !line.includes('診断'),
-            )}
-          />
-          <AiLabel feature="monthly-report" contentKey={input.monthKey} evidenceHref="/spending" />
-        </>
+        <MonthlyReportBody report={report} monthKey={input.monthKey} forecast={input.forecast} />
       )}
 
       <WasteRatioBars points={wasteRatioPoints} />
@@ -144,6 +116,88 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** 過去月には、現在の貯金・予測などを混ぜず、実際に保存された文章だけを表示する。 */
+export function SavedMonthlyReportCard({
+  monthKey,
+  report,
+}: {
+  monthKey: string;
+  report: MonthlyAiReport | null;
+}) {
+  return (
+    <section
+      className="glass rounded-2xl p-4"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
+      <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+        {monthKey} の月次レポート
+      </h2>
+      {report === null ? (
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          この月のAIレポートは保存されていません。今月以外は保存済みのレポートを表示します。
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            {formatDateJa(todayJst(new Date(report.createdAt)))}に作成した内容です。
+          </p>
+          <MonthlyReportBody report={report} monthKey={monthKey} forecast={null} />
+        </>
+      )}
+      <Link
+        href={monthReviewHref(monthKey) as Route}
+        className="mt-3 flex min-h-11 items-center text-sm font-semibold"
+        style={{ color: 'var(--accent)' }}
+      >
+        この月の内訳を確認する
+      </Link>
+    </section>
+  );
+}
+
+function MonthlyReportBody({
+  report,
+  monthKey,
+  forecast,
+}: {
+  report: MonthlyAiReport;
+  monthKey: string;
+  forecast: MonthlyReportForecast | null;
+}) {
+  return (
+    <>
+      <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          支出傾向のタイプ
+        </p>
+        <p className="mt-1 text-base font-semibold" style={{ color: 'var(--accent)' }}>
+          {SPENDING_PERSONA_LABELS[report.personaType]}
+        </p>
+        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          {SPENDING_PERSONA_DESCRIPTIONS[report.personaType]}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          {report.personaReasoning}
+        </p>
+      </div>
+      <ForecastReadSection forecast={forecast} read={report.forecastRead} />
+      <BulletList
+        heading="気づき"
+        items={report.insights.filter((line) => !line.includes('未診断') && !line.includes('診断'))}
+      />
+      <BulletList
+        heading="アドバイス"
+        items={report.advice.filter((line) => !line.includes('未診断') && !line.includes('診断'))}
+      />
+      <AiLabel
+        feature="monthly-report"
+        contentKey={monthKey}
+        evidenceHref={`/spending?month=${monthKey}` as Route}
+      />
+    </>
   );
 }
 

@@ -20,6 +20,7 @@ vi.mock('../../app/(app)/transactions/receipt-items-panel', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   usePathname: () => '/spending',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { AttentionCard } from '../../app/(app)/spending/attention-card';

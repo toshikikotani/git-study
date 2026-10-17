@@ -90,12 +90,14 @@ function Pill({ children }: { children: React.ReactNode }) {
 }
 
 /** 入力待ち(サーバーに残っているもの)。 */
-function CaptureRow({ capture }: { capture: CaptureView }) {
+export function CaptureRow({ capture, returnTo }: { capture: CaptureView; returnTo?: string }) {
   const [, m, d] = capture.capturedOn.split('-');
   return (
     <li>
       <Link
-        href={`/transactions/receipt/${capture.id}` as Route}
+        href={
+          `/transactions/receipt/${capture.id}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}` as Route
+        }
         prefetch={false}
         className={`min-h-11 ${ROW}`}
         style={ROW_STYLE}

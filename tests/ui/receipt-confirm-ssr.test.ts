@@ -18,7 +18,11 @@ const item = (name: string, amount_yen: number, confidence = 0.9) => ({
   y_ratio: 0.4,
 });
 
-function render(amount: number, goal: Parameters<typeof ReceiptConfirm>[0]['goal']) {
+function render(
+  amount: number,
+  goal: Parameters<typeof ReceiptConfirm>[0]['goal'],
+  options: { accountId?: string; parentGenreId?: string } = {},
+) {
   const parsed = buildFromAiRows([
     {
       occurred_on: '2026-09-29',
@@ -37,13 +41,18 @@ function render(amount: number, goal: Parameters<typeof ReceiptConfirm>[0]['goal
       total_confidence: 1,
     },
   ]).transactions[0]!;
-  const job = { ...newJob('j', 'blob:x', 0), status: 'ready' as const, parsed: [parsed] };
+  const job = {
+    ...newJob('j', 'blob:x', 0),
+    status: 'ready' as const,
+    parsed: [parsed],
+    parentGenreIds: options.parentGenreId ? { 0: options.parentGenreId } : {},
+  };
   return renderToString(
     h(ReceiptConfirm, {
       job,
       index: 0,
       genres: [{ id: 'cafe', name: 'カフェ・飲料' }],
-      accountId: 'a',
+      accountId: options.accountId ?? 'a',
       saving: false,
       savedLabel: null,
       goal,
@@ -54,9 +63,9 @@ function render(amount: number, goal: Parameters<typeof ReceiptConfirm>[0]['goal
 }
 
 describe('レシート確認画面(サーバー描画のスモークテスト)', () => {
-  it('画像・読み取り結果・照合バー・低信頼の下線・一括変更のチップが出る', () => {
+  it('要約・画像への入口・照合バー・低信頼の下線・一括変更のチップが出る', () => {
     const html = render(1500, null);
-    expect(html).toContain('撮影したレシート');
+    expect(html).toContain('レシート画像を確認する');
     expect(html).toContain('一致しています');
     expect(html).toContain('カフェ・飲料'); // カテゴリのチップ
     expect(html).toContain('underline'); // 低信頼(店名 0.4・品目 0.5)の黄色の下線
@@ -79,5 +88,36 @@ describe('レシート確認画面(サーバー描画のスモークテスト)',
     expect(html).toContain('目標への影響');
     // 品目がカフェ・飲料になっていない(未選択)ので、影響の行は出ない=クラッシュしないこと
     expect(html).toContain('明細のカテゴリ');
+  });
+});
+
+describe('目標への確認と保存を一つの操作にする', () => {
+  const snapshot = {
+    range: { from: '2026-09-28', to: '2026-10-05' },
+    genres: [{ genreId: 'cafe', genreName: 'カフェ・飲料', targetYen: 2000, spentYen: 0 }],
+  };
+
+  it('未来日は理由と影響を先に示し、主ボタンで確認して保存できる', () => {
+    const html = render(1500, { today: '2026-09-28', snapshot }, { parentGenreId: 'cafe' });
+    expect(html).toContain('今日より先の日付です');
+    expect(html).toContain('目標に含めて保存');
+    expect(html).toContain('今日より先の予定なので、目標のペースには含めません');
+    expect(html).not.toContain('aria-label="目標の扱い"');
+    expect(html.indexOf('今日より先の日付です')).toBeLessThan(
+      html.indexOf('レシート画像を確認する'),
+    );
+  });
+
+  it('高額かつ差額がある場合も、差額を残す機能と明示確認を一つにする', () => {
+    const html = render(1200, { today: '2026-09-29', snapshot }, { parentGenreId: 'cafe' });
+    expect(html).toContain('このカテゴリの目標の半分以上になる支払いです');
+    expect(html).toContain('目標に含め、差額を残して保存');
+    expect(html).toContain('修正候補へ');
+    expect(html).toContain('値引き行を追加');
+  });
+
+  it('保存先がまだ無い場合は保存を実行できない', () => {
+    const html = render(1500, null, { accountId: '' });
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>保存する<\/button>/);
   });
 });

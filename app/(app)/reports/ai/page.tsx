@@ -1,9 +1,19 @@
+import type { Route } from 'next';
+import Link from 'next/link';
+
+import { BackHeader } from '@/components/ui/back-header';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
 import { DailyReportCard } from './daily-report-view';
-import { loadDailyAiReportView, loadMonthlyAiReportView } from '@/features/ai-report/store';
-import { loadMonthlyLedger } from '@/features/spending/store';
+import {
+  loadDailyAiReportView,
+  loadMonthlyAiReportView,
+  loadMonthlyReport,
+} from '@/features/ai-report/store';
+import { loadCalendarMonth } from '@/features/spending/store';
+import { monthStartJst } from '@/lib/date';
+import { monthReviewHref, resolveCalendarMonthStart } from '@/lib/period-nav';
 import { withMinDuration } from '@/lib/min-loading-duration';
-import { MonthlyReportCard } from './report-view';
+import { MonthlyReportCard, SavedMonthlyReportCard } from './report-view';
 
 /**
  * AI月次・日次レポート(本人発案「AI関連もっと増やしたい。もっと画期的な機能
@@ -21,27 +31,52 @@ export const dynamic = 'force-dynamic';
 // 着地の見込み(確率予測)と、初回だけ過去の月での検証を含むため、余裕を持たせる。
 export const maxDuration = 60;
 
-export default async function AiReportPage() {
-  const [dailyView, monthlyView, ledger] = await withMinDuration(
-    Promise.all([loadDailyAiReportView(), loadMonthlyAiReportView(), loadMonthlyLedger()]),
+export default async function AiReportPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ month?: string | string[] }>;
+} = {}) {
+  const now = new Date();
+  const currentMonthStart = monthStartJst(0, now);
+  const { month } = (await searchParams) ?? {};
+  const monthStart = resolveCalendarMonthStart(month, currentMonthStart);
+  const monthKey = monthStart.slice(0, 7);
+  const isCurrentMonth = monthStart === currentMonthStart;
+  const [dailyView, monthlyView, savedReport, ledger] = await withMinDuration(
+    Promise.all([
+      isCurrentMonth ? loadDailyAiReportView(now) : null,
+      isCurrentMonth ? loadMonthlyAiReportView(now) : null,
+      isCurrentMonth ? null : loadMonthlyReport(monthKey),
+      loadCalendarMonth(monthStart, now),
+    ]),
   );
 
   const maxYen = Math.max(...ledger.genreBreakdown.map((r) => r.spentYen), 1);
 
   return (
     <div className="rise space-y-3">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          AIレポート
-        </h1>
-        <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
-          {monthlyView.input.monthKey} の傾向・気づき・アドバイス
-        </p>
-      </header>
+      <BackHeader
+        back={{ href: monthReviewHref(monthKey), label: '月のふりかえり' }}
+        title="AIレポート"
+        sub={`${monthKey} の傾向・気づき・アドバイス`}
+      />
 
-      <DailyReportCard view={dailyView} />
+      {dailyView !== null ? <DailyReportCard view={dailyView} /> : null}
 
-      <MonthlyReportCard view={monthlyView} />
+      {monthlyView !== null ? (
+        <MonthlyReportCard key={monthKey} view={monthlyView} />
+      ) : (
+        <>
+          <SavedMonthlyReportCard monthKey={monthKey} report={savedReport} />
+          <Link
+            href={`/reports/ai?month=${currentMonthStart.slice(0, 7)}` as Route}
+            className="flex min-h-11 items-center text-sm font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            今日・今月のレポートを表示・作成する
+          </Link>
+        </>
+      )}
 
       {/* ジャンル別の内訳(家計簿と同じ集計・同じ行の部品) */}
       {ledger.genreBreakdown.length > 0 ? (

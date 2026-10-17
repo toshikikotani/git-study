@@ -162,7 +162,7 @@ export function PlanBuilder({
         ) : null}
       </summary>
       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        カレンダーで期間を選ぶと、AIが過去の支出と課題から、カテゴリごとの目標を提案します。
+        期間を選び、目標案を確認して保存します。AIが過去の支出と課題からカテゴリごとの目標を提案します。
         提案は目安なので、あとから自由に直せます。
       </p>
 
@@ -188,7 +188,14 @@ export function PlanBuilder({
         ))}
       </div>
 
-      <div className="mt-3">
+      <details
+        open={overlapError !== null || start === null || end === null}
+        className="mt-3 rounded-xl px-3"
+        style={{ background: 'var(--plane)' }}
+      >
+        <summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold">
+          期間・改善の強さを調整 · {STEP_LABELS[step]}({step}%)
+        </summary>
         <RangeCalendar
           start={start}
           end={end}
@@ -196,7 +203,32 @@ export function PlanBuilder({
           blocked={ranges.map((r) => ({ from: r.periodStart, to: r.periodEnd }))}
           onChange={setRange}
         />
-      </div>
+        <div className="mt-3 pb-3">
+          <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+            改善の強さ(課題のあるカテゴリを、今回どこまで削るか)
+          </p>
+          <div className="mt-2 flex gap-2">
+            {PLAN_STEP_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={step === option}
+                onClick={() => {
+                  setStep(option);
+                  setSuggestion(null);
+                }}
+                className="min-h-11 flex-1 rounded-full py-2 text-xs font-semibold"
+                style={{
+                  background: step === option ? 'var(--accent)' : 'var(--accent-track)',
+                  color: step === option ? 'var(--on-accent)' : 'var(--accent)',
+                }}
+              >
+                {STEP_LABELS[option]}({option}%)
+              </button>
+            ))}
+          </div>
+        </div>
+      </details>
 
       {overlapError !== null ? (
         <p role="alert" className="mt-2 text-sm" style={{ color: 'var(--ink)' }}>
@@ -213,32 +245,6 @@ export function PlanBuilder({
             : `${formatDateJa(start)} 〜 ${formatDateJa(end)}(${planPeriodDays(start, end)}日間)`}
       </p>
 
-      <div className="mt-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-          改善の強さ(課題のあるカテゴリを、今回どこまで削るか)
-        </p>
-        <div className="mt-2 flex gap-2">
-          {PLAN_STEP_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={step === option}
-              onClick={() => {
-                setStep(option);
-                setSuggestion(null);
-              }}
-              className="min-h-11 flex-1 rounded-full py-2 text-xs font-semibold"
-              style={{
-                background: step === option ? 'var(--accent)' : 'var(--accent-track)',
-                color: step === option ? 'var(--on-accent)' : 'var(--accent)',
-              }}
-            >
-              {STEP_LABELS[option]}({option}%)
-            </button>
-          ))}
-        </div>
-      </div>
-
       <Button
         variant="filled"
         className="mt-4 w-full"
@@ -251,11 +257,11 @@ export function PlanBuilder({
       {suggestion !== null ? (
         <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
           {/* 根拠(記録日数・対象期間・中央値)。記録が14日未満なら「暫定」 */}
-          <div
+          <details
             className="rounded-xl p-3 text-xs leading-relaxed"
             style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
           >
-            <p className="flex flex-wrap items-center gap-2">
+            <summary className="min-h-11 cursor-pointer font-semibold">
               <span className="font-semibold" style={{ color: 'var(--ink)' }}>
                 提案の根拠
               </span>
@@ -267,7 +273,7 @@ export function PlanBuilder({
                   暫定
                 </span>
               ) : null}
-            </p>
+            </summary>
             <p className="tabular mt-1">
               家計簿の記録 {suggestion.evidence.recordedDays}日分
               {suggestion.evidence.from
@@ -276,12 +282,12 @@ export function PlanBuilder({
               ・ 1日あたりの支出の中央値{' '}
               {formatYen(suggestion.evidence.medianDailyYen, { sign: 'never' })}
             </p>
-            {suggestion.evidence.provisional ? (
-              <p className="mt-1" style={{ color: 'var(--ink-muted)' }}>
-                記録が14日に満たないため、暫定の目安です。記録がそろったら作り直せます。
-              </p>
-            ) : null}
-          </div>
+          </details>
+          {suggestion.evidence.provisional ? (
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              記録が14日に満たないため、暫定の目安です。記録がそろったら作り直せます。
+            </p>
+          ) : null}
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
             {suggestion.summary}
           </p>
@@ -315,6 +321,7 @@ export function PlanBuilder({
           ) : null}
 
           <AllocationEditor
+            compact
             key={`${start}-${end}-${step}-${suggestion.summary}`}
             periodStart={start!}
             periodEnd={end!}

@@ -14,7 +14,6 @@ import { useEffect, useRef, useState } from 'react';
 import { MdMic, MdMicOff } from 'react-icons/md';
 
 import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
-import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { hapticFor } from '@/lib/haptics';
 import { pushUndo } from '@/lib/undo';
 import { resolveGenreHint } from '@/domain/genre-hint';
@@ -25,8 +24,13 @@ import {
   type GenreNameOption,
 } from '../capture-actions';
 import { CaptureCandidateCard, type EditableCandidate } from '../capture-candidate-card';
+import { InputAccountSelector, useInputAccount } from '../input-account';
 
-type Row = EditableCandidate & { key: string; status: 'idle' | 'saving' | 'saved' | 'error' };
+type Row = EditableCandidate & {
+  key: string;
+  status: 'idle' | 'saving' | 'saved' | 'error';
+  error?: string | undefined;
+};
 
 // 標準化前のブラウザ実装(Safari 等)向け。
 type SpeechRecognitionLike = {
@@ -42,7 +46,7 @@ type SpeechRecognitionLike = {
 export function CaptureTextForm() {
   const [text, setText] = useState('');
   const [genres, setGenres] = useState<GenreNameOption[]>([]);
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const inputAccount = useInputAccount();
   const [rows, setRows] = useState<Row[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +57,6 @@ export function CaptureTextForm() {
 
   useEffect(() => {
     void fetchGenreNameOptionsAction().then(setGenres);
-    void fetchAccounts().then(setAccounts);
     const Ctor =
       (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike })
         .SpeechRecognition ??
@@ -114,9 +117,14 @@ export function CaptureTextForm() {
   }
 
   async function save(row: Row): Promise<void> {
-    const account = accounts[0];
-    if (!account) return;
-    setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, status: 'saving' } : r)));
+    const account = inputAccount.selectedAccount;
+    if (!account) {
+      setError('保存先の口座を用意してください。入力内容は残っています。');
+      return;
+    }
+    setRows((prev) =>
+      prev.map((r) => (r.key === row.key ? { ...r, status: 'saving', error: undefined } : r)),
+    );
     const genre = genres.find((g) => g.id === row.genreId);
     const store = row.storeName.trim() === '' ? '文字で記録' : row.storeName.trim();
     const amountYen = -Math.abs(row.amountYen);
@@ -141,14 +149,30 @@ export function CaptureTextForm() {
       sourceRef: null,
       memo: null,
     };
-    const outcome = await saveImportBatchAction([preview], {
-      fileName: '文字で記録',
-      source: 'manual',
-      accountId: account.id,
-      failedCount: 0,
-    });
+    let outcome;
+    try {
+      outcome = await saveImportBatchAction([preview], {
+        fileName: '文字で記録',
+        source: 'manual',
+        accountId: account.id,
+        failedCount: 0,
+      });
+    } catch {
+      setRows((prev) =>
+        prev.map((r) =>
+          r.key === row.key
+            ? { ...r, status: 'error', error: '通信に失敗しました。もう一度お試しください。' }
+            : r,
+        ),
+      );
+      return;
+    }
     if (outcome.error) {
-      setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, status: 'error' } : r)));
+      setRows((prev) =>
+        prev.map((r) =>
+          r.key === row.key ? { ...r, status: 'error', error: outcome.error ?? undefined } : r,
+        ),
+      );
       return;
     }
     hapticFor('save');
@@ -238,6 +262,7 @@ export function CaptureTextForm() {
           ))}
         </ul>
       ) : null}
+      <InputAccountSelector inputAccount={inputAccount} />
       <div className="space-y-3">
         {rows.map((row) => (
           <CaptureCandidateCard
@@ -247,7 +272,9 @@ export function CaptureTextForm() {
               setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, ...next } : r)))
             }
             genres={genres}
-            accountName={accounts[0]?.name ?? '(口座未登録)'}
+            accountName={inputAccount.selectedAccount?.name ?? '(口座を用意してください)'}
+            saveDisabled={inputAccount.selectedAccount === null}
+            errorMessage={row.error}
             status={row.status}
             onSave={() => void save(row)}
             onDiscard={() => setRows((prev) => prev.filter((r) => r.key !== row.key))}

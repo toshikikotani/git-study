@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 
 import { CalculatorKeypad } from '@/components/ui/calculator-keypad';
 import { GenreBadge } from '@/components/ui/genre-badge';
@@ -43,12 +43,15 @@ export function ManualEntryForm({
   showErrors = false,
   variant = 'receipt',
   onQuickEntryGenresChanged,
+  accountControls,
 }: {
   values: ManualEntryValues;
   /** field は本人が触った項目(再読み取りの上書き防止の印に使う)。 */
   onChange: (next: ManualEntryValues, field?: CaptureField) => void;
   genres: readonly ManualEntryGenre[];
   accounts: readonly ManualEntryAccount[];
+  /** Set up missing accounts beside the draft without leaving the form. */
+  accountControls?: ReactNode;
   recentStores: readonly string[];
   unread?: readonly CaptureField[];
   autofilled?: readonly CaptureField[];
@@ -347,7 +350,7 @@ export function ManualEntryForm({
         />
       </Field>
     ),
-    account: (
+    account: accountControls ?? (
       <Field
         label="口座"
         htmlFor={`${id}-account`}

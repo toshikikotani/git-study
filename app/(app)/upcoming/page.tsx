@@ -8,6 +8,9 @@ import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
 import { addDays, addMonths, daysBetween, monthStartJst, todayJst } from '@/lib/date';
 import { CategoryFixedBanner, DetectedPayments } from './upcoming-actions';
+import { DirectRecordEditor } from '../transactions/direct-record-editor';
+import { CategoryMark } from '../category-sheet';
+import { subscriptionKeyOf } from '@/domain/subscriptions';
 
 // 予定・固定費を直したあとの反映を常に見せる。
 export const dynamic = 'force-dynamic';
@@ -44,10 +47,12 @@ export default async function UpcomingPage() {
   const categoryFixedIds = new Set(
     genres.filter((g) => g.forecastClosed || fixedKeys.has(`genre:${g.id}`)).map((g) => g.id),
   );
+  const records = (ledger?.transactions ?? []).filter(
+    (t) => !t.isTransfer && t.reviewStatus !== 'ignored' && t.amountYen !== 0,
+  );
+  const byId = new Map(records.map((t) => [t.id, t]));
   const view = buildUpcoming({
-    rows: (ledger?.transactions ?? []).filter(
-      (t) => !t.isTransfer && t.reviewStatus !== 'ignored' && t.amountYen !== 0,
-    ),
+    rows: records,
     today,
     until,
     month,
@@ -98,20 +103,24 @@ export default async function UpcomingPage() {
               className="flex items-center gap-3 px-4 py-3"
               style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
             >
-              <span className="tabular flex w-11 shrink-0 flex-col items-center">
-                <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                  {Number(p.date.slice(5, 7))}月
+              <DirectRecordEditor transaction={byId.get(p.id)!}>
+                <span className="tabular flex w-11 shrink-0 flex-col items-center">
+                  <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                    {Number(p.date.slice(5, 7))}月
+                  </span>
+                  <span className="text-[20px] font-bold">{Number(p.date.slice(8, 10))}</span>
                 </span>
-                <span className="text-[20px] font-bold">{Number(p.date.slice(8, 10))}</span>
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[16px] font-medium">{p.name}</span>
-                <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                  {p.fixed ? '固定費' : '予定'} · {p.genreName ?? '未分類'} · あと
-                  {daysBetween(today, p.date)}日
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[16px] font-medium">{p.name}</span>
+                  <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                    {p.fixed ? '固定費' : '予定'} · {p.genreName ?? '未分類'} · あと
+                    {daysBetween(today, p.date)}日
+                  </span>
                 </span>
-              </span>
-              <span className="tabular shrink-0 text-[16px] font-semibold">{yen(p.amountYen)}</span>
+                <span className="tabular shrink-0 text-[16px] font-semibold">
+                  {yen(p.amountYen)}
+                </span>
+              </DirectRecordEditor>
             </div>
           ))
         )}
@@ -130,30 +139,39 @@ export default async function UpcomingPage() {
             固定費はまだありません。記録するときに「毎月の固定費にする」をオンにすると、ここに出ます。
           </p>
         ) : null}
-        {view.fixedItems.map((f, i) => (
-          <div
-            key={f.key}
-            className="flex items-center gap-3 px-4 py-3"
-            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
-          >
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[16px] font-medium">{f.name}</span>
-              <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                {f.genreName ?? '未分類'}
-              </span>
-            </span>
-            <span className="tabular flex shrink-0 flex-col items-end">
-              <span className="text-[16px] font-semibold">{yen(f.amountYen)}</span>
-              <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-                {f.paidOn !== null
-                  ? `${monthLabel} 支払い済み`
-                  : f.dueOn !== null
-                    ? `${jaDate(f.dueOn)} 予定`
-                    : ''}
-              </span>
-            </span>
-          </div>
-        ))}
+        {view.fixedItems.map((f, i) => {
+          const transaction = records.find(
+            (t) =>
+              subscriptionKeyOf(t.label, t.description, t.amountYen) === f.key &&
+              t.occurredOn === (f.paidOn ?? f.dueOn),
+          )!;
+          return (
+            <div
+              key={f.key}
+              className="flex items-center gap-3 px-4 py-3"
+              style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+            >
+              <DirectRecordEditor transaction={transaction}>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[16px] font-medium">{f.name}</span>
+                  <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                    {f.genreName ?? '未分類'}
+                  </span>
+                </span>
+                <span className="tabular flex shrink-0 flex-col items-end">
+                  <span className="text-[16px] font-semibold">{yen(f.amountYen)}</span>
+                  <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                    {f.paidOn !== null
+                      ? `${monthLabel} 支払い済み`
+                      : f.dueOn !== null
+                        ? `${jaDate(f.dueOn)} 予定`
+                        : ''}
+                  </span>
+                </span>
+              </DirectRecordEditor>
+            </div>
+          );
+        })}
         {view.categoryFixed.map((c, i) => (
           <div
             key={c.genreId}
@@ -164,6 +182,7 @@ export default async function UpcomingPage() {
                 : undefined
             }
           >
+            <CategoryMark genreId={c.genreId} name={c.genreName} />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[16px] font-medium">{c.genreName}(カテゴリごと)</span>
               <span

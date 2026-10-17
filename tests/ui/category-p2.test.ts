@@ -10,6 +10,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   usePathname: () => '/spending',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { CategoryHeader } from '../../app/(app)/spending/category/[genreKey]/category-header';
@@ -91,9 +92,10 @@ describe('P2 遷移の入り口(受け入れ基準1)', () => {
         }),
       ),
     );
-    // ⑦はシートなのでリンクにしない(ADR-091)
-    expect(html).not.toContain('href="/spending/category/dining');
-    expect(html).toContain('href="/spending/category/none?month=2026-09"');
+    // 月の内訳は通常カテゴリも同じ月の詳細へ。今期の目標へ切り替えない。
+    expect(html).toContain('href="/spending/category/dining?month=2026-09&amp;period=month');
+    expect(html).toContain('href="/spending/category/none?month=2026-09&amp;period=month');
+    expect(html).toContain('returnTo=%2Fspending%3Fmonth%3D2026-09');
     expect(html).not.toContain('aria-pressed');
   });
 
@@ -180,7 +182,7 @@ describe('P2 ヘッダー', () => {
   it('期間はタップで選ぶメニュー(押せる大きさ)。戻るボタンも44pt', () => {
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain('期間、2026年9月。タップで期間を選ぶ');
-    expect(html).toContain('‹ 家計簿');
+    expect(html).toContain('‹ 明細');
     expect((html.match(/min-h-11/g) ?? []).length).toBeGreaterThanOrEqual(3);
   });
 

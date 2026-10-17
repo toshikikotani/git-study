@@ -318,18 +318,26 @@ export async function checkReceiptDuplicatesAction(
   probes: readonly { key: string; storeName: string; occurredOn: string; amountYen: number }[],
 ): Promise<{
   duplicates: Record<string, { id: string; occurredOn: string; amountYen: number }[]>;
+  error: string | null;
 }> {
   const result: Record<string, { id: string; occurredOn: string; amountYen: number }[]> = {};
+  const unavailable = '重複を確認できませんでした。内容を確認してから保存することもできます。';
   try {
     const dates = [...new Set(probes.map((p) => assertDateOnly(p.occurredOn)))];
-    if (dates.length === 0) return { duplicates: result };
+    if (dates.length === 0) return { duplicates: result, error: null };
     const supabase = await createClient();
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user)
+      return {
+        duplicates: result,
+        error: 'ログイン状態を確認できませんでした。もう一度お試しください。',
+      };
     const { data, error } = await supabase
       .from('transactions')
       .select('id, occurred_on, description, merchant_name, amount_yen, review_status')
       .in('occurred_on', dates)
       .neq('review_status', 'ignored');
-    if (error || !data) return { duplicates: result };
+    if (error || !data) return { duplicates: result, error: unavailable };
     const existing = data.map((r) => ({
       id: r.id,
       storeName: r.merchant_name ?? r.description,
@@ -354,9 +362,9 @@ export async function checkReceiptDuplicatesAction(
       }
     }
   } catch {
-    // ignore
+    return { duplicates: result, error: unavailable };
   }
-  return { duplicates: result };
+  return { duplicates: result, error: null };
 }
 
 export async function recordGenreCorrectionAction(input: {

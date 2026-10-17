@@ -22,6 +22,7 @@ import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import type { CaptureView } from '@/features/receipt-captures/types';
 import { hapticFor } from '@/lib/haptics';
 import { markJustSaved } from '@/lib/just-saved';
+import { captureReturnTarget } from '@/features/receipt-captures/navigation';
 import { checkReceiptDuplicatesAction, undoReceiptSaveAction } from '../../actions';
 import {
   attachCaptureToTransactionAction,
@@ -38,6 +39,7 @@ import {
   type ManualEntryAccount,
   type ManualEntryGenre,
 } from '../../manual-entry-form';
+import { InputAccountSelector, useInputAccount } from '../../input-account';
 
 type Duplicate = { id: string; occurredOn: string; amountYen: number };
 type Done =
@@ -56,15 +58,18 @@ export function CaptureEntry({
   accounts,
   recentStores,
   today,
+  returnTo,
 }: {
   capture: CaptureView;
   genres: readonly ManualEntryGenre[];
   accounts: readonly ManualEntryAccount[];
   recentStores: readonly string[];
   today: string;
+  returnTo?: string;
 }) {
+  const target = captureReturnTarget(returnTo);
   const defaultAccount = accounts[0]?.id ?? '';
-  const [values, setValues] = useState<ManualEntryValues>(() => {
+  const [draftValues, setValues] = useState<ManualEntryValues>(() => {
     if (capture.draft) return capture.draft.values;
     try {
       const raw = window.localStorage.getItem(localKey(capture.id));
@@ -74,6 +79,11 @@ export function CaptureEntry({
     }
     return initialValuesFor(capture.readFields, today, defaultAccount);
   });
+  const inputAccount = useInputAccount(draftValues.accountId);
+  const values = useMemo(
+    () => ({ ...draftValues, accountId: inputAccount.accountId }),
+    [draftValues, inputAccount.accountId],
+  );
   const [touched, setTouched] = useState<Set<CaptureField>>(new Set(capture.draft?.touched ?? []));
   const [unread, setUnread] = useState<CaptureField[]>(capture.unreadFields);
   const [autofilled, setAutofilled] = useState<CaptureField[]>(
@@ -84,7 +94,12 @@ export function CaptureEntry({
   const [busy, setBusy] = useState<null | 'save' | 'rescan' | 'image'>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<RescanConflict[]>([]);
-  const [duplicateHits, setDuplicateHits] = useState<Duplicate[]>([]);
+  const [duplicateCheck, setDuplicateCheck] = useState<{
+    key: string;
+    hits: Duplicate[];
+    error: string | null;
+  } | null>(null);
+  const [duplicateAttempt, setDuplicateAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
@@ -112,8 +127,10 @@ export function CaptureEntry({
   // 重複の警告(同じ日・同じ店・近い金額)。金額と店名がそろったときだけ確かめる。
   const canProbe =
     values.amountYen !== null && values.amountYen > 0 && values.storeName.trim() !== '';
+  const duplicateKey = JSON.stringify([values.storeName, values.occurredOn, values.amountYen]);
   useEffect(() => {
     if (!canProbe) return;
+    let cancelled = false;
     const timer = window.setTimeout(() => {
       void checkReceiptDuplicatesAction([
         {
@@ -122,14 +139,43 @@ export function CaptureEntry({
           occurredOn: values.occurredOn,
           amountYen: -values.amountYen!,
         },
-      ]).then((r) => setDuplicateHits(r.duplicates.k ?? []));
+      ])
+        .then((r) => {
+          if (!cancelled)
+            setDuplicateCheck({
+              key: duplicateKey,
+              hits: r.duplicates.k ?? [],
+              error: r.error ?? null,
+            });
+        })
+        .catch(() => {
+          if (!cancelled)
+            setDuplicateCheck({
+              key: duplicateKey,
+              hits: [],
+              error: '重複を確認できませんでした。内容を確認してから保存することもできます。',
+            });
+        });
     }, 500);
-    return () => window.clearTimeout(timer);
-  }, [canProbe, values.amountYen, values.storeName, values.occurredOn]);
-  const duplicates = canProbe ? duplicateHits : [];
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    canProbe,
+    values.amountYen,
+    values.storeName,
+    values.occurredOn,
+    duplicateKey,
+    duplicateAttempt,
+  ]);
+  const duplicates = canProbe && duplicateCheck?.key === duplicateKey ? duplicateCheck.hits : [];
+  const duplicateError =
+    canProbe && duplicateCheck?.key === duplicateKey ? duplicateCheck.error : null;
 
   const onChange = (next: ManualEntryValues, field?: CaptureField) => {
     setValues(next);
+    inputAccount.setAccountId(next.accountId);
     if (field) {
       setTouched((prev) => new Set(prev).add(field));
       setUnread((prev) => prev.filter((f) => f !== field));
@@ -206,9 +252,16 @@ export function CaptureEntry({
 
   const save = async () => {
     setShowErrors(true);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0 || !inputAccount.selectedAccount) return;
     setBusy('save');
-    const result = await resolveCaptureAction({ id: capture.id, values });
+    let result;
+    try {
+      result = await resolveCaptureAction({ id: capture.id, values });
+    } catch {
+      setBusy(null);
+      setMessage('通信に失敗しました。入力内容を残したまま再試行できます。');
+      return;
+    }
     setBusy(null);
     if (result.error !== null) {
       setMessage(result.error);
@@ -279,11 +332,11 @@ export function CaptureEntry({
         )}
         <div>
           <Link
-            href="/spending"
+            href={target.href}
             className="inline-flex min-h-11 items-center px-4 text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
-            家計簿へ →
+            {target.href === '/spending?review=input' ? '次の入力待ちへ' : target.label} →
           </Link>
         </div>
         {message ? (
@@ -408,6 +461,7 @@ export function CaptureEntry({
         onChange={onChange}
         genres={genres}
         accounts={accounts}
+        accountControls={<InputAccountSelector inputAccount={inputAccount} />}
         recentStores={recentStores}
         unread={unread}
         autofilled={autofilled}
@@ -415,6 +469,21 @@ export function CaptureEntry({
         showErrors={showErrors}
       />
 
+      {duplicateError ? (
+        <div role="alert" className="space-y-1 text-xs" style={{ color: 'var(--over)' }}>
+          <p>{duplicateError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setDuplicateCheck(null);
+              setDuplicateAttempt((attempt) => attempt + 1);
+            }}
+            className="min-h-11 font-semibold underline"
+          >
+            重複をもう一度確認する
+          </button>
+        </div>
+      ) : null}
       {duplicates.length > 0 ? (
         <div
           role="alert"
@@ -451,7 +520,7 @@ export function CaptureEntry({
         <button
           type="button"
           onClick={() => void save()}
-          disabled={busy !== null}
+          disabled={busy !== null || inputAccount.selectedAccount === null}
           className="min-h-12 w-full rounded-2xl text-base font-semibold disabled:opacity-50"
           style={{ background: 'var(--action)', color: 'var(--on-action)' }}
         >

@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../app/(app)/spending/actions', () => ({ loadCalendarMonthAction: vi.fn() }));
+vi.mock('../../app/(app)/accounts/actions', () => ({ ensureDefaultAccountAction: vi.fn() }));
 vi.mock('../../app/(app)/transactions/actions', () => ({
   deleteTransactionAction: vi.fn(),
   duplicateTransactionAction: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   usePathname: () => '/spending',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { AttentionCard } from '../../app/(app)/spending/attention-card';

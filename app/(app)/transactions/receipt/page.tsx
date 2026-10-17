@@ -3,7 +3,7 @@
 import { markJustSaved } from '@/lib/just-saved';
 import type { Route } from 'next';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ReceiptConfirm, type ReceiptConfirmSave } from './receipt-confirm';
 import {
@@ -11,7 +11,6 @@ import {
   saveImportBatchAction,
   undoReceiptSaveAction,
 } from '../actions';
-import { ensureDefaultAccountAction } from '../../accounts/actions';
 import { loadGoalSnapshotAction } from '../../plan/actions';
 import type { GoalSnapshot } from '@/domain/goal-impact';
 import { formatYen } from '@/domain/money';
@@ -22,7 +21,7 @@ import {
   useReceiptJobs,
   type ReceiptJob,
 } from '@/features/import/receipt-queue';
-import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
+import { InputAccountSelector, useInputAccount } from '../input-account';
 import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
 
 /**
@@ -39,126 +38,161 @@ import { fetchGenreOptions, type GenreOption } from '@/features/transactions/gen
  * 口座が1件しか無いときは選ばせず、無ければ「現金」を自動で作る。
  */
 
-type Toast = { message: string; ids: string[]; undoing: boolean; error: string | null };
+type Toast = {
+  key: string;
+  message: string;
+  ids: string[];
+  undoing: boolean;
+  error: string | null;
+};
 
 export default function ReceiptPage() {
   const jobs = useReceiptJobs();
   const [genres, setGenres] = useState<GenreOption[]>([]);
-  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
-  const [accountId, setAccountId] = useState('');
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const inputAccount = useInputAccount('', { autoCreateDefault: true });
+  const accountId = inputAccount.selectedAccount?.id ?? '';
+  const [savingKeys, setSavingKeys] = useState<ReadonlySet<string>>(new Set());
+  const savingRef = useRef(new Set<string>());
+  const savedRef = useRef(new Map<string, string>());
   const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   // 目標があるとき、保存前の影響と保存後のひと言に使う。
   const [goal, setGoal] = useState<{ snapshot: GoalSnapshot; today: string } | null>(null);
+  const [goalLoaded, setGoalLoaded] = useState(false);
+  const [goalError, setGoalError] = useState<string | null>(null);
+
+  const loadGoal = useCallback(async () => {
+    try {
+      const result = await loadGoalSnapshotAction();
+      if (result.error) {
+        setGoalError(result.error);
+        setGoalLoaded(false);
+        return;
+      }
+      setGoalError(null);
+      setGoal(result.snapshot ? { snapshot: result.snapshot, today: result.today } : null);
+      setGoalLoaded(true);
+    } catch {
+      setGoalLoaded(false);
+      setGoalError('目標への影響を確認できませんでした。読み取り結果はそのまま残っています。');
+    }
+  }, []);
 
   useEffect(() => {
     void fetchGenreOptions().then(setGenres);
-    void loadGoalSnapshotAction().then((r) =>
-      setGoal(r.snapshot ? { snapshot: r.snapshot, today: r.today } : null),
-    );
-  }, []);
-
-  useEffect(() => {
-    void fetchAccounts().then(async (fetched) => {
-      if (fetched.length > 0) {
-        setAccounts(fetched);
-        setAccountId((current) => current || fetched[0]!.id);
-        return;
-      }
-      const result = await ensureDefaultAccountAction();
-      if ('account' in result) {
-        setAccounts([result.account]);
-        setAccountId((current) => current || result.account.id);
-      } else {
-        setAccounts([]);
-      }
-    });
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 外部の目標データを読み込み、結果を非同期で反映する。
+    void loadGoal();
+  }, [loadGoal]);
 
   const save = async (job: ReceiptJob, index: number, input: ReceiptConfirmSave) => {
     const key = `${job.id}:${index}`;
-    setSavingKey(key);
+    if (savingRef.current.has(key) || savedRef.current.has(key)) return;
+    savingRef.current.add(key);
+    setSavingKeys(new Set(savingRef.current));
     setSaveError(null);
-
-    let receiptImagePath: string | null = null;
-    const warnings: string[] = [];
-    if (input.imageBase64) {
-      try {
-        const res = await fetch('/api/import/receipt/upload', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ image: input.imageBase64, mediaType: 'image/jpeg' }),
-        });
-        const uploaded = (await res.json()) as { path: string | null; error: string | null };
-        receiptImagePath = uploaded.path;
-        if (uploaded.error) warnings.push(uploaded.error);
-      } catch {
-        warnings.push('レシート画像を保存できませんでした。');
+    try {
+      let receiptImagePath: string | null = null;
+      const warnings: string[] = [];
+      if (input.imageBase64) {
+        try {
+          const res = await fetch('/api/import/receipt/upload', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ image: input.imageBase64, mediaType: 'image/jpeg' }),
+          });
+          const uploaded = (await res.json()) as { path: string | null; error: string | null };
+          receiptImagePath = uploaded.path;
+          if (uploaded.error) warnings.push(uploaded.error);
+        } catch {
+          warnings.push('レシート画像を保存できませんでした。');
+        }
       }
+
+      const { plan } = input;
+      const sourceRef = plan.transaction.sourceRef!;
+      const outcome = await saveImportBatchAction(
+        [plan.transaction],
+        {
+          fileName: 'レシート撮影',
+          source: 'manual',
+          accountId,
+          failedCount: 0,
+          receiptImagePath,
+        },
+        plan.splits ? [{ sourceRef, splits: plan.splits }] : [],
+        plan.items.length > 0 ? [{ sourceRef, items: plan.items }] : [],
+        plan.expenseSubtype ? [{ sourceRef, subtype: plan.expenseSubtype }] : [],
+      );
+      if (outcome.error) {
+        setSaveError(outcome.error);
+        return;
+      }
+
+      // 直したジャンルは、履歴へ即座に反映する(次のレシートから効く)。
+      void Promise.allSettled(
+        input.corrections.map((c) =>
+          recordGenreCorrectionAction({
+            storeName: input.storeName,
+            itemName: c.itemName,
+            genreId: c.genreId,
+          }),
+        ),
+      );
+
+      markJustSaved(outcome.insertedIds);
+      const label = `${input.storeName} ${formatYen(-plan.transaction.amountYen)}`;
+      savedRef.current.set(key, label);
+      setSaved(new Map(savedRef.current));
+      setToast({
+        key,
+        message:
+          outcome.imported === 0
+            ? `${label} は既に登録済みのため追加しませんでした`
+            : (input.goalMessage ??
+              `${label} を保存しました${warnings.length > 0 ? `(${warnings[0]})` : ''}`),
+        ids: outcome.insertedIds,
+        undoing: false,
+        error: null,
+      });
+
+      // このジャンルのレシートを全部保存したら、キューから片付ける。
+      const allSaved = job.parsed.every((_, i) => savedRef.current.has(`${job.id}:${i}`));
+      if (allSaved)
+        window.setTimeout(() => {
+          if (job.parsed.every((_, i) => savedRef.current.has(`${job.id}:${i}`)))
+            removeReceiptJob(job.id);
+        }, 800);
+    } catch {
+      setSaveError(
+        '保存できませんでした。読み取り結果は残っています。もう一度「保存する」を押してください。',
+      );
+    } finally {
+      savingRef.current.delete(key);
+      setSavingKeys(new Set(savingRef.current));
     }
-
-    const { plan } = input;
-    const sourceRef = plan.transaction.sourceRef!;
-    const outcome = await saveImportBatchAction(
-      [plan.transaction],
-      {
-        fileName: 'レシート撮影',
-        source: 'manual',
-        accountId,
-        failedCount: 0,
-        receiptImagePath,
-      },
-      plan.splits ? [{ sourceRef, splits: plan.splits }] : [],
-      plan.items.length > 0 ? [{ sourceRef, items: plan.items }] : [],
-      plan.expenseSubtype ? [{ sourceRef, subtype: plan.expenseSubtype }] : [],
-    );
-    setSavingKey(null);
-    if (outcome.error) {
-      setSaveError(outcome.error);
-      return;
-    }
-
-    // 直したジャンルは、履歴へ即座に反映する(次のレシートから効く)。
-    void Promise.all(
-      input.corrections.map((c) =>
-        recordGenreCorrectionAction({
-          storeName: input.storeName,
-          itemName: c.itemName,
-          genreId: c.genreId,
-        }),
-      ),
-    );
-
-    markJustSaved(outcome.insertedIds);
-    const label = `${input.storeName} ${formatYen(-plan.transaction.amountYen)}`;
-    setSaved((prev) => new Map(prev).set(key, label));
-    setToast({
-      message:
-        outcome.imported === 0
-          ? `${label} は既に登録済みのため追加しませんでした`
-          : (input.goalMessage ??
-            `${label} を保存しました${warnings.length > 0 ? `(${warnings[0]})` : ''}`),
-      ids: outcome.insertedIds,
-      undoing: false,
-      error: null,
-    });
-
-    // このジャンルのレシートを全部保存したら、キューから片付ける。
-    const allSaved = job.parsed.every((_, i) => i === index || saved.has(`${job.id}:${i}`));
-    if (allSaved) window.setTimeout(() => removeReceiptJob(job.id), 800);
   };
 
   const undo = async () => {
     if (!toast) return;
     setToast({ ...toast, undoing: true });
-    const result = await undoReceiptSaveAction(toast.ids);
+    let result;
+    try {
+      result = await undoReceiptSaveAction(toast.ids);
+    } catch {
+      setToast({
+        ...toast,
+        undoing: false,
+        error: '元に戻せませんでした。もう一度お試しください。',
+      });
+      return;
+    }
     if (result.error) {
       setToast({ ...toast, undoing: false, error: result.error });
       return;
     }
-    setSaved(new Map());
+    savedRef.current.delete(toast.key);
+    setSaved(new Map(savedRef.current));
     setToast(null);
   };
 
@@ -187,39 +221,18 @@ export default function ReceiptPage() {
         </Link>
       </header>
 
-      {accounts !== null && accounts.length > 1 ? (
-        <label className="block">
-          <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-            口座
-          </span>
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="mt-1 w-full rounded-xl px-3 py-2 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
+      <InputAccountSelector inputAccount={inputAccount} />
+      {goalError ? (
+        <div role="alert" className="space-y-2 text-xs" style={{ color: 'var(--over)' }}>
+          <p>{goalError}</p>
+          <button
+            type="button"
+            onClick={() => void loadGoal()}
+            className="min-h-11 font-semibold underline"
           >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-      {accounts !== null && accounts.length === 0 ? (
-        <p className="text-xs" style={{ color: 'var(--over)' }}>
-          口座を用意できませんでした。時間をおいてから開き直してください。
-          <Link
-            href="/accounts"
-            className="min-h-11 inline-flex items-center ml-1 font-semibold underline"
-          >
-            口座を登録する
-          </Link>
-        </p>
+            目標への影響を再確認する
+          </button>
+        </div>
       ) : null}
 
       {/* 撮る・選ぶ。撮影は読み取りを待たず、キューへ入れてすぐ次を撮れる。 */}
@@ -364,9 +377,10 @@ export default function ReceiptPage() {
                 index={index}
                 genres={genres}
                 accountId={accountId}
-                saving={savingKey === `${job.id}:${index}`}
+                saving={savingKeys.has(`${job.id}:${index}`)}
                 savedLabel={saved.get(`${job.id}:${index}`) ?? null}
                 goal={goal}
+                autoSaveReady={goalLoaded}
                 onSave={(input) => void save(job, index, input)}
                 onDiscard={() => removeReceiptJob(job.id)}
               />
@@ -387,7 +401,7 @@ export default function ReceiptPage() {
         >
           <span className="min-w-0">{toast.error ?? toast.message}</span>
           <span className="flex shrink-0 gap-3">
-            {toast.ids.length > 0 && toast.error === null ? (
+            {toast.ids.length > 0 ? (
               <button
                 type="button"
                 onClick={() => void undo()}
