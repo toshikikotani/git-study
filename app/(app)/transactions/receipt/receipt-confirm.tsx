@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
 import { STATE_COLOR, STATE_ICON, STATE_LABEL, STATE_TRACK } from '@/domain/budget-state';
@@ -83,6 +83,7 @@ export function ReceiptConfirm({
   goal,
   onSave,
   onDiscard,
+  autoSaveReady = true,
 }: {
   job: ReceiptJob;
   index: number;
@@ -95,6 +96,8 @@ export function ReceiptConfirm({
   goal: { snapshot: GoalSnapshot; today: string } | null;
   onSave: (input: ReceiptConfirmSave) => void;
   onDiscard: () => void;
+  /** 口座・目標など、保存前の影響を判断する情報がそろったときだけ自動保存する。 */
+  autoSaveReady?: boolean;
 }) {
   const original = job.parsed[index]!;
   const [draft, setDraft] = useState<ReceiptDraft | null>(original.draft ?? null);
@@ -104,12 +107,16 @@ export function ReceiptConfirm({
   const [parentGenreId, setParentGenreId] = useState<string | null>(
     job.parentGenreIds[index] ?? null,
   );
-  const [kind, setKind] = useState<'normal' | 'special'>('normal');
-  // 未来日・高額のとき、含める/特別費のどちらかを本人が選ぶまで保存できない。
-  const [kindChosen, setKindChosen] = useState(false);
+  const kind = 'normal' as const;
+  const [showImage, setShowImage] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
-  const [duplicates, setDuplicates] = useState<number>(0);
+  const [duplicateCheck, setDuplicateCheck] = useState<{
+    key: string;
+    count: number;
+    error: string | null;
+  } | null>(null);
+  const [duplicateAttempt, setDuplicateAttempt] = useState(0);
 
   const initialGenreMap = useMemo(
     () => initialGenres(job, index, original),
@@ -136,20 +143,38 @@ export function ReceiptConfirm({
 
   // 重複の警告(同じ店・同じ日・近い金額)。日付・店・金額を直したら取り直す。
   const paidYen = draft?.paidYen ?? Math.abs(original.amountYen);
+  const duplicateKey = JSON.stringify([store, occurredOn, paidYen]);
+  const duplicateCheckReady = duplicateCheck?.key === duplicateKey && duplicateCheck.error === null;
+  const duplicates = duplicateCheck?.key === duplicateKey ? duplicateCheck.count : 0;
+  const duplicateError = duplicateCheck?.key === duplicateKey ? duplicateCheck.error : null;
   useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void checkReceiptDuplicatesAction([
         { key: 'r', storeName: store, occurredOn, amountYen: -paidYen },
-      ]).then((r) => {
-        if (!cancelled) setDuplicates(r.duplicates.r?.length ?? 0);
-      });
+      ])
+        .then((r) => {
+          if (!cancelled)
+            setDuplicateCheck({
+              key: duplicateKey,
+              count: r.duplicates.r?.length ?? 0,
+              error: r.error ?? null,
+            });
+        })
+        .catch(() => {
+          if (!cancelled)
+            setDuplicateCheck({
+              key: duplicateKey,
+              count: 0,
+              error: '重複を確認できませんでした。内容を確認してから保存してください。',
+            });
+        });
     }, 400);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [store, occurredOn, paidYen]);
+  }, [store, occurredOn, paidYen, duplicateKey, duplicateAttempt]);
 
   const update = (fn: (d: ReceiptDraft) => ReceiptDraft) =>
     setDraft((d) => (d === null ? d : fn(d)));
@@ -201,49 +226,79 @@ export function ReceiptConfirm({
         : needsKindChoice(goal.snapshot, { occurredOn, today: goal.today, deltas }),
     [goal, occurredOn, deltas],
   );
-  const mustChoose = choice.needed && !kindChosen;
-
-  const save = () => {
-    if (mustChoose) return;
-    if (draft === null && current.items.length === 0 && current.amountYen === 0) return;
-    const plan = buildReceiptSavePlan({
-      parsed: current,
+  // 注意があるときは主ボタンの押下で、目標に含める意図と保存をまとめて確認する。
+  // 自動保存は明示確認が不要な記録だけに限る。
+  const save = useCallback(
+    (confirmed = false) => {
+      if (
+        !autoSaveReady ||
+        (choice.needed && !confirmed) ||
+        saving ||
+        savedLabel !== null ||
+        !accountId
+      )
+        return;
+      if (draft === null && current.items.length === 0 && current.amountYen === 0) return;
+      const plan = buildReceiptSavePlan({
+        parsed: current,
+        accountId,
+        parentGenreId,
+        genreByLineId,
+        kind,
+        sourceRef: crypto.randomUUID(),
+      });
+      const corrections = (draft?.lines ?? [])
+        .filter((l) => l.kind === 'item')
+        .flatMap((l) => {
+          const now = genreByLineId.get(l.id) ?? null;
+          return now !== null && now !== (initialGenreMap.get(l.id) ?? null)
+            ? [{ itemName: l.name, genreId: now }]
+            : [];
+        });
+      onSave({
+        plan,
+        corrections,
+        storeName: store,
+        imageBase64: job.imageBase64,
+        goalMessage:
+          goal !== null && impact !== null
+            ? goalToastMessage({
+                label: `${store} ${formatYen(paidYen, { sign: 'never' })}`,
+                impact,
+                goal: goal.snapshot,
+                today: goal.today,
+              })
+            : null,
+      });
+    },
+    [
+      autoSaveReady,
+      choice.needed,
+      saving,
+      savedLabel,
       accountId,
+      draft,
+      current,
       parentGenreId,
       genreByLineId,
       kind,
-      sourceRef: crypto.randomUUID(),
-    });
-    const corrections = (draft?.lines ?? [])
-      .filter((l) => l.kind === 'item')
-      .flatMap((l) => {
-        const now = genreByLineId.get(l.id) ?? null;
-        return now !== null && now !== (initialGenreMap.get(l.id) ?? null)
-          ? [{ itemName: l.name, genreId: now }]
-          : [];
-      });
-    onSave({
-      plan,
-      corrections,
-      storeName: store,
-      imageBase64: job.imageBase64,
-      goalMessage:
-        goal !== null && impact !== null
-          ? goalToastMessage({
-              label: `${store} ${formatYen(paidYen, { sign: 'never' })}`,
-              impact,
-              goal: goal.snapshot,
-              today: goal.today,
-            })
-          : null,
-    });
-  };
+      initialGenreMap,
+      onSave,
+      store,
+      job.imageBase64,
+      goal,
+      impact,
+      paidYen,
+    ],
+  );
 
   // 一致していて信頼度が高ければ自動保存
   useEffect(() => {
-    if (autoSaved || saving || savedLabel !== null) return;
+    if (!autoSaveReady || autoSaved || saving || savedLabel !== null || !accountId || choice.needed)
+      return;
     if (status !== 'ok') return;
     if (lowStore || lowDate || lowTotal) return;
+    if (!duplicateCheckReady) return;
     if (duplicates > 0) return;
     if (draft !== null && draft.paidYen <= 0) return;
     const timer = window.setTimeout(() => {
@@ -251,7 +306,22 @@ export function ReceiptConfirm({
       save();
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [status, lowStore, lowDate, lowTotal, duplicates, saving, savedLabel]);
+  }, [
+    status,
+    lowStore,
+    lowDate,
+    lowTotal,
+    duplicates,
+    duplicateCheckReady,
+    saving,
+    savedLabel,
+    accountId,
+    choice.needed,
+    autoSaveReady,
+    autoSaved,
+    draft,
+    save,
+  ]);
 
   const field = 'mt-1 min-h-11 w-full rounded-xl px-3 text-sm';
   const fieldStyle = {
@@ -266,14 +336,6 @@ export function ReceiptConfirm({
       className="glass overflow-hidden rounded-[28px]"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      {/* 上半分:画像(ズーム可)。品目をタップすると該当行をハイライトする。 */}
-      <ZoomableImage
-        src={job.previewUrl}
-        alt="撮影したレシート"
-        highlightRatio={selectedLine?.yRatio ?? null}
-        className="h-[38vh] min-h-56"
-      />
-
       {/* 下半分:読み取り結果 */}
       <div className="space-y-5 p-5 pb-3">
         <div className="space-y-3">
@@ -320,6 +382,62 @@ export function ReceiptConfirm({
           </div>
         </div>
 
+        <div className="space-y-2" aria-label="確認の要約">
+          <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+            要確認{' '}
+            {Number(lowStore) +
+              Number(lowDate) +
+              Number(lowTotal) +
+              (draft?.lines.filter((line) => line.confidence < LOW_CONFIDENCE).length ?? 0) +
+              Number(status === 'mismatch') +
+              Number(duplicates > 0) +
+              Number(duplicateError !== null) +
+              Number(choice.needed)}{' '}
+            件{lowStore || lowDate || lowTotal ? ' · 下線のある項目を確認してください' : ''}
+          </p>
+          {status === 'mismatch' && reconcile !== null ? (
+            <a
+              href={`#receipt-reconcile-${job.id}-${index}`}
+              className="inline-flex min-h-11 items-center text-xs font-semibold underline"
+              style={{ color: 'var(--over)' }}
+            >
+              支払額と品目に差額 {formatYen(Math.abs(reconcile.diffYen))} があります。修正候補へ
+            </a>
+          ) : null}
+          {choice.needed ? (
+            <div
+              role="note"
+              className="rounded-xl p-3 text-xs leading-relaxed"
+              style={{
+                background: 'var(--attention-track)',
+                border: '1px solid var(--state-caution)',
+                color: 'var(--ink)',
+              }}
+            >
+              {choice.reason === 'scheduled'
+                ? '今日より先の日付です。'
+                : 'このカテゴリの目標の半分以上になる支払いです。'}
+              「目標に含めて保存」で、この内容を確定します。目標への反映は下のとおりです。
+            </div>
+          ) : null}
+          {impact !== null && goal !== null ? <GoalImpactView impact={impact} /> : null}
+        </div>
+
+        {duplicateError ? (
+          <div role="alert" className="space-y-1 text-xs" style={{ color: 'var(--over)' }}>
+            <p>{duplicateError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setDuplicateCheck(null);
+                setDuplicateAttempt((attempt) => attempt + 1);
+              }}
+              className="min-h-11 font-semibold underline"
+            >
+              重複をもう一度確認する
+            </button>
+          </div>
+        ) : null}
         {duplicates > 0 ? (
           <p
             role="alert"
@@ -334,6 +452,26 @@ export function ReceiptConfirm({
             件あります。二重登録でないか確認してください。
           </p>
         ) : null}
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowImage(!showImage)}
+            aria-expanded={showImage}
+            className="min-h-11 text-xs font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            {showImage ? 'レシート画像を閉じる' : 'レシート画像を確認する'}
+          </button>
+          {showImage ? (
+            <ZoomableImage
+              src={job.previewUrl}
+              alt="撮影したレシート"
+              highlightRatio={selectedLine?.yRatio ?? null}
+              className="h-[38vh] min-h-56 rounded-2xl"
+            />
+          ) : null}
+        </div>
 
         {draft !== null ? (
           <>
@@ -404,14 +542,15 @@ export function ReceiptConfirm({
                         }
                         selected={selected.has(l.id)}
                         editing={editing === l.id}
-                        onToggle={() =>
+                        onToggle={() => {
+                          setShowImage(true);
                           setSelected((prev) => {
                             const next = new Set(prev);
                             if (next.has(l.id)) next.delete(l.id);
                             else next.add(l.id);
                             return next;
-                          })
-                        }
+                          });
+                        }}
                         onEdit={() => setEditing(editing === l.id ? null : l.id)}
                         onChange={(patch) => updateLine(l.id, patch)}
                         onRemove={() => {
@@ -430,32 +569,44 @@ export function ReceiptConfirm({
               );
             })}
 
-            <div className="grid grid-cols-2 gap-2">
-              <NumberField
-                label="ポイント払い(円)"
-                value={draft.pointsYen}
-                onChange={(v) => update((d) => ({ ...d, pointsYen: v }))}
-                style={fieldStyle}
-              />
-              <NumberField
-                label="クーポン(円)"
-                value={draft.couponYen}
-                onChange={(v) => update((d) => ({ ...d, couponYen: v }))}
-                style={fieldStyle}
-              />
-              <NumberField
-                label="割り勘でもらった額(円)"
-                value={draft.splitYen}
-                onChange={(v) =>
-                  update((d) => ({
-                    ...d,
-                    splitYen: v,
-                    paidYen: Math.max(0, d.paidYen - (v - d.splitYen)),
-                  }))
-                }
-                style={fieldStyle}
-              />
-            </div>
+            <details
+              open={
+                draft.pointsYen !== 0 || draft.couponYen !== 0 || draft.splitYen !== 0 || undefined
+              }
+            >
+              <summary
+                className="min-h-11 cursor-pointer text-xs font-semibold"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
+                ポイント・クーポン・割り勘を調整する
+              </summary>
+              <div className="grid grid-cols-2 gap-2">
+                <NumberField
+                  label="ポイント払い(円)"
+                  value={draft.pointsYen}
+                  onChange={(v) => update((d) => ({ ...d, pointsYen: v }))}
+                  style={fieldStyle}
+                />
+                <NumberField
+                  label="クーポン(円)"
+                  value={draft.couponYen}
+                  onChange={(v) => update((d) => ({ ...d, couponYen: v }))}
+                  style={fieldStyle}
+                />
+                <NumberField
+                  label="割り勘でもらった額(円)"
+                  value={draft.splitYen}
+                  onChange={(v) =>
+                    update((d) => ({
+                      ...d,
+                      splitYen: v,
+                      paidYen: Math.max(0, d.paidYen - (v - d.splitYen)),
+                    }))
+                  }
+                  style={fieldStyle}
+                />
+              </div>
+            </details>
 
             {/* ジャンル:選んだ品目を、チップで一括変更 */}
             <div className="rounded-2xl p-3" style={{ background: 'var(--plane)' }}>
@@ -550,80 +701,11 @@ export function ReceiptConfirm({
             </select>
           </label>
         </div>
-        <div role="radiogroup" aria-label="目標の扱い" className="space-y-1">
-          <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-            目標の扱い
-          </span>
-          <div className="flex gap-1 rounded-full p-1" style={{ background: 'var(--plane)' }}>
-            {([['normal', '目標に含める']] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={kind === value}
-                onClick={() => {
-                  setKind(value);
-                  setKindChosen(true);
-                }}
-                className="glass min-h-11 flex-1 rounded-full px-2 text-xs font-semibold"
-                style={{
-                  background: kind === value ? 'var(--surface)' : 'transparent',
-                  color: kind === value ? 'var(--ink)' : 'var(--ink-secondary)',
-                  boxShadow: kind === value ? 'var(--card-shadow)' : 'none',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {choice.needed ? (
-          <div
-            role="group"
-            aria-label="目標の扱い"
-            className="rounded-xl p-3"
-            style={{
-              background: 'var(--attention-track)',
-              border: '1px solid var(--state-caution)',
-            }}
-          >
-            <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-              {choice.reason === 'scheduled'
-                ? '今日より先の日付です。'
-                : 'このカテゴリの目標の半分以上になる支払いです。'}
-              目標の扱いを選んでください
-            </p>
-            <div className="mt-2 flex gap-2">
-              {([['normal', '目標に含める']] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={kindChosen && kind === value}
-                  onClick={() => {
-                    setKind(value);
-                    setKindChosen(true);
-                  }}
-                  className="min-h-11 flex-1 rounded-full px-3 py-2 text-xs font-semibold"
-                  style={{
-                    background: kindChosen && kind === value ? 'var(--accent)' : 'var(--surface)',
-                    color:
-                      kindChosen && kind === value ? 'var(--on-accent)' : 'var(--ink-secondary)',
-                    border: '1px solid var(--hairline)',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {impact !== null && goal !== null ? <GoalImpactView impact={impact} /> : null}
       </div>
 
       {/* 照合バー(下部に固定):品目合計 + 税 − 値引き − ポイント = 支払額 */}
       <div
+        id={`receipt-reconcile-${job.id}-${index}`}
         className="sticky bottom-0 space-y-2 border-t p-4"
         style={{
           background: 'var(--surface-raised)',
@@ -654,8 +736,10 @@ export function ReceiptConfirm({
             </button>
             <button
               type="button"
-              onClick={save}
-              disabled={saving || !accountId || (draft !== null && draft.paidYen <= 0)}
+              onClick={() => save(true)}
+              disabled={
+                saving || !autoSaveReady || !accountId || (draft !== null && draft.paidYen <= 0)
+              }
               className="min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
               style={{
                 background: 'var(--action)',
@@ -663,11 +747,17 @@ export function ReceiptConfirm({
                 boxShadow: 'var(--card-shadow)',
               }}
             >
-              {saving
-                ? '保存しています…'
-                : status === 'mismatch'
-                  ? '差額を残して保存(要確認に入ります)'
-                  : '保存する'}
+              {!autoSaveReady
+                ? '保存の準備中…'
+                : saving
+                  ? '保存しています…'
+                  : status === 'mismatch'
+                    ? choice.needed
+                      ? '目標に含め、差額を残して保存'
+                      : '差額を残して保存(要確認に入ります)'
+                    : choice.needed
+                      ? '目標に含めて保存'
+                      : '保存する'}
             </button>
           </div>
         )}

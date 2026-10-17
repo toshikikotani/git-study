@@ -173,6 +173,85 @@ select count(*) as goals_visible_to_owner,
 from public.goals;
 commit;
 
+\echo '--- 重複ペア判断: 本人のペアだけ保存・取消、内容変更時に無効化 ---'
+insert into public.accounts (id, user_id, name, kind, purpose)
+values ('aaaaaaaa-0000-0000-0000-000000000002',
+        '22222222-2222-2222-2222-222222222222', '他人の銀行', 'bank', 'salary');
+insert into public.transactions (id, user_id, account_id, occurred_on, amount_yen, description, source)
+values
+  ('dddddddd-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001', '2026-10-15', -1200, 'ペア確認A', 'manual'),
+  ('dddddddd-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001', '2026-10-15', -1200, 'ペア確認B', 'gmail'),
+  ('dddddddd-0000-0000-0000-000000000003', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-0000-0000-0000-000000000002', '2026-10-15', -1200, '他人の明細', 'csv');
+
+begin;
+set local role authenticated;
+set local "test.user_id" = '11111111-1111-1111-1111-111111111111';
+insert into public.duplicate_pair_decisions (user_id, transaction_a_id, transaction_b_id, signature)
+values ('11111111-1111-1111-1111-111111111111', 'dddddddd-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000002', 'original');
+
+do $$
+begin
+  if (select count(*) from public.duplicate_pair_decisions) <> 1 then
+    raise exception 'FAIL: 本人のペア判断を保存できない';
+  end if;
+  begin
+    insert into public.duplicate_pair_decisions (user_id, transaction_a_id, transaction_b_id, signature)
+    values ('11111111-1111-1111-1111-111111111111', 'dddddddd-0000-0000-0000-000000000002', 'dddddddd-0000-0000-0000-000000000001', 'reversed');
+    raise exception 'FAIL: 逆順のペアを重複保存できてしまった';
+  exception when check_violation then null;
+  end;
+end $$;
+
+set local "test.user_id" = '22222222-2222-2222-2222-222222222222';
+do $$
+begin
+  if exists (select 1 from public.duplicate_pair_decisions) then
+    raise exception 'FAIL: 他人の判断が見えている';
+  end if;
+  begin
+    insert into public.duplicate_pair_decisions (user_id, transaction_a_id, transaction_b_id, signature)
+    values ('22222222-2222-2222-2222-222222222222', 'dddddddd-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000003', 'foreign-pair');
+    raise exception 'FAIL: 本人名義でも他人の明細をペアへ保存できてしまった';
+  exception when insufficient_privilege then null;
+  end;
+  delete from public.duplicate_pair_decisions;
+end $$;
+
+set local "test.user_id" = '11111111-1111-1111-1111-111111111111';
+do $$
+begin
+  if (select count(*) from public.duplicate_pair_decisions) <> 1 then
+    raise exception 'FAIL: 他人が判断を消せてしまった';
+  end if;
+  delete from public.duplicate_pair_decisions;
+  if exists (select 1 from public.duplicate_pair_decisions) then
+    raise exception 'FAIL: 本人が判断を取り消せない';
+  end if;
+  insert into public.duplicate_pair_decisions (user_id, transaction_a_id, transaction_b_id, signature)
+  values ('11111111-1111-1111-1111-111111111111', 'dddddddd-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000002', 'reopened');
+  update public.transactions set amount_yen = -1200 where id = 'dddddddd-0000-0000-0000-000000000001';
+  if (select count(*) from public.duplicate_pair_decisions) <> 1 then
+    raise exception 'FAIL: 内容が変わらない更新で判断が失われた';
+  end if;
+  update public.transactions set occurred_on = '2026-10-16' where id = 'dddddddd-0000-0000-0000-000000000001';
+  if exists (select 1 from public.duplicate_pair_decisions) then
+    raise exception 'FAIL: 日付変更後も判断が残った';
+  end if;
+  insert into public.duplicate_pair_decisions (user_id, transaction_a_id, transaction_b_id, signature)
+  values ('11111111-1111-1111-1111-111111111111', 'dddddddd-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000002', 'new-date');
+  update public.transactions set amount_yen = -1300 where id = 'dddddddd-0000-0000-0000-000000000002';
+  if exists (select 1 from public.duplicate_pair_decisions) then
+    raise exception 'FAIL: 金額変更後も判断が残った';
+  end if;
+  insert into public.duplicate_pair_decisions (user_id, transaction_a_id, transaction_b_id, signature)
+  values ('11111111-1111-1111-1111-111111111111', 'dddddddd-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000002', 'new-amount');
+  delete from public.transactions where id = 'dddddddd-0000-0000-0000-000000000002';
+  if exists (select 1 from public.duplicate_pair_decisions) then
+    raise exception 'FAIL: 明細削除後もペア判断が残った';
+  end if;
+end $$;
+commit;
+
 \echo '--- 全テーブルで RLS が有効か(tables_without_rls は 0 であること)---'
 select count(*) filter (where not c.relrowsecurity) as tables_without_rls,
        count(*)                                     as total_tables

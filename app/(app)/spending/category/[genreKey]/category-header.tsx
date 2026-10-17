@@ -32,6 +32,7 @@ export function CategoryHeader({
   menu,
   goalPeriod,
   isGoalPeriod,
+  returnTo,
 }: {
   genreKey: string;
   genreName: string;
@@ -48,6 +49,7 @@ export function CategoryHeader({
   goalPeriod?: { from: string; to: string } | null;
   /** 現在目標期間で表示中か。 */
   isGoalPeriod?: boolean;
+  returnTo?: string | undefined;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -90,9 +92,7 @@ export function CategoryHeader({
   // 月を選んだら月で見る(今月は目標期間が既定なので、月で見ると明示する)。
   const go = (target: string) => {
     hapticFor('tabChange');
-    const href = goalPeriod
-      ? `${monthHref(genreKey, target)}&period=month`
-      : monthHref(genreKey, target);
+    const href = monthHref(genreKey, target, { period: 'month', returnTo });
     startTransition(() => router.replace(href as Route, { scroll: false }));
   };
   const periodLabel =
@@ -150,7 +150,7 @@ export function CategoryHeader({
           className="min-h-11 inline-flex items-center pr-3 text-sm font-semibold whitespace-nowrap"
           style={{ color: 'var(--ink-secondary)' }}
         >
-          ‹ 家計簿
+          ‹ {returnTo?.startsWith('/reports') ? '月のふりかえり' : '明細'}
         </button>
         {menu}
 
@@ -196,9 +196,10 @@ export function CategoryHeader({
               onClick={(e) => {
                 e.stopPropagation();
                 // 今月は目標期間で開くのが既定。月で見るときだけ period=month を付ける。
-                const href = isGoalPeriod
-                  ? `${monthHref(genreKey, todayMonthKey)}&period=month`
-                  : monthHref(genreKey, todayMonthKey);
+                const href = monthHref(genreKey, todayMonthKey, {
+                  period: isGoalPeriod ? 'month' : 'goal',
+                  returnTo,
+                });
                 startTransition(() => router.replace(href as Route, { scroll: false }));
               }}
               className="min-h-11 text-xs font-semibold"

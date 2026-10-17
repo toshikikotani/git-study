@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   findDuplicateCandidates,
+  duplicatePairKey,
+  duplicatePairSignature,
   type MatchableTransaction,
   type TransactionSource,
 } from '@/domain/duplicate-match';
@@ -116,5 +118,46 @@ describe('findDuplicateCandidates', () => {
 
   it('候補が無ければ空配列', () => {
     expect(findDuplicateCandidates([])).toEqual([]);
+  });
+
+  it('別物と判断したペアを再表示せず、同じ明細と第三の相手は確認できる', () => {
+    const a = tx('a', '2026-09-05', -1000, 'manual');
+    const b = tx('b', '2026-09-05', -1000, 'gmail');
+    const c = tx('c', '2026-09-05', -1000, 'csv');
+    const result = findDuplicateCandidates([a, b, c], {
+      distinctPairSignatures: new Set([duplicatePairSignature(a, b)]),
+    });
+    expect(result.map((pair) => [pair.earlier.id, pair.later.id])).toEqual([['a', 'c']]);
+    expect([a, b, c].map((item) => item.reviewStatus)).toEqual(['auto_ok', 'auto_ok', 'auto_ok']);
+  });
+
+  it('ペアの順序によらず同じ判断を引き継ぐ', () => {
+    const a = tx('a', '2026-09-05', -1000, 'manual');
+    const b = tx('b', '2026-09-06', -1000, 'gmail');
+    expect(duplicatePairKey(a, b)).toBe(duplicatePairKey(b, a));
+    expect(duplicatePairSignature(a, b)).toBe(duplicatePairSignature(b, a));
+    expect(
+      findDuplicateCandidates([b, a], {
+        distinctPairSignatures: new Set([duplicatePairSignature(b, a)]),
+      }),
+    ).toEqual([]);
+  });
+
+  it.each(['date', 'amount', 'source'])('%sの変更後は古い判断で隠さない', (field) => {
+    const a = tx('a', '2026-09-05', -1000, 'manual');
+    const b = tx('b', '2026-09-06', -1000, 'gmail');
+    const previous = duplicatePairSignature(a, b);
+    const updatedA = {
+      ...a,
+      ...(field === 'date' ? { occurredOn: '2026-09-04' } : {}),
+      ...(field === 'amount' ? { amountYen: -900 } : {}),
+      ...(field === 'source' ? { source: 'csv' as const } : {}),
+    };
+    const updatedB = { ...b, ...(field === 'amount' ? { amountYen: -900 } : {}) };
+    expect(
+      findDuplicateCandidates([updatedA, updatedB], {
+        distinctPairSignatures: new Set([previous]),
+      }),
+    ).toHaveLength(1);
   });
 });

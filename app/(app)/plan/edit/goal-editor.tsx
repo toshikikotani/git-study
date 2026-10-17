@@ -10,7 +10,7 @@ import { formatEstimate, formatProbability } from '@/domain/forecast/format';
 import type { CategoryOutlook } from '@/features/goals/category-outlook';
 import { daysBetween } from '@/lib/date';
 import { Switch } from '@/components/ui/switch';
-import { reserveNextPlanAction, updatePlanAllocationAction } from '../actions';
+import { reserveNextPlanAction, updatePlanDraftAction } from '../actions';
 import { DeletePlanButton } from '../delete-plan-button';
 import { PlanPeriodForm } from '../edit-plan-section';
 import { UnrecordedSheet, type AddableGenre, type UnrecordedRow } from '../unrecorded-sheet';
@@ -103,6 +103,7 @@ export function GoalEditor({
   );
   const totalFloor = categories.reduce((s, c) => s + c.spentYen + c.scheduledYen, 0);
   const [amounts, setAmounts] = useState<Record<string, number>>(saved);
+  const [period, setPeriod] = useState({ start: periodStart, end: periodEnd });
   const [totalText, setTotalText] = useState<string | null>(null);
   const [fixedTotal, setFixedTotal] = useState(true);
   const [applied, setApplied] = useState<Record<string, number> | null>(null);
@@ -115,7 +116,11 @@ export function GoalEditor({
 
   const total = Object.values(amounts).reduce((s, v) => s + v, 0);
   const savedTotal = Object.values(saved).reduce((s, v) => s + v, 0);
-  const dirty = categories.some((c) => amounts[c.genreId] !== (c.targetYen ?? 0));
+  const dirty =
+    totalText !== null ||
+    period.start !== periodStart ||
+    period.end !== periodEnd ||
+    categories.some((c) => amounts[c.genreId] !== (c.targetYen ?? 0));
   const overshoot = (c: CategoryOutlook) => (c.p50 ?? 0) - (c.targetYen ?? 0);
   const flagged = categories
     .filter((c) => c.caution !== null && (c.targetYen ?? 0) > 0)
@@ -141,23 +146,36 @@ export function GoalEditor({
   };
 
   const save = async () => {
+    if (saving) return;
     setSaving(true);
     setError(null);
-    const result = await updatePlanAllocationAction(
-      planId,
-      categories.map((c) => ({ genreId: c.genreId, targetYen: amounts[c.genreId] ?? 0 })),
-    );
-    setSaving(false);
-    if (result.error) {
-      setError(result.error);
-      return;
+    const committed =
+      totalText === null
+        ? amounts
+        : scaleTo(amounts, Math.max(totalFloor, Number(totalText.replace(/[^\d]/g, ''))), floors);
+    try {
+      const result = await updatePlanDraftAction(planId, {
+        periodStart: period.start,
+        periodEnd: period.end,
+        items: categories
+          .filter((c) => committed[c.genreId] !== (c.targetYen ?? 0))
+          .map((c) => ({ genreId: c.genreId, targetYen: committed[c.genreId] ?? 0 })),
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push('/reports');
+      router.refresh();
+    } catch {
+      setError('保存を確認できませんでした。入力内容は残っています。もう一度お試しください。');
+    } finally {
+      setSaving(false);
     }
-    router.push('/reports');
-    router.refresh();
   };
 
   const editingCategory = categories.find((c) => c.genreId === editing) ?? null;
-  const periodDays = daysBetween(periodStart, periodEnd) + 1;
+  const periodDays = period.start && period.end ? daysBetween(period.start, period.end) + 1 : 0;
   const overYen = landing ? landing.p50 - savedTotal : 0;
 
   return (
@@ -181,6 +199,9 @@ export function GoalEditor({
           {saving ? '保存中' : '保存'}
         </button>
       </div>
+      <p className="px-4 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+        期間・総額・配分は「保存」でまとめて反映します。キャンセルすると未保存の編集を破棄します。
+      </p>
       {error ? (
         <p role="alert" className="px-1 text-[13px]" style={{ color: 'var(--over)' }}>
           {error}
@@ -231,7 +252,8 @@ export function GoalEditor({
           className="flex min-h-13 w-full items-center gap-2 px-4 text-left"
         >
           <span className="tabular flex-1 text-[16px]">
-            {dayLabel(periodStart)}〜{dayLabel(periodEnd)}
+            {period.start ? dayLabel(period.start) : '開始日を選択'}〜
+            {period.end ? dayLabel(period.end) : '終了日を選択'}
           </span>
           <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
             {periodDays}日間
@@ -244,6 +266,11 @@ export function GoalEditor({
       <p className="-mt-1 px-4 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
         給料日に合わせるのがおすすめです。
       </p>
+      {period.start !== periodStart || period.end !== periodEnd ? (
+        <p role="status" className="px-4 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          使った額・予定・見通しは、保存すると変更後の期間で更新します。
+        </p>
+      ) : null}
 
       <Caption>使っていい総額</Caption>
       <div className="-mt-1 flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
@@ -460,9 +487,18 @@ export function GoalEditor({
         ))}
       </div>
 
-      <Caption>そのほか</Caption>
+      <Caption>そのほか · ここからの操作はその場で反映</Caption>
+      <p className="px-4 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+        カテゴリ追加・設定・予約・削除は独立した操作です。編集を保存してから進めてください。
+      </p>
       <div className="-mt-1 flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
-        <UnrecordedSheet planId={planId} rows={noBudget} addable={addable} />
+        {dirty ? (
+          <p className="px-4 py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+            カテゴリを追加するには、先に上部の「保存」で編集を保存してください。
+          </p>
+        ) : (
+          <UnrecordedSheet planId={planId} rows={noBudget} addable={addable} />
+        )}
         <Divider />
         <Link href="/settings/categories" className="flex min-h-13 items-center gap-2 px-4">
           <span className="flex-1 text-[16px]">カテゴリの設定</span>
@@ -476,7 +512,7 @@ export function GoalEditor({
         <Divider />
         <button
           type="button"
-          disabled={next.reserved || reserving}
+          disabled={dirty || saving || next.reserved || reserving}
           onClick={async () => {
             setReserving(true);
             const result = await reserveNextPlanAction(planId);
@@ -489,9 +525,11 @@ export function GoalEditor({
           <span className="flex flex-1 flex-col py-2">
             <span className="text-[16px]">次の期間の目標を予約</span>
             <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-              {next.reserved
-                ? `${dayLabel(next.start)}から · 予約済み`
-                : `${dayLabel(next.start)}から · この目標を引き継いで作成`}
+              {dirty
+                ? '先に上部の「保存」で期間・総額・配分を保存してください'
+                : next.reserved
+                  ? `${dayLabel(next.start)}から · 予約済み`
+                  : `${dayLabel(next.start)}から · この目標を引き継いで作成`}
             </span>
           </span>
           <span style={{ color: 'var(--ideal)' }}>
@@ -520,11 +558,15 @@ export function GoalEditor({
             >
               閉じる
             </button>
-            <span className="text-[17px] font-semibold">期間</span>
+            <span className="text-[17px] font-semibold">期間を調整</span>
             <span />
           </div>
           <div className="rounded-2xl px-4 py-4" style={{ background: 'var(--surface)' }}>
-            <PlanPeriodForm planId={planId} periodStart={periodStart} periodEnd={periodEnd} />
+            <PlanPeriodForm
+              periodStart={period.start}
+              periodEnd={period.end}
+              onChange={setPeriod}
+            />
           </div>
         </div>
       </BottomSheet>

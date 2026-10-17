@@ -3,12 +3,23 @@
  */
 
 /** カテゴリ詳細の URL(月は家計簿の期間から引き継ぐ)。 */
-export function categoryHref(genreKey: string, monthKey: string): string {
-  return `/spending/category/${genreKey}?month=${monthKey.slice(0, 7)}`;
+export function categoryHref(
+  genreKey: string,
+  monthKey: string,
+  options?: { period?: 'month' | 'goal'; returnTo?: string | undefined },
+): string {
+  const params = new URLSearchParams({ month: monthKey.slice(0, 7) });
+  if (options?.period) params.set('period', options.period);
+  if (options?.returnTo) params.set('returnTo', options.returnTo);
+  return `/spending/category/${encodeURIComponent(genreKey)}?${params.toString()}`;
 }
 
-export function monthHref(genreKey: string, monthKey: string): string {
-  return categoryHref(genreKey, monthKey);
+export function monthHref(
+  genreKey: string,
+  monthKey: string,
+  options?: { period?: 'month' | 'goal'; returnTo?: string | undefined },
+): string {
+  return categoryHref(genreKey, monthKey, options);
 }
 
 /** 横スワイプの判定。距離が足りない・斜めに動いた(縦のスクロール)ときは null。 */

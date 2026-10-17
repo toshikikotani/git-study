@@ -23,6 +23,6 @@ describe('はじめての設定(ADR-084)', () => {
     expect(html).toContain('はじめての設定 1/3');
     expect(html).toContain('まずは手取りと給料日');
     expect(html).toContain('value="250000"');
-    expect(html).toContain('設定はあとでする');
+    expect(html).toContain('入力を保存せず、あとで設定する');
   });
 });

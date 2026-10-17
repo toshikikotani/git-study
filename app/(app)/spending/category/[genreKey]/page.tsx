@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 
 import { loadCategoryDetail } from '@/features/category/loader';
 import { genreIdOfKey } from '@/features/category/model';
+import { safeInternalHref } from '@/lib/period-nav';
 import { CategoryScreen } from './category-screen';
 import { WhatIfSection } from './what-if-section';
 
@@ -17,10 +18,15 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: Promise<{ genreKey: string }>;
-  searchParams: Promise<{ month?: string | string[]; period?: string | string[] }>;
+  searchParams: Promise<{
+    month?: string | string[];
+    period?: string | string[];
+    returnTo?: string | string[];
+  }>;
 }) {
   const { genreKey } = await params;
-  const { month, period } = await searchParams;
+  const { month, period, returnTo } = await searchParams;
+  const back = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const periodStr = Array.isArray(period) ? period[0] : period;
   const data = await loadCategoryDetail({
     genreKey,
@@ -44,5 +50,11 @@ export default async function CategoryPage({
         />
       </Suspense>
     ) : null;
-  return <CategoryScreen data={data} whatIf={whatIf} />;
+  return (
+    <CategoryScreen
+      data={data}
+      whatIf={whatIf}
+      returnTo={back ? safeInternalHref(back, '/spending') : undefined}
+    />
+  );
 }

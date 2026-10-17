@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { saveImportBatchAction } from '../actions';
+import { InputAccountSelector, useInputAccount } from '../input-account';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import {
@@ -11,7 +12,6 @@ import {
   type EmailParseResult,
   type ParsedEmailTransaction,
 } from '@/features/import/email';
-import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
 import { buildPreview } from '@/features/transactions/import-pipeline';
 import type { StoredTransaction } from '@/features/transactions/store';
@@ -40,21 +40,14 @@ export default function PastePage() {
   const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
   /** 行ごとに本人が選び直したジャンル(未選択の行は id をキーに持たない)。 */
   const [genreOverrides, setGenreOverrides] = useState<Map<string, string>>(new Map());
-  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
-  const [accountId, setAccountId] = useState('');
+  const inputAccount = useInputAccount();
+  const { accountId } = inputAccount;
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // ジャンル一覧(ADR-057)。取り込み時にAIで確定させることはしない。
   useEffect(() => {
     void fetchGenreOptions().then(setGenreOptions);
-  }, []);
-
-  // 口座(M6-2)。取得できたら最初の1件を既定にする(選び直せる)
-  useEffect(() => {
-    void fetchAccounts().then((fetched) => {
-      setAccounts(fetched);
-      setAccountId((current) => current || (fetched[0]?.id ?? ''));
-    });
   }, []);
 
   const byLabels = useMemo(() => (body.trim() ? parseNotificationEmail(body) : null), [body]);
@@ -126,20 +119,27 @@ export default function PastePage() {
   }
 
   const save = async () => {
-    if (!accountId) return;
+    if (!inputAccount.selectedAccount || saving) return;
     setSaveError(null);
-    const outcome = await saveImportBatchAction(preview, {
-      fileName: 'メール貼り付け',
-      source: 'manual',
-      accountId,
-      failedCount: parsed?.warnings.length ?? 0,
-    });
-    if (outcome.error) {
-      setSaveError(outcome.error);
-      return;
+    setSaving(true);
+    try {
+      const outcome = await saveImportBatchAction(preview, {
+        fileName: 'メール貼り付け',
+        source: 'manual',
+        accountId,
+        failedCount: parsed?.warnings.length ?? 0,
+      });
+      if (outcome.error) {
+        setSaveError(outcome.error);
+        return;
+      }
+      setSaved(outcome);
+      setBody('');
+    } catch {
+      setSaveError('通信に失敗しました。入力内容を残したまま再試行できます。');
+    } finally {
+      setSaving(false);
     }
-    setSaved(outcome);
-    setBody('');
   };
 
   return (
@@ -191,45 +191,7 @@ export default function PastePage() {
 
       {/* 口座(M6-2) */}
       <Card>
-        <label
-          className="text-xs font-medium tracking-[0.08em] uppercase"
-          style={{ color: 'var(--ink-muted)' }}
-        >
-          口座
-        </label>
-        {accounts === null ? (
-          <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
-            読み込んでいます…
-          </p>
-        ) : accounts.length === 0 ? (
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-            口座がまだ登録されていません。
-            <Link
-              href="/accounts"
-              className="ml-1 font-semibold underline decoration-dotted underline-offset-4"
-              style={{ color: 'var(--accent)' }}
-            >
-              先に登録する →
-            </Link>
-          </p>
-        ) : (
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="mt-2 w-full rounded-xl px-3 py-2 text-sm"
-            style={{
-              background: 'var(--plane)',
-              color: 'var(--ink)',
-              border: '1px solid var(--hairline)',
-            }}
-          >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <InputAccountSelector inputAccount={inputAccount} />
       </Card>
 
       <Card>
@@ -293,11 +255,11 @@ export default function PastePage() {
             <button
               type="button"
               onClick={() => void save()}
-              disabled={!accountId}
+              disabled={!inputAccount.selectedAccount || saving}
               className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
-              {preview.length} 件を取り込む
+              {saving ? '取り込んでいます…' : `${preview.length} 件を取り込む`}
             </button>
 
             {saveError ? (

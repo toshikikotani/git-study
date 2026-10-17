@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
+import { listDuplicateReview } from '@/features/transactions/duplicates-store';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { DuplicateList } from './duplicate-list';
 
@@ -17,7 +17,7 @@ import { DuplicateList } from './duplicate-list';
 export const dynamic = 'force-dynamic';
 
 export default async function DuplicatesPage() {
-  const candidates = await withMinDuration(listDuplicateCandidates());
+  const review = await withMinDuration(listDuplicateReview());
 
   return (
     <div className="rise space-y-3">
@@ -39,7 +39,7 @@ export default async function DuplicatesPage() {
         </Link>
       </header>
 
-      <DuplicateList initial={candidates} />
+      <DuplicateList review={review} />
 
       <p className="px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         残さなかった方は削除せず、集計の対象から外すだけです(目標・レポート・

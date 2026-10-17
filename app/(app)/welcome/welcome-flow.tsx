@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatYen, parseYen } from '@/domain/money';
 import { starterTargetYen } from '@/domain/onboarding';
+import { optionalSavingsGoal } from '@/features/onboarding/optional-savings';
 import { PLAN_PRESET_LABELS, planPreset, type PlanPresetId } from '@/domain/plan-presets';
 import { planPeriodDays } from '@/domain/spending-plan';
 import { formatDateJa, type DateOnly } from '@/lib/date';
@@ -32,7 +33,7 @@ function toYen(text: string): number | null {
 }
 
 /**
- * はじめての設定の3つの段(ADR-084)。保存は最後に1回だけ(途中でやめても何も残らない)。
+ * 手取り・目標・確認の3段。貯金は確認画面で任意に追加し、最後にまとめて保存する。
  */
 export function WelcomeFlow({
   today,
@@ -95,13 +96,11 @@ export function WelcomeFlow({
 
   function finish(withGoal: boolean) {
     setError(null);
-    const goalAmount = goalAmountText.trim() === '' ? null : toYen(goalAmountText);
-    if (withGoal && goalTitle.trim() === '') {
-      setError('何のために貯めるかを入れてください(あとでも作れます)');
-      return;
-    }
-    if (withGoal && goalAmountText.trim() !== '' && (goalAmount === null || goalAmount <= 0)) {
-      setError('貯めたい額は1円以上の数字で入れてください');
+    const savings = withGoal
+      ? optionalSavingsGoal({ title: goalTitle, amountText: goalAmountText, targetDate: goalDate })
+      : { goal: null, error: null };
+    if (savings.error) {
+      setError(savings.error);
       return;
     }
     startTransition(async () => {
@@ -111,13 +110,7 @@ export function WelcomeFlow({
         periodStart: period.start,
         periodEnd: period.end,
         items: chosen.map((r) => ({ genreId: r.genreId, targetYen: r.yen ?? 0 })),
-        savingsGoal: withGoal
-          ? {
-              title: goalTitle.trim(),
-              targetAmountYen: goalAmount,
-              targetDate: goalDate === '' ? null : goalDate,
-            }
-          : null,
+        savingsGoal: savings.goal,
       });
       if (result.error) {
         setError(result.error);
@@ -135,14 +128,18 @@ export function WelcomeFlow({
           はじめての設定 {step}/3
         </p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          {step === 1 ? 'まずは手取りと給料日' : step === 2 ? '今日からの目標' : '貯金目標(任意)'}
+          {step === 1
+            ? 'まずは手取りと給料日'
+            : step === 2
+              ? '今日からの目標'
+              : 'この内容ではじめる'}
         </h1>
         <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           {step === 1
             ? '使える額と、給料日までの期間を出すのに使います。あとから設定で変えられます。'
             : step === 2
               ? '今日から、よく使うカテゴリにいくらまで使うかを決めます。額は手取りからの目安です。自由に直してください。'
-              : '何のために、いくら貯めたいかを決めると、毎月いくら残せばいいかが見えます。'}
+              : '内容を確認して、そのままはじめられます。貯金目標は希望するときだけ追加できます。'}
         </p>
       </header>
 
@@ -242,36 +239,78 @@ export function WelcomeFlow({
           </div>
         ) : (
           <div className="space-y-4">
-            <Field label="何のために">
-              <input
-                type="text"
-                value={goalTitle}
-                onChange={(e) => setGoalTitle(e.target.value)}
-                placeholder="旅行・引っ越し・もしものとき など"
-                className="w-full rounded-xl px-3 py-2 text-sm"
-                style={INPUT_STYLE}
-              />
-            </Field>
-            <Field label="いくら(円・任意)">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={goalAmountText}
-                onChange={(e) => setGoalAmountText(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-sm"
-                style={INPUT_STYLE}
-              />
-            </Field>
-            <Field label="いつまでに(任意)">
-              <input
-                type="date"
-                value={goalDate}
-                min={today}
-                onChange={(e) => setGoalDate(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-sm"
-                style={INPUT_STYLE}
-              />
-            </Field>
+            <dl className="space-y-2 text-sm" style={{ color: 'var(--ink)' }}>
+              <div className="flex justify-between gap-3">
+                <dt>毎月の手取り</dt>
+                <dd>{formatYen(takeHomeYen ?? 0, { sign: 'never' })}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt>給料日</dt>
+                <dd>{payday === 31 ? '月末' : `${payday}日`}</dd>
+              </div>
+              <div>
+                <dt>今日からの目標</dt>
+                <dd className="mt-1" style={{ color: 'var(--ink-muted)' }}>
+                  {formatDateJa(period.start)} 〜 {formatDateJa(period.end)}
+                </dd>
+              </div>
+              {chosen.map((r) => (
+                <div key={r.genreId} className="flex justify-between gap-3">
+                  <dt>{r.name}</dt>
+                  <dd>{formatYen(r.yen ?? 0, { sign: 'never' })}</dd>
+                </div>
+              ))}
+              <div
+                className="flex justify-between gap-3 border-t pt-2 font-semibold"
+                style={{ borderColor: 'var(--hairline)' }}
+              >
+                <dt>目標の合計</dt>
+                <dd>{formatYen(totalYen, { sign: 'never' })}</dd>
+              </div>
+            </dl>
+            <details>
+              <summary
+                className="min-h-11 cursor-pointer py-3 text-sm font-semibold"
+                style={{ color: 'var(--accent)' }}
+              >
+                貯金目標を追加する（任意）
+              </summary>
+              <p className="mb-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+                空欄のままでも、下の「この内容ではじめる」で完了できます。
+              </p>
+              <div className="space-y-4">
+                <Field label="何のために">
+                  <input
+                    type="text"
+                    value={goalTitle}
+                    onChange={(e) => setGoalTitle(e.target.value)}
+                    placeholder="旅行・引っ越し・もしものとき など"
+                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    style={INPUT_STYLE}
+                  />
+                </Field>
+                <Field label="いくら(円・任意)">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={goalAmountText}
+                    onChange={(e) => setGoalAmountText(e.target.value)}
+                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    style={INPUT_STYLE}
+                  />
+                </Field>
+                <Field label="いつまでに(任意)">
+                  <input
+                    type="date"
+                    value={goalDate}
+                    min={today}
+                    onChange={(e) => setGoalDate(e.target.value)}
+                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    style={INPUT_STYLE}
+                  />
+                </Field>
+              </div>
+            </details>
           </div>
         )}
       </Card>
@@ -319,7 +358,8 @@ export function WelcomeFlow({
         )}
       </div>
 
-      {step === 3 ? (
+      {step === 3 &&
+      (goalTitle.trim() !== '' || goalAmountText.trim() !== '' || goalDate !== '') ? (
         <button
           type="button"
           onClick={() => finish(false)}
@@ -327,13 +367,18 @@ export function WelcomeFlow({
           className="w-full text-center text-xs font-medium disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
-          貯金目標はあとで決めて、はじめる
+          貯金目標を保存せず、この内容ではじめる
         </button>
       ) : null}
 
       <form action={skipWelcomeAction} className="pt-2 text-center">
-        <button type="submit" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          設定はあとでする
+        <button
+          type="submit"
+          disabled={pending}
+          className="min-h-11 text-xs disabled:opacity-40"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          入力を保存せず、あとで設定する
         </button>
       </form>
     </div>

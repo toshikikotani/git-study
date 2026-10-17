@@ -60,6 +60,7 @@ type RawRow = {
 export async function loadLedgerTransactions(
   range: { from: DateOnly; to: DateOnly },
   today: DateOnly,
+  options?: { reviewStatus: 'pending' },
 ): Promise<{
   genres: LedgerGenre[];
   transactions: LedgerTransaction[];
@@ -68,13 +69,29 @@ export async function loadLedgerTransactions(
 }> {
   const supabase = await createClient();
 
-  const query = (columns: string) =>
-    supabase
-      .from('transactions')
-      .select(columns)
-      .gte('occurred_on', range.from)
-      .lte('occurred_on', range.to)
-      .order('occurred_on', { ascending: false });
+  const query = async (columns: string) => {
+    const build = () =>
+      supabase
+        .from('transactions')
+        .select(columns)
+        .gte('occurred_on', range.from)
+        .lte('occurred_on', range.to)
+        .order('occurred_on', { ascending: false });
+    if (!options) return build();
+    // 確認待ちは月をまたぐ。APIの1回の取得上限で古い未処理が隠れないように読む。
+    const rows: unknown[] = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const result = await build()
+        .eq('review_status', options.reviewStatus)
+        .order('id')
+        .range(offset, offset + pageSize - 1);
+      if (result.error) return { data: null, error: result.error };
+      const page = result.data ?? [];
+      rows.push(...page);
+      if (page.length < pageSize) return { data: rows, error: null };
+    }
+  };
 
   const [genresResult, withKind] = await Promise.all([
     supabase.from('genres').select('id, name, budget_yen').order('sort_order'),

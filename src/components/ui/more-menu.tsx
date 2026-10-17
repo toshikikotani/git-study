@@ -39,7 +39,7 @@ const GROUPS = [
     ],
   },
   {
-    title: 'この先に向けて',
+    title: '資産形成',
     items: [
       { href: '/savings', label: '貯金', dek: '貯金目標と貯まり具合' },
       { href: '/investments', label: '投資' },
@@ -125,7 +125,7 @@ export function MoreMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="設定(給料日・カテゴリ・色・ログアウトなど)"
+        aria-label="メニュー（すべての機能・設定）"
         className="flex size-11 min-h-11 shrink-0 items-center justify-center"
         style={{
           borderRadius: 'var(--radius-full)',
@@ -145,7 +145,7 @@ export function MoreMenu({
         <div className="flex items-center justify-between gap-3 px-3 pt-1 pb-2">
           <div className="min-w-0">
             <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-              その他の機能
+              メニュー
             </h2>
             {account.email ? (
               <p className="mt-1 truncate text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>

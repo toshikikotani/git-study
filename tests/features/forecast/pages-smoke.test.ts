@@ -131,9 +131,9 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(html).toContain('分析');
     expect(html).toContain('月のふりかえり');
     expect(html).toContain('貯蓄率');
-    expect(html).toContain('href="/reports/frequency"');
+    expect(html).toContain('href="/reports/frequency?month=');
     expect(html).toContain('href="/reports/monthly"');
-    expect(html).toContain('href="/reports/ai"');
+    expect(html).toContain('href="/reports/ai?month=');
   }, 60000);
 
   it('そのほかの分析', async () => {
