@@ -3,8 +3,6 @@ import Link from 'next/link';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatEstimate, formatProbability } from '@/domain/forecast/format';
 import type { TodayAllowance } from '@/domain/forecast/today';
-import type { ForecastSuggestion } from '@/domain/forecast/types';
-import { NextStepCard } from '../reports/next-step-card';
 import { AllowanceDialog, type AllowanceExplain } from './allowance-dialog';
 
 /** 今期(目標の期間)の見通し。数字は「見通し」の画面と同じ予測。 */
@@ -23,35 +21,44 @@ export type TodayCardProps = {
   /** 目標が無ければ null(今日使える目安は出せない)。 */
   today: TodayAllowance | null;
   outlook: TodayOutlook | null;
-  suggestion: ForecastSuggestion | null;
-  /** 予算内に収まる確率(目標の範囲)。 */
+  /** 目標内に収まる確率(目標の範囲)。 */
   probWithinBudget: number | null;
   provisional: boolean;
   /** 今日の目安の内訳(「なぜこの額？」)。 */
   allowanceExplain?: AllowanceExplain | null;
-  /** 「2026-10」(次の一手からカテゴリの画面へ) */
-  monthKey?: string;
+  /** 明日からの1日の目安(今日が期間の最終日なら null、ADR-108)。 */
+  tomorrowYen?: number | null;
+  /** 明日から期間の終わりまでの日数。 */
+  daysAfterToday?: number;
+  /** 今日の支出の大きいものの名前(こえた日の説明に使う)。 */
+  todayTopNames?: readonly string[];
+  /** 「もし使ったら？」のボタン(押すと試算のシート、ADR-108)。 */
+  whatIf?: React.ReactNode;
 };
 
 const card = 'flex flex-col rounded-[22px]';
 const cardStyle = { background: 'var(--surface)', color: 'var(--ink)' } as const;
 
 /**
- * ホームの「今日」(デザイン仕様書、ADR-090):今日使える目安 → 今期の見通し(押すと見通しへ)→ 次の一手。
+ * ホームの「今日」(デザイン v3-1、ADR-108):今日の目安(こえた日はこえた額と、明日からの目安)→
+ * 今期の見通し(押すと分析へ)。
  */
 export function TodayCard(props: TodayCardProps) {
-  const { today, outlook, suggestion, probWithinBudget } = props;
+  const { today, outlook, probWithinBudget } = props;
   return (
     <>
       <TodayHero
         today={today}
         provisional={props.provisional}
         allowanceExplain={props.allowanceExplain ?? null}
+        tomorrowYen={props.tomorrowYen ?? null}
+        daysAfterToday={props.daysAfterToday ?? 0}
+        todayTopNames={props.todayTopNames ?? []}
+        whatIf={props.whatIf ?? null}
       />
       {outlook && probWithinBudget !== null ? (
         <OutlookCard outlook={outlook} probWithin={probWithinBudget} />
       ) : null}
-      {suggestion ? <NextStepCard suggestion={suggestion} /> : null}
     </>
   );
 }
@@ -65,27 +72,41 @@ function usualPercent(explain: AllowanceExplain | null): number | null {
   return Math.round(limit.safetyFactor * 100);
 }
 
+/** 「同窓会とガソリンで、」(名前が無ければ空)。 */
+function namesLead(names: readonly string[]): string {
+  const shown = names.filter((n) => n !== '').slice(0, 2);
+  return shown.length === 0 ? '' : `${shown.join('と')}で、`;
+}
+
+/**
+ * 今日の目安(デザイン v3-1)。こえた日は「9,389 円 こえています」と、何で多めだったか・明日からの目安を出す
+ * (「今日は目安を(仮) 9,389円 超え」と文が切れて読めなかった、本人の指摘)。
+ */
 function TodayHero({
   today,
   provisional,
   allowanceExplain,
+  tomorrowYen,
+  daysAfterToday,
+  todayTopNames,
+  whatIf,
 }: {
   today: TodayAllowance | null;
   provisional: boolean;
   allowanceExplain: AllowanceExplain | null;
+  tomorrowYen: number | null;
+  daysAfterToday: number;
+  todayTopNames: readonly string[];
+  whatIf: React.ReactNode;
 }) {
   if (!today) {
     return (
-      <section
-        aria-label="今日使える目安"
-        className={`${card} gap-2 px-5 pt-6 pb-2`}
-        style={cardStyle}
-      >
+      <section aria-label="今日の目安" className={`${card} gap-2 px-5 pt-6 pb-2`} style={cardStyle}>
         <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
-          今日使える目安
+          今日の目安
         </span>
         <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          目標(カテゴリごとの予算)を決めると、今日使える目安を出せます。
+          目標(カテゴリごとの額)を決めると、今日使える目安を出せます。
         </p>
         <div className="mt-2 h-px" style={{ background: 'var(--hairline)' }} />
         <Link
@@ -101,32 +122,54 @@ function TodayHero({
   }
   const left = today.kind === 'left';
   const pct = usualPercent(allowanceExplain);
+  const color = left ? 'var(--ink)' : 'var(--state-caution)';
   return (
-    <section aria-label="今日使える目安" className={`${card} px-5 pt-6 pb-2`} style={cardStyle}>
-      <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
-        {left ? '今日使える目安' : '今日は目安を'}
-        {provisional ? '(記録が少ないので仮)' : ''}
-      </span>
-      <p
-        className="tabular mt-1 flex items-baseline gap-1"
-        style={{ color: left ? 'var(--ink)' : 'var(--state-caution)' }}
-      >
-        {/* 68px は大きすぎた(本人の指摘「8950がちょっとでかい」)。56px にした。 */}
+    <section aria-label="今日の目安" className={`${card} px-5 pt-5 pb-5`} style={cardStyle}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+          今日の目安
+        </span>
+        {provisional ? (
+          <span
+            className="rounded-full px-2 py-1 text-[12px] font-semibold"
+            style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
+          >
+            記録が少ないので仮
+          </span>
+        ) : null}
+      </div>
+      <p className="tabular mt-1 flex flex-wrap items-baseline gap-x-2" style={{ color }}>
         <span className="text-[56px] leading-none font-bold tracking-[-0.02em]">
           {(left ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
         </span>
-        <span className="text-[24px] font-semibold">{left ? '円' : '円 超え'}</span>
+        <span className="text-[20px] font-bold">{left ? '円 使えます' : '円 こえています'}</span>
       </p>
-      <p className="mt-2 text-[15px] leading-normal" style={{ color: 'var(--ink-secondary)' }}>
-        {pct !== null ? `いつもの1日の約${pct}%。` : ''}
-        使わなかった分は明日に回ります。
+      <p className="mt-3 text-[15px] leading-normal" style={{ color: 'var(--ink-secondary)' }}>
+        {left
+          ? `${pct !== null ? `いつもの1日の約${pct}%。` : ''}使わなかった分は明日に回ります。`
+          : `${namesLead(todayTopNames)}今日は多めの日です。${
+              daysAfterToday > 0
+                ? `こえた分は残り${daysAfterToday}日で少しずつならします。`
+                : 'こえた分は次の期間で取り戻せます。'
+            }`}
       </p>
-      <div className="mt-4 h-px" style={{ background: 'var(--hairline)' }} />
-      {allowanceExplain ? (
-        <AllowanceDialog explain={allowanceExplain} />
-      ) : (
-        <div className="min-h-2" />
-      )}
+      {tomorrowYen !== null ? (
+        <div
+          className="mt-4 flex items-center justify-between gap-2 rounded-[14px] px-4 py-3"
+          style={{ background: 'var(--plane)' }}
+        >
+          <span className="text-[14px]" style={{ color: 'var(--ink-secondary)' }}>
+            明日からの目安
+          </span>
+          <span className="tabular text-[17px] font-bold">1日 {formatEstimate(tomorrowYen)}</span>
+        </div>
+      ) : null}
+      {whatIf || allowanceExplain ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {whatIf}
+          {allowanceExplain ? <AllowanceDialog explain={allowanceExplain} /> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -137,8 +180,8 @@ export function shortDate(date: string): string {
 }
 
 /**
- * 今期の見通し(デザイン仕様書):見込み(中央)と予算、1本の帯(使った額・予算を超える側・予算の目盛り・
- * 見込みの印)、使った額と予算内に収まる確率。押すと「分析 › 目標」へ(ADR-091)。
+ * 今期の見通し(デザイン仕様書):見込み(中央)と目標、1本の帯(使った額・目標をこえる側・目標の目盛り・
+ * 見込みの印)、使った額と目標内の確率。押すと「分析 › 目標」へ(ADR-091)。
  */
 function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithin: number }) {
   const overYen = outlook.p50 - outlook.budgetYen;
@@ -148,7 +191,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
   return (
     <Link
       href="/reports"
-      aria-label={`今期の見通し。${formatEstimate(outlook.p50)}、予算 ${formatEstimate(outlook.budgetYen, { approx: false })}。詳しい見通しへ`}
+      aria-label={`今期の見通し。${formatEstimate(outlook.p50)}、目標 ${formatEstimate(outlook.budgetYen, { approx: false })}。分析で見る`}
       className={`${card} min-h-11 px-5 pt-5 pb-2`}
       style={cardStyle}
     >
@@ -167,7 +210,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
               : { background: 'var(--income-track)', color: 'var(--income)' }
           }
         >
-          {overYen > 0 ? `${formatEstimate(overYen)} 超えそう` : '予算内の見込み'}
+          {overYen > 0 ? `${formatEstimate(overYen)} こえそう` : '目標内の見込み'}
         </span>
       </div>
       <p className="tabular mt-4 flex flex-wrap items-baseline gap-2">
@@ -175,7 +218,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           {formatEstimate(outlook.p50)}
         </span>
         <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
-          / 予算 {formatEstimate(outlook.budgetYen, { approx: false })}
+          / 目標 {formatEstimate(outlook.budgetYen, { approx: false })}
         </span>
       </p>
       <div aria-hidden className="relative mt-4 h-7">
@@ -215,7 +258,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           </strong>
         </span>
         <span>
-          予算内に収まる確率{' '}
+          目標内の確率{' '}
           <strong
             className="font-semibold"
             style={{ color: caution ? 'var(--state-caution)' : 'var(--income)' }}
@@ -229,7 +272,7 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
         className="flex min-h-12 items-center justify-between text-[15px] font-semibold"
         style={{ color: 'var(--accent)' }}
       >
-        詳しい見通し
+        分析で見る
         <ChevronRightIcon />
       </span>
     </Link>

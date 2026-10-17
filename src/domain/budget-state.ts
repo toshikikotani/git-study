@@ -41,7 +41,7 @@ export const STATE_LABEL: Record<BudgetState, string> = {
   ok: '余裕',
   caution: '注意',
   over: '超過',
-  none: '予算なし',
+  none: '目標なし',
   reserved: '予定で確保済み',
 };
 
@@ -83,7 +83,7 @@ export function budgetSpokenLabel(
   budgetYen: number | null,
 ): string {
   const spent = formatYen(spentYen, { sign: 'never' });
-  if (budgetYen === null || budgetYen <= 0) return `${name}、${spent}使用、予算なし`;
+  if (budgetYen === null || budgetYen <= 0) return `${name}、${spent}使用、目標なし`;
   const budget = formatYen(budgetYen, { sign: 'never' });
   const diff = budgetYen - spentYen;
   return diff >= 0

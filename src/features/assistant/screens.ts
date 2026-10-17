@@ -27,6 +27,7 @@ export const ASSISTANT_SCREENS = {
   side_hustle: { href: '/side-hustle', label: '副業' },
   job_change: { href: '/job-change', label: '転職準備' },
   notifications: { href: '/notifications', label: 'お知らせ' },
+  upcoming: { href: '/upcoming', label: 'これからの支払い' },
   theme: { href: '/settings/theme', label: '色のテーマ' },
   ai_settings: { href: '/settings/ai', label: 'AIの設定' },
 } as const;

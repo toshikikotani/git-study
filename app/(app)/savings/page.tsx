@@ -2,13 +2,16 @@ import Link from 'next/link';
 
 import { formatYen } from '@/domain/money';
 import { loadSavingsSummary } from '@/features/savings/store';
+import { getAppSettings } from '@/features/settings/store';
 import { formatDateJa, todayJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GoalCard } from './goal-card';
+import { MonthlyTarget } from './monthly-target';
 import { NewGoal } from './new-goal';
 
 /**
  * 貯金(ADR-081)。借金の画面の代わりに、貯金目標と貯まり具合を見る。
+ * 毎月の貯金目標はここで決める(ホームとAIが同じ値を見る、ADR-108)。
  *
  * 貯まった額は「収入 − 支出」から自動で数える(手入力しない)。数え始めは、
  * 進行中の目標のうちいちばん早く作った日。合計は期限の近い目標から順に割り当てる。
@@ -19,7 +22,10 @@ import { NewGoal } from './new-goal';
 export const dynamic = 'force-dynamic';
 
 export default async function SavingsPage() {
-  const summary = await withMinDuration(loadSavingsSummary());
+  const [summary, settings] = await Promise.all([
+    withMinDuration(loadSavingsSummary()),
+    getAppSettings().catch(() => null),
+  ]);
   const today = todayJst();
 
   return (
@@ -32,6 +38,8 @@ export default async function SavingsPage() {
           ホームへ戻る
         </Link>
       </header>
+
+      <MonthlyTarget initialYen={settings?.monthlySavingsTargetYen ?? 0} />
 
       <section
         className="glass rounded-[22px] px-4 py-4"

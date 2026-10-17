@@ -23,8 +23,8 @@ import {
 
 /**
  * AIに渡す「今の状況」(ADR-106)。ホームの「今日」と同じ予測から、発言のたびに計算し直す。
- * 数字は本人の画面写真(2026-10-17)のもの:今日の目安を9,391円超え、今期は予算17.2万円に対して
- * 着地約20.8万円・予算内の確率1%、月末に残る見込み+8.2万円(収入27.5万 − 支出19.3万)。
+ * 数字は本人の画面写真(2026-10-17)のもの:今日の目安を9,391円超え、今期は目標17.2万円に対して
+ * 着地約20.8万円・目標内の確率1%、月末に残る見込み+8.2万円(収入27.5万 − 支出19.3万)。
  */
 
 const NOW = new Date('2026-10-16T23:22:00Z'); // 日本時間 2026-10-17 08:22
@@ -58,6 +58,7 @@ function forecasts(): TodayForecasts {
     goalView,
     monthView,
     payday: 25,
+    monthlySavingsTargetYen: 100_000,
   };
 }
 
@@ -73,12 +74,12 @@ describe('ホームの「今日」と同じ数字をAIに渡す(ADR-106)', () =>
     expect(text).toContain('今日はもう上限を9,391円超えている');
   });
 
-  it('今期の見通し:予算・使った額・着地見込み・超えそうな額・確率・予定と固定費', () => {
+  it('今期の見通し:目標・使った額・着地見込み・超えそうな額・確率・予定と固定費', () => {
     expect(text).toContain('今期の見通し(2026-10-01〜2026-11-05、今日を入れて残り20日)');
-    expect(text).toContain('予算172,000円、今日までに使った額147,000円');
+    expect(text).toContain('目標172,000円、今日までに使った額147,000円');
     expect(text).toContain('着地見込み約20.8万円');
-    expect(text).toContain('予算を約3.6万円超えそう');
-    expect(text).toContain('予算内に収まる確率1%');
+    expect(text).toContain('目標を約3.6万円こえそう');
+    expect(text).toContain('目標内に収まる確率1%');
     expect(text).toContain('これから払う予定6,000円と固定費12,000円');
   });
 
@@ -88,11 +89,17 @@ describe('ホームの「今日」と同じ数字をAIに渡す(ADR-106)', () =>
     );
   });
 
+  it('毎月の貯金目標(ホームと同じ値)と、月末の見込みとの差', () => {
+    expect(text).toContain(
+      '毎月の貯金目標100,000円(ホームの貯金と同じ値): 月末の見込みでは、あと約1.8万円届かない',
+    );
+  });
+
   it('目標が無ければ、今日の目安と見通しは出していないと書く', () => {
     const none = formatTodayNumbers(
       todayNumbersOf({ ...forecasts(), goal: null, goalView: null, monthView: null }, NOW),
     ).join('\n');
-    expect(none).toContain('今期の目標(予算)が無いので出していない');
+    expect(none).toContain('今期の目標が無いので出していない');
     expect(none).not.toContain('今期の見通し');
     expect(none).toContain('今月の収入の記録が無いので出していない');
   });

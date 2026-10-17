@@ -56,7 +56,7 @@ export function reportInsights(input: {
       out.push({
         key: 'budget',
         tone: 'info',
-        text: `予算 ${yen(budgetYen)} に収まるのは${pct}。このペースで足りる。`,
+        text: `目標 ${yen(budgetYen)} に収まるのは${pct}。このペースで足りる。`,
       });
     } else {
       const allowance =
@@ -71,7 +71,7 @@ export function reportInsights(input: {
       out.push({
         key: 'budget',
         tone: 'caution',
-        text: `予算 ${yen(budgetYen)} に収まるのは${pct}。超えるときは平均で 約${est(forecast.expectedOvershoot)} 超える。${driverText}${allowance}`,
+        text: `目標 ${yen(budgetYen)} に収まるのは${pct}。超えるときは平均で 約${est(forecast.expectedOvershoot)} 超える。${driverText}${allowance}`,
       });
     }
   }
@@ -105,7 +105,7 @@ export function reportInsights(input: {
     out.push({
       key: 'driver',
       tone: 'info',
-      text: `予算を超える場合の原因の${Math.round(driver.shareOfRisk * 100)}%は${driver.categoryName}。`,
+      text: `目標をこえる場合の原因の${Math.round(driver.shareOfRisk * 100)}%は${driver.categoryName}。`,
     });
   }
 

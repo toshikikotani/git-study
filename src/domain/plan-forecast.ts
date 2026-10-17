@@ -158,7 +158,7 @@ export function savingsAsk(input: {
     saveYen,
     keepDailyYen,
     keepUnderYen,
-    text: `着地は ${yen(input.medianYen)} 円。予算は上限で、届かせない方が貯蓄になる。${yen(saveYen)} 円抑えて ${yen(keepUnderYen)} 円にしてほしい。残り ${input.remainingDays} 日は 1 日 ${yen(keepDailyYen)} 円。`,
+    text: `着地は ${yen(input.medianYen)} 円。目標は上限で、届かせない方が貯蓄になる。${yen(saveYen)} 円抑えて ${yen(keepUnderYen)} 円にしてほしい。残り ${input.remainingDays} 日は 1 日 ${yen(keepDailyYen)} 円。`,
   };
 }
 

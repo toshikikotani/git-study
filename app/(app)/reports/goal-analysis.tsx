@@ -234,8 +234,9 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
         rows={[
           {
             key: 'why',
-            title: `なぜ${formatEstimate(b.totalYen)}？`,
-            value: `決まった分 ${man(decided)} + これから ${man(ahead)}`,
+            // 値は下の行に(右に並べると「なぜ約20.6万円？」が2行に折れた、本人の指摘、ADR-108)。
+            title: 'なぜこの見込み？',
+            sub: `${formatEstimate(b.totalYen)} = 決まった分 ${man(decided)} + これから ${man(ahead)}`,
             content: <WhyCard forecast={forecast} closedGenreIds={closed} />,
           },
           ...(forecast.probWithinBudget !== null

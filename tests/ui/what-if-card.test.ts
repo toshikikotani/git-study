@@ -78,9 +78,9 @@ describe('カテゴリ画面の「もし、へらしたら」', () => {
     expect(html).toContain('20,481円');
     expect(html).toContain('10回中8回は 3.8万〜6.4万円');
     expect(html).toContain('このままだと 約8,800円オーバー');
-    expect(html).toContain('外食が目標を超える');
+    expect(html).toContain('外食が目標をこえる');
     expect(html).toContain('10回中7回');
-    expect(html).toContain('全体で予算に収まる');
+    expect(html).toContain('全体で目標に収まる');
     expect(html).toContain('10回中4回');
     expect(html).toContain('±0円');
     expect(html).toContain('1回 約3,100円 × 月末まで約3.7週で計算した目安です。');
@@ -154,7 +154,7 @@ describe('カテゴリ画面の「もし、へらしたら」', () => {
     expect(html).toContain('「守れたとき」と「いつもの守り方」の2つの見込みを出します');
     expect(html).toContain('外食を月末まで使わなかったら');
     expect(html).toContain('約2.1万円');
-    expect(html).toContain('予算に収まる 10回中7回');
+    expect(html).toContain('目標に収まる 10回中7回');
     expect(html).toContain('いつもの守り方なら');
     expect(html).toContain('約3.3万円');
     expect(html).toContain('これまでの約束は10回中6回守れた、として見込む');
@@ -214,8 +214,8 @@ describe('カテゴリ画面の「もし、へらしたら」', () => {
         }),
       ),
     );
-    expect(html).not.toContain('目標を超える');
-    expect(html).not.toContain('予算に収まる');
+    expect(html).not.toContain('目標をこえる');
+    expect(html).not.toContain('目標に収まる');
     expect(html).not.toContain('月末の収支');
     expect(html).not.toContain('目安</span>');
   });

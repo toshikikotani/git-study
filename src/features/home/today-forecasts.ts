@@ -21,6 +21,8 @@ export type TodayForecasts = {
   /** 今月の予測(月末に残る見込み)。読めなければ null。 */
   monthView: ForecastView | null;
   payday: number | null;
+  /** 毎月の貯金目標(設定。AIの窓口と同じ値、ADR-108)。0 なら決めていない。 */
+  monthlySavingsTargetYen: number;
 };
 
 export async function loadTodayForecasts(now: Date = new Date()): Promise<TodayForecasts> {
@@ -36,7 +38,15 @@ export async function loadTodayForecasts(now: Date = new Date()): Promise<TodayF
     goal ? loadForecast({ ...goal, now }).catch(() => null) : Promise.resolve(null),
     loadForecast({ period: monthPeriod, now }).catch(() => null),
   ]);
-  return { today, monthPeriod, goal, goalView, monthView, payday: settings?.payday ?? null };
+  return {
+    today,
+    monthPeriod,
+    goal,
+    goalView,
+    monthView,
+    payday: settings?.payday ?? null,
+    monthlySavingsTargetYen: settings?.monthlySavingsTargetYen ?? 0,
+  };
 }
 
 /** 今日の1日の上限(休日軸・確率込みの上限、無ければ予測の安全な1日分)。 */

@@ -50,7 +50,7 @@ describe('formatSpendable(FR-64)', () => {
 
   it('超過しても責めない文言にする(設計原則5)', () => {
     const message = formatSpendable(-5000);
-    expect(message).toBe('予算を5,000円超えている');
+    expect(message).toBe('目標を5,000円超えている');
     expect(message).not.toMatch(/使いすぎ|ダメ|注意|警告/);
   });
 });

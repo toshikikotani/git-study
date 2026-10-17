@@ -10,7 +10,7 @@ vi.mock('next/cache', () => ({
 }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => current.client }));
 
-import { loadForecast } from '@/features/forecast/load';
+import { loadForecast, topSpendsOn } from '@/features/forecast/load';
 
 // 過去の月での検証(半減期の選択を含む)が数秒かかる。
 vi.setConfig({ testTimeout: 60_000 });
@@ -91,6 +91,10 @@ describe('loadForecast(Supabase の読み込みを通した予測)', () => {
     const dining = view.forecast.byCategory.find((c) => c.categoryId === 'dining')!;
     expect(dining.exceedance).not.toBeNull();
     expect(view.forecast.probWithinBudget).not.toBeNull();
+    // 明日からの目安(ADR-108):明日から期間の終わりまでに、今日の分を使ったあとの残りを配る。
+    expect(view.tomorrowLimit).not.toBeNull();
+    expect(view.tomorrowLimit!.todayLimitYen).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(view.todayTopSpends)).toBe(true);
   });
 
   it('明細が無い人でも、エラーにならない', async () => {
@@ -141,5 +145,38 @@ describe('loadForecast(Supabase の読み込みを通した予測)', () => {
       now: TODAY,
     });
     expect(view.forecast.dataDays).toBeGreaterThan(300);
+  });
+});
+
+describe('topSpendsOn(今日の目安の説明に使う、今日の大きい支出、ADR-108)', () => {
+  const row = (description: string, amountYen: number, extra: Record<string, unknown> = {}) => ({
+    occurredOn: '2026-10-17',
+    genreId: 'dining',
+    genreName: '外食',
+    amountYen,
+    status: 'actual' as const,
+    kind: 'normal' as const,
+    isTransfer: false,
+    reviewStatus: 'auto_ok' as const,
+    needsInput: false,
+    merchantName: null,
+    description,
+    ...extra,
+  });
+
+  it('その日の支出を大きい順に2つ。振替・予定・ほかの日・範囲の外は入れない', () => {
+    const rows = [
+      row('コンビニ', -500),
+      row('同窓会', -5000),
+      row('ガソリン', -2000, { merchantName: 'スーパーセルフ熊谷SS' }),
+      row('振替', -9000, { isTransfer: true }),
+      row('ライブ', -6000, { status: 'scheduled' }),
+      row('昨日', -8000, { occurredOn: '2026-10-16' }),
+      row('食料品', -7000, { genreId: 'grocery' }),
+    ];
+    expect(topSpendsOn(rows, '2026-10-17', { genreIds: new Set(['dining']) })).toEqual([
+      { name: '同窓会', amountYen: 5000 },
+      { name: 'スーパーセルフ熊谷SS', amountYen: 2000 },
+    ]);
   });
 });

@@ -57,6 +57,13 @@ export type ForecastView = {
   weekdayPerDayYen: number | null;
   /** 今日の上限の計算結果(休日軸・確率込み)。 */
   dailyLimit: DailyLimitResult | null;
+  /**
+   * 明日からの1日の目安(今日の分を使ったあとの残りを、明日から期間の終わりまでに配る、ADR-108)。
+   * 今日が期間の最終日・目標が無いときは null。
+   */
+  tomorrowLimit: DailyLimitResult | null;
+  /** 範囲の、今日の支出の大きいもの(名前と額、大きい順に2つまで)。今日の目安の説明に使う。 */
+  todayTopSpends: readonly { name: string; amountYen: number }[];
 };
 
 /** 範囲の、ある日の支出(実績。返金は差し引く。特別費を外す範囲なら外す)。 */
@@ -76,6 +83,29 @@ export function spentOn(
     else if (t.kind === 'refund') yen -= t.amountYen;
   }
   return Math.max(0, yen);
+}
+
+/** 範囲の、その日の支出の大きいもの(名前と額)。返金・振替・対象外は入れない。 */
+export function topSpendsOn(
+  transactions: readonly ForecastSourceTransaction[],
+  date: DateOnly,
+  scope: ForecastScope | undefined,
+  limit = 2,
+): { name: string; amountYen: number }[] {
+  return transactions
+    .filter(
+      (t) =>
+        t.occurredOn === date &&
+        t.status === 'actual' &&
+        t.amountYen < 0 &&
+        !t.isTransfer &&
+        t.reviewStatus !== 'ignored' &&
+        !(scope?.excludeSpecial && t.kind === 'special') &&
+        !(scope?.genreIds !== undefined && (t.genreId === null || !scope.genreIds.has(t.genreId))),
+    )
+    .sort((a, b) => a.amountYen - b.amountYen)
+    .slice(0, limit)
+    .map((t) => ({ name: (t.merchantName ?? t.description).trim(), amountYen: -t.amountYen }));
 }
 
 /** 範囲から外した特別費(範囲のジャンルの、期間内の実績と予定)。 */
@@ -260,22 +290,38 @@ export async function loadForecast(args: {
   const remainingDays = Math.max(0, totalDays - elapsed + 1);
   const dayOffs = cal.dayOffs;
   const weekdays = Math.max(0, remainingDays - dayOffs);
+  const leftBudgetYen = Math.max(
+    0,
+    (args.budgetYen ?? 0) -
+      forecast.actualYen -
+      (forecast.committed?.scheduledYen ?? 0) -
+      (forecast.committed?.fixedYen ?? 0),
+  );
   const dailyLimit =
     args.budgetYen != null && averages.weekdayPerDayYen != null
       ? computeDailyLimit({
-          leftBudgetYen: Math.max(
-            0,
-            (args.budgetYen ?? 0) -
-              forecast.actualYen -
-              (forecast.committed?.scheduledYen ?? 0) -
-              (forecast.committed?.fixedYen ?? 0),
-          ),
+          leftBudgetYen,
           remainingDayOffs: dayOffs,
           remainingWeekdays: weekdays,
           dayOffMedianYen: averages.dayOffPerDayYen,
           weekdayMedianYen: averages.weekdayPerDayYen,
           probWithinBudget: forecast.probWithinBudget,
           todayIsDayOff: isDayOff(today),
+        })
+      : null;
+  // 明日からの目安:今日の分を使ったあとの残り(今日使った額は使った額に入っている)を、明日からの日に配る。
+  const tomorrow = addDays(today, 1);
+  const todayOff = isDayOff(today) ? 1 : 0;
+  const tomorrowLimit =
+    dailyLimit !== null && remainingDays > 1
+      ? computeDailyLimit({
+          leftBudgetYen,
+          remainingDayOffs: Math.max(0, dayOffs - todayOff),
+          remainingWeekdays: Math.max(0, weekdays - (1 - todayOff)),
+          dayOffMedianYen: averages.dayOffPerDayYen,
+          weekdayMedianYen: averages.weekdayPerDayYen,
+          probWithinBudget: forecast.probWithinBudget,
+          todayIsDayOff: isDayOff(tomorrow),
         })
       : null;
 
@@ -290,5 +336,7 @@ export async function loadForecast(args: {
     dayOffPerDayYen: averages.dayOffPerDayYen,
     weekdayPerDayYen: averages.weekdayPerDayYen,
     dailyLimit,
+    tomorrowLimit,
+    todayTopSpends: topSpendsOn(periodRows, today, args.scope),
   };
 }

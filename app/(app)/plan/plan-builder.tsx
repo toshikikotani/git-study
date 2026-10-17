@@ -308,7 +308,7 @@ export function PlanBuilder({
           {suggestion.noRecord.length > 0 ? (
             <details className="text-xs" style={{ color: 'var(--ink-muted)' }}>
               <summary className="min-h-11 cursor-pointer font-semibold">
-                予算なし({suggestion.noRecord.length}件・記録がないカテゴリ)
+                目標なし({suggestion.noRecord.length}件・記録がないカテゴリ)
               </summary>
               <p className="mt-1 leading-relaxed">{suggestion.noRecord.join('、')}</p>
             </details>

@@ -88,7 +88,7 @@ export function LandingScenarios({
 
       {budgetYen !== null ? (
         <p className="text-xs tabular" style={{ color: 'var(--ink-secondary)' }}>
-          予算:{' '}
+          目標:{' '}
           <strong style={{ color: 'var(--ink)' }}>{formatYen(budgetYen, { sign: 'never' })}</strong>{' '}
           <span style={{ opacity: 0.6 }}>（縦線）</span>
         </p>

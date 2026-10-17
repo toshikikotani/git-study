@@ -67,7 +67,7 @@ export function computeDailyLimit(input: DailyLimitInput): DailyLimitResult {
     `重み付き日数 = 休日${remainingDayOffs} × ${ratio.toFixed(2)} + 平日${remainingWeekdays} = ${weighted.toFixed(1)}`,
   );
   steps.push(
-    `配分 = 残り予算${leftBudgetYen.toLocaleString()} ÷ ${weighted.toFixed(1)} → 平日${Math.round(baseWeekday).toLocaleString()}円、休日${Math.round(baseDayOff).toLocaleString()}円`,
+    `配分 = 目標の残り${leftBudgetYen.toLocaleString()} ÷ ${weighted.toFixed(1)} → 平日${Math.round(baseWeekday).toLocaleString()}円、休日${Math.round(baseDayOff).toLocaleString()}円`,
   );
 
   // 3. 確率で絞る。確率が低いほど係数を下げる(最低0.5)

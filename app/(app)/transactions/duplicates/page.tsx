@@ -42,7 +42,7 @@ export default async function DuplicatesPage() {
       <DuplicateList initial={candidates} />
 
       <p className="px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        残さなかった方は削除せず、集計の対象から外すだけです(予算・レポート・
+        残さなかった方は削除せず、集計の対象から外すだけです(目標・レポート・
         ちりつも・アラートから一斉に消えます)。
       </p>
     </div>

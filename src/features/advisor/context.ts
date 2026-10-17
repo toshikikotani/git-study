@@ -56,6 +56,8 @@ export type TodayNumbers = {
   } | null;
   /** 月末に残る見込み(収入が無ければ null)。 */
   monthEnd: { to: DateOnly; incomeYen: number; p50: number } | null;
+  /** 毎月の貯金目標(設定。ホームの貯金カードと同じ値)。0 なら決めていない。 */
+  monthlySavingsTargetYen: number;
 };
 
 /** 日本時間の「2026-10-17 08:22」。 */
@@ -103,6 +105,7 @@ export function todayNumbersOf(f: TodayForecasts, now: Date): TodayNumbers {
     monthEnd: balance
       ? { to: f.monthPeriod.to, incomeYen: balance.incomeYen, p50: balance.p50 }
       : null,
+    monthlySavingsTargetYen: f.monthlySavingsTargetYen,
   };
 }
 
@@ -114,7 +117,7 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
   const yen = (v: number) => formatYen(v, { sign: 'never' });
 
   if (n.allowance === null) {
-    lines.push('- 今日使える目安: 今期の目標(予算)が無いので出していない');
+    lines.push('- 今日使える目安: 今期の目標が無いので出していない');
   } else {
     const a = n.allowance;
     const head = `- 今日使える目安${n.provisional ? '(記録が少ないので仮)' : ''}: 1日の上限${yen(a.capYen)}、今日もう使った${yen(a.spentYen)}`;
@@ -131,10 +134,10 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
     const over = o.p50 - o.budgetYen;
     lines.push(
       `- 今期の見通し(${o.from}〜${o.to}、今日を入れて残り${o.remainingDays}日):`,
-      `  予算${yen(o.budgetYen)}、今日までに使った額${yen(o.spentYen)}`,
+      `  目標${yen(o.budgetYen)}、今日までに使った額${yen(o.spentYen)}`,
       `  着地見込み${formatEstimate(o.p50)}(10回中8回は${formatEstimate(o.p10, { approx: false })}〜${formatEstimate(o.p90, { approx: false })})` +
-        (over > 0 ? ` → 予算を${formatEstimate(over)}超えそう` : ' → 予算内の見込み'),
-      `  予算内に収まる確率${formatProbability(o.probWithinBudget)}`,
+        (over > 0 ? ` → 目標を${formatEstimate(over)}こえそう` : ' → 目標内の見込み'),
+      `  目標内に収まる確率${formatProbability(o.probWithinBudget)}`,
     );
     if (o.scheduledYen > 0 || o.fixedYen > 0) {
       lines.push(
@@ -146,7 +149,7 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
   if (n.suggestion !== null) {
     const s = n.suggestion;
     lines.push(
-      `- 次の一手: ${s.categoryName}を週${s.perWeek}回へらすと、支出が${formatEstimate(s.savedYen)}へり、予算内の確率は${formatProbability(s.probBefore)} → ${formatProbability(s.probAfter)}`,
+      `- 次の一手: ${s.categoryName}を週${s.perWeek}回へらすと、支出が${formatEstimate(s.savedYen)}へり、目標内の確率は${formatProbability(s.probBefore)} → ${formatProbability(s.probAfter)}`,
     );
   }
 
@@ -157,7 +160,18 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
     lines.push(
       `- 月末(${m.to})に残る見込み: ${formatSignedEstimate(m.p50)}(収入${formatEstimate(m.incomeYen, { approx: false })} − 支出の見込み${formatEstimate(m.incomeYen - m.p50)})`,
     );
+    if (n.monthlySavingsTargetYen > 0) {
+      const short = n.monthlySavingsTargetYen - m.p50;
+      lines.push(
+        `- 毎月の貯金目標${yen(n.monthlySavingsTargetYen)}(ホームの貯金と同じ値): ${
+          short > 0
+            ? `月末の見込みでは、あと${formatEstimate(short)}届かない`
+            : '月末の見込みで届く'
+        }`,
+      );
+    }
   }
+  if (n.monthlySavingsTargetYen <= 0) lines.push('- 毎月の貯金目標: まだ決めていない');
   return lines;
 }
 

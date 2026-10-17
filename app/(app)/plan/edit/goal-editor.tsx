@@ -210,7 +210,7 @@ export function GoalEditor({
             <div className="tabular flex items-baseline justify-between gap-2">
               <span className="text-[28px] font-bold">{formatEstimate(landing.p50)}</span>
               <span className="text-[15px]">
-                予算内の確率 <strong>{formatProbability(landing.probWithin)}</strong>
+                目標内の確率 <strong>{formatProbability(landing.probWithin)}</strong>
               </span>
             </div>
             <span className="tabular text-[13px] opacity-85">

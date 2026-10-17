@@ -34,7 +34,7 @@ export function NextStepCard({
       <p className="tabular text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         {goal
           ? `月末の支出が${formatEstimate(suggestion.savedYen)}へり、目標内の確率も上がります。`
-          : `月末の支出が${formatEstimate(suggestion.savedYen)}へり、予算内の確率は${formatProbability(suggestion.probBefore)} → ${formatProbability(suggestion.probAfter)}に。`}
+          : `月末の支出が${formatEstimate(suggestion.savedYen)}へり、目標内の確率は${formatProbability(suggestion.probBefore)} → ${formatProbability(suggestion.probAfter)}に。`}
       </p>
       <button
         type="button"

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
-import { ChevronRightIcon } from '@/components/ui/nav-icons';
 
 export type AllowanceExplain = {
   budgetYen: number;
@@ -71,11 +70,10 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-12 w-full items-center justify-between text-[15px] font-semibold"
-        style={{ color: 'var(--accent)' }}
+        className="flex min-h-11 w-full items-center justify-center rounded-full text-[15px] font-semibold"
+        style={{ background: 'var(--plane)', color: 'var(--ink)' }}
       >
         なぜこの額？
-        <ChevronRightIcon />
       </button>
       <BottomSheet
         open={open}
@@ -93,7 +91,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
           <ul className="space-y-3">
             <li>
               <span className="flex justify-between text-sm" style={{ color: 'var(--ink)' }}>
-                <span>予算</span>
+                <span>目標</span>
                 <span className="tabular">{yen(explain.budgetYen)}</span>
               </span>
               {bar(explain.budgetYen, 'var(--ink-muted)')}
@@ -129,7 +127,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
               style={{ color: 'var(--ink-secondary)' }}
             >
               <li>
-                1. 残り予算 = {yen(explain.budgetYen)} − {yen(spentBefore)}
+                1. 目標の残り = {yen(explain.budgetYen)} − {yen(spentBefore)}
                 {(explain.scheduledYen ?? 0) > 0 ? ` − 予定${yen(explain.scheduledYen!)}` : ''}
                 {(explain.fixedYen ?? 0) > 0 ? ` − 固定費${yen(explain.fixedYen!)}` : ''}
                 {' = '}
@@ -146,7 +144,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                   </li>
                 ))
               ) : (
-                <li>3. 今日の上限 = {yen(cap)}（残り予算を休日/平日の比率で配分した平日分）</li>
+                <li>3. 今日の上限 = {yen(cap)}（目標の残りを休日/平日の比率で配分した平日分）</li>
               )}
             </ol>
           </div>
@@ -173,7 +171,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                       {explain.dailyLimit.ratio.toFixed(1)}倍)
                     </li>
                     <li className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                      残り予算を休日/平日の中央値の比率で配分し、確率
+                      目標の残りを休日/平日の中央値の比率で配分し、確率
                       {Math.round((explain.probWithinBudget ?? 1) * 100)}%で絞った数字です。
                     </li>
                   </>
@@ -188,7 +186,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
           ) : null}
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
             {over > 0
-              ? `今日は${yen(explain.spentTodayYen)}使ったので、上限を${yen(over)}超えています。`
+              ? `今日は${yen(explain.spentTodayYen)}使ったので、上限を${yen(over)}こえています。`
               : `今日は${yen(explain.spentTodayYen)}なので、あと${yen(cap - explain.spentTodayYen)}使えます。`}
           </p>
           {probText !== null ? (
@@ -197,9 +195,9 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
                 今の状態での確率
               </p>
               <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-                今のペースが続くと、{probText}の確率で予算内に収まります。
+                今のペースが続くと、{probText}の確率で目標内に収まります。
                 {over > 0
-                  ? '今日の上限を超えているので、このままだと確率は下がります。'
+                  ? '今日の上限をこえているので、このままだと確率は下がります。'
                   : '今日の上限内に収まっているので、確率は保たれています。'}
                 （モンテカルロ法により算出）
               </p>

@@ -144,7 +144,7 @@ export function detectWastefulBudget(
   return {
     kind: 'waste_budget_70',
     severity: 'warn',
-    title: `${category.name}が予算の${Math.round(threshold * 100)}%に達しました`,
+    title: `${category.name}が目標の${Math.round(threshold * 100)}%に達しました`,
     body: status.remainingYen === null ? null : `残り${formatYen(status.remainingYen)}使えます`,
     dedupKey: `waste_budget_70:${category.id}:${monthKey}`,
     transactionId: null,
@@ -221,7 +221,7 @@ export function buildBudgetPaceAlert(
     body:
       status.remainingYen === null
         ? null
-        : `このペースだと、月末までに予算を使い切る可能性があります。残り${formatYen(status.remainingYen)}使えます。`,
+        : `このペースだと、月末までに目標を使い切る可能性があります。残り${formatYen(status.remainingYen)}使えます。`,
     dedupKey: `budget_pace:${category.id}:${monthKey}`,
     transactionId: null,
   };
@@ -253,8 +253,8 @@ export function buildMonthlyRecapAlert(summary: MonthlyRecapSummary): CandidateA
   for (const category of summary.wasteCategories) {
     const ratioText =
       category.status.usageRatio === null
-        ? '予算なし'
-        : `予算の${Math.round(category.status.usageRatio * 100)}%`;
+        ? '目標なし'
+        : `目標の${Math.round(category.status.usageRatio * 100)}%`;
     lines.push(`${category.name}: ${formatYen(category.status.spentYen)}(${ratioText})`);
   }
 
