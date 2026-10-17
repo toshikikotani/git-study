@@ -43,14 +43,14 @@ export function CategoryLandingCard({
     targetYen === null
       ? null
       : spent > targetYen
-        ? ({ label: '超えた', color: 'var(--state-over)', bg: 'var(--state-over-track)' } as const)
+        ? ({ label: 'こえた', color: 'var(--state-over)', bg: 'var(--state-over-track)' } as const)
         : mid > targetYen
           ? ({
-              label: '▲ 超えそう',
+              label: '▲ こえそう',
               color: 'var(--state-caution)',
               bg: 'var(--state-caution-track)',
             } as const)
-          : ({ label: '予算内', color: 'var(--state-ok)', bg: 'var(--state-ok-track)' } as const);
+          : ({ label: '目標内', color: 'var(--state-ok)', bg: 'var(--state-ok-track)' } as const);
 
   return (
     <section aria-label="着地の見込み" className={`${card} space-y-4`} style={cardStyle}>

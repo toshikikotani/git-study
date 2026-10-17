@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { genreSwatch } from '@/domain/genre-style';
+import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { fetchAccounts, type AccountOption } from '@/features/transactions/accounts-client';
 import {
@@ -21,14 +22,17 @@ import { pushUndo } from '@/lib/undo';
 import { markRecordFixedAction } from './reports/fixed-cost-actions';
 import { createCategoryAction } from './spending/category/actions';
 import { saveImportBatchAction, undoReceiptSaveAction } from './transactions/actions';
-import { fetchQuickEntryGenresAction } from './transactions/new/actions';
+import { fetchQuickEntryGenresAction, fetchStoreGenresAction } from './transactions/new/actions';
 
-const KINDS = [
+/** 記録の種類。返金は支出の「詳細」で選ぶ(デザイン v3-4)。 */
+type Kind = 'expense' | 'income' | 'refund';
+/** 種類のタブは支出・収入の2つ(返金は「詳細」で、デザイン v3-4)。 */
+const KIND_TABS = [
   { value: 'expense', label: '支出' },
   { value: 'income', label: '収入' },
-  { value: 'refund', label: '返金' },
 ] as const;
-type Kind = (typeof KINDS)[number]['value'];
+/** はじめに並べるカテゴリの数(よく使う順、デザイン v3-4)。 */
+const TOP_GENRES = 8;
 export type RecordKind = Kind;
 
 /** 記録を直すときの値(明細の行から開く、ADR-101)。amountYen は割り勘を引いたあとの額(正の数)。 */
@@ -59,13 +63,27 @@ export type RecordEdit = {
  * 記録するを開くときの初期値(明細のカレンダーの「この日に手で記録」など)。
  * error は、保存できなかったときに開き直して見せる理由(入れた値は下書きから戻る、ADR-098)。
  */
-export type RecordOptions = { date?: string; kind?: 'expense' | 'income'; error?: string };
+export type RecordOptions = {
+  date?: string;
+  kind?: 'expense' | 'income';
+  error?: string;
+  /** 金額とカテゴリを入れて開く(「もし使ったら」の「予定に入れる」、ADR-108)。 */
+  amountYen?: number;
+  genreId?: string | null;
+};
 
 // ---- カテゴリと口座を先に読んでおく(開いた瞬間からタイルが並ぶように、ADR-098)------------------
 type GenreTile = { id: string; name: string };
 let genreCache: readonly GenreTile[] | null = null;
+/** 店名(比較用の形)→ 前回のカテゴリ。店名を入れたら、そのカテゴリを先に選ぶ(ADR-108)。 */
+let storeGenreCache: ReadonlyMap<string, string> | null = null;
 let accountCache: readonly AccountOption[] | null = null;
 let loading: Promise<void> | null = null;
+
+/** 読んでおいたカテゴリ(まだなら null)。「もし使ったら」のカテゴリにも使う。 */
+export function cachedRecordGenres(): readonly GenreTile[] | null {
+  return genreCache;
+}
 
 /** カテゴリと口座を読んでおく。アプリを開いたときと、記録するを開くたびに呼ぶ(重ねて呼んでも1回)。 */
 export function prefetchRecordData(): Promise<void> {
@@ -78,6 +96,11 @@ export function prefetchRecordData(): Promise<void> {
     fetchAccounts().then((a) => {
       if (a.length > 0) accountCache = a;
     }),
+    fetchStoreGenresAction()
+      .then((pairs) => {
+        storeGenreCache = new Map(pairs);
+      })
+      .catch(() => {}),
   ]).then(() => {
     loading = null;
   });
@@ -92,6 +115,23 @@ export const OpenRecordProvider = OpenRecordContext.Provider;
 /** 記録するのシートを開く。外枠の外(テストなど)では null。 */
 export function useOpenRecord(): ((options?: RecordOptions) => void) | null {
   return useContext(OpenRecordContext);
+}
+
+/**
+ * 並べるカテゴリ:「すべて」でなければ、よく使う順の8個。選んだカテゴリが8個に無ければ、8個目と入れかえる
+ * (選んだものが見えなくならないように、デザイン v3-4)。
+ */
+export function visibleGenres<G extends { id: string }>(
+  genres: readonly G[],
+  pickedId: string | null,
+  all: boolean,
+): readonly G[] {
+  if (all) return genres;
+  const top = genres.slice(0, TOP_GENRES);
+  const picked = genres.find((g) => g.id === pickedId);
+  return picked && !top.some((g) => g.id === picked.id)
+    ? [...top.slice(0, TOP_GENRES - 1), picked]
+    : top;
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
@@ -120,6 +160,8 @@ export function RecordSheet({
   initialDate,
   initialKind,
   initialError,
+  initialAmountYen,
+  initialGenreId,
   edit,
 }: {
   onClose: () => void;
@@ -130,6 +172,9 @@ export function RecordSheet({
   initialKind?: 'expense' | 'income' | undefined;
   /** 保存できなかった理由(開き直したとき)。 */
   initialError?: string | undefined;
+  /** 金額とカテゴリの初期値(「もし使ったら」の「予定に入れる」)。 */
+  initialAmountYen?: number | undefined;
+  initialGenreId?: string | null | undefined;
   /** 既にある記録を直すとき。 */
   edit?: RecordEdit | undefined;
 }) {
@@ -138,14 +183,19 @@ export function RecordSheet({
   const today = todayJst();
   // 保存せずに閉じた入力(下書き)があれば戻す。カレンダーから日付を指定して開いたら、その日にする。
   // 記録を直すときは下書きを使わない(直す前の値から始める)。
-  const [restored] = useState(() => (edit ? null : peekDraft()));
+  const prefilled = initialAmountYen !== undefined;
+  const [restored] = useState(() => (edit || prefilled ? null : peekDraft()));
   const start = edit?.initial;
   const [kind, setKind] = useState<Kind>(start?.kind ?? initialKind ?? restored?.kind ?? 'expense');
   const [amount, setAmount] = useState(
-    start ? start.amountYen.toLocaleString('ja-JP') : (restored?.amount ?? ''),
+    start
+      ? start.amountYen.toLocaleString('ja-JP')
+      : prefilled
+        ? initialAmountYen.toLocaleString('ja-JP')
+        : (restored?.amount ?? ''),
   );
   const [genreId, setGenreId] = useState<string | null>(
-    start ? start.genreId : (restored?.genreId ?? null),
+    start ? start.genreId : prefilled ? (initialGenreId ?? null) : (restored?.genreId ?? null),
   );
   const [date, setDate] = useState(start?.date ?? initialDate ?? restored?.date ?? today);
   const [name, setName] = useState(start?.name ?? restored?.name ?? '');
@@ -158,6 +208,21 @@ export function RecordSheet({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(initialError ?? null);
+  const [allGenres, setAllGenres] = useState(false);
+  // 詳細(割り勘・返金・口座・メモ)は、入っている値があるときだけ開いて始める。
+  const [more, setMore] = useState(
+    start?.kind === 'refund' ||
+      (start?.memo ?? '') !== '' ||
+      restored?.kind === 'refund' ||
+      (restored?.memo ?? '') !== '' ||
+      (restored?.split ?? '') !== '',
+  );
+  /** カテゴリを本人が選んだか(選んだら、店名からは選び直さない)。 */
+  const genreTouched = useRef(
+    (start?.genreId ?? null) !== null ||
+      (restored?.genreId ?? null) !== null ||
+      (initialGenreId ?? null) !== null,
+  );
   const [showRestored, setShowRestored] = useState(restored !== null && !initialError);
 
   useEffect(() => {
@@ -354,6 +419,30 @@ export function RecordSheet({
     router.refresh();
   };
 
+  // 店名を入れたら、前回その店で選んだカテゴリを先に選ぶ(本人がカテゴリを選んでいなければ)。
+  const changeName = (value: string) => {
+    setName(value);
+    if (genreTouched.current || kind === 'income') return;
+    const remembered = storeGenreCache?.get(comparableKey(value));
+    if (remembered && genres.some((g) => g.id === remembered)) setGenreId(remembered);
+  };
+
+  const calendarIcon = (
+    <svg
+      aria-hidden
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <rect x="4" y="5" width="16" height="15" rx="3" />
+      <path d="M4 10h16M9 3v4M15 3v4" />
+    </svg>
+  );
+
   const imageIcon = (
     <svg
       aria-hidden
@@ -371,6 +460,17 @@ export function RecordSheet({
       <path d="M20.5 16l-5-5-8.5 8" />
     </svg>
   );
+
+  // カテゴリは、よく使う8個と「すべて」(23個が全部並んで選びにくかった、本人の指摘、デザイン v3-4)。
+  // 選んだカテゴリが8個に無ければ、8個目と入れかえて見せる。
+  const shownGenres = visibleGenres(genres, genreId, allGenres);
+  const detailSummary = [
+    kind === 'expense' || kind === 'refund' ? '割り勘・返金' : null,
+    accounts.length >= 2 && !edit ? '口座' : null,
+    'メモ',
+  ]
+    .filter((x): x is string => x !== null)
+    .join('・');
 
   return (
     <div className="flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
@@ -421,11 +521,17 @@ export function RecordSheet({
       ) : null}
 
       <section
-        className="flex flex-col gap-1 rounded-[20px] px-4 pt-3 pb-4"
+        className="flex flex-col items-center gap-2 rounded-[20px] px-4 pt-3 pb-4"
         style={{ background: 'var(--surface)' }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <Segmented value={kind} options={KINDS} onChange={setKind} label="種類" />
+        <div className="flex w-full items-center justify-between gap-2">
+          {/* 種類は支出・収入の2つ。返金は「詳細」で(デザイン v3-4) */}
+          <Segmented
+            value={kind === 'income' ? 'income' : 'expense'}
+            options={KIND_TABS}
+            onChange={(v) => setKind(v === 'income' ? 'income' : 'expense')}
+            label="種類"
+          />
           {/* 押すと iPhone の選択画面(写真を撮る / 写真ライブラリ)が出る。レシートの写真でも
               決済アプリ・通販・カード通知のスクショでも、同じ読み取りに回す(ADR-100)。
               直すときは出さない(レシートの画像は下の「レシートの品目」から)。 */}
@@ -449,7 +555,7 @@ export function RecordSheet({
             </label>
           )}
         </div>
-        <label className="flex items-baseline justify-center gap-2 pt-3">
+        <label className="flex items-baseline justify-center gap-2 pt-2">
           <span className="sr-only">金額</span>
           <input
             inputMode="numeric"
@@ -466,13 +572,19 @@ export function RecordSheet({
           <span className="text-[24px] font-semibold">円</span>
         </label>
         <label
-          className="relative flex min-h-11 items-center justify-center self-center rounded-full px-3 text-[13px]"
-          style={{ color: scheduled ? 'var(--state-caution)' : 'var(--ink-muted)' }}
+          className="relative flex min-h-11 items-center gap-2 rounded-full px-4 text-[14px]"
+          style={{ background: 'var(--plane)', color: 'var(--ink)' }}
         >
-          <span className="tabular">
-            {dateLabel(date, today)}
-            {scheduled ? ' · 予定' : ''}
-          </span>
+          {calendarIcon}
+          <span className="tabular">{dateLabel(date, today)}</span>
+          {scheduled ? (
+            <span
+              className="rounded-full px-2 py-1 text-[11px] leading-none font-bold"
+              style={{ background: 'var(--state-caution)', color: 'var(--on-action)' }}
+            >
+              予定
+            </span>
+          ) : null}
           <input
             type="date"
             value={date}
@@ -481,6 +593,11 @@ export function RecordSheet({
             className="absolute inset-0 opacity-0"
           />
         </label>
+        {scheduled ? (
+          <span className="text-[12px]" style={{ color: 'var(--state-caution)' }}>
+            先の日付なので予定として記録。使った額には、その日まで入りません。
+          </span>
+        ) : null}
       </section>
 
       <label
@@ -495,7 +612,7 @@ export function RecordSheet({
           placeholder={
             kind === 'expense' && selectedGenre === undefined ? '店名など（任意）' : fallbackName
           }
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => changeName(e.target.value)}
           className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
           style={{ color: 'var(--ink)' }}
         />
@@ -503,14 +620,27 @@ export function RecordSheet({
 
       {kind !== 'income' ? (
         <section
-          className="flex flex-col gap-3 rounded-[20px] px-3 py-3"
+          className="flex flex-col gap-2 rounded-[20px] px-3 py-3"
           style={{ background: 'var(--surface)' }}
         >
-          <span className="px-1 text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
-            カテゴリ
-          </span>
+          <div className="flex items-center justify-between gap-2 px-1">
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
+              {allGenres ? `すべてのカテゴリ · ${genres.length}` : 'よく使うカテゴリ'}
+            </span>
+            {genres.length > TOP_GENRES ? (
+              <button
+                type="button"
+                onClick={() => setAllGenres(!allGenres)}
+                aria-expanded={allGenres}
+                className="min-h-11 px-1 text-[13px] font-semibold"
+                style={{ color: 'var(--accent)' }}
+              >
+                {allGenres ? 'たたむ' : `すべて（${genres.length}）`}
+              </button>
+            ) : null}
+          </div>
           <div className="grid grid-cols-4 gap-2">
-            {genres.map((g) => {
+            {shownGenres.map((g) => {
               const on = g.id === genreId;
               const color = genreSwatch(g.name);
               return (
@@ -518,7 +648,10 @@ export function RecordSheet({
                   key={g.id}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => setGenreId(on ? null : g.id)}
+                  onClick={() => {
+                    genreTouched.current = true;
+                    setGenreId(on ? null : g.id);
+                  }}
                   className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[14px] px-1 py-2"
                   style={{
                     background: on ? 'var(--note)' : 'var(--surface)',
@@ -544,30 +677,32 @@ export function RecordSheet({
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[14px]"
-              style={{
-                border: '1.5px dashed var(--bar-quiet)',
-                background: 'var(--surface)',
-                color: 'var(--accent)',
-              }}
-            >
-              <svg
-                aria-hidden
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
+            {allGenres || genres.length <= TOP_GENRES ? (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[14px]"
+                style={{
+                  border: '1.5px dashed var(--bar-quiet)',
+                  background: 'var(--surface)',
+                  color: 'var(--accent)',
+                }}
               >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              <span className="text-[12px] font-semibold">追加</span>
-            </button>
+                <svg
+                  aria-hidden
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span className="text-[12px] font-semibold">追加</span>
+              </button>
+            ) : null}
           </div>
           {adding ? (
             <div className="flex items-center gap-2 px-1 pt-1">
@@ -600,90 +735,137 @@ export function RecordSheet({
               </button>
             </div>
           ) : null}
+          <span className="px-1 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+            よく使う順。店名を入れると、前回のカテゴリを先に選びます。
+          </span>
         </section>
       ) : null}
 
-      {kind === 'expense' && !edit ? (
-        <div className="rounded-2xl" style={{ background: 'var(--surface)' }}>
+      <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
+        {kind === 'expense' && !edit ? (
           <label className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
             <span className="flex flex-col">
-              <span className="text-[16px]">固定費にする</span>
-              <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                毎月の家賃・保険・サブスクなど
+              <span className="text-[16px]">毎月の固定費にする</span>
+              <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                家賃・保険・サブスクなど毎月同じ支払い
               </span>
             </span>
-            <Switch checked={fixed} onChange={setFixed} label="固定費にする" />
-          </label>
-        </div>
-      ) : null}
-      <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
-        {accounts.length >= 2 && !edit ? (
-          <label className="flex min-h-13 items-center gap-3 px-4">
-            <span className="shrink-0 text-[16px]">口座</span>
-            <select
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
-              style={{ color: 'var(--ink)' }}
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+            <Switch checked={fixed} onChange={setFixed} label="毎月の固定費にする" />
           </label>
         ) : null}
-        {kind === 'expense' ? (
-          <label
-            className="flex min-h-13 items-center gap-3 px-4"
-            style={
-              accounts.length >= 2 && !edit ? { borderTop: '1px solid var(--hairline)' } : undefined
-            }
-          >
-            <span className="shrink-0 text-[16px]">割り勘でもらった額</span>
-            <input
-              inputMode="numeric"
-              value={split}
-              placeholder="0"
-              autoComplete="off"
-              onChange={(e) => {
-                const digits = e.target.value.replace(/[^\d]/g, '');
-                setSplit(digits === '' ? '' : Number(digits).toLocaleString('ja-JP'));
-              }}
-              aria-label="割り勘でもらった額(円)"
-              className="tabular min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
-              style={{ color: 'var(--ink)' }}
-            />
-          </label>
-        ) : null}
-        <label
-          className="flex min-h-13 items-center gap-3 px-4"
+        {/* 割り勘・返金・口座・メモは「詳細」にたたむ(デザイン v3-4) */}
+        <button
+          type="button"
+          onClick={() => setMore(!more)}
+          aria-expanded={more}
+          className="flex min-h-13 items-center justify-between gap-3 px-4 py-2 text-left"
           style={
-            kind === 'expense' || (accounts.length >= 2 && !edit)
-              ? { borderTop: '1px solid var(--hairline)' }
-              : undefined
+            kind === 'expense' && !edit ? { borderTop: '1px solid var(--hairline)' } : undefined
           }
         >
-          <span className="shrink-0 text-[16px]">メモ</span>
-          <input
-            value={memo}
-            maxLength={200}
-            autoComplete="off"
-            placeholder="任意"
-            onChange={(e) => setMemo(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
-            style={{ color: 'var(--ink)' }}
-          />
-        </label>
+          <span className="flex flex-col">
+            <span className="text-[16px]">詳細</span>
+            <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+              {detailSummary}
+            </span>
+          </span>
+          <span
+            aria-hidden
+            style={{
+              color: 'var(--ink-muted)',
+              transform: more ? 'rotate(90deg)' : 'none',
+              transition: 'transform 150ms',
+            }}
+          >
+            ›
+          </span>
+        </button>
+        {more ? (
+          <>
+            {accounts.length >= 2 && !edit ? (
+              <label
+                className="flex min-h-13 items-center gap-3 px-4"
+                style={{ borderTop: '1px solid var(--hairline)' }}
+              >
+                <span className="shrink-0 text-[16px]">口座</span>
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+                  style={{ color: 'var(--ink)' }}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {kind === 'expense' ? (
+              <label
+                className="flex min-h-13 items-center gap-3 px-4"
+                style={{ borderTop: '1px solid var(--hairline)' }}
+              >
+                <span className="shrink-0 text-[16px]">割り勘でもらった額</span>
+                <input
+                  inputMode="numeric"
+                  value={split}
+                  placeholder="0"
+                  autoComplete="off"
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/[^\d]/g, '');
+                    setSplit(digits === '' ? '' : Number(digits).toLocaleString('ja-JP'));
+                  }}
+                  aria-label="割り勘でもらった額(円)"
+                  className="tabular min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+                  style={{ color: 'var(--ink)' }}
+                />
+              </label>
+            ) : null}
+            {kind !== 'income' ? (
+              <label
+                className="flex min-h-13 items-center justify-between gap-3 px-4"
+                style={{ borderTop: '1px solid var(--hairline)' }}
+              >
+                <span className="flex flex-col">
+                  <span className="text-[16px]">返金として記録</span>
+                  <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                    返品・返金。選んだカテゴリの使った額から差し引きます
+                  </span>
+                </span>
+                <Switch
+                  checked={kind === 'refund'}
+                  onChange={(on) => setKind(on ? 'refund' : 'expense')}
+                  label="返金として記録"
+                />
+              </label>
+            ) : null}
+            <label
+              className="flex min-h-13 items-center gap-3 px-4"
+              style={{ borderTop: '1px solid var(--hairline)' }}
+            >
+              <span className="shrink-0 text-[16px]">メモ</span>
+              <input
+                value={memo}
+                maxLength={200}
+                autoComplete="off"
+                placeholder="任意"
+                onChange={(e) => setMemo(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+                style={{ color: 'var(--ink)' }}
+              />
+            </label>
+          </>
+        ) : null}
       </div>
-      <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
-        {kind === 'refund'
-          ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'
-          : splitYen > 0 && amountYen > 0
-            ? `${amountYen.toLocaleString('ja-JP')}円（自分の分）として記録します。`
-            : '日付を先にすると「予定」として記録され、使った額には入りません。'}
-      </p>
+      {kind === 'refund' || (splitYen > 0 && amountYen > 0) ? (
+        <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
+          {kind === 'refund'
+            ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'
+            : `${amountYen.toLocaleString('ja-JP')}円（自分の分）として記録します。`}
+        </p>
+      ) : null}
       {edit?.footer ?? null}
     </div>
   );

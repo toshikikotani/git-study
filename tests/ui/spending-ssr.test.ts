@@ -228,7 +228,7 @@ describe('カテゴリ行(目標画面と共通)', () => {
     );
     expect(none).not.toContain('余裕');
     expect(none).not.toContain('順調');
-    expect(none).toContain('予算なし');
+    expect(none).toContain('目標なし');
   });
 });
 

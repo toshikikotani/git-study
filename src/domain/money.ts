@@ -72,7 +72,7 @@ export function spendableParts(remainingYen: number): {
     };
   }
   return {
-    prefix: '予算を',
+    prefix: '目標を',
     amount: `${Math.abs(remainingYen).toLocaleString('ja-JP')}円`,
     suffix: '超えている',
   };

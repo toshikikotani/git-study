@@ -166,7 +166,8 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain('着地見込み');
-    expect(html).toContain('カテゴリの進み具合');
+    // カテゴリの進み具合は 気をつけたい / 順調 / 目標なし に分ける(デザイン v3-6、ADR-108)
+    expect(html).toMatch(/気をつけたい|順調|目標なし/);
     // ペースは以前の「最近の支出の勢い」のグラフ(ADR-092)
     expect(html).toContain('最近の支出の勢い');
     expect(html.indexOf('最近の支出の勢い')).toBeGreaterThan(html.indexOf('ペース'));

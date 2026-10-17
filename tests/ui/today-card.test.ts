@@ -7,8 +7,8 @@ import { outlookLabel } from '../../app/(app)/_home/today-section';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
 
-describe('ホームの「今日」(デザイン仕様書、ADR-090)', () => {
-  it('今日使える目安 → 今期の見通し → 次の一手 の順に出す', () => {
+describe('ホームの「今日」(デザイン v3-1、ADR-108)', () => {
+  it('今日の目安 → 今期の見通し の順。言葉は「目標」にそろえる', () => {
     const text = visible(
       renderToString(
         h(TodayCard, {
@@ -21,51 +21,51 @@ describe('ホームの「今日」(デザイン仕様書、ADR-090)', () => {
             p90: 266000,
             budgetYen: 170000,
           },
-          suggestion: {
-            categoryId: 'dining',
-            categoryName: '外食',
-            perWeek: 1,
-            savedYen: 6600,
-            probBefore: 0.25,
-            probAfter: 0.4,
-          },
           probWithinBudget: 0.25,
           provisional: false,
-          monthKey: '2026-10',
+          tomorrowYen: 1320,
+          daysAfterToday: 19,
         }),
       ),
     );
-    expect(text).toContain('今日使える目安');
-    expect(text).toContain('1,900円');
+    expect(text).toContain('今日の目安');
+    expect(text).toContain('1,900円 使えます');
     expect(text).toContain('使わなかった分は明日に回ります。');
+    expect(text).toContain('明日からの目安1日 約1,300円');
     expect(text).toContain('今期の見通し');
     expect(text).toContain('10/1〜11/5 · 残り21日');
-    expect(text).toContain('約2.0万円 超えそう');
+    expect(text).toContain('約2.0万円 こえそう');
     expect(text).toContain('約19.0万円');
-    expect(text).toContain('/ 予算 17.0万円');
+    expect(text).toContain('/ 目標 17.0万円');
     expect(text).toContain('使った額 9.5万円');
-    expect(text).toContain('予算内に収まる確率 25%');
-    expect(text).toContain('詳しい見通し');
-    expect(text).toContain('外食を週1回へらす');
-    const order = ['今日使える目安', '今期の見通し', '次の一手'].map((s) => text.indexOf(s));
+    expect(text).toContain('目標内の確率 25%');
+    expect(text).toContain('分析で見る');
+    expect(text).not.toContain('予算');
+    const order = ['今日の目安', '今期の見通し'].map((s) => text.indexOf(s));
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  it('上限を超えたら、超えた額を文字で(色だけにしない)', () => {
+  it('こえた日は「9,389 円 こえています」と、何で多めだったか・明日からの目安を出す(文を途中で切らない)', () => {
     const text = visible(
       renderToString(
         h(TodayCard, {
-          today: { kind: 'over', capYen: 2400, spentYen: 3000, overYen: 600 },
+          today: { kind: 'over', capYen: 1000, spentYen: 10389, overYen: 9389 },
           outlook: null,
-          suggestion: null,
-          probWithinBudget: 0.3,
+          probWithinBudget: 0.01,
           provisional: true,
+          tomorrowYen: 1320,
+          daysAfterToday: 19,
+          todayTopNames: ['同窓会', 'スーパーセルフ熊谷SS'],
         }),
       ),
     );
-    expect(text).toContain('今日は目安を');
-    expect(text).toContain('600円 超え');
-    expect(text).toContain('記録が少ないので仮');
+    expect(text).toContain('今日の目安記録が少ないので仮');
+    expect(text).toContain('9,389円 こえています');
+    expect(text).toContain(
+      '同窓会とスーパーセルフ熊谷SSで、今日は多めの日です。こえた分は残り19日で少しずつならします。',
+    );
+    expect(text).toContain('明日からの目安');
+    expect(text).not.toContain('今日は目安を');
   });
 
   it('目標が無ければ、決め方を案内する', () => {
@@ -73,14 +73,11 @@ describe('ホームの「今日」(デザイン仕様書、ADR-090)', () => {
       h(TodayCard, {
         today: null,
         outlook: null,
-        suggestion: null,
         probWithinBudget: null,
         provisional: false,
       }),
     );
-    expect(visible(html)).toContain(
-      '目標(カテゴリごとの予算)を決めると、今日使える目安を出せます。',
-    );
+    expect(visible(html)).toContain('目標(カテゴリごとの額)を決めると、今日使える目安を出せます。');
     expect(html).toContain('href="/reports"');
   });
 

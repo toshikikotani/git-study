@@ -108,7 +108,7 @@ export function CategoryChart({
   const endNote =
     isCum && forecastEnd
       ? `月末 ${formatEstimate(forecastMid)}${
-          budgetLine !== null ? `・予算 ${formatEstimate(budgetLine, { approx: false })}` : ''
+          budgetLine !== null ? `・目標 ${formatEstimate(budgetLine, { approx: false })}` : ''
         }`
       : null;
   const maxYen = isCum
@@ -597,7 +597,7 @@ export function CategoryChart({
                 {p.kind === 'tag' ? (
                   <>
                     <span className="block">
-                      {p.key === 'allowance' ? '目安' : p.key === 'budget' ? '予算' : '平均'}
+                      {p.key === 'allowance' ? '目安' : p.key === 'budget' ? '目標' : '平均'}
                     </span>
                     <span className="block">
                       {formatAxisYen(
@@ -956,7 +956,7 @@ function CumulativeLegend({
               className="inline-block w-4"
               style={{ borderTop: '2px dotted var(--ink-secondary)' }}
             />,
-            '予算までの理想',
+            '目標までの理想',
           )
         : null}
       {budget
@@ -966,7 +966,7 @@ function CumulativeLegend({
               className="inline-block w-4"
               style={{ borderTop: '1.5px dashed var(--ink-secondary)' }}
             />,
-            '予算',
+            '目標',
           )
         : null}
       {scheduled

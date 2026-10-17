@@ -1,14 +1,12 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
-import { nextGoal } from '@/domain/savings';
 import { recordCheckin } from '@/features/checkins/store';
 import { shouldShowOnboarding } from '@/features/onboarding/store';
-import { loadSavingsSummary, type SavingsSummary } from '@/features/savings/store';
+import { loadSavingsSummary } from '@/features/savings/store';
 import { HomeBanners } from './_home/home-banners';
 import { HomeHeader } from './_home/home-header';
-import { RecentRecords } from './_home/recent-records';
-import type { SavingsCardProps } from './_home/savings-card';
+import { TodayRecords, UpcomingPayments } from './_home/recent-records';
 import { TodaySection } from './_home/today-section';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
@@ -38,21 +36,20 @@ export default async function HomePage() {
         <HomeBanners />
       </Suspense>
       <Suspense fallback={<TodaySkeleton />}>
-        <TodaySection savingsGoal={savingsGoal(savings)} />
+        <TodaySection
+          savingsNowYen={savings?.thisMonthYen ?? null}
+          upcoming={
+            <Suspense fallback={null}>
+              <UpcomingPayments />
+            </Suspense>
+          }
+        />
       </Suspense>
       <Suspense fallback={null}>
-        <RecentRecords />
+        <TodayRecords />
       </Suspense>
     </div>
   );
-}
-
-/** 貯金カードの目標(次の目標。無ければ null)。 */
-function savingsGoal(savings: SavingsSummary | null): SavingsCardProps['goal'] {
-  if (savings === null) return null;
-  const next = nextGoal(savings.goals);
-  if (next === null) return null;
-  return { title: next.goal.title, savedYen: next.savedYen, targetYen: next.goal.targetAmountYen };
 }
 
 /** 今日使える目安を読み込んでいる間の枠(高さを先に取り、下の段がずれないようにする)。 */
@@ -65,7 +62,7 @@ function TodaySkeleton() {
       style={{ background: 'var(--surface)' }}
     >
       <p className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
-        今日使える目安
+        今日の目安
       </p>
       <p className="mt-3 text-[15px]" style={{ color: 'var(--ink-muted)' }}>
         見込みを計算しています…

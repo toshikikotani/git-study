@@ -32,7 +32,7 @@ describe('VoiceOver の読み上げ', () => {
     expect(budgetSpokenLabel('外食', 10000, 7900)).toBe(
       '外食、7,900円のうち10,000円使用、2,100円超過',
     );
-    expect(budgetSpokenLabel('外食', 5000, null)).toBe('外食、5,000円使用、予算なし');
+    expect(budgetSpokenLabel('外食', 5000, null)).toBe('外食、5,000円使用、目標なし');
   });
 });
 

@@ -6,6 +6,7 @@
  */
 
 import { fetchQuickEntryGenres, type QuickEntryGenre } from '@/features/genre/store';
+import { fetchStoreGenres } from '@/features/transactions/store-genres';
 import { fetchUsualEntryHistory } from '@/features/transactions/usual-entries';
 import { suggestUsualEntries, type UsualEntryCandidate } from '@/domain/usual-entries';
 
@@ -24,4 +25,9 @@ export async function suggestUsualEntriesAction(
     genreName: row.genreId ? (genreNameById[row.genreId] ?? null) : null,
   }));
   return suggestUsualEntries(withNames, now, 3);
+}
+
+/** 店名 → 前回のカテゴリ(記録するで、店名を入れたらそのカテゴリを先に選ぶ、ADR-108)。 */
+export async function fetchStoreGenresAction(): Promise<[string, string][]> {
+  return fetchStoreGenres().catch(() => []);
 }

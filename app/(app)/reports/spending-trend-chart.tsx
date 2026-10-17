@@ -252,7 +252,7 @@ export function SpendingTrendChart({
         ) : null}
         {budgetPerDayYen != null && budgetPerDayYen > 0 ? (
           <span>
-            予算平均:{' '}
+            目標の平均:{' '}
             <strong style={{ color: 'var(--state-caution)' }}>
               {formatYen(budgetPerDayYen, { sign: 'never' })}
             </strong>
@@ -302,7 +302,7 @@ export function SpendingTrendChart({
                   'repeating-linear-gradient(90deg, var(--state-caution) 0 4px, transparent 4px 7px)',
               }}
             />
-            この点線は予算平均
+            この点線は目標の平均
           </span>
         ) : null}
       </div>

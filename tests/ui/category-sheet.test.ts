@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -28,7 +29,7 @@ vi.mock('../../app/(app)/reports/fixed-cost-actions', () => ({
 }));
 
 import { CategorySheetBody } from '../../app/(app)/category-sheet';
-import { RecordSheet } from '../../app/(app)/record-sheet';
+import { RecordSheet, visibleGenres } from '../../app/(app)/record-sheet';
 import { clearDraft, keepDraft } from '@/features/transactions/record-draft';
 
 const visible = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ');
@@ -37,6 +38,7 @@ const outlook = {
   genreId: 'dining',
   name: '外食',
   targetYen: 42500,
+  untargeted: false,
   spentYen: 22752,
   scheduledYen: 0,
   lastMonthYen: 11266,
@@ -57,6 +59,7 @@ const data = {
   remainingDays: 21,
   isFixed: false,
   showOnHome: true,
+  planTotalYen: 172000,
 };
 
 describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
@@ -72,17 +75,60 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
   });
 
   it('目標額は使った額が下限。「使った分だけ」の選択肢があり、下限より下の選択肢は出さない', () => {
-    expect(html).toContain('下限 22,752円（使った額）');
+    expect(html).toContain('下限 22,752円  （使った額）');
     expect(html).toContain('いまのまま');
     expect(html).toContain('20%へらす');
     expect(html).toContain('使った分だけ');
     expect(html).toContain('このままだと約1,500円こえそう');
   });
 
-  it('設定:名前・マーク・色、固定費にする、ホームに表示', () => {
+  it('設定:名前・マーク・色、ホームに表示。固定費は記録ごとに決める(カテゴリごと固定費は外せる、ADR-108)', () => {
     expect(html).toContain('名前・マーク・色');
-    expect(html).toContain('固定費にする');
     expect(html).toContain('ホームに表示');
+    expect(html).toContain('固定費はカテゴリではなく、記録ごとに決めます(毎月の支払いだけ)。');
+    expect(html).not.toContain('カテゴリごと固定費');
+    const fixed = visible(
+      renderToString(
+        h(CategorySheetBody, {
+          data: { ...data, isFixed: true },
+          onCancel: () => {},
+          onDone: () => {},
+        }),
+      ),
+    );
+    expect(fixed).toContain('カテゴリごと固定費');
+  });
+
+  it('下限は使った額と予定の合計。こえたら知らせ、目標を上げる・このままにするを選べる(デザイン v3-5、ADR-108)', () => {
+    const hobby = visible(
+      renderToString(
+        h(CategorySheetBody, {
+          data: {
+            ...data,
+            outlook: {
+              ...outlook,
+              name: '娯楽・趣味',
+              targetYen: 33300,
+              spentYen: 41590,
+              scheduledYen: 6000,
+              p50: 47590,
+            },
+          },
+          onCancel: () => {},
+          onDone: () => {},
+        }),
+      ),
+    );
+    expect(hobby).toContain('これまで 41,590円 · 予定 6,000円');
+    expect(hobby).toContain('目標 33,300円を 8,290円 こえています');
+    expect(hobby).toContain('予定(6,000円)を入れると、14,290円 こえる見込みです。');
+    expect(hobby).toContain('どうしますか？');
+    expect(hobby).toContain('今期の目標を上げる');
+    expect(hobby).toContain('このままにする');
+    expect(hobby).toContain('下限 47,590円  （使った額 41,590 ＋ 予定 6,000）');
+    expect(hobby).toContain('予定まで');
+    expect(hobby).toContain('少し余裕');
+    expect(hobby).toContain('今期の目標の合計は 約18.7万円 になります');
   });
 
   it('目標が無ければ、目標額の代わりに作り方を案内する', () => {
@@ -111,8 +157,11 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
     expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
-    expect(html).toContain('固定費にする');
-    expect(html).toContain('日付を先にすると「予定」として記録され、使った額には入りません。');
+    expect(html).toContain('毎月の固定費にする');
+    // 種類は支出・収入の2つ。返金・割り勘・メモは「詳細」にたたむ(デザイン v3-4、ADR-108)
+    expect(html).toContain('詳細');
+    expect(html).toContain('割り勘・返金・メモ');
+    expect(html).toContain('よく使う順。店名を入れると、前回のカテゴリを先に選びます。');
     // メモ・ほかの記録のしかたは出さない(「…」のメニューにある)
     expect(html).not.toContain('店・メモ');
     expect(html).not.toContain('スクショから記録');
@@ -197,7 +246,10 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
 
   it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {
     const raw = sheet();
-    expect(raw.match(/autoComplete="off"/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // レシート名(メモ・割り勘は「詳細」を開いたときに出る。どれも自動入力を止める)
+    expect(raw.match(/autoComplete="off"/gi)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src.match(/autoComplete="off"/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 
   it('保存は金額が無くても押せる(押すと足りないものを伝える。黙って効かないボタンにしない)', () => {
@@ -243,7 +295,46 @@ describe('記録を直す:記録すると同じ画面(ADR-101)', () => {
     expect(text).toContain('レシートの品目');
   });
 
-  it('割り勘でもらった額を入れられる(記録するでも同じ)', () => {
-    expect(text).toContain('割り勘でもらった額');
+  it('割り勘でもらった額を入れられる(記録するでも同じ。「詳細」の中)', () => {
+    expect(text).toContain('割り勘・返金・メモ');
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src).toContain('割り勘でもらった額');
+  });
+});
+
+describe('記録するをシンプルに(デザイン v3-4、ADR-108)', () => {
+  const genres = Array.from({ length: 23 }, (_, i) => ({ id: `g${i}`, name: `カテゴリ${i}` }));
+
+  it('カテゴリは、よく使う順の8個と「すべて」', () => {
+    expect(visibleGenres(genres, null, false).map((g) => g.id)).toEqual([
+      'g0',
+      'g1',
+      'g2',
+      'g3',
+      'g4',
+      'g5',
+      'g6',
+      'g7',
+    ]);
+    expect(visibleGenres(genres, null, true)).toHaveLength(23);
+  });
+
+  it('選んだカテゴリが8個に無ければ、8個目と入れかえて見せる', () => {
+    expect(visibleGenres(genres, 'g15', false).map((g) => g.id)).toEqual([
+      'g0',
+      'g1',
+      'g2',
+      'g3',
+      'g4',
+      'g5',
+      'g6',
+      'g15',
+    ]);
+  });
+
+  it('店名を入れると、前回その店で選んだカテゴリを先に選ぶ(本人が選んでいなければ)', () => {
+    const src = readFileSync('app/(app)/record-sheet.tsx', 'utf8');
+    expect(src).toContain('storeGenreCache?.get(comparableKey(value))');
+    expect(src).toContain("if (genreTouched.current || kind === 'income') return;");
   });
 });

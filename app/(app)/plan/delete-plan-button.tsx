@@ -36,7 +36,7 @@ export function DeletePlanButton({ planId }: { planId: string }) {
             この目標を削除しますか?
           </p>
           <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
-            目標の予算と期間が消えます。記録した明細は消えません。
+            目標の額と期間が消えます。記録した明細は消えません。
           </p>
           {error ? (
             <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>

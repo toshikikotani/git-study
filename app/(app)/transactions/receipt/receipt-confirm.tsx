@@ -555,7 +555,7 @@ export function ReceiptConfirm({
             目標の扱い
           </span>
           <div className="flex gap-1 rounded-full p-1" style={{ background: 'var(--plane)' }}>
-            {([['normal', '目標の予算に含める']] as const).map(([value, label]) => (
+            {([['normal', '目標に含める']] as const).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -591,11 +591,11 @@ export function ReceiptConfirm({
             <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
               {choice.reason === 'scheduled'
                 ? '今日より先の日付です。'
-                : 'このカテゴリの予算の半分以上になる支払いです。'}
+                : 'このカテゴリの目標の半分以上になる支払いです。'}
               目標の扱いを選んでください
             </p>
             <div className="mt-2 flex gap-2">
-              {([['normal', '目標の予算に含める']] as const).map(([value, label]) => (
+              {([['normal', '目標に含める']] as const).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -912,7 +912,7 @@ function GoalImpactView({ impact }: { impact: ReturnType<typeof goalImpact> }) {
       aria-label="目標への影響"
     >
       <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
-        目標への影響(保存前 → 保存後の残り予算)
+        目標への影響(保存前 → 保存後の目標の残り)
       </p>
       {!impact.counts && impact.reason !== 'included' ? (
         <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>

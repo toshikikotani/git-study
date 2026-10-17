@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache';
 
 import { parseYen } from '@/domain/money';
 import { abandonGoal, achieveGoal, createGoal, GoalStoreError } from '@/features/goals/store';
+import { updateAppSettings } from '@/features/settings/store';
 import { AppError } from '@/lib/errors';
 
 export type GoalFormState = { error: string | null };
@@ -65,5 +66,27 @@ export async function abandonGoalAction(goalId: string): Promise<{ error: string
     };
   }
   done();
+  return { error: null };
+}
+
+/** 毎月の貯金目標の上限(1000万円)。桁の打ち間違いを保存しない。 */
+const MAX_MONTHLY_TARGET_YEN = 10_000_000;
+
+/**
+ * 毎月の貯金目標を決める・直す(ADR-108)。ホームの貯金カードとAIの窓口が同じ値を見る(設定の1か所)。
+ * 0 は「決めていない」。
+ */
+export async function updateMonthlySavingsTargetAction(
+  amountYen: number,
+): Promise<{ error: string | null }> {
+  if (!Number.isInteger(amountYen) || amountYen < 0 || amountYen > MAX_MONTHLY_TARGET_YEN) {
+    return { error: '毎月の貯金目標は、0円から1,000万円までの整数で入れてください。' };
+  }
+  try {
+    await updateAppSettings({ monthlySavingsTargetYen: amountYen });
+  } catch (error) {
+    return { error: errorMessage(error, '貯金目標を保存できませんでした。') };
+  }
+  revalidatePath('/', 'layout');
   return { error: null };
 }

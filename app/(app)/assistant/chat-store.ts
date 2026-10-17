@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import type { AssistantChange } from '@/features/assistant/chat-tools';
+import type { WhatIfCard } from '@/domain/forecast/what-if-spend';
 import type { AskUserQuestion, ProposedChange } from '@/features/assistant/plan';
 import {
   recordChangeOf,
@@ -40,6 +41,8 @@ export type Message = {
   };
   /** 画面へ移るボタン。 */
   links?: ScreenLink[];
+  /** もし使ったらの前 → 後(simulate_spend、ADR-108)。 */
+  whatIf?: WhatIfCard;
 };
 
 type ChatState = { messages: Message[]; sending: boolean; error: string | null };
@@ -128,6 +131,7 @@ async function deliver(messages: Message[]): Promise<void> {
       proposal?: { changes: ProposedChange[] } | null;
       question?: AskUserQuestion | null;
       links?: ScreenLink[];
+      whatIf?: WhatIfCard | null;
     };
     const changes = result.proposal?.changes ?? [];
     const links = result.links ?? [];
@@ -148,6 +152,7 @@ async function deliver(messages: Message[]): Promise<void> {
               }
             : {}),
           ...(links.length > 0 ? { links } : {}),
+          ...(result.whatIf ? { whatIf: result.whatIf } : {}),
         },
       ],
     }));

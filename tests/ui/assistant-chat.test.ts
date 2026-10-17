@@ -46,17 +46,81 @@ describe('AIの窓口:下のAIボタンから開くシート(ADR-103)', () => {
   });
 });
 
-describe('どこからでも開ける:下のメニューにAIボタン(ADR-103)', () => {
+describe('AIはタブなので、ふつうの画面で開く(デザイン v3、ADR-108)', () => {
   const shell = readFileSync('app/(app)/app-shell.tsx', 'utf8');
 
-  it('ボトムバーにAIのボタンがあり、シートで AssistantChat を開く', () => {
-    expect(shell).toContain('<AiIcon />');
-    expect(shell).toContain('onClick={() => setAiOpen(true)}');
-    expect(shell).toMatch(/<BottomSheet open=\{aiOpen\}[\s\S]*?<AssistantChat/);
+  it('下のタブに「AI」(/assistant へ移る)。シートでは開かない', () => {
+    expect(shell).toContain("{ href: '/assistant', label: 'AI', Icon: AiIcon }");
+    expect(shell).not.toContain('setAiOpen');
+    expect(shell).not.toContain('<AssistantChat');
   });
 
-  it('画面へのボタンを押したら、シートを閉じてその画面へ移る', () => {
-    expect(shell).toMatch(/onNavigate=\{\(href\) => \{\s*setAiOpen\(false\);/);
+  it('画面の題は大きく「AI」。おすすめの質問を入力欄の上に並べる', () => {
+    const raw = renderToString(h(AssistantChat, { variant: 'page' }));
+    expect(raw).toMatch(/<h1[^>]*>AI<\/h1>/);
+    expect(raw).toContain('aria-label="おすすめの質問"');
+    expect(visible(raw)).toContain('今日いくらまで使える？');
+    expect(visible(raw)).toContain('あと3,000円使ったら？');
+  });
+
+  it('入力欄がタブバーに重ならない高さ(上の余白と下のタブバーを除く)', () => {
+    const source = readFileSync('app/(app)/assistant/assistant-chat.tsx', 'utf8');
+    expect(source).toContain(
+      "'calc(100dvh - max(5.5rem, calc(3.5rem + env(safe-area-inset-top))) - 6rem - env(safe-area-inset-bottom))'",
+    );
+  });
+});
+
+describe('「やばい？」に見通しの数字で答え、次の操作ボタンを出す(デザイン v3-3、ADR-108)', () => {
+  const card = {
+    amountYen: 3000,
+    genreName: null,
+    rows: [
+      { label: '着地見込み', before: '約20.6万円', after: '約20.9万円' },
+      { label: '明日からの目安', before: '1,320円', after: '1,160円' },
+      { label: '月末の貯金', before: '+8.3万円', after: '+8.0万円' },
+    ],
+    verdict: 'この額なら、今期の見通しはほとんど変わりません。',
+    computedAt: '10/17 12:35',
+  };
+
+  it('前 → 後の表、「予定に入れる」「金額を変えて試す」、何時点の見通しかを出す', () => {
+    const text = visible(
+      renderToString(
+        h(Bubble, {
+          message: {
+            role: 'assistant',
+            content: 'あと3,000円なら、見通しはほとんど変わりません。',
+            whatIf: card,
+          },
+          busy: false,
+          onRetry: () => {},
+          onAnswer: () => {},
+          onToggle: () => {},
+          onEdit: () => {},
+          onPickStore: () => {},
+          onRecordSpend: () => {},
+          onTryAmounts: () => {},
+          onApply: () => {},
+          onCancel: () => {},
+          onGo: () => {},
+        }),
+      ),
+    );
+    expect(text).toContain('着地見込み');
+    expect(text).toContain('約20.6万円');
+    expect(text).toContain('約20.9万円');
+    expect(text).toContain('3,000円を予定に入れる');
+    expect(text).toContain('金額を変えて試す');
+    expect(text).toContain('アプリの見通し(10/17 12:35時点)をもとに回答');
+  });
+
+  it('サーバーは simulate_spend をホームと同じ予測で計算し、カードを返事につける', () => {
+    const route = readFileSync('app/api/assistant/chat/route.ts', 'utf8');
+    expect(route).toContain("name: 'simulate_spend'");
+    expect(route).toContain('whatIf: found.whatIf');
+    const tool = readFileSync('src/features/assistant/what-if-tool.ts', 'utf8');
+    expect(tool).toContain('simulateTodaySpends(');
   });
 });
 

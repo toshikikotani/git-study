@@ -21,7 +21,7 @@ describe('次の一手とグラフの金額(デザイン仕様書)', () => {
     const html = visible(renderToString(h(NextStepCard, { suggestion })));
     expect(html).toContain('次の一手');
     expect(html).toContain('外食を週1回へらす');
-    expect(html).toContain('月末の支出が約5,100円へり、予算内の確率は41% → 52%に。');
+    expect(html).toContain('月末の支出が約5,100円へり、目標内の確率は41% → 52%に。');
     expect(html).toContain('外食の見通しを見る');
     // 画面を移らずシートを開くので、リンクではなくボタン
     expect(renderToString(h(NextStepCard, { suggestion }))).not.toContain('href=');

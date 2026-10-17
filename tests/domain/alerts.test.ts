@@ -126,7 +126,7 @@ describe('detectWastefulBudget(FR-20)', () => {
     );
     expect(alert).not.toBeNull();
     expect(alert!.kind).toBe('waste_budget_70');
-    expect(alert!.title).toBe('浪費が予算の70%に達しました');
+    expect(alert!.title).toBe('浪費が目標の70%に達しました');
     expect(alert!.body).toMatch(/3,000円/);
     expect(alert!.dedupKey).toBe('waste_budget_70:c1:2026-09');
   });
@@ -257,7 +257,7 @@ describe('buildMonthlyRecapAlert(P6-1)', () => {
     expect(alert.title).toBe('2026年9月の振り返り');
     expect(alert.body).toMatch(/今月の貯金: 50,000円/);
     expect(alert.body).toMatch(/副業収入: 30,000円/);
-    expect(alert.body).toMatch(/浪費: 15,000円\(予算の75%\)/);
+    expect(alert.body).toMatch(/浪費: 15,000円\(目標の75%\)/);
     expect(alert.dedupKey).toBe('monthly_recap:2026-09');
   });
 
@@ -280,7 +280,7 @@ describe('buildMonthlyRecapAlert(P6-1)', () => {
         { name: '浪費', status: status({ budgetYen: null, usageRatio: null, spentYen: 3_000 }) },
       ],
     });
-    expect(alert.body).toMatch(/浪費: 3,000円\(予算なし\)/);
+    expect(alert.body).toMatch(/浪費: 3,000円\(目標なし\)/);
   });
 
   it('月が変わると dedup_key も変わる', () => {

@@ -29,7 +29,7 @@ export default async function AiSettingsPage() {
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         レシートの読み取り・分類、AIレポート、家計アシスタントなど、AIを使う機能を
-        まとめてオン/オフできます。オフにしても、記録・集計・予算などアプリの
+        まとめてオン/オフできます。オフにしても、記録・集計・目標などアプリの
         基本機能はすべて変わらず使えます。
       </p>
 

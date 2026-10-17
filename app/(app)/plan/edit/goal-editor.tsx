@@ -32,7 +32,7 @@ function dayLabel(date: string): string {
 }
 
 /**
- * 合計が total になるように配り直す。各カテゴリは下限(使った額)を下回らない。下限を超える分を、
+ * 合計が total になるように配り直す。各カテゴリは下限(使った額と予定)を下回らない。下限を超える分を、
  * 今の割合で配る(端数は大きい順に1円ずつ)。total が下限の合計より小さければ、下限の合計にする。
  */
 function scaleTo(
@@ -97,8 +97,10 @@ export function GoalEditor({
 }) {
   const router = useRouter();
   const saved = Object.fromEntries(categories.map((c) => [c.genreId, c.targetYen ?? 0]));
-  // 使った額(カテゴリの下限)と、使った額と予定の合計(総額の下限)。
-  const floors = Object.fromEntries(categories.map((c) => [c.genreId, c.spentYen]));
+  // カテゴリの下限も総額の下限も、使った額と予定の合計(デザイン v3-5、ADR-108)。
+  const floors = Object.fromEntries(
+    categories.map((c) => [c.genreId, c.spentYen + c.scheduledYen]),
+  );
   const totalFloor = categories.reduce((s, c) => s + c.spentYen + c.scheduledYen, 0);
   const [amounts, setAmounts] = useState<Record<string, number>>(saved);
   const [totalText, setTotalText] = useState<string | null>(null);
@@ -122,7 +124,7 @@ export function GoalEditor({
   const proposal = Object.fromEntries(
     flagged.map((c) => [
       c.genreId,
-      Math.max(c.spentYen, Math.round((c.targetYen ?? 0) * (1 - CUT))),
+      Math.max(c.spentYen + c.scheduledYen, Math.round((c.targetYen ?? 0) * (1 - CUT))),
     ]),
   );
   const proposedTotal =
@@ -210,7 +212,7 @@ export function GoalEditor({
             <div className="tabular flex items-baseline justify-between gap-2">
               <span className="text-[28px] font-bold">{formatEstimate(landing.p50)}</span>
               <span className="text-[15px]">
-                予算内の確率 <strong>{formatProbability(landing.probWithin)}</strong>
+                目標内の確率 <strong>{formatProbability(landing.probWithin)}</strong>
               </span>
             </div>
             <span className="tabular text-[13px] opacity-85">
@@ -545,6 +547,7 @@ export function GoalEditor({
               remainingDays,
               isFixed: settings[editingCategory.genreId]?.isFixed ?? false,
               showOnHome: settings[editingCategory.genreId]?.showOnHome ?? false,
+              planTotalYen: Object.values(amounts).reduce((sum, v) => sum + v, 0),
             }}
             amountYen={amounts[editingCategory.genreId] ?? 0}
             onCancel={() => setEditing(null)}

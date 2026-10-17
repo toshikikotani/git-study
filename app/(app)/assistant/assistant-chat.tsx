@@ -7,7 +7,9 @@ import type { AskUserQuestion } from '@/features/assistant/plan';
 import { recordFromEdit, type StoreCandidate } from '@/features/assistant/record-change';
 import { comparableKey } from '@/domain/store-name';
 import { useSpeechInput } from '@/lib/speech-input';
-import { RecordSheet } from '../record-sheet';
+import type { WhatIfCard } from '@/domain/forecast/what-if-spend';
+import { WhatIfSheet } from '../_home/what-if-sheet';
+import { cachedRecordGenres, RecordSheet, useOpenRecord } from '../record-sheet';
 import { refreshAllAction } from '../refresh-actions';
 import {
   answerQuestion,
@@ -33,12 +35,24 @@ import {
  * (ADR-105)。
  */
 
+/** おすすめの質問(入力欄の上に並べる、デザイン v3-3)。 */
 const SUGGESTIONS = [
+  '今日いくらまで使える？',
+  'あと3,000円使ったら？',
+  '貯金目標に届く？',
   'コンビニで500円使った',
-  '今月はあといくら使える？',
-  '食費をもう少し抑えたい',
-  '固定費を見直したい',
+  '外食をへらすと？',
 ];
+
+/**
+ * /assistant の画面の高さ:上の余白と、下のタブバー(と安全域)を除いた高さ。タブバーに入力欄が重ならない
+ * (本人の指摘「タブバーが画面下の文字に重なる」、ADR-108)。下の余白(main の pb)のぶんは負の余白で打ち消す。
+ */
+const PAGE_STYLE = {
+  height:
+    'calc(100dvh - max(5.5rem, calc(3.5rem + env(safe-area-inset-top))) - 6rem - env(safe-area-inset-bottom))',
+  marginBottom: '-5rem',
+} as const;
 
 export function AssistantChat({
   variant,
@@ -58,6 +72,17 @@ export function AssistantChat({
   const speech = useSpeechInput((text) => void send(text));
   /** 直している記録の案(どの発言の、何件目か)。 */
   const [editing, setEditing] = useState<{ message: number; change: number } | null>(null);
+  /** 「金額を変えて試す」で開くもし使ったらの、最初の額。 */
+  const [trying, setTrying] = useState<number | null>(null);
+  const openRecord = useOpenRecord();
+  // 「予定に入れる」:その額を入れた「記録する」を開く(保存は本人が押す、ADR-108)。
+  const recordSpend = (card: WhatIfCard) => {
+    const genreId =
+      card.genreName === null
+        ? null
+        : (cachedRecordGenres()?.find((g) => g.name === card.genreName)?.id ?? null);
+    openRecord?.({ amountYen: card.amountYen, genreId });
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -117,37 +142,48 @@ export function AssistantChat({
 
   return (
     <div
-      className={
-        variant === 'sheet'
-          ? 'flex h-[84dvh] flex-col gap-2'
-          : 'rise flex h-[calc(100dvh-9.5rem)] flex-col gap-2'
-      }
-      style={{ color: 'var(--ink)' }}
+      className={variant === 'sheet' ? 'flex h-[84dvh] flex-col gap-2' : 'rise flex flex-col gap-2'}
+      style={variant === 'sheet' ? { color: 'var(--ink)' } : { ...PAGE_STYLE, color: 'var(--ink)' }}
     >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-        <button
-          type="button"
-          onClick={resetChat}
-          disabled={sending || messages.length === 0}
-          className="flex min-h-11 items-center justify-self-start text-[15px] disabled:opacity-40"
-          style={{ color: 'var(--accent)' }}
-        >
-          新しい会話
-        </button>
-        <span className="text-[17px] font-semibold">AI</span>
-        {onClose ? (
+      {variant === 'page' ? (
+        <header className="flex items-center justify-between gap-2 px-1">
+          <h1 className="text-[34px] font-bold">AI</h1>
           <button
             type="button"
-            onClick={onClose}
-            className="flex min-h-11 items-center justify-self-end text-[17px] font-semibold"
+            onClick={resetChat}
+            disabled={sending || messages.length === 0}
+            className="min-h-11 rounded-full px-4 text-[15px] font-semibold disabled:opacity-40"
+            style={{ background: 'var(--surface)', color: 'var(--accent)' }}
+          >
+            新しい会話
+          </button>
+        </header>
+      ) : (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+          <button
+            type="button"
+            onClick={resetChat}
+            disabled={sending || messages.length === 0}
+            className="flex min-h-11 items-center justify-self-start text-[15px] disabled:opacity-40"
             style={{ color: 'var(--accent)' }}
           >
-            閉じる
+            新しい会話
           </button>
-        ) : (
-          <span />
-        )}
-      </div>
+          <span className="text-[17px] font-semibold">AI</span>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex min-h-11 items-center justify-self-end text-[17px] font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              閉じる
+            </button>
+          ) : (
+            <span />
+          )}
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto overscroll-contain pb-2">
         {messages.length === 0 ? (
@@ -157,21 +193,9 @@ export function AssistantChat({
               style={{ background: 'var(--surface)', color: 'var(--ink-secondary)' }}
             >
               記録・質問・設定の変更・画面の案内まで、話しかけるだけでできます。マイクで声でも。
+              「あと3,000円使ったら？」には、アプリの見通しの数字で答えます。
               記録や変更は、確認カードで「反映」を押すまで行いません。
             </p>
-            <div className="flex flex-col gap-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => void send(s)}
-                  className="min-h-11 rounded-2xl px-4 py-3 text-left text-[15px]"
-                  style={{ background: 'var(--surface)', color: 'var(--ink)' }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           messages.map((m, i) => (
@@ -184,6 +208,8 @@ export function AssistantChat({
               onToggle={(changeIndex) => toggleChange(i, changeIndex)}
               onEdit={(changeIndex) => setEditing({ message: i, change: changeIndex })}
               onPickStore={(changeIndex, store) => pickStore(i, changeIndex, store)}
+              onRecordSpend={(card) => recordSpend(card)}
+              onTryAmounts={(amountYen) => setTrying(amountYen)}
               onApply={() => void applyProposal(i, applied)}
               onCancel={() => cancelProposal(i)}
               onGo={go}
@@ -214,6 +240,33 @@ export function AssistantChat({
           </p>
         ) : null}
       </div>
+
+      {/* おすすめの質問(横に流す。押すとそのまま送る) */}
+      <div
+        role="group"
+        aria-label="おすすめの質問"
+        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {SUGGESTIONS.map((q) => (
+          <button
+            key={q}
+            type="button"
+            disabled={sending}
+            onClick={() => void send(q)}
+            className="min-h-11 shrink-0 rounded-full px-4 text-[14px] whitespace-nowrap disabled:opacity-40"
+            style={{ background: 'var(--surface)', color: 'var(--ink)' }}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+
+      <WhatIfSheet
+        open={trying !== null}
+        onClose={() => setTrying(null)}
+        initialAmountYen={trying ?? undefined}
+      />
 
       <form
         onSubmit={(e) => {
@@ -278,6 +331,8 @@ export function Bubble({
   onToggle,
   onEdit,
   onPickStore,
+  onRecordSpend,
+  onTryAmounts,
   onApply,
   onCancel,
   onGo,
@@ -289,6 +344,10 @@ export function Bubble({
   onToggle: (changeIndex: number) => void;
   onEdit: (changeIndex: number) => void;
   onPickStore: (changeIndex: number, store: StoreCandidate) => void;
+  /** もし使ったらのカードの「予定に入れる」。 */
+  onRecordSpend?: (card: WhatIfCard) => void;
+  /** もし使ったらのカードの「金額を変えて試す」。 */
+  onTryAmounts?: (amountYen: number) => void;
   onApply: () => void;
   onCancel: () => void;
   onGo: (href: string) => void;
@@ -356,6 +415,14 @@ export function Bubble({
           />
         ) : null}
 
+        {message.whatIf ? (
+          <WhatIfAnswer
+            card={message.whatIf}
+            onRecord={onRecordSpend ? () => onRecordSpend(message.whatIf!) : undefined}
+            onTry={onTryAmounts ? () => onTryAmounts(message.whatIf!.amountYen) : undefined}
+          />
+        ) : null}
+
         {message.links && message.links.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {message.links.map((l) => (
@@ -373,6 +440,66 @@ export function Bubble({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * もし使ったらの前 → 後(AIの答えに添える、デザイン v3-3)。数字はホームと同じ予測。
+ * 「予定に入れる」でその額を入れた「記録する」、「金額を変えて試す」でもし使ったらのシートを開く。
+ */
+function WhatIfAnswer({
+  card,
+  onRecord,
+  onTry,
+}: {
+  card: WhatIfCard;
+  onRecord: (() => void) | undefined;
+  onTry: (() => void) | undefined;
+}) {
+  return (
+    <div className="space-y-2 rounded-2xl p-3" style={{ background: 'var(--plane)' }}>
+      <div className="flex flex-col rounded-xl px-3 py-1" style={{ background: 'var(--surface)' }}>
+        {card.rows.map((r, i) => (
+          <div
+            key={r.label}
+            className="tabular grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 py-2 text-[14px]"
+            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+          >
+            <span style={{ color: 'var(--ink-secondary)' }}>{r.label}</span>
+            <span style={{ color: 'var(--ink-muted)' }}>{r.before}</span>
+            <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+              →
+            </span>
+            <strong>{r.after}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {onRecord ? (
+          <button
+            type="button"
+            onClick={onRecord}
+            className="min-h-11 rounded-full px-2 text-[14px] font-semibold"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            {card.amountYen.toLocaleString('ja-JP')}円を予定に入れる
+          </button>
+        ) : null}
+        {onTry ? (
+          <button
+            type="button"
+            onClick={onTry}
+            className="min-h-11 rounded-full px-2 text-[14px] font-semibold"
+            style={{ background: 'var(--surface)', color: 'var(--accent)' }}
+          >
+            金額を変えて試す
+          </button>
+        ) : null}
+      </div>
+      <p className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+        アプリの見通し({card.computedAt}時点)をもとに回答
+      </p>
     </div>
   );
 }

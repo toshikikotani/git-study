@@ -180,7 +180,7 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
               <dd className="tabular text-base font-semibold" style={{ color: 'var(--ink)' }}>
                 {freeYen >= 0
                   ? formatYen(freeYen, { sign: 'never' })
-                  : `${formatYen(-freeYen, { sign: 'never' })} 超え`}
+                  : `${formatYen(-freeYen, { sign: 'never' })} こえ`}
               </dd>
             </div>
           ) : null}
@@ -236,7 +236,7 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
           {option.exceedance !== null ? (
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-3">
-                <dt style={{ color: ON_DARK_SOFT }}>{view.categoryName}が目標を超える</dt>
+                <dt style={{ color: ON_DARK_SOFT }}>{view.categoryName}が目標をこえる</dt>
                 <dd className="tabular text-base font-semibold">
                   {formatTimesInTen(option.exceedance)}
                 </dd>
@@ -251,7 +251,7 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
           {option.probWithinBudget !== null ? (
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-3">
-                <dt style={{ color: ON_DARK_SOFT }}>全体で予算に収まる</dt>
+                <dt style={{ color: ON_DARK_SOFT }}>全体で目標に収まる</dt>
                 <dd className="tabular text-base font-semibold">
                   {formatTimesInTen(option.probWithinBudget)}
                 </dd>
@@ -276,7 +276,7 @@ export function WhatIfCard({ view }: { view: CategoryWhatIfView }) {
           <p role="status" className="text-sm">
             {labelOf(option.perWeek)}と、{formatEstimate(option.savedYen)}少なくなる見込み
             {option.probWithinBudget !== null && usual.probWithinBudget !== null
-              ? `。予算に収まる確率 ${formatProbability(usual.probWithinBudget)} → ${formatProbability(option.probWithinBudget)}`
+              ? `。目標に収まる確率 ${formatProbability(usual.probWithinBudget)} → ${formatProbability(option.probWithinBudget)}`
               : ''}
           </p>
         ) : null}
@@ -408,7 +408,7 @@ function StopCard({
       </p>
       {o.probWithinBudget !== null ? (
         <p className="tabular text-xs" style={{ color: 'var(--ink-secondary)' }}>
-          予算に収まる {formatTimesInTen(o.probWithinBudget)}
+          目標に収まる {formatTimesInTen(o.probWithinBudget)}
         </p>
       ) : null}
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>

@@ -5,6 +5,7 @@
 
 import type { ForecastScope } from '@/domain/forecast/pipeline';
 import type { CategoryTarget } from '@/domain/forecast/simulate';
+import { ADDED_FROM_SPENDING } from '@/features/spending-plan/markers';
 import type { SpendingPlan } from '@/features/spending-plan/store';
 import type { DateOnly } from '@/lib/date';
 
@@ -25,10 +26,14 @@ export function goalForecastArgs(plan: SpendingPlan | null): GoalForecastArgs | 
     period: { from: plan.periodStart, to: plan.periodEnd },
     budgetYen,
     scope: {},
-    categoryTargets: items.map((item) => ({
-      categoryId: item.genreId,
-      categoryName: item.genreName,
-      targetYen: item.targetYen,
-    })),
+    // 「期間中の支出から追加」の行は、使った額がそのまま目標なので、カテゴリの目標には入れない
+    // (こえる確率が誤って高く出る、ADR-108)。目標の合計には入れたまま。
+    categoryTargets: items
+      .filter((item) => item.reason !== ADDED_FROM_SPENDING)
+      .map((item) => ({
+        categoryId: item.genreId,
+        categoryName: item.genreName,
+        targetYen: item.targetYen,
+      })),
   };
 }

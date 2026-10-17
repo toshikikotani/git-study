@@ -2,7 +2,8 @@ import { todayAllowance } from '@/domain/forecast/today';
 import { calendarContext } from '@/domain/forecast/calendar';
 import { loadTodayForecasts, todayCapYen } from '@/features/home/today-forecasts';
 import { daysBetween, splitDateOnly } from '@/lib/date';
-import { SavingsCard, type SavingsCardProps } from './savings-card';
+import { SavingsCard } from './savings-card';
+import { WhatIfButton } from './what-if-sheet';
 import { shortDate, TodayCard } from './today-card';
 
 /** 「10月の見通し」(暦の1か月の目標)/「10月14日までの見通し」(それ以外)。 */
@@ -25,9 +26,16 @@ function dayLabel(date: string): string {
  * 次の一手は目標の範囲。月末に残る見込みは今月のすべての支出と収入。
  * 予測はAIの窓口と同じところ(loadTodayForecasts、ADR-106)から受け取る。
  */
-export async function TodaySection({ savingsGoal }: { savingsGoal: SavingsCardProps['goal'] }) {
-  const { today, monthPeriod, goal, goalView, monthView, payday } = await loadTodayForecasts();
-  const monthFrom = monthPeriod.from;
+export async function TodaySection({
+  savingsNowYen,
+  upcoming,
+}: {
+  savingsNowYen: number | null;
+  /** 今期の見通しと貯金のあいだに出す「これからの支払い」(デザイン v3-1)。 */
+  upcoming?: React.ReactNode;
+}) {
+  const { today, monthPeriod, goal, goalView, monthView, payday, monthlySavingsTargetYen } =
+    await loadTodayForecasts();
   const forecast = goalView?.forecast ?? null;
   const balance = monthView?.forecast.balance ?? null;
   // 残りの休日数を計算
@@ -76,15 +84,19 @@ export async function TodaySection({ savingsGoal }: { savingsGoal: SavingsCardPr
               }
             : null
         }
-        suggestion={forecast?.suggestion ?? null}
         probWithinBudget={forecast?.probWithinBudget ?? null}
         provisional={forecast?.provisional ?? false}
-        monthKey={monthFrom.slice(0, 7)}
+        tomorrowYen={goalView?.tomorrowLimit?.todayLimitYen ?? null}
+        daysAfterToday={Math.max(0, daysBetween(today, periodTo))}
+        todayTopNames={goalView?.todayTopSpends.map((s) => s.name) ?? []}
+        whatIf={goal && forecast ? <WhatIfButton /> : null}
       />
+      {upcoming}
       <SavingsCard
         untilLabel={`${dayLabel(monthPeriod.to)}まで`}
         balance={balance ? { p50: balance.p50, incomeYen: balance.incomeYen } : null}
-        goal={savingsGoal}
+        monthlyTargetYen={monthlySavingsTargetYen}
+        nowYen={savingsNowYen}
       />
     </>
   );

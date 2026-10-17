@@ -21,7 +21,7 @@ function normalCdf(z: number): number {
 }
 
 /**
- * 予算内に収まる確率(デザイン仕様書の「見通し」、ADR-090):大きな確率と、着地額の分布。予算より左を塗る。
+ * 目標内に収まる確率(デザイン仕様書の「見通し」、ADR-090):大きな確率と、着地額の分布。予算より左を塗る。
  * グラフをタップすると、その金額以下になる確率を出す(予算の近くは試行の結果そのものを出す)。
  */
 export function ProbabilityCard({
@@ -89,7 +89,7 @@ export function ProbabilityCard({
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 id="forecast-prob" className="text-[17px] font-semibold">
-          予算内に収まる確率
+          目標内に収まる確率
         </h2>
         <span
           className="tabular text-[28px] font-bold"
@@ -102,7 +102,7 @@ export function ProbabilityCard({
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         role="img"
-        aria-label={`着地額の分布。中央${man(p50)}円、予算${man(budgetYen)}円以下になるのは${formatProbability(probWithin)}`}
+        aria-label={`着地額の分布。中央${man(p50)}円、目標${man(budgetYen)}円以下になるのは${formatProbability(probWithin)}`}
         className="mt-2 cursor-pointer select-none"
         style={{ touchAction: 'none' }}
         onPointerDown={(e) => {
@@ -129,7 +129,7 @@ export function ProbabilityCard({
           <line x1={tap} y1="4" x2={tap} y2={base} stroke="var(--accent)" strokeWidth="1.5" />
         ) : null}
         <text x={bx} y="88" fontSize="11" fill="var(--ink)" textAnchor="middle" fontWeight="600">
-          予算 {man(budgetYen)}
+          目標 {man(budgetYen)}
         </text>
         {!midNearBudget ? (
           <text x={midX} y="88" fontSize="11" fill="var(--ink-muted)" textAnchor="middle">
