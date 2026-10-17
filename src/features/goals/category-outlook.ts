@@ -10,6 +10,7 @@ import { planPeriodDays } from '@/domain/spending-plan';
 import { buildCategoryLines } from '@/features/category/model';
 import { buildCumulative, linesForGoal, type CumulativeDay } from '@/features/category/pace';
 import { goalForecastArgs } from '@/features/forecast/goal';
+import { ADDED_FROM_SPENDING } from '@/features/spending-plan/markers';
 import { loadForecast } from '@/features/forecast/load';
 import { listGenres, type Genre } from '@/features/genre/store';
 import { loadCategorySpendingTrend } from '@/features/reports/store';
@@ -21,8 +22,10 @@ import { addDays, addMonths, daysBetween, monthStartJst, type DateOnly } from '@
 export type CategoryOutlook = {
   genreId: string;
   name: string;
-  /** 今期の目標額。目標に入っていなければ null。 */
+  /** 今期の目標額。目標に入っていなければ null(「期間中の支出から追加」の行も null、ADR-108)。 */
   targetYen: number | null;
+  /** 目標の行はあるが、目標なしとして扱う(「期間中の支出から追加」で、使った額がそのまま目標だった)。 */
+  untargeted: boolean;
   /** 期間のはじめから今日までに使った額。 */
   spentYen: number;
   /** 今日より先の予定(使った額には入らない)。 */
@@ -115,7 +118,8 @@ export async function loadCategoryOutlooks(input: {
   const outlooks: CategoryOutlook[] = ids.map((genreId) => {
     const item = targets.get(genreId);
     const row = rowById.get(genreId);
-    const targetYen = item && item.targetYen > 0 ? item.targetYen : null;
+    const untargeted = item?.reason === ADDED_FROM_SPENDING;
+    const targetYen = item && item.targetYen > 0 && !untargeted ? item.targetYen : null;
     const days = buildCumulative({
       lines: linesForGoal(buildCategoryLines(txs, genreId, period, today), period),
       monthStart: period.from,
@@ -133,18 +137,21 @@ export async function loadCategoryOutlooks(input: {
     }
     const prev = lastMonth.get(genreId) ?? null;
     const p50 = row?.p50 ?? null;
-    const caution = row?.caution ?? null;
+    const caution = untargeted ? null : (row?.caution ?? null);
     const sub = caution
       ? prev !== null && p50 !== null && p50 > prev * 1.3
         ? '先月より大きく増えそう'
         : 'このままだと目標をこえそう'
       : started && spent > 0
         ? `いまのペース 1日 約${Math.round(spent / elapsedDays).toLocaleString('ja-JP')}円`
-        : (item?.reason ?? null);
+        : untargeted
+          ? null
+          : (item?.reason ?? null);
     return {
       genreId,
       name: item?.genreName ?? nameById.get(genreId) ?? '未分類',
       targetYen,
+      untargeted,
       spentYen: spent,
       scheduledYen: scheduled,
       lastMonthYen: prev,

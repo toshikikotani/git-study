@@ -11,7 +11,7 @@ import { loadCategorySpendingTrend } from '@/features/reports/store';
 import type { SpendingPlan } from '@/features/spending-plan/store';
 import { AiCard } from './ai-card';
 import { GroupHeading } from './analysis-tabs';
-import { CategoryProgress, type ProgressRow } from './category-progress';
+import { CategoryProgress, type ProgressRow, type UntargetedRow } from './category-progress';
 import { DetailRows } from './detail-rows';
 import { GoalStatusCard } from './goal-status-card';
 import { NextStepCard } from './next-step-card';
@@ -104,6 +104,17 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
   let spentYen = 0;
   for (const d of days) if (d.actualYen !== null) spentYen = d.actualYen;
 
+  // 目標なし(「期間中の支出から追加」で使った額がそのまま目標だったもの、ADR-108):見込みだけ出す。
+  const untargeted: UntargetedRow[] = loaded.outlooks
+    .filter((o) => o.untargeted)
+    .map((o) => ({
+      genreId: o.genreId,
+      name: o.name,
+      spentYen: o.spentYen,
+      p50: o.p50,
+      fixed: o.fixed,
+    }));
+
   // どこで使っているか:目標のあるカテゴリの進み具合。
   const progress: ProgressRow[] = loaded.outlooks
     .filter((o) => o.targetYen !== null)
@@ -195,7 +206,7 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
       />
 
       <GroupHeading>どこで使っているか</GroupHeading>
-      <CategoryProgress rows={progress} />
+      <CategoryProgress rows={progress} untargeted={untargeted} />
       <WeekdayHabit rows={habit} />
 
       {today >= period.from ? (

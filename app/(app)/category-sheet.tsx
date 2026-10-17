@@ -16,12 +16,18 @@ import {
   saveCategoryTargetAction,
   type CategorySheetData,
 } from './category-sheet-actions';
-import { setCategoryFixedAction, setCategoryShowOnHomeAction } from './spending/category/actions';
+import { setCategoryShowOnHomeAction } from './spending/category/actions';
+import { releaseCategoryFixedAction, restoreCategoryFixedAction } from './upcoming/actions';
 
 /** 目標額の − / + の刻みと、スライダーの刻み。 */
 const STEP = 500;
 const SLIDER_STEP = 100;
 const yen = (v: number) => `${Math.round(v).toLocaleString('ja-JP')}円`;
+
+/** step 円単位に切り上げる。 */
+function roundUp(value: number, step: number): number {
+  return Math.ceil(value / step) * step;
+}
 
 /** 2026-10-16 → 10/16 */
 function md(date: string): string {
@@ -85,7 +91,7 @@ export function CategorySheetProvider({ children }: { children: React.ReactNode 
                 genreId: data.outlook.genreId,
                 targetYen: amount,
                 inPlan: target !== null,
-                floorYen: data.outlook.spentYen,
+                floorYen: data.outlook.spentYen + data.outlook.scheduledYen,
               });
               setSaving(false);
               if (result.error) {
@@ -171,25 +177,43 @@ export function CategorySheetBody({
   onDone: (amountYen: number | null) => void | Promise<void>;
 }) {
   const { outlook } = data;
-  const floor = outlook.spentYen;
+  const spent = outlook.spentYen;
+  const scheduled = outlook.scheduledYen;
+  // 下限は使った額と予定の合計(デザイン v3-5、ADR-108)。
+  const floor = spent + scheduled;
+  const target = outlook.targetYen;
+  /** 使った額(と予定)で目標をこえている。 */
+  const over = target !== null && floor > target;
+  const landing = Math.max(floor, outlook.p50 ?? floor);
   const initial =
     amountYen ??
-    outlook.targetYen ??
-    Math.max(floor, Math.round((outlook.p50 ?? floor) / SLIDER_STEP) * SLIDER_STEP);
+    (over
+      ? roundUp(landing, STEP)
+      : (target ?? Math.max(floor, Math.round(landing / SLIDER_STEP) * SLIDER_STEP)));
   const [amount, setAmountRaw] = useState(Math.max(floor, initial));
   const setAmount = (v: number) => setAmountRaw(Math.max(floor, Math.round(v)));
+  /** こえたときの扱い(今期の目標を上げる / このままにする)。 */
+  const [choice, setChoice] = useState<'raise' | 'keep'>('raise');
   const [fixed, setFixed] = useState(data.isFixed);
   const [home, setHome] = useState(data.showOnHome);
   const [settingError, setSettingError] = useState<string | null>(null);
   const name = outlook.name;
   const hasPlan = data.planId !== null;
-  const presets = [
-    ...(outlook.targetYen !== null ? [{ label: 'いまのまま', value: outlook.targetYen }] : []),
-    ...(outlook.targetYen !== null
-      ? [{ label: '20%へらす', value: Math.round(outlook.targetYen * 0.8) }]
-      : []),
-    { label: '使った分だけ', value: floor },
-  ].filter((p) => p.value >= floor);
+  const presets = (
+    over
+      ? [
+          { label: '予定まで', value: floor },
+          { label: '見込み', value: roundUp(landing, STEP) },
+          { label: '少し余裕', value: roundUp(landing * 1.05, 1000) },
+        ]
+      : [
+          ...(target !== null ? [{ label: 'いまのまま', value: target }] : []),
+          ...(target !== null ? [{ label: '20%へらす', value: Math.round(target * 0.8) }] : []),
+          { label: scheduled > 0 ? '予定まで' : '使った分だけ', value: floor },
+        ]
+  )
+    .filter((p) => p.value >= floor)
+    .filter((p, i, all) => all.findIndex((q) => q.value === p.value) === i);
   const max = useMemo(
     () =>
       Math.max(
@@ -198,9 +222,11 @@ export function CategorySheetBody({
       ),
     [outlook.targetYen, outlook.p90, floor],
   );
-  const left = amount - outlook.spentYen;
-  const over = outlook.p50 !== null ? outlook.p50 - amount : null;
+  const left = amount - floor;
+  const overYen = outlook.p50 !== null ? outlook.p50 - amount : null;
   const atFloor = amount <= floor;
+  const keep = over && choice === 'keep';
+  const totalAfter = data.planTotalYen !== null ? data.planTotalYen + amount - (target ?? 0) : null;
 
   const toggle = async (
     next: boolean,
@@ -231,7 +257,7 @@ export function CategorySheetBody({
         <button
           type="button"
           disabled={saving}
-          onClick={() => void onDone(hasPlan ? amount : null)}
+          onClick={() => void onDone(hasPlan && !keep ? amount : null)}
           className="flex min-h-11 items-center justify-self-end text-[17px] font-bold disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
@@ -249,29 +275,49 @@ export function CategorySheetBody({
         <span className="tabular flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[24px] font-bold">{name}</span>
           <span className="text-[14px]" style={{ color: 'var(--ink-muted)' }}>
-            これまで {yen(outlook.spentYen)}
+            これまで {yen(spent)}
+            {scheduled > 0 ? ` · 予定 ${yen(scheduled)}` : ''}
             {outlook.lastMonthYen !== null ? ` · 先月 ${yen(outlook.lastMonthYen)}` : ''}
           </span>
         </span>
       </div>
+
+      {over && target !== null ? (
+        <div
+          role="status"
+          className="flex flex-col gap-1 rounded-2xl px-4 py-3"
+          style={{ background: 'var(--state-over-track)' }}
+        >
+          <span className="text-[15px] font-bold" style={{ color: 'var(--state-over)' }}>
+            {spent > target
+              ? `目標 ${yen(target)}を ${yen(spent - target)} こえています`
+              : `予定を入れると、目標 ${yen(target)}をこえます`}
+          </span>
+          {scheduled > 0 ? (
+            <span className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+              予定({yen(scheduled)})を入れると、{yen(floor - target)} こえる見込みです。
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <Heading>見通し</Heading>
       <section
         className="flex flex-col rounded-[20px] px-4 pt-4 pb-3"
         style={{ background: 'var(--surface)' }}
       >
-        {over !== null ? (
+        {overYen !== null ? (
           <div className="flex justify-end">
             <span
               className="rounded-full px-2 py-1 text-[12px] font-bold"
               style={
-                over > 0
+                overYen > 0
                   ? { background: 'var(--state-caution-track)', color: 'var(--state-caution)' }
                   : { background: 'var(--income-track)', color: 'var(--income)' }
               }
             >
-              {over > 0
-                ? `このままだと${formatEstimate(over)}こえそう`
+              {overYen > 0
+                ? `このままだと${formatEstimate(overYen)}こえそう`
                 : 'このペースなら収まりそう'}
             </span>
           </div>
@@ -316,8 +362,64 @@ export function CategorySheetBody({
         </div>
       </section>
 
-      <Heading>今期の目標額</Heading>
-      {hasPlan ? (
+      {over && hasPlan ? (
+        <>
+          <Heading>どうしますか？</Heading>
+          <div
+            role="radiogroup"
+            aria-label="こえた分の扱い"
+            className="flex flex-col rounded-2xl"
+            style={{ background: 'var(--surface)' }}
+          >
+            {(
+              [
+                ['raise', '今期の目標を上げる', '使った額と予定に合わせて、目標を見直します'],
+                ['keep', 'このままにする', '目標はそのまま。記録だけ続けます'],
+              ] as const
+            ).map(([value, title, sub], i) => {
+              const on = choice === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setChoice(value)}
+                  className="flex min-h-16 items-center gap-3 px-4 py-2 text-left"
+                  style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+                >
+                  <span
+                    aria-hidden
+                    className="size-5 shrink-0 rounded-full"
+                    style={{
+                      border: on ? '6px solid var(--accent)' : '2px solid var(--bar-quiet)',
+                      background: 'var(--surface)',
+                    }}
+                  />
+                  <span className="flex flex-col">
+                    <span className="text-[16px] font-semibold">{title}</span>
+                    <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                      {sub}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
+      {keep ? (
+        <p
+          className="rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
+          style={{ background: 'var(--surface)', color: 'var(--ink-secondary)' }}
+        >
+          目標はそのまま。このカテゴリは「こえた」と表示され続けます。
+        </p>
+      ) : (
+        <Heading>今期の目標額</Heading>
+      )}
+      {keep ? null : hasPlan ? (
         <section
           className="flex flex-col gap-3 rounded-[20px] p-4"
           style={{ background: 'var(--surface)' }}
@@ -352,7 +454,12 @@ export function CategorySheetBody({
             className="tabular -mt-2 flex justify-between text-[12px]"
             style={{ color: 'var(--ink-muted)' }}
           >
-            <span>下限 {yen(floor)}（使った額）</span>
+            <span>
+              下限 {yen(floor)}
+              {scheduled > 0
+                ? `（使った額 ${spent.toLocaleString('ja-JP')} ＋ 予定 ${scheduled.toLocaleString('ja-JP')}）`
+                : '（使った額）'}
+            </span>
             <span>{yen(Math.max(max, amount))}</span>
           </span>
           <div className="grid grid-cols-3 gap-2">
@@ -386,6 +493,14 @@ export function CategorySheetBody({
                 : `${name}はあと${yen(left)}使えます`
               : `この金額だと、残りの${name}は0円です`}
           </p>
+          {over && totalAfter !== null ? (
+            <p
+              className="tabular text-center text-[14px]"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              今期の目標の合計は {formatEstimate(totalAfter)} になります
+            </p>
+          ) : null}
         </section>
       ) : (
         <section
@@ -419,22 +534,30 @@ export function CategorySheetBody({
           </span>
         </Link>
         <Divider />
-        <label className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
-          <span className="flex flex-col">
-            <span className="text-[16px]">固定費にする</span>
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-              毎月かならず出ていくもの
-            </span>
-          </span>
-          <Switch
-            checked={fixed}
-            onChange={(next) =>
-              void toggle(next, setFixed, () => setCategoryFixedAction(outlook.genreId, next))
-            }
-            label="固定費にする"
-          />
-        </label>
-        <Divider />
+        {data.isFixed ? (
+          <>
+            <label className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+              <span className="flex flex-col">
+                <span className="text-[16px]">カテゴリごと固定費</span>
+                <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+                  オフにすると、毎月の支払いだけを記録ごとに固定費にできます
+                </span>
+              </span>
+              <Switch
+                checked={fixed}
+                onChange={(next) =>
+                  void toggle(next, setFixed, () =>
+                    next
+                      ? restoreCategoryFixedAction(outlook.genreId)
+                      : releaseCategoryFixedAction(outlook.genreId),
+                  )
+                }
+                label="カテゴリごと固定費"
+              />
+            </label>
+            <Divider />
+          </>
+        ) : null}
         <label className="flex min-h-13 items-center justify-between gap-3 px-4">
           <span className="text-[16px]">ホームに表示</span>
           <Switch
@@ -451,6 +574,9 @@ export function CategorySheetBody({
           {settingError}
         </p>
       ) : null}
+      <p className="px-3 text-[12px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
+        固定費はカテゴリではなく、記録ごとに決めます(毎月の支払いだけ)。
+      </p>
       <div className="h-4" />
     </div>
   );

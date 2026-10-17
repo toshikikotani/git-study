@@ -38,6 +38,7 @@ const outlook = {
   genreId: 'dining',
   name: '外食',
   targetYen: 42500,
+  untargeted: false,
   spentYen: 22752,
   scheduledYen: 0,
   lastMonthYen: 11266,
@@ -58,6 +59,7 @@ const data = {
   remainingDays: 21,
   isFixed: false,
   showOnHome: true,
+  planTotalYen: 172000,
 };
 
 describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
@@ -80,10 +82,53 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
     expect(html).toContain('このままだと約1,500円こえそう');
   });
 
-  it('設定:名前・マーク・色、固定費にする、ホームに表示', () => {
+  it('設定:名前・マーク・色、ホームに表示。固定費は記録ごとに決める(カテゴリごと固定費は外せる、ADR-108)', () => {
     expect(html).toContain('名前・マーク・色');
-    expect(html).toContain('固定費にする');
     expect(html).toContain('ホームに表示');
+    expect(html).toContain('固定費はカテゴリではなく、記録ごとに決めます(毎月の支払いだけ)。');
+    expect(html).not.toContain('カテゴリごと固定費');
+    const fixed = visible(
+      renderToString(
+        h(CategorySheetBody, {
+          data: { ...data, isFixed: true },
+          onCancel: () => {},
+          onDone: () => {},
+        }),
+      ),
+    );
+    expect(fixed).toContain('カテゴリごと固定費');
+  });
+
+  it('下限は使った額と予定の合計。こえたら知らせ、目標を上げる・このままにするを選べる(デザイン v3-5、ADR-108)', () => {
+    const hobby = visible(
+      renderToString(
+        h(CategorySheetBody, {
+          data: {
+            ...data,
+            outlook: {
+              ...outlook,
+              name: '娯楽・趣味',
+              targetYen: 33300,
+              spentYen: 41590,
+              scheduledYen: 6000,
+              p50: 47590,
+            },
+          },
+          onCancel: () => {},
+          onDone: () => {},
+        }),
+      ),
+    );
+    expect(hobby).toContain('これまで 41,590円 · 予定 6,000円');
+    expect(hobby).toContain('目標 33,300円を 8,290円 こえています');
+    expect(hobby).toContain('予定(6,000円)を入れると、14,290円 こえる見込みです。');
+    expect(hobby).toContain('どうしますか？');
+    expect(hobby).toContain('今期の目標を上げる');
+    expect(hobby).toContain('このままにする');
+    expect(hobby).toContain('下限 47,590円（使った額 41,590 ＋ 予定 6,000）');
+    expect(hobby).toContain('予定まで');
+    expect(hobby).toContain('少し余裕');
+    expect(hobby).toContain('今期の目標の合計は 約18.7万円 になります');
   });
 
   it('目標が無ければ、目標額の代わりに作り方を案内する', () => {

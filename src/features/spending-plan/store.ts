@@ -16,6 +16,7 @@ import { assertDateOnly, todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
+import { ADDED_FROM_SPENDING } from './markers';
 
 export class SpendingPlanStoreError extends AppError {}
 
@@ -237,14 +238,24 @@ export async function updatePlanTargets(
     }
   }
   const supabase = await createClient();
+  // 額を変えた行は、「期間中の支出から追加」の印を外す(本人が決めた目標になる、ADR-108)。
+  const { data: current } = await supabase
+    .from('spending_plan_items')
+    .select('genre_id, target_yen, reason')
+    .eq('plan_id', planId);
+  const before = new Map((current ?? []).map((row) => [row.genre_id, row]));
   const results = await Promise.all(
-    items.map((item) =>
-      supabase
+    items.map((item) => {
+      const row = before.get(item.genreId);
+      const chosen = row?.reason === ADDED_FROM_SPENDING && row.target_yen !== item.targetYen;
+      return supabase
         .from('spending_plan_items')
-        .update({ target_yen: item.targetYen })
+        .update(
+          chosen ? { target_yen: item.targetYen, reason: null } : { target_yen: item.targetYen },
+        )
         .eq('plan_id', planId)
-        .eq('genre_id', item.genreId),
-    ),
+        .eq('genre_id', item.genreId);
+    }),
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) {

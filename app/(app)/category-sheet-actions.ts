@@ -20,6 +20,8 @@ export type CategorySheetData = {
   remainingDays: number;
   isFixed: boolean;
   showOnHome: boolean;
+  /** 今期の目標の合計(目標が無ければ null)。目標を上げたときの合計を出す。 */
+  planTotalYen: number | null;
 };
 
 /** カテゴリのシートを開くときに読む(どの画面のマークから開いても同じ)。 */
@@ -46,8 +48,11 @@ export async function loadCategorySheetAction(
         periodEnd: loaded.period.to,
         today,
         remainingDays: loaded.remainingDays,
-        isFixed: fixedKeys.has(`genre:${genreId}`),
+        isFixed: fixedKeys.has(`genre:${genreId}`) || genre.forecastClosed,
         showOnHome: genre.showOnHome,
+        planTotalYen: plan
+          ? plan.items.reduce((sum, i) => sum + Math.max(0, i.targetYen), 0)
+          : null,
       },
       error: null,
     };
@@ -58,7 +63,8 @@ export async function loadCategorySheetAction(
 
 /**
  * カテゴリの今期の目標額を保存する(⑦の「完了」)。目標に入っていなければ足す。
- * 使った額より下にはできない(デザイン仕様書のルール)。
+ * 使った額と予定の合計より下にはできない(デザイン v3-5、ADR-108。以前は使った額だけが下限で、
+ * 予定 6,000円があるのに目標を予定より下にできた)。本人が決めた額なので「期間中の支出から追加」の印は外す。
  */
 export async function saveCategoryTargetAction(input: {
   planId: string;
@@ -71,10 +77,10 @@ export async function saveCategoryTargetAction(input: {
   if (!Number.isInteger(targetYen) || targetYen < 0) {
     return { error: '目標額は0円以上の整数で入力してください' };
   }
-  if (targetYen < floorYen) return { error: '使った額より下にはできません' };
+  if (targetYen < floorYen) return { error: '使った額と予定の合計より下にはできません' };
   try {
     if (inPlan) await updatePlanTargets(planId, [{ genreId, targetYen }]);
-    else await addPlanGenre(planId, genreId, targetYen);
+    else await addPlanGenre(planId, genreId, targetYen, null);
   } catch (error) {
     return { error: describeUserError(error) };
   }

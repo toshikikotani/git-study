@@ -1,8 +1,11 @@
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
+import { ADDED_FROM_SPENDING } from './markers';
 
 class PlanMembershipError extends AppError {}
+
+export { ADDED_FROM_SPENDING };
 
 async function userId() {
   const supabase = await createClient();
@@ -19,11 +22,15 @@ export async function listGenreOptions(): Promise<{ genreId: string; genreName: 
   return (data ?? []).map((genre) => ({ genreId: genre.id, genreName: genre.name }));
 }
 
-/** 期間中に発生したジャンルを、今の目標の行にする。既存行があれば金額だけ更新する。 */
+/**
+ * 期間中に発生したジャンルを、今の目標の行にする。既存行があれば金額だけ更新する。
+ * reason は行の印(既定は「期間中の支出から追加」=目標なしとして扱う。本人が額を決めたときは null)。
+ */
 export async function addPlanGenre(
   planId: string,
   genreId: string,
   targetYen: number,
+  reason: string | null = ADDED_FROM_SPENDING,
 ): Promise<void> {
   if (!Number.isInteger(targetYen) || targetYen < 0) {
     throw new PlanMembershipError('目標額は0円以上の整数で入力してください');
@@ -44,7 +51,7 @@ export async function addPlanGenre(
   if (existing) {
     const { error } = await supabase
       .from('spending_plan_items')
-      .update({ target_yen: targetYen, reason: '期間中の支出から追加' })
+      .update({ target_yen: targetYen, reason })
       .eq('id', existing.id);
     if (error) throw new PlanMembershipError(`目標を更新できませんでした: ${error.message}`);
     return;
@@ -55,7 +62,23 @@ export async function addPlanGenre(
     genre_id: genreId,
     target_yen: targetYen,
     ai_suggested_yen: null,
-    reason: '期間中の支出から追加',
+    reason,
   });
   if (error) throw new PlanMembershipError(`目標に追加できませんでした: ${error.message}`);
+}
+
+/** 本人が目標額を決めた行から「期間中の支出から追加」の印を外す(目標として扱う、ADR-108)。 */
+export async function markTargetsChosen(
+  planId: string,
+  genreIds: readonly string[],
+): Promise<void> {
+  if (genreIds.length === 0) return;
+  const { supabase } = await userId();
+  const { error } = await supabase
+    .from('spending_plan_items')
+    .update({ reason: null })
+    .eq('plan_id', planId)
+    .eq('reason', ADDED_FROM_SPENDING)
+    .in('genre_id', [...genreIds]);
+  if (error) throw new PlanMembershipError(`目標を更新できませんでした: ${error.message}`);
 }
