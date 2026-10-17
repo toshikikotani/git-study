@@ -454,13 +454,15 @@ export function CategorySheetBody({
             className="tabular -mt-2 flex justify-between text-[12px]"
             style={{ color: 'var(--ink-muted)' }}
           >
-            <span>
-              下限 {yen(floor)}
-              {scheduled > 0
-                ? `（使った額 ${spent.toLocaleString('ja-JP')} ＋ 予定 ${scheduled.toLocaleString('ja-JP')}）`
-                : '（使った額）'}
+            <span className="flex min-w-0 flex-col">
+              <span>下限 {yen(floor)}</span>
+              <span>
+                {scheduled > 0
+                  ? `（使った額 ${spent.toLocaleString('ja-JP')} ＋ 予定 ${scheduled.toLocaleString('ja-JP')}）`
+                  : '（使った額）'}
+              </span>
             </span>
-            <span>{yen(Math.max(max, amount))}</span>
+            <span className="shrink-0 whitespace-nowrap">{yen(Math.max(max, amount))}</span>
           </span>
           <div className="grid grid-cols-3 gap-2">
             {presets.map((p) => {

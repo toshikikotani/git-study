@@ -75,7 +75,7 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
   });
 
   it('目標額は使った額が下限。「使った分だけ」の選択肢があり、下限より下の選択肢は出さない', () => {
-    expect(html).toContain('下限 22,752円（使った額）');
+    expect(html).toContain('下限 22,752円  （使った額）');
     expect(html).toContain('いまのまま');
     expect(html).toContain('20%へらす');
     expect(html).toContain('使った分だけ');
@@ -125,7 +125,7 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
     expect(hobby).toContain('どうしますか？');
     expect(hobby).toContain('今期の目標を上げる');
     expect(hobby).toContain('このままにする');
-    expect(hobby).toContain('下限 47,590円（使った額 41,590 ＋ 予定 6,000）');
+    expect(hobby).toContain('下限 47,590円  （使った額 41,590 ＋ 予定 6,000）');
     expect(hobby).toContain('予定まで');
     expect(hobby).toContain('少し余裕');
     expect(hobby).toContain('今期の目標の合計は 約18.7万円 になります');
