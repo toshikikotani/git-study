@@ -21,6 +21,11 @@ export type DailyLimitInput = {
 };
 
 export type DailyLimitResult = {
+  /** 計算に使った値(「なぜこの額？」で見せる)。 */
+  input: DailyLimitInput;
+  /** 絞る前の平日・休日の配分。 */
+  baseWeekdayYen: number;
+  baseDayOffYen: number;
   /** 今日の上限 */
   todayLimitYen: number;
   /** 平日の配分 */
@@ -90,6 +95,9 @@ export function computeDailyLimit(input: DailyLimitInput): DailyLimitResult {
   );
 
   return {
+    input,
+    baseWeekdayYen: Math.round(baseWeekday),
+    baseDayOffYen: Math.round(baseDayOff),
     todayLimitYen: todayLimit,
     weekdayAllocYen: weekdayAlloc,
     dayOffAllocYen: dayOffAlloc,

@@ -110,6 +110,20 @@ describe('loadForecast(Supabase の読み込みを通した予測)', () => {
     expect(again.forecast.total.p50).toBe(base.forecast.total.p50);
     expect(spent.forecast.total.p50).toBeGreaterThan(base.forecast.total.p50);
     expect(spent.todaySpentYen).toBe(base.todaySpentYen + 8000);
+    // 今日の目安は昨日までに使った額から決める(今日使った額で目安の元を減らさない、ADR-109)。
+    // 明日からの目安は、今日の分を使ったあとの残りから。
+    if (base.dailyLimit && spent.dailyLimit) {
+      expect(spent.dailyLimit.input.leftBudgetYen).toBe(base.dailyLimit.input.leftBudgetYen);
+    }
+    if (
+      base.tomorrowLimit &&
+      spent.tomorrowLimit &&
+      base.tomorrowLimit.input.leftBudgetYen > 8000
+    ) {
+      expect(spent.tomorrowLimit.input.leftBudgetYen).toBe(
+        base.tomorrowLimit.input.leftBudgetYen - 8000,
+      );
+    }
     if (base.tomorrowLimit && spent.tomorrowLimit) {
       expect(spent.tomorrowLimit.todayLimitYen).toBeLessThanOrEqual(
         base.tomorrowLimit.todayLimitYen,
