@@ -44,6 +44,17 @@ const data = [
 ];
 
 describe('buildForecast の範囲(scope)と目標(categoryTargets)', () => {
+  it('限定した目標では、全支出で評価した母集団補正を既定で使わない', () => {
+    const input = {
+      ...base,
+      transactions: data,
+      scope: { genreIds: new Set(['dining']), excludeSpecial: true },
+    };
+    expect(buildForecast(input)).toEqual(buildForecast({ ...input, usePopulationPrior: false }));
+    expect(buildForecast({ ...base, transactions: data })).toEqual(
+      buildForecast({ ...base, transactions: data, usePopulationPrior: true }),
+    );
+  });
   it('カテゴリを指定すると、そのカテゴリだけを数える', () => {
     const all = buildForecast({ ...base, transactions: data });
     const only = buildForecast({

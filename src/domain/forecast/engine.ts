@@ -87,7 +87,10 @@ export function buildForecast(input: BuildForecastInput): Forecast {
   // 母集団の補正(設計書 v3 4.5):本人の月が少ない分だけ、中心と PIT を母集団の値へ寄せる。
   const recordDays =
     input.recordStart === null ? 0 : Math.max(0, daysBetween(input.recordStart, input.today) + 1);
-  const prior = input.usePopulationPrior === false ? NO_PRIOR : populationPriorFor(recordDays);
+  // 母集団は全カテゴリ・特別費込みで評価したもの。限定した目標へ暗黙に流用しない。
+  const scoped = input.scope?.genreIds !== undefined || input.scope?.excludeSpecial === true;
+  const usePopulationPrior = input.usePopulationPrior ?? !scoped;
+  const prior = usePopulationPrior ? populationPriorFor(recordDays) : NO_PRIOR;
   const months = calibration?.months ?? 0;
   const ownCenterWeight = months / (months + CENTER_PRIOR_MONTHS);
   const center =

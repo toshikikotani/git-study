@@ -258,11 +258,10 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
                   value: `${man(forecast.total.p10)}〜${man(forecast.total.p90)}`,
                   content: (
                     <ProbabilityCard
-                      p10={forecast.total.p10}
+                      distribution={forecast.distribution}
                       p50={forecast.total.p50}
-                      p90={forecast.total.p90}
                       budgetYen={budgetYen}
-                      probWithin={forecast.probWithinBudget}
+                      provisional={forecast.provisional}
                     />
                   ),
                 },

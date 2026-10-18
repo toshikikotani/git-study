@@ -7,6 +7,7 @@
  */
 
 import { unstable_cache } from 'next/cache';
+import { createHash } from 'node:crypto';
 
 import type { CautionPrecision } from '@/domain/forecast/caution';
 import { buildForecast } from '@/domain/forecast/engine';
@@ -23,7 +24,7 @@ import { periodDays } from '@/domain/period';
 import { createClient } from '@/lib/supabase/server';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
 import { continuousRecordStart, periodIncome } from '@/domain/forecast/record';
-import { verifyCautions, verifyForecast, type Verification } from './calibration';
+import { forecastScopeKey, verifyCautions, verifyForecast, type Verification } from './calibration';
 import { loadForecastHistory } from './history';
 import { listPromises } from './promise-store';
 import { genreSpentYen, promiseKeepRate, promiseKept } from '@/domain/forecast/promise';
@@ -220,15 +221,36 @@ export async function prepareForecast(
 
   // 検証は重い(数秒)ので、明細が変わらない間は結果を使い回す。サーバーのデータキャッシュに
   // 置くので、サーバーが入れ替わっても残る。検証に使うのは完了した月だけなので、鍵も予測の期間に
-  // よらない(レポート・目標・カテゴリ画面のどこから呼んでも同じ検証結果を使う)。
-  // 鍵に本人のIDと明細の版を含める(他人の結果を返さない)。
+  // よらない。同じ範囲なら再利用し、目標のカテゴリ・特別費の扱いが違えば別に求める。
+  // 鍵に本人のIDと明細の内容を含める(カテゴリの変更や同額の訂正でも古い補正を返さない)。
   const completed = transactions.filter(
     (t) => t.occurredOn < monthStartJst(0, args.now ?? new Date()),
   );
-  const completedVersion = `${completed.length}:${completed.at(-1)?.occurredOn ?? ''}:${Math.round(
-    completed.reduce((sum, t) => sum + t.amountYen, 0),
-  )}`;
-  const cacheKey = `v3:${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${recordStart ?? ''}:${[...noForecast].sort().join(',')}`;
+  const completedVersion = createHash('sha256')
+    .update(
+      completed
+        .map((t) =>
+          JSON.stringify([
+            t.occurredOn,
+            t.createdOn ?? null,
+            t.genreId,
+            t.genreName,
+            t.amountYen,
+            t.kind,
+            t.status,
+            t.isTransfer,
+            t.mustPay ?? false,
+            t.reviewStatus,
+            t.needsInput,
+            t.merchantName,
+            t.description,
+          ]),
+        )
+        .sort()
+        .join('\n'),
+    )
+    .digest('hex');
+  const cacheKey = `v4:${userId}:${completedVersion}:${today}:${payday ?? 'x'}:${recordStart ?? ''}:${[...noForecast].sort().join(',')}:${forecastScopeKey(args.scope)}`;
   const verification = await unstable_cache(
     async () =>
       verifyForecast({
@@ -238,6 +260,7 @@ export async function prepareForecast(
         recordStart,
         payday,
         noForecastGenreIds: noForecast,
+        ...(args.scope ? { scope: args.scope } : {}),
       }),
     ['forecast-verification', cacheKey],
     { revalidate: 60 * 60 * 24 },
@@ -265,6 +288,7 @@ export async function prepareForecast(
               recordStart,
               payday,
               noForecastGenreIds: noForecast,
+              ...(args.scope ? { scope: args.scope } : {}),
               verification,
               targets: cautionTargets,
             }),
@@ -306,6 +330,8 @@ export async function prepareForecast(
           })),
       ),
       calibration: verification?.calibration ?? null,
+      // 合成の母集団補正は全カテゴリ・特別費込みで作られている。限定した範囲へは流用しない。
+      usePopulationPrior: !(args.scope?.genreIds !== undefined || args.scope?.excludeSpecial),
       ...(verification
         ? {
             halfLifeDays: verification.halfLifeDays,

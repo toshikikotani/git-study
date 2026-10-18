@@ -2,7 +2,7 @@
  * 予測の補正を、本人の過去の月で求める(半減期 × 今月の水準の強さ、時点帯ごとの中心、PIT)。
  *
  * 毎回のページ表示でバックテストを回すと重いので、明細が変わらない間は同じ結果を使い回す
- * (明細の件数・最新日・合計が変わると鍵が変わり、求め直す)。サーバーのメモリ内だけの
+ * (明細の内容や予測の範囲が変わると鍵が変わり、求め直す)。サーバーのメモリ内だけの
  * 使い回しで、ユーザーごとに分ける(他人の結果を返さない)。
  */
 
@@ -23,6 +23,7 @@ import type { CautionPrecision } from '@/domain/forecast/caution';
 import { rawLevelFor } from '@/domain/forecast/pit';
 import type { ForecastSourceTransaction } from '@/domain/forecast/decompose';
 import type { ForecastCalibration } from '@/domain/forecast/types';
+import { applyScope, type ForecastScope } from '@/domain/forecast/pipeline';
 import { addDays, addMonths, daysBetween, nthDayOfMonth, type DateOnly } from '@/lib/date';
 
 /** 検証に使う、直近の完了した月の数の上限。 */
@@ -36,6 +37,14 @@ const SELECTION_STEP_DAYS = 6;
 const MIN_HISTORY_DAYS = 30;
 const TRAINING_WINDOW_DAYS = 730;
 const CACHE_LIMIT = 20;
+
+/** カテゴリの並び順に左右されず、数える範囲をキャッシュで区別する。 */
+export function forecastScopeKey(scope: ForecastScope | undefined): string {
+  return JSON.stringify({
+    genreIds: scope?.genreIds === undefined ? null : [...scope.genreIds].sort(),
+    excludeSpecial: scope?.excludeSpecial === true,
+  });
+}
 
 export type VerificationSummary = {
   pointCount: number;
@@ -112,13 +121,16 @@ export function verifyForecast(input: {
   recordStart: DateOnly | null;
   payday: number | null;
   noForecastGenreIds?: ReadonlySet<string>;
+  /** 予測と同じカテゴリ・特別費の範囲で、学習も検証の正解も数える。 */
+  scope?: ForecastScope;
 }): Verification | null {
-  if (cache.has(input.cacheKey)) return cache.get(input.cacheKey) ?? null;
+  const cacheKey = JSON.stringify([input.cacheKey, forecastScopeKey(input.scope)]);
+  if (cache.has(cacheKey)) return cache.get(cacheKey) ?? null;
   const periods = backtestMonths(input.today, input.recordStart);
   let result: Verification | null = null;
   if (periods.length > 0) {
     const base = {
-      transactions: input.transactions,
+      transactions: applyScope(input.transactions, input.scope),
       periods,
       trainingWindowDays: TRAINING_WINDOW_DAYS,
       recordStart: input.recordStart,
@@ -186,7 +198,7 @@ export function verifyForecast(input: {
     }
   }
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
-  cache.set(input.cacheKey, result);
+  cache.set(cacheKey, result);
   return result;
 }
 
@@ -207,16 +219,18 @@ export function verifyCautions(input: {
   recordStart: DateOnly | null;
   payday: number | null;
   noForecastGenreIds?: ReadonlySet<string>;
+  scope?: ForecastScope;
   verification: Verification | null;
   targets: readonly { categoryId: string; targetYen: number }[];
 }): CautionPrecision {
-  const hit = cautionCache.get(input.cacheKey);
+  const cacheKey = JSON.stringify([input.cacheKey, forecastScopeKey(input.scope)]);
+  const hit = cautionCache.get(cacheKey);
   if (hit) return hit;
   const periods = backtestMonths(input.today, input.recordStart);
   let result: CautionPrecision = {};
   if (periods.length > 0 && input.targets.length > 0) {
     result = runBacktest({
-      transactions: input.transactions,
+      transactions: applyScope(input.transactions, input.scope),
       periods,
       trainingWindowDays: TRAINING_WINDOW_DAYS,
       recordStart: input.recordStart,
@@ -235,6 +249,6 @@ export function verifyCautions(input: {
   if (cautionCache.size >= CACHE_LIMIT) {
     cautionCache.delete(cautionCache.keys().next().value as string);
   }
-  cautionCache.set(input.cacheKey, result);
+  cautionCache.set(cacheKey, result);
   return result;
 }
