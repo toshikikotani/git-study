@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { whatIfRows, whatIfVerdict, type WhatIfSpend } from '@/domain/forecast/what-if-spend';
 import { cachedRecordGenres, prefetchRecordData, useOpenRecord } from '../record-sheet';
 import { simulateSpendAction } from './what-if-actions';
@@ -122,8 +122,8 @@ function WhatIfBody({
   const rows = base && option ? whatIfRows(base, option) : [];
 
   return (
-    <div className="flex flex-col gap-3 pt-1 pb-4" style={{ color: 'var(--ink)' }}>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+    <div className="flex flex-col gap-3 pb-4" style={{ color: 'var(--ink)' }}>
+      <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center pt-1">
         <button
           type="button"
           onClick={onClose}
@@ -134,7 +134,7 @@ function WhatIfBody({
         </button>
         <span className="text-[17px] font-semibold">もし使ったら</span>
         <span />
-      </div>
+      </BottomSheetHeader>
 
       <section
         className="flex flex-col items-center gap-3 rounded-[20px] px-4 pt-3 pb-4"

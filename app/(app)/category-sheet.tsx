@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { Switch } from '@/components/ui/switch';
@@ -103,8 +103,8 @@ export function CategorySheetProvider({ children }: { children: React.ReactNode 
             }}
           />
         ) : (
-          <div className="flex flex-col gap-3 pt-1 pb-8">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+          <div className="flex flex-col gap-3 pb-8">
+            <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center">
               <button
                 type="button"
                 onClick={close}
@@ -117,7 +117,7 @@ export function CategorySheetProvider({ children }: { children: React.ReactNode 
                 カテゴリ
               </span>
               <span />
-            </div>
+            </BottomSheetHeader>
             <p role="status" className="px-1 text-[15px]" style={{ color: 'var(--ink-muted)' }}>
               {error ?? '読み込んでいます…'}
             </p>
@@ -243,8 +243,8 @@ export function CategorySheetBody({
   };
 
   return (
-    <div className="flex flex-col gap-3 pt-1" style={{ color: 'var(--ink)' }}>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+    <div className="flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
+      <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center">
         <button
           type="button"
           onClick={onCancel}
@@ -263,7 +263,7 @@ export function CategorySheetBody({
         >
           {saving ? '保存中' : '完了'}
         </button>
-      </div>
+      </BottomSheetHeader>
       {error ? (
         <p role="alert" className="px-1 text-[13px]" style={{ color: 'var(--over)' }}>
           {error}

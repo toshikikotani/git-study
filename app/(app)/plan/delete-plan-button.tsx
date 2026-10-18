@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { deletePlanAction } from './actions';
 
 /**
@@ -31,10 +31,12 @@ export function DeletePlanButton({ planId }: { planId: string }) {
         onClose={() => (busy ? undefined : setConfirming(false))}
         role="dialog"
       >
-        <div className="space-y-3 px-4 pt-2 pb-4">
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            この目標を削除しますか?
-          </p>
+        <div className="space-y-3 px-4 pb-4">
+          <BottomSheetHeader className="pt-2">
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              この目標を削除しますか?
+            </p>
+          </BottomSheetHeader>
           <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             目標の額と期間が消えます。記録した明細は消えません。
           </p>

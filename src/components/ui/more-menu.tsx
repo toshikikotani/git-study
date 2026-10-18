@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { signOutAction } from '@/features/auth/actions';
-import { BottomSheet } from './bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from './bottom-sheet';
 
 const GROUPS = [
   {
@@ -141,8 +141,8 @@ export function MoreMenu({
         </svg>
       </button>
 
-      <BottomSheet open={open} onClose={() => setOpen(false)} role="menu">
-        <div className="flex items-center justify-between gap-3 px-3 pt-1 pb-2">
+      <BottomSheet open={open} onClose={() => setOpen(false)} role="menu" label="メニュー">
+        <BottomSheetHeader className="flex items-center justify-between gap-3 px-3 pb-2">
           <div className="min-w-0">
             <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
               メニュー
@@ -162,7 +162,7 @@ export function MoreMenu({
               ログアウト
             </button>
           </form>
-        </div>
+        </BottomSheetHeader>
 
         <div className="flex flex-col gap-4 px-1 pt-1 pb-3">
           {groups.map((group) => (

@@ -10,7 +10,7 @@ import { buildCumulative, categoryAllowanceYen, goalOverlaps } from '@/features/
 import { buildSeries, type Bucket, type ChartUnit } from '@/features/category/series';
 import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
 import { CONFIDENT, predictGenres, type GenrePrediction } from '@/domain/genre-prediction';
 import { suggestRule, type RuleSuggestion } from '@/domain/rule-match';
@@ -570,9 +570,11 @@ function CategoryScreenInner({
       {/* 左スワイプの「カテゴリを移す」:格子から1タップ */}
       <BottomSheet open={movePicker !== null} onClose={() => setMovePicker(null)} role="dialog">
         <div className="space-y-2 px-3 pb-3">
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {movePicker?.label} のカテゴリを移す
-          </p>
+          <BottomSheetHeader>
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              {movePicker?.label} のカテゴリを移す
+            </p>
+          </BottomSheetHeader>
           <CategoryPicker
             genres={data.genres}
             currentId={currentGenreId}
@@ -636,9 +638,11 @@ function CategoryScreenInner({
 
       <BottomSheet open={bulkPicker} onClose={() => setBulkPicker(false)} role="dialog">
         <div className="space-y-2 px-3 pb-3">
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {selectedLines.length}件のカテゴリを移す
-          </p>
+          <BottomSheetHeader>
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              {selectedLines.length}件のカテゴリを移す
+            </p>
+          </BottomSheetHeader>
           <CategoryPicker
             genres={data.genres}
             currentId={currentGenreId}
@@ -656,9 +660,11 @@ function CategoryScreenInner({
 
       <BottomSheet open={confirmDelete} onClose={() => setConfirmDelete(false)} role="dialog">
         <div className="space-y-3 px-3 pb-3">
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {selectedLines.length}件を削除しますか?
-          </p>
+          <BottomSheetHeader>
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              {selectedLines.length}件を削除しますか?
+            </p>
+          </BottomSheetHeader>
           <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             削除した直後なら、元に戻せます。
           </p>

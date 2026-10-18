@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
 vi.mock('@/features/auth/actions', () => ({ signOutAction: vi.fn() }));
-vi.mock('@/components/ui/bottom-sheet', () => ({
+vi.mock('@/components/ui/bottom-sheet', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/ui/bottom-sheet')>()),
   BottomSheet: ({ children }: { children: ReactNode }) => children,
 }));
 
