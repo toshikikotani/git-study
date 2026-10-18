@@ -471,11 +471,17 @@ export function SelectableTransaction({
   );
 }
 
-/** 検索・絞り込み・開いたときだけ出すカレンダー。 */
+/** 検索・絞り込み・カレンダー(出す / 隠す と 週 / 月 は覚えておく、ADR-121)。 */
 export function LedgerSearch({
   initialCalendarView = 'week',
-}: { initialCalendarView?: CalendarView } = {}) {
-  return <LedgerSearchControls initialCalendarView={initialCalendarView} />;
+  initialCalendarOpen = true,
+}: { initialCalendarView?: CalendarView; initialCalendarOpen?: boolean } = {}) {
+  return (
+    <LedgerSearchControls
+      initialCalendarView={initialCalendarView}
+      initialCalendarOpen={initialCalendarOpen}
+    />
+  );
 }
 
 function ListSkeleton() {
