@@ -92,8 +92,8 @@ export function GoalEditor({
   noBudget: readonly UnrecordedRow[];
   addable: readonly AddableGenre[];
   next: { start: string; reserved: boolean };
-  /** カテゴリの設定(固定費・ホームに表示)。⑦のスイッチの初めの状態。 */
-  settings: Readonly<Record<string, { isFixed: boolean; showOnHome: boolean }>>;
+  /** カテゴリの設定(固定費)。⑦のスイッチの初めの状態。 */
+  settings: Readonly<Record<string, { isFixed: boolean }>>;
 }) {
   const router = useRouter();
   const saved = Object.fromEntries(categories.map((c) => [c.genreId, c.targetYen ?? 0]));
@@ -166,7 +166,6 @@ export function GoalEditor({
         return;
       }
       router.push('/reports');
-      router.refresh();
     } catch {
       setError('保存を確認できませんでした。入力内容は残っています。もう一度お試しください。');
     } finally {
@@ -503,7 +502,7 @@ export function GoalEditor({
         <Link href="/settings/categories" className="flex min-h-13 items-center gap-2 px-4">
           <span className="flex-1 text-[16px]">カテゴリの設定</span>
           <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
-            名前・色・ホーム表示
+            名前・色・並び順
           </span>
           <span style={{ color: 'var(--ideal)' }}>
             <ChevronRightIcon />
@@ -518,7 +517,6 @@ export function GoalEditor({
             const result = await reserveNextPlanAction(planId);
             setReserving(false);
             setReserveNote(result.error ?? `${dayLabel(next.start)}からの目標を予約しました。`);
-            if (!result.error) router.refresh();
           }}
           className="flex min-h-13 items-center gap-2 px-4 text-left disabled:opacity-60"
         >
@@ -588,7 +586,6 @@ export function GoalEditor({
               today,
               remainingDays,
               isFixed: settings[editingCategory.genreId]?.isFixed ?? false,
-              showOnHome: settings[editingCategory.genreId]?.showOnHome ?? false,
               planTotalYen: Object.values(amounts).reduce((sum, v) => sum + v, 0),
             }}
             amountYen={amounts[editingCategory.genreId] ?? 0}

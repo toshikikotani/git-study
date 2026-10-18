@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import {
@@ -26,7 +25,6 @@ export function CategoryFixedBanner({
   categories: readonly MixedCategory[];
   fixedTotalYen: number;
 }) {
-  const router = useRouter();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   // 「このままにする」はこの端末に残す。サーバーの表示とそろえるため、読むのは表示のあと。
   useEffect(() => {
@@ -37,25 +35,27 @@ export function CategoryFixedBanner({
   const [error, setError] = useState<string | null>(null);
   const shown = categories.filter((c) => !hidden.has(c.genreId));
 
+  // 押したらすぐ変える(保存はうしろで。できなければ戻して理由を出す、ADR-117)。画面の数字は
+  // アクションの返事で作り直される(router.refresh() は要らない)。
   const release = async (c: MixedCategory) => {
     setError(null);
+    setReleased(c);
     const result = await releaseCategoryFixedAction(c.genreId);
     if (result.error) {
+      setReleased(null);
       setError(result.error);
-      return;
     }
-    setReleased(c);
-    router.refresh();
   };
   const undo = async () => {
     if (!released) return;
-    const result = await restoreCategoryFixedAction(released.genreId);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
+    const target = released;
+    setError(null);
     setReleased(null);
-    router.refresh();
+    const result = await restoreCategoryFixedAction(target.genreId);
+    if (result.error) {
+      setReleased(target);
+      setError(result.error);
+    }
   };
   const dismiss = (c: MixedCategory) => {
     const next = new Set(hidden).add(c.genreId);
@@ -136,18 +136,20 @@ type Detected = { key: string; label: string; amountYen: number; nextOn: string 
 
 /** 見つけた定期支払い(同じ店・同じくらいの額が2か月続いたもの)。「固定費にする」で、その店・額だけ固定費に。 */
 export function DetectedPayments({ detected }: { detected: readonly Detected[] }) {
-  const router = useRouter();
   const [done, setDone] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const confirm = async (d: Detected) => {
     setError(null);
+    setDone((prev) => new Set(prev).add(d.key));
     const result = await confirmDetectedFixedAction(d.key);
     if (result.error) {
+      setDone((prev) => {
+        const next = new Set(prev);
+        next.delete(d.key);
+        return next;
+      });
       setError(result.error);
-      return;
     }
-    setDone(new Set(done).add(d.key));
-    router.refresh();
   };
   return (
     <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>

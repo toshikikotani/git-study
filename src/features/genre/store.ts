@@ -31,7 +31,10 @@ export type Genre = {
   sortOrder: number;
   /** 月次予算(本人発案「カテゴリのそれぞれの値段設定」)。未設定なら無制限。 */
   budgetYen: number | null;
-  /** ホーム画面に残額を出すジャンルか(旧 categories.show_on_home、FR-14, FR-61)。 */
+  /**
+   * 以前の「ホームに表示」の選択(旧 categories.show_on_home)。画面ではもう選ばない(ホームは目標を
+   * こえそうなカテゴリを自動で出す、ADR-117)。毎朝の知らせ・カレンダーの残額はまだこれを使う。
+   */
   showOnHome: boolean;
   /** もう使わない。残りの日の予測に足さない。 */
   forecastClosed: boolean;
@@ -167,17 +170,11 @@ export async function updateGenreBudget(id: string, budgetYen: number | null): P
   if (error) throw new GenreStoreError(`予算を更新できませんでした: ${error.message}`);
 }
 
-/** ホーム画面に残額を出すか(旧 categories.show_on_home、FR-14, FR-61)。 */
+/** 予測を止めるか(固定費として扱う)。 */
 export async function setGenreForecastClosed(id: string, closed: boolean): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from('genres').update({ forecast_closed: closed }).eq('id', id);
   if (error) throw new GenreStoreError(`予測の停止を保存できませんでした: ${error.message}`);
-}
-
-export async function setGenreShowOnHome(id: string, showOnHome: boolean): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase.from('genres').update({ show_on_home: showOnHome }).eq('id', id);
-  if (error) throw new GenreStoreError(`更新できませんでした: ${error.message}`);
 }
 
 /**

@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { updateMonthlySavingsTargetAction } from './actions';
@@ -9,7 +8,6 @@ import { updateMonthlySavingsTargetAction } from './actions';
  * 毎月の貯金目標(ADR-108)。ホームの貯金カードとAIの窓口が見る値を、ここで決める・直す(1か所で管理)。
  */
 export function MonthlyTarget({ initialYen }: { initialYen: number }) {
-  const router = useRouter();
   const [value, setValue] = useState(initialYen > 0 ? initialYen.toLocaleString('ja-JP') : '');
   const [saved, setSaved] = useState(initialYen);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +24,6 @@ export function MonthlyTarget({ initialYen }: { initialYen: number }) {
       return;
     }
     setSaved(amountYen);
-    router.refresh();
   };
 
   return (

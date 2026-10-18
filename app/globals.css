@@ -817,3 +817,47 @@ button {
     animation-timing-function: linear;
   }
 }
+
+/* 画面を移るのを待っているあいだの細い帯(src/components/ui/navigation-progress.tsx、ADR-117)。
+   150ms を過ぎるまでは見せない(すぐ切り替わるときはちらつかない)。 */
+.nav-progress {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  animation: nav-progress-in 1ms linear forwards;
+}
+.nav-progress::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 3px;
+  background: var(--accent);
+  animation: nav-progress-run 1.1s var(--ease-standard, ease) infinite;
+}
+@keyframes nav-progress-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes nav-progress-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress::before {
+    width: 100%;
+    animation: none;
+    opacity: 0.6;
+  }
+}

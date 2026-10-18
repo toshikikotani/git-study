@@ -19,7 +19,6 @@
  * 必須(must_pay)/裁量の2軸でも見られるようにした。
  */
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { formatYen } from '@/domain/money';
@@ -39,7 +38,6 @@ export function GenreBreakdownCard({
   const [allPendingCount, setAllPendingCount] = useState(initialAllPendingCount);
   const [progressCount, setProgressCount] = useState<number | null>(null);
   const [progressScope, setProgressScope] = useState<'month' | 'all'>('month');
-  const router = useRouter();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -75,7 +73,6 @@ export function GenreBreakdownCard({
     }
     setProgressCount(null);
     setRunning(false);
-    router.refresh();
   };
 
   return (

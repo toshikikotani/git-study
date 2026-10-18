@@ -14,7 +14,6 @@ vi.mock('../../app/(app)/spending/category/actions', () => ({
   createCategoryAction: vi.fn(),
   mergeCategoryAction: vi.fn(),
   reorderCategoriesAction: vi.fn(),
-  setCategoryShowOnHomeAction: vi.fn(),
 }));
 
 import { CategoryList } from '../../app/(app)/settings/categories/category-list';
@@ -26,8 +25,8 @@ describe('設定 > カテゴリ', () => {
     renderToString(
       h(CategoryList, {
         categories: [
-          { id: 'dining', name: '外食', showOnHome: true },
-          { id: 'cafe', name: 'カフェ', showOnHome: false },
+          { id: 'dining', name: '外食' },
+          { id: 'cafe', name: 'カフェ' },
         ],
       }),
     ),
@@ -38,12 +37,11 @@ describe('設定 > カテゴリ', () => {
     expect(html).toContain('href="/settings/categories/cafe"');
   });
 
-  it('ホームに出すかはスイッチで、「ホームに表示」と「そのほか」に分けて数も出す(デザイン仕様書)', () => {
-    expect(html.match(/role="switch"/g)?.length).toBe(2);
-    expect(html.match(/checked=""/g)?.length).toBe(1);
-    expect(html).toContain('ホームに表示 · 1');
-    expect(html).toContain('そのほか · 1');
-    expect(html).toContain('外食をホームに表示');
+  it('1行に押せる所は1つ(名前)。スイッチは置かず、1つの一覧に数を出す(本人の指摘、ADR-117)', () => {
+    expect(html).not.toContain('role="switch"');
+    expect(html).not.toContain('ホームに表示');
+    expect(html).not.toContain('そのほか');
+    expect(html).toContain('カテゴリ · 2');
     expect(html).toContain('並べ替え');
   });
 

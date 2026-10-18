@@ -7,12 +7,7 @@
  */
 
 import { listAccounts } from '@/features/accounts/store';
-import {
-  createGenre,
-  listGenres,
-  setGenreShowOnHome,
-  updateGenreBudget,
-} from '@/features/genre/store';
+import { createGenre, listGenres, updateGenreBudget } from '@/features/genre/store';
 import { createGoal, listActiveGoals } from '@/features/goals/store';
 import { setExpenseSubtype } from '@/features/receipts/expense-subtype-store';
 import { replaceReceiptItems } from '@/features/receipts/items-store';
@@ -124,9 +119,6 @@ export async function executeOperation(operation: Operation): Promise<void> {
       return;
     case 'update_genre_budget':
       await updateGenreBudget(operation.genreId, operation.budgetYen);
-      return;
-    case 'set_genre_show_on_home':
-      await setGenreShowOnHome(operation.genreId, operation.showOnHome);
       return;
     case 'create_genre':
       await createGenre(operation.name);

@@ -50,6 +50,8 @@ export type ForecastView = {
   excludedByCategory: ReadonlyMap<string, number>;
   /** 目標があるとき:過去の月で測った、時点帯ごとの注意の精度(設計書 v3 3.2)。 */
   cautionPrecision: CautionPrecision | null;
+  /** 「予測を止める」にしたカテゴリ(固定費として扱う)。 */
+  closedGenreIds: ReadonlySet<string>;
   /** 範囲の、今日の支出(今日あと使える額に使う。設計書 v3 3.1)。 */
   todaySpentYen: number;
   /** 直近の実績から計算した、休日(土日祝)と平日の1日あたり平均。 */
@@ -377,6 +379,7 @@ export async function prepareForecast(
       verification,
       today,
       excludedByCategory: excludedSpend(txs, args.period, args.scope),
+      closedGenreIds: noForecast,
       cautionPrecision,
       todaySpentYen,
       dayOffPerDayYen: averages.dayOffPerDayYen,

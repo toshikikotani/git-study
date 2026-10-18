@@ -82,9 +82,9 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
     expect(html).toContain('このままだと約1,500円こえそう');
   });
 
-  it('設定:名前・マーク・色、ホームに表示。固定費は記録ごとに決める(カテゴリごと固定費は外せる、ADR-108)', () => {
+  it('設定:名前・マーク・色。固定費は記録ごとに決める(カテゴリごと固定費は外せる、ADR-108)。ホームに出すかは選ばない(自動、ADR-117)', () => {
     expect(html).toContain('名前・マーク・色');
-    expect(html).toContain('ホームに表示');
+    expect(html).not.toContain('ホームに表示');
     expect(html).toContain('固定費はカテゴリではなく、記録ごとに決めます(毎月の支払いだけ)。');
     expect(html).not.toContain('カテゴリごと固定費');
     const fixed = visible(

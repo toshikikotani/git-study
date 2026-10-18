@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { planTotalChange } from '@/domain/spending-plan';
@@ -21,7 +20,6 @@ export function GoalTargetEdit({
   genreId: string;
   rows: readonly { genreId: string; yen: number }[];
 }) {
-  const router = useRouter();
   const currentYen = rows.find((row) => row.genreId === genreId)?.yen ?? null;
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -65,7 +63,6 @@ export function GoalTargetEdit({
     }
     hapticFor('save');
     setEditing(false);
-    router.refresh();
   };
 
   return (

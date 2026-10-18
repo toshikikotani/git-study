@@ -1,9 +1,14 @@
 import { todayAllowance } from '@/domain/forecast/today';
 import { calendarContext } from '@/domain/forecast/calendar';
-import { loadTodayForecasts, todayCapYen } from '@/features/home/today-forecasts';
+import {
+  loadTodayForecasts,
+  todayCapYen,
+  watchCategoriesOf,
+} from '@/features/home/today-forecasts';
 import { addDays, daysBetween, splitDateOnly, weekdayOf } from '@/lib/date';
 import { isDayOff, isHoliday } from '@/domain/forecast/holidays';
 import { SavingsCard } from './savings-card';
+import { WatchCategories } from './watch-categories';
 import { WhatIfButton } from './what-if-sheet';
 import { shortDate, TodayCard } from './today-card';
 
@@ -108,6 +113,8 @@ export async function TodaySection({
         todayTopNames={goalView?.todayTopSpends.map((s) => s.name) ?? []}
         whatIf={goal && forecast ? <WhatIfButton /> : null}
       />
+      {/* 気をつけたいカテゴリ:目標をこえた・こえそう・8割をこえたものを自動で最大3つ(ADR-117)。 */}
+      {goal && goalView ? <WatchCategories categories={watchCategoriesOf(goalView)} /> : null}
       {upcoming}
       <SavingsCard
         untilLabel={`${dayLabel(monthPeriod.to)}まで`}

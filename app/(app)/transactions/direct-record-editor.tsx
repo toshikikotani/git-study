@@ -88,11 +88,9 @@ export function DirectRecordEditor({
           pushUndo(`${values.name} を直しました`, async () => {
             const restored = await restoreRowFieldsAction(previous);
             if (!restored.error) onRestored?.();
-            router.refresh();
             return restored.error;
           });
         }
-        router.refresh();
         onSaved?.();
       } catch (error) {
         setRetry({

@@ -2,37 +2,41 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { BackHeader } from '@/components/ui/back-header';
 import { genreSwatch } from '@/domain/genre-style';
 import { similarCategories } from '@/domain/genre-similarity';
 import { hapticFor } from '@/lib/haptics';
-import { Switch } from '@/components/ui/switch';
+import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import {
   createCategoryAction,
   mergeCategoryAction,
   reorderCategoriesAction,
-  setCategoryShowOnHomeAction,
 } from '../../spending/category/actions';
 
-type Category = { id: string; name: string; showOnHome: boolean };
+type Category = { id: string; name: string };
 
 /**
- * カテゴリの一覧(デザイン仕様書の「カテゴリの設定」、ADR-090):「ホームに表示」と「そのほか」に分け、
- * 右のスイッチで行き来する。「並べ替え」で上下の順を変え、「完了」で保存。いちばん下で追加できる。
+ * カテゴリの一覧(デザイン仕様書の「カテゴリの設定」、ADR-090 → 113):1行に押せる所は1つ(名前を押すと
+ * そのカテゴリの設定)。「並べ替え」で上下の順を変え、「完了」で保存。いちばん下で追加できる。
+ * 以前は「ホームに表示」と「そのほか」に分け、22行すべてにスイッチを置いていた。一覧がオン・オフの設定画面に
+ * 見え、名前とスイッチを押し間違えやすく、月ごとに入れ替える手間も要った(本人の指摘)。ホームの
+ * 「気をつけたいカテゴリ」はいまは自動で選ぶ(ADR-117)。
  */
 export function CategoryList({ categories }: { categories: readonly Category[] }) {
-  const router = useRouter();
   const [items, setItems] = useState<readonly Category[]>(categories);
+  // 保存のあとはサーバーから新しい一覧が届く(アクションの返事に画面の作り直しが入る)。届いたら入れ替える。
+  const [source, setSource] = useState(categories);
+  if (source !== categories) {
+    setSource(categories);
+    setItems(categories);
+  }
   const [sorting, setSorting] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const similar = similarCategories(items);
-  const shown = items.filter((c) => c.showOnHome);
-  const hidden = items.filter((c) => !c.showOnHome);
 
   const add = async () => {
     if (name.trim() === '') return;
@@ -46,17 +50,6 @@ export function CategoryList({ categories }: { categories: readonly Category[] }
     }
     hapticFor('save');
     setName('');
-    router.refresh();
-  };
-
-  const toggle = async (c: Category) => {
-    const next = !c.showOnHome;
-    setItems((prev) => prev.map((p) => (p.id === c.id ? { ...p, showOnHome: next } : p)));
-    const result = await setCategoryShowOnHomeAction(c.id, next);
-    if (result.error !== null) {
-      setItems((prev) => prev.map((p) => (p.id === c.id ? { ...p, showOnHome: !next } : p)));
-      setError(result.error);
-    }
   };
 
   const move = (id: string, delta: -1 | 1) => {
@@ -79,7 +72,6 @@ export function CategoryList({ categories }: { categories: readonly Category[] }
       return;
     }
     setSorting(false);
-    router.refresh();
   };
 
   const merge = async (from: Category, into: { id: string; name: string }) => {
@@ -92,7 +84,6 @@ export function CategoryList({ categories }: { categories: readonly Category[] }
       return;
     }
     setItems((prev) => prev.filter((p) => p.id !== from.id));
-    router.refresh();
   };
 
   const rows = (list: readonly Category[]) =>
@@ -104,7 +95,6 @@ export function CategoryList({ categories }: { categories: readonly Category[] }
         sorting={sorting}
         similar={similar.get(c.id) ?? null}
         busy={busy}
-        onToggle={() => void toggle(c)}
         onMove={(delta) => move(c.id, delta)}
         onMerge={(into) => void merge(c, into)}
       />
@@ -134,24 +124,10 @@ export function CategoryList({ categories }: { categories: readonly Category[] }
         </p>
       ) : null}
 
-      <Caption>ホームに表示 · {shown.length}</Caption>
+      <Caption>カテゴリ · {items.length}</Caption>
       <ul className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
-        {shown.length > 0 ? (
-          rows(shown)
-        ) : (
-          <li className="px-4 py-4 text-[15px]" style={{ color: 'var(--ink-muted)' }}>
-            まだありません。下のスイッチで選べます。
-          </li>
-        )}
-      </ul>
-      <p className="px-4 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-        ホームの「今日」で、使った額がすぐ見えるようになります。
-      </p>
-
-      <Caption>そのほか · {hidden.length}</Caption>
-      <ul className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
-        {rows(hidden)}
-        <li style={hidden.length > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}>
+        {rows(items)}
+        <li style={items.length > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}>
           <label className="flex min-h-14 items-center gap-3 px-4">
             <span
               aria-hidden
@@ -214,7 +190,6 @@ function Row({
   sorting,
   similar,
   busy,
-  onToggle,
   onMove,
   onMerge,
 }: {
@@ -223,7 +198,6 @@ function Row({
   sorting: boolean;
   similar: { id: string; name: string } | null;
   busy: boolean;
-  onToggle: () => void;
   onMove: (delta: -1 | 1) => void;
   onMerge: (into: { id: string; name: string }) => void;
 }) {
@@ -247,7 +221,12 @@ function Row({
           >
             {category.name.charAt(0)}
           </span>
-          <span className="truncate text-[16px]">{category.name}</span>
+          <span className="min-w-0 flex-1 truncate text-[16px]">{category.name}</span>
+          {sorting ? null : (
+            <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+              <ChevronRightIcon />
+            </span>
+          )}
         </Link>
         {sorting ? (
           <span className="flex shrink-0 gap-1">
@@ -262,15 +241,9 @@ function Row({
               onClick={() => onMove(1)}
             />
           </span>
-        ) : (
-          <Switch
-            checked={category.showOnHome}
-            onChange={onToggle}
-            label={`${category.name}をホームに表示`}
-          />
-        )}
+        ) : null}
       </div>
-      {similar && category.showOnHome && !sorting ? (
+      {similar && !sorting ? (
         <div
           className="mr-4 mb-3 ml-16 flex items-center justify-between gap-2 rounded-xl py-1 pr-1 pl-3"
           style={{ background: 'var(--state-caution-track)' }}

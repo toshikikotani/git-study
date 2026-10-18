@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
@@ -16,7 +15,6 @@ import {
   saveCategoryTargetAction,
   type CategorySheetData,
 } from './category-sheet-actions';
-import { setCategoryShowOnHomeAction } from './spending/category/actions';
 import { releaseCategoryFixedAction, restoreCategoryFixedAction } from './upcoming/actions';
 
 /** 目標額の − / + の刻みと、スライダーの刻み。 */
@@ -45,23 +43,27 @@ export function useOpenCategory(): OpenCategory {
 /**
  * カテゴリのシート(デザイン仕様書の⑦「カテゴリ」、ADR-091)を、アプリのどこからでも開けるようにする。
  * 開くとサーバーから今期の様子を読み、「完了」で目標額を保存する。
+ * 「完了」を押したらすぐ閉じ、保存はうしろで続ける(待たせない、ADR-098 → 113)。保存できなかったら、
+ * 入れた額のままシートを開き直し、理由を出す。
  */
 export function CategorySheetProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const [genreId, setGenreId] = useState<string | null>(null);
   const [data, setData] = useState<CategorySheetData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  /** 保存できずに開き直したときの、入れていた額。 */
+  const [retryAmount, setRetryAmount] = useState<number | undefined>(undefined);
 
-  const open = useCallback((id: string) => {
+  const load = useCallback((id: string, failed?: { amountYen: number; error: string }) => {
     setGenreId(id);
     setData(null);
     setError(null);
+    setRetryAmount(failed?.amountYen);
     void loadCategorySheetAction(id).then((result) => {
       setData(result.data);
-      setError(result.error);
+      setError(failed?.error ?? result.error);
     });
   }, []);
+  const open = useCallback((id: string) => load(id), [load]);
   const close = () => {
     setGenreId(null);
     setData(null);
@@ -75,31 +77,27 @@ export function CategorySheetProvider({ children }: { children: React.ReactNode 
           <CategorySheetBody
             key={data.outlook.genreId}
             data={data}
-            saving={saving}
+            {...(retryAmount !== undefined ? { amountYen: retryAmount } : {})}
             error={error}
             onCancel={close}
-            onDone={async (amount) => {
+            onDone={(amount) => {
               const target = data.outlook.targetYen;
-              if (amount === null || data.planId === null || amount === target) {
-                close();
-                router.refresh();
-                return;
-              }
-              setSaving(true);
-              const result = await saveCategoryTargetAction({
+              close();
+              if (amount === null || data.planId === null || amount === target) return;
+              const id = data.outlook.genreId;
+              void saveCategoryTargetAction({
                 planId: data.planId,
-                genreId: data.outlook.genreId,
+                genreId: id,
                 targetYen: amount,
                 inPlan: target !== null,
                 floorYen: data.outlook.spentYen + data.outlook.scheduledYen,
-              });
-              setSaving(false);
-              if (result.error) {
-                setError(result.error);
-                return;
-              }
-              close();
-              router.refresh();
+              })
+                .catch(() => ({
+                  error: '保存できませんでした。電波のよい所でもう一度押してください。',
+                }))
+                .then((result) => {
+                  if (result.error) load(id, { amountYen: amount, error: result.error });
+                });
             }}
           />
         ) : (
@@ -195,7 +193,6 @@ export function CategorySheetBody({
   /** こえたときの扱い(今期の目標を上げる / このままにする)。 */
   const [choice, setChoice] = useState<'raise' | 'keep'>('raise');
   const [fixed, setFixed] = useState(data.isFixed);
-  const [home, setHome] = useState(data.showOnHome);
   const [settingError, setSettingError] = useState<string | null>(null);
   const name = outlook.name;
   const hasPlan = data.planId !== null;
@@ -538,9 +535,9 @@ export function CategorySheetBody({
             <ChevronRightIcon />
           </span>
         </Link>
-        <Divider />
         {data.isFixed ? (
           <>
+            <Divider />
             <label className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
               <span className="flex flex-col">
                 <span className="text-[16px]">カテゴリごと固定費</span>
@@ -560,19 +557,8 @@ export function CategorySheetBody({
                 label="カテゴリごと固定費"
               />
             </label>
-            <Divider />
           </>
         ) : null}
-        <label className="flex min-h-13 items-center justify-between gap-3 px-4">
-          <span className="text-[16px]">ホームに表示</span>
-          <Switch
-            checked={home}
-            onChange={(next) =>
-              void toggle(next, setHome, () => setCategoryShowOnHomeAction(outlook.genreId, next))
-            }
-            label="ホームに表示"
-          />
-        </label>
       </div>
       {settingError ? (
         <p role="alert" className="px-1 text-[13px]" style={{ color: 'var(--over)' }}>

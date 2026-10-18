@@ -29,6 +29,34 @@ import {
 
 const NOW = new Date('2026-10-16T23:22:00Z'); // 日本時間 2026-10-17 08:22
 
+/** カテゴリの予測の行(使った額・目標・見込み)。 */
+function band(
+  id: string,
+  name: string,
+  actualYen: number,
+  targetYen: number,
+  p50: number,
+  type = 'steady',
+) {
+  return {
+    categoryId: id,
+    categoryName: name,
+    p10: 0,
+    p50: p50 - actualYen,
+    p90: p50 - actualYen,
+    landing: { p10: p50, p50, p90: p50 + 1_000 },
+    baseYen: actualYen,
+    actualYen,
+    scheduledYen: 0,
+    fixedYen: 0,
+    targetYen,
+    exceedance: p50 > targetYen ? 0.9 : 0.1,
+    meanYen: 0,
+    expectedCount: 0,
+    type,
+  };
+}
+
 function forecasts(): TodayForecasts {
   const goalView = {
     forecast: {
@@ -39,7 +67,17 @@ function forecasts(): TodayForecasts {
       breakdown: { actualYen: 147_000 },
       committed: { scheduledYen: 6_000, fixedYen: 12_000 },
       suggestion: null,
+      remainingDays: 20,
+      byCategory: [
+        band('dining', '外食', 22_000, 20_000, 25_000),
+        band('food', '食料品', 33_000, 40_000, 38_000),
+        band('rent', '家賃', 80_000, 80_000, 80_000, 'fixed'),
+        band('cafe', 'カフェ', 2_000, 10_000, 4_000),
+      ],
     },
+    excludedByCategory: new Map(),
+    closedGenreIds: new Set(),
+    cautionPrecision: null,
     todaySpentYen: 10_391,
     dailyLimit: { todayLimitYen: 1_000 },
   } as unknown as ForecastView;
@@ -93,6 +131,15 @@ describe('ホームの「今日」と同じ数字をAIに渡す(ADR-106)', () =>
     expect(text).toContain(
       '毎月の貯金目標100,000円(ホームの貯金と同じ値): 月末の見込みでは、あと約1.8万円届かない',
     );
+  });
+
+  it('気をつけたいカテゴリ(ホームと同じ、こえた → 8割をこえた。固定費・順調は出さない、ADR-117)', () => {
+    expect(text).toContain(
+      '- 気をつけたいカテゴリ(ホームに出しているもの): 外食は目標をこえた(使った額22,000円/目標20,000円、見込み約2.5万円)、食料品は目標の8割をこえた(使った額33,000円/目標40,000円、見込み約3.8万円)',
+    );
+    expect(text).not.toContain('家賃は');
+    expect(text).not.toContain('カフェは');
+    expect(text).not.toContain('ホームに出すと決めたカテゴリ');
   });
 
   it('目標が無ければ、今日の目安と見通しは出していないと書く', () => {

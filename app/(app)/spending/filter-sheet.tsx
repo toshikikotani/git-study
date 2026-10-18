@@ -7,6 +7,7 @@ import { hapticFor } from '@/lib/haptics';
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { activeFilterCount, isFilterActive } from '@/features/spending/views';
 import { addDays, formatDateJa, splitDateOnly } from '@/lib/date';
+import { useMerchantNameCheck } from './merchant-name-review';
 import { useSpendingMonth } from './spending-month-provider';
 
 export function monthDay(date: string): string {
@@ -26,9 +27,12 @@ export function FilterSheet({
   goalRange: { from: string; to: string } | null;
   compact?: boolean;
 }) {
-  const { filter, setFilter, clearFilter, genres, accounts, today, captures } = useSpendingMonth();
+  const { filter, setFilter, clearFilter, genres, accounts, today, captures, reloadVisibleMonth } =
+    useSpendingMonth();
   const [open, setOpen] = useState(false);
   const count = activeFilterCount(filter);
+  // 店名の表記ゆれは、いつでもここから探して直せる(本人の要望、ADR-118)。直したら一覧を読み直す。
+  const names = useMerchantNameCheck(reloadVisibleMonth);
 
   return (
     <>
@@ -166,6 +170,25 @@ export function FilterSheet({
             </Choice>
           </Group>
 
+          <Group label="整える">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                names.start();
+              }}
+              className="flex min-h-11 w-full flex-col items-start rounded-2xl px-4 py-2 text-left"
+              style={{ border: '1px solid var(--hairline)' }}
+            >
+              <span className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+                店名の表記ゆれを直す
+              </span>
+              <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                すべての月から、表記ゆれ・店名なし・住所のような店名を探します
+              </span>
+            </button>
+          </Group>
+
           <button
             type="button"
             onClick={() => setOpen(false)}
@@ -176,6 +199,7 @@ export function FilterSheet({
           </button>
         </div>
       </BottomSheet>
+      {names.sheet}
     </>
   );
 }

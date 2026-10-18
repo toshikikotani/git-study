@@ -75,7 +75,7 @@ function formatGenreLines(genres: readonly Genre[]): string {
   return genres
     .map((g) => {
       const budget = g.budgetYen === null ? '無制限' : `${g.budgetYen}円`;
-      return `- ${g.name}(月次予算=${budget} / ホーム表示=${g.showOnHome ? 'あり' : 'なし'})`;
+      return `- ${g.name}(月次予算=${budget})`;
     })
     .join('\n');
 }

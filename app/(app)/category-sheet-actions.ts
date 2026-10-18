@@ -19,7 +19,6 @@ export type CategorySheetData = {
   today: string;
   remainingDays: number;
   isFixed: boolean;
-  showOnHome: boolean;
   /** 今期の目標の合計(目標が無ければ null)。目標を上げたときの合計を出す。 */
   planTotalYen: number | null;
 };
@@ -49,7 +48,6 @@ export async function loadCategorySheetAction(
         today,
         remainingDays: loaded.remainingDays,
         isFixed: fixedKeys.has(`genre:${genreId}`) || genre.forecastClosed,
-        showOnHome: genre.showOnHome,
         planTotalYen: plan
           ? plan.items.reduce((sum, i) => sum + Math.max(0, i.targetYen), 0)
           : null,

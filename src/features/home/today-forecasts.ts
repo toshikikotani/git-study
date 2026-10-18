@@ -4,6 +4,8 @@
  * AIが画面と違う数字で話さないようにする(ADR-106)。呼ぶたびに明細から計算し直す。
  */
 
+import { landingRowsFrom } from '@/domain/forecast/landing-rows';
+import { watchCategories, type WatchCategory } from '@/domain/forecast/watch-categories';
 import { goalForecastArgs, type GoalForecastArgs } from '@/features/forecast/goal';
 import { loadForecast, type ForecastView } from '@/features/forecast/load';
 import { getCurrentPlan } from '@/features/spending-plan/store';
@@ -52,4 +54,22 @@ export async function loadTodayForecasts(now: Date = new Date()): Promise<TodayF
 /** 今日の1日の上限(休日軸・確率込みの上限、無ければ予測の安全な1日分)。 */
 export function todayCapYen(view: ForecastView): number {
   return view.dailyLimit?.todayLimitYen ?? view.forecast.safeDailyAllowance ?? 0;
+}
+
+/**
+ * ホームに出す「気をつけたいカテゴリ」(目標をこえた・こえそう・8割をこえた、最大3つ、ADR-117)。
+ * 今期の目標の予測から選ぶ(読み込みを増やさない)。AIの窓口にも同じものを渡す。
+ */
+export function watchCategoriesOf(view: ForecastView): WatchCategory[] {
+  const rows = landingRowsFrom({
+    forecast: view.forecast,
+    excludedByCategory: view.excludedByCategory,
+    closedGenreIds: view.closedGenreIds,
+    cautionPrecision: view.cautionPrecision,
+  });
+  return watchCategories({
+    rows,
+    byCategory: view.forecast.byCategory,
+    closedGenreIds: view.closedGenreIds,
+  });
 }

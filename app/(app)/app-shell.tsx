@@ -18,6 +18,7 @@ import { useKeyboard } from '@/lib/keyboard';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
+import { NavigationProgress } from '@/components/ui/navigation-progress';
 import { AiIcon, AnalysisIcon, ListIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
@@ -119,6 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <OpenRecordProvider value={openRecord}>
         <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
           <div aria-hidden className="status-blur" />
+          <NavigationProgress />
           <PullToRefresh>
             <main
               className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"

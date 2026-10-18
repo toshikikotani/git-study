@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { formatYen } from '@/domain/money';
 import type {
@@ -28,7 +27,6 @@ const SOURCE_LABEL: Record<DuplicateSideView['source'], string> = {
  * 「別の買い物」はペアへの判断を保存する(どちらも集計に残る)。
  */
 export function DuplicateList({ review }: { review: DuplicateReviewView }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const { candidates, decided } = review;
@@ -39,7 +37,6 @@ export function DuplicateList({ review }: { review: DuplicateReviewView }) {
       try {
         const result = await action();
         if (result.error) setError(result.error);
-        else router.refresh();
       } catch {
         setError('通信できませんでした。接続を確認してもう一度お試しください。');
       }

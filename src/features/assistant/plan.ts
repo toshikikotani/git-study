@@ -58,7 +58,6 @@ export const WRITE_TOOL_NAMES = [
   'update_receipt_items',
   'set_expense_subtype',
   'update_genre_budget',
-  'set_genre_show_on_home',
   'create_genre',
   'create_goal',
   'update_plan_targets',
@@ -129,7 +128,6 @@ export type Operation =
   | { op: 'replace_receipt_items'; transactionId: string; items: ReceiptItemInput[] }
   | { op: 'set_expense_subtype'; transactionId: string; subtype: string }
   | { op: 'update_genre_budget'; genreId: string; budgetYen: number | null }
-  | { op: 'set_genre_show_on_home'; genreId: string; showOnHome: boolean }
   | { op: 'create_genre'; name: string }
   | {
       op: 'create_goal';
@@ -364,24 +362,6 @@ function planGenreBudget(input: unknown, ctx: PlanContext): PlannedChange {
   };
 }
 
-function planGenreShowOnHome(input: unknown, ctx: PlanContext): PlannedChange {
-  const args = asRecord(input);
-  const genre = resolveGenreByName(args.genre_name, ctx.genres);
-  if (typeof args.show_on_home !== 'boolean') {
-    throw new ChatToolError('show_on_home は true/false で指定してください。');
-  }
-  return {
-    change: {
-      tool: 'set_genre_show_on_home',
-      input: args,
-      kind: 'updated',
-      target: genre.name,
-      detail: `ホームに残額を出す: ${genre.showOnHome ? '出す' : '出さない'}→${args.show_on_home ? '出す' : '出さない'}`,
-    },
-    operation: { op: 'set_genre_show_on_home', genreId: genre.id, showOnHome: args.show_on_home },
-  };
-}
-
 /**
  * 記録する(add_transaction、ADR-103)。日付・金額・名前・カテゴリ・種類を確かめ、確認カードに出す。
  * 日付は1年前〜1年先まで(先の日付は「予定」として記録される)。返金はカテゴリが要る。
@@ -552,8 +532,6 @@ export function planToolCall(name: string, input: unknown, ctx: PlanContext): Pl
       return planExpenseSubtype(input, ctx);
     case 'update_genre_budget':
       return planGenreBudget(input, ctx);
-    case 'set_genre_show_on_home':
-      return planGenreShowOnHome(input, ctx);
     case 'create_genre':
       return planCreateGenre(input, ctx);
     case 'create_goal':

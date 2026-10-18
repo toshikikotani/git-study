@@ -53,10 +53,7 @@ export default async function GoalEditPage() {
       addable={genreOptions.filter((g) => !taken.has(g.genreId))}
       next={{ start: nextStart, reserved }}
       settings={Object.fromEntries(
-        loaded.genres.map((g) => [
-          g.id,
-          { isFixed: fixedKeys.has(`genre:${g.id}`), showOnHome: g.showOnHome },
-        ]),
+        loaded.genres.map((g) => [g.id, { isFixed: fixedKeys.has(`genre:${g.id}`) }]),
       )}
     />
   );

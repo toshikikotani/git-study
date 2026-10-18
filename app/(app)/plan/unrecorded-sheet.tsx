@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
@@ -27,7 +26,6 @@ export function UnrecordedSheet({
   rows: readonly UnrecordedRow[];
   addable: readonly AddableGenre[];
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
@@ -46,7 +44,6 @@ export function UnrecordedSheet({
       return;
     }
     setOpen(false);
-    router.refresh();
   }
 
   return (
