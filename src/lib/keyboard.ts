@@ -21,6 +21,12 @@ export type KeyboardState = {
 /** これより低いものは、キーボードではなくツールバーの出入りとみなす。 */
 export const KEYBOARD_MIN_PX = 120;
 
+/**
+ * 欄からフォーカスが外れてから「閉じた」とするまでの待ち(ミリ秒)。外れた瞬間に並びを戻すと、
+ * 押したボタンが動いて押し損ねる(ADR-112)。キーボードが下がりきるのとおよそ同じ長さ。
+ */
+export const KEYBOARD_CLOSE_DELAY_MS = 250;
+
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'tel', 'url', 'password', 'number']);
 
 /** キーボードが出る欄か(文字を打つ入力欄・テキストエリア・編集できる要素)。 */
@@ -84,14 +90,20 @@ function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   if (stop === null) {
     const vv = window.visualViewport;
+    let closing = 0;
+    const onFocusOut = () => {
+      window.clearTimeout(closing);
+      closing = window.setTimeout(update, KEYBOARD_CLOSE_DELAY_MS);
+    };
     document.addEventListener('focusin', update);
-    document.addEventListener('focusout', update);
+    document.addEventListener('focusout', onFocusOut);
     vv?.addEventListener('resize', update);
     vv?.addEventListener('scroll', update);
     current = measure();
     stop = () => {
+      window.clearTimeout(closing);
       document.removeEventListener('focusin', update);
-      document.removeEventListener('focusout', update);
+      document.removeEventListener('focusout', onFocusOut);
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
     };

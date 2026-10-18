@@ -52,7 +52,9 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
 
     const onTouchStart = (e: TouchEvent) => {
       // 画面の最上部でだけ引っ張りを開始する(途中でのスクロールと混同しない)。
-      startYRef.current = window.scrollY <= 0 ? (e.touches[0]?.clientY ?? null) : null;
+      // 画面に固定した層(AIの会話、data-no-pull)では引っ張らない。会話を上へ戻すのを止めていた(ADR-112)。
+      const noPull = e.target instanceof Element && e.target.closest('[data-no-pull]') !== null;
+      startYRef.current = window.scrollY <= 0 && !noPull ? (e.touches[0]?.clientY ?? null) : null;
     };
 
     const onTouchMove = (e: TouchEvent) => {
