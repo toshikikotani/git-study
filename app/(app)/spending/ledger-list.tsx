@@ -22,6 +22,8 @@ import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
 import { PendingReceiptRows } from './pending-receipt-rows';
+import { LedgerSelectionMenu } from './ledger-selection-menu';
+import { SelectionCopySheet } from './selection-copy-sheet';
 import { SplitPaymentSheet } from './split-payment-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -50,7 +52,7 @@ export function LedgerList(props: LedgerListProps) {
   return <LedgerListContent key={JSON.stringify([visibleMonth, filter])} {...props} />;
 }
 
-function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: LedgerListProps) {
+export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: LedgerListProps) {
   const {
     transactions,
     today,
@@ -66,6 +68,7 @@ function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: Ledger
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [splitOpen, setSplitOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const selectionReady = !loading && (error === null || isCurrentMonth) && !filter.pendingOnly;
   const fixedKeySet = useMemo(() => new Set(fixedKeys), [fixedKeys]);
   const isFixed = useCallback(
@@ -76,33 +79,6 @@ function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: Ledger
   );
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
-  const eligible = useMemo(() => {
-    const seen = new Set<string>();
-    return filtered.filter((t) => {
-      if (!isSplitPaymentEligible(t) || seen.has(t.id)) return false;
-      seen.add(t.id);
-      return true;
-    });
-  }, [filtered]);
-  const selected = useMemo(
-    () => eligible.filter((t) => selectedIds.has(t.id)),
-    [eligible, selectedIds],
-  );
-  const selectedTotal = selected.reduce((sum, t) => sum - t.amountYen, 0);
-  const validTotal = Number.isSafeInteger(selectedTotal) && selectedTotal <= MAX_YEN;
-  const toggleSelected = (id: string) =>
-    setSelectedIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  const exitSelect = () => {
-    setSelectMode(false);
-    setSelectedIds(new Set());
-    setSplitOpen(false);
-  };
-  const selection = selectMode ? { selectedIds, onToggle: toggleSelected } : undefined;
   const model = useMemo(() => buildListModel(filtered, today), [filtered, today]);
   const fixed = useMemo(
     () => filtered.filter((t) => t.amountYen < 0 && isFixed(t)),
@@ -122,6 +98,50 @@ function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: Ledger
         .filter((g) => g.transactions.length > 0),
     [model.dayGroups, isFixed],
   );
+  const selectable = useMemo(() => {
+    // 全選択で、一覧に出ていない振替・対象外などを巻き込まない。
+    const visibleIds = new Set([
+      ...model.scheduled.filter((t) => !isFixed(t)).map((t) => t.id),
+      ...fixed.map((t) => t.id),
+      ...dayGroups.flatMap((g) => g.transactions.map((t) => t.id)),
+    ]);
+    const seen = new Set<string>();
+    return filtered.filter((t) => {
+      if (!visibleIds.has(t.id) || seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [filtered, model.scheduled, fixed, dayGroups, isFixed]);
+  const selected = useMemo(
+    () => selectable.filter((t) => selectedIds.has(t.id)),
+    [selectable, selectedIds],
+  );
+  const selectedTotal = selected.reduce((sum, t) => sum - t.amountYen, 0);
+  const validTotal = Number.isSafeInteger(selectedTotal) && selectedTotal <= MAX_YEN;
+  const splitDisabledReason =
+    selected.length === 0
+      ? '明細を選択してください。'
+      : !selected.every(isSplitPaymentEligible)
+        ? '割り勘は実績の支出だけを選ぶと使えます。'
+        : !validTotal
+          ? '割り勘の合計が金額の上限を超えています。'
+          : null;
+  const toggleSelected = (id: string) =>
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setSplitOpen(false);
+    setCopyOpen(false);
+  };
+  const selection = selectMode
+    ? { selectedIds, onToggle: toggleSelected, disabled: !selectionReady }
+    : undefined;
   const monthLabel = `${Number(visibleMonth.slice(5, 7))}月の固定費`;
   const risky = useMemo(
     () => transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod)),
@@ -130,30 +150,9 @@ function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: Ledger
   const active = isFilterActive(filter);
 
   return (
-    <section
-      id="ledger"
-      aria-label="明細"
-      className={`scroll-mt-16 flex flex-col gap-3 ${selectMode ? 'pb-24' : ''}`}
-    >
+    <section id="ledger" aria-label="明細" className="scroll-mt-16 flex flex-col gap-3">
       <ActiveFilterChips goalRange={goalRange} />
       <PendingReceiptRows />
-      {eligible.length > 0 || selectMode ? (
-        <div className="flex min-h-11 items-center justify-between gap-3 px-1">
-          <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-            {selectMode ? '割り勘にする支出を選んでください' : 'まとめて割り勘を請求できます'}
-          </p>
-          <button
-            type="button"
-            aria-pressed={selectMode}
-            disabled={!selectMode && !selectionReady}
-            onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-            className="min-h-11 shrink-0 px-2 text-[15px] font-semibold disabled:opacity-40"
-            style={{ color: 'var(--accent)' }}
-          >
-            {selectMode ? 'キャンセル' : '選択'}
-          </button>
-        </div>
-      ) : null}
       {risky.length > 0 ? (
         <Link
           href="/transactions/reconcile"
@@ -243,36 +242,34 @@ function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: Ledger
           </p>
         </>
       )}
-      {selectMode ? (
-        <div
-          role="region"
-          aria-label="選択した明細の操作"
-          className="fixed inset-x-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg"
-          style={{ background: 'var(--surface)', borderColor: 'var(--hairline)' }}
-        >
-          <p className="tabular flex min-w-0 flex-col text-[13px]" aria-live="polite">
-            <span>{selected.length}件を選択</span>
-            {validTotal ? (
-              <Yen value={selectedTotal} className="text-[20px] font-bold" />
-            ) : (
-              <span className="text-[13px]">合計が金額の上限を超えています</span>
-            )}
-          </p>
-          <Button
-            type="button"
-            disabled={selected.length === 0 || !validTotal || !selectionReady}
-            onClick={() => setSplitOpen(true)}
-            className="shrink-0 text-[15px] font-semibold"
-            variant="filled"
-          >
-            割り勘
-          </Button>
-        </div>
+      {selectable.length > 0 || selectMode ? (
+        <LedgerSelectionMenu
+          selectMode={selectMode}
+          count={selected.length}
+          availableCount={selectable.length}
+          ready={selectionReady}
+          splitDisabledReason={splitDisabledReason}
+          expenseTotalYen={
+            selected.length > 0 && splitDisabledReason === null ? selectedTotal : undefined
+          }
+          hidden={(splitOpen || copyOpen) && selectionReady}
+          onStart={() => selectionReady && setSelectMode(true)}
+          onExit={exitSelect}
+          onSplit={() => selectionReady && splitDisabledReason === null && setSplitOpen(true)}
+          onCopy={() => selectionReady && selected.length > 0 && setCopyOpen(true)}
+          onSelectAll={() => selectionReady && setSelectedIds(new Set(selectable.map((t) => t.id)))}
+          onClear={() => setSelectedIds(new Set())}
+        />
       ) : null}
       <SplitPaymentSheet
         open={splitOpen && selectionReady}
         transactions={selected}
         onClose={() => setSplitOpen(false)}
+      />
+      <SelectionCopySheet
+        open={copyOpen && selectionReady}
+        transactions={selected}
+        onClose={() => setCopyOpen(false)}
       />
     </section>
   );
@@ -302,6 +299,7 @@ function DaySection({
     | {
         selectedIds: ReadonlySet<string>;
         onToggle: (id: string) => void;
+        disabled: boolean;
       }
     | undefined;
 }) {
@@ -340,6 +338,7 @@ function DaySection({
                 key={t.id}
                 transaction={t}
                 selected={selection.selectedIds.has(t.id)}
+                disabled={selection.disabled}
                 onToggle={() => selection.onToggle(t.id)}
               />
             ) : (
@@ -378,23 +377,24 @@ function DaySection({
 }
 
 /** 選択中は行全体でチェックを切り替え、編集やスワイプの誤操作を避ける。 */
-function SelectableTransaction({
+export function SelectableTransaction({
   transaction: t,
   selected,
   onToggle,
+  disabled = false,
 }: {
   transaction: DrilldownTransaction;
   selected: boolean;
   onToggle: () => void;
+  disabled?: boolean;
 }) {
-  const eligible = isSplitPaymentEligible(t);
   return (
     <li style={selected ? { background: 'var(--accent-track)' } : undefined}>
       <label className="flex min-h-14 items-start gap-3 px-4 py-3">
         <input
           type="checkbox"
-          checked={selected && eligible}
-          disabled={!eligible}
+          checked={selected}
+          disabled={disabled}
           onChange={onToggle}
           aria-label={`${t.label}、${Math.abs(t.amountYen).toLocaleString('ja-JP')}円を選択`}
           className="mt-1 size-5 shrink-0"
@@ -412,11 +412,6 @@ function SelectableTransaction({
           {t.items.length > 0 ? (
             <span className="text-[12px] break-words" style={{ color: 'var(--ink-secondary)' }}>
               {t.items.map((item) => item.name).join('・')}
-            </span>
-          ) : null}
-          {!eligible ? (
-            <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-              {t.status === 'scheduled' ? '予定は対象外です' : '支出の実績だけ選べます'}
             </span>
           ) : null}
         </span>
