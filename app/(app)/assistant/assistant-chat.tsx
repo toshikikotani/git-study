@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AskUserQuestion } from '@/features/assistant/plan';
 import { recordFromEdit, type StoreCandidate } from '@/features/assistant/record-change';
 import { comparableKey } from '@/domain/store-name';
+import { useKeyboard, type KeyboardState } from '@/lib/keyboard';
 import { useSpeechInput } from '@/lib/speech-input';
 import type { WhatIfCard } from '@/domain/forecast/what-if-spend';
 import { WhatIfSheet } from '../_home/what-if-sheet';
@@ -54,6 +55,26 @@ const PAGE_STYLE = {
   marginBottom: '-5rem',
 } as const;
 
+/**
+ * キーボードが出ているあいだの /assistant:見えている範囲いっぱいに広げ、入力欄をキーボードのすぐ上に置く。
+ * 以前は画面の高さが変わらず、入力欄とキーボードのあいだにタブバーが浮き、上は空いていた
+ * (本人の指摘「AI入力画面違和感」、ADR-111)。タブバーはそのあいだ隠れる(app-shell)。
+ */
+function dockedStyle(keyboard: KeyboardState): React.CSSProperties {
+  return {
+    position: 'fixed',
+    insetInline: 0,
+    top: keyboard.top,
+    height: keyboard.height,
+    zIndex: 45,
+    maxWidth: '42rem',
+    marginInline: 'auto',
+    paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+    background: 'var(--plane)',
+    color: 'var(--ink)',
+  };
+}
+
 export function AssistantChat({
   variant,
   onClose,
@@ -72,6 +93,8 @@ export function AssistantChat({
   const { messages, sending, error } = useChat();
   const [input, setInput] = useState(initialPrompt ?? '');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const keyboard = useKeyboard();
+  const docked = variant === 'page' && keyboard.open;
   const speech = useSpeechInput((text) => void send(text));
   /** 直している記録の案(どの発言の、何件目か)。 */
   const [editing, setEditing] = useState<{ message: number; change: number } | null>(null);
@@ -89,7 +112,7 @@ export function AssistantChat({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, sending, editing]);
+  }, [messages, sending, editing, keyboard.height]);
 
   const submit = () => {
     if (input.trim() === '' || sending) return;
@@ -145,12 +168,25 @@ export function AssistantChat({
 
   return (
     <div
-      className={variant === 'sheet' ? 'flex h-[84dvh] flex-col gap-2' : 'rise flex flex-col gap-2'}
-      style={variant === 'sheet' ? { color: 'var(--ink)' } : { ...PAGE_STYLE, color: 'var(--ink)' }}
+      className={
+        variant === 'sheet'
+          ? 'flex h-[84dvh] flex-col gap-2'
+          : docked
+            ? 'rise flex flex-col gap-2 px-4 pb-2'
+            : 'rise flex flex-col gap-2'
+      }
+      style={
+        variant === 'sheet'
+          ? { color: 'var(--ink)' }
+          : docked
+            ? dockedStyle(keyboard)
+            : { ...PAGE_STYLE, color: 'var(--ink)' }
+      }
     >
       {variant === 'page' ? (
         <header className="flex items-center justify-between gap-2 px-1">
-          <h1 className="text-[34px] font-bold">AI</h1>
+          {/* キーボードが出ているあいだは題を小さくし、会話の見える行をふやす。 */}
+          <h1 className={docked ? 'text-[17px] font-semibold' : 'text-[34px] font-bold'}>AI</h1>
           <button
             type="button"
             onClick={resetChat}
@@ -276,7 +312,11 @@ export function AssistantChat({
           e.preventDefault();
           submit();
         }}
-        className="flex items-end gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        className={
+          docked
+            ? 'flex items-end gap-2'
+            : 'flex items-end gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+        }
       >
         {speech.supported ? (
           <button

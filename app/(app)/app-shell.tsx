@@ -14,6 +14,7 @@ import {
   type RecordOptions,
 } from './record-sheet';
 import { parseDateOnlyOr, todayJst } from '@/lib/date';
+import { useKeyboard } from '@/lib/keyboard';
 import { createLongPress } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
@@ -164,6 +165,9 @@ function BottomBar({
 }) {
   const pathname = usePathname();
   const jobs = useReceiptJobs();
+  // 文字を打っているあいだ(キーボードが出ているあいだ)は、タブバーと読み取りの知らせを隠す。
+  // iPhone では入力欄とキーボードのあいだに浮いていた(本人の指摘、ADR-111)。
+  const keyboard = useKeyboard();
   useEffect(() => {
     void restoreWaitingReceipts();
   }, []);
@@ -227,7 +231,7 @@ function BottomBar({
   );
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      {reading + waiting + offlineWaiting + needInput > 0 ? (
+      {!keyboard.open && reading + waiting + offlineWaiting + needInput > 0 ? (
         <Link
           href="/transactions/receipt"
           prefetch={false}
@@ -281,7 +285,11 @@ function BottomBar({
           initialGenreId={record?.genreId}
         />
       </BottomSheet>
-      <div className="tabbar flex w-full items-center gap-3" data-compact={compact}>
+      <div
+        className="tabbar flex w-full items-center gap-3"
+        data-compact={compact}
+        style={keyboard.open ? { display: 'none' } : undefined}
+      >
         <nav aria-label="メイン" className="min-w-0 flex-1">
           <ul className="tabbar-pill liquid-capsule flex items-center">
             {NAV.map((item) => {
