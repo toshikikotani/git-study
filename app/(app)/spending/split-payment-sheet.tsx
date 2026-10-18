@@ -1,9 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { buildSplitPaymentRequest, type SplitPaymentEntry } from '@/domain/split-payment-request';
+import { saveBrowserSplitPaymentTracking } from '@/features/split-payments/browser-store';
+import type { TrackingStorage } from '@/features/split-payments/types';
+import { saveSplitPaymentTrackingAction } from './split-payment-tracking-actions';
 
 type Props = {
   transactions: readonly SplitPaymentEntry[];
@@ -22,10 +27,21 @@ const yen = (amount: number) => `${amount.toLocaleString('ja-JP')}円`;
 
 /** コピーする文面をその場で確認する。保存済みの明細には変更を加えない。 */
 export function SplitPaymentForm({ transactions, onClose }: Props) {
+  const router = useRouter();
   const [people, setPeople] = useState('2');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<{ text: string; message: string } | null>(null);
   const [copying, setCopying] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [tracked, setTracked] = useState<{
+    text: string;
+    storage: TrackingStorage;
+    complete: boolean;
+  } | null>(null);
+  const [trackingError, setTrackingError] = useState<{ text: string; message: string } | null>(
+    null,
+  );
   const previewRef = useRef<HTMLTextAreaElement>(null);
 
   let request: ReturnType<typeof buildSplitPaymentRequest> | null = null;
@@ -36,8 +52,46 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
     error = cause instanceof Error ? cause.message : '人数と明細を確認してください。';
   }
 
+  async function track(snapshot: ReturnType<typeof buildSplitPaymentRequest>) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setTrackingError(null);
+    try {
+      const result = await saveSplitPaymentTrackingAction({
+        entries: snapshot.entries,
+        participants: snapshot.participants,
+      });
+      if (result.error || !result.userId || !result.request) {
+        throw new Error(result.error ?? 'ホームへの追加を確認できませんでした。');
+      }
+      const saved =
+        result.storage === 'browser'
+          ? await saveBrowserSplitPaymentTracking(result.userId, result.request)
+          : result.request;
+      setTracked({
+        text: snapshot.message,
+        storage: result.storage,
+        complete: saved.receivedCount === saved.participants - 1,
+      });
+      router.refresh();
+    } catch (cause) {
+      setTrackingError({
+        text: snapshot.message,
+        message:
+          cause instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(cause.message)
+            ? cause.message
+            : 'ホームに追加できませんでした。もう一度お試しください。',
+      });
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
   async function copy() {
-    if (!request || copying) return;
+    if (!request || copying || savingRef.current) return;
+    const snapshot = request;
     const text = request.message;
     setCopying(true);
     setCopyError(null);
@@ -52,6 +106,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
       }
       await navigator.clipboard.writeText(text);
       setCopiedText(text);
+      await track(snapshot);
     } catch {
       setCopyError({
         text,
@@ -77,11 +132,11 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
         <button
           type="button"
           onClick={copy}
-          disabled={!request || copying}
+          disabled={!request || copying || saving}
           className="min-h-11 justify-self-end px-2 text-sm font-semibold disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
-          {copying ? 'コピー中…' : 'コピー'}
+          {saving ? '追加中…' : copying ? 'コピー中…' : 'コピー'}
         </button>
       </BottomSheetHeader>
 
@@ -106,6 +161,8 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
               setPeople(event.target.value);
               setCopiedText(null);
               setCopyError(null);
+              setTracked(null);
+              setTrackingError(null);
             }}
             aria-invalid={error !== null}
             aria-describedby={error ? 'split-payment-error' : undefined}
@@ -185,6 +242,45 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
             {copyError?.text === request.message ? (
               <p role="alert" className="text-sm">
                 {copyError.message}
+              </p>
+            ) : null}
+            {tracked?.text === request.message ? (
+              <div className="space-y-2 text-sm">
+                <p role="status">
+                  {tracked.complete
+                    ? 'この請求は受取済みとして保存されています。'
+                    : 'ホームの受取待ちに追加しました。'}
+                </p>
+                {tracked.storage === 'browser' ? (
+                  <p style={{ color: 'var(--ink-muted)' }}>このブラウザに保存されています。</p>
+                ) : null}
+                <Link
+                  href="/"
+                  className="inline-flex min-h-11 items-center font-semibold"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  ホームで受取を確認 →
+                </Link>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={saving || copying}
+                onClick={() => void track(request)}
+                className="min-h-11 px-2 text-sm font-semibold disabled:opacity-40"
+                style={{ color: 'var(--accent)' }}
+              >
+                {saving
+                  ? '追加しています…'
+                  : trackingError?.text === request.message
+                    ? 'ホームへの追加を再試行'
+                    : '受取待ちに追加'}
+              </button>
+            )}
+            {trackingError?.text === request.message ? (
+              <p role="alert" className="text-sm">
+                {trackingError.message}
+                {copiedText === request.message ? ' 文面はコピー済みです。' : ''}
               </p>
             ) : null}
           </>

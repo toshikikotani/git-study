@@ -47,6 +47,7 @@ PENDING=(
   20261007000100_spending_promises_stop.sql
   20261007000200_savings_replace_debts.sql
   20261017000100_duplicate_pair_decisions.sql
+  20261018000100_split_payment_requests.sql
 )
 
 WORK="$(mktemp -d)"

@@ -252,6 +252,136 @@ begin
 end $$;
 commit;
 
+\echo '--- 割り勘の受取: 本人だけが作成・更新・取消でき、不正な金額・人数を保存できない ---'
+begin;
+set local role authenticated;
+set local "test.user_id" = '11111111-1111-1111-1111-111111111111';
+insert into public.split_payment_requests (
+  id, user_id, signature, entries, participants, total_yen, amount_per_person_yen
+) values (
+  'eeeeeeee-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+  repeat('a', 64), '[{"label":"食事","amountYen":-1000}]', 3, 1000, 333
+);
+
+do $$
+declare
+  invalid_patch text;
+  changed bigint;
+begin
+  if (select count(*) from public.split_payment_requests) <> 1 then
+    raise exception 'FAIL: 本人の割り勘依頼を保存・参照できない';
+  end if;
+  if not exists (
+    select 1 from public.split_payment_requests
+    where received_count = 0 and version = 0 and created_at is not null
+  ) then
+    raise exception 'FAIL: 受取人数・バージョン・作成日時の既定値が正しくない';
+  end if;
+  begin
+    insert into public.split_payment_requests (
+      user_id, signature, entries, participants, total_yen, amount_per_person_yen
+    ) values ('11111111-1111-1111-1111-111111111111', repeat('a', 64), '[{}]', 3, 1000, 333);
+    raise exception 'FAIL: 同じ本人・署名の依頼を重複保存できてしまった';
+  exception when unique_violation then null;
+  end;
+  foreach invalid_patch in array array[
+    'received_count = -1', 'received_count = 3',
+    'participants = 0', 'participants = 1', 'participants = 1000000000001',
+    'total_yen = 0', 'total_yen = 1000000000001',
+    'amount_per_person_yen = 0', 'amount_per_person_yen = 334',
+    'amount_per_person_yen = 1000000000001', 'version = -1',
+    'entries = ''[]''::jsonb', 'entries = ''{}''::jsonb',
+    'signature = ''invalid'''
+  ] loop
+    begin
+      execute format(
+        'update public.split_payment_requests set %s where id = %L::uuid',
+        invalid_patch, 'eeeeeeee-0000-0000-0000-000000000001'
+      );
+      raise exception 'FAIL: 不正な割り勘依頼の更新が成功した: %', invalid_patch;
+    exception when check_violation then null;
+    end;
+  end loop;
+  update public.split_payment_requests set received_count = 1, version = 1
+  where id = 'eeeeeeee-0000-0000-0000-000000000001' and version = 0;
+  get diagnostics changed = row_count;
+  if changed <> 1 then
+    raise exception 'FAIL: 本人が受取を記録できない';
+  end if;
+  update public.split_payment_requests set received_count = 2, version = 1
+  where id = 'eeeeeeee-0000-0000-0000-000000000001' and version = 0;
+  get diagnostics changed = row_count;
+  if changed <> 0 then
+    raise exception 'FAIL: 古いバージョンの更新が受取を上書きした';
+  end if;
+  update public.split_payment_requests set received_count = 2, version = 2
+  where id = 'eeeeeeee-0000-0000-0000-000000000001' and version = 1;
+  if not exists (select 1 from public.split_payment_requests where received_count = 2 and version = 2) then
+    raise exception 'FAIL: 全員の受取を記録できない';
+  end if;
+  update public.split_payment_requests set received_count = 0, version = 3
+  where id = 'eeeeeeee-0000-0000-0000-000000000001' and version = 2;
+  if not exists (select 1 from public.split_payment_requests where received_count = 0 and version = 3) then
+    raise exception 'FAIL: 受取チェックを元に戻せない';
+  end if;
+  begin
+    update public.split_payment_requests set user_id = '22222222-2222-2222-2222-222222222222'
+    where id = 'eeeeeeee-0000-0000-0000-000000000001';
+    raise exception 'FAIL: 他人名義へ依頼を変更できてしまった';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+set local "test.user_id" = '22222222-2222-2222-2222-222222222222';
+do $$
+declare
+  changed bigint;
+begin
+  if exists (select 1 from public.split_payment_requests) then
+    raise exception 'FAIL: 他人の割り勘依頼が見えている';
+  end if;
+  update public.split_payment_requests set received_count = 1
+  where id = 'eeeeeeee-0000-0000-0000-000000000001';
+  get diagnostics changed = row_count;
+  if changed <> 0 then
+    raise exception 'FAIL: 他人が受取を更新できてしまった';
+  end if;
+  delete from public.split_payment_requests where id = 'eeeeeeee-0000-0000-0000-000000000001';
+  get diagnostics changed = row_count;
+  if changed <> 0 then
+    raise exception 'FAIL: 他人が割り勘依頼を削除できてしまった';
+  end if;
+  begin
+    insert into public.split_payment_requests (
+      user_id, signature, entries, participants, total_yen, amount_per_person_yen
+    ) values ('11111111-1111-1111-1111-111111111111', repeat('b', 64), '[{}]', 3, 1000, 333);
+    raise exception 'FAIL: 他人名義の割り勘依頼を作れてしまった';
+  exception when insufficient_privilege then null;
+  end;
+  -- 同じ署名でも、別ユーザーの依頼は独立する。
+  insert into public.split_payment_requests (
+    user_id, signature, entries, participants, total_yen, amount_per_person_yen
+  ) values ('22222222-2222-2222-2222-222222222222', repeat('a', 64), '[{}]', 3, 1000, 333);
+  delete from public.split_payment_requests;
+  get diagnostics changed = row_count;
+  if changed <> 1 then
+    raise exception 'FAIL: 別ユーザーが自分の依頼だけを取り消せない';
+  end if;
+end $$;
+
+set local "test.user_id" = '11111111-1111-1111-1111-111111111111';
+do $$
+begin
+  if (select count(*) from public.split_payment_requests) <> 1 then
+    raise exception 'FAIL: 他人の削除操作で本人の割り勘依頼が失われた';
+  end if;
+  delete from public.split_payment_requests;
+  if exists (select 1 from public.split_payment_requests) then
+    raise exception 'FAIL: 本人が割り勘依頼を取り消せない';
+  end if;
+end $$;
+commit;
+
 \echo '--- 全テーブルで RLS が有効か(tables_without_rls は 0 であること)---'
 select count(*) filter (where not c.relrowsecurity) as tables_without_rls,
        count(*)                                     as total_tables
