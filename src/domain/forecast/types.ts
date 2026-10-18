@@ -407,6 +407,8 @@ export type Forecast = {
    * 添字 i が分位 (i + 1) × 5%。
    */
   totalQuantiles: readonly number[];
+  /** 同じ試行・補正による着地の分布。目標内と任意の金額以下の確率に共通で使う。 */
+  distribution: import('./distribution').ForecastDistribution;
   /** グラフの線と帯(同じ試行の、日ごとの分位)。最終日の値 + 実績 = total。 */
   path: readonly PathPoint[];
   /** 理想の線の形(期間全体)。 */

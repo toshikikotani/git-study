@@ -18,7 +18,8 @@ import { eachDay } from '@/domain/period';
 import { daysBetween, type DateOnly } from '@/lib/date';
 import { recordedShare } from './lag';
 import { dayFeature, DEFAULT_MONTH_LEVEL_K, rateFactor } from './model';
-import { calibratedProbability, rawLevelFor, type PitCalibration } from './pit';
+import { rawLevelFor, type PitCalibration } from './pit';
+import { forecastDistribution, probabilityAt, trialProbability } from './distribution';
 import {
   createRng,
   pickOne,
@@ -603,8 +604,8 @@ function mean(samples: Float64Array): number {
 }
 
 /** 金額は整数の円で返す(画面の formatYen は整数でないと例外にする、ADR-008)。 */
-function bandAt(sorted: Float64Array, levels: Levels, shift = 0): Band {
-  const p10 = Math.max(0, Math.round(quantileAt(sorted, levels.p10) + shift));
+function bandAt(sorted: Float64Array, levels: Levels, shift = 0, minimum = 0): Band {
+  const p10 = Math.max(minimum, Math.round(quantileAt(sorted, levels.p10) + shift));
   const p50 = Math.max(p10, Math.round(quantileAt(sorted, levels.p50) + shift));
   const p70 = Math.max(p50, Math.round(quantileAt(sorted, levels.p70) + shift));
   const p90 = Math.max(p70, Math.round(quantileAt(sorted, levels.p90) + shift));
@@ -663,17 +664,9 @@ export function simulateForecast(input: SimulateInput): Forecast {
   };
 
   const sortedTotal = sortedCopy(totalSamples);
-  const total = bandAt(sortedTotal, levels);
-  // 下限が実績より低くなりすぎないようにする。変動費の平均の半分を最低限とする。
-  const variableMean = mean(variableSamples);
-  const minRemaining = Math.round(variableMean * 0.5);
-  const floor = input.actualYen + minRemaining;
-  if (total.p10 < floor) {
-    total.p10 = floor;
-    if (total.p50 < total.p10) total.p50 = total.p10;
-    if (total.p70 < total.p50) total.p70 = total.p50;
-    if (total.p90 < total.p70) total.p90 = total.p70;
-  }
+  const distribution = forecastDistribution(sortedTotal, cal);
+  // 返金が支出を上回る期間の純支出は負になる。合計だけ0円へ丸めると分布と矛盾する。
+  const total = bandAt(sortedTotal, levels, 0, Number.NEGATIVE_INFINITY);
   const categoryMedian = categorySamples.map((s) => quantileAt(sortedCopy(s), 0.5));
 
   // 予算を超えた試行での、各カテゴリの「ふだんより多い分」(原因の割り当て)。
@@ -728,7 +721,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
   });
 
   const probWithinBudget =
-    input.budgetYen !== null ? calibratedProbability(cal, 1 - overshootTrialCount / trials) : null;
+    input.budgetYen !== null ? probabilityAt(distribution, input.budgetYen) : null;
 
   const totalOvershootRisk = overshootByCategory.reduce((a, b) => a + b, 0);
   const drivers: ForecastDriver[] =
@@ -813,6 +806,7 @@ export function simulateForecast(input: SimulateInput): Forecast {
     totalQuantiles: TOTAL_QUANTILE_LEVELS.map((p) =>
       Math.round(quantileAt(sortedTotal, rawLevelFor(cal, p))),
     ),
+    distribution,
     path,
     typicalProfile: typicalProfile(input),
     byCategory,
@@ -910,7 +904,7 @@ function suggestCut(args: {
   const within = (shift: (t: number) => number) => {
     let n = 0;
     for (let t = 0; t < run.trials; t += 1) if (run.totalSamples[t]! - shift(t) <= budget) n += 1;
-    return calibratedProbability(cal, n / run.trials);
+    return trialProbability(cal, n, run.trials);
   };
   const probBefore = within(() => 0);
   // 約束したジャンルは、もう決めてあるので重ねて勧めない(ADR-075)。
@@ -1081,7 +1075,7 @@ function whatIfOf(args: {
         perWeek,
         landing: { p10, p50, p90 },
         exceedance: cat.targetYen === null ? null : over / run.trials,
-        probWithinBudget: budget === null ? null : calibratedProbability(cal, within / run.trials),
+        probWithinBudget: budget === null ? null : trialProbability(cal, within, run.trials),
         savedYen: Math.round(meanYen * cut),
       };
     };

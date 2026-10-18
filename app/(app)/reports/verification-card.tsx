@@ -1,7 +1,7 @@
 import type { Verification } from '@/features/forecast/calibration';
 import type { DateOnly } from '@/lib/date';
 
-/** この予測が過去の月でどれだけ当たったか(自分の記録での検証)。 */
+/** 補正に使った過去の月での確認。将来の的中率とは区別して示す。 */
 export function VerificationCard({
   verification,
   monthStart,
@@ -17,7 +17,7 @@ export function VerificationCard({
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
       <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-        予測の当たり具合
+        過去の記録での確認
       </p>
       {verification === null ? (
         <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -38,6 +38,7 @@ export function VerificationCard({
             回の予測(2日おき)を、補正したうえで実際と比べたとき、着地が「10回中8回の幅」に入った割合
             (目安は80%)。補正の前は{Math.round(verification.summary.hitRate80 * 100)}
             %、中央値のずれは平均 {Math.round(verification.summary.medianAbsErrorRatio * 100)}%。
+            補正に使った同じ月での参考値です。これからの精度は、今後の記録で確かめます。
             {verification.summary.months < 3 ? ' 確かめられた月がまだ少ないので、目安。' : ''}
           </p>
         </>
