@@ -3,7 +3,7 @@
 import { pushUndo } from '@/lib/undo';
 import { useEffect, useRef, useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
 import type { GenreOption } from '@/features/genre/store';
@@ -274,11 +274,11 @@ export function ReceiptItemsPanel({
         </>
       ) : null}
       <BottomSheet open={dialogOpen} onClose={closeDialog} role="dialog">
-        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+        <BottomSheetHeader className="flex items-center justify-between px-3 pt-1 pb-2">
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             品目を編集
           </h2>
-        </div>
+        </BottomSheetHeader>
         <div className="space-y-2 px-3 pb-3">
           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
             品目ごとに品名・金額・カテゴリを直せます。合計を一致させる必要はありません。

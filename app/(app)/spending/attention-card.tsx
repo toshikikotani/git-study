@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import { buildAttention } from '@/features/spending/views';
 import {
@@ -205,10 +205,12 @@ function AttentionFixer({
     <BottomSheet open={open} onClose={onClose} role="dialog">
       <div className="space-y-3 px-3 pb-3" aria-live="polite">
         {current === null ? (
-          <div className="py-4 text-center">
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              ✓ 確認が必要なものはありません
-            </p>
+          <div className="pb-4 text-center">
+            <BottomSheetHeader className="pt-4">
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                ✓ 確認が必要なものはありません
+              </p>
+            </BottomSheetHeader>
             <button
               type="button"
               onClick={onClose}
@@ -220,7 +222,7 @@ function AttentionFixer({
           </div>
         ) : (
           <>
-            <div className="flex items-baseline justify-between">
+            <BottomSheetHeader className="flex items-baseline justify-between">
               <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 {position} / {total}
               </p>
@@ -232,7 +234,7 @@ function AttentionFixer({
               >
                 あとで
               </button>
-            </div>
+            </BottomSheetHeader>
             <div>
               {current.reasons.length > 1 ? (
                 <p className="mb-1 text-xs" style={{ color: 'var(--ink-muted)' }}>

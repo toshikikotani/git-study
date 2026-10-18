@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { formatProbability } from '@/domain/forecast/format';
 import type { DailyLimitResult } from '@/features/forecast/daily-limit';
 
@@ -134,8 +134,8 @@ export function AllowanceExplainBody({
   );
 
   return (
-    <div className="flex flex-col gap-3 pt-1 pb-6" style={{ color: 'var(--ink)' }}>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+    <div className="flex flex-col gap-3 pb-6" style={{ color: 'var(--ink)' }}>
+      <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center pt-1">
         <span />
         <span className="text-[17px] font-semibold">なぜこの額？</span>
         <button
@@ -146,7 +146,7 @@ export function AllowanceExplainBody({
         >
           閉じる
         </button>
-      </div>
+      </BottomSheetHeader>
 
       <section
         className="flex flex-col gap-1 rounded-[20px] px-4 pt-4 pb-3"

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatEstimate, formatProbability } from '@/domain/forecast/format';
 import type { CategoryOutlook } from '@/features/goals/category-outlook';
@@ -548,8 +548,8 @@ export function GoalEditor({
       </div>
 
       <BottomSheet open={periodOpen} onClose={() => setPeriodOpen(false)} label="期間" tall>
-        <div className="flex flex-col gap-3 pt-1">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+        <div className="flex flex-col gap-3">
+          <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center pt-1">
             <button
               type="button"
               onClick={() => setPeriodOpen(false)}
@@ -560,7 +560,7 @@ export function GoalEditor({
             </button>
             <span className="text-[17px] font-semibold">期間を調整</span>
             <span />
-          </div>
+          </BottomSheetHeader>
           <div className="rounded-2xl px-4 py-4" style={{ background: 'var(--surface)' }}>
             <PlanPeriodForm
               periodStart={period.start}

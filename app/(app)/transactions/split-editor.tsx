@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
@@ -1092,9 +1092,11 @@ export function TransactionRowWithSplit({
 
       <BottomSheet open={pickOpen} onClose={() => setPickOpen(false)} role="dialog">
         <div className="space-y-2 px-2 pb-2">
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {display?.name ?? transaction.description} のカテゴリ
-          </p>
+          <BottomSheetHeader>
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              {display?.name ?? transaction.description} のカテゴリ
+            </p>
+          </BottomSheetHeader>
           <ul className="space-y-2">
             {predictions.map((p) => (
               <li key={p.genreId}>
@@ -1229,9 +1231,11 @@ export function TransactionRowWithSplit({
 
       <BottomSheet open={genreSheetOpen} onClose={() => setGenreSheetOpen(false)} role="dialog">
         <div className="space-y-2 px-2 pb-2">
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            カテゴリを変更
-          </p>
+          <BottomSheetHeader>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+              カテゴリを変更
+            </p>
+          </BottomSheetHeader>
           <div className="flex flex-wrap gap-2">
             {categories.map((c) => (
               <button
@@ -1254,11 +1258,11 @@ export function TransactionRowWithSplit({
       </BottomSheet>
 
       <BottomSheet open={previewOpen} onClose={() => setPreviewOpen(false)} role="dialog">
-        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+        <BottomSheetHeader className="flex items-center justify-between px-3 pt-1 pb-2">
           <h2 className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
             明細のプレビュー
           </h2>
-        </div>
+        </BottomSheetHeader>
 
         <div className="space-y-3 px-3 pb-3">
           <div>

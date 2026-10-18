@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { MdVisibility, MdVisibilityOff } from 'react-icons/md';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import type { QuickEntryGenreSetting } from '@/features/genre/store';
 import {
   fetchQuickEntryGenreSettingsAction,
@@ -92,10 +92,12 @@ export function QuickEntryGenreManager({
 
   return (
     <BottomSheet open={open} onClose={onClose} role="dialog">
-      <div className="px-4 pt-2 pb-6">
-        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          カテゴリの並べ替え・非表示
-        </p>
+      <div className="px-4 pb-6">
+        <BottomSheetHeader className="pt-2">
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            カテゴリの並べ替え・非表示
+          </p>
+        </BottomSheetHeader>
         <p className="mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           ▲▼で並べ替え、目のアイコンで格子から隠せます(カテゴリ自体は残ります)。
         </p>

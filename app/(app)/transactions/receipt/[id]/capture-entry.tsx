@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageEditor } from '@/components/receipt/image-editor';
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import {
   CAPTURE_FIELD_LABEL,
   applyConflict,
@@ -540,10 +540,12 @@ export function CaptureEntry({
       </div>
 
       <BottomSheet open={confirmDiscard} onClose={() => setConfirmDiscard(false)} role="dialog">
-        <div className="space-y-3 px-4 pt-2 pb-4">
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            このレシートを破棄しますか?
-          </p>
+        <div className="space-y-3 px-4 pb-4">
+          <BottomSheetHeader className="pt-2">
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              このレシートを破棄しますか?
+            </p>
+          </BottomSheetHeader>
           <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             入力待ちから外れます。画像は残り、破棄した直後なら元に戻せます。
           </p>

@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
-import { ExpandableSheet } from '@/components/ui/expandable-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
 import type { TxPatch } from '@/features/category/edits';
 import type { CategoryLine } from '@/features/category/model';
-import type { SheetState } from '@/lib/sheet';
 import { CategoryPicker } from './category-picker';
 
 type EditResult = boolean | void | Promise<boolean | void>;
@@ -18,10 +17,10 @@ type EditCallbacks = {
 };
 
 /**
- * 取引の編集シート。半分の高さで開き、上へスワイプすると全画面になる。
+ * 取引の編集シート。高さと見出しの位置は固定し、本文だけスクロールする。
  * レシート付きの取引は、上部に画像を出す(ピンチ・ダブルタップでズーム)。金額・日付・店名・
  * メモ・品目を編集でき、カテゴリは格子から1タップで移せる。品目は1つだけ別のカテゴリへ移せる。
- * キーボードが入力欄を隠さないよう、シートがキーボードの高さぶん持ち上がる。
+ * キーボードに合わせて入力欄を見せるのはブラウザに任せる。
  */
 export function EditSheet({
   line,
@@ -40,18 +39,21 @@ export function EditSheet({
   error?: string | null;
   onClose: () => void;
 } & EditCallbacks) {
-  const [state, setState] = useState<Exclude<SheetState, 'closed'>>('half');
   return (
-    <ExpandableSheet
-      open={line !== null}
-      state={state}
-      onState={setState}
-      onClose={() => {
-        setState('half');
-        onClose();
-      }}
-      label="取引の編集"
-    >
+    <BottomSheet open={line !== null} onClose={onClose} label="取引の編集" tall>
+      <BottomSheetHeader className="flex min-h-12 items-center justify-between gap-3 pb-2">
+        <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+          取引の編集
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-11 px-2 text-sm font-semibold"
+          style={{ color: 'var(--action)' }}
+        >
+          閉じる
+        </button>
+      </BottomSheetHeader>
       {line ? (
         <EditForm
           key={line.txId}
@@ -59,14 +61,14 @@ export function EditSheet({
           genres={genres}
           suggestedGenreId={suggestedGenreId}
           error={error}
-          full={state === 'full'}
+          full
           onSave={onSave}
           onMove={onMove}
           onMoveItem={onMoveItem}
           onDelete={onDelete}
         />
       ) : null}
-    </ExpandableSheet>
+    </BottomSheet>
   );
 }
 

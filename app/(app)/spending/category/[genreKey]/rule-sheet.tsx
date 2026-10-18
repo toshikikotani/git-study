@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
 import { describeRule, type RuleScope, type RuleSuggestion } from '@/domain/rule-match';
 import { hapticFor } from '@/lib/haptics';
@@ -112,9 +112,11 @@ export function RuleFlow({
     <div className="space-y-3 px-3 pb-3">
       {step === 'ask' ? (
         <>
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {suggestion.question}
-          </p>
+          <BottomSheetHeader>
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              {suggestion.question}
+            </p>
+          </BottomSheetHeader>
           <p className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
             ルールにすると、次からのレシートは自動で{toGenre.name}に入ります。保存の前に、
             一致する過去の取引を確認できます。
@@ -142,9 +144,11 @@ export function RuleFlow({
         </>
       ) : (
         <>
-          <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            {describeRule(suggestion.scope)} → {toGenre.name}
-          </p>
+          <BottomSheetHeader>
+            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              {describeRule(suggestion.scope)} → {toGenre.name}
+            </p>
+          </BottomSheetHeader>
           <p role="status" className="text-sm" style={{ color: 'var(--ink)' }}>
             このルールに一致する過去の取引が{matches.length}件あります
           </p>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 
 export type DetailRow = {
@@ -63,8 +63,8 @@ export function DetailRows({ rows }: { rows: readonly DetailRow[] }) {
         tall
       >
         {current ? (
-          <div className="flex flex-col gap-3 pt-1 pb-6">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+          <div className="flex flex-col gap-3 pb-6">
+            <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center pt-1">
               <button
                 type="button"
                 onClick={() => setOpen(null)}
@@ -77,7 +77,7 @@ export function DetailRows({ rows }: { rows: readonly DetailRow[] }) {
                 {current.title}
               </span>
               <span />
-            </div>
+            </BottomSheetHeader>
             {current.content}
           </div>
         ) : null}

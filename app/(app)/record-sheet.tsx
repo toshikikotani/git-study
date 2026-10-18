@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
+import { BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { genreSwatch } from '@/domain/genre-style';
@@ -465,7 +466,7 @@ export function RecordSheet({
 
   return (
     <div className="flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
-      <div className="-mt-1 grid grid-cols-[1fr_auto_1fr] items-center">
+      <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center">
         <button
           type="button"
           onClick={onClose}
@@ -484,7 +485,7 @@ export function RecordSheet({
         >
           {edit?.saveLabel ?? '保存'}
         </button>
-      </div>
+      </BottomSheetHeader>
       {error ? (
         <p
           role="alert"

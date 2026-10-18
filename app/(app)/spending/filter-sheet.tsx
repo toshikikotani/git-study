@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { hapticFor } from '@/lib/haptics';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { activeFilterCount, isFilterActive } from '@/features/spending/views';
 import { addDays, formatDateJa, splitDateOnly } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
@@ -40,8 +40,8 @@ export function FilterSheet({ goalRange }: { goalRange: { from: string; to: stri
       </button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="dialog">
-        <div className="space-y-5 px-3 pt-1 pb-3">
-          <div className="flex items-center justify-between">
+        <div className="space-y-5 px-3 pb-3">
+          <BottomSheetHeader className="flex items-center justify-between pt-1">
             <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
               フィルター{count > 0 ? `(${count})` : ''}
             </h2>
@@ -54,7 +54,7 @@ export function FilterSheet({ goalRange }: { goalRange: { from: string; to: stri
             >
               すべて解除
             </button>
-          </div>
+          </BottomSheetHeader>
 
           <Group label="期間">
             <Choice

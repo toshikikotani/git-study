@@ -13,7 +13,8 @@ const state = vi.hoisted(() => ({
   undo: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
-vi.mock('@/components/ui/bottom-sheet', () => ({
+vi.mock('@/components/ui/bottom-sheet', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/ui/bottom-sheet')>()),
   BottomSheet: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock('@/lib/undo', () => ({ pushUndo: (...args: unknown[]) => state.undo(...args) }));

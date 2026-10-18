@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatYen } from '@/domain/money';
 import { addGoalGenreAction } from './membership-actions';
@@ -67,9 +67,11 @@ export function UnrecordedSheet({
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)}>
         <div className="px-2 pb-2">
-          <h2 className="px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
-            目標に加える
-          </h2>
+          <BottomSheetHeader>
+            <h2 className="px-2 text-base font-semibold" style={{ color: 'var(--ink)' }}>
+              目標に加える
+            </h2>
+          </BottomSheetHeader>
           <ul className="mt-3 space-y-3">
             {addable.map((genre) => (
               <li key={genre.genreId} className="px-2">

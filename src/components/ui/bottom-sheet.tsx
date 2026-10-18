@@ -26,8 +26,7 @@ export function BottomSheet({
   /** 読み上げ用の名前(画面には出さない)。 */
   label?: string;
   /**
-   * 画面の高さいっぱいの灰色のシート(デザイン仕様書の「記録する」「カテゴリの目標額」、ADR-090)。
-   * 角は上だけ丸く、下端まで伸ばす。
+   * 灰色の背景で下端まで伸ばす。高さは全シート共通(ADR-110追補)。
    */
   tall?: boolean;
   children: React.ReactNode;
@@ -52,37 +51,56 @@ export function BottomSheet({
           style={{ touchAction: 'manipulation' }}
           className={
             tall
-              ? 'fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl outline-none'
-              : 'fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] outline-none'
+              ? 'fixed inset-x-0 bottom-0 z-50 mx-auto h-[92dvh] w-full max-w-2xl outline-none'
+              : 'fixed inset-x-0 bottom-0 z-50 mx-auto h-[92dvh] w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] outline-none'
           }
         >
           <div
-            className={
-              tall
-                ? 'max-h-[92dvh] overflow-y-auto overscroll-contain px-4 pb-[max(2rem,env(safe-area-inset-bottom))]'
-                : 'max-h-[78dvh] overflow-y-auto overscroll-contain p-2'
-            }
+            className="flex h-full min-h-0 flex-col overflow-hidden"
             style={
-              tall
-                ? {
-                    borderRadius: '22px 22px 0 0',
-                    background: 'var(--plane)',
-                    boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.12)',
-                  }
-                : {
-                    borderRadius: 'var(--radius-card)',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--glass-border)',
-                    boxShadow: 'var(--glass-shadow-float)',
-                  }
+              {
+                '--sheet-background': tall ? 'var(--plane)' : 'var(--surface)',
+                borderRadius: tall ? '22px 22px 0 0' : 'var(--radius-card)',
+                background: 'var(--sheet-background)',
+                border: tall ? undefined : '1px solid var(--glass-border)',
+                boxShadow: tall ? '0 -4px 24px rgba(0, 0, 0, 0.12)' : 'var(--glass-shadow-float)',
+              } as React.CSSProperties
             }
           >
             <Drawer.Title className="sr-only">{label}</Drawer.Title>
-            <Drawer.Handle className="mx-auto mt-2 mb-1 block h-1.5 w-10 rounded-full bg-[var(--hairline)]" />
-            {children}
+            <Drawer.Handle className="mx-auto mt-2 mb-1 block h-1.5 w-10 shrink-0 rounded-full bg-[var(--hairline)]" />
+            <div
+              data-sheet-scroll
+              className={
+                tall
+                  ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(2rem,env(safe-area-inset-bottom))]'
+                  : 'min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2'
+              }
+            >
+              {children}
+            </div>
           </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+}
+
+/** スクロール中も見出しと操作を上端に残す。背景を塗り、本文が重ならないようにする。 */
+export function BottomSheetHeader({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      data-sheet-header
+      className={`sticky top-0 z-10 shrink-0 py-1 ${className}`}
+      style={{ background: 'var(--sheet-background, var(--plane))' }}
+    >
+      {children}
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
 import { Segmented } from '@/components/ui/segmented';
 import {
@@ -549,14 +549,14 @@ export function ItemDetailBody({
 }) {
   return (
     <div className="space-y-4 px-3 pb-3">
-      <div>
+      <BottomSheetHeader>
         <h2 className="text-base font-semibold break-words" style={{ color: 'var(--ink)' }}>
           {detail.name}
         </h2>
         <p className="tabular mt-1 text-xs" style={{ color: 'var(--ink-secondary)' }}>
           {detail.count}回 ・ 平均単価 {detail.averageYen.toLocaleString('ja-JP')}円
         </p>
-      </div>
+      </BottomSheetHeader>
 
       <div>
         <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
