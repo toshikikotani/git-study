@@ -8,92 +8,16 @@ import { formatYen } from '@/domain/money';
 import { formatDateJa } from '@/lib/date';
 import { saveMerchantNameChangesAction } from './merchant-name-actions';
 
-/** 探した結果(api/merchant-names/scan の返事)。 */
-type ScanResult = { groups: MerchantNameReviewGroup[]; warning: string | null } | { error: string };
-
-/** すべての月の明細から、規則と AI で表記ゆれを探す(読むだけ、ADR-119)。 */
-async function scanMerchantNames(signal: AbortSignal): Promise<ScanResult> {
-  try {
-    const response = await fetch('/api/merchant-names/scan', { method: 'POST', signal });
-    return (await response.json()) as ScanResult;
-  } catch {
-    return { error: '通信に失敗しました。もう一度お試しください。' };
-  }
-}
-
-/**
- * 店名をまとめて直すを、いつでも始められるようにする(本人の要望、ADR-118 → 119)。start() でシートを
- * 開き、その場ですべての月の明細から AI も使って候補を探す。開くたびに探し直し、閉じたら探すのをやめる。
- */
-export function useMerchantNameCheck(onClosed?: () => void): {
-  start: () => void;
-  sheet: React.ReactNode;
-} {
-  const [run, setRun] = useState<{
-    id: number;
-    groups: readonly MerchantNameReviewGroup[] | null;
-    error: string | null;
-    warning: string | null;
-  } | null>(null);
-  const aborter = useRef<AbortController | null>(null);
-  const start = () => {
-    aborter.current?.abort();
-    const controller = new AbortController();
-    aborter.current = controller;
-    const id = Date.now();
-    setRun({ id, groups: null, error: null, warning: null });
-    void scanMerchantNames(controller.signal).then((result) => {
-      if (controller.signal.aborted) return;
-      setRun((current) =>
-        current?.id !== id
-          ? current
-          : 'error' in result
-            ? { id, groups: [], error: result.error, warning: null }
-            : { id, groups: result.groups, error: null, warning: result.warning },
-      );
-    });
-  };
-  const sheet = (
-    <MerchantNameReview
-      key={run?.id ?? 0}
-      open={run !== null}
-      groups={run?.groups ?? null}
-      error={run?.error ?? null}
-      warning={run?.warning ?? null}
-      onClose={() => {
-        aborter.current?.abort();
-        setRun(null);
-        onClosed?.();
-      }}
-    />
-  );
-  return { start, sheet };
-}
-
+/** 確認が必要な店名(要確認の「店名をまとめて直す」から、規則で見つけたもの)。 */
 export function MerchantNameReview({
   open,
   groups,
-  error = null,
-  warning = null,
   onClose,
 }: {
   open: boolean;
-  /** null は探している途中。 */
-  groups: readonly MerchantNameReviewGroup[] | null;
-  error?: string | null;
-  /** AI が使えなかったなど、規則で探した分だけを出しているときの理由。 */
-  warning?: string | null;
+  groups: readonly MerchantNameReviewGroup[];
   onClose: () => void;
 }) {
-  const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
-  const remaining = (groups ?? [])
-    .map((group) => ({
-      ...group,
-      entries: group.entries.filter((entry) => saved.get(entry.id) !== snapshotKey(entry)),
-    }))
-    .filter((group) => group.entries.length > 0);
-  const count = remaining.reduce((sum, group) => sum + group.entries.length, 0);
-
   return (
     <BottomSheet open={open} onClose={onClose} label="店名をまとめて直す">
       <BottomSheetHeader className="flex items-center justify-between gap-3">
@@ -109,6 +33,34 @@ export function MerchantNameReview({
           閉じる
         </button>
       </BottomSheetHeader>
+      <MerchantNameResults groups={groups} />
+    </BottomSheet>
+  );
+}
+
+/** 店名の候補と、その直し方(シートの中身。AIでチェックのシートでも使う、ADR-120)。 */
+export function MerchantNameResults({
+  groups,
+  error = null,
+  warning = null,
+}: {
+  /** null は探している途中。 */
+  groups: readonly MerchantNameReviewGroup[] | null;
+  error?: string | null;
+  /** AI が使えなかったなど、規則で探した分だけを出しているときの理由。 */
+  warning?: string | null;
+}) {
+  const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
+  const remaining = (groups ?? [])
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((entry) => saved.get(entry.id) !== snapshotKey(entry)),
+    }))
+    .filter((group) => group.entries.length > 0);
+  const count = remaining.reduce((sum, group) => sum + group.entries.length, 0);
+
+  return (
+    <>
       <p className="my-3 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         候補は自動では保存されません。対象の明細と新しい店名・支店名を確かめてください。金額・日付・カテゴリと、取り込んだ原文は変わりません。
       </p>
@@ -154,7 +106,7 @@ export function MerchantNameReview({
           />
         ))}
       </div>
-    </BottomSheet>
+    </>
   );
 }
 
