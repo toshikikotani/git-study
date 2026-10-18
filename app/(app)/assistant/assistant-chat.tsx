@@ -7,6 +7,7 @@ import type { AskUserQuestion } from '@/features/assistant/plan';
 import { recordFromEdit, type StoreCandidate } from '@/features/assistant/record-change';
 import { comparableKey } from '@/domain/store-name';
 import { useKeyboard, type KeyboardState } from '@/lib/keyboard';
+import { useScrollLock } from '@/components/ui/use-scroll-lock';
 import { useSpeechInput } from '@/lib/speech-input';
 import type { WhatIfCard } from '@/domain/forecast/what-if-spend';
 import { WhatIfSheet } from '../_home/what-if-sheet';
@@ -36,6 +37,12 @@ import {
  * (ADR-105)。
  */
 
+/**
+ * 送る・おすすめの質問・マイクを押しても入力欄のフォーカスを外さない。キーボードは出たままで、
+ * 並びが変わってボタンを押し損ねることもない(ADR-112)。
+ */
+const keepFocus = (e: React.MouseEvent) => e.preventDefault();
+
 /** おすすめの質問(入力欄の上に並べる、デザイン v3-3)。 */
 const SUGGESTIONS = [
   '今日いくらまで使える？',
@@ -46,33 +53,37 @@ const SUGGESTIONS = [
 ];
 
 /**
- * /assistant の画面の高さ:上の余白と、下のタブバー(と安全域)を除いた高さ。タブバーに入力欄が重ならない
- * (本人の指摘「タブバーが画面下の文字に重なる」、ADR-108)。下の余白(main の pb)のぶんは負の余白で打ち消す。
+ * /assistant の画面:画面に固定した層にし、会話だけをその中でスクロールさせ、入力欄の位置は動かさない
+ * (本人の希望「コンテンツと入力欄を分離させて入力欄の位置を固定」、ADR-112)。ページそのものは動かさない
+ * (use-scroll-lock)。キーボードが閉じているときは上の余白と下のタブバーのぶんを空け(タブバーに入力欄が
+ * 重ならない、ADR-108)、出ているときは見えている範囲いっぱいにして入力欄をキーボードのすぐ上に置く
+ * (タブバーはそのあいだ隠れる、ADR-111)。
  */
-const PAGE_STYLE = {
-  height:
-    'calc(100dvh - max(5.5rem, calc(3.5rem + env(safe-area-inset-top))) - 6rem - env(safe-area-inset-bottom))',
-  marginBottom: '-5rem',
-} as const;
-
-/**
- * キーボードが出ているあいだの /assistant:見えている範囲いっぱいに広げ、入力欄をキーボードのすぐ上に置く。
- * 以前は画面の高さが変わらず、入力欄とキーボードのあいだにタブバーが浮き、上は空いていた
- * (本人の指摘「AI入力画面違和感」、ADR-111)。タブバーはそのあいだ隠れる(app-shell)。
- */
-function dockedStyle(keyboard: KeyboardState): React.CSSProperties {
-  return {
+function pageStyle(keyboard: KeyboardState): React.CSSProperties {
+  const base: React.CSSProperties = {
     position: 'fixed',
     insetInline: 0,
-    top: keyboard.top,
-    height: keyboard.height,
-    zIndex: 45,
+    zIndex: 35,
     maxWidth: '42rem',
     marginInline: 'auto',
-    paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
     background: 'var(--plane)',
     color: 'var(--ink)',
   };
+  return keyboard.open
+    ? {
+        ...base,
+        top: keyboard.top,
+        height: keyboard.height,
+        paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+        paddingBottom: '0.5rem',
+      }
+    : {
+        ...base,
+        top: 0,
+        bottom: 0,
+        paddingTop: 'max(5.5rem, calc(3.5rem + env(safe-area-inset-top)))',
+        paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))',
+      };
 }
 
 export function AssistantChat({
@@ -93,6 +104,7 @@ export function AssistantChat({
   const { messages, sending, error } = useChat();
   const [input, setInput] = useState(initialPrompt ?? '');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   const keyboard = useKeyboard();
   const docked = variant === 'page' && keyboard.open;
   const speech = useSpeechInput((text) => void send(text));
@@ -134,6 +146,7 @@ export function AssistantChat({
     editing && editingProposal?.status === 'pending'
       ? editingProposal.changes[editing.change]?.record
       : undefined;
+  useScrollLock(layerRef, variant === 'page' && !(editing && editingRecord));
   if (editing && editingRecord) {
     const target = editing;
     const before = editingRecord;
@@ -168,20 +181,12 @@ export function AssistantChat({
 
   return (
     <div
+      ref={layerRef}
+      data-no-pull={variant === 'page' ? true : undefined}
       className={
-        variant === 'sheet'
-          ? 'flex h-[84dvh] flex-col gap-2'
-          : docked
-            ? 'rise flex flex-col gap-2 px-4 pb-2'
-            : 'rise flex flex-col gap-2'
+        variant === 'sheet' ? 'flex h-[84dvh] flex-col gap-2' : 'rise flex flex-col gap-2 px-4'
       }
-      style={
-        variant === 'sheet'
-          ? { color: 'var(--ink)' }
-          : docked
-            ? dockedStyle(keyboard)
-            : { ...PAGE_STYLE, color: 'var(--ink)' }
-      }
+      style={variant === 'sheet' ? { color: 'var(--ink)' } : pageStyle(keyboard)}
     >
       {variant === 'page' ? (
         <header className="flex items-center justify-between gap-2 px-1">
@@ -285,13 +290,15 @@ export function AssistantChat({
         role="group"
         aria-label="おすすめの質問"
         className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
-        style={{ scrollbarWidth: 'none' }}
+        // 横にだけ流す(縦に指を動かしてもページを動かさない)。
+        style={{ scrollbarWidth: 'none', touchAction: 'pan-x' }}
       >
         {SUGGESTIONS.map((q) => (
           <button
             key={q}
             type="button"
             disabled={sending}
+            onMouseDown={keepFocus}
             onClick={() => void send(q)}
             className="min-h-11 shrink-0 rounded-full px-4 text-[14px] whitespace-nowrap disabled:opacity-40"
             style={{ background: 'var(--surface)', color: 'var(--ink)' }}
@@ -321,6 +328,7 @@ export function AssistantChat({
         {speech.supported ? (
           <button
             type="button"
+            onMouseDown={keepFocus}
             onClick={speech.toggle}
             aria-pressed={speech.listening}
             aria-label={speech.listening ? '声の入力を止める' : '声で話しかける'}
@@ -353,6 +361,7 @@ export function AssistantChat({
         </label>
         <button
           type="submit"
+          onMouseDown={keepFocus}
           disabled={sending || input.trim() === ''}
           aria-label="送る"
           className="flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-40"

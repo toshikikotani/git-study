@@ -63,10 +63,24 @@ describe('AIはタブなので、ふつうの画面で開く(デザイン v3、A
     expect(visible(raw)).toContain('あと3,000円使ったら？');
   });
 
-  it('入力欄がタブバーに重ならない高さ(上の余白と下のタブバーを除く)', () => {
+  it('画面に固定した層で、入力欄がタブバーに重ならない(上の余白と下のタブバーのぶんを空ける)', () => {
+    const raw = renderToString(h(AssistantChat, { variant: 'page' }));
+    const root = raw.match(/^<div[^>]*>/)?.[0] ?? '';
+    expect(root).toContain('position:fixed');
+    expect(root).toContain('top:0');
+    expect(root).toContain('bottom:0');
+    expect(root).toContain('padding-top:max(5.5rem, calc(3.5rem + env(safe-area-inset-top)))');
+    expect(root).toContain('padding-bottom:calc(6rem + env(safe-area-inset-bottom))');
+  });
+
+  it('会話だけがスクロールし、ページは動かさない。引っぱって最新化もしない(ADR-112)', () => {
+    const raw = renderToString(h(AssistantChat, { variant: 'page' }));
+    expect(raw.match(/^<div[^>]*>/)?.[0]).toContain('data-no-pull="true"');
+    expect(raw).toMatch(/class="flex-1 [^"]*overflow-y-auto overscroll-contain/);
+    expect(raw).toContain('touch-action:pan-x');
     const source = readFileSync('app/(app)/assistant/assistant-chat.tsx', 'utf8');
     expect(source).toContain(
-      "'calc(100dvh - max(5.5rem, calc(3.5rem + env(safe-area-inset-top))) - 6rem - env(safe-area-inset-bottom))'",
+      "useScrollLock(layerRef, variant === 'page' && !(editing && editingRecord));",
     );
   });
 });

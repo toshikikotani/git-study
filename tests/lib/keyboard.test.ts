@@ -3,7 +3,12 @@ import { createElement as h } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { isTextEntry, KEYBOARD_MIN_PX, keyboardOpen } from '@/lib/keyboard';
+import {
+  isTextEntry,
+  KEYBOARD_CLOSE_DELAY_MS,
+  KEYBOARD_MIN_PX,
+  keyboardOpen,
+} from '@/lib/keyboard';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -38,6 +43,14 @@ describe('キーボードが出る欄か(ADR-111)', () => {
   it('指で操作する端末なら、欄にフォーカスした時点で出ているとみなす(iPhone は高さが測れないことがある)', () => {
     expect(keyboardOpen({ typing: true, coarse: true, inset: 0 })).toBe(true);
     expect(keyboardOpen({ typing: false, coarse: true, inset: 300 })).toBe(false);
+  });
+
+  it('欄から外れても、キーボードが下がるまで少し待ってから閉じたとする(押したボタンが動かない)', () => {
+    expect(KEYBOARD_CLOSE_DELAY_MS).toBeGreaterThanOrEqual(200);
+    expect(KEYBOARD_CLOSE_DELAY_MS).toBeLessThanOrEqual(400);
+    const source = readFileSync('src/lib/keyboard.ts', 'utf8');
+    expect(source).toContain("document.addEventListener('focusout', onFocusOut);");
+    expect(source).toContain('window.setTimeout(update, KEYBOARD_CLOSE_DELAY_MS)');
   });
 
   it('マウスの端末では、キーボードの高さが測れたときだけ', () => {
