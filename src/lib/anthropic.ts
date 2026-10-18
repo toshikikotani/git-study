@@ -9,6 +9,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { z } from 'zod';
 
@@ -43,7 +44,15 @@ export type StructuredRequest<S extends z.ZodType> = {
   effort?: 'low' | 'medium' | 'high';
   /** 既定 DEFAULT_AI_TIMEOUT_MS(10秒、N1本人要件)。長いレポート生成等は明示的に伸ばす。 */
   timeoutMs?: number;
+  /**
+   * モデルが方針で答えなかったとき、サーバー側で既定の代わりのモデルに回す(server-side fallback、
+   * ベータ)。Opus 5.5 などで使う(ADR-119)。
+   */
+  fallbacks?: 'default';
 };
+
+/** server-side fallback の「default」形のベータ。 */
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
 export async function parseStructured<S extends z.ZodType>(
   request: StructuredRequest<S>,
@@ -59,32 +68,59 @@ export async function parseStructured<S extends z.ZodType>(
     disableThinking,
     effort,
     timeoutMs,
+    fallbacks,
   } = request;
 
   try {
-    const response = await client.messages.parse(
-      {
-        model,
-        max_tokens: maxTokens,
-        system,
-        messages,
-        // Sonnet 5 は disabled を受けない。思考を止めるときは between_tools。
-        // SDK の型にはまだ無いので、送る値だけ合わせる。
-        ...(disableThinking
-          ? { thinking: { type: 'between_tools' } as unknown as Anthropic.ThinkingConfigParam }
-          : {}),
-        output_config: {
-          format: zodOutputFormat(schema),
-          ...(effort ? { effort } : {}),
-        },
-      },
-      { timeout: timeoutMs ?? DEFAULT_AI_TIMEOUT_MS },
-    );
+    const options = { timeout: timeoutMs ?? DEFAULT_AI_TIMEOUT_MS };
+    const response = fallbacks
+      ? await client.beta.messages.parse(
+          {
+            model,
+            max_tokens: maxTokens,
+            system,
+            messages,
+            betas: [FALLBACK_BETA],
+            fallbacks,
+            output_config: {
+              format: betaZodOutputFormat(schema),
+              ...(effort ? { effort } : {}),
+            },
+          },
+          options,
+        )
+      : await client.messages.parse(
+          {
+            model,
+            max_tokens: maxTokens,
+            system,
+            messages,
+            // Sonnet 5 は disabled を受けない。思考を止めるときは between_tools。
+            // SDK の型にはまだ無いので、送る値だけ合わせる。
+            ...(disableThinking
+              ? { thinking: { type: 'between_tools' } as unknown as Anthropic.ThinkingConfigParam }
+              : {}),
+            output_config: {
+              format: zodOutputFormat(schema),
+              ...(effort ? { effort } : {}),
+            },
+          },
+          options,
+        );
 
     const usage = {
       inputTokens: response.usage.input_tokens ?? 0,
       outputTokens: response.usage.output_tokens,
     };
+
+    if (response.stop_reason === 'refusal') {
+      return {
+        ok: false,
+        failure: 'api_error',
+        message: 'AI がこの内容には答えられませんでした。',
+        usage,
+      };
+    }
 
     if (response.stop_reason === 'max_tokens') {
       return {

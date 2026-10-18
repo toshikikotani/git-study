@@ -47,3 +47,43 @@ describe('parseStructured の thinking / effort', () => {
     expect('effort' in args.output_config).toBe(false);
   });
 });
+
+describe('parseStructured の server-side fallback(ADR-119)', () => {
+  function betaClient(stopReason = 'end_turn') {
+    const parse = vi.fn().mockResolvedValue({
+      stop_reason: stopReason,
+      parsed_output: stopReason === 'refusal' ? null : { ok: true },
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const plain = vi.fn();
+    return {
+      client: { messages: { parse: plain }, beta: { messages: { parse } } } as unknown as Anthropic,
+      parse,
+      plain,
+    };
+  }
+
+  it('fallbacks を付けると、ベータの呼び出しで default の代わりのモデルを頼む', async () => {
+    const { client, parse, plain } = betaClient();
+    const result = await parseStructured({
+      ...base,
+      client,
+      model: 'claude-opus-5-5',
+      effort: 'low',
+      fallbacks: 'default',
+    });
+    expect(result.ok).toBe(true);
+    expect(plain).not.toHaveBeenCalled();
+    const args = parse.mock.calls[0]![0];
+    expect(args.betas).toEqual(['server-side-fallback-2026-07-01']);
+    expect(args.fallbacks).toBe('default');
+    expect(args.output_config.effort).toBe('low');
+    expect('thinking' in args).toBe(false);
+  });
+
+  it('答えなかった(refusal)ときは、そう伝える', async () => {
+    const { client } = betaClient('refusal');
+    const result = await parseStructured({ ...base, client, fallbacks: 'default' });
+    expect(result).toMatchObject({ ok: false, message: 'AI がこの内容には答えられませんでした。' });
+  });
+});
