@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -63,7 +62,6 @@ export function PlanBuilder({
   /** 進行中の目標の終了日。あれば「次の目標を予約」として折りたたみ、開始日を翌日にする。 */
   activeEnd: DateOnly | null;
 }) {
-  const router = useRouter();
   const reserving = activeEnd !== null;
   // 予約のときは、進行中の目標の終了日の翌日から。
   const baseDate = reserving ? reservationStart(activeEnd) : today;
@@ -139,7 +137,6 @@ export function PlanBuilder({
     });
     if (result.error === null) {
       setSuggestion(null);
-      router.refresh();
     }
     return result;
   };

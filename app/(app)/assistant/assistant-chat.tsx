@@ -136,8 +136,9 @@ export function AssistantChat({
     else router.push(href as never);
   };
   // 反映したら、どの画面も最新にする(AIの反映はルートハンドラーで書くので、画面の作り置きを消す)。
+  // アクションの返事に今の画面の作り直しが入るので、router.refresh() は重ねない(ADR-117)。
   const applied = () => {
-    void refreshAllAction().then(() => router.refresh());
+    void refreshAllAction();
   };
 
   // AIが出した記録の案を直す:記録すると同じ画面にして、「完了」で確認カードに戻す(ADR-105)。

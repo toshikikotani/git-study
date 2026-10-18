@@ -117,7 +117,6 @@ export function WelcomeFlow({
         return;
       }
       router.push('/');
-      router.refresh();
     });
   }
 

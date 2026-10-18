@@ -208,15 +208,9 @@ describe('planToolCall: ジャンル', () => {
     ).toThrow(ChatToolError);
   });
 
-  it('ホーム表示の切り替え', () => {
-    const { change } = planToolCall(
-      'set_genre_show_on_home',
-      { genre_name: '外食', show_on_home: true },
-      CTX,
-    );
-    expect(change.detail).toContain('出さない→出す');
+  it('ホーム表示の切り替えはもう頼めない(ホームは気をつけたいカテゴリを自動で出す、ADR-117)', () => {
     expect(() =>
-      planToolCall('set_genre_show_on_home', { genre_name: '外食', show_on_home: 'yes' }, CTX),
+      planToolCall('set_genre_show_on_home', { genre_name: '外食', show_on_home: true }, CTX),
     ).toThrow(ChatToolError);
   });
 

@@ -74,6 +74,8 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
     };
   }, [genreId]);
 
+  // 保存したら画面はアクションの返事で作り直される(ここで router.refresh() をもう一度呼ぶと、往復が
+  // 2回になって待つ時間がのびる、ADR-117)。
   const run = async (job: () => Promise<{ error: string | null }>, done: string) => {
     setBusy(true);
     setMessage(null);
@@ -85,8 +87,38 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
     }
     hapticFor('save');
     setMessage(done);
-    router.refresh();
     return true;
+  };
+
+  // 固定費・見込みのスイッチは押したらすぐ切り替える(保存はうしろで。できなければ戻して理由を出す、
+  // ADR-117)。以前は保存と画面の作り直しが終わるまで動かず、ほかのボタンも押せなかった。
+  const [isFixed, setIsFixed] = useState(data.isFixed);
+  const [forecastClosed, setForecastClosed] = useState(data.forecastClosed);
+  const [synced, setSynced] = useState(data);
+  if (synced !== data) {
+    setSynced(data);
+    setIsFixed(data.isFixed);
+    setForecastClosed(data.forecastClosed);
+  }
+  const toggle = (
+    next: boolean,
+    set: (v: boolean) => void,
+    job: () => Promise<{ error: string | null }>,
+    done: string,
+  ) => {
+    set(next);
+    setMessage(null);
+    void job()
+      .catch(() => ({ error: '保存できませんでした。もう一度押してください。' }))
+      .then((r) => {
+        if (r.error) {
+          set(!next);
+          setMessage(r.error);
+          return;
+        }
+        hapticFor('save');
+        setMessage(done);
+      });
   };
 
   const styleChanged = icon !== current.icon || colorIndex !== (current.colorIndex ?? -1);
@@ -273,10 +305,12 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
         <SwitchRow
           label="固定費"
           note="家賃・保険など、毎月ほぼ同じ額のもの。固定費にすると、月末の見込みも出しません。"
-          checked={data.isFixed}
-          disabled={busy}
+          checked={isFixed}
+          disabled={false}
           onChange={(next) =>
-            void run(
+            toggle(
+              next,
+              setIsFixed,
               () => setCategoryFixedAction(genreId, next),
               next ? '固定費にしました' : '固定費をやめました',
             )
@@ -285,14 +319,16 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
         <SwitchRow
           label="月末の見込みを出す"
           note={
-            data.isFixed
+            isFixed
               ? '固定費なので、見込みは出しません。'
               : 'まとめて払うことが多いなど、見込みが当てにならないときは切ります。'
           }
-          checked={!data.isFixed && !data.forecastClosed}
-          disabled={busy || data.isFixed}
+          checked={!isFixed && !forecastClosed}
+          disabled={isFixed}
           onChange={(next) =>
-            void run(
+            toggle(
+              !next,
+              setForecastClosed,
               () => setCategoryForecastClosedAction(genreId, !next),
               next ? '見込みを出すようにしました' : '見込みを止めました',
             )
@@ -449,7 +485,6 @@ function MonthGuideEdit({
   currentYen: number | null;
   onSaved: (message: string) => void;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState(currentYen === null ? '' : String(currentYen));
   const [pending, setPending] = useState<{ yen: number | null } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -481,7 +516,6 @@ function MonthGuideEdit({
     }
     hapticFor('save');
     onSaved('月の目安を変えました');
-    router.refresh();
   };
 
   if (pending !== null) {

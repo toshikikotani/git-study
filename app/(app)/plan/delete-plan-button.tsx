@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
@@ -11,7 +10,6 @@ import { deletePlanAction } from './actions';
  * (誤タップで目標が消えないようにする)。
  */
 export function DeletePlanButton({ planId }: { planId: string }) {
-  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +63,6 @@ export function DeletePlanButton({ planId }: { planId: string }) {
                 if (result.error !== null) setError(result.error);
                 else {
                   setConfirming(false);
-                  router.refresh();
                 }
               }}
               className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"

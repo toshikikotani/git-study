@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { GenreBadge } from '@/components/ui/genre-badge';
@@ -49,7 +48,6 @@ export function CategoryProgress({
   untargeted?: readonly UntargetedRow[];
 }) {
   const open = useOpenCategory();
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (rows.length === 0 && untargeted.length === 0) return null;
@@ -65,9 +63,7 @@ export function CategoryProgress({
     setPending(false);
     if (result.error) {
       setError(result.error);
-      return;
     }
-    router.refresh();
   };
 
   return (
@@ -255,8 +251,8 @@ function Row({ first, children }: { first: boolean; children: React.ReactNode })
   );
 }
 
-/** 使った額・見込みの帯と、目標の目盛り。 */
-function Bar({
+/** 使った額・見込みの帯と、目標の目盛り(ホームの気をつけたいカテゴリでも使う)。 */
+export function Bar({
   spentYen,
   p50,
   targetYen,

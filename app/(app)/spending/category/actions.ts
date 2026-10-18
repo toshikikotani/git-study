@@ -45,7 +45,6 @@ import {
   reorderGenres,
   listGenres,
   setGenreForecastClosed,
-  setGenreShowOnHome,
   updateGenreBudget,
 } from '@/features/genre/store';
 import { renameGenre, saveGenreStyle } from '@/features/genre/style-store';
@@ -651,20 +650,6 @@ export async function mergeCategoryAction(
 export async function deleteCategoryAction(genreId: string): Promise<{ error: string | null }> {
   try {
     await deleteGenre(genreId);
-  } catch (error) {
-    return { error: describeUserError(error) };
-  }
-  revalidatePath('/', 'layout');
-  return { error: null };
-}
-
-/** ホームに残額を出すカテゴリか。 */
-export async function setCategoryShowOnHomeAction(
-  genreId: string,
-  showOnHome: boolean,
-): Promise<{ error: string | null }> {
-  try {
-    await setGenreShowOnHome(genreId, showOnHome);
   } catch (error) {
     return { error: describeUserError(error) };
   }

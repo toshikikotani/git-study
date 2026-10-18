@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,6 @@ import { createNextPlanAction } from './actions';
  * 超えたジャンルも責めず、数字とできたことを先に見せる。
  */
 export function ReviewCard({ planId, review }: { planId: string; review: GoalReview }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,9 +25,7 @@ export function ReviewCard({ planId, review }: { planId: string; review: GoalRev
     setBusy(false);
     if (result.error !== null) {
       setError(result.error);
-      return;
     }
-    router.refresh();
   };
 
   return (

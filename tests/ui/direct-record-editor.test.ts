@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('ホーム・予定のその場編集', () => {
-  it('保存した日付・金額を共通Actionへ渡し、元画面を更新してUndoを残す', async () => {
+  it('保存した日付・金額を共通Actionへ渡し、Undoを残す(元画面はActionの返事で更新)', async () => {
     const onSaved = vi.fn();
     renderToString(
       h(DirectRecordEditor, {
@@ -73,7 +73,8 @@ describe('ホーム・予定のその場編集', () => {
       description: '買い物',
       memo: '予定を変更',
     });
-    expect(state.refresh).toHaveBeenCalledOnce();
+    // 元画面はアクションの返事で作り直す。router.refresh() を重ねない(往復が2回になる、ADR-117)。
+    expect(state.refresh).not.toHaveBeenCalled();
     expect(state.undo).toHaveBeenCalledOnce();
   });
 

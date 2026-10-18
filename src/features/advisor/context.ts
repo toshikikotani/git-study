@@ -17,9 +17,11 @@ import { todayAllowance, type TodayAllowance } from '@/domain/forecast/today';
 import { formatYen } from '@/domain/money';
 import { goalOutlook } from '@/domain/savings';
 import { loadHomeSummary, type HomeSummary } from '@/features/home/summary';
+import type { WatchCategory } from '@/domain/forecast/watch-categories';
 import {
   loadTodayForecasts,
   todayCapYen,
+  watchCategoriesOf,
   type TodayForecasts,
 } from '@/features/home/today-forecasts';
 import { daysBetween, todayJst, type DateOnly } from '@/lib/date';
@@ -58,6 +60,8 @@ export type TodayNumbers = {
   monthEnd: { to: DateOnly; incomeYen: number; p50: number } | null;
   /** 毎月の貯金目標(設定。ホームの貯金カードと同じ値)。0 なら決めていない。 */
   monthlySavingsTargetYen: number;
+  /** ホームの「気をつけたいカテゴリ」(目標をこえた・こえそう・8割をこえた、最大3つ、ADR-117)。 */
+  watch: WatchCategory[];
 };
 
 /** 日本時間の「2026-10-17 08:22」。 */
@@ -106,6 +110,7 @@ export function todayNumbersOf(f: TodayForecasts, now: Date): TodayNumbers {
       ? { to: f.monthPeriod.to, incomeYen: balance.incomeYen, p50: balance.p50 }
       : null,
     monthlySavingsTargetYen: f.monthlySavingsTargetYen,
+    watch: view ? watchCategoriesOf(view) : [],
   };
 }
 
@@ -146,6 +151,24 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
     }
   }
 
+  if (n.outlook !== null) {
+    const label = {
+      over: '目標をこえた',
+      risk: 'このままだと目標をこえそう',
+      near: '目標の8割をこえた',
+    };
+    lines.push(
+      n.watch.length === 0
+        ? '- 気をつけたいカテゴリ: なし(目標の8割をこえた・こえそうなカテゴリは無い)'
+        : `- 気をつけたいカテゴリ(ホームに出しているもの): ${n.watch
+            .map(
+              (w) =>
+                `${w.name}は${label[w.tone]}(使った額${yen(w.spentYen)}/目標${yen(w.targetYen)}、見込み${formatEstimate(w.p50)})`,
+            )
+            .join('、')}`,
+    );
+  }
+
   if (n.suggestion !== null) {
     const s = n.suggestion;
     lines.push(
@@ -175,7 +198,10 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
   return lines;
 }
 
-/** 旧ホームの集計から、貯金・カテゴリの予算・貯金目標の行を作る。 */
+/**
+ * 旧ホームの集計から、貯金・貯金目標の行を作る。カテゴリは「気をつけたいカテゴリ」(ホームと同じ、
+ * ADR-117)を formatTodayNumbers で渡す(以前の「ホームに出すと決めたカテゴリ」の予算は渡さない)。
+ */
 function formatSummary(summary: HomeSummary, today: DateOnly): string[] {
   const { savings } = summary;
   const lines: string[] = ['', '貯金(収入 − 支出で自動で数える):'];
@@ -186,21 +212,6 @@ function formatSummary(summary: HomeSummary, today: DateOnly): string[] {
     lines.push(`- いつもの月(直近3か月の平均): ${formatYen(savings.paceYen)}`);
   if (savings.startOn !== null) {
     lines.push(`- ${savings.startOn}から貯まった合計: ${formatYen(savings.totalYen)}`);
-  }
-
-  lines.push('', 'カテゴリの月の予算(今月分、ホームに出すと決めたカテゴリだけ):');
-  if (summary.tiles.length === 0) {
-    lines.push('- 設定なし');
-  } else {
-    for (const tile of summary.tiles) {
-      const budgetPart =
-        tile.budgetYen === null ? '予算上限なし' : `予算${formatYen(tile.budgetYen)}`;
-      const remainingPart =
-        tile.remainingYen === null ? '' : `、残り${formatYen(tile.remainingYen)}`;
-      lines.push(
-        `- ${tile.label}: 今月${formatYen(tile.spentYen)}使った(${budgetPart}${remainingPart})`,
-      );
-    }
   }
 
   lines.push('', '貯金目標(期限の近い順。貯まった合計を順に割り当てる):');

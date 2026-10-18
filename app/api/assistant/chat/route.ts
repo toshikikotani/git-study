@@ -242,18 +242,6 @@ const TOOLS: Tool[] = [
     },
   },
   {
-    name: 'set_genre_show_on_home',
-    description: 'ジャンルの残額をホーム画面に出すかどうかを変更する案を作る。',
-    input_schema: {
-      type: 'object',
-      properties: {
-        genre_name: { type: 'string' },
-        show_on_home: { type: 'boolean' },
-      },
-      required: ['genre_name', 'show_on_home'],
-    },
-  },
-  {
     name: 'create_genre',
     description:
       '新しいジャンルを追加する案を作る。既存のジャンルで足りるときは作らない。' +

@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
@@ -178,7 +177,6 @@ export function RecordSheet({
   /** 既にある記録を直すとき。 */
   edit?: RecordEdit | undefined;
 }) {
-  const router = useRouter();
   const openRecord = useOpenRecord();
   const today = todayJst();
   // 保存せずに閉じた入力(下書き)があれば戻す。カレンダーから日付を指定して開いたら、その日にする。
@@ -407,12 +405,9 @@ export function RecordSheet({
       const ids = outcome.insertedIds;
       pushUndo(`${label} を記録しました`, async () => {
         const r = await undoReceiptSaveAction(ids);
-        if (r.error) return r.error;
-        router.refresh();
-        return null;
+        return r.error ?? null;
       });
     }
-    router.refresh();
   };
 
   // 店名を入れたら、前回その店で選んだカテゴリを先に選ぶ(本人がカテゴリを選んでいなければ)。
