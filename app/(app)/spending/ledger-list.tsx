@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Yen } from '@/components/ui/money';
+import { LedgerAmount, Yen } from '@/components/ui/money';
+import { MAX_YEN } from '@/domain/money';
+import { isSplitPaymentEligible } from '@/domain/split-payment-request';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
@@ -20,6 +22,7 @@ import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
 import { PendingReceiptRows } from './pending-receipt-rows';
+import { SplitPaymentSheet } from './split-payment-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -35,15 +38,19 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
  *
  * フィルターは横スクロールのチップ1行(口座/ジャンル/期間/目標期間)+検索。
  */
-export function LedgerList({
-  goalRange,
-  duplicateCount,
-  fixedKeys = [],
-}: {
+type LedgerListProps = {
   goalRange: { from: string; to: string } | null;
   duplicateCount: number;
   fixedKeys?: readonly string[];
-}) {
+};
+
+export function LedgerList(props: LedgerListProps) {
+  const { visibleMonth, filter } = useSpendingMonth();
+  // 月・絞り込みを変えたら、見えなくなった明細の選択と請求文を残さない。
+  return <LedgerListContent key={JSON.stringify([visibleMonth, filter])} {...props} />;
+}
+
+function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: LedgerListProps) {
   const {
     transactions,
     today,
@@ -56,6 +63,10 @@ export function LedgerList({
     captures,
     visibleMonth,
   } = useSpendingMonth();
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [splitOpen, setSplitOpen] = useState(false);
+  const selectionReady = !loading && (error === null || isCurrentMonth) && !filter.pendingOnly;
   const fixedKeySet = useMemo(() => new Set(fixedKeys), [fixedKeys]);
   const isFixed = useCallback(
     (t: (typeof transactions)[number]) =>
@@ -65,6 +76,33 @@ export function LedgerList({
   );
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
+  const eligible = useMemo(() => {
+    const seen = new Set<string>();
+    return filtered.filter((t) => {
+      if (!isSplitPaymentEligible(t) || seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [filtered]);
+  const selected = useMemo(
+    () => eligible.filter((t) => selectedIds.has(t.id)),
+    [eligible, selectedIds],
+  );
+  const selectedTotal = selected.reduce((sum, t) => sum - t.amountYen, 0);
+  const validTotal = Number.isSafeInteger(selectedTotal) && selectedTotal <= MAX_YEN;
+  const toggleSelected = (id: string) =>
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setSplitOpen(false);
+  };
+  const selection = selectMode ? { selectedIds, onToggle: toggleSelected } : undefined;
   const model = useMemo(() => buildListModel(filtered, today), [filtered, today]);
   const fixed = useMemo(
     () => filtered.filter((t) => t.amountYen < 0 && isFixed(t)),
@@ -92,9 +130,30 @@ export function LedgerList({
   const active = isFilterActive(filter);
 
   return (
-    <section id="ledger" aria-label="明細" className="scroll-mt-16 flex flex-col gap-3">
+    <section
+      id="ledger"
+      aria-label="明細"
+      className={`scroll-mt-16 flex flex-col gap-3 ${selectMode ? 'pb-24' : ''}`}
+    >
       <ActiveFilterChips goalRange={goalRange} />
       <PendingReceiptRows />
+      {eligible.length > 0 || selectMode ? (
+        <div className="flex min-h-11 items-center justify-between gap-3 px-1">
+          <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            {selectMode ? '割り勘にする支出を選んでください' : 'まとめて割り勘を請求できます'}
+          </p>
+          <button
+            type="button"
+            aria-pressed={selectMode}
+            disabled={!selectMode && !selectionReady}
+            onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+            className="min-h-11 shrink-0 px-2 text-[15px] font-semibold disabled:opacity-40"
+            style={{ color: 'var(--accent)' }}
+          >
+            {selectMode ? 'キャンセル' : '選択'}
+          </button>
+        </div>
+      ) : null}
       {risky.length > 0 ? (
         <Link
           href="/transactions/reconcile"
@@ -155,6 +214,7 @@ export function LedgerList({
               key="scheduled"
               heading="予定 · 使った額には入りません"
               transactions={model.scheduled.filter((t) => !isFixed(t))}
+              selection={selection}
             />
           ) : null}
           {fixed.length > 0 ? (
@@ -164,6 +224,7 @@ export function LedgerList({
               heading={monthLabel}
               total={fixed.reduce((sum, t) => sum - t.amountYen, 0)}
               transactions={fixed}
+              selection={selection}
             />
           ) : null}
           {dayGroups.map((g) => (
@@ -172,6 +233,7 @@ export function LedgerList({
               heading={dayHeading(g.date)}
               total={g.spentYen}
               transactions={g.transactions}
+              selection={selection}
             />
           ))}
           <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -181,6 +243,37 @@ export function LedgerList({
           </p>
         </>
       )}
+      {selectMode ? (
+        <div
+          role="region"
+          aria-label="選択した明細の操作"
+          className="fixed inset-x-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg"
+          style={{ background: 'var(--surface)', borderColor: 'var(--hairline)' }}
+        >
+          <p className="tabular flex min-w-0 flex-col text-[13px]" aria-live="polite">
+            <span>{selected.length}件を選択</span>
+            {validTotal ? (
+              <Yen value={selectedTotal} className="text-[20px] font-bold" />
+            ) : (
+              <span className="text-[13px]">合計が金額の上限を超えています</span>
+            )}
+          </p>
+          <button
+            type="button"
+            disabled={selected.length === 0 || !validTotal || !selectionReady}
+            onClick={() => setSplitOpen(true)}
+            className="min-h-11 shrink-0 rounded-full px-6 text-[15px] font-semibold disabled:opacity-40"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            割り勘
+          </button>
+        </div>
+      ) : null}
+      <SplitPaymentSheet
+        open={splitOpen && selectionReady}
+        transactions={selected}
+        onClose={() => setSplitOpen(false)}
+      />
     </section>
   );
 }
@@ -199,11 +292,18 @@ function DaySection({
   heading,
   total,
   transactions,
+  selection,
 }: {
   id?: string;
   heading: string;
   total?: number;
   transactions: DrilldownTransaction[];
+  selection?:
+    | {
+        selectedIds: ReadonlySet<string>;
+        onToggle: (id: string) => void;
+      }
+    | undefined;
 }) {
   const { genres, transactions: monthTransactions } = useSpendingMonth();
   const justSavedIds = useJustSaved();
@@ -234,37 +334,94 @@ function DaySection({
       </div>
       <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
         <ul className="divider-list">
-          {transactions.map((t) => (
-            <div key={t.id} className="relative">
-              <TransactionRowWithSplit
+          {transactions.map((t) =>
+            selection ? (
+              <SelectableTransaction
+                key={t.id}
                 transaction={t}
-                categories={genres}
-                initialSplits={t.splits.map((s) => ({
-                  id: s.id,
-                  genreId: s.genreId,
-                  genreName: s.genreName,
-                  amountYen: s.amountYen,
-                  note: s.note,
-                }))}
-                genreHistory={history}
-                justSaved={justSavedIds.includes(t.id)}
-                receiptItems={t.items}
-                expenseSubtype={t.expenseSubtype}
-                display={{
-                  name: t.label,
-                  branch: t.branchName,
-                  thumbnailUrl: t.thumbnailUrl,
-                  shares: splitShares(t),
-                  scheduled: t.status === 'scheduled',
-                  special: t.kind === 'special',
-                  refund: t.kind === 'refund',
-                }}
+                selected={selection.selectedIds.has(t.id)}
+                onToggle={() => selection.onToggle(t.id)}
               />
-            </div>
-          ))}
+            ) : (
+              <div key={t.id} className="relative">
+                <TransactionRowWithSplit
+                  transaction={t}
+                  categories={genres}
+                  initialSplits={t.splits.map((s) => ({
+                    id: s.id,
+                    genreId: s.genreId,
+                    genreName: s.genreName,
+                    amountYen: s.amountYen,
+                    note: s.note,
+                  }))}
+                  genreHistory={history}
+                  justSaved={justSavedIds.includes(t.id)}
+                  receiptItems={t.items}
+                  expenseSubtype={t.expenseSubtype}
+                  display={{
+                    name: t.label,
+                    branch: t.branchName,
+                    thumbnailUrl: t.thumbnailUrl,
+                    shares: splitShares(t),
+                    scheduled: t.status === 'scheduled',
+                    special: t.kind === 'special',
+                    refund: t.kind === 'refund',
+                  }}
+                />
+              </div>
+            ),
+          )}
         </ul>
       </div>
     </section>
+  );
+}
+
+/** 選択中は行全体でチェックを切り替え、編集やスワイプの誤操作を避ける。 */
+function SelectableTransaction({
+  transaction: t,
+  selected,
+  onToggle,
+}: {
+  transaction: DrilldownTransaction;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const eligible = isSplitPaymentEligible(t);
+  return (
+    <li style={selected ? { background: 'var(--accent-track)' } : undefined}>
+      <label className="flex min-h-14 items-start gap-3 px-4 py-3">
+        <input
+          type="checkbox"
+          checked={selected && eligible}
+          disabled={!eligible}
+          onChange={onToggle}
+          aria-label={`${t.label}、${Math.abs(t.amountYen).toLocaleString('ja-JP')}円を選択`}
+          className="mt-1 size-5 shrink-0"
+          style={{ accentColor: 'var(--accent)' }}
+        />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex items-start justify-between gap-3">
+            <span className="min-w-0 text-[15px] font-medium break-words">{t.label}</span>
+            <LedgerAmount amountYen={t.amountYen} className="shrink-0 text-[15px]" />
+          </span>
+          <span className="text-[12px] break-words" style={{ color: 'var(--ink-muted)' }}>
+            {t.occurredOn.replaceAll('-', '/')}
+            {t.branchName ? ` · ${t.branchName}` : ''}
+          </span>
+          {t.items.length > 0 ? (
+            <span className="text-[12px] break-words" style={{ color: 'var(--ink-secondary)' }}>
+              {t.items.map((item) => item.name).join('・')}
+            </span>
+          ) : null}
+          {!eligible ? (
+            <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+              {t.status === 'scheduled' ? '予定は対象外です' : '支出の実績だけ選べます'}
+            </span>
+          ) : null}
+        </span>
+      </label>
+    </li>
   );
 }
 
