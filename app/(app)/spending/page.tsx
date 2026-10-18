@@ -5,7 +5,12 @@ import { getCurrentPlan } from '@/features/spending-plan/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { listDuplicateCandidates } from '@/features/transactions/duplicates-store';
 import { listMerchantNameReviewGroups } from '@/features/transactions/merchant-name-store';
-import { CALENDAR_VIEW_COOKIE, parseCalendarView } from '@/lib/calendar-view';
+import {
+  CALENDAR_OPEN_COOKIE,
+  CALENDAR_VIEW_COOKIE,
+  parseCalendarOpen,
+  parseCalendarView,
+} from '@/lib/calendar-view';
 import { AttentionCard } from './attention-card';
 import { LedgerList, LedgerSearch } from './ledger-list';
 import { loadSpendingMonthData } from './month-data';
@@ -18,7 +23,7 @@ import { PendingReviewPage } from './pending-review-page';
  * 明細(デザイン仕様書の「明細」、ADR-090)。上から次の順に並べる:
  *   1. 見出しと月の切り替え(‹ 10月 ›)
  *   2. 支出・収入・差額
- *   3. 検索・絞り込み・必要なときに開くカレンダー(週 ↔ 月、ADR-093/116)
+ *   3. 検索・絞り込み・カレンダー(既定で出す。出す / 隠す と 週 ↔ 月 は覚えておく、ADR-093/116/121)
  *   4. 確認が必要なものをまとめたカード(あるときだけ)
  *   5. これからの予定1行 → 日付ごとの明細(固定費も払った日に含める)
  * カテゴリ・回数と1回の金額・1年の流れは「分析」へ移した。
@@ -71,6 +76,7 @@ export default async function SpendingPage({
         <MonthSummary />
         <LedgerSearch
           initialCalendarView={parseCalendarView(jar.get(CALENDAR_VIEW_COOKIE)?.value)}
+          initialCalendarOpen={parseCalendarOpen(jar.get(CALENDAR_OPEN_COOKIE)?.value)}
         />
         <AttentionCard
           hasGoal={plan !== null}

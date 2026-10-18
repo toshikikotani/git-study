@@ -133,7 +133,7 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     ),
   );
 
-  it('月・合計・検索とカレンダーボタン・確認が必要・明細の順に並び、カレンダー本体は閉じておく', () => {
+  it('月・合計・検索とカレンダーボタン・確認が必要・明細の順に並び、カレンダーは最初から出す(ADR-121)', () => {
     const order = [
       '表示する月',
       'この月の合計',
@@ -144,8 +144,27 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     ].map((k) => html.indexOf(k === '確認が必要' ? k : `aria-label="${k}"`));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).not.toContain('aria-label="日付ごとの支出"');
+    expect(html).toMatch(/aria-label="カレンダー" aria-expanded="true"/);
+    expect(html).toContain('aria-label="日付ごとの支出"');
+  });
+
+  it('前に隠したカレンダーは、隠したまま描く(cookie の値をサーバーで読む、ADR-121)', () => {
+    const hidden = renderToString(
+      h(SpendingMonthProvider, {
+        today: '2026-09-29',
+        currentMonthStart: '2026-09-01',
+        currentTransactions: txs,
+        currentGenreBreakdown: views.genreBreakdown,
+        currentTotals: views.totals,
+        genres,
+        accounts: [{ id: 'a', name: '現金' }],
+        children: h(function HiddenCalendar() {
+          return LedgerSearch({ initialCalendarOpen: false });
+        }),
+      }),
+    );
+    expect(hidden).toMatch(/aria-label="カレンダー" aria-expanded="false"/);
+    expect(hidden).not.toContain('aria-label="日付ごとの支出"');
   });
 
   it('合計は 支出・収入・差額 の3列', () => {

@@ -1,20 +1,27 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId } from 'react';
 
 import type { CalendarView } from '@/lib/calendar-view';
 import { CalendarHeatmap } from './calendar-heatmap';
+import { saveCalendarOpen, useCalendarOpen } from './calendar-prefs';
 import { FilterSheet } from './filter-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
-/** 検索・絞り込み・カレンダーを1行にまとめる。カレンダーは必要なときだけ開く。 */
+/**
+ * 検索・絞り込み・カレンダーを1行にまとめる。カレンダーは既定で出し、横のボタンで隠せる。出す / 隠すと
+ * 週 / 月は覚えておき、次に開いたときも同じにする(本人の要望、ADR-121)。
+ */
 export function LedgerSearchControls({
   initialCalendarView = 'week',
+  initialCalendarOpen = true,
 }: {
   initialCalendarView?: CalendarView;
+  /** サーバーで読んだ、前回の出す / 隠す(cookie)。 */
+  initialCalendarOpen?: boolean;
 } = {}) {
   const { filter, setFilter } = useSpendingMonth();
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarOpen = useCalendarOpen(initialCalendarOpen);
   const calendarId = useId();
 
   return (
@@ -56,7 +63,7 @@ export function LedgerSearchControls({
           aria-label="カレンダー"
           aria-expanded={calendarOpen}
           aria-controls={calendarOpen ? calendarId : undefined}
-          onClick={() => setCalendarOpen((open) => !open)}
+          onClick={() => saveCalendarOpen(!calendarOpen)}
           className="flex size-11 min-h-11 shrink-0 items-center justify-center rounded-xl"
           style={{
             background: calendarOpen ? 'var(--accent)' : 'var(--field)',

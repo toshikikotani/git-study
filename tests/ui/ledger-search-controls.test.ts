@@ -116,14 +116,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('明細の検索横の操作', () => {
-  it('最初はカレンダーを描画せず、同じボタンから開閉する。保存した月/週表示を渡す', () => {
+  it('カレンダーは最初から出し、同じボタンで隠す・出す。どちらも cookie に覚える(ADR-121)', () => {
+    const cookieJar = { cookie: '' };
+    vi.stubGlobal('document', cookieJar);
     let tree = controls();
-    expect(nodes(tree).some((node) => node.type === CalendarHeatmap)).toBe(false);
-    expect(
-      nodes(tree).find((node) => node.props['aria-label'] === 'カレンダー')?.props['aria-expanded'],
-    ).toBe(false);
-    click(tree, 'カレンダー');
-    tree = controls();
     const opened = nodes(tree).find((node) => node.type === CalendarHeatmap);
     expect(opened).toBeDefined();
     expect(opened!.props).toMatchObject({ initialView: 'month' });
@@ -131,7 +127,22 @@ describe('明細の検索横の操作', () => {
       nodes(tree).find((node) => node.props['aria-label'] === 'カレンダー')?.props['aria-expanded'],
     ).toBe(true);
     click(tree, 'カレンダー');
-    expect(nodes(controls()).some((node) => node.type === CalendarHeatmap)).toBe(false);
+    expect(cookieJar.cookie).toContain('spending-calendar-open=0');
+    state.client = true;
+    tree = controls();
+    expect(nodes(tree).some((node) => node.type === CalendarHeatmap)).toBe(false);
+    expect(
+      nodes(tree).find((node) => node.props['aria-label'] === 'カレンダー')?.props['aria-expanded'],
+    ).toBe(false);
+    click(tree, 'カレンダー');
+    expect(cookieJar.cookie).toContain('spending-calendar-open=1');
+    expect(nodes(controls()).some((node) => node.type === CalendarHeatmap)).toBe(true);
+  });
+
+  it('前に隠していたら、サーバーの描画から隠したまま', () => {
+    state.host!.begin();
+    const tree = LedgerSearchControls({ initialCalendarOpen: false });
+    expect(nodes(tree).some((node) => node.type === CalendarHeatmap)).toBe(false);
   });
 
   it('検索は既存の共有filterへ反映し、絞り込みも同じ行のアイコンから開ける', () => {
