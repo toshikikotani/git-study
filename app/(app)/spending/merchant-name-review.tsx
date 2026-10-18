@@ -6,14 +6,24 @@ import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import type { MerchantNameReviewGroup, MerchantNameSnapshot } from '@/domain/merchant-name-review';
 import { formatYen } from '@/domain/money';
 import { formatDateJa } from '@/lib/date';
-import {
-  findMerchantNameGroupsAction,
-  saveMerchantNameChangesAction,
-} from './merchant-name-actions';
+import { saveMerchantNameChangesAction } from './merchant-name-actions';
+
+/** 探した結果(api/merchant-names/scan の返事)。 */
+type ScanResult = { groups: MerchantNameReviewGroup[]; warning: string | null } | { error: string };
+
+/** すべての月の明細から、規則と AI で表記ゆれを探す(読むだけ、ADR-119)。 */
+async function scanMerchantNames(signal: AbortSignal): Promise<ScanResult> {
+  try {
+    const response = await fetch('/api/merchant-names/scan', { method: 'POST', signal });
+    return (await response.json()) as ScanResult;
+  } catch {
+    return { error: '通信に失敗しました。もう一度お試しください。' };
+  }
+}
 
 /**
- * 店名をまとめて直すを、いつでも始められるようにする(本人の要望、ADR-118)。start() でシートを開き、
- * その場ですべての月の明細から候補を探す。開くたびに探し直す。
+ * 店名をまとめて直すを、いつでも始められるようにする(本人の要望、ADR-118 → 119)。start() でシートを
+ * 開き、その場ですべての月の明細から AI も使って候補を探す。開くたびに探し直し、閉じたら探すのをやめる。
  */
 export function useMerchantNameCheck(onClosed?: () => void): {
   start: () => void;
@@ -23,17 +33,25 @@ export function useMerchantNameCheck(onClosed?: () => void): {
     id: number;
     groups: readonly MerchantNameReviewGroup[] | null;
     error: string | null;
+    warning: string | null;
   } | null>(null);
+  const aborter = useRef<AbortController | null>(null);
   const start = () => {
+    aborter.current?.abort();
+    const controller = new AbortController();
+    aborter.current = controller;
     const id = Date.now();
-    setRun({ id, groups: null, error: null });
-    void findMerchantNameGroupsAction()
-      .catch(() => ({ groups: [], error: '通信に失敗しました。もう一度お試しください。' }))
-      .then((result) =>
-        setRun((current) =>
-          current?.id === id ? { id, groups: result.groups, error: result.error } : current,
-        ),
+    setRun({ id, groups: null, error: null, warning: null });
+    void scanMerchantNames(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      setRun((current) =>
+        current?.id !== id
+          ? current
+          : 'error' in result
+            ? { id, groups: [], error: result.error, warning: null }
+            : { id, groups: result.groups, error: null, warning: result.warning },
       );
+    });
   };
   const sheet = (
     <MerchantNameReview
@@ -41,7 +59,9 @@ export function useMerchantNameCheck(onClosed?: () => void): {
       open={run !== null}
       groups={run?.groups ?? null}
       error={run?.error ?? null}
+      warning={run?.warning ?? null}
       onClose={() => {
+        aborter.current?.abort();
         setRun(null);
         onClosed?.();
       }}
@@ -54,12 +74,15 @@ export function MerchantNameReview({
   open,
   groups,
   error = null,
+  warning = null,
   onClose,
 }: {
   open: boolean;
   /** null は探している途中。 */
   groups: readonly MerchantNameReviewGroup[] | null;
   error?: string | null;
+  /** AI が使えなかったなど、規則で探した分だけを出しているときの理由。 */
+  warning?: string | null;
   onClose: () => void;
 }) {
   const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
@@ -91,7 +114,7 @@ export function MerchantNameReview({
       </p>
       <p role="status" className="mb-3 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
         {groups === null
-          ? 'すべての月の明細から、店名の表記ゆれを探しています…'
+          ? 'AIがすべての月の明細の店名を見比べています…(30秒ほどかかることがあります)'
           : error
             ? ''
             : count > 0
@@ -103,6 +126,11 @@ export function MerchantNameReview({
       {error ? (
         <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--over)' }}>
           {error}
+        </p>
+      ) : null}
+      {warning ? (
+        <p className="mb-3 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+          {warning} 決まった規則で見つけたものだけを出しています。
         </p>
       ) : null}
       {groups !== null && groups.length === 0 && !error ? (
@@ -156,7 +184,9 @@ export function MerchantNameGroupEditor({
     ? '店名なし'
     : group.reasons.includes('address')
       ? '住所のような店名'
-      : '店名の表記ゆれ';
+      : group.reasons.includes('ai')
+        ? 'AIが見つけた表記ゆれ'
+        : '店名の表記ゆれ';
 
   async function save() {
     if (saving.current || name.trim() === '' || selectedEntries.length === 0) return;

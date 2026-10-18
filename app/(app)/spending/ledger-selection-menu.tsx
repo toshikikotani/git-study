@@ -20,6 +20,8 @@ type Props = {
   onCopy: () => void;
   onSelectAll: () => void;
   onClear: () => void;
+  /** 「店名を整える」(AI で店名の表記ゆれを探す、ADR-119)。選択中は出さない。 */
+  onTidy?: (() => void) | undefined;
 };
 
 /** ページのアニメーションから離し、一覧のどこでも右上から選択した明細を操作する。 */
@@ -37,6 +39,7 @@ export function LedgerSelectionMenu({
   onCopy,
   onSelectAll,
   onClear,
+  onTidy,
 }: Props) {
   const isClient = useIsClient();
   const [open, setOpen] = useState(false);
@@ -82,6 +85,22 @@ export function LedgerSelectionMenu({
       aria-label="明細の選択"
       className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-40 mx-auto flex max-w-2xl justify-end px-4"
     >
+      {onTidy && !selectMode ? (
+        <button
+          type="button"
+          onClick={onTidy}
+          className="pointer-events-auto mr-2 flex min-h-11 items-center gap-1 rounded-full border px-4 text-[15px] font-semibold"
+          style={{
+            background: 'var(--surface-raised)',
+            borderColor: 'var(--hairline)',
+            boxShadow: 'var(--card-shadow)',
+            color: 'var(--accent)',
+          }}
+        >
+          <span aria-hidden>✦</span>
+          店名を整える
+        </button>
+      ) : null}
       <div ref={root} className="pointer-events-auto relative max-w-full">
         <div
           className="flex items-center rounded-full border px-1"

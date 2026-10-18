@@ -2,10 +2,15 @@ import { z } from 'zod';
 
 import {
   groupMerchantNameReview,
+  mergeMerchantNameGroups,
+  type MerchantNameReviewEntry,
   type MerchantNameReviewGroup,
   type MerchantNameSnapshot,
 } from '@/domain/merchant-name-review';
+import { apiKeyMissingMessage } from '@/lib/anthropic';
+import { readAnthropicApiKey } from '@/lib/env';
 import { AppError } from '@/lib/errors';
+import { findMerchantNameVariantsWithAi } from './merchant-name-ai';
 import { todayJst } from '@/lib/date';
 import { createClient } from '@/lib/supabase/server';
 
@@ -72,6 +77,28 @@ async function authenticatedClient() {
 
 /** 月をまたぐ表記ゆれも、本人の実績明細からまとめて確認できる。 */
 export async function listMerchantNameReviewGroups(): Promise<MerchantNameReviewGroup[]> {
+  return groupMerchantNameReview(await loadMerchantNameEntries());
+}
+
+/**
+ * AI でも表記ゆれを探す(本人が押したときだけ、ADR-119)。決まった規則のまとめに、AI のまとめを
+ * 先に足す。AI が使えない・失敗したときは規則のまとめだけを返し、理由を warning に入れる。
+ * 読むだけで、何も書き換えない。
+ */
+export async function scanMerchantNames(): Promise<{
+  groups: MerchantNameReviewGroup[];
+  warning: string | null;
+}> {
+  const entries = await loadMerchantNameEntries();
+  const rule = groupMerchantNameReview(entries);
+  const apiKey = readAnthropicApiKey();
+  if (apiKey === null) return { groups: rule, warning: apiKeyMissingMessage('AIの店名チェック') };
+  const ai = await findMerchantNameVariantsWithAi(entries, apiKey);
+  return { groups: mergeMerchantNameGroups(ai.groups, rule), warning: ai.warning };
+}
+
+/** 本人の実績明細(振替・対象外を除く、今日まで)の店名。 */
+async function loadMerchantNameEntries(): Promise<MerchantNameReviewEntry[]> {
   const { supabase, userId } = await authenticatedClient();
   const today = todayJst();
   const entries = [];
@@ -100,7 +127,7 @@ export async function listMerchantNameReviewGroups(): Promise<MerchantNameReview
     );
     if (data.length < PAGE_SIZE) break;
   }
-  return groupMerchantNameReview(entries);
+  return entries;
 }
 
 /**
