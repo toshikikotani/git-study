@@ -25,7 +25,7 @@ import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { LedgerSelectionMenu } from './ledger-selection-menu';
-import { useMerchantNameCheck } from './merchant-name-review';
+import { useAiCheck } from './ai-check';
 import { LedgerSearchControls } from './ledger-search-controls';
 import { CompactTransactionSummary } from './compact-transaction-summary';
 import { SelectionCopySheet } from './selection-copy-sheet';
@@ -63,8 +63,9 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [splitOpen, setSplitOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
-  // 店名の表記ゆれは、右上の「店名を整える」からいつでも AI で探して直せる(本人の要望、ADR-119)。
-  const names = useMerchantNameCheck(reloadVisibleMonth);
+  // 店名の表記ゆれとレシートの品目の読み取りミスは、右上の「AIでチェック」からいつでも探して直せる
+  // (本人の要望、ADR-119 → 120)。
+  const check = useAiCheck(reloadVisibleMonth);
   const selectionReady = !loading && (error === null || isCurrentMonth) && !filter.pendingOnly;
   const fixedKeySet = useMemo(() => new Set(fixedKeys), [fixedKeys]);
   const isFixed = useCallback(
@@ -207,8 +208,8 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
           </p>
         </>
       )}
-      {names.sheet}
-      {/* 右上の「店名を整える」はいつでも出す(明細の無い月でも、ほかの月の店名を直せる)。 */}
+      {check.sheet}
+      {/* 右上の「AIでチェック」はいつでも出す(明細の無い月でも、ほかの月の店名やレシートを直せる)。 */}
       <LedgerSelectionMenu
         selectMode={selectMode}
         count={selected.length}
@@ -225,7 +226,7 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
         onCopy={() => selectionReady && selected.length > 0 && setCopyOpen(true)}
         onSelectAll={() => selectionReady && setSelectedIds(new Set(selectable.map((t) => t.id)))}
         onClear={() => setSelectedIds(new Set())}
-        onTidy={names.start}
+        onTidy={check.start}
       />
       <SplitPaymentSheet
         open={splitOpen && selectionReady}

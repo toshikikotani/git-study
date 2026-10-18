@@ -6,7 +6,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MerchantNameReviewGroup } from '@/domain/merchant-name-review';
 
 /**
- * 店名の表記ゆれを、右上の「店名を整える」からいつでも AI で探して直せる(本人の要望、ADR-118 → 119)。
+ * 店名の表記ゆれを、右上の「AIでチェック」(はじめは「店名を整える」)からいつでも AI で探して直せる
+ * (本人の要望、ADR-118 → 119 → 120)。
  */
 
 const store = vi.hoisted(() => ({ scan: vi.fn() }));
@@ -23,7 +24,7 @@ vi.mock('@/components/ui/bottom-sheet', () => ({
 }));
 
 import { POST } from '../../app/api/merchant-names/scan/route';
-import { MerchantNameReview } from '../../app/(app)/spending/merchant-name-review';
+import { MerchantNameResults } from '../../app/(app)/spending/merchant-name-review';
 
 const group: MerchantNameReviewGroup = {
   key: 'ai:0',
@@ -72,12 +73,7 @@ describe('店名をまとめて直すのシート', () => {
   const render = (
     groups: readonly MerchantNameReviewGroup[] | null,
     extra: { error?: string | null; warning?: string | null } = {},
-  ) =>
-    text(
-      renderToStaticMarkup(
-        h(MerchantNameReview, { open: true, groups, onClose: () => {}, ...extra }),
-      ),
-    );
+  ) => text(renderToStaticMarkup(h(MerchantNameResults, { groups, ...extra })));
 
   it('探しているあいだは、AI が見比べていると書く', () => {
     expect(render(null)).toContain('AIがすべての月の明細の店名を見比べています…');
@@ -101,17 +97,17 @@ describe('店名をまとめて直すのシート', () => {
   });
 });
 
-describe('入口(明細の右上「店名を整える」)', () => {
+describe('入口(明細の右上「AIでチェック」)', () => {
   const menu = readFileSync('app/(app)/spending/ledger-selection-menu.tsx', 'utf8');
   const list = readFileSync('app/(app)/spending/ledger-list.tsx', 'utf8');
-  const review = readFileSync('app/(app)/spending/merchant-name-review.tsx', 'utf8');
+  const check = readFileSync('app/(app)/spending/ai-check.tsx', 'utf8');
   const filter = readFileSync('app/(app)/spending/filter-sheet.tsx', 'utf8');
 
   it('右上の「選択」の隣に、いつでも出す(選択中は出さない)', () => {
-    expect(menu).toContain('店名を整える');
+    expect(menu).toContain('AIでチェック');
     expect(menu).toContain('{onTidy && !selectMode ? (');
-    expect(list).toContain('onTidy={names.start}');
-    expect(list).toContain('useMerchantNameCheck(reloadVisibleMonth)');
+    expect(list).toContain('onTidy={check.start}');
+    expect(list).toContain('useAiCheck(reloadVisibleMonth)');
   });
 
   it('分かりにくかった絞り込みの中の入口はやめた', () => {
@@ -119,7 +115,8 @@ describe('入口(明細の右上「店名を整える」)', () => {
   });
 
   it('押すたびに探し直し、閉じたら探すのをやめる', () => {
-    expect(review).toContain("fetch('/api/merchant-names/scan', { method: 'POST', signal })");
-    expect(review).toContain('aborter.current?.abort();');
+    expect(check).toContain("fetch(url, { method: 'POST', signal })");
+    expect(check).toContain("'/api/merchant-names/scan'");
+    expect(check).toContain('aborter.current?.abort();');
   });
 });

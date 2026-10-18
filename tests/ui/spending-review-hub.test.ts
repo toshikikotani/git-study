@@ -48,6 +48,7 @@ vi.mock('@/components/ui/bottom-sheet', () => ({
 import { AttentionCard } from '../../app/(app)/spending/attention-card';
 import {
   MerchantNameGroupEditor,
+  MerchantNameResults,
   MerchantNameReview,
 } from '../../app/(app)/spending/merchant-name-review';
 import { JobRow } from '../../app/(app)/spending/pending-receipt-rows';
@@ -257,7 +258,7 @@ describe('店名候補は対象と名前を確認して保存する', () => {
   it('保存済みは元の候補だけ隠し、同じIDの新しい候補は隠さない', () => {
     function renderGroups(currentGroup: MerchantNameReviewGroup) {
       state.host!.begin();
-      return nodes(MerchantNameReview({ open: true, groups: [currentGroup], onClose: vi.fn() }));
+      return nodes(MerchantNameResults({ groups: [currentGroup] }));
     }
     const editor = renderGroups(group).find((node) => node.type === MerchantNameGroupEditor)!;
     editor.props.onSaved!([group.entries[0]!.id]);

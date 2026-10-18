@@ -20,7 +20,7 @@ type Props = {
   onCopy: () => void;
   onSelectAll: () => void;
   onClear: () => void;
-  /** 「店名を整える」(AI で店名の表記ゆれを探す、ADR-119)。選択中は出さない。 */
+  /** 「AIでチェック」(店名の表記ゆれとレシートの読み取りミスを AI で探す、ADR-119 → 120)。選択中は出さない。 */
   onTidy?: (() => void) | undefined;
 };
 
@@ -98,7 +98,7 @@ export function LedgerSelectionMenu({
           }}
         >
           <span aria-hidden>✦</span>
-          店名を整える
+          AIでチェック
         </button>
       ) : null}
       <div ref={root} className="pointer-events-auto relative max-w-full">
