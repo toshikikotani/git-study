@@ -16,8 +16,8 @@ import { useOpenRecord } from '../record-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-/** 点の濃さ(使った額の段階ごとの、accent の割合)。 */
-const DOT_MIX = [0, 18, 40, 68, 100];
+/** 面の濃さ。文字色と背景色の混合なので、明暗どちらのテーマでも段階が分かる。 */
+const HEAT_MIX = [0, 18, 40, 68, 100];
 
 /** 2026-10-11 〜 2026-10-17 → 「10月11日〜17日」 */
 function weekLabel(week: readonly string[]): string {
@@ -55,7 +55,7 @@ function saveView(view: CalendarView): void {
 /**
  * カレンダー(デザイン仕様書の「明細」、ADR-090)。既定は今日のある週、「月で見る」で月全体。
  * 選んだ表示(週 / 月)は覚えておき、次に開いたときも同じにする(ADR-093)。
- * 日付の下の点が濃いほど多く使った日。今日は accent の面、先の日は白い面で、予定がある日は輪の点。
+ * 日付の面が濃いほど多く使った日。今日は輪郭と「今日」で示し、予定がある日は輪の点。
  * 日付をタップすると明細がその日に絞り込まれる(もう一度で解除)。
  */
 export function CalendarHeatmap({
@@ -135,19 +135,20 @@ export function CalendarHeatmap({
                   onClick={() => setFilter({ date: selected ? null : date })}
                   className="flex h-13 min-h-11 flex-col items-center justify-center gap-1 rounded-xl"
                   style={{
-                    background: isToday
-                      ? 'var(--accent)'
+                    background:
+                      level > 0
+                        ? `color-mix(in srgb, var(--ink) ${HEAT_MIX[level]}%, var(--plane))`
+                        : future
+                          ? 'var(--surface)'
+                          : 'var(--plane)',
+                    color: level >= 3 ? 'var(--plane)' : future ? 'var(--ink-muted)' : 'var(--ink)',
+                    boxShadow: isToday
+                      ? 'inset 0 0 0 1px var(--accent)'
                       : future
-                        ? 'var(--surface)'
-                        : 'var(--plane)',
-                    color: isToday
-                      ? 'var(--on-accent)'
-                      : future
-                        ? 'var(--ink-muted)'
-                        : 'var(--ink)',
-                    boxShadow: future && !isToday ? 'inset 0 0 0 1px var(--hairline)' : 'none',
+                        ? 'inset 0 0 0 1px var(--hairline)'
+                        : 'none',
                     outline: selected ? '2px solid var(--accent)' : 'none',
-                    outlineOffset: '-2px',
+                    outlineOffset: '1px',
                     opacity: inMonth ? 1 : 0.4,
                   }}
                 >
@@ -162,14 +163,6 @@ export function CalendarHeatmap({
                       data-scheduled-mark
                       className="size-2 rounded-full"
                       style={{ border: '1.5px solid var(--ideal)' }}
-                    />
-                  ) : level > 0 ? (
-                    <span
-                      aria-hidden
-                      className="size-2 rounded-full"
-                      style={{
-                        background: `color-mix(in srgb, var(--accent) ${DOT_MIX[level]}%, var(--track))`,
-                      }}
                     />
                   ) : (
                     <span aria-hidden className="size-2" />
@@ -208,12 +201,18 @@ export function CalendarHeatmap({
           )
         ) : null}
         <span className="flex items-center gap-1">
-          <span
-            aria-hidden
-            className="size-2 rounded-full"
-            style={{ background: 'var(--accent)' }}
-          />
-          点が濃いほど多い
+          <span aria-hidden className="flex gap-1">
+            {HEAT_MIX.slice(1).map((mix) => (
+              <span
+                key={mix}
+                className="size-2 rounded-sm"
+                style={{
+                  background: `color-mix(in srgb, var(--ink) ${mix}%, var(--plane))`,
+                }}
+              />
+            ))}
+          </span>
+          色が濃いほど多い
         </span>
         <span className="flex items-center gap-1">
           <span

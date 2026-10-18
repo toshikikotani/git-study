@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 // サーバー専用の Server Action・ルーターは、描画に関係しないので差し替える。
 vi.mock('../../app/(app)/spending/actions', () => ({ loadCalendarMonthAction: vi.fn() }));
+vi.mock('../../app/(app)/spending/merchant-name-actions', () => ({
+  saveMerchantNameChangesAction: vi.fn(),
+}));
 vi.mock('../../app/(app)/transactions/actions', () => ({
   deleteTransactionAction: vi.fn(),
   duplicateTransactionAction: vi.fn(),
@@ -122,7 +125,6 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
           h(PeriodSwitcher, { key: 'p' }),
           h(MonthSummary, { key: 's' }),
           h(LedgerSearch, { key: 'q' }),
-          h(CalendarHeatmap, { key: 'c' }),
           h(AttentionCard, { key: 'at', hasGoal: true }),
           h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
           h(GenreBreakdown, { key: 'g' }),
@@ -131,13 +133,19 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     ),
   );
 
-  it('上から 月の切り替え → 合計 → 検索 → カレンダー → 要確認 → 明細 の順に並ぶ(デザイン仕様書)', () => {
-    const order = ['表示する月', 'この月の合計', '明細を検索', 'カレンダー', '要確認', '明細'].map(
-      // 要確認は件数つきの読み上げ(「要確認 1件。…」)なので前方一致
-      (k) => html.indexOf(k === '要確認' ? `aria-label="${k}` : `aria-label="${k}"`),
-    );
+  it('月・合計・検索とカレンダーボタン・確認が必要・明細の順に並び、カレンダー本体は閉じておく', () => {
+    const order = [
+      '表示する月',
+      'この月の合計',
+      '明細を検索',
+      'カレンダー',
+      '確認が必要',
+      '明細',
+    ].map((k) => html.indexOf(k === '確認が必要' ? k : `aria-label="${k}"`));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('aria-label="日付ごとの支出"');
   });
 
   it('合計は 支出・収入・差額 の3列', () => {
@@ -151,17 +159,20 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     expect(html).toMatch(/外食[\s\S]{0,200}%/);
   });
 
-  it('予定は「予定」セクション、使った額に入らない。要確認に未分類が出る', () => {
-    expect(html).toContain('予定 · 使った額には入りません');
-    expect(html).toContain('3,400円'); // 使った額(3,000 + 400)。26,540円は入らない
-    expect(html).not.toContain('29,940円');
+  it('予定は「これからの予定」の一行へまとめ、使った額に入れない。確認が必要に未分類が出る', () => {
+    expect(html).toContain('これからの予定 1件');
+    expect(html).toContain('使った額には入りません');
+    const monthSummary = html.match(/<section aria-label="この月の合計"[\s\S]*?<\/section>/)![0];
+    expect(monthSummary).toContain('3,900円'); // 実績の3,000 + 400 + 500。予定26,540円は含めない
+    expect(monthSummary).not.toContain('30,440円');
     expect(html).toContain('未分類 1件');
     expect(html).toContain('目標に未反映');
   });
 
-  it('分割した明細は、子の羅列ではなく比率のバー(role=img)', () => {
-    expect(html).toContain('カテゴリの内訳:カフェ・飲料 2,000円、外食 1,000円');
-    expect(html).toContain('阪神大阪梅田駅店');
+  it('複数カテゴリは二行目の文字にまとめ、内訳バーを一覧に出さない', () => {
+    expect(html).toContain('カフェ・飲料・外食');
+    expect(html).not.toContain('カテゴリの内訳:');
+    expect(html).not.toContain('阪神大阪梅田駅店');
   });
 
   it('支出の行に「−」は付かず、「円」は小さく組まれ、VoiceOver 向けの読み上げがある', () => {
@@ -187,21 +198,20 @@ describe('F4 明細の行', () => {
     ),
   );
 
-  it('未分類の行は、「?」やグレーのバーではなく、行の中の「カテゴリを選ぶ」チップ(受け入れ基準5)', () => {
-    expect(html).toContain('カテゴリを選ぶ');
-    // 未分類は1件だけ → チップも1つ
-    expect(html.match(/カテゴリを選ぶ/g)).toHaveLength(1);
-    expect(html).not.toContain('未分類</span>'); // 「未分類」ラベルのバッジを出さない
+  it('未分類も二行の要約に収め、別行のカテゴリ選択チップを足さない', () => {
+    expect(html).toContain('未分類');
+    expect(html).not.toContain('カテゴリを選ぶ');
+    expect(html).not.toContain('カテゴリの内訳:');
   });
 
-  it('1行目は正規化した店名、2行目に支店名(受け入れ基準6)。店名は切れない(truncate しない)', () => {
-    expect(html).toMatch(/ドトールコーヒー[\s\S]{0,400}梅田店/);
-    const nameLine = html.match(/<p class="([^"]*)"[^>]*>ドトールコーヒー/);
-    expect(nameLine?.[1]).not.toContain('truncate');
+  it('1行目は店名、2行目はカテゴリと最初の品目の要約にし、支店名は一覧で繰り返さない', () => {
+    expect(html).toContain('ドトールコーヒー');
+    expect(html).toContain('title="カフェ・飲料"');
+    expect(html).not.toContain('梅田店');
   });
 
-  it('レシート画像はサムネイルではなく小さなレシートアイコン(タップでフルスクリーン)', () => {
-    expect(html).toContain('レシート画像を見る');
+  it('レシートは一覧の全行にマークを出さず、画像も読み込まない', () => {
+    expect(html).not.toContain('レシート画像を見る');
     expect(html).not.toContain('<img');
   });
 
@@ -267,9 +277,9 @@ describe('F5 カレンダー', () => {
     expect(week).toContain('9月27日〜10月3日');
   });
 
-  it('凡例は「点が濃いほど多い」と「予定あり」(デザイン仕様書)', () => {
+  it('凡例は「色が濃いほど多い」と「予定あり」(デザイン仕様書)', () => {
     const html = render(null);
-    expect(html).toContain('点が濃いほど多い');
+    expect(html).toContain('色が濃いほど多い');
     expect(html).toContain('予定あり');
     expect(html).toContain('9月27日〜10月3日');
     expect(html).toContain('月で見る');
@@ -308,7 +318,7 @@ describe('分析のカテゴリ(デザイン仕様書)', () => {
   });
 });
 
-describe('明細は省略しない(本人の要望「省略はなし」、ADR-095)', () => {
+describe('一覧は二行の要約、過去日は折り畳み。全内容は明細を開いて確認（ADR-116）', () => {
   const names = ['ファミリーマート', 'マツモトキヨシ', '耳鼻咽喉科', 'スギ薬局', 'ローソン'];
   const many = names.map((label, i) => ({
     ...ledgerTx({ id: `d${i}`, occurredOn: '2026-09-15', label, amountYen: -100 * (i + 1) }),
@@ -346,13 +356,17 @@ describe('明細は省略しない(本人の要望「省略はなし」、ADR-09
     ),
   );
 
-  it('1日に4件以上あっても、たたまずにすべて出す', () => {
-    for (const name of names) expect(html).toContain(name);
+  it('過去日を畳んでも、日付を開けば件数にかかわらず全明細を見られる', () => {
+    const group = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/)?.[0];
+    expect(group).toBeDefined();
+    expect(group).not.toMatch(/^<details\b[^>]*\bopen=/);
+    for (const name of names) expect(group).toContain(name);
     expect(html).not.toContain('この日のほかの記録');
   });
 
-  it('品目はすべて並べ、「ほか○点」や「…」で切らない', () => {
-    expect(html).toContain('野菜、レジ袋、牛乳、卵、ライオンキャラメル');
-    expect(html).not.toMatch(/ほか\d+点/);
+  it('品目は最初の一つと「ほかN」にまとめ、残りの長い品名は一覧に並べない', () => {
+    expect(html).toContain('野菜 ほか4');
+    expect(html).not.toContain('野菜、レジ袋、牛乳、卵、ライオンキャラメル');
+    expect(html).not.toContain('ライオンキャラメル');
   });
 });

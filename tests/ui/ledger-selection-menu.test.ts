@@ -53,6 +53,7 @@ vi.mock('../../app/(app)/spending/selection-copy-sheet', () => ({
 }));
 
 import {
+  DaySection,
   LedgerList,
   LedgerListContent,
   SelectableTransaction,
@@ -60,6 +61,7 @@ import {
 import { LedgerSelectionMenu } from '../../app/(app)/spending/ledger-selection-menu';
 import { SplitPaymentSheet } from '../../app/(app)/spending/split-payment-sheet';
 import { SelectionCopySheet } from '../../app/(app)/spending/selection-copy-sheet';
+import { TransactionRowWithSplit } from '../../app/(app)/transactions/split-editor';
 
 type MenuProps = ComponentProps<typeof LedgerSelectionMenu>;
 type NodeProps = {
@@ -70,6 +72,8 @@ type NodeProps = {
   'aria-expanded'?: boolean;
   disabled?: boolean;
   checked?: boolean;
+  open?: boolean;
+  onToggle?: (event: { currentTarget: { open: boolean } }) => void;
   onClick?: () => void;
   onChange?: () => void;
 };
@@ -302,7 +306,7 @@ describe('明細の複数選択は割り勘から独立した共通操作', () =
     expect(sheet.transactions.map((t) => t.id)).toEqual(['dinner', 'taxi']);
   });
 
-  it('固定費の条件に一致しても表示されない正金額の明細を全選択に含めない', () => {
+  it('固定費の条件に一致する入金も日付に残し、表示された全件をコピーできる', () => {
     fixedKeys = ['genre:dining'];
     state.month!.transactions = [
       fixtures[0]!,
@@ -310,16 +314,47 @@ describe('明細の複数選択は割り勘から独立した共通操作', () =
       transaction({ id: 'fixed-income', label: '固定費の入金', amountYen: 1000 }),
     ];
     listMenu().onStart();
-    expect(renderedIds().sort()).toEqual(['dinner', 'taxi']);
+    expect(renderedIds().sort()).toEqual(['dinner', 'fixed-income', 'taxi']);
     listMenu().onSelectAll();
-    expect(listMenu()).toMatchObject({ count: 2, availableCount: 2, splitDisabledReason: null });
+    expect(listMenu()).toMatchObject({ count: 3, availableCount: 3 });
+    expect(listMenu().splitDisabledReason).toEqual(expect.any(String));
     listMenu().onCopy();
     expect(
       propsOf<ComponentProps<typeof SelectionCopySheet>>(
         renderList(),
         SelectionCopySheet,
       ).transactions.map((t) => t.id),
-    ).toEqual(['dinner', 'taxi']);
+    ).toEqual(['dinner', 'taxi', 'fixed-income']);
+  });
+
+  it('複数選択中は過去日と予定をすべて開き、全選択・コピーと画面に出る行を一致させる', () => {
+    const groups = () =>
+      nodes(renderList())
+        .filter((node) => typeof node.type === 'function' && node.type.name === 'DaySection')
+        .map(
+          (node) =>
+            node.props as {
+              forceOpen: boolean;
+              initiallyOpen: boolean;
+              transactions: DrilldownTransaction[];
+            },
+        );
+    expect(groups().length).toBeGreaterThan(1);
+    expect(groups().every((group) => !group.forceOpen && !group.initiallyOpen)).toBe(true);
+    listMenu().onStart();
+    expect(groups().every((group) => group.forceOpen)).toBe(true);
+    const visibleIds = groups().flatMap((group) => group.transactions.map((t) => t.id));
+    expect(visibleIds).toContain('future');
+    expect(listMenu().availableCount).toBe(visibleIds.length);
+    listMenu().onSelectAll();
+    listMenu().onCopy();
+    const copied = propsOf<ComponentProps<typeof SelectionCopySheet>>(
+      renderList(),
+      SelectionCopySheet,
+    );
+    expect(copied.transactions.map((t) => t.id).sort()).toEqual(visibleIds.sort());
+    listMenu().onExit();
+    expect(groups().every((group) => !group.forceOpen)).toBe(true);
   });
 
   it('選択解除は選択モードを保ち、完了は件数と開いた画面をリセットする', () => {
@@ -398,6 +433,40 @@ describe('明細の複数選択は割り勘から独立した共通操作', () =
     checkbox.onChange!();
     expect(onToggle).toHaveBeenCalledOnce();
     expect(renderToStaticMarkup(tree)).not.toContain('支出の実績だけ選べます');
+  });
+});
+
+describe('過去日の開閉', () => {
+  it('どの過去日も開く・閉じる操作を繰り返せ、明細を失わない', () => {
+    const renderDay = () => {
+      state.host!.begin();
+      const tree = DaySection({
+        heading: '9月10日（木）',
+        transactions: fixtures.slice(0, 2),
+        initiallyOpen: false,
+      });
+      state.host!.flush();
+      return tree;
+    };
+    let details = nodes(renderDay()).find((node) => node.type === 'details')!.props;
+    expect(details.open).toBe(false);
+    details.onToggle!({ currentTarget: { open: true } });
+    const opened = renderDay();
+    details = nodes(opened).find((node) => node.type === 'details')!.props;
+    expect(details.open).toBe(true);
+    const rowIds = (tree: ReactNode) =>
+      nodes(tree)
+        .filter((node) => node.type === TransactionRowWithSplit)
+        .map(
+          (node) => (node.props as ComponentProps<typeof TransactionRowWithSplit>).transaction.id,
+        );
+    expect(nodes(opened).some((node) => node.type === 'summary')).toBe(true);
+    expect(rowIds(opened).sort()).toEqual(['dinner', 'taxi']);
+    details.onToggle!({ currentTarget: { open: false } });
+    const closed = renderDay();
+    details = nodes(closed).find((node) => node.type === 'details')!.props;
+    expect(details.open).toBe(false);
+    expect(rowIds(closed).sort()).toEqual(['dinner', 'taxi']);
   });
 });
 

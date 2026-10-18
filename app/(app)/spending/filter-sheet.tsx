@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { hapticFor } from '@/lib/haptics';
@@ -18,7 +19,13 @@ export function monthDay(date: string): string {
  * 選ぶ。n は選んでいる条件の数。条件は「口座・ジャンル・期間・入力待ち」で、まとめて解除できる。
  * 選んでいる間は、明細の上に「○○で絞り込み中 ×」のチップ(ActiveFilterChips)が出る。
  */
-export function FilterSheet({ goalRange }: { goalRange: { from: string; to: string } | null }) {
+export function FilterSheet({
+  goalRange,
+  compact = false,
+}: {
+  goalRange: { from: string; to: string } | null;
+  compact?: boolean;
+}) {
   const { filter, setFilter, clearFilter, genres, accounts, today, captures } = useSpendingMonth();
   const [open, setOpen] = useState(false);
   const count = activeFilterCount(filter);
@@ -29,14 +36,37 @@ export function FilterSheet({ goalRange }: { goalRange: { from: string; to: stri
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="tabular flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold"
+        aria-label={compact ? `絞り込み${count > 0 ? `、${count}件の条件` : ''}` : undefined}
+        className={`tabular relative flex min-h-11 shrink-0 items-center justify-center text-sm font-semibold ${compact ? 'size-11 rounded-xl' : 'rounded-full px-4'}`}
         style={{
           background: count > 0 ? 'var(--accent)' : 'transparent',
           color: count > 0 ? 'var(--on-accent)' : 'var(--ink)',
-          border: '1px solid var(--hairline)',
+          border: compact ? 'none' : '1px solid var(--hairline)',
         }}
       >
-        フィルター{count > 0 ? `(${count})` : ''}
+        {compact ? (
+          <>
+            <svg
+              aria-hidden
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <path d="M4 6h16M7 12h10M10 18h4" />
+            </svg>
+            {count > 0 ? (
+              <span aria-hidden className="absolute top-0 right-0 text-[11px] leading-none">
+                {count}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>フィルター{count > 0 ? `(${count})` : ''}</>
+        )}
       </button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} role="dialog">
@@ -118,6 +148,13 @@ export function FilterSheet({ goalRange }: { goalRange: { from: string; to: stri
                 {a.name}
               </Choice>
             ))}
+            <Link
+              href="/accounts"
+              className="inline-flex min-h-11 w-full items-center rounded-full px-4 text-sm font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              口座を管理
+            </Link>
           </Group>
 
           <Group label="状態">

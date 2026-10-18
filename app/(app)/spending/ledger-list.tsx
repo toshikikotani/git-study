@@ -1,45 +1,39 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { LedgerAmount, Yen } from '@/components/ui/money';
+import { GenreBadge } from '@/components/ui/genre-badge';
+import { ledgerRowPresentation } from '@/domain/ledger-row-presentation';
 import { MAX_YEN } from '@/domain/money';
 import { isSplitPaymentEligible } from '@/domain/split-payment-request';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
-import { isRiskyPaymentMethod } from '@/features/classification/rules';
 import {
   EMPTY_FILTER,
   buildListModel,
   filterLedger,
   isFilterActive,
   splitShares,
+  toLedgerEntries,
 } from '@/features/spending/views';
 import { useJustSaved } from '@/lib/just-saved';
-import { weekdayOf } from '@/lib/date';
+import { weekdayOf, formatDateJa } from '@/lib/date';
+import type { CalendarView } from '@/lib/calendar-view';
 import { TransactionRowWithSplit } from '../transactions/split-editor';
 import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { LedgerSelectionMenu } from './ledger-selection-menu';
+import { LedgerSearchControls } from './ledger-search-controls';
+import { CompactTransactionSummary } from './compact-transaction-summary';
 import { SelectionCopySheet } from './selection-copy-sheet';
 import { SplitPaymentSheet } from './split-payment-sheet';
 import { useSpendingMonth } from './spending-month-provider';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
-/**
- * 明細リスト。
- *
- * 行:正規化した店名(1行目)、支店名と品目のプレビュー(2行目)、右に金額、ジャンルの
- * アイコンと色、レシートのサムネイル。分割した明細は品目の羅列ではなく、ジャンル比率の
- * 細い積み上げバー。日付ヘッダーは画面上部に固定し、その日の使った額を出す。
- * 今日より先の日付は「予定」に分ける。スワイプ:右=ジャンル変更、左=複製・削除。
- * 各行に赤字のエラーは出さない(確認が要るものは要確認カードに集約)。
- *
- * フィルターは横スクロールのチップ1行(口座/ジャンル/期間/目標期間)+検索。
- */
+/** 今日を開き、過去の日は合計とカテゴリでたたむ。検索・複数選択では対象行を開く。 */
 type LedgerListProps = {
   goalRange: { from: string; to: string } | null;
   duplicateCount: number;
@@ -52,7 +46,7 @@ export function LedgerList(props: LedgerListProps) {
   return <LedgerListContent key={JSON.stringify([visibleMonth, filter])} {...props} />;
 }
 
-export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: LedgerListProps) {
+export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps) {
   const {
     transactions,
     today,
@@ -63,7 +57,6 @@ export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }:
     isCurrentMonth,
     reloadVisibleMonth,
     captures,
-    visibleMonth,
   } = useSpendingMonth();
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -80,29 +73,19 @@ export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }:
 
   const filtered = useMemo(() => filterLedger(transactions, filter), [transactions, filter]);
   const model = useMemo(() => buildListModel(filtered, today), [filtered, today]);
-  const fixed = useMemo(
-    () => filtered.filter((t) => t.amountYen < 0 && isFixed(t)),
-    [filtered, isFixed],
+  const dayGroups = model.dayGroups;
+  const scheduledTotal = toLedgerEntries(model.scheduled).reduce(
+    (sum, entry) => sum + Math.max(0, -entry.amountYen),
+    0,
   );
-  const dayGroups = useMemo(
-    () =>
-      model.dayGroups
-        .map((g) => {
-          const rows = g.transactions.filter((t) => !isFixed(t));
-          return {
-            ...g,
-            transactions: rows,
-            spentYen: rows.reduce((sum, t) => sum + (t.amountYen < 0 ? -t.amountYen : 0), 0),
-          };
-        })
-        .filter((g) => g.transactions.length > 0),
-    [model.dayGroups, isFixed],
+  const fixedIds = useMemo(
+    () => new Set(filtered.filter((t) => t.amountYen < 0 && isFixed(t)).map((t) => t.id)),
+    [filtered, isFixed],
   );
   const selectable = useMemo(() => {
     // 全選択で、一覧に出ていない振替・対象外などを巻き込まない。
     const visibleIds = new Set([
-      ...model.scheduled.filter((t) => !isFixed(t)).map((t) => t.id),
-      ...fixed.map((t) => t.id),
+      ...model.scheduled.map((t) => t.id),
       ...dayGroups.flatMap((g) => g.transactions.map((t) => t.id)),
     ]);
     const seen = new Set<string>();
@@ -111,7 +94,7 @@ export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }:
       seen.add(t.id);
       return true;
     });
-  }, [filtered, model.scheduled, fixed, dayGroups, isFixed]);
+  }, [filtered, model.scheduled, dayGroups]);
   const selected = useMemo(
     () => selectable.filter((t) => selectedIds.has(t.id)),
     [selectable, selectedIds],
@@ -142,31 +125,12 @@ export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }:
   const selection = selectMode
     ? { selectedIds, onToggle: toggleSelected, disabled: !selectionReady }
     : undefined;
-  const monthLabel = `${Number(visibleMonth.slice(5, 7))}月の固定費`;
-  const risky = useMemo(
-    () => transactions.filter((t) => isRiskyPaymentMethod(t.paymentMethod)),
-    [transactions],
-  );
   const active = isFilterActive(filter);
 
   return (
     <section id="ledger" aria-label="明細" className="scroll-mt-16 flex flex-col gap-3">
       <ActiveFilterChips goalRange={goalRange} />
-      <PendingReceiptRows />
-      {risky.length > 0 ? (
-        <Link
-          href="/transactions/reconcile"
-          className="flex min-h-11 items-center justify-between rounded-2xl px-4 py-3"
-          style={{ background: 'var(--surface)' }}
-        >
-          <p className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
-            二重に入っていそうな明細が {duplicateCount} 組
-          </p>
-          <span className="text-[15px] font-semibold" style={{ color: 'var(--accent)' }}>
-            確認する
-          </span>
-        </Link>
-      ) : null}
+      {filter.pendingOnly ? <PendingReceiptRows /> : null}
 
       {error !== null && !isCurrentMonth ? (
         <div role="alert" className="px-1 py-6 text-center">
@@ -192,7 +156,7 @@ export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }:
         <ListSkeleton />
       ) : transactions.length === 0 ? (
         <EmptyState />
-      ) : dayGroups.length === 0 && model.scheduled.length === 0 && fixed.length === 0 ? (
+      ) : dayGroups.length === 0 && model.scheduled.length === 0 ? (
         <div className="px-1 py-6 text-center">
           <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
             この絞り込みに一致する明細がありません。
@@ -208,31 +172,29 @@ export function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }:
         </div>
       ) : (
         <>
-          {model.scheduled.some((t) => !isFixed(t)) ? (
+          {model.scheduled.length > 0 ? (
             <DaySection
               key="scheduled"
-              heading="予定 · 使った額には入りません"
-              transactions={model.scheduled.filter((t) => !isFixed(t))}
+              heading={`これからの予定 ${model.scheduled.length}件`}
+              total={scheduledTotal}
+              transactions={model.scheduled}
               selection={selection}
-            />
-          ) : null}
-          {fixed.length > 0 ? (
-            <DaySection
-              key="fixed"
-              id="fixed-costs"
-              heading={monthLabel}
-              total={fixed.reduce((sum, t) => sum - t.amountYen, 0)}
-              transactions={fixed}
-              selection={selection}
+              initiallyOpen={false}
+              forceOpen={selectMode || active}
+              fixedIds={fixedIds}
+              upcoming
             />
           ) : null}
           {dayGroups.map((g) => (
             <DaySection
               key={g.date}
-              heading={dayHeading(g.date)}
+              heading={`${g.date === today ? '今日 · ' : ''}${dayHeading(g.date)}`}
               total={g.spentYen}
               transactions={g.transactions}
               selection={selection}
+              initiallyOpen={g.date === today}
+              forceOpen={selectMode || active}
+              fixedIds={fixedIds}
             />
           ))}
           <p className="px-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -280,18 +242,17 @@ function dayHeading(date: string): string {
   return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${WEEKDAYS[weekdayOf(date)]}）`;
 }
 
-/**
- * 日付・予定・固定費の区切り(デザイン仕様書の「明細」):白い面の上に見出しと合計、その下に行。
- * その日の記録はたたまず、すべて出す(本人の要望「省略はなし」、ADR-095)。
- */
-function DaySection({
-  id,
+/** 日付や予定を開く。明細はたたんでも削らず、検索・複数選択ではすべて見せる(ADR-116)。 */
+export function DaySection({
   heading,
   total,
   transactions,
   selection,
+  initiallyOpen = false,
+  forceOpen = false,
+  fixedIds = new Set<string>(),
+  upcoming = false,
 }: {
-  id?: string;
   heading: string;
   total?: number;
   transactions: DrilldownTransaction[];
@@ -302,9 +263,14 @@ function DaySection({
         disabled: boolean;
       }
     | undefined;
+  initiallyOpen?: boolean;
+  forceOpen?: boolean;
+  fixedIds?: ReadonlySet<string>;
+  upcoming?: boolean;
 }) {
   const { genres, transactions: monthTransactions } = useSpendingMonth();
   const justSavedIds = useJustSaved();
+  const [expanded, setExpanded] = useState(initiallyOpen);
   const history = useMemo(
     () =>
       monthTransactions
@@ -320,59 +286,140 @@ function DaySection({
         ),
     [monthTransactions],
   );
-
+  const categories = useMemo(() => {
+    const unique = new Map<string, { genreId: string | null; genreName: string | null }>();
+    for (const t of transactions) {
+      const summary = ledgerRowPresentation({ name: t.label, ...t });
+      for (const part of summary.breakdown) {
+        const key = part.genreId ?? part.genreName ?? 'none';
+        if (!unique.has(key)) unique.set(key, part);
+      }
+    }
+    return [...unique.values()];
+  }, [transactions]);
+  const isOpen = forceOpen || expanded;
+  const first = transactions[0];
+  const scheduledNote = upcoming ? (
+    <p className="px-3 pb-2 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+      予定は使った額には入りません。
+    </p>
+  ) : null;
+  const header = (
+    <>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold">{heading}</span>
+        {upcoming && first ? (
+          <span
+            className="mt-1 block truncate text-[12px] font-normal"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            {formatDateJa(first.occurredOn)}{' '}
+            {ledgerRowPresentation({ name: first.label, ...first }).name}
+          </span>
+        ) : null}
+      </span>
+      {!isOpen && !upcoming ? (
+        <span
+          role="img"
+          aria-label={`カテゴリ: ${categories.map((g) => g.genreName ?? '未分類').join('、')}`}
+          className="flex shrink-0 items-center -space-x-1"
+        >
+          {categories.slice(0, 4).map((g) => (
+            <GenreBadge key={g.genreId ?? g.genreName ?? 'none'} name={g.genreName} size={24} />
+          ))}
+          {categories.length > 4 ? (
+            <span className="pl-2 text-[11px]">+{categories.length - 4}</span>
+          ) : null}
+        </span>
+      ) : null}
+      {total !== undefined ? (
+        <span
+          className="tabular shrink-0 text-[13px] font-semibold"
+          aria-label={`支出 ${total.toLocaleString('ja-JP')}円`}
+        >
+          {total < 0 ? '−' : ''}
+          <Yen value={total} />
+        </span>
+      ) : null}
+      {!forceOpen ? (
+        <span aria-hidden className="shrink-0 text-[14px]">
+          {isOpen ? '⌄' : '›'}
+        </span>
+      ) : null}
+    </>
+  );
+  const rows = (
+    <ul
+      className="divider-list overflow-hidden rounded-2xl"
+      style={{ background: 'var(--surface)' }}
+    >
+      {transactions.map((t) =>
+        selection ? (
+          <SelectableTransaction
+            key={t.id}
+            transaction={t}
+            selected={selection.selectedIds.has(t.id)}
+            disabled={selection.disabled}
+            fixed={fixedIds.has(t.id)}
+            onToggle={() => selection.onToggle(t.id)}
+          />
+        ) : (
+          <TransactionRowWithSplit
+            key={t.id}
+            transaction={t}
+            categories={genres}
+            initialSplits={t.splits.map((part) => ({ ...part }))}
+            genreHistory={history}
+            justSaved={justSavedIds.includes(t.id)}
+            receiptItems={t.items}
+            expenseSubtype={t.expenseSubtype}
+            display={{
+              name: t.label,
+              branch: t.branchName,
+              thumbnailUrl: t.thumbnailUrl,
+              shares: splitShares(t),
+              scheduled: t.status === 'scheduled',
+              special: t.kind === 'special',
+              refund: t.kind === 'refund',
+              compact: true,
+              fixed: fixedIds.has(t.id),
+            }}
+          />
+        ),
+      )}
+    </ul>
+  );
+  if (forceOpen) {
+    return (
+      <section aria-label={heading} className="flex flex-col gap-1">
+        <div
+          className="flex min-h-11 items-center gap-2 px-2"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          {header}
+        </div>
+        {scheduledNote}
+        {rows}
+      </section>
+    );
+  }
   return (
-    <section id={id} aria-label={heading} className="scroll-mt-16 flex flex-col gap-1">
-      <div
-        className="tabular flex items-baseline justify-between px-4 pt-2 text-[13px]"
-        style={{ color: 'var(--ink-muted)' }}
+    <details
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+      aria-label={heading}
+      className="rounded-2xl"
+      style={{ background: expanded ? undefined : 'var(--surface)' }}
+    >
+      <summary
+        className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-3 py-3 [&::-webkit-details-marker]:hidden"
+        style={{ color: expanded ? 'var(--ink-muted)' : 'var(--ink-secondary)' }}
       >
-        <span>{heading}</span>
-        {total !== undefined && total > 0 ? <Yen value={total} /> : null}
-      </div>
-      <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
-        <ul className="divider-list">
-          {transactions.map((t) =>
-            selection ? (
-              <SelectableTransaction
-                key={t.id}
-                transaction={t}
-                selected={selection.selectedIds.has(t.id)}
-                disabled={selection.disabled}
-                onToggle={() => selection.onToggle(t.id)}
-              />
-            ) : (
-              <div key={t.id} className="relative">
-                <TransactionRowWithSplit
-                  transaction={t}
-                  categories={genres}
-                  initialSplits={t.splits.map((s) => ({
-                    id: s.id,
-                    genreId: s.genreId,
-                    genreName: s.genreName,
-                    amountYen: s.amountYen,
-                    note: s.note,
-                  }))}
-                  genreHistory={history}
-                  justSaved={justSavedIds.includes(t.id)}
-                  receiptItems={t.items}
-                  expenseSubtype={t.expenseSubtype}
-                  display={{
-                    name: t.label,
-                    branch: t.branchName,
-                    thumbnailUrl: t.thumbnailUrl,
-                    shares: splitShares(t),
-                    scheduled: t.status === 'scheduled',
-                    special: t.kind === 'special',
-                    refund: t.kind === 'refund',
-                  }}
-                />
-              </div>
-            ),
-          )}
-        </ul>
-      </div>
-    </section>
+        {header}
+      </summary>
+      {scheduledNote}
+      {rows}
+    </details>
   );
 }
 
@@ -382,77 +429,48 @@ export function SelectableTransaction({
   selected,
   onToggle,
   disabled = false,
+  fixed = false,
 }: {
   transaction: DrilldownTransaction;
   selected: boolean;
   onToggle: () => void;
   disabled?: boolean;
+  fixed?: boolean;
 }) {
+  const summary = ledgerRowPresentation({ name: t.label, ...t });
+  const shownSummary =
+    t.status === 'scheduled'
+      ? { ...summary, subtitle: `${formatDateJa(t.occurredOn)} · ${summary.subtitle}` }
+      : summary;
   return (
     <li style={selected ? { background: 'var(--accent-track)' } : undefined}>
-      <label className="flex min-h-14 items-start gap-3 px-4 py-3">
+      <label className="flex h-16 items-center gap-3 px-3 py-3">
         <input
           type="checkbox"
           checked={selected}
           disabled={disabled}
           onChange={onToggle}
-          aria-label={`${t.label}、${Math.abs(t.amountYen).toLocaleString('ja-JP')}円を選択`}
-          className="mt-1 size-5 shrink-0"
+          aria-label={`${summary.name}、${Math.abs(t.amountYen).toLocaleString('ja-JP')}円を選択`}
+          className="size-5 shrink-0"
           style={{ accentColor: 'var(--accent)' }}
         />
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex items-start justify-between gap-3">
-            <span className="min-w-0 text-[15px] font-medium break-words">{t.label}</span>
-            <LedgerAmount amountYen={t.amountYen} className="shrink-0 text-[15px]" />
-          </span>
-          <span className="text-[12px] break-words" style={{ color: 'var(--ink-muted)' }}>
-            {t.occurredOn.replaceAll('-', '/')}
-            {t.branchName ? ` · ${t.branchName}` : ''}
-          </span>
-          {t.items.length > 0 ? (
-            <span className="text-[12px] break-words" style={{ color: 'var(--ink-secondary)' }}>
-              {t.items.map((item) => item.name).join('・')}
-            </span>
-          ) : null}
-        </span>
+        <GenreBadge name={summary.genreName} size={32} />
+        <CompactTransactionSummary summary={shownSummary} fixed={fixed} />
+        <LedgerAmount
+          amountYen={t.amountYen}
+          muted={t.status === 'scheduled'}
+          className="shrink-0 text-[15px]"
+        />
       </label>
     </li>
   );
 }
 
-/** 検索(デザイン仕様書の「明細」:灰色の面に虫眼鏡と「店名・品目・メモ」)。 */
-export function LedgerSearch() {
-  const { filter, setFilter } = useSpendingMonth();
-  return (
-    <label
-      className="flex h-11 items-center gap-2 rounded-xl px-3"
-      style={{ background: 'var(--field)', color: 'var(--ink-muted)' }}
-    >
-      <svg
-        aria-hidden
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      >
-        <circle cx="11" cy="11" r="6.5" />
-        <path d="M16 16l4 4" />
-      </svg>
-      <span className="sr-only">検索</span>
-      <input
-        type="search"
-        value={filter.search ?? ''}
-        onChange={(e) => setFilter({ search: e.target.value })}
-        placeholder="店名・品目・メモ"
-        aria-label="明細を検索"
-        className="min-w-0 flex-1 bg-transparent text-[17px] outline-none"
-        style={{ color: 'var(--ink)' }}
-      />
-    </label>
-  );
+/** 検索・絞り込み・開いたときだけ出すカレンダー。 */
+export function LedgerSearch({
+  initialCalendarView = 'week',
+}: { initialCalendarView?: CalendarView } = {}) {
+  return <LedgerSearchControls initialCalendarView={initialCalendarView} />;
 }
 
 function ListSkeleton() {
