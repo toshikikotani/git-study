@@ -31,7 +31,7 @@
 
 ## Now
 
-なし
+なし。
 
 ## Next
 
@@ -120,12 +120,13 @@ T-6・T-9・T-11・T-12・T-22・T-23・T-24 は本セッションで完了(下�
 | B-8 | Vercel 本番環境変数の `CRON_SECRET` を、GitHub Secrets の `CRON_SECRET` と**完全に一致する値**に直す | **本人による設定**。**2026-09-15 に実際のジョブログ・本番 Supabase への直接照会で再調査**:以前の症状(`APP_BASE_URL`/`CRON_SECRET` が GitHub Secrets に未設定、`curl: (3) URL rejected`)はすでに解消しており、GitHub Secrets 側は両方とも設定済みと確認できた(実際に本番URLへ到達している)。しかし直近の実行(2026-09-15 23:22 時点でも失敗)は一貫して `{"error":"認証情報が正しくありません"}` / ステータス 401 を返している——これは `isAuthorized()` が `getCronSecret()` で例外を投げていない(＝ Vercel 側にも `CRON_SECRET` は設定されている)のに比較が一致しない状態で、**GitHub Secrets と Vercel の `CRON_SECRET` の値が食い違っている**ことを意味する。`job_runs` テーブルを直接照会し、`trigger_source='github_actions'` の成功記録が1件も無いことも確認済み(pg_cron 経由の keepalive 8件のみ成功、これは無関係な別経路)。両方に**同じ文字列**を入れ直せば直る |
 | B-9 | Google Cloud Console でOAuthクライアントを作成し、`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` を発行、`/settings/google` の「Google と連携する」で同意して `GOOGLE_REFRESH_TOKEN` を取得・環境変数へ設定する | **本人による作業**(手順は `.env.example` に記載。ADR-022)。Google Cloud Console でのプロジェクト作成・API有効化・OAuth同意画面の設定・ブラウザでの認可はいずれも本人のGoogleアカウントでの操作が要るため、このセッションからは行えない(B-3/B-6 と同種のサンドボックス制約)。未設定の間は `/api/cron/sync-google` が両方(カレンダー同期・スプレッドシートバックアップ)を静かにスキップするだけでジョブ自体は失敗しない。設定後、次回の cron 実行(毎日07:30 JST)から自動的に動き始める |
 | B-11 | LINE Developers コンソールでチャネルシークレットを控え、`LINE_CHANNEL_SECRET`・`LINE_RECEIPT_ACCOUNT_ID`(取り込み先口座のUUID)を GitHub Secrets / Vercel に設定し、Messaging API設定で Webhook URL(`${APP_BASE_URL}/api/webhooks/line`)を有効化する | **本人による設定**(手順は `.env.example` に記載、ADR-025)。B-6(`LINE_CHANNEL_ACCESS_TOKEN`/`LINE_USER_ID`)と`ANTHROPIC_API_KEY`も揃って初めて動く。P10-5 は実装・検証済み(型チェック・lint・本番ビルド・ユニットテスト全通過、`/api/webhooks/line`のルート生成も確認)だが、このセッションにはLINEの資格情報が無く、実際のWebhook配信・署名検証・画像取得は未確認。設定されれば、LINE公式アカウントへレシート写真を送るだけで自動取り込みが始まる |
-| B-17 | 本番へ未適用のマイグレーションをまとめて適用する — `supabase/apply-pending.sql` を Supabase ダッシュボードの SQL Editor に貼って Run する(何度実行しても壊れず、最後に出る表で全行 ok を確認できる)。当初は `receipt_items.category_id` 等3件だけだったが、P10-61(ADR-056、ジャンル分類機能)で `genres`・`transaction_genres`・`receipt_item_genres` の3テーブルが加わり計6件になった | **本人による適用**(B-16 と同じ制約:このサンドボックスに Management API 資格情報が無い)。適用されるまで品目の分類結果(P10-34、ADR-035)は保存を試みても列が無くエラーになる設計ではなく、`replaceReceiptItems()` が `category_id` を渡そうとしても列が無ければ Supabase 側がエラーを返すため、レシート取り込み時の警告として表示される(取り込み自体は失敗しない)。ジャンル分類機能(P10-61)も同様にテーブル未作成の間は「まだ利用できません」という案内に留め、画面全体は落とさない。適用後は自動的に使えるようになる |
+| B-17 | 本番へ未適用のマイグレーションをまとめて適用する — `supabase/apply-pending.sql` を Supabase ダッシュボードの SQL Editor に貼って Run する(何度実行しても壊れず、最後に出る表で全行 ok を確認できる)。当初は `receipt_items.category_id` 等3件だけだったが、P10-61(ADR-056、ジャンル分類機能)で `genres`・`transaction_genres`・`receipt_item_genres` の3テーブルが加わり計6件になった | **本人による適用**(B-16 と同じ制約:このサンドボックスに Management API 資格情報が無い)。適用されるまで品目の分類結果(P10-34、ADR-035)は保存を試みても列が無くエラーになる設計ではなく、`replaceReceiptItems()` が `category_id` を渡そうとしても列が無ければ Supabase 側がエラーを返すため、レシート取り込み時の警告として表示される(取り込み自体は失敗しない)。ジャンル分類機能(P10-61)も同様にテーブル未作成の間は「まだ利用できません」という案内に留め、画面全体は落とさない。適用後は自動的に使えるようになる。UX-4(ADR-114)の `split_payment_requests` も同ファイルへ追記済み。表が未適用の間、受取チェックは本人のブラウザだけに保存し、適用後に引き継ぐ |
 
 ## Done
 
 | ID | タスク | 完了日 |
 |---|---|---|
+| UX-4 | 割り勘の請求を保存し、ホームで受取チェック・一部受取・取り消しを行う(ADR-114)。再コピーの重複を防ぎ、元の明細と収支は変更しない。本番の表が未適用なら本人のブラウザへ保存し、適用後に受取状況を引き継ぐ。競合時は記録を残して選べる。保存・ホーム操作・競合の回帰テストを追加 | 2026-10-18 |
 | UX-3 | 明細の複数選択 → 割り勘 → 自分を含む人数 → 日付・店名・金額つきの請求文コピー(ADR-113)。端数は自分負担。コピー失敗時は手動選択でき、帳簿は変更しない。計算・コピー操作の回帰テストを追加 | 2026-10-18 |
 | UX-2 | 下から開く全シートの上端・高さを固定し、つまみと見出し・操作を残して本文だけスクロール(ADR-110追補)。カテゴリ取引編集も固定高に統一。既存機能と入力操作を維持 | 2026-10-18 |
 | UX-1 | 動線の単純化(ADR-110):期間の継承・未処理への直行・ホーム/予定の直接編集・口座準備・確認と保存・重複判断の保存/取消・目標のまとめ保存・任意の初回設定。4タブと既存機能を維持。回帰テストとSQL検証を追加 | 2026-10-17 |

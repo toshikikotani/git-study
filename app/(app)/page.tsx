@@ -8,6 +8,7 @@ import { HomeBanners } from './_home/home-banners';
 import { HomeHeader } from './_home/home-header';
 import { TodayRecords, UpcomingPayments } from './_home/recent-records';
 import { TodaySection } from './_home/today-section';
+import { SplitPaymentReceipts } from './_home/split-payment-receipts';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
 // (ADR-001)。ただし ADR-029 により、この画面自体はブラウザの Router Cache
@@ -44,6 +45,9 @@ export default async function HomePage() {
             </Suspense>
           }
         />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SplitPaymentReceipts />
       </Suspense>
       <Suspense fallback={null}>
         <TodayRecords />

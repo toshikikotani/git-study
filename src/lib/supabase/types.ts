@@ -1498,6 +1498,45 @@ export type Database = {
           },
         ];
       };
+      split_payment_requests: {
+        Row: {
+          amount_per_person_yen: number;
+          created_at: string;
+          entries: Json;
+          id: string;
+          participants: number;
+          received_count: number;
+          signature: string;
+          total_yen: number;
+          user_id: string;
+          version: number;
+        };
+        Insert: {
+          amount_per_person_yen: number;
+          created_at?: string;
+          entries: Json;
+          id?: string;
+          participants: number;
+          received_count?: number;
+          signature: string;
+          total_yen: number;
+          user_id: string;
+          version?: number;
+        };
+        Update: {
+          amount_per_person_yen?: number;
+          created_at?: string;
+          entries?: Json;
+          id?: string;
+          participants?: number;
+          received_count?: number;
+          signature?: string;
+          total_yen?: number;
+          user_id?: string;
+          version?: number;
+        };
+        Relationships: [];
+      };
       fixed_cost_confirmations: {
         Row: {
           confirmed_at: string;

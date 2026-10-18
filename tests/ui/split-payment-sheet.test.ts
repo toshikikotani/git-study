@@ -6,7 +6,19 @@ import { createHookState } from '../helpers/hook-state';
 import { ledgerTx } from '../helpers/ledger';
 import { buildSplitPaymentRequest } from '@/domain/split-payment-request';
 
-const state = vi.hoisted(() => ({ host: null as ReturnType<typeof createHookState> | null }));
+const state = vi.hoisted(() => ({
+  host: null as ReturnType<typeof createHookState> | null,
+  save: vi.fn(),
+  refresh: vi.fn(),
+  browserSave: vi.fn(),
+}));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
+vi.mock('../../app/(app)/spending/split-payment-tracking-actions', () => ({
+  saveSplitPaymentTrackingAction: (...args: unknown[]) => state.save(...args),
+}));
+vi.mock('@/features/split-payments/browser-store', () => ({
+  saveBrowserSplitPaymentTracking: (...args: unknown[]) => state.browserSave(...args),
+}));
 vi.mock('react', async (original) => ({
   ...(await original<typeof import('react')>()),
   useState: (...args: Parameters<ReturnType<typeof createHookState>['hooks']['useState']>) =>
@@ -71,11 +83,67 @@ beforeEach(() => {
   currentTransactions = transactions;
   vi.clearAllMocks();
   writeText.mockResolvedValue(undefined);
+  state.save.mockImplementation(async (input) => {
+    const request = buildSplitPaymentRequest(input.entries, input.participants);
+    return {
+      userId: '11111111-1111-1111-1111-111111111111',
+      storage: 'database',
+      error: null,
+      request: { ...request, receivedCount: 0 },
+    };
+  });
+  state.browserSave.mockImplementation((_userId, request) => request);
   vi.stubGlobal('navigator', { clipboard: { writeText } });
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('割り勘の文面を確認してコピーする', () => {
+  it('コピー後に同じ人数・明細で受取待ちを保存しホームへ進める', async () => {
+    changePeople('3');
+    await button('コピー').onClick!();
+    expect(state.save).toHaveBeenCalledWith({
+      entries: buildSplitPaymentRequest(transactions, 3).entries,
+      participants: 3,
+    });
+    expect(html()).toContain('ホームの受取待ちに追加しました');
+    expect(html()).toContain('ホームで受取を確認');
+    expect(state.refresh).toHaveBeenCalled();
+  });
+
+  it('追加だけ失敗したときはコピー成功を残し、再コピーせず保存を再試行する', async () => {
+    state.save.mockResolvedValueOnce({ error: '保存に失敗しました', request: null, userId: null });
+    await button('コピー').onClick!();
+    expect(html()).toContain('コピーしました');
+    expect(html()).toContain('文面はコピー済みです');
+    expect(html()).not.toContain('ホームの受取待ちに追加しました');
+    await button('ホームへの追加を再試行').onClick!();
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(state.save).toHaveBeenCalledTimes(2);
+    expect(html()).toContain('ホームの受取待ちに追加しました');
+  });
+
+  it('手動コピーを使う人も受取待ちへ追加できる', async () => {
+    await button('受取待ちに追加').onClick!();
+    expect(writeText).not.toHaveBeenCalled();
+    expect(state.save).toHaveBeenCalledTimes(1);
+    expect(html()).toContain('ホームの受取待ちに追加しました');
+  });
+
+  it('ブラウザ保存が失敗したらホームへの追加成功を表示しない', async () => {
+    state.save.mockResolvedValueOnce({
+      userId: '11111111-1111-1111-1111-111111111111',
+      storage: 'browser',
+      error: null,
+      request: { ...buildSplitPaymentRequest(transactions, 2), receivedCount: 0 },
+    });
+    state.browserSave.mockImplementationOnce(() => {
+      throw new Error('保存容量がいっぱいです');
+    });
+    await button('コピー').onClick!();
+    expect(html()).toContain('保存容量がいっぱいです');
+    expect(html()).toContain('文面はコピー済みです');
+    expect(html()).not.toContain('ホームの受取待ちに追加しました');
+  });
   it('初期値は自分を含む2人で、明示的に押してから全文のコピー成功を知らせる', async () => {
     expect(input().value).toBe('2');
     expect(html()).toContain('相手1人あたり');
