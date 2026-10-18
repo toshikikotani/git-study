@@ -88,7 +88,7 @@ const capture = (over: Partial<CaptureView> = {}): CaptureView => ({
   ...over,
 });
 
-const ledgerHtml = (captures: CaptureView[]) =>
+const ledgerHtml = (captures: CaptureView[], pendingOnly = false) =>
   visible(
     renderToString(
       h(SpendingMonthProvider, {
@@ -100,6 +100,7 @@ const ledgerHtml = (captures: CaptureView[]) =>
         genres,
         accounts: [{ id: 'a', name: '現金' }],
         captures,
+        initialFilter: { pendingOnly },
         children: [
           h(MonthSummary, { key: 's' }),
           h(AttentionCard, { key: 'at', hasGoal: true }),
@@ -110,8 +111,18 @@ const ledgerHtml = (captures: CaptureView[]) =>
   );
 
 describe('F7 入力待ち(受け入れ基準13)', () => {
-  it('読み取れなかったレシートは、明細に画像つきの「入力待ちのレシート」で出る(デザイン仕様書)', () => {
+  it('通常の明細では入力待ちを「確認が必要」に集約し、画像付きの行を並べない（ADR-116）', () => {
     const html = ledgerHtml([capture()]);
+    expect(html).toContain('aria-label="確認が必要。1項目"');
+    expect(html).toContain('入力待ち 1件');
+    expect(html).not.toContain('src="https://example.test/receipt.jpg"');
+    expect(html).not.toContain('href="/transactions/receipt/cap-1"');
+    expect(html).not.toContain('aria-label="読み取り中・入力待ちのレシート"');
+  });
+
+  it('入力待ちの一覧を開くと画像と入力リンクがあり、元のレシート画面へ進める', () => {
+    const html = ledgerHtml([capture()], true);
+    expect(html).toContain('aria-label="読み取り中・入力待ちのレシート"');
     expect(html).toContain('入力待ちのレシート');
     expect(html).toContain('src="https://example.test/receipt.jpg"');
     expect(html).toContain('href="/transactions/receipt/cap-1"');

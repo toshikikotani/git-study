@@ -6,6 +6,7 @@ import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { formatYen } from '@/domain/money';
 import { receiptItemsStatus } from '@/domain/receipt-items';
+import { ledgerRowPresentation } from '@/domain/ledger-row-presentation';
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { CategoryMark } from '../category-sheet';
 import { LedgerAmount } from '@/components/ui/money';
@@ -21,6 +22,7 @@ import type { PaymentMethod } from '@/features/import/adapters';
 import type { ReceiptItem } from '@/features/receipts/items-store';
 import type { TransactionSplit } from '@/features/transactions/splits-store';
 import type { StoredTransaction } from '@/features/transactions/store';
+import { formatDateJa } from '@/lib/date';
 import { hapticFor } from '@/lib/haptics';
 import { pushUndo } from '@/lib/undo';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
@@ -38,6 +40,7 @@ import {
 } from './actions';
 import { RecordSheet, type RecordEditValues } from '../record-sheet';
 import { ReceiptItemsPanel } from './receipt-items-panel';
+import { CompactTransactionSummary } from '../spending/compact-transaction-summary';
 
 const METHOD_LABEL: Partial<Record<PaymentMethod, string>> = {
   revolving: 'リボ払い',
@@ -135,6 +138,10 @@ export type RowDisplay = {
   special: boolean;
   /** 返品・返金の記録(直すときに「返金」で開く)。 */
   refund?: boolean;
+  /** 明細一覧では、店名とカテゴリ・先頭品目の2行に揃える。 */
+  compact?: boolean;
+  /** 固定費の実績。日付を移動せず、一覧の店名の横で示す。 */
+  fixed?: boolean;
 };
 
 export function TransactionRowWithSplit({
@@ -464,7 +471,28 @@ export function TransactionRowWithSplit({
     : [];
   const shares = display?.shares ?? [];
   const subtitle = subtitleOf(display?.branch, itemNames);
-  const rowAriaLabel = `${display?.name ?? transaction.description}、${transaction.genreName ?? '未分類'}、${isIncome ? '収入' : '支出'}${formatYen(targetAbsYen)}${display?.scheduled ? '、予定' : ''}`;
+  const compact = display?.compact ?? false;
+  const presentation = ledgerRowPresentation({
+    name: display?.name ?? transaction.description,
+    genreId: genreId || null,
+    genreName:
+      categories.find((category) => category.id === genreId)?.name ??
+      (genreId === transaction.genreId ? transaction.genreName : null),
+    amountYen: transaction.amountYen,
+    items,
+    splits,
+  });
+  const compactSummary =
+    compact && display?.scheduled
+      ? {
+          ...presentation,
+          subtitle: `${formatDateJa(transaction.occurredOn)} · ${presentation.subtitle}`,
+        }
+      : presentation;
+  const rowUncategorized = compact
+    ? compactSummary.genreId === null && compactSummary.genreName === null && !isIncome
+    : uncategorized;
+  const rowAriaLabel = `${compact ? compactSummary.name : (display?.name ?? transaction.description)}、${compact ? compactSummary.subtitle : (transaction.genreName ?? '未分類')}、${isIncome ? '収入' : '支出'}${formatYen(targetAbsYen)}${display?.scheduled ? '、予定' : ''}${display?.fixed ? '、固定費' : ''}`;
 
   async function changeGenre(newGenreId: string): Promise<void> {
     setGenreSheetOpen(false);
@@ -632,7 +660,7 @@ export function TransactionRowWithSplit({
         <div
           className={`flex items-center pr-2 ${flash ? 'row-flash' : ''} ${justSaved ? 'row-insert' : ''}`}
         >
-          {uncategorized ? (
+          {rowUncategorized ? (
             // 未分類は「?」やグレーではなく、点線の空の丸。ジャンルは行の中のチップで選ぶ。
             <span
               aria-hidden
@@ -642,74 +670,88 @@ export function TransactionRowWithSplit({
           ) : (
             // カテゴリのマークは、押すとそのカテゴリ(⑦)を開く(デザイン仕様書のルール、ADR-091)。
             <span className="ml-2 flex shrink-0">
-              <CategoryMark genreId={transaction.genreId} name={transaction.genreName} />
+              <CategoryMark
+                genreId={compact ? compactSummary.genreId : transaction.genreId}
+                name={compact ? compactSummary.genreName : transaction.genreName}
+              />
             </span>
           )}
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setEditSheetOpen(true)}
-            className={`min-h-11 flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 text-left ${uncategorized ? 'pl-3' : 'pl-1'}`}
+            className={`min-h-11 flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 text-left ${rowUncategorized ? 'pl-3' : 'pl-1'}`}
             aria-label={rowAriaLabel}
           >
-            <div className="min-w-0 flex-1">
-              {/* 1行目:正規化した店名(切れないように折り返す) */}
-              <p
-                className="text-[16px] leading-snug font-medium break-words"
-                style={{ color: 'var(--ink)' }}
-              >
-                {display?.name ?? transaction.description}
-                {risky && methodLabel ? (
-                  <span
-                    className="ml-2 rounded-full px-2 py-1 align-middle text-xs font-semibold"
-                    style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
-                  >
-                    {methodLabel}
-                  </span>
-                ) : null}
-              </p>
-              {/* 2行目:支店名と品目(省略せず折り返す、ADR-095。分割は比率の細いバーも出す) */}
-              {subtitle !== '' ? (
-                <p className="text-[13px] break-words" style={{ color: 'var(--ink-muted)' }}>
-                  {subtitle}
+            {compact ? (
+              <CompactTransactionSummary
+                summary={compactSummary}
+                fixed={display?.fixed ?? false}
+                attentionLabel={risky ? (methodLabel ?? null) : null}
+              />
+            ) : (
+              <div className="min-w-0 flex-1">
+                {/* 1行目:正規化した店名(切れないように折り返す) */}
+                <p
+                  className="text-[16px] leading-snug font-medium break-words"
+                  style={{ color: 'var(--ink)' }}
+                >
+                  {display?.name ?? transaction.description}
+                  {risky && methodLabel ? (
+                    <span
+                      className="ml-2 rounded-full px-2 py-1 align-middle text-xs font-semibold"
+                      style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
+                    >
+                      {methodLabel}
+                    </span>
+                  ) : null}
                 </p>
-              ) : null}
-              {shares.length > 0 ? (
-                <>
-                  <div
-                    role="img"
-                    aria-label={`カテゴリの内訳:${shares
-                      .map(
-                        (sh) =>
-                          `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
-                      )
-                      .join('、')}`}
-                    className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
-                  >
-                    {shares.map((sh) => (
-                      <span
-                        key={sh.genreId ?? 'none'}
-                        style={{
-                          width: `${sh.ratio * 100}%`,
-                          background: genreBarColor(
-                            sh.genreName,
-                            sh.genreName ? overrides[sh.genreName] : null,
-                          ),
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p className="mt-1 text-xs break-words" style={{ color: 'var(--ink-secondary)' }}>
-                    {shares
-                      .map(
-                        (sh) =>
-                          `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
-                      )
-                      .join(' + ')}
+                {/* 2行目:支店名と品目(省略せず折り返す、ADR-095。分割は比率の細いバーも出す) */}
+                {subtitle !== '' ? (
+                  <p className="text-[13px] break-words" style={{ color: 'var(--ink-muted)' }}>
+                    {subtitle}
                   </p>
-                </>
-              ) : null}
-            </div>
+                ) : null}
+                {shares.length > 0 ? (
+                  <>
+                    <div
+                      role="img"
+                      aria-label={`カテゴリの内訳:${shares
+                        .map(
+                          (sh) =>
+                            `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
+                        )
+                        .join('、')}`}
+                      className="mt-2 flex h-2 w-full overflow-hidden rounded-full"
+                    >
+                      {shares.map((sh) => (
+                        <span
+                          key={sh.genreId ?? 'none'}
+                          style={{
+                            width: `${sh.ratio * 100}%`,
+                            background: genreBarColor(
+                              sh.genreName,
+                              sh.genreName ? overrides[sh.genreName] : null,
+                            ),
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <p
+                      className="mt-1 text-xs break-words"
+                      style={{ color: 'var(--ink-secondary)' }}
+                    >
+                      {shares
+                        .map(
+                          (sh) =>
+                            `${sh.genreName ?? '未分類'} ${sh.amountYen.toLocaleString('ja-JP')}円`,
+                        )
+                        .join(' + ')}
+                    </p>
+                  </>
+                ) : null}
+              </div>
+            )}
 
             <LedgerAmount
               amountYen={isIncome ? targetAbsYen : -targetAbsYen}
@@ -718,7 +760,7 @@ export function TransactionRowWithSplit({
             />
           </button>
           {/* レシート画像は小さなレシートアイコンに。タップでフルスクリーン表示 */}
-          {display?.thumbnailUrl ? (
+          {!compact && display?.thumbnailUrl ? (
             <button
               type="button"
               aria-label="レシート画像を見る"
@@ -731,7 +773,7 @@ export function TransactionRowWithSplit({
           ) : null}
         </div>
         {/* 未分類:行の中の「ジャンルを選ぶ」チップ。タップ → 予測上位3件 → 1タップで確定 */}
-        {uncategorized ? (
+        {!compact && uncategorized ? (
           <div className="pr-4 pb-3 pl-[60px]">
             <button
               type="button"
@@ -1149,21 +1191,34 @@ export function TransactionRowWithSplit({
             initial: editRetry?.values ?? editStart,
             onSave: saveEdit,
             footer: (
-              <ReceiptItemsPanel
-                transaction={{
-                  id: transaction.id,
-                  occurredOn: transaction.occurredOn,
-                  accountId: transaction.accountId,
-                  paymentMethod: transaction.paymentMethod,
-                  amountYen: transaction.amountYen,
-                }}
-                categories={categories}
-                items={items}
-                onItemsReplaced={setItems}
-                subtype={subtype}
-                onSubtypeReplaced={setSubtype}
-                openRequest={itemEditRequest}
-              />
+              <div className="space-y-3">
+                {display?.thumbnailUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setViewerOpen(true)}
+                    className="flex min-h-11 items-center gap-2 text-sm font-semibold"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    <MdReceiptLong aria-hidden size={18} />
+                    レシート画像を見る
+                  </button>
+                ) : null}
+                <ReceiptItemsPanel
+                  transaction={{
+                    id: transaction.id,
+                    occurredOn: transaction.occurredOn,
+                    accountId: transaction.accountId,
+                    paymentMethod: transaction.paymentMethod,
+                    amountYen: transaction.amountYen,
+                  }}
+                  categories={categories}
+                  items={items}
+                  onItemsReplaced={setItems}
+                  subtype={subtype}
+                  onSubtypeReplaced={setSubtype}
+                  openRequest={itemEditRequest}
+                />
+              </div>
             ),
           }}
         />

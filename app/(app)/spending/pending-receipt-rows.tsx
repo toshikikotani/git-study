@@ -119,7 +119,7 @@ export function CaptureRow({ capture, returnTo }: { capture: CaptureView; return
 }
 
 /** 撮影直後の仮の行。 */
-function JobRow({ job }: { job: ReceiptJob }) {
+export function JobRow({ job }: { job: ReceiptJob }) {
   const href: Route =
     job.status === 'needs_input' && job.captureId
       ? (`/transactions/receipt/${job.captureId}` as Route)
