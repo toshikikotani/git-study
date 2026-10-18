@@ -6,19 +6,64 @@ import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import type { MerchantNameReviewGroup, MerchantNameSnapshot } from '@/domain/merchant-name-review';
 import { formatYen } from '@/domain/money';
 import { formatDateJa } from '@/lib/date';
-import { saveMerchantNameChangesAction } from './merchant-name-actions';
+import {
+  findMerchantNameGroupsAction,
+  saveMerchantNameChangesAction,
+} from './merchant-name-actions';
+
+/**
+ * 店名をまとめて直すを、いつでも始められるようにする(本人の要望、ADR-118)。start() でシートを開き、
+ * その場ですべての月の明細から候補を探す。開くたびに探し直す。
+ */
+export function useMerchantNameCheck(onClosed?: () => void): {
+  start: () => void;
+  sheet: React.ReactNode;
+} {
+  const [run, setRun] = useState<{
+    id: number;
+    groups: readonly MerchantNameReviewGroup[] | null;
+    error: string | null;
+  } | null>(null);
+  const start = () => {
+    const id = Date.now();
+    setRun({ id, groups: null, error: null });
+    void findMerchantNameGroupsAction()
+      .catch(() => ({ groups: [], error: '通信に失敗しました。もう一度お試しください。' }))
+      .then((result) =>
+        setRun((current) =>
+          current?.id === id ? { id, groups: result.groups, error: result.error } : current,
+        ),
+      );
+  };
+  const sheet = (
+    <MerchantNameReview
+      key={run?.id ?? 0}
+      open={run !== null}
+      groups={run?.groups ?? null}
+      error={run?.error ?? null}
+      onClose={() => {
+        setRun(null);
+        onClosed?.();
+      }}
+    />
+  );
+  return { start, sheet };
+}
 
 export function MerchantNameReview({
   open,
   groups,
+  error = null,
   onClose,
 }: {
   open: boolean;
-  groups: readonly MerchantNameReviewGroup[];
+  /** null は探している途中。 */
+  groups: readonly MerchantNameReviewGroup[] | null;
+  error?: string | null;
   onClose: () => void;
 }) {
   const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
-  const remaining = groups
+  const remaining = (groups ?? [])
     .map((group) => ({
       ...group,
       entries: group.entries.filter((entry) => saved.get(entry.id) !== snapshotKey(entry)),
@@ -45,8 +90,26 @@ export function MerchantNameReview({
         候補は自動では保存されません。対象の明細と新しい店名・支店名を確かめてください。金額・日付・カテゴリと、取り込んだ原文は変わりません。
       </p>
       <p role="status" className="mb-3 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        {count > 0 ? `確認が必要な店名 ${count}件` : '店名の確認が終わりました'}
+        {groups === null
+          ? 'すべての月の明細から、店名の表記ゆれを探しています…'
+          : error
+            ? ''
+            : count > 0
+              ? `確認が必要な店名 ${count}件`
+              : groups.length === 0
+                ? '直す店名は見つかりませんでした'
+                : '店名の確認が終わりました'}
       </p>
+      {error ? (
+        <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--over)' }}>
+          {error}
+        </p>
+      ) : null}
+      {groups !== null && groups.length === 0 && !error ? (
+        <p className="mb-3 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+          表記のゆれ・店名なし・住所のような店名を、すべての月の明細から探しました。
+        </p>
+      ) : null}
       <div className="space-y-3 pb-4">
         {remaining.map((group) => (
           <MerchantNameGroupEditor
