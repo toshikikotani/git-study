@@ -258,15 +258,15 @@ function LedgerListContent({ goalRange, duplicateCount, fixedKeys = [] }: Ledger
               <span className="text-[13px]">合計が金額の上限を超えています</span>
             )}
           </p>
-          <button
+          <Button
             type="button"
             disabled={selected.length === 0 || !validTotal || !selectionReady}
             onClick={() => setSplitOpen(true)}
-            className="min-h-11 shrink-0 rounded-full px-6 text-[15px] font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="shrink-0 text-[15px] font-semibold"
+            variant="filled"
           >
             割り勘
-          </button>
+          </Button>
         </div>
       ) : null}
       <SplitPaymentSheet
