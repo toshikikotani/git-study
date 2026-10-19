@@ -63,3 +63,65 @@ describe('分析 › 目標「いまの状況」(ADR-094)', () => {
     expect(raw).toContain('10回中8回は17.6万〜20.4万円の間');
   });
 });
+
+const densityDays = days.map((day) => ({
+  ...day,
+  ...(day.forecastLowYen !== null && day.forecastHighYen !== null
+    ? {
+        forecastDensity: [
+          { lowYen: day.forecastLowYen, highYen: day.forecastHighYen, probability: 0.8 },
+        ],
+      }
+    : {}),
+}));
+
+function renderStatus(overrides: Partial<Parameters<typeof GoalStatusCard>[0]['status']> = {}) {
+  return renderToString(
+    h(GoalStatusCard, {
+      status: {
+        budgetYen: 169000,
+        p10: 176000,
+        p50: 189000,
+        p90: 204000,
+        probWithin: 0.14,
+        days: densityDays,
+        spentYen: 111000,
+        ...overrides,
+      },
+      periodLabel: '10/1〜11/5 · 残り21日',
+      endLabel: '11月5日',
+      remainingDays: 21,
+    }),
+  );
+}
+
+describe('予測の濃淡とその読み方', () => {
+  it('濃淡・読み方を加え、見込み・帯の幅・確率・目標線を保つ', () => {
+    const markup = renderStatus();
+    expect(markup).toContain('data-forecast-density="true"');
+    expect(visible(markup)).toContain('同じ日の中で、濃いところほど予測が多い');
+    expect(visible(markup)).toContain('約18.9万円');
+    expect(visible(markup)).toContain('10回中8回は 17.6万〜20.4万円');
+    expect(visible(markup)).toContain('14%');
+    expect(markup.indexOf('data-line="budget"')).toBeGreaterThan(
+      markup.indexOf('data-forecast-density="true"'),
+    );
+  });
+
+  it('濃淡の材料がない古い結果は、従来の帯で示す', () => {
+    expect(raw).not.toContain('data-forecast-density');
+    expect(visible(raw)).not.toContain('濃いところほど');
+    expect(raw).toContain('fill="var(--band-outer)"');
+    const partial = renderStatus({
+      days: densityDays.map((day, i) => (i === 20 ? { ...day, forecastDensity: [] } : day)),
+    });
+    expect(partial).not.toContain('data-forecast-density');
+    expect(visible(partial)).not.toContain('濃いところほど');
+  });
+
+  it('記録が少ない予測は、このカードでも目安と分かる', () => {
+    const markup = renderStatus({ provisional: true });
+    expect(visible(markup)).toContain('記録が少ないため、確率は目安です。');
+    expect(renderStatus()).not.toContain('記録が少ないため');
+  });
+});

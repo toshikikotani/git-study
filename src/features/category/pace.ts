@@ -4,6 +4,7 @@
  */
 
 import { addDays, addMonths, daysBetween, nthDayOfMonth, type DateOnly } from '@/lib/date';
+import type { PathDensityBin } from '@/domain/forecast/path-density';
 import type { CategoryLine } from './model';
 import { niceCeil } from './series';
 
@@ -83,6 +84,8 @@ export type CumulativeDay = {
   /** 予測の濃い帯(10回中5回。日ごとの分位があるときだけ)。 */
   forecastInnerLowYen: number | null;
   forecastInnerHighYen: number | null;
+  /** 日ごとの補正済み分布の密度。金額は今日までの実績を含む累計。 */
+  forecastDensity?: readonly PathDensityBin[];
 };
 
 export type CumulativeChart = {
@@ -119,6 +122,8 @@ export type RemainingForecast = {
     /** 濃い帯(25%・75%)。 */
     innerLowYen?: number;
     innerHighYen?: number;
+    /** 同じ日の試行から得た、金額幅ごとの確率(予定・固定費・請求を含む)。 */
+    density?: readonly PathDensityBin[];
   }[];
   /**
    * 理想の線の形(各日までに決まっている支払いの累計と、いつもの使い方での変動費の累計の割合)。
@@ -157,6 +162,15 @@ export function withoutScheduled(
       ...out,
       ...(innerLowYen !== undefined ? { innerLowYen } : {}),
       ...(innerHighYen !== undefined ? { innerHighYen } : {}),
+      ...(p.density
+        ? {
+            density: p.density.map((bin) => ({
+              ...bin,
+              lowYen: Math.max(0, bin.lowYen - cum),
+              highYen: Math.max(0, bin.highYen - cum),
+            })),
+          }
+        : {}),
     };
   });
   // 合計の low・median・high はもともと予定を含まないので、そのまま使う。
@@ -350,6 +364,15 @@ export function buildCumulative(input: {
           : null,
       forecastInnerLowYen: innerAt('innerLowYen'),
       forecastInnerHighYen: innerAt('innerHighYen'),
+      ...(hasForecast && future && lastPath?.density
+        ? {
+            forecastDensity: lastPath.density.map((bin) => ({
+              ...bin,
+              lowYen: base + bin.lowYen,
+              highYen: base + bin.highYen,
+            })),
+          }
+        : {}),
     });
   }
 

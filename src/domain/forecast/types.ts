@@ -1,4 +1,5 @@
 import type { DateOnly } from '@/lib/date';
+import type { PathDensityBin } from './path-density';
 
 /**
  * カテゴリ×日の学習データ1行。支出が無い日も count=0, amountYen=0 で持つ。
@@ -273,6 +274,8 @@ export type PathPoint = {
   p50: number;
   p75: number;
   p90: number;
+  /** 同じ試行と確率補正から作った、p10〜p90内の金額ごとの密度(濃淡表示用)。 */
+  density?: readonly PathDensityBin[];
 };
 
 /**

@@ -199,6 +199,7 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
           probWithin: forecast.probWithinBudget,
           days,
           spentYen,
+          provisional: forecast.provisional,
         }}
         periodLabel={`${md(period.from)}〜${md(period.to)} · 残り${remainingDays}日`}
         endLabel={dayLabel(period.to)}
