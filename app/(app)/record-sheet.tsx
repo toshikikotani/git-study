@@ -144,18 +144,19 @@ function dateLabel(date: string, today: string): string {
 
 /**
  * 記録する(デザイン仕様書の⑤、ADR-091)。手で記録するのはここだけ(ADR-096。旧「手入力」の画面をまとめた)。
- * 支出 / 収入 / 返金、画像から入力(レシートの写真でもスクショでもよい、ADR-100)、金額と日付、
+ * 支出 / 収入 / 返金、Web カメラ・写真から選ぶ(スクショでもよい、ADR-100)、金額と日付、
  * レシート名(空ならカテゴリ名、ADR-092)、
  * カテゴリ(押して選ぶ・「追加」で足す)、固定費にする、口座(2つ以上あるとき)とメモ。
  * 日付を今日より先にすると「予定」として記録する(使った額には入らない)。返金は、選んだカテゴリの
  * 使った額から差し引く(収入にはならない)。
  * 保存は取り込みと同じ経路(saveImportBatchAction、ADR-033)。口座の既定は1つめの口座。
- * 明細の行から開いたときは「記録を直す」として同じ画面を使う(edit、ADR-101。画像から入力・固定費・口座は
+ * 明細の行から開いたときは「記録を直す」として同じ画面を使う(edit、ADR-101。撮影・写真選択・固定費・口座は
  * 出さず、下にレシートの品目を出す)。
  */
 export function RecordSheet({
   onClose,
   onFiles,
+  onCamera,
   initialDate,
   initialKind,
   initialError,
@@ -166,6 +167,8 @@ export function RecordSheet({
   onClose: () => void;
   /** 選んだ画像(撮った写真・写真ライブラリのレシートやスクショ)を読み取りへ回す。 */
   onFiles: (files: File[]) => void;
+  /** 外枠の Web カメラを開く。外枠が無い場合はカメラの URL へ進む。 */
+  onCamera?: (() => void) | undefined;
   /** 日付の初期値(無ければ今日)。 */
   initialDate?: string | undefined;
   initialKind?: 'expense' | 'income' | undefined;
@@ -519,29 +522,47 @@ export function RecordSheet({
             onChange={(v) => setKind(v === 'income' ? 'income' : 'expense')}
             label="種類"
           />
-          {/* 押すと iPhone の選択画面(写真を撮る / 写真ライブラリ)が出る。レシートの写真でも
-              決済アプリ・通販・カード通知のスクショでも、同じ読み取りに回す(ADR-100)。
+          {/* 撮影は Web カメラ、保存済みの写真・スクショは別の入口から読み取る。
               直すときは出さない(レシートの画像は下の「レシートの品目」から)。 */}
-          {edit ? null : (
-            <label
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
-              style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+          {edit ? null : onCamera ? (
+            <button
+              type="button"
+              onClick={onCamera}
+              className="flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
-              {imageIcon}
-              画像から入力
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  onFiles(Array.from(e.target.files ?? []));
-                  e.target.value = '';
-                }}
-              />
-            </label>
+              カメラ
+            </button>
+          ) : (
+            <Link
+              href="/camera"
+              onClick={onClose}
+              className="flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            >
+              カメラ
+            </Link>
           )}
         </div>
+        {edit ? null : (
+          <label
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
+            style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+          >
+            {imageIcon}
+            写真から選ぶ
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                onFiles(Array.from(e.target.files ?? []));
+                e.target.value = '';
+              }}
+            />
+          </label>
+        )}
         <label className="flex items-baseline justify-center gap-2 pt-2">
           <span className="sr-only">金額</span>
           <input

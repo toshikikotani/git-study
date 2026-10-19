@@ -34,6 +34,7 @@ import { nextChromeCompact } from '@/lib/chrome';
 import { upgradeStoredTheme } from '@/lib/color-theme';
 import { scrollToTop, tabTapAction } from '@/lib/scroll';
 import { createCaptureFromReadAction } from './transactions/receipt/capture-actions';
+import { CAMERA_PATH } from '@/features/receipt-captures/camera-entry';
 import './liquid-tab.css';
 
 configureReceiptQueue({ createCapture: createCaptureFromReadAction });
@@ -67,6 +68,10 @@ function isSameTab(pathname: string, href: string): boolean {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const cameraEntry = pathname === CAMERA_PATH;
+  useEffect(() => {
+    void restoreWaitingReceipts();
+  }, []);
   // 以前に選んだ色(4色だけの保存)を、今の色の役割に置き換える(ADR-079)。
   useEffect(() => {
     upgradeStoredTheme();
@@ -119,18 +124,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <CategorySheetProvider>
       <OpenRecordProvider value={openRecord}>
         <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-          <div aria-hidden className="status-blur" />
+          {cameraEntry ? null : <div aria-hidden className="status-blur" />}
           <NavigationProgress />
           <PullToRefresh>
             <main
-              className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
+              className={
+                cameraEntry
+                  ? 'flex-1'
+                  : 'flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]'
+              }
               aria-busy={navigating}
             >
               {children}
             </main>
           </PullToRefresh>
           <UndoToastHost />
-          {isClient ? (
+          {cameraEntry ? null : isClient ? (
             createPortal(
               <BottomBar
                 onNavigate={beginNavigate}
@@ -170,9 +179,6 @@ function BottomBar({
   // 文字を打っているあいだ(キーボードが出ているあいだ)は、タブバーと読み取りの知らせを隠す。
   // iPhone では入力欄とキーボードのあいだに浮いていた(本人の指摘、ADR-111)。
   const keyboard = useKeyboard();
-  useEffect(() => {
-    void restoreWaitingReceipts();
-  }, []);
   const [compact, setCompact] = useState(false);
   const [compactPath, setCompactPath] = useState(pathname);
   if (compactPath !== pathname) {
@@ -219,10 +225,9 @@ function BottomBar({
     if (url.searchParams.get('capture') !== '1') return;
     url.searchParams.delete('capture');
     window.history.replaceState(null, '', url.pathname + url.search);
-    if (typeof navigator.mediaDevices?.getUserMedia === 'function') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
-      setCameraOpen(true);
-    }
+    // 非対応・許可待ちでも、カメラの画面から写真の選択とURLのコピーができる。
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
+    setCameraOpen(true);
   }, []);
   // 右の＋は、押すと「記録する」のシートを開く(デザイン仕様書、ADR-090:撮る・写真から・手で入力)。
   // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じシート。
@@ -259,34 +264,44 @@ function BottomBar({
           <span aria-hidden> →</span>
         </Link>
       ) : null}
-      {cameraOpen ? (
-        <ReceiptCamera
-          initialMode="single"
-          onCapture={(files) => enqueueReceiptFiles(files)}
-          onClose={() => setCameraOpen(false)}
-        />
-      ) : null}
-      <BottomSheet
-        open={record !== null}
-        onClose={() => setFabMenuOpen(false)}
-        role="dialog"
-        label="記録する"
-        tall
-      >
-        <RecordSheet
-          key={record?.openId ?? 0}
+      {cameraOpen
+        ? createPortal(
+            <ReceiptCamera
+              initialMode="single"
+              onCapture={(files) => enqueueReceiptFiles(files)}
+              onClose={() => setCameraOpen(false)}
+            />,
+            document.body,
+          )
+        : null}
+      {/* カメラへ移るときは閉じるシートも外し、映像・スクロール制御に重ねない。 */}
+      {cameraOpen ? null : (
+        <BottomSheet
+          open={record !== null}
           onClose={() => setFabMenuOpen(false)}
-          onFiles={(files) => {
-            enqueueReceiptFiles(files);
-            setFabMenuOpen(false);
-          }}
-          initialDate={record?.date}
-          initialKind={record?.kind}
-          initialError={record?.error}
-          initialAmountYen={record?.amountYen}
-          initialGenreId={record?.genreId}
-        />
-      </BottomSheet>
+          role="dialog"
+          label="記録する"
+          tall
+        >
+          <RecordSheet
+            key={record?.openId ?? 0}
+            onClose={() => setFabMenuOpen(false)}
+            onFiles={(files) => {
+              enqueueReceiptFiles(files);
+              setFabMenuOpen(false);
+            }}
+            onCamera={() => {
+              setFabMenuOpen(false);
+              setCameraOpen(true);
+            }}
+            initialDate={record?.date}
+            initialKind={record?.kind}
+            initialError={record?.error}
+            initialAmountYen={record?.amountYen}
+            initialGenreId={record?.genreId}
+          />
+        </BottomSheet>
+      )}
       <div
         className="tabbar flex w-full items-center gap-3"
         data-compact={compact}

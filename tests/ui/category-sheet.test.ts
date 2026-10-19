@@ -152,8 +152,9 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
   it('できるのは 記録する・カテゴリを足す・固定費にする の3つだけ', () => {
     expect(html).toContain('支出');
     expect(html).toContain('収入');
-    // 画像から入力(レシートの写真でもスクショでもよい、ADR-100)
-    expect(html).toContain('画像から入力');
+    // Web カメラと、保存済みの写真・スクショの入口を分ける。
+    expect(html).toContain('カメラ');
+    expect(html).toContain('写真から選ぶ');
     expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
@@ -237,10 +238,12 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     expect(visible(raw)).toContain('保存できませんでした。');
   });
 
-  it('画像から入力は、カメラを決め打ちせず画像を選ばせる(写真を撮る / 写真ライブラリのどちらでも)', () => {
+  it('写真から選ぶでは複数の画像を選べる。OS カメラを指定しない', () => {
     const raw = sheet();
+    expect(raw).toContain('href="/camera"');
     const input = raw.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? '';
     expect(input).toContain('accept="image/*"');
+    expect(input).toContain('multiple');
     expect(input).not.toContain('capture');
   });
 
@@ -288,8 +291,9 @@ describe('記録を直す:記録すると同じ画面(ADR-101)', () => {
     expect(text).toContain('10月23日');
   });
 
-  it('画像から入力・固定費・下書きの案内は出さず、下にレシートの品目を出す', () => {
-    expect(text).not.toContain('画像から入力');
+  it('カメラ・写真選択・固定費・下書きの案内は出さず、下にレシートの品目を出す', () => {
+    expect(text).not.toContain('カメラ');
+    expect(text).not.toContain('写真から選ぶ');
     expect(text).not.toContain('固定費にする');
     expect(text).not.toContain('前に入れかけた内容を戻しました');
     expect(text).toContain('レシートの品目');

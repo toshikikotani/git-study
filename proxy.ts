@@ -12,8 +12,8 @@
  * /api/cron/* は対象外。cron ジョブはブラウザのセッション cookie を
  * 持たず、CRON_SECRET で自分自身を認証する(ADR-009、M2-7c で実装)。
  *
- * ログイン画面は、ログイン済みならホームへ送る(ログインのあと画面が切り替わらず、
- * ログイン画面に取り残されるのを防ぐ。ADR-083)。
+ * ログイン画面は、ログイン済みなら入口の画面(指定がなければホーム)へ送る。
+ * カメラの URL から入った場合も、ログインのあと同じ入口へ戻れる(ADR-083)。
  *
  * /api/webhooks/* も対象外。LINE のサーバーがセッション cookie を持たずに
  * 直接叩いてくる経路のため(本人発案のレシート受信 Webhook)。X-Line-Signature
@@ -23,6 +23,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { authGate, isPublicPath } from '@/lib/auth-gate';
+import { safeReturnTo } from '@/lib/auth-return';
 import { getPublicEnv } from '@/lib/env';
 
 export async function proxy(request: NextRequest) {
@@ -63,9 +64,25 @@ export async function proxy(request: NextRequest) {
   }
   if (gate === 'to-login' || gate === 'to-home') {
     const url = request.nextUrl.clone();
-    url.pathname = gate === 'to-login' ? '/login' : '/';
+    const returnTo = safeReturnTo(
+      gate === 'to-login'
+        ? `${request.nextUrl.pathname}${request.nextUrl.search}`
+        : request.nextUrl.searchParams.get('returnTo'),
+    );
+    url.pathname = '/login';
     url.search = '';
-    return NextResponse.redirect(url);
+    if (gate === 'to-login') {
+      if (returnTo !== '/') url.searchParams.set('returnTo', returnTo);
+    } else {
+      const target = new URL(returnTo, request.url);
+      url.pathname = target.pathname;
+      url.search = target.search;
+      url.hash = target.hash;
+    }
+    const redirect = NextResponse.redirect(url);
+    // getUser() が更新したセッションを次の画面へ持っていく。
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   return response;
