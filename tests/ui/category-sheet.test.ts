@@ -147,14 +147,17 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
 });
 
 describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
-  const html = visible(renderToString(h(RecordSheet, { onClose: () => {} })));
+  const raw = renderToString(
+    h(RecordSheet, { onClose: () => {}, onCamera: () => {}, onFiles: () => {} }),
+  );
+  const html = visible(raw);
 
   it('撮影・写真と手入力・カテゴリ・固定費の操作を用意する', () => {
     expect(html).toContain('支出');
     expect(html).toContain('収入');
-    // 撮影と写真選択はそれぞれ専用画面へ。
+    // いちばん上に大きい「レシートを撮る」と、写真から読み取るボタン(デザイン v3-4、ADR-126)。
     expect(html).toContain('レシートを撮る');
-    expect(html).toContain('写真から読み取る');
+    expect(raw).toContain('aria-label="写真から読み取る"');
     expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
@@ -236,10 +239,13 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     expect(visible(raw)).toContain('保存できませんでした。');
   });
 
-  it('撮影と写真選択の専用画面へそれぞれ直接進める', () => {
-    const raw = sheet();
-    expect(raw).toContain('href="/camera"');
-    expect(raw).toContain('href="/photos"');
+  it('撮るはその場でカメラを開き、写真は端末の写真選択をすぐ開く(間に画面を挟まない、ADR-126)', () => {
+    const raw = sheet({ onCamera: () => {}, onFiles: () => {} });
+    expect(raw).not.toContain('href="/camera"');
+    expect(raw).not.toContain('href="/photos"');
+    expect(raw).toMatch(/<input[^>]*type="file"[^>]*accept="image\/\*"[^>]*multiple/);
+    // 開いたところからカメラ・写真を渡されないとき(直すときなど)は出さない。
+    expect(visible(sheet())).not.toContain('レシートを撮る');
   });
 
   it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {

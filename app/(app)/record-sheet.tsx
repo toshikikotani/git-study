@@ -150,11 +150,14 @@ function dateLabel(date: string, today: string): string {
  * 日付を今日より先にすると「予定」として記録する(使った額には入らない)。返金は、選んだカテゴリの
  * 使った額から差し引く(収入にはならない)。
  * 保存は取り込みと同じ経路(saveImportBatchAction、ADR-033)。口座の既定は1つめの口座。
- * 明細の行から開いたときは「記録を直す」として同じ画面を使う(edit、ADR-101。画像から入力・固定費・口座は
+ * いちばん上に「レシートを撮る」と写真から読み取るボタン(デザイン v3-4、ADR-126)。
+ * 明細の行から開いたときは「記録を直す」として同じ画面を使う(edit、ADR-101。撮る・写真・固定費・口座は
  * 出さず、下にレシートの品目を出す)。
  */
 export function RecordSheet({
   onClose,
+  onCamera,
+  onFiles,
   initialDate,
   initialKind,
   initialError,
@@ -163,6 +166,10 @@ export function RecordSheet({
   edit,
 }: {
   onClose: () => void;
+  /** 「レシートを撮る」:その場でカメラを開く(デザイン v3-4、ADR-126)。 */
+  onCamera?: (() => void) | undefined;
+  /** 写真のボタンで選んだ画像(レシートの写真でもスクショでもよい)を読み取りへ回す(ADR-100)。 */
+  onFiles?: ((files: File[]) => void) | undefined;
   /** 日付の初期値(無ければ今日)。 */
   initialDate?: string | undefined;
   initialKind?: 'expense' | 'income' | undefined;
@@ -175,6 +182,7 @@ export function RecordSheet({
   edit?: RecordEdit | undefined;
 }) {
   const openRecord = useOpenRecord();
+  const photoInput = useRef<HTMLInputElement>(null);
   const today = todayJst();
   // 保存せずに閉じた入力(下書き)があれば戻す。カレンダーから日付を指定して開いたら、その日にする。
   // 記録を直すときは下書きを使わない(直す前の値から始める)。
@@ -431,11 +439,28 @@ export function RecordSheet({
     </svg>
   );
 
+  const cameraIcon = (
+    <svg
+      aria-hidden
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+
   const imageIcon = (
     <svg
       aria-hidden
-      width="16"
-      height="16"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -504,40 +529,65 @@ export function RecordSheet({
         </div>
       ) : null}
 
+      {/* いちばん上に大きい「レシートを撮る」と、写真から読み取るボタン(デザイン v3-4)。
+          写真のボタンは、端末の写真を選ぶ画面をすぐ開く。直すときは出さない。 */}
+      {edit || (onCamera === undefined && onFiles === undefined) ? null : (
+        <div className="flex gap-2">
+          {onCamera ? (
+            <button
+              type="button"
+              onClick={onCamera}
+              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl px-4 text-[16px] font-semibold"
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            >
+              {cameraIcon}
+              レシートを撮る
+            </button>
+          ) : null}
+          {onFiles ? (
+            <>
+              <button
+                type="button"
+                aria-label="写真から読み取る"
+                onClick={() => photoInput.current?.click()}
+                className={`flex min-h-[52px] items-center justify-center gap-2 rounded-2xl ${
+                  onCamera ? 'w-[52px]' : 'flex-1 px-4 text-[16px] font-semibold'
+                }`}
+                style={{ background: 'var(--surface)', color: 'var(--ink-secondary)' }}
+              >
+                {imageIcon}
+                {onCamera ? null : '写真から読み取る'}
+              </button>
+              <input
+                ref={photoInput}
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                aria-hidden="true"
+                tabIndex={-1}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = '';
+                  if (files.length > 0) onFiles(files);
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+      )}
+
       <section
         className="flex flex-col items-center gap-2 rounded-[20px] px-4 pt-3 pb-4"
         style={{ background: 'var(--surface)' }}
       >
-        {edit ? null : (
-          <Link
-            href="/camera"
-            onClick={onClose}
-            className="flex min-h-12 w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-          >
-            レシートを撮る
-          </Link>
-        )}
-        <div className="flex w-full items-center justify-between gap-2">
-          {/* 種類は支出・収入の2つ。返金は「詳細」で(デザイン v3-4) */}
-          <Segmented
-            value={kind === 'income' ? 'income' : 'expense'}
-            options={KIND_TABS}
-            onChange={(v) => setKind(v === 'income' ? 'income' : 'expense')}
-            label="種類"
-          />
-          {edit ? null : (
-            <Link
-              href="/photos"
-              onClick={onClose}
-              className="flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
-              style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
-            >
-              {imageIcon}
-              写真から読み取る
-            </Link>
-          )}
-        </div>
+        {/* 種類は支出・収入の2つ。返金は「詳細」で(デザイン v3-4) */}
+        <Segmented
+          value={kind === 'income' ? 'income' : 'expense'}
+          options={KIND_TABS}
+          onChange={(v) => setKind(v === 'income' ? 'income' : 'expense')}
+          label="種類"
+        />
         <label className="flex items-baseline justify-center gap-2 pt-2">
           <span className="sr-only">金額</span>
           <input

@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { FiArrowLeft, FiCamera, FiCheck, FiEdit2, FiImage, FiSettings } from 'react-icons/fi';
+import { FiCamera, FiCheck, FiEdit2, FiImage, FiSettings } from 'react-icons/fi';
 import {
   readReceiptQuickAction,
   RECEIPT_QUICK_ACTION_KEY,
@@ -11,11 +10,25 @@ import {
 } from '@/lib/receipt-quick-action';
 import styles from './receipt-entry-menu.module.css';
 
+/**
+ * ＋を押したときのメニュー(デザイン v3-11、ADR-125 → 126)。撮る・写真から読み取る・手で記録する・
+ * 長押しの設定。色はアプリのテーマに合わせる(固定の色を使わない)。
+ *   - レシートを撮る:その場でカメラを開く(画面を移らない)
+ *   - 写真から読み取る:端末の写真を選ぶ画面をすぐ開く(間に自前の画面を挟まない)
+ *   - 長押しの設定:メニューの中で開いて選ぶ(別の画面にしない)
+ */
 type ReceiptEntryMenuProps = {
   open: boolean;
   onClose: () => void;
+  onCamera: () => void;
+  onFiles: (files: File[]) => void;
   onManual: () => void;
 };
+
+const LONG_PRESS_OPTIONS = [
+  { value: 'camera', label: 'カメラ(レシートを撮る)' },
+  { value: 'manual', label: '手で記録する' },
+] as const;
 
 function findMenuTrigger() {
   return (
@@ -38,11 +51,17 @@ export function ReceiptEntryMenu({ open, ...props }: ReceiptEntryMenuProps) {
   return open ? <ReceiptEntryPopover {...props} /> : null;
 }
 
-function ReceiptEntryPopover({ onClose, onManual }: Omit<ReceiptEntryMenuProps, 'open'>) {
-  const [settings, setSettings] = useState(false);
+function ReceiptEntryPopover({
+  onClose,
+  onCamera,
+  onFiles,
+  onManual,
+}: Omit<ReceiptEntryMenuProps, 'open'>) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [anchor, setAnchor] = useState(measureMenuAnchor);
   const panelRef = useRef<HTMLDivElement>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
   const preference = useSyncExternalStore(
     (listener) => {
       window.addEventListener('storage', listener);
@@ -65,18 +84,15 @@ function ReceiptEntryPopover({ onClose, onManual }: Omit<ReceiptEntryMenuProps, 
         : document.querySelector<HTMLButtonElement>('button[aria-label="記録する"]');
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    panel?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = previousOverflow;
-      // 手入力などが別のシートを開いた場合、その画面のフォーカスを奪わない。
+      // 手入力・カメラなどが別の画面を開いた場合、その画面のフォーカスを奪わない。
       if (document.activeElement === document.body || panel?.contains(document.activeElement)) {
         previousFocus?.focus({ preventScroll: true });
       }
     };
   }, []);
-
-  useEffect(() => {
-    panelRef.current?.querySelector<HTMLElement>('a, button')?.focus({ preventScroll: true });
-  }, [settings]);
 
   useEffect(() => {
     const updateAnchor = () => {
@@ -99,6 +115,17 @@ function ReceiptEntryPopover({ onClose, onManual }: Omit<ReceiptEntryMenuProps, 
     };
   }, []);
 
+  const choose = (value: ReceiptQuickAction) => {
+    try {
+      localStorage.setItem(RECEIPT_QUICK_ACTION_KEY, value);
+      window.dispatchEvent(new Event(RECEIPT_QUICK_ACTION_EVENT));
+      setSaveError('');
+      setSettingsOpen(false);
+    } catch {
+      setSaveError('設定を保存できませんでした。ブラウザのストレージ設定を確認してください。');
+    }
+  };
+
   return (
     <>
       <button
@@ -113,7 +140,7 @@ function ReceiptEntryPopover({ onClose, onManual }: Omit<ReceiptEntryMenuProps, 
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={settings ? '長押しの設定' : '記録する'}
+        aria-label="記録する"
         className={styles.panel}
         style={anchor}
         onKeyDown={(event) => {
@@ -124,7 +151,7 @@ function ReceiptEntryPopover({ onClose, onManual }: Omit<ReceiptEntryMenuProps, 
           }
           if (event.key !== 'Tab') return;
           const controls = Array.from(
-            event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+            event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])'),
           );
           const first = controls[0];
           const last = controls.at(-1);
@@ -137,86 +164,95 @@ function ReceiptEntryPopover({ onClose, onManual }: Omit<ReceiptEntryMenuProps, 
           }
         }}
       >
-        {settings ? (
-          <>
-            <button type="button" className={styles.back} onClick={() => setSettings(false)}>
-              <FiArrowLeft aria-hidden="true" />
-              長押しの設定
-            </button>
-            <p className={styles.description}>＋を長押ししたときに開く画面</p>
-            <div role="radiogroup" aria-label="長押しで開く画面">
-              {(
-                [
-                  { value: 'camera', label: 'レシートを撮る', Icon: FiCamera },
-                  { value: 'manual', label: '手で記録する', Icon: FiEdit2 },
-                ] as const
-              ).map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={preference === value}
-                  className={styles.row}
-                  onClick={() => {
-                    try {
-                      localStorage.setItem(RECEIPT_QUICK_ACTION_KEY, value);
-                      window.dispatchEvent(new Event(RECEIPT_QUICK_ACTION_EVENT));
-                      setSaveError('');
-                    } catch {
-                      setSaveError(
-                        '設定を保存できませんでした。ブラウザのストレージ設定を確認してください。',
-                      );
-                    }
-                  }}
-                >
-                  <Icon className={styles.optionIcon} aria-hidden="true" />
-                  <span className={styles.label}>{label}</span>
-                  {preference === value ? <FiCheck aria-hidden="true" /> : null}
-                </button>
-              ))}
-            </div>
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onCamera();
+          }}
+          className={styles.row}
+        >
+          <span className={styles.label}>レシートを撮る</span>
+          {preference === 'camera' ? <span className={styles.badge}>長押し</span> : null}
+          <FiCamera aria-hidden="true" />
+        </button>
+        {/* 押すと端末の写真を選ぶ画面がすぐ開く。選んだら読み取りへ回してメニューを閉じる
+            (選ぶのをやめたらメニューはそのまま)。 */}
+        <button type="button" onClick={() => photoInput.current?.click()} className={styles.row}>
+          <span className={styles.label}>写真から読み取る</span>
+          <FiImage aria-hidden="true" />
+        </button>
+        <input
+          ref={photoInput}
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
+            event.target.value = '';
+            if (files.length === 0) return;
+            onClose();
+            onFiles(files);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onManual();
+          }}
+          className={styles.row}
+        >
+          <span className={styles.label}>手で記録する</span>
+          {preference === 'manual' ? <span className={styles.badge}>長押し</span> : null}
+          <FiEdit2 aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-expanded={settingsOpen}
+          aria-controls="receipt-entry-long-press"
+          onClick={() => setSettingsOpen((value) => !value)}
+          className={`${styles.row} ${styles.settingsRow}`}
+        >
+          <span className={styles.label}>
+            長押しの設定
+            <span className={styles.preference}>長押し：{preferredLabel}</span>
+          </span>
+          <FiSettings aria-hidden="true" />
+        </button>
+        {settingsOpen ? (
+          <div
+            id="receipt-entry-long-press"
+            role="radiogroup"
+            aria-label="＋を長押ししたとき"
+            className={styles.options}
+          >
+            <p className={styles.description}>＋を長押ししたとき</p>
+            {LONG_PRESS_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={preference === value}
+                className={styles.option}
+                onClick={() => choose(value)}
+              >
+                <span className={styles.check} aria-hidden="true">
+                  {preference === value ? <FiCheck /> : null}
+                </span>
+                {label}
+              </button>
+            ))}
             {saveError ? (
               <p role="alert" className={styles.error}>
                 {saveError}
               </p>
             ) : null}
-          </>
-        ) : (
-          <>
-            <Link href="/camera" onClick={onClose} className={styles.row}>
-              <span className={styles.label}>レシートを撮る</span>
-              {preference === 'camera' ? <span className={styles.badge}>長押し</span> : null}
-              <FiCamera aria-hidden="true" />
-            </Link>
-            <Link href="/photos" onClick={onClose} className={styles.row}>
-              <span className={styles.label}>写真から読み取る</span>
-              <FiImage aria-hidden="true" />
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onManual();
-              }}
-              className={styles.row}
-            >
-              <span className={styles.label}>手で記録する</span>
-              {preference === 'manual' ? <span className={styles.badge}>長押し</span> : null}
-              <FiEdit2 aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSettings(true)}
-              className={`${styles.row} ${styles.settingsRow}`}
-            >
-              <span className={styles.label}>
-                長押しの設定
-                <span className={styles.preference}>長押し: {preferredLabel}</span>
-              </span>
-              <FiSettings aria-hidden="true" />
-            </button>
-          </>
-        )}
+          </div>
+        ) : null}
       </div>
     </>
   );
