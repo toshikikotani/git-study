@@ -4,6 +4,7 @@ import { markJustSaved } from '@/lib/just-saved';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { ReceiptConfirm, type ReceiptConfirmSave } from './receipt-confirm';
 import {
@@ -23,6 +24,7 @@ import {
 } from '@/features/import/receipt-queue';
 import { InputAccountSelector, useInputAccount } from '../input-account';
 import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
+import { ReceiptCamera } from '@/components/receipt/receipt-camera';
 
 /**
  * レシートの確認画面(撮影 → 読み取り → 確認 → 保存)。
@@ -57,6 +59,7 @@ export default function ReceiptPage() {
   const [saved, setSaved] = useState<ReadonlyMap<string, string>>(new Map());
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   // 目標があるとき、保存前の影響と保存後のひと言に使う。
   const [goal, setGoal] = useState<{ snapshot: GoalSnapshot; today: string } | null>(null);
   const [goalLoaded, setGoalLoaded] = useState(false);
@@ -241,27 +244,18 @@ export default function ReceiptPage() {
         style={{ borderColor: 'var(--hairline)' }}
       >
         <div className="flex justify-center gap-3">
-          <label
-            className="min-h-11 label-text cursor-pointer px-6 py-3"
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
+            className="min-h-11 label-text px-6 py-3"
             style={{
               borderRadius: 'var(--radius-full)',
               background: 'var(--action)',
               color: 'var(--on-action)',
             }}
           >
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                enqueueReceiptFiles(Array.from(e.target.files ?? []));
-                e.target.value = '';
-              }}
-            />
             撮る
-          </label>
+          </button>
           <label
             className="min-h-11 label-text cursor-pointer px-6 py-3"
             style={{
@@ -284,6 +278,13 @@ export default function ReceiptPage() {
           </label>
         </div>
       </div>
+
+      {cameraOpen
+        ? createPortal(
+            <ReceiptCamera onCapture={enqueueReceiptFiles} onClose={() => setCameraOpen(false)} />,
+            document.body,
+          )
+        : null}
 
       {saveError ? (
         <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>

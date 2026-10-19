@@ -8,7 +8,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
+import { safeReturnTo } from '@/lib/auth-return';
 import { createClient } from '@/lib/supabase/client';
 
 import { signUpAction } from './actions';
@@ -16,7 +18,7 @@ import { signUpAction } from './actions';
 type Tab = 'password' | 'register';
 
 /**
- * ログインできたら、ホームをページごと読み直して開く(ADR-083)。
+ * ログインできたら、入口の画面をページごと読み直して開く(ADR-083)。
  *
  * 以前は `router.push('/')` の直後に `router.refresh()` を呼んでいた。refresh は「今の画面」を
  * 読み直すため、ホームへの移動が終わる前に呼ばれるとログイン画面を読み直してしまい、ホームへ
@@ -24,12 +26,14 @@ type Tab = 'password' | 'register';
  * ページごと読み直せば、新しいセッションの cookie を必ず持ってホームを開ける。戻るボタンで
  * ログイン画面に戻らないよう replace にする。
  */
-function openHome() {
-  window.location.replace('/');
+function openReturnTarget(returnTo: string) {
+  window.location.replace(safeReturnTo(returnTo));
 }
 
 export function LoginForm() {
   const [tab, setTab] = useState<Tab>('password');
+  const searchParams = useSearchParams();
+  const returnTo = safeReturnTo(searchParams.get('returnTo'));
 
   return (
     <div className="rise">
@@ -46,12 +50,18 @@ export function LoginForm() {
         </TabButton>
       </div>
 
-      <div className="mt-4">{tab === 'password' ? <PasswordForm /> : <RegisterForm />}</div>
+      <div className="mt-4">
+        {tab === 'password' ? (
+          <PasswordForm returnTo={returnTo} />
+        ) : (
+          <RegisterForm returnTo={returnTo} />
+        )}
+      </div>
     </div>
   );
 }
 
-function PasswordForm() {
+function PasswordForm({ returnTo }: { returnTo: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle');
@@ -67,7 +77,7 @@ function PasswordForm() {
       setStatus('error');
       return;
     }
-    openHome();
+    openReturnTarget(returnTo);
   }
 
   return (
@@ -120,7 +130,7 @@ function PasswordForm() {
   );
 }
 
-function RegisterForm() {
+function RegisterForm({ returnTo }: { returnTo: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -159,7 +169,7 @@ function RegisterForm() {
       return;
     }
 
-    openHome();
+    openReturnTarget(returnTo);
   }
 
   return (

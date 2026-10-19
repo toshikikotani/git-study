@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { ImageEditor } from '@/components/receipt/image-editor';
+import { ReceiptCamera } from '@/components/receipt/receipt-camera';
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import {
@@ -103,10 +105,10 @@ export function CaptureEntry({
   const [editing, setEditing] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
-  const takeRef = useRef<HTMLInputElement>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const pickRef = useRef<HTMLInputElement>(null);
 
-  const openTake = () => takeRef.current?.click();
+  const openTake = () => setCameraOpen(true);
   const openPick = () => pickRef.current?.click();
 
   const errors = useMemo(() => validateManualEntry(values, today), [values, today]);
@@ -383,17 +385,6 @@ export function CaptureEntry({
           disabled={busy !== null || imageUrl === null}
         />
         <input
-          ref={takeRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          hidden
-          onChange={(e) => {
-            void replaceImage(e.target.files?.[0]);
-            e.target.value = '';
-          }}
-        />
-        <input
           ref={pickRef}
           type="file"
           accept="image/*"
@@ -404,6 +395,21 @@ export function CaptureEntry({
           }}
         />
       </div>
+
+      {cameraOpen
+        ? createPortal(
+            <ReceiptCamera
+              initialMode="single"
+              singleCapture
+              onCapture={(files) => {
+                setCameraOpen(false);
+                void replaceImage(files[0]);
+              }}
+              onClose={() => setCameraOpen(false)}
+            />,
+            document.body,
+          )
+        : null}
 
       {busy === 'rescan' ? (
         <p role="status" className="text-xs" style={{ color: 'var(--ink-secondary)' }}>
