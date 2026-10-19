@@ -48,11 +48,12 @@ type FabAsCapture = CommonProps & {
 };
 
 /** 押すと自前の画面(自動撮影のカメラ)を開く。ハイドレーション後に使う。 */
-type FabAsButton = CommonProps & {
-  href?: undefined;
-  onFiles?: undefined;
-  onPress: () => void;
-};
+type FabAsButton = CommonProps &
+  Pick<React.AriaAttributes, 'aria-expanded' | 'aria-controls' | 'aria-haspopup'> & {
+    href?: undefined;
+    onFiles?: undefined;
+    onPress: () => void;
+  };
 
 const SHARED_STYLE: React.CSSProperties = {
   borderRadius: 'var(--radius-full)',
@@ -72,6 +73,9 @@ export function Fab(props: FabAsLink | FabAsCapture | FabAsButton) {
         type="button"
         aria-label={label}
         onClick={props.onPress}
+        aria-expanded={props['aria-expanded']}
+        aria-controls={props['aria-controls']}
+        aria-haspopup={props['aria-haspopup']}
         className={`active:scale-[0.92] flex min-h-11 ${sizeClass} shrink-0 items-center justify-center`}
         style={SHARED_STYLE}
       >

@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MdClose, MdPhotoLibrary } from 'react-icons/md';
+import { MdClose, MdMoreHoriz, MdPhotoLibrary } from 'react-icons/md';
+import { createPortal } from 'react-dom';
+import { useIsClient } from '@/components/ui/use-is-client';
+import { projectDocumentBox } from '@/features/import/document-preview';
+import './receipt-camera.css';
 import { PhotoLibrary } from './photo-library';
 import { rememberPhotos, useRecentPhotos } from '@/features/import/recent-photos';
 
@@ -61,6 +65,12 @@ export function ReceiptCamera({
   /** 最初のモード(撮影ボタンの長押しから「連続撮影」を選んだときは continuous)。 */
   initialMode?: 'single' | 'continuous' | 'long';
 }) {
+  const isClient = useIsClient();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const [libraryOpen, setLibraryOpen] = useState(false);
   const recentPhotos = useRecentPhotos();
   const [shooting, setShooting] = useState(false);
@@ -86,6 +96,35 @@ export function ReceiptCamera({
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const preview = previewRef.current;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setViewport({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    if (preview) observer.observe(preview);
+    return () => {
+      observer.disconnect();
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isClient]);
+
+  useEffect(() => {
+    if (!libraryOpen) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.querySelector<HTMLButtonElement>('.receipt-camera__library-back')?.focus();
+    return () => {
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [libraryOpen]);
 
   const finish = useCallback(
     (files: File[]) => {
@@ -164,8 +203,9 @@ export function ReceiptCamera({
     }
   }, [finish]);
 
-  // カメラの起動。
+  // カメラの起動。Portalが描画されてから映像を接続する。
   useEffect(() => {
+    if (!isClient) return;
     let cancelled = false;
     // 同期的な setState を避けるため、非対応も Promise の失敗として扱う。
     const request = navigator.mediaDevices?.getUserMedia
@@ -195,11 +235,11 @@ export function ReceiptCamera({
       cancelled = true;
       stop();
     };
-  }, [stop]);
+  }, [isClient, stop]);
 
   // 輪郭の検出と自動撮影。
   useEffect(() => {
-    if (error !== null || libraryOpen) return;
+    if (error !== null || libraryOpen || settingsOpen) return;
     const canvas = document.createElement('canvas');
     const timer = window.setInterval(() => {
       const video = videoRef.current;
@@ -229,208 +269,276 @@ export function ReceiptCamera({
       if (stable && Date.now() - lastCaptureRef.current > COOLDOWN_MS) void shoot();
     }, SAMPLE_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [error, libraryOpen, shoot]);
+  }, [error, libraryOpen, settingsOpen, shoot]);
 
-  return (
+  const projected = box ? projectDocumentBox(box, videoSize, viewport) : null;
+  const capturedCount = mode === 'long' ? parts.length : count;
+  const status = error
+    ? '写真からも読み取れます'
+    : capturedCount > 0
+      ? `${capturedCount}枚 撮りました · 次のレシートをどうぞ`
+      : guidance({ box, assessment, auto, progress });
+  const close = () => {
+    stop();
+    onClose();
+  };
+  const content = (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="レシートを撮影"
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: '#000', color: '#fff' }}
+      className="receipt-camera"
+      data-no-pull
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          if (libraryOpen) setLibraryOpen(false);
+          else if (settingsOpen) setSettingsOpen(false);
+          else close();
+        }
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), a[href]',
+          ),
+        ).filter((element) => !element.closest('[inert]'));
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
     >
-      <div className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
-        <button
-          type="button"
-          aria-label="閉じる"
-          onClick={() => {
-            stop();
-            onClose();
-          }}
-          className="min-h-11 flex size-10 items-center justify-center rounded-full"
-          style={{ background: 'rgba(255,255,255,0.18)' }}
-        >
-          <MdClose aria-hidden size={22} />
-        </button>
-        <div role="radiogroup" aria-label="撮影モード" className="flex gap-1">
-          {MODES.map((m) => (
+      <div className="receipt-camera__preview" ref={previewRef} inert={libraryOpen}>
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          onLoadedMetadata={(event) =>
+            setVideoSize({
+              width: event.currentTarget.videoWidth,
+              height: event.currentTarget.videoHeight,
+            })
+          }
+          className="receipt-camera__video"
+          aria-label="カメラの映像"
+        />
+        <div className="receipt-camera__shade" aria-hidden />
+        <header className="receipt-camera__header">
+          <button
+            type="button"
+            aria-label="閉じる"
+            onClick={close}
+            className="min-h-[44px] receipt-camera__round-button"
+          >
+            <MdClose aria-hidden size={22} />
+          </button>
+          <button
+            type="button"
+            aria-label="撮影設定"
+            aria-expanded={settingsOpen}
+            aria-controls="receipt-camera-settings"
+            onClick={() => setSettingsOpen((value) => !value)}
+            className="min-h-[44px] receipt-camera__round-button receipt-camera__settings-trigger"
+          >
+            <MdMoreHoriz aria-hidden size={24} />
+          </button>
+          {onManual ? (
             <button
-              key={m.value}
               type="button"
-              role="radio"
-              aria-checked={mode === m.value}
               onClick={() => {
-                setMode(m.value);
-                modeRef.current = m.value;
-                partsRef.current = [];
-                setParts([]);
+                close();
+                onManual();
               }}
-              className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold"
-              style={{
-                background: mode === m.value ? '#fff' : 'rgba(255,255,255,0.18)',
-                color: mode === m.value ? '#000' : '#fff',
-              }}
+              className="min-h-[44px] receipt-camera__manual"
             >
-              {m.label}
+              手で入力
             </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={auto}
-          aria-label="レシートと確かめられたら自動で撮る"
-          onClick={() => {
-            const next = !auto;
-            setAuto(next);
-            autoRef.current = next;
-            trackerRef.current.reset();
-            setProgress(0);
-            try {
-              localStorage.setItem(AUTO_KEY, next ? 'on' : 'off');
-            } catch {
-              // 保存できなくても、この撮影の間は切り替える
-            }
-          }}
-          className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold"
-          style={{
-            background: auto ? '#fff' : 'rgba(255,255,255,0.18)',
-            color: auto ? '#000' : '#fff',
-          }}
-        >
-          自動 {auto ? 'オン' : 'オフ'}
-        </button>
-      </div>
-
-      {onManual ? (
-        <button
-          type="button"
-          onClick={() => {
-            stop();
-            onClose();
-            onManual();
-          }}
-          className="min-h-11 self-end rounded-full px-4 py-2 text-sm"
-        >
-          手で入力
-        </button>
-      ) : null}
-      <div className="relative min-h-0 flex-1">
-        {error === null ? (
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className="absolute inset-0 size-full object-cover"
-            aria-label="カメラの映像"
-          />
+          ) : (
+            <span className="receipt-camera__header-spacer" />
+          )}
+        </header>
+        {settingsOpen ? (
+          <section
+            className="receipt-camera__settings"
+            id="receipt-camera-settings"
+            aria-label="撮影設定"
+          >
+            <h2>撮影設定</h2>
+            <div role="radiogroup" aria-label="撮影モード" className="receipt-camera__modes">
+              {MODES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === option.value}
+                  onClick={() => {
+                    setMode(option.value);
+                    modeRef.current = option.value;
+                    partsRef.current = [];
+                    setParts([]);
+                  }}
+                  className="min-h-[44px]"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={auto}
+              aria-label="レシートと確かめられたら自動で撮る"
+              onClick={() => {
+                const next = !auto;
+                setAuto(next);
+                autoRef.current = next;
+                trackerRef.current.reset();
+                setProgress(0);
+                try {
+                  localStorage.setItem(AUTO_KEY, next ? 'on' : 'off');
+                } catch {
+                  /* この撮影の間は切り替える */
+                }
+              }}
+              className="min-h-[44px] receipt-camera__auto"
+            >
+              自動撮影<span>{auto ? 'オン' : 'オフ'}</span>
+            </button>
+            <button
+              type="button"
+              className="min-h-[44px] receipt-camera__settings-done"
+              onClick={() => setSettingsOpen(false)}
+            >
+              設定を閉じる
+            </button>
+          </section>
+        ) : null}
+        {error ? (
+          <div className="receipt-camera__error">
+            <MdPhotoLibrary aria-hidden size={32} />
+            <p>{error}</p>
+            <button type="button" onClick={() => setLibraryOpen(true)} className="min-h-[44px]">
+              写真から読み取る
+            </button>
+          </div>
         ) : (
-          <p className="absolute inset-0 flex items-center justify-center px-8 text-center text-sm">
-            {error}
-          </p>
-        )}
-        {box !== null ? (
           <div
             aria-hidden
-            className="pointer-events-none absolute rounded-lg border-2"
-            style={{
-              left: `${box.x0 * 100}%`,
-              top: `${box.y0 * 100}%`,
-              width: `${(box.x1 - box.x0) * 100}%`,
-              height: `${(box.y1 - box.y0) * 100}%`,
-              borderColor: assessment?.receipt && auto ? '#34d399' : '#fbbf24',
-              borderStyle: assessment?.receipt && auto ? 'solid' : 'dashed',
-            }}
-          />
-        ) : null}
-        <p
-          role="status"
-          className="absolute inset-x-0 bottom-3 text-center text-xs"
-          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
-        >
-          {error !== null ? '' : guidance({ box, assessment, auto, progress })}
-          {mode === 'continuous' && count > 0 ? `(${count}枚撮影済み)` : ''}
-          {mode === 'long' && parts.length > 0 ? `(${parts.length}枚目まで撮影済み)` : ''}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2 overflow-x-auto px-4 pt-3">
-        <span className="shrink-0 text-xs">選択・撮影した写真</span>
-        {recentPhotos.slice(0, 3).map((photo) => (
-          <button
-            type="button"
-            key={photo.id}
-            aria-label={`${photo.file.name}を読み取る`}
-            className="min-h-11 w-12 shrink-0"
-            onClick={() => finish([photo.file])}
+            className={`receipt-camera__frame${projected ? ' is-detected' : ''}`}
+            style={
+              projected
+                ? {
+                    left: `${projected.left}%`,
+                    top: `${projected.top}%`,
+                    width: `${projected.width}%`,
+                    height: `${projected.height}%`,
+                  }
+                : undefined
+            }
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.url} alt="" className="size-11 rounded-md object-cover" />
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => setLibraryOpen(true)}
-          className="min-h-11 ml-auto shrink-0 text-xs underline"
-        >
-          すべての写真
-        </button>
-      </div>
-      {libraryOpen ? (
-        <div className="absolute inset-0 z-10 overflow-y-auto bg-black p-4 pb-12">
-          <button type="button" onClick={() => setLibraryOpen(false)} className="min-h-11 px-3">
-            カメラに戻る
-          </button>
-          <h2 className="mb-4 text-lg font-semibold">写真から読み取る</h2>
-          <PhotoLibrary onFiles={finish} />
-        </div>
-      ) : null}
-      <div className="flex items-center justify-between px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={() => setLibraryOpen(true)}
-          className="flex min-h-11 size-12 items-center justify-center rounded-full"
-          style={{ background: 'rgba(255,255,255,0.18)' }}
-          aria-label="写真ライブラリから選ぶ"
-        >
-          <MdPhotoLibrary aria-hidden size={24} />
-        </button>
-        <button
-          type="button"
-          aria-label="シャッター"
-          disabled={error !== null || shooting}
-          onClick={() => void shoot()}
-          className="size-16 rounded-full border-4 disabled:opacity-30"
-          style={{ borderColor: '#fff', background: 'rgba(255,255,255,0.35)' }}
-        />
-        {mode === 'long' ? (
-          <button
-            type="button"
-            disabled={parts.length === 0}
-            onClick={() => void finishLong()}
-            className="min-h-11 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-30"
-            style={{ background: '#fff', color: '#000' }}
-          >
-            つなげて完了
-          </button>
-        ) : mode === 'continuous' ? (
-          <button
-            type="button"
-            onClick={() => {
-              stop();
-              onClose();
-            }}
-            className="min-h-11 rounded-full px-4 py-2 text-xs font-semibold"
-            style={{ background: '#fff', color: '#000' }}
-          >
-            完了
-          </button>
-        ) : (
-          <span className="w-12" />
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
         )}
+        <div className="receipt-camera__status" role="status">
+          <span aria-hidden className="receipt-camera__status-dot" />
+          <span>{status}</span>
+        </div>
       </div>
+      <footer className="receipt-camera__controls" inert={libraryOpen}>
+        <div className="receipt-camera__photos">
+          <span className="receipt-camera__recent-label">最近の写真</span>
+          <div className="receipt-camera__thumbnails" aria-label="このタブで選択・撮影した写真">
+            {recentPhotos.slice(0, 3).map((photo) => (
+              <button
+                type="button"
+                key={photo.id}
+                aria-label={`${photo.file.name}を写真一覧で開く`}
+                onClick={() => setLibraryOpen(true)}
+                className="min-h-[44px]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.url} alt="" />
+              </button>
+            ))}
+            {recentPhotos.length === 0 ? (
+              <span className="receipt-camera__empty-photos">写真を選べます</span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="min-h-[44px] receipt-camera__all-photos"
+            onClick={() => setLibraryOpen(true)}
+          >
+            すべての写真
+          </button>
+        </div>
+        <div className="receipt-camera__actions">
+          <button
+            type="button"
+            onClick={() => setLibraryOpen(true)}
+            className="min-h-[44px] receipt-camera__album"
+            aria-label="写真ライブラリから選ぶ"
+          >
+            {recentPhotos[0] ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={recentPhotos[0].url} alt="" />
+              </>
+            ) : (
+              <MdPhotoLibrary aria-hidden size={25} />
+            )}
+            {capturedCount > 0 ? (
+              <span className="receipt-camera__count">{capturedCount}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            aria-label="シャッター"
+            disabled={error !== null || shooting}
+            onClick={() => void shoot()}
+            className="min-h-[44px] receipt-camera__shutter"
+          />
+          <button
+            type="button"
+            disabled={mode === 'long' && parts.length === 0}
+            onClick={() => {
+              if (mode === 'long') void finishLong();
+              else close();
+            }}
+            className="min-h-[44px] receipt-camera__done"
+          >
+            {mode === 'long' ? 'つなげる' : '完了'}
+          </button>
+        </div>
+        <p className="receipt-camera__hint">
+          {auto ? 'かざすと自動で撮れます。続けて何枚でも。' : 'シャッターを押して撮影します。'}
+        </p>
+      </footer>
+      {libraryOpen ? (
+        <section className="receipt-camera__library" aria-label="写真から読み取る">
+          <button
+            type="button"
+            onClick={() => setLibraryOpen(false)}
+            className="min-h-[44px] receipt-camera__library-back"
+          >
+            ‹ カメラに戻る
+          </button>
+          <h2>写真から読み取る</h2>
+          <PhotoLibrary onFiles={finish} />
+        </section>
+      ) : null}
     </div>
   );
+  return isClient ? createPortal(content, document.body) : null;
 }
 
 /** 画面の下の案内。自動で撮らないときは、理由と「シャッターで撮れる」ことを伝える。 */
@@ -447,9 +555,9 @@ function guidance({
 }): string {
   if (!auto) return 'シャッターを押して撮ります(自動はオフ)';
   if (box === null || assessment === null) {
-    return 'レシート全体を枠に収めてください。自動で撮れないときはシャッターを';
+    return 'レシートを枠に合わせてください';
   }
-  if (assessment.receipt) return progress >= 1 ? '撮影します' : 'レシートです。そのまま動かさずに…';
+  if (assessment.receipt) return progress >= 1 ? '撮影します' : 'そのまま動かさずに…';
   switch (assessment.reason) {
     case 'edge':
       return 'レシート全体が画面に入るように、少し離してください';
