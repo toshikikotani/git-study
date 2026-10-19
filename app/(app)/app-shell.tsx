@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -238,7 +238,14 @@ function BottomBar({
   // 右の＋は、押すと「記録する」のシートを開く(デザイン仕様書、ADR-090:撮る・写真から・手で入力)。
   // タップはメニュー、長押しは保存された設定に従ってカメラか手入力を直接開く。
   const fab = (
-    <Fab label="記録する" size="large" onPress={() => setEntryMenuOpen(true)}>
+    <Fab
+      label="記録する"
+      size="large"
+      aria-haspopup="dialog"
+      aria-expanded={entryMenuOpen}
+      aria-controls="receipt-entry-menu"
+      onPress={() => setEntryMenuOpen(true)}
+    >
       <PlusIcon />
     </Fab>
   );
@@ -339,7 +346,14 @@ function BottomBar({
           </ul>
         </nav>
         <div
-          className="shrink-0"
+          className="shrink-0 rounded-full"
+          style={
+            {
+              '--action': '#a27bff',
+              '--on-action': '#170b2a',
+              boxShadow: '0 0 0 6px rgba(162,123,255,0.19)',
+            } as CSSProperties
+          }
           onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
           onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
           onPointerUp={longPress.end}
