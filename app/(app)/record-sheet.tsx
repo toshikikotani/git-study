@@ -511,6 +511,16 @@ export function RecordSheet({
         className="flex flex-col items-center gap-2 rounded-[20px] px-4 pt-3 pb-4"
         style={{ background: 'var(--surface)' }}
       >
+        {edit ? null : (
+          <Link
+            href="/camera"
+            onClick={onClose}
+            className="flex min-h-12 w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            レシートを撮る
+          </Link>
+        )}
         <div className="flex w-full items-center justify-between gap-2">
           {/* 種類は支出・収入の2つ。返金は「詳細」で(デザイン v3-4) */}
           <Segmented

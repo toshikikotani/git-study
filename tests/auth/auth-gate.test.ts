@@ -17,6 +17,9 @@ describe('認証ガードの行き先', () => {
   });
 
   it('マニフェストは誰でも見られる', () => {
+    expect(authGate('/camera.webmanifest', false)).toBe('pass');
+    expect(authGate('/receipt-camera-192.png', false)).toBe('pass');
+    expect(authGate('/camera', false)).toBe('to-login');
     expect(authGate('/manifest.webmanifest', false)).toBe('pass');
     expect(authGate('/manifest.webmanifest', true)).toBe('pass');
   });

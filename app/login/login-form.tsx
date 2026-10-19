@@ -25,7 +25,12 @@ type Tab = 'password' | 'register';
  * ログイン画面に戻らないよう replace にする。
  */
 function openHome() {
-  window.location.replace('/');
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (next === '/camera') {
+    window.location.replace('/camera');
+  } else {
+    window.location.replace('/');
+  }
 }
 
 export function LoginForm() {
