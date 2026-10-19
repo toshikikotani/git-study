@@ -147,13 +147,14 @@ describe('⑦ カテゴリ(デザイン仕様書、ADR-091)', () => {
 });
 
 describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
-  const html = visible(renderToString(h(RecordSheet, { onClose: () => {}, onFiles: () => {} })));
+  const html = visible(renderToString(h(RecordSheet, { onClose: () => {} })));
 
-  it('できるのは 記録する・カテゴリを足す・固定費にする の3つだけ', () => {
+  it('撮影・写真と手入力・カテゴリ・固定費の操作を用意する', () => {
     expect(html).toContain('支出');
     expect(html).toContain('収入');
-    // 画像から入力(レシートの写真でもスクショでもよい、ADR-100)
-    expect(html).toContain('画像から入力');
+    // 撮影と写真選択はそれぞれ専用画面へ。
+    expect(html).toContain('レシートを撮る');
+    expect(html).toContain('写真から読み取る');
     expect(html).not.toContain('レシートで入力');
     expect(html).toContain('カテゴリ');
     expect(html).toContain('追加');
@@ -177,7 +178,6 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
       renderToString(
         h(RecordSheet, {
           onClose: () => {},
-          onFiles: () => {},
           initialDate: '2026-10-14',
           initialKind: 'income',
         }),
@@ -189,7 +189,7 @@ describe('⑤ 記録する(デザイン仕様書、ADR-091)', () => {
   });
 
   it('レシート名を入れられる。空ならカテゴリ名で記録する(ADR-092)', () => {
-    const raw = renderToString(h(RecordSheet, { onClose: () => {}, onFiles: () => {} }));
+    const raw = renderToString(h(RecordSheet, { onClose: () => {} }));
     expect(html).toContain('レシート名');
     expect(raw).toContain('placeholder="店名など（任意）"');
     expect(raw).toContain('maxLength="60"');
@@ -201,7 +201,6 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     renderToString(
       h(RecordSheet, {
         onClose: () => {},
-        onFiles: () => {},
         ...props,
       }),
     );
@@ -237,11 +236,10 @@ describe('⑤ 記録する:雑に扱っても困らない(ADR-098)', () => {
     expect(visible(raw)).toContain('保存できませんでした。');
   });
 
-  it('画像から入力は、カメラを決め打ちせず画像を選ばせる(写真を撮る / 写真ライブラリのどちらでも)', () => {
+  it('撮影と写真選択の専用画面へそれぞれ直接進める', () => {
     const raw = sheet();
-    const input = raw.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? '';
-    expect(input).toContain('accept="image/*"');
-    expect(input).not.toContain('capture');
+    expect(raw).toContain('href="/camera"');
+    expect(raw).toContain('href="/photos"');
   });
 
   it('文字を入れる欄は自動入力を止める(iPhone の「連絡先を自動入力」を出さない、ADR-099)', () => {
@@ -264,7 +262,6 @@ describe('記録を直す:記録すると同じ画面(ADR-101)', () => {
   const raw = renderToString(
     h(RecordSheet, {
       onClose: () => {},
-      onFiles: () => {},
       edit: {
         initial: {
           kind: 'expense',

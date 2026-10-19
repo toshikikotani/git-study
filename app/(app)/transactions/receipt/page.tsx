@@ -15,7 +15,6 @@ import { loadGoalSnapshotAction } from '../../plan/actions';
 import type { GoalSnapshot } from '@/domain/goal-impact';
 import { formatYen } from '@/domain/money';
 import {
-  enqueueReceiptFiles,
   removeReceiptJob,
   retryWaitingJobs,
   useReceiptJobs,
@@ -252,26 +251,17 @@ export default function ReceiptPage() {
           >
             レシートを撮る
           </Link>
-          <label
-            className="min-h-11 label-text cursor-pointer px-6 py-3"
+          <Link
+            href="/photos"
+            className="min-h-11 label-text px-6 py-3"
             style={{
               borderRadius: 'var(--radius-full)',
               border: '1px solid var(--hairline)',
               color: 'var(--accent)',
             }}
           >
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                enqueueReceiptFiles(Array.from(e.target.files ?? []));
-                e.target.value = '';
-              }}
-            />
-            ライブラリから選ぶ
-          </label>
+            写真から読み取る
+          </Link>
         </div>
       </div>
 

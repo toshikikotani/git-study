@@ -155,7 +155,6 @@ function dateLabel(date: string, today: string): string {
  */
 export function RecordSheet({
   onClose,
-  onFiles,
   initialDate,
   initialKind,
   initialError,
@@ -164,8 +163,6 @@ export function RecordSheet({
   edit,
 }: {
   onClose: () => void;
-  /** 選んだ画像(撮った写真・写真ライブラリのレシートやスクショ)を読み取りへ回す。 */
-  onFiles: (files: File[]) => void;
   /** 日付の初期値(無ければ今日)。 */
   initialDate?: string | undefined;
   initialKind?: 'expense' | 'income' | undefined;
@@ -529,27 +526,16 @@ export function RecordSheet({
             onChange={(v) => setKind(v === 'income' ? 'income' : 'expense')}
             label="種類"
           />
-          {/* 押すと iPhone の選択画面(写真を撮る / 写真ライブラリ)が出る。レシートの写真でも
-              決済アプリ・通販・カード通知のスクショでも、同じ読み取りに回す(ADR-100)。
-              直すときは出さない(レシートの画像は下の「レシートの品目」から)。 */}
           {edit ? null : (
-            <label
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
+            <Link
+              href="/photos"
+              onClick={onClose}
+              className="flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] font-semibold"
               style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
             >
               {imageIcon}
-              画像から入力
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  onFiles(Array.from(e.target.files ?? []));
-                  e.target.value = '';
-                }}
-              />
-            </label>
+              写真から読み取る
+            </Link>
           )}
         </div>
         <label className="flex items-baseline justify-center gap-2 pt-2">

@@ -125,7 +125,6 @@ export function DirectRecordEditor({
           <RecordSheet
             key={revision}
             onClose={() => setOpen(false)}
-            onFiles={() => {}}
             initialError={retry?.error}
             edit={{
               initial: retry?.values ?? initial,

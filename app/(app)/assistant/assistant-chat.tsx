@@ -156,7 +156,6 @@ export function AssistantChat({
         <RecordSheet
           key={`${target.message}-${target.change}`}
           onClose={() => setEditing(null)}
-          onFiles={() => {}}
           edit={{
             initial: {
               kind: before.kind,

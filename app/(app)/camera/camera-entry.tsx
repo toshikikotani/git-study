@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
 import { enqueueReceiptFiles } from '@/features/import/receipt-queue';
 
 export function CameraEntry() {
+  const router = useRouter();
+  const captured = useRef(false);
   const [open, setOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   return (
@@ -51,8 +54,15 @@ export function CameraEntry() {
       {open ? (
         <ReceiptCamera
           initialMode="continuous"
-          onCapture={enqueueReceiptFiles}
-          onClose={() => setOpen(false)}
+          onCapture={(files) => {
+            captured.current = true;
+            enqueueReceiptFiles(files);
+          }}
+          onClose={() => {
+            setOpen(false);
+            if (captured.current) router.push('/transactions/receipt');
+          }}
+          onManual={() => router.push('/spending?record=1')}
         />
       ) : null}
     </main>
