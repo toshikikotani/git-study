@@ -1185,7 +1185,6 @@ export function TransactionRowWithSplit({
         <RecordSheet
           key={editOpenId}
           onClose={closeEdit}
-          onFiles={() => {}}
           initialError={editRetry?.error}
           edit={{
             initial: editRetry?.values ?? editStart,

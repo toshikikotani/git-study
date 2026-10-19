@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 /**
  * PWA(ホーム画面に追加)。ホーム画面のアイコンを長押しすると出るショートカットから、
- * レシート撮影・手入力・話して/文字で記録を直接開ける(`/spending?capture=1` は撮影を開く)。
+ * レシート撮影・手入力・話して/文字で記録を直接開ける(`/camera` は撮影を開く)。
  * Siri・ショートカットアプリからの起動(N3本人要件)も、ネイティブアプリを持たない
  * ウェブアプリでは作れないため、この仕組み(ホーム画面ショートカット + 後述の
  * /api/widget/today)で代替する——「スクショから記録」は長押しメニュー
@@ -26,7 +26,7 @@ export default function manifest(): MetadataRoute.Manifest {
         name: 'レシートを撮る',
         short_name: '撮影',
         description: 'カメラを開いてレシートを撮影する',
-        url: '/spending?capture=1',
+        url: '/camera',
       },
       {
         name: '手入力',

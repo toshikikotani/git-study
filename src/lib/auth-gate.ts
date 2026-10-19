@@ -8,7 +8,12 @@
 
 export type AuthGate = 'pass' | 'to-login' | 'to-home' | 'unauthorized';
 
-const PUBLIC_PATHS = ['/manifest.webmanifest'];
+const PUBLIC_PATHS = [
+  '/manifest.webmanifest',
+  '/camera.webmanifest',
+  '/receipt-camera-192.png',
+  '/receipt-camera-512.png',
+];
 
 export function isLoginPath(pathname: string): boolean {
   return pathname === '/login' || pathname.startsWith('/login/');

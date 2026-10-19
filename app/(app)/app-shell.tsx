@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -22,6 +22,8 @@ import { NavigationProgress } from '@/components/ui/navigation-progress';
 import { AiIcon, AnalysisIcon, ListIcon, PlusIcon, TodayIcon } from '@/components/ui/nav-icons';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
+import { ReceiptEntryMenu } from './receipt-entry-menu';
+import { readReceiptQuickAction } from '@/lib/receipt-quick-action';
 import { ReceiptCamera } from '@/components/receipt/receipt-camera';
 import {
   configureReceiptQueue,
@@ -201,15 +203,24 @@ function BottomBar({
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
   }, []);
+  const router = useRouter();
+  const [entryMenuOpen, setEntryMenuOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const setFabMenuOpen = useCallback(
     (open: boolean) => (open ? onOpenRecord() : onCloseRecord()),
     [onOpenRecord, onCloseRecord],
   );
   const longPress = useMemo(
-    () => createLongPress({ onLongPress: () => setFabMenuOpen(true) }),
-    [setFabMenuOpen],
+    () =>
+      createLongPress({
+        onLongPress: () => {
+          if (readReceiptQuickAction() === 'manual') onOpenRecord();
+          else router.push('/camera');
+        },
+      }),
+    [onOpenRecord, router],
   );
+  useEffect(() => () => longPress.end(), [longPress]);
   const reading = countReading(jobs);
   const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
   const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
@@ -225,9 +236,9 @@ function BottomBar({
     }
   }, []);
   // 右の＋は、押すと「記録する」のシートを開く(デザイン仕様書、ADR-090:撮る・写真から・手で入力)。
-  // すぐにカメラを開かない(誤って撮らないため、本人の希望)。長押しでも同じシート。
+  // タップはメニュー、長押しは保存された設定に従ってカメラか手入力を直接開く。
   const fab = (
-    <Fab label="記録する" size="large" onPress={() => setFabMenuOpen(true)}>
+    <Fab label="記録する" size="large" onPress={() => setEntryMenuOpen(true)}>
       <PlusIcon />
     </Fab>
   );
@@ -266,6 +277,11 @@ function BottomBar({
           onClose={() => setCameraOpen(false)}
         />
       ) : null}
+      <ReceiptEntryMenu
+        open={entryMenuOpen}
+        onClose={() => setEntryMenuOpen(false)}
+        onManual={() => onOpenRecord()}
+      />
       <BottomSheet
         open={record !== null}
         onClose={() => setFabMenuOpen(false)}
@@ -276,10 +292,6 @@ function BottomBar({
         <RecordSheet
           key={record?.openId ?? 0}
           onClose={() => setFabMenuOpen(false)}
-          onFiles={(files) => {
-            enqueueReceiptFiles(files);
-            setFabMenuOpen(false);
-          }}
           initialDate={record?.date}
           initialKind={record?.kind}
           initialError={record?.error}

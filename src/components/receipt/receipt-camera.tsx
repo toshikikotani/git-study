@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MdClose, MdPhotoLibrary } from 'react-icons/md';
+import { PhotoLibrary } from './photo-library';
+import { rememberPhotos, useRecentPhotos } from '@/features/import/recent-photos';
 
 import {
   assessReceipt,
@@ -51,12 +53,18 @@ export function ReceiptCamera({
   onCapture,
   onClose,
   initialMode = 'single',
+  onManual,
 }: {
   onCapture: (files: File[]) => void;
   onClose: () => void;
+  onManual?: () => void;
   /** 最初のモード(撮影ボタンの長押しから「連続撮影」を選んだときは continuous)。 */
   initialMode?: 'single' | 'continuous' | 'long';
 }) {
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const recentPhotos = useRecentPhotos();
+  const [shooting, setShooting] = useState(false);
+  const shootingRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const trackerRef = useRef(createStabilityTracker());
@@ -104,25 +112,34 @@ export function ReceiptCamera({
   }, []);
 
   const shoot = useCallback(async () => {
-    const blob = await grabFrame();
-    if (!blob) return;
-    lastCaptureRef.current = Date.now();
-    trackerRef.current.reset();
-    setProgress(0);
-    const current = modeRef.current;
-    if (current === 'long') {
-      partsRef.current = [...partsRef.current, blob];
-      setParts(partsRef.current);
-      return;
+    if (shootingRef.current) return;
+    shootingRef.current = true;
+    setShooting(true);
+    try {
+      const blob = await grabFrame();
+      if (!blob) return;
+      lastCaptureRef.current = Date.now();
+      trackerRef.current.reset();
+      setProgress(0);
+      const current = modeRef.current;
+      if (current === 'long') {
+        partsRef.current = [...partsRef.current, blob];
+        setParts(partsRef.current);
+        return;
+      }
+      const file = new File([blob], `receipt-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      rememberPhotos([file]);
+      if (current === 'single') {
+        finish([file]);
+        return;
+      }
+      // 連続:撮ったらすぐ読み取りへ回し、カメラは開いたまま次を待つ。
+      onCapture([file]);
+      setCount((c) => c + 1);
+    } finally {
+      shootingRef.current = false;
+      setShooting(false);
     }
-    const file = new File([blob], `receipt-${Date.now()}.jpg`, { type: 'image/jpeg' });
-    if (current === 'single') {
-      finish([file]);
-      return;
-    }
-    // 連続:撮ったらすぐ読み取りへ回し、カメラは開いたまま次を待つ。
-    onCapture([file]);
-    setCount((c) => c + 1);
   }, [finish, grabFrame, onCapture]);
 
   const finishLong = useCallback(async () => {
@@ -182,7 +199,7 @@ export function ReceiptCamera({
 
   // 輪郭の検出と自動撮影。
   useEffect(() => {
-    if (error !== null) return;
+    if (error !== null || libraryOpen) return;
     const canvas = document.createElement('canvas');
     const timer = window.setInterval(() => {
       const video = videoRef.current;
@@ -212,12 +229,7 @@ export function ReceiptCamera({
       if (stable && Date.now() - lastCaptureRef.current > COOLDOWN_MS) void shoot();
     }, SAMPLE_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [error, shoot]);
-
-  const onLibrary = (files: FileList | null) => {
-    const list = Array.from(files ?? []);
-    if (list.length > 0) finish(list);
-  };
+  }, [error, libraryOpen, shoot]);
 
   return (
     <div
@@ -290,6 +302,19 @@ export function ReceiptCamera({
         </button>
       </div>
 
+      {onManual ? (
+        <button
+          type="button"
+          onClick={() => {
+            stop();
+            onClose();
+            onManual();
+          }}
+          className="min-h-11 self-end rounded-full px-4 py-2 text-sm"
+        >
+          手で入力
+        </button>
+      ) : null}
       <div className="relative min-h-0 flex-1">
         {error === null ? (
           <video
@@ -329,28 +354,51 @@ export function ReceiptCamera({
         </p>
       </div>
 
+      <div className="flex items-center gap-2 overflow-x-auto px-4 pt-3">
+        <span className="shrink-0 text-xs">選択・撮影した写真</span>
+        {recentPhotos.slice(0, 3).map((photo) => (
+          <button
+            type="button"
+            key={photo.id}
+            aria-label={`${photo.file.name}を読み取る`}
+            className="min-h-11 w-12 shrink-0"
+            onClick={() => finish([photo.file])}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photo.url} alt="" className="size-11 rounded-md object-cover" />
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setLibraryOpen(true)}
+          className="min-h-11 ml-auto shrink-0 text-xs underline"
+        >
+          すべての写真
+        </button>
+      </div>
+      {libraryOpen ? (
+        <div className="absolute inset-0 z-10 overflow-y-auto bg-black p-4 pb-12">
+          <button type="button" onClick={() => setLibraryOpen(false)} className="min-h-11 px-3">
+            カメラに戻る
+          </button>
+          <h2 className="mb-4 text-lg font-semibold">写真から読み取る</h2>
+          <PhotoLibrary onFiles={finish} />
+        </div>
+      ) : null}
       <div className="flex items-center justify-between px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <label
-          className="flex size-12 cursor-pointer items-center justify-center rounded-full"
+        <button
+          type="button"
+          onClick={() => setLibraryOpen(true)}
+          className="flex min-h-11 size-12 items-center justify-center rounded-full"
           style={{ background: 'rgba(255,255,255,0.18)' }}
           aria-label="写真ライブラリから選ぶ"
         >
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              onLibrary(e.target.files);
-              e.target.value = '';
-            }}
-          />
           <MdPhotoLibrary aria-hidden size={24} />
-        </label>
+        </button>
         <button
           type="button"
           aria-label="シャッター"
-          disabled={error !== null}
+          disabled={error !== null || shooting}
           onClick={() => void shoot()}
           className="size-16 rounded-full border-4 disabled:opacity-30"
           style={{ borderColor: '#fff', background: 'rgba(255,255,255,0.35)' }}

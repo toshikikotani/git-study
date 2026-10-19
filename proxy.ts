@@ -65,6 +65,9 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = gate === 'to-login' ? '/login' : '/';
     url.search = '';
+    if (gate === 'to-login' && pathname === '/camera') url.searchParams.set('next', '/camera');
+    if (gate === 'to-home' && request.nextUrl.searchParams.get('next') === '/camera')
+      url.pathname = '/camera';
     return NextResponse.redirect(url);
   }
 

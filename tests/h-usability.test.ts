@@ -153,7 +153,7 @@ describe('H ウィジェット・ショートカット(代替の実装)', () => 
   it('マニフェストに、撮影を直接開くショートカットと手入力がある', () => {
     const m = manifest();
     const urls = (m.shortcuts ?? []).map((s) => s.url);
-    expect(urls).toContain('/spending?capture=1');
+    expect(urls).toContain('/camera');
     // 手入力は「記録する」のシートを開く(ADR-096)
     expect(urls).toContain('/spending?record=1');
     expect(m.display).toBe('standalone');
