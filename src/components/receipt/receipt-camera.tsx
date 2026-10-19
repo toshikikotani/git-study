@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { projectDocumentBox } from '@/features/import/document-preview';
 import './receipt-camera.css';
-import { PhotoLibrary } from './photo-library';
 import { rememberPhotos, useRecentPhotos } from '@/features/import/recent-photos';
 
 import {
@@ -20,16 +19,17 @@ import {
 } from '@/features/import/document-detect';
 
 /**
- * レシートの自動撮影(全画面のカメラ)。
+ * レシートの自動撮影(全画面のカメラ、デザイン v3-12、ADR-126)。
  *
  * 映像を縮小して輪郭を検出し(features/import/document-detect.ts)、レシートだと確かめられて
  * (紙の全体が枠の中・縦長・印字の行がいくつもある)、2秒ほぼ動かなかったときだけ自動でシャッターを
  * 切る。確かめられないものは自動では撮らない(シャッターで撮る)。自動はオフにもできる。
+ *   - 連続(既定):撮り続けられる(1枚ごとに読み取りは裏で進む)。最後に「完了」
  *   - 1枚:撮ったら閉じる
- *   - 連続:撮り続けられる(1枚ごとに読み取りは裏で進む)
  *   - 長いレシート:分けて撮った複数枚を縦に結合して1枚にする
- *   - ライブラリ:写真ライブラリから複数選択
- * カメラを使えない環境(権限拒否・非対応)では、ライブラリ選択に切り替える。
+ *   - すべての写真:端末の写真を選ぶ画面をすぐ開く(間に自前の画面を挟まない)
+ * カメラを使えない環境(権限拒否・非対応)では、写真から選べるようにする。
+ * 色はカメラらしく黒・白・灰色だけ(アプリのテーマの色を、映像の上には載せない)。
  */
 
 type Mode = 'single' | 'continuous' | 'long';
@@ -56,13 +56,16 @@ const COOLDOWN_MS = 1600;
 export function ReceiptCamera({
   onCapture,
   onClose,
-  initialMode = 'single',
+  onDone,
+  initialMode = 'continuous',
   onManual,
 }: {
   onCapture: (files: File[]) => void;
+  /** ✕で閉じたとき(撮った分の読み取りは裏で続く)。 */
   onClose: () => void;
+  /** 撮り終えたとき(「完了」・1枚で撮った・長いレシートをつなげた)。無ければ onClose。 */
+  onDone?: () => void;
   onManual?: () => void;
-  /** 最初のモード(撮影ボタンの長押しから「連続撮影」を選んだときは continuous)。 */
   initialMode?: 'single' | 'continuous' | 'long';
 }) {
   const isClient = useIsClient();
@@ -71,7 +74,7 @@ export function ReceiptCamera({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
   const recentPhotos = useRecentPhotos();
   const [shooting, setShooting] = useState(false);
   const shootingRef = useRef(false);
@@ -116,23 +119,32 @@ export function ReceiptCamera({
     };
   }, [isClient]);
 
-  useEffect(() => {
-    if (!libraryOpen) return;
-    const previousFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialogRef.current?.querySelector<HTMLButtonElement>('.receipt-camera__library-back')?.focus();
-    return () => {
-      if (previousFocus?.isConnected) previousFocus.focus();
-    };
-  }, [libraryOpen]);
+  const done = useCallback(() => {
+    stop();
+    (onDone ?? onClose)();
+  }, [onClose, onDone, stop]);
 
   const finish = useCallback(
     (files: File[]) => {
-      stop();
       onCapture(files);
-      onClose();
+      done();
     },
-    [onCapture, onClose, stop],
+    [done, onCapture],
+  );
+
+  /** 端末の写真から選んだもの。撮ったものと同じく読み取りへ回す。 */
+  const pick = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+      rememberPhotos(files);
+      if (modeRef.current === 'single') {
+        finish(files);
+        return;
+      }
+      onCapture(files);
+      setCount((c) => c + files.length);
+    },
+    [finish, onCapture],
   );
 
   const grabFrame = useCallback(async (): Promise<Blob | null> => {
@@ -227,7 +239,7 @@ export function ReceiptCamera({
       .catch(() => {
         if (!cancelled) {
           setError(
-            'カメラを開けませんでした(権限を確認してください)。写真ライブラリから選べます。',
+            'カメラを開けませんでした(カメラの利用を許可してください)。写真から選ぶこともできます。',
           );
         }
       });
@@ -239,7 +251,7 @@ export function ReceiptCamera({
 
   // 輪郭の検出と自動撮影。
   useEffect(() => {
-    if (error !== null || libraryOpen || settingsOpen) return;
+    if (error !== null || settingsOpen) return;
     const canvas = document.createElement('canvas');
     const timer = window.setInterval(() => {
       const video = videoRef.current;
@@ -269,12 +281,12 @@ export function ReceiptCamera({
       if (stable && Date.now() - lastCaptureRef.current > COOLDOWN_MS) void shoot();
     }, SAMPLE_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [error, libraryOpen, settingsOpen, shoot]);
+  }, [error, settingsOpen, shoot]);
 
   const projected = box ? projectDocumentBox(box, videoSize, viewport) : null;
   const capturedCount = mode === 'long' ? parts.length : count;
   const status = error
-    ? '写真からも読み取れます'
+    ? '写真から選んで読み取れます'
     : capturedCount > 0
       ? `${capturedCount}枚 撮りました · 次のレシートをどうぞ`
       : guidance({ box, assessment, auto, progress });
@@ -282,27 +294,25 @@ export function ReceiptCamera({
     stop();
     onClose();
   };
+  const openPhotos = () => photoInput.current?.click();
   const content = (
     <div
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label="レシートを撮影"
+      aria-label="レシートを撮る"
       className="receipt-camera"
       data-no-pull
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
-          if (libraryOpen) setLibraryOpen(false);
-          else if (settingsOpen) setSettingsOpen(false);
+          if (settingsOpen) setSettingsOpen(false);
           else close();
         }
         if (event.key !== 'Tab') return;
         const focusable = Array.from(
-          event.currentTarget.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), input:not(:disabled), a[href]',
-          ),
-        ).filter((element) => !element.closest('[inert]'));
+          event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled)'),
+        );
         const first = focusable[0];
         const last = focusable.at(-1);
         if (event.shiftKey && document.activeElement === first) {
@@ -314,7 +324,21 @@ export function ReceiptCamera({
         }
       }}
     >
-      <div className="receipt-camera__preview" ref={previewRef} inert={libraryOpen}>
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/*"
+        multiple
+        className="sr-only"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = '';
+          pick(files);
+        }}
+      />
+      <div className="receipt-camera__preview" ref={previewRef}>
         <video
           ref={videoRef}
           playsInline
@@ -334,56 +358,55 @@ export function ReceiptCamera({
             type="button"
             aria-label="閉じる"
             onClick={close}
-            className="min-h-[44px] receipt-camera__round-button"
+            className="min-h-11 receipt-camera__round-button"
           >
-            <MdClose aria-hidden size={22} />
+            <MdClose aria-hidden size={20} />
           </button>
-          <button
-            type="button"
-            aria-label="撮影設定"
-            aria-expanded={settingsOpen}
-            aria-controls="receipt-camera-settings"
-            onClick={() => setSettingsOpen((value) => !value)}
-            className="min-h-[44px] receipt-camera__round-button receipt-camera__settings-trigger"
-          >
-            <MdMoreHoriz aria-hidden size={24} />
-          </button>
-          {onManual ? (
+          <div className="receipt-camera__header-end">
             <button
               type="button"
-              onClick={() => {
-                close();
-                onManual();
-              }}
-              className="min-h-[44px] receipt-camera__manual"
+              aria-label="撮影の設定"
+              aria-expanded={settingsOpen}
+              aria-controls="receipt-camera-settings"
+              onClick={() => setSettingsOpen((value) => !value)}
+              className="min-h-11 receipt-camera__round-button"
             >
-              手で入力
+              <MdMoreHoriz aria-hidden size={22} />
             </button>
-          ) : (
-            <span className="receipt-camera__header-spacer" />
-          )}
+            {onManual ? (
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  onManual();
+                }}
+                className="min-h-11 receipt-camera__pill"
+              >
+                手で入力
+              </button>
+            ) : null}
+          </div>
         </header>
         {settingsOpen ? (
           <section
             className="receipt-camera__settings"
             id="receipt-camera-settings"
-            aria-label="撮影設定"
+            aria-label="撮影の設定"
           >
-            <h2>撮影設定</h2>
-            <div role="radiogroup" aria-label="撮影モード" className="receipt-camera__modes">
+            <div role="radiogroup" aria-label="撮り方" className="receipt-camera__modes">
               {MODES.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   role="radio"
                   aria-checked={mode === option.value}
+                  className="min-h-11"
                   onClick={() => {
                     setMode(option.value);
                     modeRef.current = option.value;
                     partsRef.current = [];
                     setParts([]);
                   }}
-                  className="min-h-[44px]"
                 >
                   {option.label}
                 </button>
@@ -393,7 +416,6 @@ export function ReceiptCamera({
               type="button"
               role="switch"
               aria-checked={auto}
-              aria-label="レシートと確かめられたら自動で撮る"
               onClick={() => {
                 const next = !auto;
                 setAuto(next);
@@ -406,16 +428,9 @@ export function ReceiptCamera({
                   /* この撮影の間は切り替える */
                 }
               }}
-              className="min-h-[44px] receipt-camera__auto"
+              className="min-h-11 receipt-camera__auto"
             >
-              自動撮影<span>{auto ? 'オン' : 'オフ'}</span>
-            </button>
-            <button
-              type="button"
-              className="min-h-[44px] receipt-camera__settings-done"
-              onClick={() => setSettingsOpen(false)}
-            >
-              設定を閉じる
+              かざしたら自動で撮る<span>{auto ? 'オン' : 'オフ'}</span>
             </button>
           </section>
         ) : null}
@@ -423,8 +438,8 @@ export function ReceiptCamera({
           <div className="receipt-camera__error">
             <MdPhotoLibrary aria-hidden size={32} />
             <p>{error}</p>
-            <button type="button" onClick={() => setLibraryOpen(true)} className="min-h-[44px]">
-              写真から読み取る
+            <button type="button" onClick={openPhotos} className="min-h-11 receipt-camera__pill">
+              写真から選ぶ
             </button>
           </div>
         ) : (
@@ -453,89 +468,55 @@ export function ReceiptCamera({
           <span>{status}</span>
         </div>
       </div>
-      <footer className="receipt-camera__controls" inert={libraryOpen}>
+      <footer className="receipt-camera__controls">
+        {/* Web からは端末の最近の写真を並べられないため、「すべての写真」のボタンだけを出す
+            (デザインの注記どおり)。押すと端末の写真を選ぶ画面がすぐ開く。 */}
         <div className="receipt-camera__photos">
-          <span className="receipt-camera__recent-label">最近の写真</span>
-          <div className="receipt-camera__thumbnails" aria-label="このタブで選択・撮影した写真">
-            {recentPhotos.slice(0, 3).map((photo) => (
-              <button
-                type="button"
-                key={photo.id}
-                aria-label={`${photo.file.name}を写真一覧で開く`}
-                onClick={() => setLibraryOpen(true)}
-                className="min-h-[44px]"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.url} alt="" />
-              </button>
-            ))}
-            {recentPhotos.length === 0 ? (
-              <span className="receipt-camera__empty-photos">写真を選べます</span>
-            ) : null}
-          </div>
           <button
             type="button"
-            className="min-h-[44px] receipt-camera__all-photos"
-            onClick={() => setLibraryOpen(true)}
+            className="min-h-11 receipt-camera__all-photos"
+            onClick={openPhotos}
           >
+            <MdPhotoLibrary aria-hidden size={18} />
             すべての写真
           </button>
         </div>
         <div className="receipt-camera__actions">
-          <button
-            type="button"
-            onClick={() => setLibraryOpen(true)}
-            className="min-h-[44px] receipt-camera__album"
-            aria-label="写真ライブラリから選ぶ"
-          >
-            {recentPhotos[0] ? (
+          <span className="receipt-camera__stack" aria-hidden={capturedCount === 0}>
+            {capturedCount > 0 && recentPhotos[0] ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={recentPhotos[0].url} alt="" />
+                <span className="receipt-camera__count">{capturedCount}</span>
               </>
-            ) : (
-              <MdPhotoLibrary aria-hidden size={25} />
-            )}
-            {capturedCount > 0 ? (
-              <span className="receipt-camera__count">{capturedCount}</span>
             ) : null}
-          </button>
+          </span>
           <button
             type="button"
-            aria-label="シャッター"
+            aria-label="撮る"
             disabled={error !== null || shooting}
             onClick={() => void shoot()}
-            className="min-h-[44px] receipt-camera__shutter"
-          />
+            className="min-h-11 receipt-camera__shutter"
+          >
+            <span aria-hidden />
+          </button>
           <button
             type="button"
             disabled={mode === 'long' && parts.length === 0}
             onClick={() => {
               if (mode === 'long') void finishLong();
+              else if (capturedCount > 0) done();
               else close();
             }}
-            className="min-h-[44px] receipt-camera__done"
+            className={`min-h-11 receipt-camera__done${capturedCount > 0 ? ' is-ready' : ''}`}
           >
             {mode === 'long' ? 'つなげる' : '完了'}
           </button>
         </div>
         <p className="receipt-camera__hint">
-          {auto ? 'かざすと自動で撮れます。続けて何枚でも。' : 'シャッターを押して撮影します。'}
+          {auto ? 'かざすと自動で撮れます。続けて何枚でも。' : 'シャッターを押して撮ります。'}
         </p>
       </footer>
-      {libraryOpen ? (
-        <section className="receipt-camera__library" aria-label="写真から読み取る">
-          <button
-            type="button"
-            onClick={() => setLibraryOpen(false)}
-            className="min-h-[44px] receipt-camera__library-back"
-          >
-            ‹ カメラに戻る
-          </button>
-          <h2>写真から読み取る</h2>
-          <PhotoLibrary onFiles={finish} />
-        </section>
-      ) : null}
     </div>
   );
   return isClient ? createPortal(content, document.body) : null;

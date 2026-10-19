@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -215,10 +215,18 @@ function BottomBar({
       createLongPress({
         onLongPress: () => {
           if (readReceiptQuickAction() === 'manual') onOpenRecord();
-          else router.push('/camera');
+          else setCameraOpen(true);
         },
       }),
-    [onOpenRecord, router],
+    [onOpenRecord],
+  );
+  // 写真から選んだ・撮り終えたレシートは、読み取り結果の画面で確かめる(デザイン v3-13)。
+  const readFiles = useCallback(
+    (files: File[]) => {
+      enqueueReceiptFiles(files);
+      router.push('/transactions/receipt');
+    },
+    [router],
   );
   useEffect(() => () => longPress.end(), [longPress]);
   const reading = countReading(jobs);
@@ -235,8 +243,8 @@ function BottomBar({
       setCameraOpen(true);
     }
   }, []);
-  // 右の＋は、押すと「記録する」のシートを開く(デザイン仕様書、ADR-090:撮る・写真から・手で入力)。
-  // タップはメニュー、長押しは保存された設定に従ってカメラか手入力を直接開く。
+  // 右の＋は、押すと「撮る・写真から・手で記録する」のメニュー(デザイン v3-11、ADR-125 → 126)。
+  // 長押しは、設定に従ってカメラか手入力をすぐ開く。カメラはこの場で開く(画面を移らない)。
   const fab = (
     <Fab
       label="記録する"
@@ -279,14 +287,20 @@ function BottomBar({
       ) : null}
       {cameraOpen ? (
         <ReceiptCamera
-          initialMode="single"
           onCapture={(files) => enqueueReceiptFiles(files)}
           onClose={() => setCameraOpen(false)}
+          onDone={() => {
+            setCameraOpen(false);
+            router.push('/transactions/receipt');
+          }}
+          onManual={() => onOpenRecord()}
         />
       ) : null}
       <ReceiptEntryMenu
         open={entryMenuOpen}
         onClose={() => setEntryMenuOpen(false)}
+        onCamera={() => setCameraOpen(true)}
+        onFiles={readFiles}
         onManual={() => onOpenRecord()}
       />
       <BottomSheet
@@ -299,6 +313,14 @@ function BottomBar({
         <RecordSheet
           key={record?.openId ?? 0}
           onClose={() => setFabMenuOpen(false)}
+          onCamera={() => {
+            setFabMenuOpen(false);
+            setCameraOpen(true);
+          }}
+          onFiles={(files) => {
+            setFabMenuOpen(false);
+            readFiles(files);
+          }}
           initialDate={record?.date}
           initialKind={record?.kind}
           initialError={record?.error}
@@ -346,14 +368,7 @@ function BottomBar({
           </ul>
         </nav>
         <div
-          className="shrink-0 rounded-full"
-          style={
-            {
-              '--action': '#a27bff',
-              '--on-action': '#170b2a',
-              boxShadow: '0 0 0 6px rgba(162,123,255,0.19)',
-            } as CSSProperties
-          }
+          className="shrink-0"
           onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
           onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
           onPointerUp={longPress.end}
