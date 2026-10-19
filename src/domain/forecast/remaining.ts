@@ -23,6 +23,7 @@ export function remainingOfTotal(forecast: Forecast): RemainingForecast {
       highYen: p.p90,
       innerLowYen: p.p25,
       innerHighYen: p.p75,
+      ...(p.density ? { density: p.density } : {}),
     })),
     profile: forecast.typicalProfile,
   };

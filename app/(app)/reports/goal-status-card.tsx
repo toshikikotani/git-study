@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { formatEstimate, formatEstimateRange, formatProbability } from '@/domain/forecast/format';
 import { formatYen } from '@/domain/money';
 import type { CumulativeDay } from '@/features/category/pace';
+import { ForecastDensity } from './forecast-density';
 
 /** いまの状況の材料(目標の期間の確率予測)。 */
 export type GoalStatus = {
@@ -19,6 +20,8 @@ export type GoalStatus = {
   days: readonly CumulativeDay[];
   /** 今日までの使った額。 */
   spentYen: number;
+  /** 本人の完了月が少なく、確率の検証が十分ではない。 */
+  provisional?: boolean;
 };
 
 /** 2026-10-16 → 10/16 */
@@ -61,7 +64,11 @@ export function GoalStatusCard({
   const perDay = remainingDays > 0 ? Math.round(leftYen / remainingDays) : null;
   const caution = status.probWithin !== null && status.probWithin < 0.5;
   const range = formatEstimateRange(status.p10, status.p90);
-  const spoken = `使った額は${formatYen(status.spentYen, { sign: 'never' })}。${endLabel}には${formatEstimate(status.p50)}の見込みで、10回中8回は${range}の間。目標${formatEstimate(status.budgetYen, { approx: false })}を${overYen > 0 ? 'こえそう' : '下回りそう'}。`;
+  const densityDays = status.days.filter((day) => day.forecastYen !== null);
+  const hasDensity =
+    densityDays.length > 0 && densityDays.every((day) => (day.forecastDensity?.length ?? 0) > 0);
+  const densityNote = '同じ日の中で、濃いところほど予測が多い';
+  const spoken = `使った額は${formatYen(status.spentYen, { sign: 'never' })}。${endLabel}には${formatEstimate(status.p50)}の見込みで、10回中8回は${range}の間。目標${formatEstimate(status.budgetYen, { approx: false })}を${overYen > 0 ? 'こえそう' : '下回りそう'}。${hasDensity ? `${densityNote}。` : ''}${status.provisional ? '記録が少ないため、確率は目安です。' : ''}`;
   const speak = () => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setNote('この環境では読み上げできません。');
@@ -168,6 +175,27 @@ export function GoalStatusCard({
           目標までの理想
         </Legend>
       </div>
+      {hasDensity ? (
+        <p
+          className="mt-2 flex items-center gap-2 text-[12px]"
+          style={{ color: 'var(--ink-secondary)' }}
+        >
+          <span
+            aria-hidden="true"
+            className="h-3 w-8 shrink-0 rounded-sm"
+            style={{
+              background:
+                'linear-gradient(to right, transparent, color-mix(in srgb, var(--caution-mark) 70%, transparent))',
+            }}
+          />
+          {densityNote}
+        </p>
+      ) : null}
+      {status.provisional ? (
+        <p className="mt-2 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+          記録が少ないため、確率は目安です。
+        </p>
+      ) : null}
       <p
         className="tabular mt-4 rounded-xl px-4 py-3 text-[14px] leading-relaxed"
         style={{ background: 'var(--note)', color: 'var(--ink-secondary)' }}
@@ -254,6 +282,8 @@ function CumulativeSvg({ data, label }: { data: GoalStatus; label: string }) {
   const future = days.filter((d) => d.index > last && d.forecastYen !== null);
   // 10回中8回の幅:今日の点から広がる帯。上下の縁に細い線を引き、帯の形がわかるようにする。
   const bandRows = future.filter((d) => d.forecastLowYen !== null && d.forecastHighYen !== null);
+  const hasDensity =
+    bandRows.length > 0 && bandRows.every((day) => (day.forecastDensity?.length ?? 0) > 0);
   const upperPts = bandRows.map((d) => pt(d.index, d.forecastHighYen as number));
   const lowerPts = bandRows.map((d) => pt(d.index, d.forecastLowYen as number));
   const outer =
@@ -305,7 +335,20 @@ function CumulativeSvg({ data, label }: { data: GoalStatus; label: string }) {
     >
       <line x1={X0} y1={bottom} x2={X1} y2={bottom} stroke="var(--bar-quiet)" strokeWidth="1" />
       {outer ? (
-        <path data-band="outer" d={outer} fill="var(--band-outer)" fillOpacity="0.75" />
+        <path
+          data-band="outer"
+          d={outer}
+          fill={hasDensity ? 'none' : 'var(--band-outer)'}
+          fillOpacity="0.75"
+        />
+      ) : null}
+      {hasDensity ? (
+        <ForecastDensity
+          rows={bandRows}
+          x={x}
+          y={y}
+          origin={{ x: last >= 0 ? x(last) : x(0), yen: nowYen }}
+        />
       ) : null}
       {edges.map((d) => (
         <path

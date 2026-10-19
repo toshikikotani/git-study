@@ -20,6 +20,7 @@ import { recordedShare } from './lag';
 import { dayFeature, DEFAULT_MONTH_LEVEL_K, rateFactor } from './model';
 import { rawLevelFor, type PitCalibration } from './pit';
 import { forecastDistribution, probabilityAt, trialProbability } from './distribution';
+import { pathDensity } from './path-density';
 import {
   createRng,
   pickOne,
@@ -764,6 +765,10 @@ export function simulateForecast(input: SimulateInput): Forecast {
         p50: band.p50,
         p75: Math.min(band.p90, Math.max(band.p50, Math.round(quantileAt(column, inner.p75)))),
         p90: band.p90,
+        density: pathDensity(forecastDistribution(column, cal), {
+          lowYen: band.p10,
+          highYen: band.p90,
+        }),
       });
     }
     // 最終日は着地と同じ数字にそろえる(丸めの差も残さない)。
@@ -782,6 +787,15 @@ export function simulateForecast(input: SimulateInput): Forecast {
       last.p90 = Math.max(0, total.p90 - input.actualYen);
       last.p25 = Math.min(last.p25, last.p50);
       last.p75 = Math.min(last.p75, last.p90);
+      // 最終日の濃淡も見出し・分布と同じ合計試行を使う(増分との丸め直しの差を残さない)。
+      last.density = pathDensity(distribution, {
+        lowYen: total.p10,
+        highYen: total.p90,
+      }).map((bin) => ({
+        ...bin,
+        lowYen: bin.lowYen - input.actualYen,
+        highYen: bin.highYen - input.actualYen,
+      }));
     }
   }
 
