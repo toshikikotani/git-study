@@ -105,8 +105,8 @@ describe('割り勘の文面を確認してコピーする', () => {
       entries: buildSplitPaymentRequest(transactions, 3).entries,
       participants: 3,
     });
-    expect(html()).toContain('ホームの受取待ちに追加しました');
-    expect(html()).toContain('ホームで受取を確認');
+    expect(html()).toContain('今日の画面の受取待ちに追加しました');
+    expect(html()).toContain('今日の画面で受取を確認');
     expect(state.refresh).toHaveBeenCalled();
   });
 
@@ -115,18 +115,18 @@ describe('割り勘の文面を確認してコピーする', () => {
     await button('コピー').onClick!();
     expect(html()).toContain('コピーしました');
     expect(html()).toContain('文面はコピー済みです');
-    expect(html()).not.toContain('ホームの受取待ちに追加しました');
-    await button('ホームへの追加を再試行').onClick!();
+    expect(html()).not.toContain('今日の画面の受取待ちに追加しました');
+    await button('今日の画面への追加を再試行').onClick!();
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(state.save).toHaveBeenCalledTimes(2);
-    expect(html()).toContain('ホームの受取待ちに追加しました');
+    expect(html()).toContain('今日の画面の受取待ちに追加しました');
   });
 
   it('手動コピーを使う人も受取待ちへ追加できる', async () => {
     await button('受取待ちに追加').onClick!();
     expect(writeText).not.toHaveBeenCalled();
     expect(state.save).toHaveBeenCalledTimes(1);
-    expect(html()).toContain('ホームの受取待ちに追加しました');
+    expect(html()).toContain('今日の画面の受取待ちに追加しました');
   });
 
   it('ブラウザ保存が失敗したらホームへの追加成功を表示しない', async () => {
@@ -142,7 +142,7 @@ describe('割り勘の文面を確認してコピーする', () => {
     await button('コピー').onClick!();
     expect(html()).toContain('保存容量がいっぱいです');
     expect(html()).toContain('文面はコピー済みです');
-    expect(html()).not.toContain('ホームの受取待ちに追加しました');
+    expect(html()).not.toContain('今日の画面の受取待ちに追加しました');
   });
   it('初期値は自分を含む2人で、明示的に押してから全文のコピー成功を知らせる', async () => {
     expect(input().value).toBe('2');

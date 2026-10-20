@@ -102,7 +102,7 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
       monthKey: row.monthKey,
       wasteRatio: wasteRatioOf(row),
     })),
-    savings: savingsForReport(home.savings),
+    savings: savingsForReport(home.savings, settings?.monthlySavingsTargetYen ?? 0),
     forecast: forecast === null ? null : forecastSummary(forecast.forecast),
     evidence: {
       ...evidence,
@@ -114,9 +114,13 @@ export async function loadMonthlyReportInput(now: Date = new Date()): Promise<Mo
   };
 }
 
-function savingsForReport(savings: SavingsSummary): MonthlyReportInput['savings'] {
+function savingsForReport(
+  savings: SavingsSummary,
+  monthlyTargetYen: number,
+): MonthlyReportInput['savings'] {
   const next = nextGoal(savings.goals);
   return {
+    monthlyTargetYen,
     totalYen: savings.totalYen,
     thisMonthYen: savings.thisMonthYen,
     paceYen: savings.paceYen,

@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { BackLink } from '@/components/ui/back-header';
 import { loadCategorySettings } from '@/features/category/settings-loader';
 import { SettingsBody } from './settings-body';
 
@@ -16,13 +16,7 @@ export default async function CategorySettingsPage({
   if (data === null) notFound();
   return (
     <div className="rise space-y-4">
-      <Link
-        href="/settings/categories"
-        className="inline-flex min-h-11 items-center text-sm font-semibold"
-        style={{ color: 'var(--ink-secondary)' }}
-      >
-        ‹ カテゴリ
-      </Link>
+      <BackLink back={{ href: '/settings/categories', label: 'カテゴリ' }} />
       <div
         className="glass rounded-[28px] p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}

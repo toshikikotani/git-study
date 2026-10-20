@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { BackHeader } from '@/components/ui/back-header';
+import type { BackTarget } from '@/lib/back-target';
 import { genreSwatch } from '@/domain/genre-style';
 import { similarCategories } from '@/domain/genre-similarity';
 import { hapticFor } from '@/lib/haptics';
@@ -24,7 +25,13 @@ type Category = { id: string; name: string };
  * 見え、名前とスイッチを押し間違えやすく、月ごとに入れ替える手間も要った(本人の指摘)。ホームの
  * 「気をつけたいカテゴリ」はいまは自動で選ぶ(ADR-117)。
  */
-export function CategoryList({ categories }: { categories: readonly Category[] }) {
+export function CategoryList({
+  categories,
+  back,
+}: {
+  categories: readonly Category[];
+  back: BackTarget;
+}) {
   const [items, setItems] = useState<readonly Category[]>(categories);
   // 保存のあとはサーバーから新しい一覧が届く(アクションの返事に画面の作り直しが入る)。届いたら入れ替える。
   const [source, setSource] = useState(categories);
@@ -103,7 +110,7 @@ export function CategoryList({ categories }: { categories: readonly Category[] }
   return (
     <>
       <BackHeader
-        back={{ href: '/plan/edit', label: '目標' }}
+        back={back}
         title="カテゴリ"
         sub="名前をタップすると、アイコン・色・目標額・固定費を変えられます。"
         action={

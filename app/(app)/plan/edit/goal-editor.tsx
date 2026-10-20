@@ -499,7 +499,10 @@ export function GoalEditor({
           <UnrecordedSheet planId={planId} rows={noBudget} addable={addable} />
         )}
         <Divider />
-        <Link href="/settings/categories" className="flex min-h-13 items-center gap-2 px-4">
+        <Link
+          href="/settings/categories?from=/plan/edit"
+          className="flex min-h-13 items-center gap-2 px-4"
+        >
           <span className="flex-1 text-[16px]">カテゴリの設定</span>
           <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
             名前・色・並び順

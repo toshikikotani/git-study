@@ -40,9 +40,12 @@ describe('ログアウト', () => {
     expect(deleted).toEqual(['sb-abc-auth-token.0', 'sb-abc-auth-token.1']);
   });
 
-  it('メニューの一番下に、押せる大きさ(44pt)のログアウトのボタンがある', async () => {
+  it('設定の画面の一番下に、押せる大きさ(44pt)のログアウトのボタンがある', async () => {
     const { readFileSync } = await import('node:fs');
-    const menu = readFileSync('src/components/ui/more-menu.tsx', 'utf8');
+    const menu = readFileSync('app/(app)/settings/sign-out-button.tsx', 'utf8');
+    expect(readFileSync('app/(app)/settings/page.tsx', 'utf8')).toMatch(
+      /<SignOutButton \/>\s*<\/div>\s*\);\s*\}/,
+    );
     expect(menu).toContain('action={signOutAction}');
     expect(menu).toMatch(/min-h-11[^"]*"[\s\S]{0,200}ログアウト/);
   });

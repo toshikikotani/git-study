@@ -1,32 +1,6 @@
-import { resolvePaydayChecklistState } from '@/features/transfer-runs/store';
-import { todayJst } from '@/lib/date';
-import { PaydayAmountForm, PaydayChecklist } from './checklist';
+import { redirect } from 'next/navigation';
 
-/**
- * 給料日は入金額だけを聞く。振替ルール(貯金へ・投資へ等)は使わない。
- */
-
-export const dynamic = 'force-dynamic';
-
-export default async function PaydayPage() {
-  const checklistState = await resolvePaydayChecklistState(todayJst());
-
-  return (
-    <div className="rise space-y-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          給料日
-        </h1>
-      </header>
-      {checklistState.kind === 'needs_amount' ? (
-        <PaydayAmountForm paydayOn={checklistState.paydayOn} />
-      ) : checklistState.kind === 'checklist' ? (
-        <PaydayChecklist run={checklistState.run} />
-      ) : (
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          給料日になったら、入った額だけ入れます。
-        </p>
-      )}
-    </div>
-  );
+/** 古いリンクの受け皿:給料日は、今日の画面のカード(給料日)と設定から開くシートにした(ADR-127)。 */
+export default function PaydayPage() {
+  redirect('/settings');
 }

@@ -40,7 +40,7 @@ const loadHomeRecords = cache(async () => {
 });
 
 /**
- * ホームの「これからの支払い」(デザイン v3-1、ADR-108):明日から31日先までの予定を近い順に3件。
+ * 今日の画面の「予定と固定費」(デザイン v3-1、ADR-108。名前は ADR-127 でそろえた):明日から31日先までの予定を近い順に3件。
  * 「予定と固定費をすべて見る」でその画面へ。
  */
 export async function UpcomingPayments() {
@@ -59,7 +59,7 @@ export async function UpcomingPayments() {
         className="px-1 pt-3 text-[22px] font-bold"
         style={{ color: 'var(--ink)' }}
       >
-        これからの支払い
+        予定と固定費
       </h2>
       <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {upcoming.length === 0 ? (
@@ -113,7 +113,7 @@ export async function UpcomingPayments() {
           className="flex min-h-12 items-center justify-between px-4 text-[15px] font-semibold"
           style={{ color: 'var(--accent)', borderTop: '1px solid var(--hairline)' }}
         >
-          予定と固定費をすべて見る
+          すべて見る
           <ChevronRightIcon />
         </Link>
       </div>

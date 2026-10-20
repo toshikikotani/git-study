@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { updateMonthlySavingsTargetAction } from './actions';
 
 /**
- * 毎月の貯金目標(ADR-108)。ホームの貯金カードとAIの窓口が見る値を、ここで決める・直す(1か所で管理)。
+ * * 貯金目標の毎月の額(ADR-108 → 127)。今日の画面の貯金カードとAIの窓口が見る値を、ここで決める・直す
+ * (1か所で管理)。
  */
 export function MonthlyTarget({ initialYen }: { initialYen: number }) {
   const [value, setValue] = useState(initialYen > 0 ? initialYen.toLocaleString('ja-JP') : '');
@@ -27,16 +28,10 @@ export function MonthlyTarget({ initialYen }: { initialYen: number }) {
   };
 
   return (
-    <section
-      aria-labelledby="monthly-target"
-      className="flex flex-col gap-2 rounded-[22px] px-4 py-4"
-      style={{ background: 'var(--surface)', color: 'var(--ink)' }}
-    >
-      <h2 id="monthly-target" className="text-[17px] font-semibold">
-        毎月の貯金目標
-      </h2>
+    <div className="flex flex-col gap-2">
+      <p className="text-[15px] font-medium">毎月</p>
       <p className="text-[13px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
-        ホームの「貯金」とAIは、この額で月末の見込みと比べます。0円にすると決めていない扱いです。
+        今日の「貯金」とAIは、この額で月末の見込みと比べます。0円にすると決めていない扱いです。
       </p>
       <div className="flex items-center gap-2">
         <label
@@ -73,6 +68,6 @@ export function MonthlyTarget({ initialYen }: { initialYen: number }) {
           {error}
         </p>
       ) : null}
-    </section>
+    </div>
   );
 }

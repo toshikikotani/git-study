@@ -1,5 +1,6 @@
 'use client';
 
+import { SettingsLink } from '@/components/ui/settings-link';
 import { addMonths, nthDayOfMonth, splitDateOnly } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -27,7 +28,7 @@ function Chevron({ d }: { d: string }) {
 
 /**
  * 見出しと月の切り替え(デザイン仕様書の「明細」「分析」、ADR-090):左に大きな見出し、右に
- * ‹ 10月 › の白い丸い切り替え。合計・カレンダー・明細・カテゴリがすべてこの月に連動する。
+ * ‹ 10月 › の白い丸い切り替えと設定の歯車(ADR-127)。合計・カレンダー・明細・カテゴリがすべてこの月に連動する。
  */
 export function PeriodSwitcher({ title = '明細' }: { title?: string }) {
   const { visibleMonth, currentMonthStart, today, isCurrentMonth, goToMonth } = useSpendingMonth();
@@ -56,40 +57,43 @@ export function PeriodSwitcher({ title = '明細' }: { title?: string }) {
           </button>
         ) : null}
       </div>
-      <div
-        role="group"
-        aria-label="表示する月"
-        className="flex h-11 items-center rounded-full"
-        style={{ background: 'var(--surface)' }}
-      >
-        <button
-          type="button"
-          aria-label="前の月"
-          className="flex size-11 min-h-11 items-center justify-center disabled:opacity-30"
-          style={{ color: 'var(--ink-secondary)' }}
-          disabled={prev < earliest}
-          onClick={() => goToMonth(prev)}
+      <div className="flex items-center gap-2">
+        <div
+          role="group"
+          aria-label="表示する月"
+          className="flex h-11 items-center rounded-full"
+          style={{ background: 'var(--surface)' }}
         >
-          <Chevron d="M15 5l-7 7 7 7" />
-        </button>
-        <span
-          aria-live="polite"
-          className="tabular min-w-11 text-center text-[15px] font-semibold"
-          style={{ color: 'var(--ink)' }}
-        >
-          {yearPrefix}
-          {month}月
-        </span>
-        <button
-          type="button"
-          aria-label="次の月"
-          className="flex size-11 min-h-11 items-center justify-center disabled:opacity-30"
-          style={{ color: 'var(--ink-secondary)' }}
-          disabled={next > latest}
-          onClick={() => goToMonth(next)}
-        >
-          <Chevron d="M9 5l7 7-7 7" />
-        </button>
+          <button
+            type="button"
+            aria-label="前の月"
+            className="flex size-11 min-h-11 items-center justify-center disabled:opacity-30"
+            style={{ color: 'var(--ink-secondary)' }}
+            disabled={prev < earliest}
+            onClick={() => goToMonth(prev)}
+          >
+            <Chevron d="M15 5l-7 7 7 7" />
+          </button>
+          <span
+            aria-live="polite"
+            className="tabular min-w-11 text-center text-[15px] font-semibold"
+            style={{ color: 'var(--ink)' }}
+          >
+            {yearPrefix}
+            {month}月
+          </span>
+          <button
+            type="button"
+            aria-label="次の月"
+            className="flex size-11 min-h-11 items-center justify-center disabled:opacity-30"
+            style={{ color: 'var(--ink-secondary)' }}
+            disabled={next > latest}
+            onClick={() => goToMonth(next)}
+          >
+            <Chevron d="M9 5l7 7-7 7" />
+          </button>
+        </div>
+        <SettingsLink />
       </div>
     </header>
   );

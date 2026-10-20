@@ -63,7 +63,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
         participants: snapshot.participants,
       });
       if (result.error || !result.userId || !result.request) {
-        throw new Error(result.error ?? 'ホームへの追加を確認できませんでした。');
+        throw new Error(result.error ?? '今日の画面への追加を確認できませんでした。');
       }
       const saved =
         result.storage === 'browser'
@@ -81,7 +81,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
         message:
           cause instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(cause.message)
             ? cause.message
-            : 'ホームに追加できませんでした。もう一度お試しください。',
+            : '今日の画面に追加できませんでした。もう一度お試しください。',
       });
     } finally {
       savingRef.current = false;
@@ -249,7 +249,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
                 <p role="status">
                   {tracked.complete
                     ? 'この請求は受取済みとして保存されています。'
-                    : 'ホームの受取待ちに追加しました。'}
+                    : '今日の画面の受取待ちに追加しました。'}
                 </p>
                 {tracked.storage === 'browser' ? (
                   <p style={{ color: 'var(--ink-muted)' }}>このブラウザに保存されています。</p>
@@ -259,7 +259,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
                   className="inline-flex min-h-11 items-center font-semibold"
                   style={{ color: 'var(--accent)' }}
                 >
-                  ホームで受取を確認 →
+                  今日の画面で受取を確認 →
                 </Link>
               </div>
             ) : (
@@ -273,7 +273,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
                 {saving
                   ? '追加しています…'
                   : trackingError?.text === request.message
-                    ? 'ホームへの追加を再試行'
+                    ? '今日の画面への追加を再試行'
                     : '受取待ちに追加'}
               </button>
             )}

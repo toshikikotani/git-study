@@ -28,9 +28,14 @@ describe('設定 > カテゴリ', () => {
           { id: 'dining', name: '外食' },
           { id: 'cafe', name: 'カフェ' },
         ],
+        back: { href: '/settings', label: '設定' },
       }),
     ),
   );
+
+  it('設定から開くので「‹ 設定」で戻る(ADR-127)', () => {
+    expect(html).toMatch(/href="\/settings"[^>]*>[\s\S]{0,400}設定<\/a>/);
+  });
 
   it('行を開くと、そのカテゴリの設定ページへ行く', () => {
     expect(html).toContain('href="/settings/categories/dining"');

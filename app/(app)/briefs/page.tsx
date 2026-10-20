@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { BackHeader } from '@/components/ui/back-header';
 import { requireOwner } from '@/features/auth/owner';
 
 import { Card } from '@/components/ui/card';
@@ -23,11 +24,7 @@ export default async function BriefsPage() {
 
   return (
     <div className="rise space-y-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          朝配信
-        </h1>
-      </header>
+      <BackHeader back={{ href: '/settings', label: '設定' }} title="朝配信" />
 
       {briefs.length === 0 ? (
         <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

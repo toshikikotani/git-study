@@ -1,19 +1,18 @@
 import Link from 'next/link';
 
-import { MoreMenu } from '@/components/ui/more-menu';
+import { SettingsLink } from '@/components/ui/settings-link';
 import { countUnread } from '@/features/alerts/inbox';
-import { getCurrentAccount } from '@/features/auth/owner';
 import { todayJst } from '@/lib/date';
 import { homeDateLine } from './date-line';
 
 /**
  * ホームの見出し(デザイン仕様書の「今日」、ADR-090):大きな「今日」と、その横に日付と曜日
  * (本人の要望「今日の横に日付が欲しい」)。右上にお知らせ(まだ見ていないものがあれば印)と
- * 「…」(設定・給料日・ログアウトなど)。
+ * 設定の歯車(どのタブにも同じ場所に置く、ADR-127)。
  */
 export async function HomeHeader() {
   const today = todayJst();
-  const [unread, account] = await Promise.all([countUnread().catch(() => 0), getCurrentAccount()]);
+  const unread = await countUnread().catch(() => 0);
   return (
     <header className="flex items-center justify-between gap-2 px-1 pt-2 pb-1">
       <h1
@@ -54,7 +53,7 @@ export async function HomeHeader() {
             />
           ) : null}
         </Link>
-        <MoreMenu account={account} />
+        <SettingsLink />
       </div>
     </header>
   );

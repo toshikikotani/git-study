@@ -7,6 +7,7 @@ import { loadSavingsSummary } from '@/features/savings/store';
 import { AiInsightLine } from './_home/ai-insight-line';
 import { HomeBanners } from './_home/home-banners';
 import { HomeHeader } from './_home/home-header';
+import { PaydayCard } from './_home/payday-card';
 import { TodayRecords, UpcomingPayments } from './_home/recent-records';
 import { TodaySection } from './_home/today-section';
 import { SplitPaymentReceipts } from './_home/split-payment-receipts';
@@ -36,6 +37,9 @@ export default async function HomePage() {
       <HomeHeader />
       <Suspense fallback={null}>
         <HomeBanners />
+      </Suspense>
+      <Suspense fallback={null}>
+        <PaydayCard />
       </Suspense>
       <Suspense fallback={<TodaySkeleton />}>
         <TodaySection

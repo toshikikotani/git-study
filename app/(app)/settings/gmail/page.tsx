@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { BackHeader } from '@/components/ui/back-header';
 import { requireOwner } from '@/features/auth/owner';
 
 import { Card } from '@/components/ui/card';
@@ -21,14 +22,7 @@ export default async function GmailSettingsPage() {
 
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          Gmail 自動取得
-        </h1>
-        <Link href="/spending" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          戻る
-        </Link>
-      </header>
+      <BackHeader back={{ href: '/settings', label: '設定' }} title="Gmail 自動取得" />
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         カード会社の利用通知メールを自動で取り込みます。設定すると、リボ・

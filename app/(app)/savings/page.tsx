@@ -1,8 +1,10 @@
 import Link from 'next/link';
 
+import { BackHeader } from '@/components/ui/back-header';
 import { formatYen } from '@/domain/money';
 import { loadSavingsSummary } from '@/features/savings/store';
 import { getAppSettings } from '@/features/settings/store';
+import { backTargetOf } from '@/lib/back-target';
 import { formatDateJa, todayJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { GoalCard } from './goal-card';
@@ -11,7 +13,8 @@ import { NewGoal } from './new-goal';
 
 /**
  * 貯金(ADR-081)。借金の画面の代わりに、貯金目標と貯まり具合を見る。
- * 毎月の貯金目標はここで決める(ホームとAIが同じ値を見る、ADR-108)。
+ * 貯金目標は1つ(ADR-127):毎月の額が目標で、今日の画面とAIも同じ値を見る(ADR-108)。「何のために・いくら・
+ * いつまでに」はその目標のくわしい内容(任意)。前につくった目標が複数あれば、2つ目からはたたんで出す。
  *
  * 貯まった額は「収入 − 支出」から自動で数える(手入力しない)。数え始めは、
  * 進行中の目標のうちいちばん早く作った日。合計は期限の近い目標から順に割り当てる。
@@ -21,25 +24,44 @@ import { NewGoal } from './new-goal';
 // 目標の作成・保存直後の反映を常に見せる。App Router のキャッシュに乗せない。
 export const dynamic = 'force-dynamic';
 
-export default async function SavingsPage() {
+export default async function SavingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
+  const { from } = await searchParams;
   const [summary, settings] = await Promise.all([
     withMinDuration(loadSavingsSummary()),
     getAppSettings().catch(() => null),
   ]);
   const today = todayJst();
 
+  const [primary, ...older] = summary.goals;
+  const target = settings?.monthlySavingsTargetYen ?? 0;
+
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          貯金
-        </h1>
-        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          ホームへ戻る
-        </Link>
-      </header>
+      <BackHeader back={backTargetOf(from)} title="貯金" />
 
-      <MonthlyTarget initialYen={settings?.monthlySavingsTargetYen ?? 0} />
+      {/* 貯金目標は1つ(提案書、ADR-127):毎月の額が目標。「何のために・いくら・いつまでに」はその目標の
+          くわしい内容(任意)。今日・貯金・AIは、どれもこの毎月の額で「あといくら」を出す。 */}
+      <section
+        aria-labelledby="savings-target"
+        className="flex flex-col gap-3 rounded-[22px] px-4 py-4"
+        style={{ background: 'var(--surface)', color: 'var(--ink)' }}
+      >
+        <h2 id="savings-target" className="text-[17px] font-semibold">
+          貯金目標
+        </h2>
+        <MonthlyTarget initialYen={target} />
+        {primary ? <GoalCard progress={primary} today={today} /> : <NewGoal />}
+        {primary?.monthlyNeededYen != null && primary.monthlyNeededYen !== target ? (
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+            期限に間に合わせるには、毎月 {formatYen(primary.monthlyNeededYen, { sign: 'never' })}{' '}
+            ほど要ります。毎月の額に入れると、今日の画面とAIもこの額で見ます。
+          </p>
+        ) : null}
+      </section>
 
       <section
         className="glass rounded-[22px] px-4 py-4"
@@ -65,24 +87,25 @@ export default async function SavingsPage() {
         </p>
       </section>
 
-      {summary.goals.length > 0 ? (
-        <div className="space-y-3">
-          {summary.goals.map((progress) => (
-            <GoalCard key={progress.goal.id} progress={progress} today={today} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
-          貯金目標はまだありません。何のために、いくら、いつまでに貯めたいかを決めると、
-          毎月いくら残せばいいかが見えます。
-        </p>
-      )}
-
-      <NewGoal />
+      {older.length > 0 ? (
+        <details className="rounded-[22px] px-4" style={{ background: 'var(--surface)' }}>
+          <summary
+            className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            前につくった目標({older.length}件)
+          </summary>
+          <div className="space-y-3 pb-4">
+            {older.map((progress) => (
+              <GoalCard key={progress.goal.id} progress={progress} today={today} />
+            ))}
+          </div>
+        </details>
+      ) : null}
 
       <Link
         href="/assistant?context=savings"
-        className="block text-xs font-medium"
+        className="flex min-h-11 items-center text-xs font-medium"
         style={{ color: 'var(--accent)' }}
       >
         AIに相談して目標を立てる →

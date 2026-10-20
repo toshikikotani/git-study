@@ -8,6 +8,7 @@ import { recordFromEdit, type StoreCandidate } from '@/features/assistant/record
 import { comparableKey } from '@/domain/store-name';
 import { useKeyboard, type KeyboardState } from '@/lib/keyboard';
 import { useScrollLock } from '@/components/ui/use-scroll-lock';
+import { SettingsLink } from '@/components/ui/settings-link';
 import { useSpeechInput } from '@/lib/speech-input';
 import type { WhatIfCard } from '@/domain/forecast/what-if-spend';
 import { WhatIfSheet } from '../_home/what-if-sheet';
@@ -192,15 +193,18 @@ export function AssistantChat({
         <header className="flex items-center justify-between gap-2 px-1">
           {/* キーボードが出ているあいだは題を小さくし、会話の見える行をふやす。 */}
           <h1 className={docked ? 'text-[17px] font-semibold' : 'text-[34px] font-bold'}>AI</h1>
-          <button
-            type="button"
-            onClick={resetChat}
-            disabled={sending || messages.length === 0}
-            className="min-h-11 rounded-full px-4 text-[15px] font-semibold disabled:opacity-40"
-            style={{ background: 'var(--surface)', color: 'var(--accent)' }}
-          >
-            新しい会話
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={resetChat}
+              disabled={sending || messages.length === 0}
+              className="min-h-11 rounded-full px-4 text-[15px] font-semibold disabled:opacity-40"
+              style={{ background: 'var(--surface)', color: 'var(--accent)' }}
+            >
+              新しい会話
+            </button>
+            <SettingsLink />
+          </div>
         </header>
       ) : (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center">
