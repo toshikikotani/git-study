@@ -38,6 +38,12 @@ const MIN_INTERVAL_DAYS = 25;
 const MAX_INTERVAL_DAYS = 35;
 /** これ未満の連続回数では「たまたま」と区別できないため検知しない。 */
 const MIN_OCCURRENCES = 2;
+/**
+ * 同じ店で、ほかの金額の買い物がこれだけあれば、ふだん買い物をする店(コンビニなど)。たまたま同じ額が
+ * 1か月おきに続いただけなので、定期支払いとしない(本人の指摘「候補の半分がコンビニの200円前後」、
+ * ADR-127)。サブスクは、その店ではふつうその支払いしかない。
+ */
+const MAX_OTHER_PURCHASES = 2;
 
 /**
  * 明細から定期支払いを検知する。振替・ignored・収入は対象外
@@ -47,6 +53,8 @@ export function detectSubscriptions(
   transactions: readonly SubscriptionTransaction[],
 ): DetectedSubscription[] {
   const groups = new Map<string, SubscriptionTransaction[]>();
+  /** 店ごとの支出(金額を問わない)。ふだん買い物をする店かを見る。 */
+  const byLabel = new Map<string, SubscriptionTransaction[]>();
 
   for (const t of transactions) {
     if (t.isTransfer || t.reviewStatus === 'ignored' || t.amountYen >= 0) continue;
@@ -57,6 +65,9 @@ export function detectSubscriptions(
     const list = groups.get(key) ?? [];
     list.push(t);
     groups.set(key, list);
+    const sameStore = byLabel.get(normalizeLabel(label)) ?? [];
+    sameStore.push(t);
+    byLabel.set(normalizeLabel(label), sameStore);
   }
 
   const results: DetectedSubscription[] = [];
@@ -70,7 +81,16 @@ export function detectSubscriptions(
       if (!brokeRun) continue;
 
       const run = sorted.slice(runStart, i);
-      if (run.length >= MIN_OCCURRENCES) {
+      const first = run[0]!;
+      const others = (
+        byLabel.get(normalizeLabel((first.merchantName ?? first.description).trim())) ?? []
+      ).filter(
+        (t) =>
+          t.amountYen !== first.amountYen &&
+          t.occurredOn >= first.occurredOn &&
+          t.occurredOn <= run[run.length - 1]!.occurredOn,
+      ).length;
+      if (run.length >= MIN_OCCURRENCES && others < MAX_OTHER_PURCHASES) {
         const last = run[run.length - 1]!;
         results.push({
           key,

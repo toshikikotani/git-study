@@ -159,6 +159,13 @@ export function savingsRateOf(entry: MonthlyIncomeExpense): number | null {
   return (entry.incomeYen - entry.expenseYen) / entry.incomeYen;
 }
 
+/** 収入か支出の記録がある月だけ(「いつもの月」・月平均はこれで数える、ADR-127)。 */
+export function recordedMonths<T extends { incomeYen: number; expenseYen: number }>(
+  rows: readonly T[],
+): T[] {
+  return rows.filter((r) => r.incomeYen > 0 || r.expenseYen > 0);
+}
+
 export type SpendingPaceVsAverage = {
   currentMonthExpenseYen: number;
   /** 当月を除いた他の月の平均支出。 */
@@ -182,7 +189,8 @@ export function compareCurrentMonthToTrailingAverage(
   currentMonthKey: string,
 ): SpendingPaceVsAverage | null {
   const current = rows.find((r) => r.monthKey === currentMonthKey);
-  const priorMonths = rows.filter((r) => r.monthKey !== currentMonthKey);
+  // 記録のない月を0円として数えない(記録が1年に満たないと平均が小さく出る、ADR-127)。
+  const priorMonths = recordedMonths(rows).filter((r) => r.monthKey !== currentMonthKey);
   if (!current || priorMonths.length === 0) return null;
 
   const totalPriorExpenseYen = priorMonths.reduce((acc, r) => acc + r.expenseYen, 0);

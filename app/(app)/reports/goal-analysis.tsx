@@ -8,6 +8,7 @@ import { buildCategoryLines, UNCATEGORIZED_KEY } from '@/features/category/model
 import { buildCumulative, linesForGoal } from '@/features/category/pace';
 import { loadCategoryOutlooks } from '@/features/goals/category-outlook';
 import { loadCategorySpendingTrend } from '@/features/reports/store';
+import { watchToneOf } from '@/domain/forecast/watch-categories';
 import type { SpendingPlan } from '@/features/spending-plan/store';
 import { AiCard } from './ai-card';
 import { GroupHeading } from './analysis-tabs';
@@ -115,23 +116,29 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
       fixed: o.fixed,
     }));
 
-  // どこで使っているか:目標のあるカテゴリの進み具合。
+  // どこで使っているか:目標のあるカテゴリの進み具合。「気をつけたい」は今日と同じ決め方(ADR-127):
+  // こえた・こえそう・8割をこえた。固定費(決まった型・予測を止めたカテゴリ)は別にまとめる。
   const progress: ProgressRow[] = loaded.outlooks
     .filter((o) => o.targetYen !== null)
-    .map((o) => ({
-      genreId: o.genreId,
-      name: o.name,
-      spentYen: o.spentYen,
-      targetYen: o.targetYen!,
-      p50: o.p50,
-      fixed: o.fixed,
-      tone:
-        o.spentYen > o.targetYen!
-          ? 'over'
-          : o.caution !== null || (o.p50 !== null && o.p50 > o.targetYen!)
-            ? 'risk'
-            : 'ok',
-    }));
+    .map((o) => {
+      const fixed = o.fixed || fixedIds.has(o.genreId);
+      const tone = watchToneOf({
+        spentYen: o.spentYen,
+        targetYen: o.targetYen,
+        p50: o.p50,
+        caution: o.caution,
+        fixed,
+      });
+      return {
+        genreId: o.genreId,
+        name: o.name,
+        spentYen: o.spentYen,
+        targetYen: o.targetYen!,
+        p50: o.p50,
+        fixed,
+        tone: fixed ? 'fixed' : (tone ?? 'ok'),
+      };
+    });
   const habit = weekdayHabitRows(loaded.transactions, {
     from: period.from,
     to: today < period.to ? today : period.to,

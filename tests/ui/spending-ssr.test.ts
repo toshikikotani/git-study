@@ -167,10 +167,10 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     expect(hidden).not.toContain('aria-label="日付ごとの支出"');
   });
 
-  it('合計は 支出・収入・差額 の3列', () => {
+  it('合計は 支出・収入・収支 の3列(収入−支出はどの画面でも「収支」、ADR-127)', () => {
     expect(html).toContain('支出');
     expect(html).toContain('収入');
-    expect(html).toContain('差額');
+    expect(html).toContain('収支');
   });
 
   it('カテゴリはドーナツと、名前・金額・割合の行', () => {

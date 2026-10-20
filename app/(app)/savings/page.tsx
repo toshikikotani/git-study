@@ -50,7 +50,7 @@ export default async function SavingsPage() {
             label="貯まった"
             value={summary.startOn === null ? '—' : formatYen(summary.totalYen, { sign: 'never' })}
           />
-          <Stat label="今月" value={formatYen(summary.thisMonthYen)} />
+          <Stat label="今月の収支" value={formatYen(summary.thisMonthYen)} />
           <Stat
             label="いつもの月"
             value={summary.paceYen === null ? '—' : formatYen(summary.paceYen)}

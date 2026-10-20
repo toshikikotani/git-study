@@ -39,7 +39,7 @@ export function MonthSummary() {
       </div>
       <div className={cell}>
         <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-          差額
+          収支
         </span>
         <span
           className="text-[17px] font-bold"

@@ -57,7 +57,8 @@ export function todayCapYen(view: ForecastView): number {
 }
 
 /**
- * ホームに出す「気をつけたいカテゴリ」(目標をこえた・こえそう・8割をこえた、最大3つ、ADR-117)。
+ * 「気をつけたいカテゴリ」(目標をこえた・こえそう・8割をこえた、ADR-117 → 127)。すべてを返す(ホームは
+ * 上から3つを出す)。
  * 今期の目標の予測から選ぶ(読み込みを増やさない)。AIの窓口にも同じものを渡す。
  */
 export function watchCategoriesOf(view: ForecastView): WatchCategory[] {
@@ -71,5 +72,7 @@ export function watchCategoriesOf(view: ForecastView): WatchCategory[] {
     rows,
     byCategory: view.forecast.byCategory,
     closedGenreIds: view.closedGenreIds,
+    // ホームは上から3つだけ出し、残りの件数を「ほかN件」と添える(分析 › 目標と同じ一覧、ADR-127)。
+    limit: Number.POSITIVE_INFINITY,
   });
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { formatEstimate } from '@/domain/forecast/format';
+import type { WatchTone } from '@/domain/forecast/watch-categories';
 import { useOpenCategory } from '../category-sheet';
 import { setTargetsFromOutlookAction } from './progress-actions';
 
@@ -14,8 +15,11 @@ export type ProgressRow = {
   targetYen: number;
   p50: number | null;
   fixed: boolean;
-  /** over:使った額で目標をこえた。risk:このままだとこえそう。ok:順調。 */
-  tone: 'over' | 'risk' | 'ok';
+  /**
+   * over:使った額で目標をこえた。risk:このままだとこえそう。near:目標の8割をこえた(ここまでが
+   * 「気をつけたい」、今日と同じ決め方、ADR-127)。ok:順調。fixed:固定費(毎月ほぼ同じ額)。
+   */
+  tone: WatchTone | 'ok' | 'fixed';
 };
 
 /** 目標なしのカテゴリ(「期間中の支出から追加」で、使った額がそのまま目標だった行、ADR-108)。 */
@@ -32,11 +36,13 @@ const yen = (v: number) => `${Math.round(v).toLocaleString('ja-JP')}円`;
 const TONES = {
   over: { label: 'こえた', color: 'var(--state-over)', bg: 'var(--state-over-track)' },
   risk: { label: 'こえそう', color: 'var(--state-caution)', bg: 'var(--state-caution-track)' },
-  ok: { label: '順調', color: 'var(--income)', bg: 'var(--income-track)' },
+  near: { label: '8割をこえた', color: 'var(--state-caution)', bg: 'var(--state-caution-track)' },
 } as const;
+const ORDER: Record<WatchTone, number> = { over: 0, risk: 1, near: 2 };
 
 /**
- * カテゴリの進み具合(デザイン v3-6、ADR-108):気をつけたい(こえた・こえそう)/ 順調 / 目標なし。
+ * カテゴリの進み具合(デザイン v3-6、ADR-108):気をつけたい(こえた・こえそう・8割をこえた。今日と
+ * 同じ決め方、ADR-127)/ 順調 / 固定費 / 目標なし。
  * 目標なしは「期間中の支出から追加」で使った額がそのまま目標になっていたもの。こえたと誤って出ないよう、
  * 見込みだけを出し、「見込みに合わせて目標をつける」で目標にできる。行を押すとそのカテゴリ(⑦)。
  */
@@ -52,9 +58,10 @@ export function CategoryProgress({
   const [error, setError] = useState<string | null>(null);
   if (rows.length === 0 && untargeted.length === 0) return null;
   const watch = rows
-    .filter((r) => r.tone !== 'ok')
-    .sort((a, b) => (a.tone === b.tone ? b.spentYen - a.spentYen : a.tone === 'over' ? -1 : 1));
+    .filter((r): r is ProgressRow & { tone: WatchTone } => r.tone !== 'ok' && r.tone !== 'fixed')
+    .sort((a, b) => ORDER[a.tone] - ORDER[b.tone] || b.spentYen - a.spentYen);
   const ok = rows.filter((r) => r.tone === 'ok').sort((a, b) => b.spentYen - a.spentYen);
+  const fixed = rows.filter((r) => r.tone === 'fixed').sort((a, b) => b.spentYen - a.spentYen);
 
   const setTargets = async () => {
     setPending(true);
@@ -74,14 +81,14 @@ export function CategoryProgress({
             const tone = TONES[r.tone];
             const note =
               r.tone === 'over'
-                ? r.fixed
-                  ? '固定費'
-                  : r.p50 !== null && r.p50 > r.spentYen
-                    ? `見込み ${formatEstimate(r.p50)}`
-                    : `${yen(r.spentYen - r.targetYen)}オーバー`
-                : r.p50 !== null
+                ? r.p50 !== null && r.p50 > r.spentYen
                   ? `見込み ${formatEstimate(r.p50)}`
-                  : '';
+                  : `${yen(r.spentYen - r.targetYen)}オーバー`
+                : r.tone === 'risk'
+                  ? r.p50 !== null
+                    ? `見込み ${formatEstimate(r.p50)}`
+                    : ''
+                  : `あと${yen(r.targetYen - r.spentYen)}`;
             return (
               <Row key={r.genreId} first={i === 0}>
                 <button
@@ -134,6 +141,31 @@ export function CategoryProgress({
                   <span className="truncate text-[15px] font-medium">{r.name}</span>
                   <Bar spentYen={r.spentYen} p50={r.p50} targetYen={r.targetYen} />
                 </span>
+                <span
+                  className="tabular shrink-0 text-right text-[12px] leading-snug"
+                  style={{ color: 'var(--ink-muted)' }}
+                >
+                  {yen(r.spentYen)}
+                  <br />/ {yen(r.targetYen)}
+                </span>
+              </button>
+            </Row>
+          ))}
+        </Group>
+      ) : null}
+
+      {fixed.length > 0 ? (
+        <Group title="固定費" count={`${fixed.length} · 毎月ほぼ同じ額`}>
+          {fixed.map((r, i) => (
+            <Row key={r.genreId} first={i === 0}>
+              <button
+                type="button"
+                onClick={() => open(r.genreId)}
+                className="flex min-h-13 w-full items-center gap-3 px-4 py-2 text-left"
+                aria-label={`${r.name}、固定費。${yen(r.spentYen)} / 目標 ${yen(r.targetYen)}`}
+              >
+                <GenreBadge name={r.name} size={32} />
+                <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{r.name}</span>
                 <span
                   className="tabular shrink-0 text-right text-[12px] leading-snug"
                   style={{ color: 'var(--ink-muted)' }}

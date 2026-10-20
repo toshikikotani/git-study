@@ -33,7 +33,8 @@ export function InsightsCard({
   view: SpendingDiagnosisView;
   /** 今月使った額(集計関数の値)。診断の内訳の合計にそろえる。 */
   totalSpentYen: number;
-  pile: { thresholdYen: number; smallSpendTotalYen: number };
+  /** 年にすると:ちりつもの画面と同じ計算(1日あたりに均して365倍、ADR-127)。 */
+  pile: { thresholdYen: number; smallSpendTotalYen: number; smallSpendAnnualizedYen: number };
 }) {
   const current = view.currentMonth;
 
@@ -110,7 +111,7 @@ export function InsightsCard({
 
       <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         今月の小口は {formatYen(pile.smallSpendTotalYen, { sign: 'never' })}。年にすると約{' '}
-        {formatYen(pile.smallSpendTotalYen * 12, { sign: 'never' })}。
+        {formatYen(pile.smallSpendAnnualizedYen, { sign: 'never' })}。
       </p>
 
       {/* ちりつも(小口支出の積み重ね)は補助。要約1行だけ見せて詳細へ */}

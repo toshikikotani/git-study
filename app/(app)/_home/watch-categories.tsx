@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatEstimate } from '@/domain/forecast/format';
-import type { WatchCategory, WatchTone } from '@/domain/forecast/watch-categories';
+import {
+  WATCH_LIMIT,
+  type WatchCategory,
+  type WatchTone,
+} from '@/domain/forecast/watch-categories';
 import { useOpenCategory } from '../category-sheet';
 import { Bar } from '../reports/category-progress';
 
@@ -30,11 +34,13 @@ function noteOf(c: WatchCategory): string {
 /**
  * ホームの「気をつけたいカテゴリ」(本人の案、ADR-117):目標をこえた・こえそう・8割をこえたカテゴリを、
  * 自動で最大3つ。手で選ぶスイッチはやめた。行を押すとそのカテゴリ(⑦)。なければ何も出さない。
- * すべてのカテゴリの進み具合は「分析 › 目標」。
+ * 「分析 › 目標」の「気をつけたい」と同じ一覧(ADR-127)。4つ以上あるときは「ほかN件」と添える。
  */
 export function WatchCategories({ categories }: { categories: readonly WatchCategory[] }) {
   const open = useOpenCategory();
   if (categories.length === 0) return null;
+  const shown = categories.slice(0, WATCH_LIMIT);
+  const more = categories.length - shown.length;
   return (
     <section
       aria-label="気をつけたいカテゴリ"
@@ -48,11 +54,11 @@ export function WatchCategories({ categories }: { categories: readonly WatchCate
           className="flex min-h-11 items-center gap-1 px-2 text-[15px]"
           style={{ color: 'var(--accent)' }}
         >
-          すべて
+          {more > 0 ? `ほか${more}件` : 'すべて'}
           <ChevronRightIcon />
         </Link>
       </div>
-      {categories.map((c) => {
+      {shown.map((c) => {
         const tone = TONES[c.tone];
         return (
           <button

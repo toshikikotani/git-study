@@ -16,7 +16,11 @@ export async function LaterCards({ totalSpentYen }: { totalSpentYen: number }) {
       <InsightsCard
         view={diagnosis}
         totalSpentYen={totalSpentYen}
-        pile={{ thresholdYen: pile.thresholdYen, smallSpendTotalYen: pile.smallSpendTotalYen }}
+        pile={{
+          thresholdYen: pile.thresholdYen,
+          smallSpendTotalYen: pile.smallSpendTotalYen,
+          smallSpendAnnualizedYen: pile.smallSpendAnnualizedYen,
+        }}
       />
       <SubscriptionsCard subscriptions={subscriptions} />
     </>

@@ -9,6 +9,7 @@
 
 import { formatSignedYen } from '@/domain/budget-state';
 import { formatYen } from '@/domain/money';
+import { recordedMonths } from '@/domain/spending';
 import { formatMonthJa } from '@/lib/date';
 import type { IncomeExpenseTrend } from '@/features/reports/store';
 
@@ -26,7 +27,11 @@ export function YearNetBarChart({ trend }: { trend: IncomeExpenseTrend }) {
   const nets = rows.map((r) => r.incomeYen - r.expenseYen);
   const maxAbs = Math.max(...nets.map((n) => Math.abs(n)), 1);
   const totalNet = nets.reduce((a, b) => a + b, 0);
-  const averageNet = Math.round(totalNet / rows.length);
+  // 月平均は記録のある月だけで数える(1年の流れの「いつもの月」と同じ、ADR-127)。
+  const recorded = recordedMonths(rows);
+  const averageNet = Math.round(
+    recorded.reduce((sum, r) => sum + r.incomeYen - r.expenseYen, 0) / Math.max(1, recorded.length),
+  );
 
   const barWidth = (WIDTH - PADDING * 2) / rows.length;
   const barInnerWidth = barWidth * 0.6;

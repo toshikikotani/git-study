@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 const yen = (v: number) => formatYen(v, { sign: 'never' });
 
 /**
- * 月ごとの表(分析から開く、ADR-090):直近12か月の収入・支出・差額の表と、収支のグラフ、
+ * 月ごとの表(分析から開く、ADR-090):直近12か月の収入・支出・収支の表と、収支のグラフ、
  * カテゴリごとの推移。
  */
 export default async function MonthlyTablePage() {
@@ -41,7 +41,7 @@ export default async function MonthlyTablePage() {
                   支出
                 </th>
                 <th scope="col" className="px-4 py-3 text-right font-normal">
-                  差額
+                  収支
                 </th>
               </tr>
             </thead>
