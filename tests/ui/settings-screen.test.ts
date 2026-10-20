@@ -207,9 +207,9 @@ describe('設定は1画面', () => {
     expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*role="switch"[^>]*checked/);
     expect(html).toContain('aria-label="AI機能を使う"');
     expect(html).not.toContain('保存する');
-    expect(read('app/(app)/settings/ai-switch.tsx')).toContain(
-      'onChange={() => form.current?.requestSubmit()}',
-    );
+    const source = read('app/(app)/settings/ai-switch.tsx');
+    expect(source).toContain('<Switch checked={checked} onChange={change} label="AI機能を使う" />');
+    expect(source).toContain('await updateAiSettingsAction(');
   });
 
   it('パスワードと給料日の振り分けはシートで開く(画面を移らない)', async () => {
