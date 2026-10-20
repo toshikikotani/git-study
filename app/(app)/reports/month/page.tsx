@@ -10,12 +10,14 @@ import { AnalysisTabs } from '../analysis-tabs';
 import { loadMerchantSpendingRanking } from '@/features/reports/store';
 import { MerchantRankingCard } from '../merchant-ranking-card';
 import { YearFlowCard } from '../year-flow-card';
+import { AiReportLink } from './ai-report-link';
 import { FrequencyCard } from './frequency-card';
 import { SmallSpendCard } from './small-spend-card';
 
 /**
  * 分析 › 月のふりかえり(デザイン仕様書の「4b」、ADR-091):何に使ったか。月の切り替え → 支出・収入・
- * 貯蓄率 → カテゴリ → 回数と1回の金額 → お店 → 小口(ちりつも)→ 1年の流れ(「表で見る」で月ごとの表)。
+ * 貯蓄率 → AIのレポート(ADR-128)→ カテゴリ → 回数と1回の金額 → お店 → 小口(ちりつも)→ 1年の流れ
+ * (「表で見る」で月ごとの表)。
  * 分析を浅くするため、別の画面に分かれていたもの(回数・月ごとの表・ちりつも・お店)をカードにした
  * (どれもタブから2回で届く、ADR-127)。
  */
@@ -46,6 +48,7 @@ export default async function MonthReviewPage({
         <PeriodSwitcher title="分析" />
         <AnalysisTabs current="month" />
         <AnalysisSummary />
+        <AiReportLink />
         <GenreBreakdown />
         <FrequencyCard />
         <Suspense fallback={null}>

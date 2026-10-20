@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -8,6 +9,7 @@ import { generateMonthlyAiReportAction } from './ai/actions';
 /**
  * AIの気づき(デザイン仕様書の「分析 › 目標」、ADR-091):いつ更新した分析か、箇条書き、「もう一度分析する」。
  * 分析し直すと保存して画面を読み直す。今日の画面には、いちばん上の気づきを1行出す(ADR-127)。
+ * 「くわしいレポート」で、日次・タイプ診断・アドバイス・見込みの読み・前の月のレポートを開く(ADR-128)。
  */
 export function AiCard({
   asOfLabel,
@@ -69,15 +71,24 @@ export function AiCard({
           {error}
         </p>
       ) : null}
-      <button
-        type="button"
-        onClick={() => void run()}
-        disabled={busy}
-        className="mt-4 min-h-11 self-start rounded-full px-5 text-[15px] font-semibold disabled:opacity-40"
-        style={{ background: 'var(--button-quiet)', color: 'var(--ink)' }}
-      >
-        {busy ? '分析しています…' : analyzed ? 'もう一度分析する' : 'AIに分析させる'}
-      </button>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy}
+          className="min-h-11 rounded-full px-5 text-[15px] font-semibold disabled:opacity-40"
+          style={{ background: 'var(--button-quiet)', color: 'var(--ink)' }}
+        >
+          {busy ? '分析しています…' : analyzed ? 'もう一度分析する' : 'AIに分析させる'}
+        </button>
+        <Link
+          href="/reports/ai?from=/reports"
+          className="flex min-h-11 items-center text-[15px] font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          くわしいレポート ›
+        </Link>
+      </div>
     </section>
   );
 }

@@ -246,12 +246,30 @@ export async function loadMonthlyReport(monthKey: string): Promise<MonthlyAiRepo
   };
 }
 
+/**
+ * 保存してある月次レポートの月(新しい順、最大 `limit` か月)。AIのレポートの画面で、前の月のレポートを
+ * 開けるようにする(ADR-128)。テーブル未作成・読めないときは空。
+ */
+export async function listMonthlyReportMonths(limit = 12): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('ai_monthly_reports')
+    .select('month')
+    .order('month', { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (isMissingTableError(error)) return [];
+    throw new AiReportStoreError(`レポートの一覧を取得できませんでした: ${error.message}`);
+  }
+  return (data ?? []).map((row) => String(row.month).slice(0, 7));
+}
+
 export type MonthlyAiReportView = {
   input: MonthlyReportInput;
   report: MonthlyAiReport | null;
 };
 
-/** /reports/ai の画面向けビュー。数値データ(常に取得可能)とレポート(無ければ null)をまとめて返す。 */
+/** AIのレポートの画面(/reports/ai)向けビュー。数値データ(常に取得可能)とレポート(無ければ null)をまとめて返す。 */
 export async function loadMonthlyAiReportView(
   now: Date = new Date(),
 ): Promise<MonthlyAiReportView> {
