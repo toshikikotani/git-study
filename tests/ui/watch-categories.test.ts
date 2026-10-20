@@ -87,6 +87,7 @@ describe('ホームの「気をつけたいカテゴリ」(本人の案、ADR-11
       'app/(app)/category-sheet.tsx',
       'app/(app)/spending/category/actions.ts',
       'app/api/assistant/chat/route.ts',
+      'src/features/assistant/turn.ts',
       'src/features/assistant/plan.ts',
     ]) {
       const source = readFileSync(file, 'utf8');

@@ -24,6 +24,8 @@ const SETTINGS: AppSettings = {
   payday: 25,
   sideIncomeSavingsRatio: 0.7,
   aiEnabled: true,
+  eveningCheckEnabled: true,
+  eveningCheckAt: '21:00',
 };
 
 const TRANSACTION: StoredTransaction = {
