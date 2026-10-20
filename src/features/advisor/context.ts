@@ -116,9 +116,7 @@ export function todayNumbersOf(f: TodayForecasts, now: Date): TodayNumbers {
 
 /** ホームの「今日」と同じ数字を、AIが読む文にする。 */
 export function formatTodayNumbers(n: TodayNumbers): string[] {
-  const lines: string[] = [
-    `ホームの「今日」と同じ数字(${n.computedAt} に明細から計算し直した最新の値):`,
-  ];
+  const lines: string[] = [`今日の画面と同じ数字(${n.computedAt} に明細から計算し直した最新の値):`];
   const yen = (v: number) => formatYen(v, { sign: 'never' });
 
   if (n.allowance === null) {
@@ -160,7 +158,7 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
     lines.push(
       n.watch.length === 0
         ? '- 気をつけたいカテゴリ: なし(目標の8割をこえた・こえそうなカテゴリは無い)'
-        : `- 気をつけたいカテゴリ(ホームに出しているもの): ${n.watch
+        : `- 気をつけたいカテゴリ(今日の画面に出しているもの): ${n.watch
             .map(
               (w) =>
                 `${w.name}は${label[w.tone]}(使った額${yen(w.spentYen)}/目標${yen(w.targetYen)}、見込み${formatEstimate(w.p50)})`,
@@ -186,7 +184,7 @@ export function formatTodayNumbers(n: TodayNumbers): string[] {
     if (n.monthlySavingsTargetYen > 0) {
       const short = n.monthlySavingsTargetYen - m.p50;
       lines.push(
-        `- 毎月の貯金目標${yen(n.monthlySavingsTargetYen)}(ホームの貯金と同じ値): ${
+        `- 毎月の貯金目標${yen(n.monthlySavingsTargetYen)}(今日の画面の貯金と同じ値): ${
           short > 0
             ? `月末の見込みでは、あと${formatEstimate(short)}届かない`
             : '月末の見込みで届く'

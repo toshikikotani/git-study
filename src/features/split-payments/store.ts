@@ -20,7 +20,8 @@ const table = 'split_payment_requests';
 const columns =
   'id, signature, entries, participants, total_yen, amount_per_person_yen, received_count, version, created_at';
 const authMessage = 'ログイン状態を確認できませんでした。もう一度ログインしてください。';
-const conflictMessage = '別の画面で受取状況が変更されました。ホームを更新して確認してください。';
+const conflictMessage =
+  '別の画面で受取状況が変更されました。今日の画面を更新して確認してください。';
 const updateInput = z.object({
   id: trackingIdSchema,
   expectedVersion: z
