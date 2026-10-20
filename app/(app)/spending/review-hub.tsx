@@ -30,6 +30,8 @@ import { useSpendingMonth } from './spending-month-provider';
  * 残っているものだけを出す。
  */
 export function ReviewHub({
+  todayCheck = null,
+  todayCheckCount = 0,
   hasGoal,
   captures,
   records,
@@ -37,6 +39,9 @@ export function ReviewHub({
   merchantNameGroups,
   merchantNameError,
 }: {
+  /** いちばん上の「今日の分をまとめて確かめる」(今日の答え合わせ、ADR-129)。 */
+  todayCheck?: React.ReactNode;
+  todayCheckCount?: number;
   hasGoal: boolean;
   captures: readonly CaptureView[];
   records: readonly LedgerTransaction[];
@@ -55,6 +60,7 @@ export function ReviewHub({
   );
   const nameCount = merchantNameGroups.reduce((sum, group) => sum + group.entries.length, 0);
   const nothing =
+    todayCheckCount === 0 &&
     jobs.length === 0 &&
     captures.length === 0 &&
     records.length === 0 &&
@@ -66,6 +72,7 @@ export function ReviewHub({
 
   return (
     <div className="flex flex-col gap-6" style={{ color: 'var(--ink)' }}>
+      {todayCheck}
       {nothing ? (
         <p role="status" className="px-1 py-6 text-[15px]" style={{ color: 'var(--ink-muted)' }}>
           確認が必要なものはありません。

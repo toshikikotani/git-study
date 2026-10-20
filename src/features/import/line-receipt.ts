@@ -22,8 +22,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { classifyImportRows } from '@/features/classification/import-classify';
 import { buildPreview } from '@/features/transactions/import-pipeline';
-import { importTransactionsAsAdmin } from '@/features/transactions/store';
+import { autoMergeSamePayments } from '@/features/transactions/payment-merge';
+import { importTransactionsAsAdmin, type StoredTransaction } from '@/features/transactions/store';
 import type { Database } from '@/lib/supabase/types';
 import type { AiReceiptExtractor } from './receipt-ai';
 import { uploadReceiptImage } from './receipt-storage';
@@ -70,11 +72,17 @@ export async function importLineReceiptAsAdmin(
     'image/jpeg',
   );
 
-  const preview = buildPreview(
-    extracted.transactions,
-    accountId,
-    (index) => `line-${messageId}-${index}`,
-    'manual',
+  // 確認の画面が無い経路なので、覚えたお店のカテゴリを付け、自信が無ければ夜の答え合わせへ回す
+  // (ADR-129)。
+  const preview = await classifyImportRows(
+    admin,
+    userId,
+    buildPreview(
+      extracted.transactions,
+      accountId,
+      (index) => `line-${messageId}-${index}`,
+      'manual',
+    ),
   );
 
   const result = await importTransactionsAsAdmin(admin, userId, preview, {
@@ -85,18 +93,29 @@ export async function importLineReceiptAsAdmin(
     receiptImagePath,
   });
 
+  // 先に入っていたカードの通知メールと同じ支払いなら、自動で1件にまとめる(ADR-129)。
+  const merged =
+    result.importedCount > 0
+      ? await autoMergeSamePayments(
+          admin,
+          userId,
+          preview.map((t) => t.occurredOn),
+        ).catch(() => 0)
+      : 0;
+
   return {
     imported: result.importedCount,
     duplicates: result.duplicateCount,
-    summaryText: buildSummaryText(preview, result.duplicateCount, extracted.warnings),
+    summaryText: buildSummaryText(preview, result.duplicateCount, extracted.warnings, merged),
   };
 }
 
 /** LINE への返信文。「取り込みました」だけでは読み取り内容が正しいか本人が確認できない。 */
 function buildSummaryText(
-  preview: ReturnType<typeof buildPreview>,
+  preview: readonly StoredTransaction[],
   duplicateCount: number,
   extractWarnings: readonly string[],
+  mergedCount = 0,
 ): string {
   const lines = preview.map((t) => {
     const amount = Math.abs(t.amountYen).toLocaleString('ja-JP');
@@ -106,6 +125,9 @@ function buildSummaryText(
 
   if (duplicateCount > 0) {
     lines.push(`※ ${duplicateCount}件は取り込み済みのため重複として無視しました`);
+  }
+  if (mergedCount > 0) {
+    lines.push('※ カードの通知メールと同じ支払いなので、1件にまとめました(品目と画像を付けました)');
   }
   for (const warning of extractWarnings) {
     lines.push(`⚠ ${warning}`);
