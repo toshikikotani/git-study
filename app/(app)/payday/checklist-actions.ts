@@ -28,11 +28,13 @@ export async function createPaydayRunAction(
   } catch (error) {
     return { error: describeUserError(error) };
   }
-  revalidatePath('/payday');
+  revalidatePath('/');
+  revalidatePath('/settings');
   return { error: null };
 }
 
 export async function toggleTransferRunItemAction(itemId: string, isDone: boolean): Promise<void> {
   await setTransferRunItemDone(itemId, isDone);
-  revalidatePath('/payday');
+  revalidatePath('/');
+  revalidatePath('/settings');
 }

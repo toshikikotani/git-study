@@ -1,6 +1,11 @@
 import { formatYen } from '@/domain/money';
 import { compareCurrentMonthToTrailingAverage } from '@/domain/spending';
-import { loadIncomeExpenseTrend } from '@/features/reports/store';
+import {
+  loadCategorySpendingTrend,
+  loadIncomeExpenseTrend,
+  type IncomeExpenseTrend,
+} from '@/features/reports/store';
+import { CategoryTrendChart } from './category-trend-chart';
 
 /** 「いつもの月」と比べるのに要る、記録のある月の数。 */
 const MIN_MONTHS = 3;
@@ -10,10 +15,14 @@ const signed = (yen: number) =>
 
 /**
  * 1年の流れ(デザイン仕様書の「分析」、ADR-090):直近12か月の収入(緑)と支出(橙)の棒、1年の収支と
- * 月平均、「いつもの月」との比較。明細を待たせないよう、後から出す。
+ * 月平均(記録のある月だけで数える、ADR-127)、「いつもの月」との比較。「表で見る」で月ごとの表と
+ * カテゴリの推移。明細を待たせないよう、後から出す。
  */
 export async function YearFlowCard() {
-  const trend = await loadIncomeExpenseTrend().catch(() => null);
+  const [trend, categoryTrend] = await Promise.all([
+    loadIncomeExpenseTrend().catch(() => null),
+    loadCategorySpendingTrend().catch(() => null),
+  ]);
   if (trend === null || trend.rows.length === 0) return null;
   const rows = trend.rows;
   const first = trend.monthKeys[0]!;
@@ -139,7 +148,7 @@ export async function YearFlowCard() {
             className="text-[20px] font-bold"
             style={{ color: net >= 0 ? 'var(--income)' : 'var(--state-caution)' }}
           >
-            {signed(net / rows.length)}
+            {signed(net / Math.max(1, recorded.length))}
           </span>
         </div>
       </div>
@@ -153,6 +162,66 @@ export async function YearFlowCard() {
             ? `今月の支出は、いつもの月(平均 ${formatYen(pace.trailingAverageExpenseYen, { sign: 'never' })})と同じくらいです。`
             : `今月の支出は、いつもの月(平均 ${formatYen(pace.trailingAverageExpenseYen, { sign: 'never' })})より ${formatYen(Math.abs(pace.differenceYen), { sign: 'never' })} ${pace.differenceYen > 0 ? '多め' : '少なめ'}です。`}
       </p>
+      {/* 月ごとの数字とカテゴリの推移は「表で見る」で開く(もとは「月ごとの表」の画面、ADR-127)。 */}
+      <details className="mt-2">
+        <summary
+          className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          表で見る
+        </summary>
+        <MonthlyTable rows={rows} />
+        {categoryTrend && categoryTrend.categories.length > 0 ? (
+          <div className="mt-3">
+            <CategoryTrendChart trend={categoryTrend} />
+          </div>
+        ) : null}
+      </details>
     </section>
+  );
+}
+
+/** 月ごとの収入・支出・収支(新しい月から)。 */
+function MonthlyTable({ rows }: { rows: IncomeExpenseTrend['rows'] }) {
+  const yen = (v: number) => formatYen(v, { sign: 'never' });
+  return (
+    <table className="tabular mt-1 w-full text-[14px]" style={{ color: 'var(--ink)' }}>
+      <thead>
+        <tr className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+          <th scope="col" className="py-2 text-left font-normal">
+            月
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            収入
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            支出
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            収支
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {[...rows].reverse().map((r) => {
+          const diff = r.incomeYen - r.expenseYen;
+          return (
+            <tr key={r.monthKey} style={{ borderTop: '1px solid var(--hairline)' }}>
+              <th scope="row" className="py-2 text-left font-normal">
+                {r.monthKey.slice(0, 4)}年{Number(r.monthKey.slice(5, 7))}月
+              </th>
+              <td className="py-2 text-right">{yen(r.incomeYen)}</td>
+              <td className="py-2 text-right">{yen(r.expenseYen)}</td>
+              <td
+                className="py-2 text-right font-semibold"
+                style={{ color: diff >= 0 ? 'var(--income)' : 'var(--state-caution)' }}
+              >
+                {signed(diff)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }

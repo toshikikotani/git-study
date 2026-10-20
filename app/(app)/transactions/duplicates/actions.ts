@@ -24,7 +24,7 @@ export async function ignoreTransactionAction(id: string): Promise<{ error: stri
     return { error: '明細を除外できませんでした。' };
   }
 
-  revalidatePath('/transactions/duplicates');
+  revalidatePath('/spending/review');
   revalidatePath('/spending');
   return { error: null };
 }
@@ -42,7 +42,7 @@ export async function saveDistinctPairAction(
         error instanceof DuplicateStoreError ? error.message : '確認結果を保存できませんでした。',
     };
   }
-  revalidatePath('/transactions/duplicates');
+  revalidatePath('/spending/review');
   revalidatePath('/spending');
   return { error: null };
 }
@@ -59,7 +59,7 @@ export async function undoDistinctPairAction(
       error: error instanceof DuplicateStoreError ? error.message : '確認結果を戻せませんでした。',
     };
   }
-  revalidatePath('/transactions/duplicates');
+  revalidatePath('/spending/review');
   revalidatePath('/spending');
   return { error: null };
 }

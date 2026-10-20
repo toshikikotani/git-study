@@ -42,7 +42,8 @@ describe('ホームの貯金:毎月の貯金目標は1か所で(デザイン v3-
 
   it('貯金の画面で毎月の貯金目標を決める・直す(設定の値。AIも同じ値を見る)', () => {
     const page = readFileSync('app/(app)/savings/page.tsx', 'utf8');
-    expect(page).toContain('<MonthlyTarget initialYen={settings?.monthlySavingsTargetYen ?? 0} />');
+    expect(page).toContain('const target = settings?.monthlySavingsTargetYen ?? 0;');
+    expect(page).toContain('<MonthlyTarget initialYen={target} />');
     const actions = readFileSync('app/(app)/savings/actions.ts', 'utf8');
     expect(actions).toContain('updateAppSettings({ monthlySavingsTargetYen: amountYen })');
   });

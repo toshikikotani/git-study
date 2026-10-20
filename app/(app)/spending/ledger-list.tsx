@@ -530,7 +530,7 @@ function EmptyState() {
           レシートを撮るか、銀行・カードの CSV を取り込むと、自動で分類されます。
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button href="/transactions/receipt" variant="filled">
+          <Button href="/spending/review" variant="filled">
             レシートを撮る
             <span aria-hidden>→</span>
           </Button>

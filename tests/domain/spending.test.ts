@@ -216,20 +216,20 @@ describe('compareCurrentMonthToTrailingAverage', () => {
     { monthKey: '2026-09', incomeYen: 0, expenseYen: 90_000, scheduledYen: 0 },
   ];
 
-  it('当月を除いた他の月の平均と当月の差を返す', () => {
+  it('当月を除いた他の月の平均と当月の差を返す。記録のない月(8月)は0円として数えない(ADR-127)', () => {
     const result = compareCurrentMonthToTrailingAverage(rows, '2026-09');
     expect(result).toEqual({
       currentMonthExpenseYen: 90_000,
-      trailingAverageExpenseYen: 100_000, // (100,000+200,000+0)/3
-      differenceYen: -10_000,
+      trailingAverageExpenseYen: 150_000, // (100,000+200,000)/2
+      differenceYen: -60_000,
     });
   });
 
   it('平均より多く使った月は正の差になる(使いすぎ)', () => {
     const result = compareCurrentMonthToTrailingAverage(rows, '2026-07');
-    // 平均 = (100,000+0+90,000)/3 = 63,333.33... → 63,333
-    expect(result?.trailingAverageExpenseYen).toBe(63_333);
-    expect(result?.differenceYen).toBe(136_667); // 200,000 - 63,333
+    // 平均 = (100,000+90,000)/2 = 95,000
+    expect(result?.trailingAverageExpenseYen).toBe(95_000);
+    expect(result?.differenceYen).toBe(105_000); // 200,000 - 95,000
   });
 
   it('当月のデータが無ければ null', () => {

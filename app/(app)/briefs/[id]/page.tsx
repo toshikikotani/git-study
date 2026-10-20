@@ -1,5 +1,4 @@
-import Link from 'next/link';
-
+import { BackHeader } from '@/components/ui/back-header';
 import { requireOwner } from '@/features/auth/owner';
 import { notFound } from 'next/navigation';
 
@@ -26,14 +25,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          {formatDateJa(brief.briefOn)}
-        </h1>
-        <Link href="/briefs" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          一覧へ戻る
-        </Link>
-      </header>
+      <BackHeader back={{ href: '/briefs', label: '朝配信' }} title={formatDateJa(brief.briefOn)} />
 
       <div className="space-y-3">
         {brief.items.map((item) => (

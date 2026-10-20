@@ -336,7 +336,7 @@ export function CaptureEntry({
             className="inline-flex min-h-11 items-center px-4 text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
-            {target.href === '/spending?review=input' ? '次の入力待ちへ' : target.label} →
+            {target.href === '/spending/review' ? '次の入力待ちへ' : target.label} →
           </Link>
         </div>
         {message ? (

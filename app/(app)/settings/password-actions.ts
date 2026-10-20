@@ -1,13 +1,11 @@
 'use server';
 
 /**
- * パスワード設定の Server Action(ADR-011)。
+ * パスワード設定の Server Action(ADR-011)。設定の画面のシートから使う(ADR-127)。
  *
  * DB のどのテーブルにも触れない。Supabase Auth の updateUser() が
  * ハッシュ化・保存を担う。ここでは形式チェックを呼ぶだけ。
  */
-
-import { redirect } from 'next/navigation';
 
 import { assertPassword, assertPasswordConfirmed } from '@/domain/auth';
 import { describeUserError } from '@/lib/errors';
@@ -15,6 +13,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export type PasswordFormState = {
   error: string | null;
+  saved: boolean;
 };
 
 export async function setPasswordAction(
@@ -31,14 +30,15 @@ export async function setPasswordAction(
         error,
         'パスワードを設定できませんでした。入力内容を確認してください。',
       ),
+      saved: false,
     };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
-    return { error: `パスワードを設定できませんでした: ${error.message}` };
+    return { error: `パスワードを設定できませんでした: ${error.message}`, saved: false };
   }
 
-  redirect('/');
+  return { error: null, saved: true };
 }

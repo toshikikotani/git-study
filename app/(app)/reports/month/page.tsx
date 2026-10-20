@@ -7,13 +7,17 @@ import { PeriodSwitcher } from '../../spending/period-switcher';
 import { SpendingMonthProvider } from '../../spending/spending-month-provider';
 import { AnalysisSummary } from '../analysis-summary';
 import { AnalysisTabs } from '../analysis-tabs';
+import { loadMerchantSpendingRanking } from '@/features/reports/store';
+import { MerchantRankingCard } from '../merchant-ranking-card';
 import { YearFlowCard } from '../year-flow-card';
-import { MonthAnalysisLinks } from './month-analysis-links';
+import { FrequencyCard } from './frequency-card';
+import { SmallSpendCard } from './small-spend-card';
 
 /**
  * 分析 › 月のふりかえり(デザイン仕様書の「4b」、ADR-091):何に使ったか。月の切り替え → 支出・収入・
- * 貯蓄率 → カテゴリ → 1年の流れ → 回数と1回の金額・月ごとの表・AIレポート。
- * そのほかの分析(固定費の候補・お店・資産・予測の当たり具合)は「…」の「そのほかの分析」へ。
+ * 貯蓄率 → カテゴリ → 回数と1回の金額 → お店 → 小口(ちりつも)→ 1年の流れ(「表で見る」で月ごとの表)。
+ * 分析を浅くするため、別の画面に分かれていたもの(回数・月ごとの表・ちりつも・お店)をカードにした
+ * (どれもタブから2回で届く、ADR-127)。
  */
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +47,13 @@ export default async function MonthReviewPage({
         <AnalysisTabs current="month" />
         <AnalysisSummary />
         <GenreBreakdown />
+        <FrequencyCard />
+        <Suspense fallback={null}>
+          <MerchantRanking />
+        </Suspense>
+        <Suspense fallback={null}>
+          <SmallSpendCard />
+        </Suspense>
         <Suspense fallback={null}>
           <div className="space-y-2">
             <p className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
@@ -51,8 +62,13 @@ export default async function MonthReviewPage({
             <YearFlowCard />
           </div>
         </Suspense>
-        <MonthAnalysisLinks />
       </SpendingMonthProvider>
     </div>
   );
+}
+
+/** お店ごとの支出(直近の数か月、金額の多い順。もとは「そのほかの分析」)。 */
+async function MerchantRanking() {
+  const ranking = await loadMerchantSpendingRanking().catch(() => null);
+  return ranking ? <MerchantRankingCard ranking={ranking} /> : null;
 }

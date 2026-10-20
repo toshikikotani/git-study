@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { BackHeader } from '@/components/ui/back-header';
 import { listAccounts } from '@/features/accounts/store';
 import { listGenres } from '@/features/genre/store';
 import { recentStoreNames } from '@/features/transactions/recent-stores';
@@ -32,18 +32,7 @@ export default async function CapturePage({
 
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-          レシートを入力
-        </h1>
-        <Link
-          href={target.href}
-          className="min-h-11 inline-flex items-center text-xs"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
-          {target.label} →
-        </Link>
-      </header>
+      <BackHeader back={target} title="レシートを入力" />
       {capture.status === 'resolved' ? (
         <p className="py-8 text-center text-sm" style={{ color: 'var(--ink-secondary)' }}>
           このレシートは保存済みです。

@@ -1,5 +1,4 @@
-import Link from 'next/link';
-
+import { BackHeader } from '@/components/ui/back-header';
 import { requireOwner } from '@/features/auth/owner';
 
 import { listRescuedEmails, type RescuedEmail } from '@/features/import/rescue-store';
@@ -29,14 +28,7 @@ export default async function RescuedEmailsPage() {
 
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          AI救済メールの見直し
-        </h1>
-        <Link href="/settings/gmail" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          戻る
-        </Link>
-      </header>
+      <BackHeader back={{ href: '/settings', label: '設定' }} title="読み取れなかったメール" />
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         ラベル辞書で読めず AI に回ったメールの本文です。同じ書式が繰り返し出てくるなら、

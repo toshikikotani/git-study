@@ -131,24 +131,10 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(html).toContain('分析');
     expect(html).toContain('月のふりかえり');
     expect(html).toContain('貯蓄率');
-    expect(html).toContain('href="/reports/frequency?month=');
-    expect(html).toContain('href="/reports/monthly"');
-    expect(html).toContain('href="/reports/ai?month=');
-  }, 60000);
-
-  it('そのほかの分析', async () => {
-    const html = (await render(() => import('../../../app/(app)/reports/more/page'))).replace(
-      /<!-- -->/g,
-      '',
-    );
-    expect(html).toContain('そのほかの分析');
-  }, 60000);
-
-  it('月ごとの表・回数と1回の金額', async () => {
-    const monthly = await render(() => import('../../../app/(app)/reports/monthly/page'));
-    expect(monthly).toContain('月ごとの表');
-    const frequency = await render(() => import('../../../app/(app)/reports/frequency/page'));
-    expect(frequency).toContain('回数と1回の金額');
+    // 回数・お店・小口・1年の流れはこの画面のカード(別の画面へ飛ばさない、ADR-127)。
+    expect(html).not.toContain('href="/reports/frequency');
+    expect(html).not.toContain('href="/reports/monthly"');
+    expect(html).not.toContain('href="/reports/more"');
   }, 60000);
 
   it('分析 › 目標(デザイン仕様書、ADR-091。旧「見通し」をまとめた)', async () => {

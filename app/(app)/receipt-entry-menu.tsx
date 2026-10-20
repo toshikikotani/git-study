@@ -1,7 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { FiCamera, FiCheck, FiEdit2, FiImage, FiSettings } from 'react-icons/fi';
+import {
+  FiCamera,
+  FiCheck,
+  FiEdit2,
+  FiFileText,
+  FiImage,
+  FiMail,
+  FiSettings,
+} from 'react-icons/fi';
 import {
   readReceiptQuickAction,
   RECEIPT_QUICK_ACTION_KEY,
@@ -11,8 +20,9 @@ import {
 import styles from './receipt-entry-menu.module.css';
 
 /**
- * ＋を押したときのメニュー(デザイン v3-11、ADR-125 → 126)。撮る・写真から読み取る・手で記録する・
- * 長押しの設定。色はアプリのテーマに合わせる(固定の色を使わない)。
+ * ＋を押したときのメニュー(デザイン v3-11、ADR-125 → 126 → 127)。記録の入口はここに集める:撮る・
+ * 写真から読み取る・手で記録する・メールから取り込む・CSVを取り込む、と長押しの設定。
+ * 色はアプリのテーマに合わせる(固定の色を使わない)。
  *   - レシートを撮る:その場でカメラを開く(画面を移らない)
  *   - 写真から読み取る:端末の写真を選ぶ画面をすぐ開く(間に自前の画面を挟まない)
  *   - 長押しの設定:メニューの中で開いて選ぶ(別の画面にしない)
@@ -84,7 +94,7 @@ function ReceiptEntryPopover({
         : document.querySelector<HTMLButtonElement>('button[aria-label="記録する"]');
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    panel?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+    panel?.querySelector<HTMLElement>('a[href], button')?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = previousOverflow;
       // 手入力・カメラなどが別の画面を開いた場合、その画面のフォーカスを奪わない。
@@ -151,7 +161,7 @@ function ReceiptEntryPopover({
           }
           if (event.key !== 'Tab') return;
           const controls = Array.from(
-            event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])'),
+            event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
           );
           const first = controls[0];
           const last = controls.at(-1);
@@ -210,6 +220,14 @@ function ReceiptEntryPopover({
           {preference === 'manual' ? <span className={styles.badge}>長押し</span> : null}
           <FiEdit2 aria-hidden="true" />
         </button>
+        <Link href="/transactions/email" prefetch={false} onClick={onClose} className={styles.row}>
+          <span className={styles.label}>メールから取り込む</span>
+          <FiMail aria-hidden="true" />
+        </Link>
+        <Link href="/transactions/import" prefetch={false} onClick={onClose} className={styles.row}>
+          <span className={styles.label}>CSVを取り込む</span>
+          <FiFileText aria-hidden="true" />
+        </Link>
         <button
           type="button"
           aria-expanded={settingsOpen}

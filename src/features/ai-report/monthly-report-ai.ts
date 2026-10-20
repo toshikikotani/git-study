@@ -64,6 +64,8 @@ export type MonthlyReportInput = {
   wasteRatioTrend: readonly { monthKey: string; wasteRatio: number | null }[];
   /** 貯金(収入 − 支出の自動の数え方、ADR-081)。 */
   savings: {
+    /** 貯金目標の毎月の額(今日の画面・AIの窓口と同じ値、ADR-127)。0 なら決めていない。 */
+    monthlyTargetYen?: number;
     totalYen: number;
     thisMonthYen: number;
     /** いつものペース(直近の月の平均)。 */
@@ -317,16 +319,20 @@ function buildUserContent(input: MonthlyReportInput): string {
   const s = input.savings;
   lines.push(
     '貯金の状況(収入 − 支出):',
-    `今月 ${s.thisMonthYen}円` +
+    // 貯金目標は1つ:毎月の額が目標(今日の画面と同じ値。「あといくら」はこの額で言う、ADR-127)。
+    ((s.monthlyTargetYen ?? 0) > 0
+      ? `貯金目標 毎月${s.monthlyTargetYen}円 ・ 今月あと${Math.max(0, (s.monthlyTargetYen ?? 0) - s.thisMonthYen)}円 ・ `
+      : '') +
+      `今月 ${s.thisMonthYen}円` +
       (s.paceYen !== null ? ` ・ いつもの月 ${s.paceYen}円` : '') +
       (s.nextGoal !== null ? ` ・ 貯まった合計 ${s.totalYen}円` : ''),
   );
   if (s.nextGoal !== null) {
     const g = s.nextGoal;
     lines.push(
-      `次の貯金目標: ${g.title}` +
+      `貯金目標の目的(目標額までの進み。「あと」は毎月の額で言う): ${g.title}` +
         (g.targetAmountYen !== null ? ` ${g.targetAmountYen}円` : '') +
-        (g.remainingYen !== null ? ` ・ あと${g.remainingYen}円` : '') +
+        (g.remainingYen !== null ? ` ・ 目標額まであと${g.remainingYen}円` : '') +
         (g.targetDate !== null ? ` ・ 期限${g.targetDate}` : ''),
     );
   }

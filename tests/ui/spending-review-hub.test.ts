@@ -39,19 +39,30 @@ vi.mock('../../app/(app)/transactions/actions', () => ({
   restoreRowFieldsAction: vi.fn(),
   updateTransactionAction: vi.fn(),
 }));
+vi.mock('../../app/(app)/transactions/receipt/receipt-results', () => ({
+  ReceiptResults: () => null,
+}));
+vi.mock('../../app/(app)/transactions/duplicates/duplicate-list', () => ({
+  DuplicateList: () => null,
+}));
+vi.mock('../../app/(app)/spending/pending-review-records', () => ({
+  PendingReviewRecords: () => null,
+}));
 vi.mock('@/components/ui/bottom-sheet', () => ({
   BottomSheet: ({ open, children }: { open: boolean; children: ReactNode }) =>
     open ? children : null,
   BottomSheetHeader: ({ children }: { children: ReactNode }) => children,
 }));
 
-import { AttentionCard } from '../../app/(app)/spending/attention-card';
+import { AttentionCard, AttentionFixer } from '../../app/(app)/spending/attention-card';
+import { ReviewHub } from '../../app/(app)/spending/review-hub';
+import { ReceiptResults } from '../../app/(app)/transactions/receipt/receipt-results';
+import { DuplicateList } from '../../app/(app)/transactions/duplicates/duplicate-list';
 import {
   MerchantNameGroupEditor,
   MerchantNameResults,
-  MerchantNameReview,
 } from '../../app/(app)/spending/merchant-name-review';
-import { JobRow } from '../../app/(app)/spending/pending-receipt-rows';
+import { CaptureRow } from '../../app/(app)/spending/pending-receipt-rows';
 
 const group: MerchantNameReviewGroup = {
   key: 'sugi',
@@ -111,13 +122,28 @@ function renderHub(props: Partial<ComponentProps<typeof AttentionCard>> = {}) {
   state.host!.begin();
   return AttentionCard({ hasGoal: true, ...props });
 }
-function openHub(props: Partial<ComponentProps<typeof AttentionCard>>) {
-  const card = nodes(renderHub(props)).find(
-    (node) => node.type === 'button' && node.props['aria-label']?.startsWith('確認が必要'),
-  )!;
-  card.props.onClick!();
-  return nodes(renderHub(props));
+const EMPTY_DUPLICATES = {
+  candidates: [],
+  decided: [],
+  storage: 'account' as const,
+  hasBrowserDecisions: false,
+};
+function renderReview(props: Partial<ComponentProps<typeof ReviewHub>> = {}) {
+  state.host!.begin();
+  return ReviewHub({
+    hasGoal: true,
+    captures: [],
+    records: [],
+    duplicates: EMPTY_DUPLICATES,
+    merchantNameGroups: [],
+    merchantNameError: null,
+    ...props,
+  });
 }
+const sectionTitles = (tree: ReactNode) =>
+  nodes(tree)
+    .map((node) => (node.props as { title?: string }).title)
+    .filter((title): title is string => typeof title === 'string');
 function renderEditor() {
   state.host!.begin();
   return MerchantNameGroupEditor({ group, onSaved });
@@ -163,53 +189,54 @@ beforeEach(() => {
   };
 });
 
-describe('明細の確認を1つの入口にまとめる', () => {
+describe('明細の確認を1つの入口にまとめる(「確認が必要」1画面、ADR-127)', () => {
   it('未処理がなければ確認カードを表示しない', () => {
     expect(renderHub()).toBeNull();
   });
-  it('全期間の入力・カテゴリ・重複・店名を1つのカードから開く', () => {
+  it('カードは「確認が必要」の画面へ進む。数は全期間の入力・カテゴリ・重複・店名', () => {
     const props = {
       pendingInputCount: 2,
       pendingCategoryCount: 3,
       duplicateCount: 1,
       merchantNameGroups: [group],
     };
-    const closed = nodes(renderHub(props));
-    expect(
-      closed.filter(
-        (node) => node.type === 'button' && node.props['aria-label']?.startsWith('確認が必要'),
-      ),
-    ).toHaveLength(1);
-    expect(closed.some((node) => node.props.href === '/spending?review=input')).toBe(false);
-    const opened = openHub(props);
-    for (const href of [
-      '/spending?review=input',
-      '/spending?review=category',
-      '/transactions/duplicates',
-      '/transactions/reconcile',
-    ]) {
-      expect(opened.some((node) => node.props.href === href)).toBe(true);
-    }
-    expect(opened.some((node) => node.props.href === '/accounts')).toBe(false);
+    const card = nodes(renderHub(props)).find((node) => node.props.href === '/spending/review')!;
+    expect(card.props['aria-label']).toBe('確認が必要。8項目');
+    expect(nodes(renderHub(props)).some((node) => node.type === 'button')).toBe(false);
   });
   it('別の月・口座・検索を選んでも全期間の未処理入口が残る', () => {
     state.month!.visibleMonth = '2026-08-01';
     state.month!.filter = { ...EMPTY_FILTER, accountId: 'other', search: '見つからない' };
     expect(
-      openHub({ pendingInputCount: 2 }).some(
-        (node) => node.props.href === '/spending?review=input',
+      nodes(renderHub({ pendingInputCount: 2 })).some(
+        (node) => node.props.href === '/spending/review',
       ),
     ).toBe(true);
   });
-  it('店名候補から対象確認シートへ進む', () => {
-    const props = { merchantNameGroups: [group] };
-    const opened = openHub(props);
-    opened.find(
-      (node) => node.type === 'button' && text(node.props.children).includes('店名をまとめて直す'),
-    )!.props.onClick!();
-    const sheet = nodes(renderHub(props)).find((node) => node.type === MerchantNameReview)!;
-    expect(sheet.props.open).toBe(true);
-    expect(sheet.props.groups).toEqual([group]);
+  it('その画面で、読み取ったレシート・入力待ち・カテゴリ・店名・重複を片づける(別の画面へ飛ばさない)', () => {
+    const tree = renderReview({
+      captures: [{ id: 'cap' } as ComponentProps<typeof ReviewHub>['captures'][number]],
+      records: [ledgerTx({ id: 'r', reviewStatus: 'pending' })],
+      duplicates: { ...EMPTY_DUPLICATES, candidates: [{} as never] },
+      merchantNameGroups: [group],
+    });
+    expect(sectionTitles(tree).sort()).toEqual(
+      ['入力待ちのレシート', 'カテゴリの確認', '店名のゆれ・店名なし', '重複'].sort(),
+    );
+    const all = nodes(tree);
+    expect(all.some((node) => node.type === ReceiptResults)).toBe(true);
+    expect(all.some((node) => node.type === CaptureRow)).toBe(true);
+    expect(all.some((node) => node.type === DuplicateList)).toBe(true);
+    expect(all.some((node) => node.type === MerchantNameResults)).toBe(true);
+    for (const href of [
+      '/spending?review=input',
+      '/spending?review=category',
+      '/transactions/duplicates',
+      '/transactions/reconcile',
+      '/transactions/receipt',
+    ]) {
+      expect(all.some((node) => node.props.href === href)).toBe(false);
+    }
   });
   it('カテゴリと差額の既存修正キューを残す', () => {
     state.month!.transactions = [
@@ -219,17 +246,15 @@ describe('明細の確認を1つの入口にまとめる', () => {
         expenseSubtype: null,
       },
     ];
-    const opened = openHub({});
-    opened.find(
+    nodes(renderReview()).find(
       (node) =>
-        node.type === 'button' &&
-        text(node.props.children).includes('この月のカテゴリ・差額を直す'),
+        node.type === 'button' && text(node.props.children).includes('カテゴリ・差額を直す'),
     )!.props.onClick!();
-    const fixer = nodes(renderHub()).find((node) => node.props.queue)!;
+    const fixer = nodes(renderReview()).find((node) => node.type === AttentionFixer)!;
     expect(fixer.props.open).toBe(true);
     expect(fixer.props.queue).toHaveLength(1);
   });
-  it('サーバー入力待ちと同じジョブを重複せず、読み取り中の入口を残す', () => {
+  it('サーバー入力待ちと同じジョブを重複して数えない', () => {
     state.month!.captures = [
       { id: 'capture' } as ReturnType<typeof useSpendingMonth>['captures'][number],
     ];
@@ -237,20 +262,20 @@ describe('明細の確認を1つの入口にまとめる', () => {
       { id: 'covered', status: 'needs_input', captureId: 'capture' },
       { id: 'reading', status: 'reading' },
     ] as ReceiptJob[];
-    const props = { pendingInputCount: 1 };
-    const card = nodes(renderHub(props)).find((node) =>
+    const card = nodes(renderHub({ pendingInputCount: 1 })).find((node) =>
       node.props['aria-label']?.startsWith('確認が必要'),
     )!;
     expect(card.props['aria-label']).toBe('確認が必要。2項目');
-    const opened = openHub(props);
-    expect(opened.filter((node) => node.type === JobRow)).toHaveLength(1);
   });
   it('候補読み込み失敗を未処理なしとして隠さない', () => {
     expect(renderHub({ merchantNameError: '店名を読み込めませんでした' })).not.toBeNull();
-    const opened = openHub({ merchantNameError: '店名を読み込めませんでした' });
-    expect(opened.some((node) => text(node.props.children) === '店名を読み込めませんでした')).toBe(
-      true,
-    );
+    const results = nodes(renderReview({ merchantNameError: '店名を読み込めませんでした' })).find(
+      (node) => node.type === MerchantNameResults,
+    )!;
+    expect((results.props as { error?: string }).error).toBe('店名を読み込めませんでした');
+  });
+  it('何も残っていなければ、そう出す', () => {
+    expect(renderToStaticMarkup(renderReview())).toContain('確認が必要なものはありません。');
   });
 });
 

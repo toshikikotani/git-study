@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * `/settings/ai` の Server Action(N1)。全AI機能の一括オン/オフだけを扱う。
+ * 設定の画面の「AI機能」のスイッチ(N1、ADR-127)。全AI機能の一括オン/オフだけを扱う。
  */
 
 import { revalidatePath } from 'next/cache';
@@ -28,6 +28,6 @@ export async function updateAiSettingsAction(
     throw error;
   }
 
-  revalidatePath('/settings/ai');
+  revalidatePath('/', 'layout');
   return { error: null, saved: true };
 }

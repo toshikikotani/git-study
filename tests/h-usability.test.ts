@@ -207,10 +207,10 @@ describe('H Undo(受け入れ基準12)', () => {
       'saveImportBatchAction',
     ];
     const missing: string[] = [];
-    // 取り込み(CSV・貼り付け・突き合わせ・重複確認)は別の確認フローを持つため対象外。
+    // 取り込み(CSV・メールから取り込む・重複確認)は別の確認フローを持つため対象外。
     const files = walk('app/(app)').filter(
       (f) =>
-        !/transactions\/(import|paste|reconcile|duplicates)\//.test(f) &&
+        !/transactions\/(import|email|paste|reconcile|duplicates)\//.test(f) &&
         !f.endsWith('actions.ts') &&
         !f.includes('/receipt/'),
     );

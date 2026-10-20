@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { BackHeader } from '@/components/ui/back-header';
 
 import { buildUpcoming } from '@/domain/upcoming';
 import { listGenres } from '@/features/genre/store';
@@ -6,6 +6,7 @@ import { loadLedgerTransactions } from '@/features/spending/entries';
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-store';
 import { loadDetectedSubscriptions } from '@/features/subscriptions/store';
+import { backTargetOf } from '@/lib/back-target';
 import { addDays, addMonths, daysBetween, monthStartJst, todayJst } from '@/lib/date';
 import { CategoryFixedBanner, DetectedPayments } from './upcoming-actions';
 import { DirectRecordEditor } from '../transactions/direct-record-editor';
@@ -25,11 +26,17 @@ function yen(n: number): string {
 }
 
 /**
- * これからの支払い(デザイン v3-7、ADR-108):今期の終わりまでの予定と、毎月の固定費、見つけた定期支払い。
+ * 予定と固定費(デザイン v3-7、ADR-108。もとの名前は「これからの支払い」、ADR-127 でそろえた):今期の終わりまでの
+ * 予定と、毎月の固定費、見つけた定期支払い。今日の画面と設定から開き、「‹ 戻り先」は開いた画面にする。
  * カテゴリごと固定費に毎月ちがう出費が入っていたら、外すかを聞く(本人の指摘:娯楽・趣味のライブ代が
  * 固定費 81,960円 に入っていた)。
  */
-export default async function UpcomingPage() {
+export default async function UpcomingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
+  const { from } = await searchParams;
   const today = todayJst();
   const monthFrom = monthStartJst();
   const month = { from: monthFrom, to: addDays(addMonths(monthFrom, 1), -1) };
@@ -64,22 +71,11 @@ export default async function UpcomingPage() {
 
   return (
     <div className="rise flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
-      <Link
-        href="/"
-        className="-ml-1 flex min-h-11 items-center self-start text-[17px]"
-        style={{ color: 'var(--accent)' }}
-      >
-        <span aria-hidden className="mr-1">
-          ‹
-        </span>
-        今日
-      </Link>
-      <header className="flex flex-col gap-1 px-1">
-        <h1 className="text-[28px] font-bold">これからの支払い</h1>
-        <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
-          {jaDate(until)}までの予定と、毎月の固定費
-        </span>
-      </header>
+      <BackHeader
+        back={backTargetOf(from)}
+        title="予定と固定費"
+        sub={`${jaDate(until)}までの予定と、毎月の固定費`}
+      />
 
       <CategoryFixedBanner
         categories={view.categoryFixed

@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
+import { SettingsLink } from '@/components/ui/settings-link';
 import { loadGoalView } from '@/features/goals/loader';
 import { getAppSettings } from '@/features/settings/store';
 import { getCurrentPlan, listPlanRanges, type SpendingPlan } from '@/features/spending-plan/store';
@@ -34,10 +35,11 @@ export default async function AnalysisGoalPage() {
           : 'active';
   return (
     <div className="rise flex flex-col gap-3">
-      <header className="px-1 pt-2">
+      <header className="flex items-center justify-between gap-2 px-1 pt-2">
         <h1 className="text-[34px] leading-tight font-bold" style={{ color: 'var(--ink)' }}>
           分析
         </h1>
+        <SettingsLink />
       </header>
       <AnalysisTabs current="goal" />
       {state === 'active' && plan ? (

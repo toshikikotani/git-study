@@ -18,8 +18,8 @@ export async function HomeBanners() {
         <Banner
           href={
             captures === 1 && captureSummary.firstId
-              ? (`/transactions/receipt/${captureSummary.firstId}?returnTo=${encodeURIComponent('/spending?review=input')}` as Route)
-              : '/spending?review=input'
+              ? (`/transactions/receipt/${captureSummary.firstId}?returnTo=${encodeURIComponent('/spending/review')}` as Route)
+              : '/spending/review'
           }
           title={`レシート${captures}件が入力待ち`}
           detail="読み取れなかったので、画像を見て入力できます"
@@ -33,7 +33,7 @@ export async function HomeBanners() {
       ) : null}
       {pending > 0 ? (
         <Banner
-          href="/spending?review=category"
+          href="/spending/review"
           title={`確認待ちの記録が${pending}件`}
           detail="自動で分けたカテゴリを確かめられます"
           icon={<path d="M5 12l5 5L20 7" />}

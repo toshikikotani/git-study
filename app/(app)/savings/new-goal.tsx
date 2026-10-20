@@ -30,7 +30,7 @@ export function NewGoal() {
         className="w-full rounded-full py-3 text-sm font-semibold"
         style={{ ...INPUT_STYLE, color: 'var(--accent)' }}
       >
-        + 貯金目標をつくる
+        + 何のために貯めるか(任意)
       </button>
     );
   }

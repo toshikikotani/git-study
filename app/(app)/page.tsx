@@ -4,8 +4,10 @@ import { Suspense } from 'react';
 import { recordCheckin } from '@/features/checkins/store';
 import { shouldShowOnboarding } from '@/features/onboarding/store';
 import { loadSavingsSummary } from '@/features/savings/store';
+import { AiInsightLine } from './_home/ai-insight-line';
 import { HomeBanners } from './_home/home-banners';
 import { HomeHeader } from './_home/home-header';
+import { PaydayCard } from './_home/payday-card';
 import { TodayRecords, UpcomingPayments } from './_home/recent-records';
 import { TodaySection } from './_home/today-section';
 import { SplitPaymentReceipts } from './_home/split-payment-receipts';
@@ -18,7 +20,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * ホーム(デザイン仕様書の「今日」、ADR-090):見出し → 入力待ちの知らせ → 今日使える目安 →
- * 今期の見通し → 次の一手 → 貯金 → 最近の記録。
+ * 今期の見通し → 次の一手 → 貯金 → AIの気づき1行 → 最近の記録。
  */
 export default async function HomePage() {
   // 目標も明細もまだ無い新しい人は、はじめての設定へ(ADR-084)。
@@ -36,6 +38,9 @@ export default async function HomePage() {
       <Suspense fallback={null}>
         <HomeBanners />
       </Suspense>
+      <Suspense fallback={null}>
+        <PaydayCard />
+      </Suspense>
       <Suspense fallback={<TodaySkeleton />}>
         <TodaySection
           savingsNowYen={savings?.thisMonthYen ?? null}
@@ -45,6 +50,9 @@ export default async function HomePage() {
             </Suspense>
           }
         />
+      </Suspense>
+      <Suspense fallback={null}>
+        <AiInsightLine />
       </Suspense>
       <Suspense fallback={null}>
         <SplitPaymentReceipts />

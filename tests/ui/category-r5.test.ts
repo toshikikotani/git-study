@@ -102,7 +102,6 @@ describe('R5 Liquid Glass(半透明の素材)はナビゲーションの層だ�
     'app/(app)/spending/category/[genreKey]/category-header.tsx', // 上部に固定される小さなナビゲーションバー
     'src/components/ui/bottom-sheet.tsx', // シート
     'src/components/ui/expandable-sheet.tsx', // シート
-    'src/components/ui/more-menu.tsx', // メニュー
     'src/components/ui/undo-toast.tsx', // 浮かぶ通知
     'src/components/ui/pull-to-refresh.tsx', // 引っ張って更新のインジケーター(浮かぶ丸)
   ]);

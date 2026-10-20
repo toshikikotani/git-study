@@ -37,6 +37,26 @@ describe('detectSubscriptions', () => {
     });
   });
 
+  it('ふだん買い物をする店(ほかの金額の買い物が2回以上)で、たまたま同じ額が続いたものは検知しない(ADR-127)', () => {
+    const conv = (occurredOn: string, amountYen: number) =>
+      tx({ merchantName: 'セブン-イレブン', description: 'ｾﾌﾞﾝｲﾚﾌﾞﾝ', occurredOn, amountYen });
+    expect(
+      detectSubscriptions([
+        conv('2026-08-03', -216),
+        conv('2026-08-15', -540),
+        conv('2026-08-28', -1_280),
+        conv('2026-09-02', -216),
+      ]),
+    ).toEqual([]);
+    // その店の買い物がその支払いだけなら、少額でも検知する(iCloud など)。
+    expect(
+      detectSubscriptions([
+        tx({ merchantName: 'iCloud', occurredOn: '2026-08-03', amountYen: -130 }),
+        tx({ merchantName: 'iCloud', occurredOn: '2026-09-03', amountYen: -130 }),
+      ]),
+    ).toHaveLength(1);
+  });
+
   it('1回しか無い場合は検知しない', () => {
     const result = detectSubscriptions([tx({ occurredOn: '2026-09-01' })]);
     expect(result).toEqual([]);

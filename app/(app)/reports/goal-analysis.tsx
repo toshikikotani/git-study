@@ -8,6 +8,7 @@ import { buildCategoryLines, UNCATEGORIZED_KEY } from '@/features/category/model
 import { buildCumulative, linesForGoal } from '@/features/category/pace';
 import { loadCategoryOutlooks } from '@/features/goals/category-outlook';
 import { loadCategorySpendingTrend } from '@/features/reports/store';
+import { watchToneOf } from '@/domain/forecast/watch-categories';
 import type { SpendingPlan } from '@/features/spending-plan/store';
 import { AiCard } from './ai-card';
 import { GroupHeading } from './analysis-tabs';
@@ -19,6 +20,7 @@ import { ProbabilityCard } from './probability-card';
 import { SpendingTrendChart } from './spending-trend-chart';
 import { WeekdayHabit } from './weekday-habit';
 import { weekdayHabitRows } from './weekday-habit-data';
+import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
 
 /** 2026-10-01 → 10/1 */
@@ -115,23 +117,29 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
       fixed: o.fixed,
     }));
 
-  // どこで使っているか:目標のあるカテゴリの進み具合。
+  // どこで使っているか:目標のあるカテゴリの進み具合。「気をつけたい」は今日と同じ決め方(ADR-127):
+  // こえた・こえそう・8割をこえた。固定費(決まった型・予測を止めたカテゴリ)は別にまとめる。
   const progress: ProgressRow[] = loaded.outlooks
     .filter((o) => o.targetYen !== null)
-    .map((o) => ({
-      genreId: o.genreId,
-      name: o.name,
-      spentYen: o.spentYen,
-      targetYen: o.targetYen!,
-      p50: o.p50,
-      fixed: o.fixed,
-      tone:
-        o.spentYen > o.targetYen!
-          ? 'over'
-          : o.caution !== null || (o.p50 !== null && o.p50 > o.targetYen!)
-            ? 'risk'
-            : 'ok',
-    }));
+    .map((o) => {
+      const fixed = o.fixed || fixedIds.has(o.genreId);
+      const tone = watchToneOf({
+        spentYen: o.spentYen,
+        targetYen: o.targetYen,
+        p50: o.p50,
+        caution: o.caution,
+        fixed,
+      });
+      return {
+        genreId: o.genreId,
+        name: o.name,
+        spentYen: o.spentYen,
+        targetYen: o.targetYen!,
+        p50: o.p50,
+        fixed,
+        tone: fixed ? 'fixed' : (tone ?? 'ok'),
+      };
+    });
   const habit = weekdayHabitRows(loaded.transactions, {
     from: period.from,
     to: today < period.to ? today : period.to,
@@ -249,7 +257,16 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
             // 値は下の行に(右に並べると「なぜ約20.6万円？」が2行に折れた、本人の指摘、ADR-108)。
             title: 'なぜこの見込み？',
             sub: `${formatEstimate(b.totalYen)} = 決まった分 ${man(decided)} + これから ${man(ahead)}`,
-            content: <WhyCard forecast={forecast} closedGenreIds={closed} />,
+            // 予測の確かさ(過去の月での当たり具合)もここで見る(もとは「そのほかの分析」、ADR-127)。
+            content: (
+              <div className="flex flex-col gap-3">
+                <WhyCard forecast={forecast} closedGenreIds={closed} />
+                <VerificationCard
+                  verification={loaded.forecast?.verification ?? null}
+                  monthStart={period.from}
+                />
+              </div>
+            ),
           },
           ...(forecast.probWithinBudget !== null
             ? [

@@ -1,7 +1,8 @@
 'use server';
 
 /**
- * カテゴリ分析(/reports/genres)の Server Action(本人発案、ADR-056)。
+ * AI でカテゴリを分ける(本人発案、ADR-056)。明細の「確認が必要」の未分類から押す(もとはカテゴリ分析の
+ * 画面、ADR-127)。AI の分類は、合計に入れる前に「カテゴリの確認」へ提案として出す(確認待ちにする)。
  *
  * 「カテゴリ分類する」は AI家計診断(ADR-030)の diagnoseSpendingAction() と
  * 同じ、本人がボタンを押した時だけ AI を呼ぶ唯一の入り口。カテゴリの追加・削除などの
@@ -91,7 +92,6 @@ export async function classifyGenresAction(
     };
   }
 
-  revalidatePath('/reports/genres');
   revalidatePath('/spending');
   return {
     classifiedCount: outcome.classifications.length,

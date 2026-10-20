@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { saveImportBatchAction } from '../actions';
+import { BackHeader } from '@/components/ui/back-header';
 import { Card } from '@/components/ui/card';
 import { TransactionRow } from '@/components/ui/transaction-row';
 import {
@@ -170,14 +171,7 @@ export default function ImportPage() {
 
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          CSV を取り込む
-        </h1>
-        <Link href="/spending" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          やめる
-        </Link>
-      </header>
+      <BackHeader back={{ href: '/spending', label: '明細', cancel: true }} title="CSVを取り込む" />
 
       <Card>
         <InputAccountSelector inputAccount={inputAccount} />

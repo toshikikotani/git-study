@@ -3,9 +3,9 @@
 import { useActionState } from 'react';
 
 import { MIN_PASSWORD_LENGTH } from '@/domain/auth';
-import { setPasswordAction, type PasswordFormState } from './actions';
+import { setPasswordAction, type PasswordFormState } from './password-actions';
 
-const INITIAL_STATE: PasswordFormState = { error: null };
+const INITIAL_STATE: PasswordFormState = { error: null, saved: false };
 
 export function PasswordForm() {
   const [state, formAction, pending] = useActionState(setPasswordAction, INITIAL_STATE);
@@ -46,12 +46,17 @@ export function PasswordForm() {
           {state.error}
         </p>
       ) : null}
+      {state.saved ? (
+        <p role="status" className="text-xs" style={{ color: 'var(--income)' }}>
+          パスワードを設定しました。次回からこのパスワードでログインできます。
+        </p>
+      ) : null}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-2xl py-3 text-sm font-medium text-white disabled:opacity-50"
-        style={{ background: 'var(--action)' }}
+        className="min-h-11 w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
+        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
       >
         {pending ? '設定しています…' : 'パスワードを設定'}
       </button>

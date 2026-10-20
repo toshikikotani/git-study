@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 import { BottomSheetHeader } from '@/components/ui/bottom-sheet';
@@ -883,39 +882,6 @@ export function RecordSheet({
             ? '返品・返金は、選んだカテゴリの使った額から差し引かれます（収入にはなりません）。'
             : `${amountYen.toLocaleString('ja-JP')}円（自分の分）として記録します。`}
         </p>
-      ) : null}
-      {!edit ? (
-        <details className="rounded-2xl px-4" style={{ background: 'var(--surface)' }}>
-          <summary
-            className="min-h-11 cursor-pointer py-3 text-[14px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            ほかの入力方法
-          </summary>
-          <nav aria-label="ほかの入力方法" className="flex flex-col pb-2">
-            {(
-              [
-                { href: '/transactions/capture-text', label: '話して・文字で記録' },
-                { href: '/transactions/import', label: 'CSVを取り込む' },
-                { href: '/transactions/paste', label: 'メールを貼り付ける' },
-              ] as const
-            ).map((entry) => (
-              <Link
-                key={entry.href}
-                href={entry.href}
-                prefetch={false}
-                onClick={() => {
-                  keepDraft(current);
-                  onClose();
-                }}
-                className="flex min-h-11 items-center text-[14px] font-medium"
-                style={{ color: 'var(--ink)' }}
-              >
-                {entry.label} →
-              </Link>
-            ))}
-          </nav>
-        </details>
       ) : null}
       {edit?.footer ?? null}
     </div>

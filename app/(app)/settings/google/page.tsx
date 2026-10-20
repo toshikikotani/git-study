@@ -1,5 +1,4 @@
-import Link from 'next/link';
-
+import { BackHeader } from '@/components/ui/back-header';
 import { requireOwner } from '@/features/auth/owner';
 
 import { Card } from '@/components/ui/card';
@@ -23,14 +22,7 @@ export default async function GoogleSettingsPage() {
 
   return (
     <div className="rise space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-          Google 連携
-        </h1>
-        <Link href="/" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-          戻る
-        </Link>
-      </header>
+      <BackHeader back={{ href: '/settings', label: '設定' }} title="Google 連携" />
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         給料日・サブスクの更新日・貯金目標の期限をGoogleカレンダーへ、毎月の明細を

@@ -277,7 +277,7 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
       const result = await loadSplitPaymentTrackingAction();
       if (result.error) throw new Error(result.error);
       if (result.userId !== userId)
-        throw new Error('ログイン状態が変わりました。ホームを開き直してください。');
+        throw new Error('ログイン状態が変わりました。今日の画面を開き直してください。');
       setRequests(result.requests);
       setStorage(result.storage);
       setLoadError(null);
