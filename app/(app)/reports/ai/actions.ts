@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * AI月次・日次レポート(/reports/ai)の Server Action(ADR-031/ADR-032)。
+ * AI月次・日次レポートの Server Action(ADR-031/ADR-032)。AIのレポート(/reports/ai)と分析の「AIの気づき」から。
  * 本人がボタンを押した時だけ AI を呼ぶ唯一の入り口。
  */
 
@@ -114,6 +114,8 @@ async function runReportAction<Input, Body, Saved>(step: {
   }
 
   revalidatePath('/reports');
+  revalidatePath('/reports/ai');
+  revalidatePath('/');
   return {
     report: { ...saved, createdAt: new Date().toISOString() },
     error: null,

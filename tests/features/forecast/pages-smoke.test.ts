@@ -135,6 +135,8 @@ describe('主要ページがサーバー描画でエラーにならない(Supaba
     expect(html).not.toContain('href="/reports/frequency');
     expect(html).not.toContain('href="/reports/monthly"');
     expect(html).not.toContain('href="/reports/more"');
+    // AIのレポート(日次・タイプ診断・アドバイス・見込みの読み・前の月)は、選んだ月で開く(ADR-128)。
+    expect(html).toContain('href="/reports/ai?month=');
   }, 60000);
 
   it('分析 › 目標(デザイン仕様書、ADR-091。旧「見通し」をまとめた)', async () => {

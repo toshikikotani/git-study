@@ -6,7 +6,7 @@ import { todayJst } from '@/lib/date';
 
 /**
  * 今日の画面の「AIの気づき」1行(提案書「AIレポートは分析の気づきと今日の1行に」、ADR-127)。今月の
- * AIの分析のいちばん上の気づきだけを出し、押すと分析 › 目標(気づきの全部と「もう一度分析する」)。
+ * AIの分析のいちばん上の気づきだけを出し、押すとAIのレポート(気づき・アドバイス・タイプ診断・日次、ADR-128)。
  * まだ分析していなければ何も出さない。
  */
 export async function AiInsightLine() {
@@ -15,7 +15,7 @@ export async function AiInsightLine() {
   if (!first) return null;
   return (
     <Link
-      href="/reports"
+      href="/reports/ai?from=/"
       className="flex min-h-14 items-center gap-3 rounded-[22px] px-4 py-3"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >

@@ -10,6 +10,7 @@ export const ASSISTANT_SCREENS = {
   review: { href: '/spending/review', label: '確認が必要' },
   analysis: { href: '/reports', label: '分析 › 目標' },
   month_review: { href: '/reports/month', label: '分析 › 月のふりかえり' },
+  ai_report: { href: '/reports/ai', label: 'AIのレポート' },
   goal_edit: { href: '/plan/edit', label: '今期の目標' },
   categories: { href: '/settings/categories', label: 'カテゴリの設定' },
   accounts: { href: '/accounts', label: '口座' },
