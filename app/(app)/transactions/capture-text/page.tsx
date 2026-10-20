@@ -1,10 +1,9 @@
-import { CaptureTextForm } from './capture-text-form';
+import { redirect } from 'next/navigation';
 
 /**
- * 「話して記録」「文字で記録」(N3)。普通の文章(または音声認識でテキスト化
- * した文章)から取引の候補を作る。入口が2つあるだけで、後段の処理は完全に
- * 共通(features/import/natural-text-ai.ts)。
+ * 古いリンクの受け皿:「話して記録」「文字で記録」は AI のタブにまとめた(マイクでも文字でも記録できる、
+ * ADR-127)。
  */
 export default function CaptureTextPage() {
-  return <CaptureTextForm />;
+  redirect('/assistant');
 }

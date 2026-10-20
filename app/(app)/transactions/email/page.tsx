@@ -1,0 +1,319 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+
+import { saveImportBatchAction } from '../actions';
+import { InputAccountSelector, useInputAccount } from '../input-account';
+import { BackHeader } from '@/components/ui/back-header';
+import { Card } from '@/components/ui/card';
+import { TransactionRow } from '@/components/ui/transaction-row';
+import {
+  parseNotificationEmail,
+  type EmailParseResult,
+  type ParsedEmailTransaction,
+} from '@/features/import/email';
+import { parseStatementEmail } from '@/features/import/statement-email';
+import { fetchGenreOptions, type GenreOption } from '@/features/transactions/genres-client';
+import { buildPreview } from '@/features/transactions/import-pipeline';
+import type { StoredTransaction } from '@/features/transactions/store';
+import { StatementCheck } from './statement-check';
+
+/**
+ * メールから取り込む(＋のメニューから開く、ADR-127)。カード会社のメールを貼るだけ:
+ *   - 利用のお知らせ(ご利用日・ご利用先・金額):明細として取り込む(もとの「メールを貼り付ける」)
+ *   - 請求のお知らせ(ご請求金額・期間):取り込んだ明細と突き合わせる(もとの「請求金額と突き合わせる」)
+ * どちらかは貼った本文から見分ける(貼る前にどちらの画面を開くか迷わない)。
+ *
+ * ── これは主経路ではない ────────────────────────────────────
+ * 設計原則2は「記録の手間を最小化。手入力は例外」。毎回貼り付けさせるのは
+ * 離脱理由の1位(入力の手間)そのものなので、本来は Gmail 自動取得
+ * (ADR-018)が働く。この画面は次の3つの場合のための逃げ道:
+ *
+ *   1. Gmail 連携をまだ設定していない
+ *   2. 連携していない別のアドレスに届いた
+ *   3. 自動取得が取りこぼした1通を今すぐ入れたい
+ *
+ * 画面上でもその位置づけを明示し、自動取得への導線を必ず置く。
+ */
+
+export default function EmailImportPage() {
+  const [body, setBody] = useState('');
+  const [saved, setSaved] = useState<{ imported: number; duplicates: number } | null>(null);
+  /** 辞書で読めなかったときに AI が読み取った結果(ADR-019)。 */
+  const [rescued, setRescued] = useState<EmailParseResult | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [genreOptions, setGenreOptions] = useState<GenreOption[]>([]);
+  /** 行ごとに本人が選び直したジャンル(未選択の行は id をキーに持たない)。 */
+  const [genreOverrides, setGenreOverrides] = useState<Map<string, string>>(new Map());
+  const inputAccount = useInputAccount();
+  const { accountId } = inputAccount;
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // ジャンル一覧(ADR-057)。取り込み時にAIで確定させることはしない。
+  useEffect(() => {
+    void fetchGenreOptions().then(setGenreOptions);
+  }, []);
+
+  const byLabels = useMemo(() => (body.trim() ? parseNotificationEmail(body) : null), [body]);
+  const parsed = rescued ?? byLabels;
+  // 利用のお知らせとして読めず、請求の金額が読めたら、請求のお知らせとして突き合わせる。
+  const statement = useMemo(() => (body.trim() ? parseStatementEmail(body) : null), [body]);
+  const isStatement =
+    statement?.statement != null && (byLabels?.transactions.length ?? 0) === 0 && rescued === null;
+
+  /**
+   * AI に読み取らせる。
+   *
+   * 自動では呼ばない。読めているメールで API を叩くのは無駄だし、
+   * 入力のたびに課金が走るのは本人にとって不意打ちになる。
+   * 「辞書で読めなかった」ときにだけボタンを出し、押されたら呼ぶ。
+   */
+  const askAi = async () => {
+    setAsking(true);
+    try {
+      const response = await fetch('/api/import/email', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      if (!response.ok) {
+        setRescued({ transactions: [], warnings: ['AI での読み取りに失敗しました。'] });
+        return;
+      }
+      const result = (await response.json()) as {
+        transactions: ParsedEmailTransaction[];
+        warnings: string[];
+      };
+      setRescued({ transactions: result.transactions, warnings: result.warnings });
+    } catch {
+      setRescued({ transactions: [], warnings: ['AI での読み取りに失敗しました。'] });
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const rulePreview = useMemo<StoredTransaction[]>(() => {
+    if (!parsed || !accountId) return [];
+    return buildPreview(parsed.transactions, accountId, (i) => `paste-${i}`, 'manual');
+  }, [parsed, accountId]);
+
+  // 本人がその場で選び直したジャンルを重ねる。本文を書き換えると
+  // rulePreview の内容が総入れ替えになるため、古い genreOverrides は
+  // 自然に参照されなくなる。
+  const preview = useMemo<StoredTransaction[]>(() => {
+    if (genreOverrides.size === 0) return rulePreview;
+    return rulePreview.map((t) => {
+      const genreId = genreOverrides.get(t.id);
+      if (genreId === undefined) return t;
+      return {
+        ...t,
+        genreId,
+        genreName: genreOptions.find((g) => g.id === genreId)?.name ?? null,
+        classifiedBy: 'manual',
+      };
+    });
+  }, [rulePreview, genreOverrides, genreOptions]);
+
+  function setRowGenre(transactionId: string, genreId: string): void {
+    setGenreOverrides((prev) => {
+      const next = new Map(prev);
+      if (genreId === '') {
+        next.delete(transactionId);
+      } else {
+        next.set(transactionId, genreId);
+      }
+      return next;
+    });
+  }
+
+  const save = async () => {
+    if (!inputAccount.selectedAccount || saving) return;
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const outcome = await saveImportBatchAction(preview, {
+        fileName: 'メール貼り付け',
+        source: 'manual',
+        accountId,
+        failedCount: parsed?.warnings.length ?? 0,
+      });
+      if (outcome.error) {
+        setSaveError(outcome.error);
+        return;
+      }
+      setSaved(outcome);
+      setBody('');
+    } catch {
+      setSaveError('通信に失敗しました。入力内容を残したまま再試行できます。');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rise space-y-4">
+      <BackHeader
+        back={{ href: '/spending', label: '明細' }}
+        title="メールから取り込む"
+        sub="利用のお知らせも、請求のお知らせも、ここに貼ります"
+      />
+
+      {/* 主経路ではないことを画面で明示する */}
+      <div
+        className="glass rounded-2xl p-4"
+        style={{ background: 'var(--accent-track)', boxShadow: 'var(--card-shadow)' }}
+      >
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          これは一時的な手段です。毎回貼り付ける必要はありません。
+          <br />
+          Gmail 連携を設定すると、通知メールは自動で取り込まれます。
+        </p>
+        <Link
+          href="/settings/gmail"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
+          style={{ color: 'var(--accent)' }}
+        >
+          自動取得を設定する
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
+
+      {saved ? (
+        <Card>
+          <p className="text-sm" style={{ color: 'var(--ink)' }}>
+            {saved.imported} 件を取り込みました
+            {saved.duplicates > 0 ? `(重複 ${saved.duplicates} 件を除外)` : ''}
+          </p>
+          <Link
+            href="/spending"
+            className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
+            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          >
+            明細を見る
+          </Link>
+        </Card>
+      ) : null}
+
+      {/* 口座(M6-2) */}
+      <Card>
+        <InputAccountSelector inputAccount={inputAccount} />
+      </Card>
+
+      <Card>
+        <label
+          className="text-xs font-medium tracking-[0.08em] uppercase"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          メール本文
+        </label>
+        <textarea
+          value={body}
+          onChange={(e) => {
+            setBody(e.target.value);
+            setSaved(null);
+            setRescued(null);
+          }}
+          rows={8}
+          placeholder={
+            'ご利用日: 2026/09/03\nご利用先: ローソン渋谷\nご利用金額: 3,500円\n\nまたは\nご利用期間:2026年8月11日〜2026年9月10日\n今回のご請求金額 45,678円'
+          }
+          className="mt-2 w-full resize-y rounded-2xl p-3 text-sm"
+          style={{
+            background: 'var(--plane)',
+            color: 'var(--ink)',
+            border: '1px solid var(--hairline)',
+          }}
+        />
+
+        {!isStatement && preview.length > 0 ? (
+          <>
+            <ul
+              className="mt-4 divide-y overflow-hidden rounded-2xl"
+              style={{ borderColor: 'var(--hairline)', background: 'var(--plane)' }}
+            >
+              {preview.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <TransactionRow transaction={t} />
+                  </div>
+                  <select
+                    value={t.genreId ?? ''}
+                    onChange={(e) => setRowGenre(t.id, e.target.value)}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs"
+                    style={{
+                      background: 'var(--surface)',
+                      color: 'var(--ink)',
+                      border: '1px solid var(--hairline)',
+                    }}
+                  >
+                    <option value="">未分類</option>
+                    {genreOptions.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={!inputAccount.selectedAccount || saving}
+              className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            >
+              {saving ? '取り込んでいます…' : `${preview.length} 件を取り込む`}
+            </button>
+
+            {saveError ? (
+              <p className="mt-2 text-center text-xs" style={{ color: 'var(--over)' }}>
+                {saveError}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+
+        {/* 辞書で読めなかったメールは AI に回せる。押されたときだけ呼ぶ。 */}
+        {byLabels && byLabels.transactions.length === 0 && rescued === null && !isStatement ? (
+          <button
+            type="button"
+            onClick={() => void askAi()}
+            disabled={asking}
+            className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
+            style={{
+              background: 'var(--plane)',
+              color: 'var(--accent)',
+              border: '1px solid var(--hairline)',
+              opacity: asking ? 0.6 : 1,
+            }}
+          >
+            {asking ? '読み取っています…' : 'AI に読み取らせる'}
+          </button>
+        ) : null}
+
+        {rescued && rescued.transactions.length > 0 ? (
+          <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            AI が読み取りました。金額と日付が合っているか確認してください。
+          </p>
+        ) : null}
+
+        {/* 読めなかった理由を黙って捨てない */}
+        {!isStatement && parsed && parsed.warnings.length > 0 ? (
+          <ul className="mt-3 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
+            {parsed.warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        ) : null}
+      </Card>
+
+      {isStatement && statement ? (
+        <StatementCheck key={body} parsed={statement} inputAccount={inputAccount} />
+      ) : null}
+    </div>
+  );
+}

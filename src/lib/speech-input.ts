@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * 声で入力する(ブラウザの音声認識、日本語)。話し終えると onText に聞き取った文を渡す。
  * 標準化前の実装(Safari などの webkitSpeechRecognition)にも対応する。使えない端末では supported が false。
- * 「話して・文字で記録」(capture-text-form.tsx)と同じやり方を、AIの窓口(ADR-103)でも使えるようにした。
+ * もとは「話して・文字で記録」の画面のやり方。いまは AI の窓口(ADR-103)で使う(その画面は AI にまとめた、ADR-127)。
  */
 type SpeechRecognitionLike = {
   lang: string;

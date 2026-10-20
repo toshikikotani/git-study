@@ -35,10 +35,10 @@ export default function manifest(): MetadataRoute.Manifest {
         url: '/spending?record=1',
       },
       {
-        name: '話して記録・文字で記録',
-        short_name: '話す/打つ',
-        description: '声か文章で取引を記録する',
-        url: '/transactions/capture-text',
+        name: 'AIに話して記録',
+        short_name: 'AI',
+        description: '声か文章で取引を記録する(AIのタブ)',
+        url: '/assistant',
       },
     ],
   };
