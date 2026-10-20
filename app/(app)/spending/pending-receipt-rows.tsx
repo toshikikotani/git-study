@@ -123,7 +123,7 @@ export function JobRow({ job }: { job: ReceiptJob }) {
   const href: Route =
     job.status === 'needs_input' && job.captureId
       ? (`/transactions/receipt/${job.captureId}` as Route)
-      : '/transactions/receipt';
+      : '/spending/review';
   return (
     <li>
       <Link href={href} prefetch={false} className={`min-h-11 ${ROW}`} style={ROW_STYLE}>

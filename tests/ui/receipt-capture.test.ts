@@ -98,15 +98,16 @@ describe('増えていた画面をなくす', () => {
     expect(entry).not.toContain('ホーム画面からすぐ撮影');
     expect(entry).not.toContain('<main');
     expect(entry).not.toContain('<h1');
-    expect(entry).toContain("onDone={() => router.replace('/transactions/receipt')}");
+    // 撮り終えたら「確認が必要」で読み取ったレシートを確かめる(ADR-127)。
+    expect(entry).toContain("onDone={() => router.replace('/spending/review')}");
     expect(entry).toContain('router.back()');
   });
 
-  it('＋・長押し・記録するシートからは、その場でカメラを開く。撮り終えたら読み取り結果へ', () => {
+  it('＋・長押し・記録するシートからは、その場でカメラを開く。撮り終えたら「確認が必要」へ', () => {
     const shell = read('app/(app)/app-shell.tsx');
     expect(shell).not.toContain("router.push('/camera')");
     expect(shell).toContain('onCamera={() => setCameraOpen(true)}');
-    expect(shell).toContain("router.push('/transactions/receipt');");
+    expect(shell).toContain("router.push('/spending/review');");
     const sheet = read('app/(app)/record-sheet.tsx');
     expect(sheet).not.toContain('href="/camera"');
     expect(sheet).not.toContain('href="/photos"');

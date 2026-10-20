@@ -42,7 +42,12 @@ describe('初回設定の任意の貯金目標', () => {
 
 describe('入力待ちの戻り先', () => {
   it('次の入力待ちへ戻る経路を保ち、外部URLや未知の経路は受け付けない', () => {
-    expect(captureReturnTarget('/spending?review=input').href).toBe('/spending?review=input');
+    // 入力待ちは「確認が必要」の画面にまとめた(古いリンクもそこへ、ADR-127)。
+    expect(captureReturnTarget('/spending/review')).toEqual({
+      href: '/spending/review',
+      label: '確認が必要',
+    });
+    expect(captureReturnTarget('/spending?review=input').href).toBe('/spending/review');
     expect(captureReturnTarget('/').href).toBe('/');
     for (const value of [undefined, 'https://example.com', '//example.com', '/settings']) {
       expect(captureReturnTarget(value).href).toBe('/spending');

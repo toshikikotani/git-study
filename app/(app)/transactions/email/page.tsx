@@ -172,7 +172,7 @@ export default function EmailImportPage() {
         </p>
         <Link
           href="/settings/gmail"
-          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold"
+          className="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           自動取得を設定する
@@ -188,7 +188,7 @@ export default function EmailImportPage() {
           </p>
           <Link
             href="/spending"
-            className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
+            className="mt-4 flex min-h-11 w-full items-center justify-center rounded-full py-3 text-sm font-semibold"
             style={{ background: 'var(--action)', color: 'var(--on-action)' }}
           >
             明細を見る
@@ -263,7 +263,7 @@ export default function EmailImportPage() {
               type="button"
               onClick={() => void save()}
               disabled={!inputAccount.selectedAccount || saving}
-              className="mt-4 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
+              className="mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--action)', color: 'var(--on-action)' }}
             >
               {saving ? '取り込んでいます…' : `${preview.length} 件を取り込む`}
@@ -283,7 +283,7 @@ export default function EmailImportPage() {
             type="button"
             onClick={() => void askAi()}
             disabled={asking}
-            className="mt-4 w-full rounded-full py-3 text-sm font-semibold"
+            className="mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold"
             style={{
               background: 'var(--plane)',
               color: 'var(--accent)',

@@ -1,9 +1,11 @@
-/** 入力待ちの戻り先。外部URLや不明な経路を渡されても明細へ戻す。 */
+/** 入力待ちのレシートを入力したあとの戻り先(「‹ 前の画面の名前」にそろえる、ADR-127)。 */
 export function captureReturnTarget(value: string | undefined): {
-  href: '/spending' | '/spending?review=input' | '/';
+  href: '/spending' | '/spending/review' | '/';
   label: string;
 } {
-  if (value === '/spending?review=input') return { href: value, label: '入力待ちへ戻る' };
-  if (value === '/') return { href: value, label: '今日へ戻る' };
-  return { href: '/spending', label: '家計簿へ' };
+  if (value === '/spending/review' || value === '/spending?review=input') {
+    return { href: '/spending/review', label: '確認が必要' };
+  }
+  if (value === '/') return { href: '/', label: '今日' };
+  return { href: '/spending', label: '明細' };
 }

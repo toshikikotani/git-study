@@ -224,7 +224,7 @@ function BottomBar({
   const readFiles = useCallback(
     (files: File[]) => {
       enqueueReceiptFiles(files);
-      router.push('/transactions/receipt');
+      router.push('/spending/review');
     },
     [router],
   );
@@ -261,10 +261,10 @@ function BottomBar({
     <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {!keyboard.open && reading + waiting + offlineWaiting + needInput > 0 ? (
         <Link
-          href="/transactions/receipt"
+          href="/spending/review"
           prefetch={false}
           role="status"
-          onPointerDown={() => onNavigate('/transactions/receipt')}
+          onPointerDown={() => onNavigate('/spending/review')}
           className="min-h-11 inline-flex items-center label-text px-4 py-2 text-xs"
           style={{
             borderRadius: 'var(--radius-full)',
@@ -291,7 +291,7 @@ function BottomBar({
           onClose={() => setCameraOpen(false)}
           onDone={() => {
             setCameraOpen(false);
-            router.push('/transactions/receipt');
+            router.push('/spending/review');
           }}
           onManual={() => onOpenRecord()}
         />

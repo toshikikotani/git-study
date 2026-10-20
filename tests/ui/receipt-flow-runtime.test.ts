@@ -57,7 +57,7 @@ vi.mock('../../app/(app)/transactions/actions', () => ({
 }));
 vi.mock('@/lib/just-saved', () => ({ markJustSaved: vi.fn() }));
 
-import ReceiptPage from '../../app/(app)/transactions/receipt/page';
+import { ReceiptResults as ReceiptPage } from '../../app/(app)/transactions/receipt/receipt-results';
 
 const input: ReceiptConfirmSave = {
   plan: {

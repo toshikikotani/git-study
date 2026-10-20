@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 import { countNeedsInputCaptures, countPendingReview } from '@/features/home/pending';
 import { getCurrentPlan } from '@/features/spending-plan/store';
@@ -17,7 +18,6 @@ import { loadSpendingMonthData } from './month-data';
 import { MonthSummary } from './month-summary';
 import { PeriodSwitcher } from './period-switcher';
 import { SpendingMonthProvider } from './spending-month-provider';
-import { PendingReviewPage } from './pending-review-page';
 
 /**
  * 明細(デザイン仕様書の「明細」、ADR-090)。上から次の順に並べる:
@@ -41,9 +41,8 @@ export default async function SpendingPage({
   searchParams?: Promise<{ review?: string }>;
 }) {
   const query = await searchParams;
-  if (query?.review === 'input' || query?.review === 'category') {
-    return <PendingReviewPage kind={query.review} />;
-  }
+  // 古いリンクの受け皿:入力待ち・カテゴリの確認は「確認が必要」の画面にまとめた(ADR-127)。
+  if (query?.review === 'input' || query?.review === 'category') redirect('/spending/review');
   const [data, duplicates, fixedKeys, jar, pendingInputCount, pendingCategoryCount, merchantNames] =
     await Promise.all([
       loadSpendingMonthData(),

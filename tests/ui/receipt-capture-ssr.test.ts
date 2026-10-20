@@ -113,7 +113,9 @@ const ledgerHtml = (captures: CaptureView[], pendingOnly = false) =>
 describe('F7 入力待ち(受け入れ基準13)', () => {
   it('通常の明細では入力待ちを「確認が必要」に集約し、画像付きの行を並べない（ADR-116）', () => {
     const html = ledgerHtml([capture()]);
-    expect(html).toContain('aria-label="確認が必要。1項目"');
+    // 「確認が必要」は1画面にまとめた(押すとその画面へ、ADR-127)。
+    expect(html).toContain('href="/spending/review"');
+    expect(html).toContain('確認が必要');
     expect(html).toContain('入力待ち 1件');
     expect(html).not.toContain('src="https://example.test/receipt.jpg"');
     expect(html).not.toContain('href="/transactions/receipt/cap-1"');

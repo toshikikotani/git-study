@@ -19,7 +19,7 @@ describe('未処理バナーから対象へ進む', () => {
     pending.input.mockResolvedValue({ count: 1, firstId: 'capture-one' });
     const html = renderToString(await HomeBanners());
     expect(html).toContain(
-      'href="/transactions/receipt/capture-one?returnTo=%2Fspending%3Freview%3Dinput"',
+      'href="/transactions/receipt/capture-one?returnTo=%2Fspending%2Freview"',
     );
   });
 
@@ -27,8 +27,8 @@ describe('未処理バナーから対象へ進む', () => {
     pending.input.mockResolvedValue({ count: 2, firstId: 'capture-one' });
     pending.review.mockResolvedValue(3);
     const html = renderToString(h('main', null, await HomeBanners()));
-    expect(html).toContain('href="/spending?review=input"');
-    expect(html).toContain('href="/spending?review=category"');
+    // 入力待ちもカテゴリの確認も「確認が必要」の画面にまとめた(ADR-127)。
+    expect(html.match(/href="\/spending\/review"/g)).toHaveLength(2);
     expect(html).not.toContain('href="/spending"');
   });
 });
