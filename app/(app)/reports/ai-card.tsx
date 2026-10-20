@@ -7,7 +7,7 @@ import { generateMonthlyAiReportAction } from './ai/actions';
 
 /**
  * AIの気づき(デザイン仕様書の「分析 › 目標」、ADR-091):いつ更新した分析か、箇条書き、「もう一度分析する」。
- * 分析し直すと保存して画面を読み直す。全文は「月のふりかえり」の「日次・月次のAIレポート」。
+ * 分析し直すと保存して画面を読み直す。今日の画面には、いちばん上の気づきを1行出す(ADR-127)。
  */
 export function AiCard({
   asOfLabel,

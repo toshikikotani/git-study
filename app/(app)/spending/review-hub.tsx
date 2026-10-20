@@ -17,6 +17,7 @@ import { categoryHref } from '@/lib/category-nav';
 import { DuplicateList } from '../transactions/duplicates/duplicate-list';
 import { ReceiptResults } from '../transactions/receipt/receipt-results';
 import { AttentionFixer, REVIEW_HREF } from './attention-card';
+import { ClassifyButton } from './classify-button';
 import { MerchantNameResults } from './merchant-name-review';
 import { CaptureRow } from './pending-receipt-rows';
 import { PendingReviewRecords } from './pending-review-records';
@@ -123,6 +124,7 @@ export function ReviewHub({
               <span aria-hidden>›</span>
             </Link>
           ) : null}
+          {attention.uncategorized.count > 0 ? <ClassifyButton /> : null}
         </Section>
       ) : null}
 

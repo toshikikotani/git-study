@@ -298,7 +298,7 @@ export function PlanBuilder({
               未分類の支出が{formatYen(suggestion.uncategorizedYen, { sign: 'never' })}
               あり、目標に含まれていません。先に
               <Link
-                href="/reports/genres"
+                href="/spending/review"
                 className="min-h-11 inline-flex items-center font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
@@ -340,7 +340,7 @@ export function PlanBuilder({
           {error}
           {needsGenres ? (
             <Link
-              href="/reports/genres"
+              href="/spending/review"
               className="min-h-11 ml-1 inline-flex items-center font-semibold"
               style={{ color: 'var(--accent)' }}
             >

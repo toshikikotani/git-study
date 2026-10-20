@@ -99,8 +99,8 @@ export default async function GmailSettingsPage() {
           : '自動取得を有効にするまでは'}
         {settings.gmailEnabled ? null : (
           <>
-            <Link href="/transactions/paste" className="underline underline-offset-4">
-              メールの貼り付け
+            <Link href="/transactions/email" className="underline underline-offset-4">
+              メールから取り込む
             </Link>
             で個別に取り込めます。
           </>

@@ -113,7 +113,7 @@ async function runReportAction<Input, Body, Saved>(step: {
     };
   }
 
-  revalidatePath('/reports/ai');
+  revalidatePath('/reports');
   return {
     report: { ...saved, createdAt: new Date().toISOString() },
     error: null,

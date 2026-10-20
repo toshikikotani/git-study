@@ -1,11 +1,12 @@
-import Link from 'next/link';
-
+import { BackHeader } from '@/components/ui/back-header';
 import { listInbox, type InboxItem } from '@/features/alerts/inbox';
 import { MarkReadButton } from './mark-read-button';
+import { RiskyRulesCard } from './risky-rules-card';
 
 /**
  * お知らせ(デザインのホームのお知らせボタンの先、ADR-078)。これまで Discord などにだけ
  * 送っていた通知(alerts)を、アプリの中でも新しい順に見られるようにする。
+ * 危険な支払い方法(リボ・キャッシング・分割)の検知のしかたもここで見る(もとはカテゴリ分析、ADR-127)。
  */
 export const dynamic = 'force-dynamic';
 
@@ -26,21 +27,11 @@ export default async function NotificationsPage() {
   const unread = items.filter((item) => !item.read).length;
   return (
     <div className="rise space-y-4">
-      <header className="flex items-center justify-between gap-2">
-        <div>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center text-sm font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            ‹ ホーム
-          </Link>
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>
-            お知らせ
-          </h1>
-        </div>
-        {unread > 0 ? <MarkReadButton /> : null}
-      </header>
+      <BackHeader
+        back={{ href: '/', label: '今日' }}
+        title="お知らせ"
+        action={unread > 0 ? <MarkReadButton /> : undefined}
+      />
       {items.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
           この60日のお知らせはありません。
@@ -82,6 +73,7 @@ export default async function NotificationsPage() {
           ))}
         </ul>
       )}
+      <RiskyRulesCard />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { ProbabilityCard } from './probability-card';
 import { SpendingTrendChart } from './spending-trend-chart';
 import { WeekdayHabit } from './weekday-habit';
 import { weekdayHabitRows } from './weekday-habit-data';
+import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
 
 /** 2026-10-01 → 10/1 */
@@ -256,7 +257,16 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
             // 値は下の行に(右に並べると「なぜ約20.6万円？」が2行に折れた、本人の指摘、ADR-108)。
             title: 'なぜこの見込み？',
             sub: `${formatEstimate(b.totalYen)} = 決まった分 ${man(decided)} + これから ${man(ahead)}`,
-            content: <WhyCard forecast={forecast} closedGenreIds={closed} />,
+            // 予測の確かさ(過去の月での当たり具合)もここで見る(もとは「そのほかの分析」、ADR-127)。
+            content: (
+              <div className="flex flex-col gap-3">
+                <WhyCard forecast={forecast} closedGenreIds={closed} />
+                <VerificationCard
+                  verification={loaded.forecast?.verification ?? null}
+                  monthStart={period.from}
+                />
+              </div>
+            ),
           },
           ...(forecast.probWithinBudget !== null
             ? [

@@ -372,7 +372,13 @@ export async function saveGenres(
   for (const r of results.filter((r) => r.kind === 'transaction')) {
     const { error } = await supabase
       .from('transactions')
-      .update({ genre_id: r.genreId, classified_by: 'ai', confidence: r.confidence })
+      // AI の分類は提案:確認待ちにして、明細の「確認が必要」の「カテゴリの確認」に出す(ADR-127)。
+      .update({
+        genre_id: r.genreId,
+        classified_by: 'ai',
+        confidence: r.confidence,
+        review_status: 'pending',
+      })
       .eq('id', r.id);
     if (error) throw new GenreStoreError(`明細のカテゴリを保存できませんでした: ${error.message}`);
   }

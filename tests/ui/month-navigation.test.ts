@@ -24,15 +24,24 @@ vi.mock('../../app/(app)/reports/ai/actions', () => ({
   generateMonthlyAiReportAction: vi.fn(),
   generateDailyAiReportAction: vi.fn(),
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/reports/month' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/reports/month',
+  redirect: (url: string) => {
+    throw new Error(`REDIRECT ${url}`);
+  },
+}));
 vi.mock('../../app/(app)/spending/spending-month-provider', () => ({
   useSpendingMonth: () => monthState,
 }));
 
 import { GenreBreakdown } from '../../app/(app)/spending/genre-breakdown';
+import { FrequencyCard } from '../../app/(app)/reports/month/frequency-card';
 import FrequencyPage from '../../app/(app)/reports/frequency/page';
 import AiReportPage from '../../app/(app)/reports/ai/page';
-import { MonthAnalysisLinks } from '../../app/(app)/reports/month/month-analysis-links';
+import MonthlyPage from '../../app/(app)/reports/monthly/page';
+import MorePage from '../../app/(app)/reports/more/page';
+import GenresPage from '../../app/(app)/reports/genres/page';
+import PilePage from '../../app/(app)/spending/pile/page';
 
 const transactions = [
   ledgerTx({ id: 'meal1', genreId: 'dining', genreName: '外食', amountYen: -1_000 }),
@@ -62,81 +71,25 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-describe('月のふりかえりから同じ対象へ進む', () => {
-  it('頻度・AIリンクと要約を選択月にそろえ、年の分析は12か月のまま残す', () => {
-    const html = renderToString(h(MonthAnalysisLinks)).replace(/<!-- -->/g, '');
-    expect(html).toContain('href="/reports/frequency?month=2026-09"');
-    expect(html).toContain('href="/reports/ai?month=2026-09"');
-    expect(html).toContain('外食は回数が多く、趣味は1回が高め');
-    expect(html).toContain('href="/reports/monthly"');
-    expect(html).toContain('今月までの直近12か月');
-    expect(html).toContain('href="/reports/more"');
-
+describe('月のふりかえりから同じ対象へ進む(分析を浅くする、ADR-127)', () => {
+  it('回数と1回の金額は、月のふりかえりのカードで、選んだ月の明細から出す', () => {
+    const html = renderToString(h(FrequencyCard)).replace(/<!-- -->/g, '');
+    expect(html).toContain('回数と1回の金額');
     monthState = { ...monthState, visibleMonth: '2026-08-01', transactions: [] };
-    const changed = renderToString(h(MonthAnalysisLinks));
-    expect(changed).toContain('href="/reports/frequency?month=2026-08"');
-    expect(changed).not.toContain('外食は回数が多く');
+    expect(renderToString(h(FrequencyCard))).toBe('');
   });
 
   it('通常カテゴリも未分類も選択した月の内訳へ直行し、戻り先を持つ', () => {
+    monthState = { ...monthState, visibleMonth: '2026-09-01', transactions };
     const html = renderToString(h(GenreBreakdown));
     expect(html).toContain('href="/spending/category/dining?month=2026-09&amp;period=month');
     expect(html).toContain('href="/spending/category/none?month=2026-09&amp;period=month');
     expect(html).toContain('returnTo=%2Freports%2Fmonth%3Fmonth%3D2026-09');
   });
 
-  it('頻度は指定月の明細で集計し、見出しと戻り先も一致する', async () => {
-    const page = await FrequencyPage({ searchParams: Promise.resolve({ month: '2026-09' }) });
-    expect(store.calendar).toHaveBeenCalledWith('2026-09-01', expect.any(Date));
-    const html = renderToString(page).replace(/<!-- -->/g, '');
-    expect(html).toContain('2026年9月');
-    expect(html).toContain('外食は回数が多く、趣味は1回が高め');
-    expect(html).toContain('href="/reports/month?month=2026-09"');
-  });
-
-  it('壊れたURLでは有効な今月を読み込む', async () => {
-    await FrequencyPage({ searchParams: Promise.resolve({ month: '2026-13' }) });
-    expect(store.calendar).toHaveBeenCalledWith('2026-10-01', expect.any(Date));
-  });
-});
-
-describe('選択月のAIレポート', () => {
-  it('過去月に未保存なら、その事実と次の操作を表示し、今月データを混ぜない', async () => {
-    const page = await AiReportPage({ searchParams: Promise.resolve({ month: '2026-09' }) });
-    const html = renderToString(page).replace(/<!-- -->/g, '');
-    expect(store.monthlyReport).toHaveBeenCalledWith('2026-09');
-    expect(store.calendar).toHaveBeenCalledWith('2026-09-01', expect.any(Date));
-    expect(store.monthlyView).not.toHaveBeenCalled();
-    expect(store.dailyView).not.toHaveBeenCalled();
-    expect(html).toContain('この月のAIレポートは保存されていません');
-    expect(html).toContain('href="/reports/month?month=2026-09"');
-    expect(html).toContain('href="/reports/ai?month=2026-10"');
-    expect(html).not.toContain('今日の支出');
-    expect(html).not.toContain('今月の傾向');
-  });
-
-  it('保存済みの過去月レポートを表示し、根拠もその月へ戻す', async () => {
-    store.monthlyReport.mockResolvedValue({
-      personaType: 'balanced',
-      personaReasoning: '9月は使うところを選べました。',
-      insights: ['9月の外食の記録です。'],
-      advice: ['買い物の予定を確認しましょう。'],
-      createdAt: '2026-09-30T12:00:00Z',
-      forecastRead: null,
-    });
-    const page = await AiReportPage({ searchParams: Promise.resolve({ month: '2026-09' }) });
-    const html = renderToString(page).replace(/<!-- -->/g, '');
-    expect(html).toContain('9月は使うところを選べました。');
-    expect(html).toContain('2026年9月30日に作成した内容です。');
-    expect(html).toContain('href="/spending?month=2026-09"');
-    expect(html).not.toContain('保存されていません');
-    expect(html).not.toContain('今月のレポートを更新する');
-  });
-
-  it('今月では従来の日次・月次の作成機能を維持する', async () => {
-    await AiReportPage({ searchParams: Promise.resolve({ month: '2026-10' }) });
-    expect(store.monthlyView).toHaveBeenCalledOnce();
-    expect(store.dailyView).toHaveBeenCalledOnce();
-    expect(store.monthlyReport).not.toHaveBeenCalled();
+  it('別の画面だった 回数・月ごとの表・AIレポート・そのほかの分析・カテゴリ分析・ちりつも は、月のふりかえりへ', () => {
+    for (const Page of [FrequencyPage, AiReportPage, MonthlyPage, MorePage, GenresPage, PilePage]) {
+      expect(() => Page()).toThrow('REDIRECT /reports/month');
+    }
   });
 });

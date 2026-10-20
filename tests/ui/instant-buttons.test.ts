@@ -48,7 +48,6 @@ describe('保存のあとに router.refresh() を重ねない(往復を1回に�
     'app/(app)/plan/edit/goal-editor.tsx',
     'app/(app)/record-sheet.tsx',
     'app/(app)/reports/category-progress.tsx',
-    'app/(app)/reports/genres/genre-breakdown-card.tsx',
     'app/(app)/spending/category/[genreKey]/goal-target-edit.tsx',
     'app/(app)/transactions/duplicates/duplicate-list.tsx',
     'app/(app)/welcome/welcome-flow.tsx',
