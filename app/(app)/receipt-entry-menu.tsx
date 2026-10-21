@@ -141,6 +141,7 @@ function ReceiptEntryPopover({
       <button
         type="button"
         className={styles.dismiss}
+        data-tap-ok
         aria-label="記録メニューを閉じる"
         tabIndex={-1}
         onClick={onClose}

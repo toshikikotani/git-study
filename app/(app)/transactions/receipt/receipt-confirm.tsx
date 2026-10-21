@@ -333,7 +333,7 @@ export function ReceiptConfirm({
   return (
     <section
       aria-label={`${store}のレシート`}
-      className="glass overflow-hidden rounded-[28px]"
+      className="glass overflow-hidden rounded-2xl"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       {/* 下半分:読み取り結果 */}
@@ -740,12 +740,8 @@ export function ReceiptConfirm({
               disabled={
                 saving || !autoSaveReady || !accountId || (draft !== null && draft.paidYen <= 0)
               }
-              className="min-h-12 flex-1 rounded-full text-base font-semibold disabled:opacity-40"
-              style={{
-                background: 'var(--action)',
-                color: 'var(--on-action)',
-                boxShadow: 'var(--card-shadow)',
-              }}
+              className="btn-primary min-h-12 flex-1 rounded-full text-base font-semibold"
+              style={{ boxShadow: 'var(--card-shadow)' }}
             >
               {!autoSaveReady
                 ? '保存の準備中…'

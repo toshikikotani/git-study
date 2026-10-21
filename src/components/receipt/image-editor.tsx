@@ -195,8 +195,7 @@ export function ImageEditor({
             type="button"
             onClick={() => void save()}
             disabled={busy || image === null || isUnadjusted(rotation, insets, brightness)}
-            className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-11 flex-1 rounded-xl text-sm font-semibold"
           >
             {busy ? '保存しています…' : 'この画像を使う'}
           </button>

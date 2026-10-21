@@ -55,8 +55,7 @@ export function PasswordForm() {
       <button
         type="submit"
         disabled={pending}
-        className="min-h-11 w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary min-h-11 w-full rounded-2xl py-3 text-sm font-semibold"
       >
         {pending ? '設定しています…' : 'パスワードを設定'}
       </button>

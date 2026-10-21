@@ -124,7 +124,9 @@ export function CalendarHeatmap({
                     opacity: inMonth ? 1 : 0.4,
                   }}
                 >
-                  <span className={`tabular text-[16px] ${isToday ? 'font-bold' : 'font-medium'}`}>
+                  <span
+                    className={`tabular text-[16px] ${isToday ? 'font-bold' : 'font-semibold'}`}
+                  >
                     {d}
                   </span>
                   {isToday ? (

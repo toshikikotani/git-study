@@ -48,7 +48,7 @@ export function StatTile({
     >
       <div className="flex items-center justify-between gap-2">
         <span
-          className="text-xs font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-semibold tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           {label}
@@ -87,7 +87,7 @@ export function StatTile({
 
       {hint ? (
         <p
-          className="mt-3 flex items-center gap-1 text-xs font-medium"
+          className="mt-3 flex items-center gap-1 text-xs font-semibold"
           style={{ color: 'var(--ink-muted)' }}
         >
           {hint.text}
@@ -117,7 +117,7 @@ function ToneBadge({ tone, text }: { tone: BudgetTone; text: string }) {
   }[tone];
 
   return (
-    <span className="inline-flex items-center gap-2 text-xs font-medium">
+    <span className="inline-flex items-center gap-2 text-xs font-semibold">
       <span className="size-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
       <span style={{ color: tone === 'normal' ? 'var(--ink-muted)' : 'var(--ink-secondary)' }}>
         {text}

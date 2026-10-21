@@ -21,7 +21,7 @@ export function NetWorthChart({ points }: { points: readonly NetWorthPoint[] }) 
   if (points.length === 0) {
     return (
       <div
-        className="glass rounded-[22px] p-5"
+        className="glass rounded-2xl p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -56,7 +56,7 @@ export function NetWorthChart({ points }: { points: readonly NetWorthPoint[] }) 
 
   return (
     <div
-      className="glass rounded-[22px] p-5"
+      className="glass rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -131,13 +131,13 @@ function NetWorthTable({ points }: { points: readonly NetWorthPoint[] }) {
         <caption className="sr-only">月末時点の貯金・投資評価額の表</caption>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--hairline)' }}>
-            <th className="p-2 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-2 text-left font-semibold" style={{ color: 'var(--ink-muted)' }}>
               月末
             </th>
-            <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-2 text-right font-semibold" style={{ color: 'var(--ink-muted)' }}>
               貯金
             </th>
-            <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <th className="p-2 text-right font-semibold" style={{ color: 'var(--ink-muted)' }}>
               投資評価額
             </th>
           </tr>

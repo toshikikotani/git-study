@@ -7,11 +7,12 @@ import { formatDateJa } from '@/lib/date';
 import { CategoryMark } from '../category-sheet';
 import { DirectRecordEditor } from '../transactions/direct-record-editor';
 
-/** 自動分類の確認待ちだけ。1件なら直開きし、保存したら次へ進む。 */
+/**
+ * 自動分類の確認待ちだけ。開くのは押したときだけ(勝手に開くと、LINE から来た答え合わせのシートと
+ * 重なる、ADR-131)。保存したら次へ進む。
+ */
 export function PendingReviewRecords({ records }: { records: readonly LedgerTransaction[] }) {
-  const [openId, setOpenId] = useState<string | null>(() =>
-    records.length === 1 ? records[0]!.id : null,
-  );
+  const [openId, setOpenId] = useState<string | null>(null);
   const [handled, setHandled] = useState<ReadonlySet<string>>(new Set());
   const remaining = records.filter((r) => !handled.has(r.id));
   if (remaining.length === 0)
@@ -47,7 +48,7 @@ export function PendingReviewRecords({ records }: { records: readonly LedgerTran
             }
           >
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[16px] font-medium" style={{ color: 'var(--ink)' }}>
+              <span className="truncate text-[16px] font-semibold" style={{ color: 'var(--ink)' }}>
                 {t.label}
               </span>
               <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>

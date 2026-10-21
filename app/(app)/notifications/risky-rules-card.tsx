@@ -10,42 +10,28 @@
  * 編集はできない(会話からも app/api/assistant/chat/route.ts で二重に拒む)。
  */
 
-import { DEFAULT_DETECTION_RULES } from '@/features/classification/rules';
-
-const METHOD_LABEL = {
-  revolving: 'リボ払い',
-  cashing: 'キャッシング',
-  installment: '分割払い',
-} as const;
-
+/**
+ * 見つけるもの(リボ払い・キャッシング・分割払い)を一文で言う。中で使う文字の式
+ * (「リボ|ﾘﾎﾞ|revolving|リボルビング」など)は出さない(読む人には意味がない、ADR-131)。
+ */
 export function RiskyRulesCard() {
   return (
     <div
-      className="glass rounded-[22px] p-5"
+      className="rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        危険な支払方法の検知(変更不可)
+      <h2 className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+        危ない支払い方の見張り
       </h2>
-      <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        見逃しが致命的なため、固定のルールで常に検知します。カテゴリとは独立
-        していて、会話やここからも変更できません。
+      <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        {/* 言葉の途中で折れないように(「キャッシ／ング」と折れていた)。 */}
+        <span className="whitespace-nowrap">リボ払い</span>・
+        <span className="whitespace-nowrap">キャッシング</span>・
+        <span className="whitespace-nowrap">分割払い</span>を見つけたら知らせます。
       </p>
-
-      <ul className="mt-3 space-y-2">
-        {DEFAULT_DETECTION_RULES.map((rule) => (
-          <li
-            key={rule.id}
-            className="flex items-baseline justify-between gap-3 text-xs"
-            style={{ color: 'var(--ink-secondary)' }}
-          >
-            <span>{METHOD_LABEL[rule.setPaymentMethod as keyof typeof METHOD_LABEL]}</span>
-            <span className="tabular truncate" style={{ color: 'var(--ink-muted)' }}>
-              {rule.pattern}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+        見逃すと困るので、いつも決まった方法で探します(ここや会話からは変えられません)。
+      </p>
     </div>
   );
 }

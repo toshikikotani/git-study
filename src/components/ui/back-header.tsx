@@ -9,7 +9,7 @@ export function BackLink({ back }: { back: { href: string; label: string; cancel
   return (
     <Link
       href={back.href as Route}
-      className="flex min-h-11 items-center gap-1 self-start text-[17px] font-medium"
+      className="flex min-h-11 items-center gap-1 self-start text-[17px] font-semibold"
       style={{ color: 'var(--accent)' }}
     >
       {back.cancel ? null : (

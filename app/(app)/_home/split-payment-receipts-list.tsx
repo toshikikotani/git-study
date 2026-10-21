@@ -309,7 +309,7 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
         </p>
         <p className="mt-1 break-words text-[16px] font-semibold">{names(request)}</p>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <p className="text-[14px]" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
             相手{others.toLocaleString('ja-JP')}人 × {formatYen(request.amountPerPersonYen)}
           </p>
           <p className="tabular text-[15px] font-semibold">
@@ -357,7 +357,7 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
             </div>
           </div>
         ) : (
-          <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-3 text-[15px] font-medium">
+          <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-3 text-[15px] font-semibold">
             <input
               type="checkbox"
               checked={isComplete}
@@ -403,7 +403,7 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
             </button>
           </div>
         ) : null}
-        <details className="mt-1 text-[14px]">
+        <details className="mt-1 text-[13px]">
           <summary
             className="min-h-11 cursor-pointer content-center"
             style={{ color: 'var(--accent)' }}
@@ -431,8 +431,7 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
                   type="button"
                   disabled={disabled || !validCount || Number(draft) === request.receivedCount}
                   onClick={() => (validCount ? void update(receipt, Number(draft)) : undefined)}
-                  className="min-h-11 rounded-xl px-4 font-semibold disabled:opacity-40"
-                  style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+                  className="btn-primary min-h-11 rounded-xl px-4 font-semibold"
                 >
                   反映
                 </button>

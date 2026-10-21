@@ -15,7 +15,7 @@ export function AiReportLink() {
   return (
     <Link
       href={`/reports/ai?month=${visibleMonth.slice(0, 7)}` as Route}
-      className="flex min-h-14 items-center gap-3 rounded-[22px] px-4 py-3"
+      className="flex min-h-14 items-center gap-3 rounded-2xl px-4 py-3"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">

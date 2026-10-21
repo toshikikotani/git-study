@@ -15,7 +15,7 @@ export function PurposeBalanceCard({ balances }: { balances: readonly PurposeBal
   if (balances.length === 0) {
     return (
       <div
-        className="glass rounded-[22px] p-5"
+        className="glass rounded-2xl p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -32,7 +32,7 @@ export function PurposeBalanceCard({ balances }: { balances: readonly PurposeBal
 
   return (
     <div
-      className="glass rounded-[22px] p-5"
+      className="glass rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -53,14 +53,14 @@ export function PurposeBalanceCard({ balances }: { balances: readonly PurposeBal
             <li key={balance.purpose}>
               <div className="flex items-baseline justify-between gap-2 text-xs">
                 <span className="flex min-w-0 items-baseline gap-2">
-                  <span className="truncate font-medium" style={{ color: 'var(--ink)' }}>
+                  <span className="truncate font-semibold" style={{ color: 'var(--ink)' }}>
                     {label}
                   </span>
                   <span className="tabular shrink-0" style={{ color: 'var(--ink-muted)' }}>
                     {balance.accountCount}口座
                   </span>
                 </span>
-                <span className="tabular shrink-0 font-medium" style={{ color }}>
+                <span className="tabular shrink-0 font-semibold" style={{ color }}>
                   {formatYen(balance.totalYen)}
                 </span>
               </div>

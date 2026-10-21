@@ -188,8 +188,7 @@ export default function EmailImportPage() {
           </p>
           <Link
             href="/spending"
-            className="mt-4 flex min-h-11 w-full items-center justify-center rounded-full py-3 text-sm font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary mt-4 flex min-h-11 w-full items-center justify-center rounded-full py-3 text-sm font-semibold"
           >
             明細を見る
           </Link>
@@ -203,7 +202,7 @@ export default function EmailImportPage() {
 
       <Card>
         <label
-          className="text-xs font-medium tracking-[0.08em] uppercase"
+          className="text-xs font-semibold tracking-[0.08em] uppercase"
           style={{ color: 'var(--ink-muted)' }}
         >
           メール本文
@@ -263,8 +262,7 @@ export default function EmailImportPage() {
               type="button"
               onClick={() => void save()}
               disabled={!inputAccount.selectedAccount || saving}
-              className="mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold"
             >
               {saving ? '取り込んでいます…' : `${preview.length} 件を取り込む`}
             </button>

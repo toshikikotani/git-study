@@ -56,7 +56,7 @@ export function InsightsCard({
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           気づき ・ AI家計診断
         </p>
         {summary.wasteRatio !== null ? (
@@ -139,7 +139,10 @@ function DiagnosisItemList({
               <span className="truncate text-xs" style={{ color: 'var(--ink)' }}>
                 {item.label}
               </span>
-              <span className="tabular shrink-0 text-xs font-medium" style={{ color: amountColor }}>
+              <span
+                className="tabular shrink-0 text-xs font-semibold"
+                style={{ color: amountColor }}
+              >
                 {formatYen(item.amountYen)}
               </span>
             </div>

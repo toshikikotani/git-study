@@ -60,7 +60,9 @@ export function BottomSheet({
             style={
               {
                 '--sheet-background': tall ? 'var(--plane)' : 'var(--surface)',
-                borderRadius: tall ? '22px 22px 0 0' : 'var(--radius-card)',
+                borderRadius: tall
+                  ? 'var(--radius-card) var(--radius-card) 0 0'
+                  : 'var(--radius-card)',
                 background: 'var(--sheet-background)',
                 border: tall ? undefined : '1px solid var(--glass-border)',
                 boxShadow: tall ? '0 -4px 24px rgba(0, 0, 0, 0.12)' : 'var(--glass-shadow-float)',

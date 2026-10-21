@@ -5,6 +5,9 @@
  * 出すのは、自動で入った(Gmail のカードの通知メール・CSV・LINE のレシート・LINE の文字)明細のうち、
  * まだ確かめていない(auto_ok・pending)もの。手入力とアプリで撮ったレシートは、本人が確かめて入れている
  * ので出さない。今日の分を先に、前の日(直近 {@link CHECK_WINDOW_DAYS} 日)の片づけ残しをあとに続ける。
+ *
+ * カテゴリの確認待ち(pending)は、いつの・どこから入った記録でも出す。今日の画面で「確認待ち」と
+ * 「答え合わせ」が同じ記録を別の数で数えていたので、答え合わせ1つにまとめた(ADR-131)。
  */
 
 import { addDays, type DateOnly } from '@/lib/date';
@@ -12,13 +15,14 @@ import { addDays, type DateOnly } from '@/lib/date';
 /** 今日を含めて何日前までの片づけ残しを出すか。 */
 export const CHECK_WINDOW_DAYS = 7;
 
-export type CheckSource = 'gmail' | 'csv' | 'line_receipt' | 'line_text';
+export type CheckSource = 'gmail' | 'csv' | 'line_receipt' | 'line_text' | 'app';
 
 export const CHECK_SOURCE_LABEL: Record<CheckSource, string> = {
   gmail: 'カードの通知メール',
   csv: 'CSV',
   line_receipt: 'LINEのレシート',
   line_text: 'LINE',
+  app: 'アプリ',
 };
 
 /** LINE の文字から入れた記録の source_ref の頭(LINE のレシートは `line-<メッセージID>-<番号>`)。 */
@@ -81,7 +85,8 @@ export function jstTime(iso: string): string {
 
 /**
  * 出す行を選んで、今日の分(新しく入った順)→ 前の日(新しい日から)の順に並べる。
- * 確かめ済み・数えない・振替・0円・自動で入っていない行は出さない。
+ * 確かめ済み・数えない・振替・0円・先の日付の行は出さない。自動で入っていない行と、直近
+ * {@link CHECK_WINDOW_DAYS} 日より前の行は、カテゴリの確認待ち(pending)のときだけ出す。
  */
 export function pickCheckItems(
   rows: readonly CheckRow[],
@@ -97,9 +102,11 @@ export function pickCheckItems(
   for (const row of rows) {
     if (row.reviewStatus !== 'auto_ok' && row.reviewStatus !== 'pending') continue;
     if (row.isTransfer || row.amountYen === 0) continue;
-    if (row.occurredOn < from || row.occurredOn > today) continue;
-    const source = checkSourceOf(row.source, row.sourceRef);
-    if (source === null) continue;
+    if (row.occurredOn > today) continue;
+    const pending = row.reviewStatus === 'pending';
+    const auto = checkSourceOf(row.source, row.sourceRef);
+    if (!pending && (auto === null || row.occurredOn < from)) continue;
+    const source = auto ?? 'app';
     items.push({
       id: row.id,
       occurredOn: row.occurredOn,

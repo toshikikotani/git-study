@@ -16,7 +16,7 @@ export function SignOutButton() {
     <form action={signOutAction} onSubmit={clearSession}>
       <button
         type="submit"
-        className="min-h-11 w-full rounded-2xl px-4 py-3 text-left text-[15px] font-medium"
+        className="min-h-11 w-full rounded-2xl px-4 py-3 text-left text-[15px] font-semibold"
         style={{ background: 'var(--surface)', color: 'var(--over)' }}
       >
         ログアウト

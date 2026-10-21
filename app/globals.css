@@ -131,7 +131,8 @@
   --button-quiet: #efeeec; /* 灰色のボタン */
   --bar-quiet: #d1d1d6; /* 予算ペースより少ない日の棒 */
   --ideal: #8e8e93; /* 予算までの理想の線 */
-  --field: #e3e3e8; /* 検索欄 */
+  --field: #e3e3e8; /* 検索欄・切り替えの溝 */
+  --segment-on: #ffffff; /* 切り替えの選んでいる面(溝より明るく) */
   --danger: #c62828; /* 削除 */
   --notify: #d9480f; /* お知らせの印 */
   --suggest-line: #f2c99a; /* 提案の枠 */
@@ -155,8 +156,10 @@
     --accent: #f2f5fa;
     --on-accent: #0b1b3a;
     --accent-track: rgba(255, 255, 255, 0.08);
-    --action: #d4d4d4;
+    --action: #f2f5fa;
     --on-action: #111111;
+    --action-off: #2c2c2e;
+    --on-action-off: #98989f;
     --income: #7cd591;
     --income-track: #1a3520;
     --over: #fea196;
@@ -199,6 +202,7 @@
     --bar-quiet: #48484a;
     --ideal: #8e8e93;
     --field: #1c1c1e;
+    --segment-on: #48484a;
     --danger: #ff6b5e;
     --notify: #ff7a45;
     --suggest-line: #6a4520;
@@ -221,6 +225,10 @@
   --accent: #f2f5fa;
   --on-accent: #0b1b3a;
   --accent-track: rgba(255, 255, 255, 0.08);
+  --action: #f2f5fa;
+  --on-action: #111111;
+  --action-off: #2c2c2e;
+  --on-action-off: #98989f;
   --income: #7cd591;
   --income-track: #1a3520;
   --over: #fea196;
@@ -263,6 +271,7 @@
   --bar-quiet: #48484a;
   --ideal: #8e8e93;
   --field: #1c1c1e;
+  --segment-on: #48484a;
   --danger: #ff6b5e;
   --notify: #ff7a45;
   --suggest-line: #6a4520;
@@ -338,10 +347,13 @@
   --motion-row: 250ms;
   --motion-ease-out: cubic-bezier(0, 0, 0.2, 1);
 
-  /* 青は主要な操作(撮影・保存・AIで目標案を作る)だけに使う。ほかの色の役割は上の
+  /* 主のボタン(撮影・保存・つぎへ・＋)は強調色の塗り(--action)。押せないときは塗りを薄めず、
+     淡い面に読める濃さの文字(--action-off、どのテーマでも 4.5:1 以上、ADR-131)。ほかの色の役割は上の
      --accent(中立の選択色)・--state-*(状態)・--income(収入)。 */
   --action: #5c5853;
   --on-action: #ffffff;
+  --action-off: #ededf0;
+  --on-action-off: #636366;
 
   /* 余白は4の倍数。画面の左右は16。 */
   --space-1: 4px;
@@ -360,9 +372,11 @@
   --font-body: calc(15 / 17 * 1rem);
   --font-caption: calc(13 / 17 * 1rem);
 
-  /* 金額の「円」は数字の0.7倍で、少し細く。 */
-  --yen-unit-scale: 0.7;
-  --yen-unit-weight: 400;
+  /* 一覧・文中の金額の「円」は、数字と同じ大きさ・太さで、空白を入れない(「6,000円」、ADR-131)。
+     明細だけ「円」を小さく(9pt)していたので、同じ記録でも画面ごとに見た目が変わっていた。
+     大きな金額の表示(今日の目安・記録するの入力など)だけは、数字のあとに小さめの「円」を並べる。 */
+  --yen-unit-scale: 1;
+  --yen-unit-weight: inherit;
 
   /* 区切り線:アイコンの右端から、白6%の細い線。 */
   --divider: color-mix(in srgb, var(--ink) 6%, transparent);
@@ -696,11 +710,23 @@ button {
   }
 }
 
-/* 金額の「円」。数字の0.7倍で少し細くする(components/ui/money.tsx)。 */
+/* ボタンの色の型(ADR-131)。主のボタン=強調色の塗り。押せないとき=淡い面に読める濃さの文字
+   (薄めた塗りだと、押せるボタンと同じ灰色に見えていた)。Tailwind の disabled:opacity-* より強い。 */
+.btn-primary {
+  background: var(--action);
+  color: var(--on-action);
+}
+.btn-primary:disabled,
+.btn-primary[aria-disabled='true'] {
+  background: var(--action-off);
+  color: var(--on-action-off);
+  opacity: 1;
+}
+
+/* 金額の「円」(components/ui/money.tsx)。数字と同じ大きさ・太さで、間をあけない(ADR-131)。 */
 .yen-unit {
   font-size: calc(1em * var(--yen-unit-scale));
   font-weight: var(--yen-unit-weight);
-  margin-left: 0.08em;
 }
 
 /* 一覧の区切り線。アイコンの右端から始まり、白6%の細い線。 */

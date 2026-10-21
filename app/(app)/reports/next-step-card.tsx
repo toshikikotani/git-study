@@ -22,7 +22,7 @@ export function NextStepCard({
   return (
     <section
       aria-label={goal ? 'いちばん効く一手' : '次の一手'}
-      className="flex flex-col gap-2 rounded-[22px] p-5"
+      className="flex flex-col gap-2 rounded-2xl p-5"
       style={{ background: 'var(--surface)' }}
     >
       <h2 className="text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>

@@ -77,33 +77,22 @@ function PasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <input
+      <Field
+        label="メールアドレス"
         type="email"
         required
         autoComplete="email"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         placeholder="you@example.com"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-        style={{
-          background: 'var(--surface)',
-          color: 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
-        }}
       />
-      <input
+      <Field
+        label="パスワード"
         type="password"
         required
         autoComplete="current-password"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
-        placeholder="パスワード"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-        style={{
-          background: 'var(--surface)',
-          color: 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
-        }}
       />
 
       {status === 'error' ? (
@@ -116,8 +105,7 @@ function PasswordForm() {
       <button
         type="submit"
         disabled={status === 'sending'}
-        className="w-full rounded-2xl py-3 text-sm font-medium text-white disabled:opacity-50"
-        style={{ background: 'var(--action)' }}
+        className="btn-primary min-h-11 w-full rounded-full py-3 text-sm font-semibold"
       >
         {status === 'sending' ? 'ログインしています…' : 'ログイン'}
       </button>
@@ -173,47 +161,32 @@ function RegisterForm() {
         メールアドレスとパスワードで、自分のアカウントを作れます。家計簿のデータは、あなただけが
         見られます(ほかの人には見えません)。
       </p>
-      <input
+      <Field
+        label="メールアドレス"
         type="email"
         required
         autoComplete="email"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         placeholder="you@example.com"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-        style={{
-          background: 'var(--surface)',
-          color: 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
-        }}
       />
-      <input
+      <Field
+        label="パスワード"
         type="password"
         required
         autoComplete="new-password"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
-        placeholder="パスワード(8文字以上)"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-        style={{
-          background: 'var(--surface)',
-          color: 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
-        }}
+        placeholder="8文字以上"
       />
-      <input
+      <Field
+        label="パスワード(確認)"
         type="password"
         required
         autoComplete="new-password"
         value={passwordConfirmation}
         onChange={(event) => setPasswordConfirmation(event.target.value)}
-        placeholder="確認のため再入力"
-        className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-        style={{
-          background: 'var(--surface)',
-          color: 'var(--ink)',
-          boxShadow: 'var(--card-shadow)',
-        }}
+        placeholder="もう一度入れる"
       />
       {status === 'error' ? (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
@@ -224,8 +197,7 @@ function RegisterForm() {
       <button
         type="submit"
         disabled={status === 'sending'}
-        className="w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
-        style={{ background: 'var(--plane)', color: 'var(--ink-secondary)' }}
+        className="btn-primary min-h-11 w-full rounded-full py-3 text-sm font-semibold"
       >
         {status === 'sending' ? '登録しています…' : 'アカウントを作ってはじめる'}
       </button>
@@ -246,7 +218,8 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full px-3 py-2 text-xs font-medium"
+      aria-pressed={active}
+      className="min-h-11 rounded-full px-4 text-[13px] font-semibold"
       style={
         active
           ? { background: 'var(--accent)', color: 'var(--on-accent)' }
@@ -255,5 +228,28 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+/** 見える名前のついた入力欄(中の例文だけでは、入れ始めると何の欄か分からなくなる、ADR-131)。 */
+function Field({
+  label,
+  ...input
+}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="px-1 text-[13px] font-semibold" style={{ color: 'var(--ink-secondary)' }}>
+        {label}
+      </span>
+      <input
+        {...input}
+        className="min-h-11 w-full rounded-xl px-4 py-3 text-sm outline-none"
+        style={{
+          background: 'var(--surface)',
+          color: 'var(--ink)',
+          boxShadow: 'var(--card-shadow)',
+        }}
+      />
+    </label>
   );
 }

@@ -41,7 +41,7 @@ export function AccountRow({ account }: { account: Account }) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="shrink-0 text-xs font-semibold"
+          className="-my-3 -mr-3 flex min-h-11 min-w-11 shrink-0 items-center justify-center px-3 text-[13px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           編集
@@ -77,7 +77,10 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
       <dt className="inline" style={{ color: 'var(--ink-muted)' }}>
         {label}{' '}
       </dt>
-      <dd className="tabular inline font-medium" style={{ color: color ?? 'var(--ink-secondary)' }}>
+      <dd
+        className="tabular inline font-semibold"
+        style={{ color: color ?? 'var(--ink-secondary)' }}
+      >
         {value}
       </dd>
     </div>

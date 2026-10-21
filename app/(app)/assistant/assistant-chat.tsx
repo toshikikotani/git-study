@@ -237,7 +237,7 @@ export function AssistantChat({
         {messages.length === 0 ? (
           <div className="space-y-3">
             <p
-              className="rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
+              className="rounded-2xl px-4 py-3 text-[13px] leading-relaxed"
               style={{ background: 'var(--surface)', color: 'var(--ink-secondary)' }}
             >
               記録・質問・設定の変更・画面の案内まで、話しかけるだけでできます。マイクで声でも。
@@ -289,13 +289,19 @@ export function AssistantChat({
         ) : null}
       </div>
 
-      {/* おすすめの質問(横に流す。押すとそのまま送る) */}
+      {/* おすすめの質問(横に流す。押すとそのまま送る)。右端をぼかして、続きがあると分かるようにする
+          (右端で切れて、横に動かせると分からなかった、ADR-131)。 */}
       <div
         role="group"
         aria-label="おすすめの質問"
-        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+        className="-mx-1 flex gap-2 overflow-x-auto px-1 pr-8 pb-1"
         // 横にだけ流す(縦に指を動かしてもページを動かさない)。
-        style={{ scrollbarWidth: 'none', touchAction: 'pan-x' }}
+        style={{
+          scrollbarWidth: 'none',
+          touchAction: 'pan-x',
+          maskImage: 'linear-gradient(to right, #000 calc(100% - 40px), transparent)',
+          WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 40px), transparent)',
+        }}
       >
         {SUGGESTIONS.map((q) => (
           <button
@@ -304,7 +310,7 @@ export function AssistantChat({
             disabled={sending}
             onMouseDown={keepFocus}
             onClick={() => void send(q)}
-            className="min-h-11 shrink-0 rounded-full px-4 text-[14px] whitespace-nowrap disabled:opacity-40"
+            className="min-h-11 shrink-0 rounded-full px-4 text-[13px] whitespace-nowrap disabled:opacity-40"
             style={{ background: 'var(--surface)', color: 'var(--ink)' }}
           >
             {q}
@@ -368,8 +374,7 @@ export function AssistantChat({
           onMouseDown={keepFocus}
           disabled={sending || input.trim() === ''}
           aria-label="送る"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary flex size-11 shrink-0 items-center justify-center rounded-full"
         >
           <SendIcon />
         </button>
@@ -443,7 +448,7 @@ export function Bubble({
               type="button"
               onClick={onRetry}
               disabled={busy}
-              className="flex min-h-11 items-center gap-2 rounded-full px-4 text-[14px] font-semibold disabled:opacity-40"
+              className="flex min-h-11 items-center gap-2 rounded-full px-4 text-[13px] font-semibold disabled:opacity-40"
               style={{ background: 'var(--plane)', color: 'var(--accent)' }}
             >
               <RetryIcon />
@@ -486,7 +491,7 @@ export function Bubble({
                 key={l.href}
                 type="button"
                 onClick={() => onGo(l.href)}
-                className="flex min-h-11 items-center gap-1 rounded-full px-4 text-[14px] font-semibold"
+                className="flex min-h-11 items-center gap-1 rounded-full px-4 text-[13px] font-semibold"
                 style={{ background: 'var(--plane)', color: 'var(--accent)' }}
               >
                 {l.label}を開く
@@ -519,7 +524,7 @@ function WhatIfAnswer({
         {card.rows.map((r, i) => (
           <div
             key={r.label}
-            className="tabular grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 py-2 text-[14px]"
+            className="tabular grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 py-2 text-[13px]"
             style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
           >
             <span style={{ color: 'var(--ink-secondary)' }}>{r.label}</span>
@@ -536,8 +541,7 @@ function WhatIfAnswer({
           <button
             type="button"
             onClick={onRecord}
-            className="min-h-11 rounded-full px-2 text-[14px] font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-11 rounded-full px-2 text-[13px] font-semibold"
           >
             {card.amountYen.toLocaleString('ja-JP')}円を予定に入れる
           </button>
@@ -546,7 +550,7 @@ function WhatIfAnswer({
           <button
             type="button"
             onClick={onTry}
-            className="min-h-11 rounded-full px-2 text-[14px] font-semibold"
+            className="min-h-11 rounded-full px-2 text-[13px] font-semibold"
             style={{ background: 'var(--surface)', color: 'var(--accent)' }}
           >
             金額を変えて試す
@@ -587,7 +591,7 @@ function QuestionCard({
       className="space-y-2 rounded-2xl p-3"
       style={{ background: 'var(--plane)', opacity: disabled ? 0.6 : 1 }}
     >
-      <p className="text-[14px] font-semibold">{question.question}</p>
+      <p className="text-[13px] font-semibold">{question.question}</p>
       <div className="space-y-2">
         {question.options.map((option) => {
           const isPicked = picked.includes(option.label);
@@ -603,7 +607,7 @@ function QuestionCard({
                 outline: isPicked ? '2px solid var(--accent)' : 'none',
               }}
             >
-              <span className="block text-[14px] font-medium">{option.label}</span>
+              <span className="block text-[13px] font-semibold">{option.label}</span>
               {option.description ? (
                 <span className="block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                   {option.description}
@@ -618,8 +622,7 @@ function QuestionCard({
           type="button"
           disabled={disabled || picked.length === 0}
           onClick={() => onAnswer(picked)}
-          className="min-h-11 w-full rounded-xl text-[14px] font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary min-h-11 w-full rounded-xl text-[13px] font-semibold"
         >
           この内容で決める
         </button>
@@ -681,7 +684,7 @@ function ProposalCard({
       className="space-y-2 rounded-2xl p-3"
       style={{ background: 'var(--plane)', opacity: status === 'cancelled' ? 0.5 : 1 }}
     >
-      <p className="text-[14px] font-semibold">確認({changes.length}件)— 反映するものにチェック</p>
+      <p className="text-[13px] font-semibold">確認({changes.length}件)— 反映するものにチェック</p>
       <ul className="space-y-2">
         {changes.map((c, i) => (
           <li key={i} className="rounded-xl" style={{ background: 'var(--surface)' }}>
@@ -694,7 +697,7 @@ function ProposalCard({
                   onChange={() => onToggle(i)}
                   className="mt-1 size-5"
                 />
-                <span className="min-w-0 text-[14px]">
+                <span className="min-w-0 text-[13px]">
                   <span className="font-semibold">{c.target}</span>
                   <span className="block text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                     {c.detail}
@@ -707,7 +710,7 @@ function ProposalCard({
                   type="button"
                   onClick={() => onEdit(i)}
                   aria-label={`${c.target}を直す`}
-                  className="flex min-h-11 shrink-0 items-center px-3 text-[14px] font-semibold"
+                  className="flex min-h-11 shrink-0 items-center px-3 text-[13px] font-semibold"
                   style={{ color: 'var(--accent)' }}
                 >
                   直す
@@ -748,8 +751,7 @@ function ProposalCard({
             type="button"
             disabled={locked || selectedCount === 0}
             onClick={onApply}
-            className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-11 flex-1 rounded-xl text-[15px] font-semibold"
           >
             {status === 'applying' ? '反映しています…' : `${selectedCount}件を反映`}
           </button>

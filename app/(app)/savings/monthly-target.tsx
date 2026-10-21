@@ -29,40 +29,41 @@ export function MonthlyTarget({ initialYen }: { initialYen: number }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[15px] font-medium">毎月</p>
-      <p className="text-[13px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
-        今日の「貯金」とAIは、この額で月末の見込みと比べます。0円にすると決めていない扱いです。
-      </p>
-      <div className="flex items-center gap-2">
-        <label
-          className="flex min-h-11 flex-1 items-center gap-1 rounded-xl px-3"
-          style={{ background: 'var(--plane)' }}
-        >
-          <span className="sr-only">毎月の貯金目標(円)</span>
-          <input
-            inputMode="numeric"
-            value={value}
-            placeholder="例:100,000"
-            autoComplete="off"
-            onChange={(e) => {
-              const digits = e.target.value.replace(/[^\d]/g, '');
-              setValue(digits === '' ? '' : Number(digits).toLocaleString('ja-JP'));
-            }}
-            className="tabular min-w-0 flex-1 bg-transparent text-right text-[17px] outline-none"
-            style={{ color: 'var(--ink)' }}
-          />
-          <span className="text-[15px]">円</span>
-        </label>
+      {/* 保存は見出しの右(右上、ADR-131)。入力欄の横に置くと、狭い画面で右端からはみ出していた。 */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[15px] font-semibold">毎月</p>
         <button
           type="button"
           onClick={() => void save()}
           disabled={pending || amountYen === saved}
-          className="min-h-11 shrink-0 rounded-full px-5 text-[15px] font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="-mr-2 min-h-11 min-w-11 shrink-0 px-2 text-[17px] font-semibold disabled:opacity-40"
+          style={{ color: 'var(--accent)' }}
         >
           {pending ? '保存中…' : '保存'}
         </button>
       </div>
+      <p className="text-[13px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
+        今日の「貯金」とAIは、この額で月末の見込みと比べます。0円にすると決めていない扱いです。
+      </p>
+      <label
+        className="flex min-h-11 min-w-0 items-center gap-1 rounded-xl px-3"
+        style={{ background: 'var(--plane)' }}
+      >
+        <span className="sr-only">毎月の貯金目標(円)</span>
+        <input
+          inputMode="numeric"
+          value={value}
+          placeholder="例:100,000"
+          autoComplete="off"
+          onChange={(e) => {
+            const digits = e.target.value.replace(/[^\d]/g, '');
+            setValue(digits === '' ? '' : Number(digits).toLocaleString('ja-JP'));
+          }}
+          className="tabular w-0 min-w-0 flex-1 bg-transparent text-right text-[17px] outline-none"
+          style={{ color: 'var(--ink)' }}
+        />
+        <span className="text-[15px]">円</span>
+      </label>
       {error ? (
         <p role="alert" className="text-[13px]" style={{ color: 'var(--over)' }}>
           {error}

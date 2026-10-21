@@ -35,6 +35,7 @@ function tables(): FakeTables {
       tx('a'),
       tx('b', { review_status: 'pending', genre_id: null, classified_by: 'unclassified' }),
       tx('hand', { source: 'manual' }),
+      tx('old-pending', { occurred_on: '2026-08-01', review_status: 'pending' }),
       tx('other-user', { user_id: 'someone' }),
     ],
     genres: [
@@ -49,10 +50,10 @@ function tables(): FakeTables {
 }
 
 describe('答え合わせの対象', () => {
-  it('本人の、自動で入った、まだ確かめていない記録だけ', async () => {
+  it('本人の、自動で入った、まだ確かめていない記録と、いつのものでもカテゴリの確認待ち', async () => {
     const { client } = fakeSupabase(tables());
     const items = await listTodayCheck(client as never, 'me', today);
-    expect(items.map((i) => i.id).sort()).toEqual(['a', 'b']);
+    expect(items.map((i) => i.id).sort()).toEqual(['a', 'b', 'old-pending']);
     expect(items.find((i) => i.id === 'a')!.genreName).toBe('食料品');
     expect(items.find((i) => i.id === 'b')!.unsure).toBe(true);
   });
@@ -138,7 +139,7 @@ describe('合ってる・直す・数えない・ひとつ戻る', () => {
     const { client } = fakeSupabase(t);
     const result = await confirmSureTodayCheck(client as never, 'me', today);
     expect(result.confirmed).toBe(1);
-    expect(result.remaining.map((i) => i.id)).toEqual(['b']);
+    expect(result.remaining.map((i) => i.id)).toEqual(['b', 'old-pending']);
     expect(t.transactions!.find((r) => r.id === 'a')!.review_status).toBe('confirmed');
     expect(t.transactions!.find((r) => r.id === 'b')!.review_status).toBe('pending');
   });

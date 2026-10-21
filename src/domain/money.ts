@@ -43,6 +43,20 @@ export function formatYen(value: number, options?: { sign?: 'auto' | 'never' }):
 }
 
 /**
+ * 狭い場所(曜日のマス・グラフの目盛り)の短い金額。1,000円未満は「550」、それより上は万の小数1桁
+ * (「0.7万」「1.1万」)、10万以上は整数(「12万」)。英語の「k」は使わない(ほかの画面の「万円」と
+ * そろえる、ADR-131)。
+ */
+export function formatCompactYen(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? MINUS : '';
+  if (abs < 1000) return `${sign}${Math.round(abs)}`;
+  const man = abs / 10_000;
+  const text = man >= 10 ? String(Math.round(man)) : String(Math.round(man * 10) / 10);
+  return `${sign}${text}万`;
+}
+
+/**
  * 「あと◯円使える」の肯定形表示(FR-64)。
  * 残額がマイナスでも責めない文言にする(設計原則5)。
  */

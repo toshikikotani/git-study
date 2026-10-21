@@ -221,7 +221,14 @@ describe('明細の確認を1つの入口にまとめる(「確認が必要」1�
       merchantNameGroups: [group],
     });
     expect(sectionTitles(tree).sort()).toEqual(
-      ['入力待ちのレシート', 'カテゴリの確認', '店名のゆれ・店名なし', '重複'].sort(),
+      // 「AIでチェック」はいつでも出す(明細のタイトルの上から移した、ADR-131)
+      [
+        '入力待ちのレシート',
+        'カテゴリの確認',
+        '店名のゆれ・店名なし',
+        '重複',
+        'AIでチェック',
+      ].sort(),
     );
     const all = nodes(tree);
     expect(all.some((node) => node.type === ReceiptResults)).toBe(true);

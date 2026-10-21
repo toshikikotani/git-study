@@ -162,7 +162,7 @@ export function AllocationEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium" style={{ color: 'var(--ink)' }}>
+        <span className="font-semibold" style={{ color: 'var(--ink)' }}>
           総額
         </span>
         <label className="flex items-center gap-1">
@@ -241,7 +241,7 @@ export function AllocationEditor({
             <li key={row.genreId}>
               <div className="flex items-center justify-between gap-2">
                 <span
-                  className="min-w-0 truncate text-sm font-medium"
+                  className="min-w-0 truncate text-sm font-semibold"
                   style={{ color: 'var(--ink)' }}
                 >
                   {row.genreName}
@@ -310,7 +310,7 @@ export function AllocationEditor({
           </Button>
         ) : null}
         <div className="rounded-xl p-3" style={{ background: 'var(--surface-raised)' }}>
-          <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
             このままだと、いくらで着きそうか
           </p>
           <Button

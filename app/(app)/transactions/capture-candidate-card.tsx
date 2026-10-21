@@ -174,8 +174,7 @@ export function CaptureCandidateCard({
           type="button"
           onClick={onSave}
           disabled={saveDisabled || status === 'saving' || candidate.amountYen === 0}
-          className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary min-h-11 flex-1 rounded-xl text-sm font-semibold"
         >
           {status === 'saving' ? '登録中…' : '登録する'}
         </button>

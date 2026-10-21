@@ -19,7 +19,7 @@ export function MerchantRankingCard({ ranking }: { ranking: MerchantRanking }) {
   if (merchants.length === 0) {
     return (
       <div
-        className="glass rounded-[22px] p-5"
+        className="glass rounded-2xl p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -36,7 +36,7 @@ export function MerchantRankingCard({ ranking }: { ranking: MerchantRanking }) {
 
   return (
     <div
-      className="glass rounded-[22px] p-5"
+      className="glass rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -58,14 +58,14 @@ export function MerchantRankingCard({ ranking }: { ranking: MerchantRanking }) {
                   <span className="tabular shrink-0" style={{ color: 'var(--ink-muted)' }}>
                     {index + 1}位
                   </span>
-                  <span className="truncate font-medium" style={{ color: 'var(--ink)' }}>
+                  <span className="truncate font-semibold" style={{ color: 'var(--ink)' }}>
                     {merchant.label}
                   </span>
                   <span className="tabular shrink-0" style={{ color: 'var(--ink-muted)' }}>
                     {merchant.count}回
                   </span>
                 </span>
-                <span className="tabular shrink-0 font-medium" style={{ color: 'var(--ink)' }}>
+                <span className="tabular shrink-0 font-semibold" style={{ color: 'var(--ink)' }}>
                   {formatYen(merchant.totalYen)}
                 </span>
               </div>

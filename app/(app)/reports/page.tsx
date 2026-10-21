@@ -92,7 +92,7 @@ function UpcomingPlan({ plan }: { plan: SpendingPlan }) {
   return (
     <section
       aria-label="これから始まる目標"
-      className="rounded-[22px] p-5"
+      className="rounded-2xl p-5"
       style={{ background: 'var(--surface)' }}
     >
       <p className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>

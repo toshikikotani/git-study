@@ -122,7 +122,7 @@ export function DuplicateList({ review }: { review: DuplicateReviewView }) {
                     href={side.receiptImageUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="min-h-11 mt-1 inline-block px-3 text-xs font-medium underline decoration-dotted underline-offset-4"
+                    className="min-h-11 mt-1 inline-block px-3 text-xs font-semibold underline decoration-dotted underline-offset-4"
                     style={{ color: 'var(--accent)' }}
                   >
                     レシートの写真を見る
@@ -155,7 +155,7 @@ export function DuplicateList({ review }: { review: DuplicateReviewView }) {
       {decided.length > 0 ? (
         <details className="rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
           <summary
-            className="min-h-11 cursor-pointer text-sm font-medium"
+            className="min-h-11 cursor-pointer text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
             確認済み {decided.length}組
@@ -166,7 +166,7 @@ export function DuplicateList({ review }: { review: DuplicateReviewView }) {
           <div className="mt-3 space-y-4">
             {decided.map((candidate) => (
               <div key={candidate.key}>
-                <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                   {formatYen(candidate.earlier.amountYen, { sign: 'never' })} の2件
                 </p>
                 {[candidate.earlier, candidate.later].map((side) => (

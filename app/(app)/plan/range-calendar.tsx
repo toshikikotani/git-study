@@ -84,7 +84,7 @@ export function RangeCalendar({
                       style={{ opacity: off ? 0.35 : 1 }}
                     >
                       <span
-                        className="tabular flex size-9 items-center justify-center rounded-full font-medium"
+                        className="tabular flex size-9 items-center justify-center rounded-full font-semibold"
                         style={{
                           background: edge ? 'var(--accent)' : 'transparent',
                           color: edge

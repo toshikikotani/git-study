@@ -79,7 +79,7 @@ export function GenreBreakdown() {
   return (
     <section
       aria-labelledby="genre-breakdown"
-      className="flex flex-col rounded-[22px] px-4 pt-5 pb-2"
+      className="flex flex-col rounded-2xl px-4 pt-5 pb-2"
       style={{ background: 'var(--surface)' }}
     >
       <h2

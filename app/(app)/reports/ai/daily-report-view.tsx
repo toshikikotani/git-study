@@ -36,7 +36,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           今日の支出
         </p>
         <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -63,8 +63,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
         type="button"
         onClick={() => void run()}
         disabled={pending}
-        className="mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold"
       >
         {pending
           ? '作成しています…'

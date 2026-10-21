@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatCompactYen,
   MAX_YEN,
   MoneyError,
   assertYen,
@@ -39,6 +40,20 @@ describe('formatYen', () => {
 
   it('sign: never で符号を落とす(支出額を正で見せたいとき)', () => {
     expect(formatYen(-3500, { sign: 'never' })).toBe('3,500円');
+  });
+});
+
+describe('formatCompactYen(狭い場所の金額、ADR-131)', () => {
+  it('英語の k を使わず、万の小数1桁にする', () => {
+    expect(formatCompactYen(550)).toBe('550');
+    expect(formatCompactYen(6_900)).toBe('0.7万');
+    expect(formatCompactYen(11_000)).toBe('1.1万');
+    expect(formatCompactYen(10_000)).toBe('1万');
+    expect(formatCompactYen(123_456)).toBe('12万');
+    expect(formatCompactYen(-6_900)).toBe('−0.7万');
+    for (const yen of [999, 1_000, 6_500, 99_999, 5_000_000]) {
+      expect(formatCompactYen(yen)).not.toMatch(/k/);
+    }
   });
 });
 

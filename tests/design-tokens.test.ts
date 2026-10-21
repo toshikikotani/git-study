@@ -96,7 +96,8 @@ describe('G 面の3段階と文字のコントラスト', () => {
     ]) {
       expect(css).toContain(`${t}:`);
     }
-    expect(css).toMatch(/--yen-unit-scale:\s*0\.7/);
+    // 一覧・文中の「円」は数字と同じ大きさ(明細だけ小さくしない、ADR-131)
+    expect(css).toMatch(/--yen-unit-scale:\s*1;/);
     expect(css).toMatch(/--fab-size:\s*56px/);
     expect(css).toMatch(/--gutter:\s*16px/);
   });

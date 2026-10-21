@@ -38,7 +38,7 @@ export function YearNetBarChart({ trend }: { trend: IncomeExpenseTrend }) {
 
   return (
     <div
-      className="glass rounded-[22px] p-5"
+      className="glass rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -96,16 +96,16 @@ export function YearNetBarChart({ trend }: { trend: IncomeExpenseTrend }) {
           <caption className="sr-only">月別の収支の表</caption>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--hairline)' }}>
-              <th className="p-2 text-left font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <th className="p-2 text-left font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 月
               </th>
-              <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <th className="p-2 text-right font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 収入
               </th>
-              <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <th className="p-2 text-right font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 支出
               </th>
-              <th className="p-2 text-right font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <th className="p-2 text-right font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 収支
               </th>
             </tr>

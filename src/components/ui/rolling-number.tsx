@@ -8,7 +8,7 @@ import { digitColumns, MOTION, prefersReducedMotion } from '@/lib/motion';
  * 金額が変わったとき、数字が桁ごとに回転する表示(400ms)。
  * 「視差効果を減らす」ときは回転せず、クロスフェードにする。
  * 読み上げは aria-label に最終の金額を入れ、回転する桁は aria-hidden にする
- * (途中の数字が読み上げられない)。「円」は数字の0.7倍(.yen-unit)。
+ * (途中の数字が読み上げられない)。「円」は数字と同じ大きさ(.yen-unit)。
  */
 export function RollingNumber({
   value,

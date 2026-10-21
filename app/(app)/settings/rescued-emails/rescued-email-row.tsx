@@ -30,7 +30,7 @@ export function RescuedEmailRow({ email }: { email: RescuedEmail }) {
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {email.subject ?? '(件名なし)'}
           </p>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -42,7 +42,7 @@ export function RescuedEmailRow({ email }: { email: RescuedEmail }) {
           type="button"
           disabled={pending}
           onClick={() => void onDelete()}
-          className="shrink-0 text-xs font-semibold disabled:opacity-40"
+          className="min-h-11 shrink-0 text-xs font-semibold disabled:opacity-40"
           style={{ color: 'var(--over)' }}
         >
           削除
@@ -52,7 +52,7 @@ export function RescuedEmailRow({ email }: { email: RescuedEmail }) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="mt-2 text-xs font-semibold"
+        className="min-h-11 mt-2 text-xs font-semibold"
         style={{ color: 'var(--accent)' }}
       >
         {expanded ? '本文を隠す' : '本文を見る'}

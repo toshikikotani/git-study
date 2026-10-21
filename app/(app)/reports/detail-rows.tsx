@@ -46,7 +46,7 @@ export function DetailRows({ rows }: { rows: readonly DetailRow[] }) {
               ) : null}
             </span>
             {r.value ? (
-              <span className="tabular shrink-0 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+              <span className="tabular shrink-0 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                 {r.value}
               </span>
             ) : null}

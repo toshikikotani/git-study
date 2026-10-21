@@ -135,8 +135,7 @@ export function RuleFlow({
               type="button"
               onClick={() => void openPreview()}
               disabled={busy}
-              className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-50"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary min-h-11 flex-1 rounded-xl text-sm font-semibold"
             >
               {busy ? '調べています…' : 'ルールにする'}
             </button>
@@ -191,8 +190,7 @@ export function RuleFlow({
               type="button"
               onClick={() => void save(true)}
               disabled={busy || matches.length === 0}
-              className="min-h-11 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary min-h-11 flex-1 rounded-xl text-sm font-semibold"
             >
               過去の{matches.length}件にも適用
             </button>

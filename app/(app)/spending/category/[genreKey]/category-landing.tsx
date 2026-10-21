@@ -1,9 +1,9 @@
 import { formatEstimate, formatEstimateRange } from '@/domain/forecast/format';
-import { formatYen } from '@/domain/money';
+import { formatCompactYen, formatYen } from '@/domain/money';
 import type { CategoryLine } from '@/features/category/model';
 import type { CumulativeChart } from '@/features/category/pace';
 
-const card = 'glass rounded-[28px] px-5 py-5';
+const card = 'glass rounded-2xl px-5 py-5';
 const cardStyle = { background: 'var(--surface)', boxShadow: 'var(--card-shadow)' } as const;
 
 /** 2026-11-05 → 11月5日 */
@@ -80,13 +80,15 @@ export function CategoryLandingCard({
           </span>
         ) : null}
       </div>
-      <div aria-hidden className="relative h-12">
+      {/* 「目標」の文字はゲージの上の段に、端でも折れないように置く(右端で縦に折れて、印と重なって
+          いた、ADR-131)。 */}
+      <div aria-hidden className="relative h-14">
         <span
-          className="absolute inset-x-0 top-5 h-2 rounded-full"
+          className="absolute inset-x-0 top-7 h-2 rounded-full"
           style={{ background: 'var(--state-none-track)' }}
         />
         <span
-          className="absolute top-4 h-4 rounded-full"
+          className="absolute top-6 h-4 rounded-full"
           style={{
             left: pct(low),
             width: `calc(${pct(high)} - ${pct(low)})`,
@@ -95,17 +97,17 @@ export function CategoryLandingCard({
           }}
         />
         <span
-          className="absolute top-4 h-4 rounded-full"
+          className="absolute top-6 h-4 rounded-full"
           style={{ width: pct(spent), background: 'var(--ink)' }}
         />
         {targetYen !== null ? (
           <>
             <span
-              className="absolute top-3 h-6 w-0.5 -translate-x-1/2"
+              className="absolute top-5 h-6 w-0.5 -translate-x-1/2"
               style={{ left: pct(targetYen), background: 'var(--ink)' }}
             />
             <span
-              className="absolute top-0 -translate-x-1/2 text-xs font-semibold"
+              className={`absolute top-0 text-xs font-semibold whitespace-nowrap ${labelShift(targetYen / max)}`}
               style={{ left: pct(targetYen), color: 'var(--ink)' }}
             >
               目標
@@ -113,7 +115,7 @@ export function CategoryLandingCard({
           </>
         ) : null}
         <span
-          className="absolute top-4 size-4 -translate-x-1/2 rounded-full"
+          className="absolute top-6 size-4 -translate-x-1/2 rounded-full"
           style={{
             left: pct(mid),
             background: 'var(--action)',
@@ -130,6 +132,13 @@ export function CategoryLandingCard({
       </p>
     </section>
   );
+}
+
+/** 印の上の文字を、端では内側へ寄せる(はみ出さない・折れない)。 */
+function labelShift(ratio: number): string {
+  if (ratio > 0.88) return '-translate-x-full';
+  if (ratio < 0.12) return '';
+  return '-translate-x-1/2';
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
@@ -151,7 +160,6 @@ export function WeekdayCard({
   const max = Math.max(...sums);
   if (max <= 0) return null;
   const top = sums.indexOf(max);
-  const short = (yen: number) => (yen >= 1000 ? `${Math.round(yen / 100) / 10}k` : String(yen));
   return (
     <section aria-labelledby="weekday-card" className={`${card} space-y-3`} style={cardStyle}>
       <h2 id="weekday-card" className="text-base font-bold" style={{ color: 'var(--ink)' }}>
@@ -171,7 +179,7 @@ export function WeekdayCard({
               className="tabular text-xs"
               style={{ color: i === top ? 'var(--ink)' : 'var(--ink-secondary)' }}
             >
-              {short(yen)}
+              {formatCompactYen(yen)}
             </span>
             <div
               className="w-full rounded-md"

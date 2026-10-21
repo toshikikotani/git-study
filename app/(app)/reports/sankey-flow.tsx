@@ -190,7 +190,7 @@ export function SankeyFlow({
                 dominantBaseline="middle"
                 fill="var(--ink)"
                 fontSize={11}
-                fontWeight={500}
+                fontWeight={600}
               >
                 {n.name.length > 8 ? `${n.name.slice(0, 7)}…` : n.name}
               </text>
@@ -200,7 +200,7 @@ export function SankeyFlow({
                 textAnchor="end"
                 dominantBaseline="middle"
                 fill="var(--ink-secondary)"
-                fontSize={9}
+                fontSize={11}
                 className="tabular"
               >
                 {formatYen(n.value, { sign: 'never' })}

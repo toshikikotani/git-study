@@ -1184,6 +1184,9 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     ? mixHex(ink, inkMuted, 0.35)
     : softenedInk(ink, plane, surface, 6.4);
   const hueE = themeHues(colors)[4];
+  // 押せない主のボタン(ADR-131):強調の塗りを薄めず、文字に寄せた淡い面に、読める濃さの文字。
+  const actionOff = mixHex(ink, surface, dark ? 0.16 : 0.08);
+  const onActionOff = ensureContrast(inkMuted, ink, [actionOff], 4.5);
 
   return {
     '--plane': plane,
@@ -1197,6 +1200,11 @@ export function themeTokens(colors: ThemeColors): Record<string, string> {
     '--action': accent,
     '--on-accent': onAccent,
     '--on-action': onAction,
+    '--action-off': actionOff,
+    '--on-action-off': onActionOff,
+    // 切り替えの溝(--field)と、選んでいる面(溝より明るく、ADR-131)
+    '--field': mixHex(ink, surface, dark ? 0.06 : 0.1),
+    '--segment-on': dark ? mixHex(ink, surface, 0.24) : surface,
     '--accent-track': rgba(accent, dark ? 0.16 : 0.1),
     '--mark': hueE,
     '--state-ok': subLine,

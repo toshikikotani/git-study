@@ -172,7 +172,7 @@
   border-radius: 999px;
   background: rgba(20, 20, 24, 0.82);
   padding: 8px 14px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.45;
 }
@@ -309,7 +309,7 @@
   border-radius: 8px;
   background: transparent;
   color: var(--camera-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 .receipt-camera__modes button[aria-checked='true'] {

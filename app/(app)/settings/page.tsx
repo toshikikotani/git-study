@@ -120,7 +120,7 @@ function lineReady(): boolean {
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section aria-label={title} className="flex flex-col gap-2">
-      <h2 className="px-2 text-[13px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+      <h2 className="px-2 text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
         {title}
       </h2>
       <div
@@ -141,7 +141,7 @@ function Row({ href, label, sub }: { href: string; label: string; sub?: string }
       className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 active:opacity-60"
     >
       <span className="flex min-w-0 flex-col">
-        <span className="text-[15px] font-medium" style={{ color: 'var(--ink)' }}>
+        <span className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
           {label}
         </span>
         {sub ? (

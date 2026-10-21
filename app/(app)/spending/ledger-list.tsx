@@ -25,7 +25,6 @@ import type { DrilldownTransaction } from './drilldown';
 import { ActiveFilterChips } from './filter-sheet';
 import { PendingReceiptRows } from './pending-receipt-rows';
 import { LedgerSelectionMenu } from './ledger-selection-menu';
-import { useAiCheck } from './ai-check';
 import { LedgerSearchControls } from './ledger-search-controls';
 import { CompactTransactionSummary } from './compact-transaction-summary';
 import { SelectionCopySheet } from './selection-copy-sheet';
@@ -63,9 +62,6 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [splitOpen, setSplitOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
-  // 店名の表記ゆれとレシートの品目の読み取りミスは、右上の「AIでチェック」からいつでも探して直せる
-  // (本人の要望、ADR-119 → 120)。
-  const check = useAiCheck(reloadVisibleMonth);
   const selectionReady = !loading && (error === null || isCurrentMonth) && !filter.pendingOnly;
   const fixedKeySet = useMemo(() => new Set(fixedKeys), [fixedKeys]);
   const isFixed = useCallback(
@@ -208,8 +204,6 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
           </p>
         </>
       )}
-      {check.sheet}
-      {/* 右上の「AIでチェック」はいつでも出す(明細の無い月でも、ほかの月の店名やレシートを直せる)。 */}
       <LedgerSelectionMenu
         selectMode={selectMode}
         count={selected.length}
@@ -226,7 +220,6 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
         onCopy={() => selectionReady && selected.length > 0 && setCopyOpen(true)}
         onSelectAll={() => selectionReady && setSelectedIds(new Set(selectable.map((t) => t.id)))}
         onClear={() => setSelectedIds(new Set())}
-        onTidy={check.start}
       />
       <SplitPaymentSheet
         open={splitOpen && selectionReady}
@@ -347,7 +340,7 @@ export function DaySection({
         </span>
       ) : null}
       {!forceOpen ? (
-        <span aria-hidden className="shrink-0 text-[14px]">
+        <span aria-hidden className="shrink-0 text-[13px]">
           {isOpen ? '⌄' : '›'}
         </span>
       ) : null}

@@ -1,7 +1,7 @@
 import { formatYen } from '@/domain/money';
 
 /**
- * 金額の表示部品。数字は等幅(tabular)、「円」は数字の0.7倍で少し細く(.yen-unit)。
+ * 金額の表示部品。数字は等幅(tabular)、「円」は数字と同じ大きさ(.yen-unit、ADR-131)。
  * 一覧の支出には「−」を付けない(収入だけ緑の「+」)。読み上げは呼び出し側の aria-label が担う。
  */
 export function Yen({ value, className }: { value: number; className?: string }) {

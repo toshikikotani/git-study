@@ -40,7 +40,7 @@ export function EveningCheckSetting({
     <div className="flex flex-col gap-2 px-4 py-3">
       <div className="flex min-h-11 items-center justify-between gap-3">
         <span className="flex min-w-0 flex-col">
-          <span className="text-[15px] font-medium" style={{ color: 'var(--ink)' }}>
+          <span className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
             夜の答え合わせ(LINE)
           </span>
           <span

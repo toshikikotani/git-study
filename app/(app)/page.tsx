@@ -5,12 +5,10 @@ import { recordCheckin } from '@/features/checkins/store';
 import { shouldShowOnboarding } from '@/features/onboarding/store';
 import { loadSavingsSummary } from '@/features/savings/store';
 import { AiInsightLine } from './_home/ai-insight-line';
-import { HomeBanners } from './_home/home-banners';
 import { HomeHeader } from './_home/home-header';
-import { PaydayCard } from './_home/payday-card';
-import { TodayCheckCard } from './_home/today-check-card';
 import { TodayRecords, UpcomingPayments } from './_home/recent-records';
 import { TodaySection } from './_home/today-section';
+import { TodayTodo } from './_home/today-todo';
 import { SplitPaymentReceipts } from './_home/split-payment-receipts';
 
 // サーバー側は常に最新の値を計算する。静的化・サーバー側キャッシュには乗せない
@@ -20,9 +18,9 @@ import { SplitPaymentReceipts } from './_home/split-payment-receipts';
 export const dynamic = 'force-dynamic';
 
 /**
- * ホーム(デザイン仕様書の「今日」、ADR-090):見出し → 入力待ちの知らせ → 給料日 → 今日の答え合わせ
- * (片づけるものがあるときだけ、ADR-129。LINE の「1件ずつ見る」は `?check=today` で開く)→ 今日使える目安 →
- * 今期の見通し → 次の一手 → 貯金 → AIの気づき1行 → 最近の記録。
+ * ホーム(デザイン仕様書の「今日」、ADR-090):見出し → 今日使える目安 → 今日やること(答え合わせ・入力待ちの
+ * レシート・給料日を1枚に。片づけるものがあるときだけ、ADR-131。LINE の「1件ずつ見る」は `?check=today`
+ * で開く)→ 今期の見通し → 次の一手 → 貯金 → AIの気づき1行 → 最近の記録。目安をいちばん上に置く。
  */
 export default async function HomePage({
   searchParams,
@@ -42,18 +40,14 @@ export default async function HomePage({
   return (
     <div className="flex flex-col gap-4">
       <HomeHeader />
-      <Suspense fallback={null}>
-        <HomeBanners />
-      </Suspense>
-      <Suspense fallback={null}>
-        <PaydayCard />
-      </Suspense>
-      <Suspense fallback={null}>
-        <TodayCheckCard autoOpen={check === 'today'} />
-      </Suspense>
       <Suspense fallback={<TodaySkeleton />}>
         <TodaySection
           savingsNowYen={savings?.thisMonthYen ?? null}
+          todo={
+            <Suspense fallback={null}>
+              <TodayTodo autoOpen={check === 'today'} />
+            </Suspense>
+          }
           upcoming={
             <Suspense fallback={null}>
               <UpcomingPayments />
@@ -80,10 +74,10 @@ function TodaySkeleton() {
     <section
       aria-label="今日使える目安"
       aria-busy="true"
-      className="rounded-[22px] px-5 pt-6 pb-6"
+      className="rounded-2xl px-5 pt-6 pb-6"
       style={{ background: 'var(--surface)' }}
     >
-      <p className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-[15px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
         今日の目安
       </p>
       <p className="mt-3 text-[15px]" style={{ color: 'var(--ink-muted)' }}>

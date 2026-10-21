@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 
@@ -31,10 +31,23 @@ function attrText(node: ts.JsxOpeningLikeElement, name: string, sf: ts.SourceFil
   return null;
 }
 
+/** となりの CSS Modules(`x.module.css`)で、min-height が 44px 以上のクラス名。 */
+function tallModuleClasses(file: string): Set<string> {
+  const css = file.replace(/\.tsx$/, '.module.css');
+  const tall = new Set<string>();
+  if (!existsSync(css)) return tall;
+  for (const m of readFileSync(css, 'utf8').matchAll(/\.([\w-]+)\s*\{([^}]*)\}/g)) {
+    const h = m[2]!.match(/min-height:\s*(\d+)px/);
+    if (h && Number(h[1]) >= 44) tall.add(m[1]!);
+  }
+  return tall;
+}
+
 export function findTapTargetIssues(files: readonly string[]): TapTargetIssue[] {
   const issues: TapTargetIssue[] = [];
   for (const file of files) {
     const text = readFileSync(file, 'utf8');
+    const tall = tallModuleClasses(file);
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const visit = (node: ts.Node) => {
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
@@ -50,6 +63,8 @@ export function findTapTargetIssues(files: readonly string[]): TapTargetIssue[] 
           const ok =
             OK_CLASS.test(` ${cls.replace(/\$\{[^}]*\}/g, ' ').replace(/["'{}`]/g, ' ')} `) ||
             /minHeight:\s*(4[4-9]|[5-9]\d)/.test(style) ||
+            // CSS Modules のクラスで 44px 以上を決めているもの
+            [...cls.matchAll(/styles\.(\w+)/g)].some((m) => tall.has(m[1]!)) ||
             // 明示的な例外(ダミーのリンクなど、44pt を親が担保しているもの)
             /data-tap-ok/.test(node.getText(sf));
           if (!ok) {

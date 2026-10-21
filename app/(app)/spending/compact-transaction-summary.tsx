@@ -18,7 +18,7 @@ export function CompactTransactionSummary({
   return (
     <div className="min-w-0 flex-1">
       <p
-        className="flex h-5 items-center gap-1 text-[15px] leading-5 font-medium"
+        className="flex h-5 items-center gap-1 text-[15px] leading-5 font-semibold"
         style={{ color: 'var(--ink)' }}
       >
         <span className="min-w-0 truncate" title={summary.name}>
@@ -26,7 +26,7 @@ export function CompactTransactionSummary({
         </span>
         {fixed ? (
           <span
-            className="shrink-0 rounded px-1 text-[11px] font-medium"
+            className="shrink-0 rounded px-1 text-[11px] font-semibold"
             style={{ background: 'var(--plane)', color: 'var(--ink-muted)' }}
           >
             固定費
@@ -34,7 +34,7 @@ export function CompactTransactionSummary({
         ) : null}
         {attentionLabel ? (
           <span
-            className="shrink-0 rounded px-1 text-[11px] font-medium"
+            className="shrink-0 rounded px-1 text-[11px] font-semibold"
             style={{ background: 'var(--attention-track)', color: 'var(--attention)' }}
           >
             {attentionLabel}

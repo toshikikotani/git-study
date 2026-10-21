@@ -20,11 +20,16 @@ type Props = {
   onCopy: () => void;
   onSelectAll: () => void;
   onClear: () => void;
-  /** 「AIでチェック」(店名の表記ゆれとレシートの読み取りミスを AI で探す、ADR-119 → 120)。選択中は出さない。 */
-  onTidy?: (() => void) | undefined;
 };
 
-/** ページのアニメーションから離し、一覧のどこでも右上から選択した明細を操作する。 */
+/** 見出しの行に「選択」を置く場所(PeriodSwitcher)。上部を1段にする(ADR-131)。 */
+export const HEADER_ACTIONS_ID = 'spending-header-actions';
+
+/**
+ * 「選択」は見出しの行(戻る・タイトルと同じ1段)に置く。選んでいる間だけ、一覧のどこでも右上から
+ * 選択した明細を操作できるよう、ページのアニメーションから離した浮く操作にする。
+ * 「AIでチェック」は「確認が必要」の中へ移した(タイトルの上に浮いて2段になっていた、ADR-131)。
+ */
 export function LedgerSelectionMenu({
   selectMode,
   count,
@@ -39,7 +44,6 @@ export function LedgerSelectionMenu({
   onCopy,
   onSelectAll,
   onClear,
-  onTidy,
 }: Props) {
   const isClient = useIsClient();
   const [open, setOpen] = useState(false);
@@ -75,8 +79,23 @@ export function LedgerSelectionMenu({
 
   if (!isClient || hidden) return null;
   const unavailable = count === 0 || !ready;
+  const header = document.getElementById(HEADER_ACTIONS_ID);
+  if (!selectMode && header) {
+    return createPortal(
+      <button
+        type="button"
+        disabled={!ready || availableCount === 0}
+        onClick={onStart}
+        className="flex min-h-11 items-center px-2 text-[17px] disabled:opacity-40"
+        style={{ color: 'var(--accent)' }}
+      >
+        選択
+      </button>,
+      header,
+    );
+  }
   const itemClass =
-    'flex w-full items-center rounded-xl px-3 py-3 text-left text-[15px] font-medium hover:bg-[var(--accent-track)] disabled:opacity-40';
+    'flex w-full items-center rounded-xl px-3 py-3 text-left text-[15px] font-semibold hover:bg-[var(--accent-track)] disabled:opacity-40';
 
   return createPortal(
     <div
@@ -85,22 +104,6 @@ export function LedgerSelectionMenu({
       aria-label="明細の選択"
       className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-40 mx-auto flex max-w-2xl justify-end px-4"
     >
-      {onTidy && !selectMode ? (
-        <button
-          type="button"
-          onClick={onTidy}
-          className="pointer-events-auto mr-2 flex min-h-11 items-center gap-1 rounded-full border px-4 text-[15px] font-semibold"
-          style={{
-            background: 'var(--surface-raised)',
-            borderColor: 'var(--hairline)',
-            boxShadow: 'var(--card-shadow)',
-            color: 'var(--accent)',
-          }}
-        >
-          <span aria-hidden>✦</span>
-          AIでチェック
-        </button>
-      ) : null}
       <div ref={root} className="pointer-events-auto relative max-w-full">
         <div
           className="flex items-center rounded-full border px-1"
@@ -120,7 +123,7 @@ export function LedgerSelectionMenu({
                 aria-haspopup="dialog"
                 aria-controls={open ? 'ledger-selection-actions' : undefined}
                 onClick={() => setOpen((value) => !value)}
-                className="tabular flex min-h-11 items-center gap-2 px-3 text-[14px] font-semibold"
+                className="tabular flex min-h-11 items-center gap-2 px-3 text-[13px] font-semibold"
               >
                 <span aria-live="polite">{count}件を選択</span>
                 <span aria-hidden>⌄</span>
@@ -128,7 +131,7 @@ export function LedgerSelectionMenu({
               <button
                 type="button"
                 onClick={() => act(onExit)}
-                className="min-h-11 px-3 text-[14px] font-semibold"
+                className="min-h-11 px-3 text-[13px] font-semibold"
               >
                 完了
               </button>

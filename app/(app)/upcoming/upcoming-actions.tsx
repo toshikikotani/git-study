@@ -68,7 +68,7 @@ export function CategoryFixedBanner({
       {error ? (
         <p
           role="alert"
-          className="rounded-xl px-3 py-2 text-[14px]"
+          className="rounded-xl px-3 py-2 text-[13px]"
           style={{ background: 'var(--note)', color: 'var(--over)' }}
         >
           {error}
@@ -80,13 +80,13 @@ export function CategoryFixedBanner({
           className="flex items-center justify-between gap-3 rounded-2xl px-4 py-2"
           style={{ background: 'var(--income-track)' }}
         >
-          <span className="text-[14px] font-semibold" style={{ color: 'var(--income)' }}>
+          <span className="text-[13px] font-semibold" style={{ color: 'var(--income)' }}>
             {released.genreName}を固定費から外しました
           </span>
           <button
             type="button"
             onClick={() => void undo()}
-            className="min-h-11 shrink-0 px-1 text-[14px] font-semibold"
+            className="min-h-11 shrink-0 px-1 text-[13px] font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             元に戻す
@@ -112,8 +112,7 @@ export function CategoryFixedBanner({
               <button
                 type="button"
                 onClick={() => void release(c)}
-                className="min-h-11 rounded-full text-[15px] font-semibold"
-                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+                className="btn-primary min-h-11 rounded-full text-[15px] font-semibold"
               >
                 固定費から外す
               </button>
@@ -154,12 +153,12 @@ export function DetectedPayments({ detected }: { detected: readonly Detected[] }
   return (
     <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
       {error ? (
-        <p role="alert" className="px-4 pt-3 text-[14px]" style={{ color: 'var(--over)' }}>
+        <p role="alert" className="px-4 pt-3 text-[13px]" style={{ color: 'var(--over)' }}>
           {error}
         </p>
       ) : null}
       {detected.length === 0 ? (
-        <p className="px-4 py-3 text-[14px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
+        <p className="px-4 py-3 text-[13px] leading-normal" style={{ color: 'var(--ink-muted)' }}>
           まだありません。同じ店・同じくらいの金額の記録が2か月続くと、ここで「固定費にしますか？」と聞きます。
         </p>
       ) : (
@@ -170,7 +169,7 @@ export function DetectedPayments({ detected }: { detected: readonly Detected[] }
             style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
           >
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[16px] font-medium" style={{ color: 'var(--ink)' }}>
+              <span className="truncate text-[16px] font-semibold" style={{ color: 'var(--ink)' }}>
                 {d.label}
               </span>
               <span className="tabular text-[13px]" style={{ color: 'var(--ink-muted)' }}>
@@ -186,7 +185,7 @@ export function DetectedPayments({ detected }: { detected: readonly Detected[] }
               <button
                 type="button"
                 onClick={() => void confirm(d)}
-                className="min-h-11 shrink-0 rounded-full px-4 text-[14px] font-semibold"
+                className="min-h-11 shrink-0 rounded-full px-4 text-[13px] font-semibold"
                 style={{ background: 'var(--plane)', color: 'var(--accent)' }}
               >
                 固定費にする

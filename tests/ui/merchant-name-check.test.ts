@@ -97,17 +97,19 @@ describe('店名をまとめて直すのシート', () => {
   });
 });
 
-describe('入口(明細の右上「AIでチェック」)', () => {
+describe('入口(「確認が必要」の中の「AIでチェック」)', () => {
   const menu = readFileSync('app/(app)/spending/ledger-selection-menu.tsx', 'utf8');
   const list = readFileSync('app/(app)/spending/ledger-list.tsx', 'utf8');
+  const hub = readFileSync('app/(app)/spending/review-hub.tsx', 'utf8');
   const check = readFileSync('app/(app)/spending/ai-check.tsx', 'utf8');
   const filter = readFileSync('app/(app)/spending/filter-sheet.tsx', 'utf8');
 
-  it('右上の「選択」の隣に、いつでも出す(選択中は出さない)', () => {
-    expect(menu).toContain('AIでチェック');
-    expect(menu).toContain('{onTidy && !selectMode ? (');
-    expect(list).toContain('onTidy={check.start}');
-    expect(list).toContain('useAiCheck(reloadVisibleMonth)');
+  it('明細のタイトルの上には浮かせず、「確認が必要」の中にいつでも出す(上部が2段になっていた、ADR-131)', () => {
+    expect(menu).not.toContain('onTidy');
+    expect(list).not.toContain('useAiCheck');
+    expect(hub).toContain('useAiCheck(');
+    expect(hub).toContain('title="AIでチェック"');
+    expect(hub).toContain('onClick={check.start}');
   });
 
   it('分かりにくかった絞り込みの中の入口はやめた', () => {

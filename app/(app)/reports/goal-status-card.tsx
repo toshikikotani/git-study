@@ -84,7 +84,7 @@ export function GoalStatusCard({
   return (
     <section
       aria-label="いまの状況"
-      className="flex flex-col rounded-[22px] px-5 pt-5 pb-2"
+      className="flex flex-col rounded-2xl px-5 pt-5 pb-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -98,7 +98,7 @@ export function GoalStatusCard({
         </span>
         <Link
           href="/plan/edit"
-          className="flex min-h-11 items-center rounded-full px-4 text-[14px] font-semibold"
+          className="flex min-h-11 items-center rounded-full px-4 text-[13px] font-semibold"
           style={{ background: 'var(--plane)', color: 'var(--accent)' }}
         >
           編集
@@ -197,7 +197,7 @@ export function GoalStatusCard({
         </p>
       ) : null}
       <p
-        className="tabular mt-4 rounded-xl px-4 py-3 text-[14px] leading-relaxed"
+        className="tabular mt-4 rounded-xl px-4 py-3 text-[13px] leading-relaxed"
         style={{ background: 'var(--note)', color: 'var(--ink-secondary)' }}
       >
         {perDay !== null && perDay > 0 ? (
@@ -221,7 +221,7 @@ export function GoalStatusCard({
         <button
           type="button"
           onClick={speak}
-          className="flex min-h-11 items-center gap-2 px-1 text-[14px] font-semibold"
+          className="flex min-h-11 items-center gap-2 px-1 text-[13px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           <svg

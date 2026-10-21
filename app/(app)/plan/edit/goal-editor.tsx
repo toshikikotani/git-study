@@ -192,7 +192,7 @@ export function GoalEditor({
           type="button"
           onClick={() => void save()}
           disabled={!dirty || saving}
-          className="flex min-h-11 items-center justify-self-end text-[17px] font-bold disabled:opacity-40"
+          className="-mr-2 flex min-h-11 min-w-11 items-center justify-center justify-self-end px-2 text-[17px] font-bold disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
           {saving ? '保存中' : '保存'}
@@ -207,11 +207,7 @@ export function GoalEditor({
         </p>
       ) : null}
 
-      <section
-        aria-live="polite"
-        className="flex flex-col gap-1 rounded-[20px] px-5 py-4"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-      >
+      <section aria-live="polite" className="btn-primary flex flex-col gap-1 rounded-2xl px-5 py-4">
         <span className="text-[13px] opacity-85">この目標で着地すると</span>
         {dirty || landing === null ? (
           <>
@@ -317,7 +313,7 @@ export function GoalEditor({
       {flagged.length > 0 && applied === null ? (
         <section
           aria-label="提案"
-          className="mt-2 flex flex-col gap-2 rounded-[20px] px-4 pt-4 pb-4"
+          className="mt-2 flex flex-col gap-2 rounded-2xl px-4 pt-4 pb-4"
           style={{
             background: 'var(--surface)',
             boxShadow: 'inset 0 0 0 1.5px var(--suggest-line)',
@@ -342,15 +338,15 @@ export function GoalEditor({
             </svg>
             提案
           </span>
-          <span className="text-[18px] font-bold">
+          <span className="text-[17px] font-bold">
             {flagged.map((c) => c.name).join('と')}を{Math.round(CUT * 100)}%へらす
           </span>
-          <span className="text-[14px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          <span className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
             {flagged.length === 1 ? 'ここが' : `この${flagged.length}つが`}
             見直し候補です。ほかのカテゴリは、いまのペースのままで大丈夫です。
           </span>
           <div
-            className="tabular flex flex-col gap-1 rounded-xl px-3 py-3 text-[14px]"
+            className="tabular flex flex-col gap-1 rounded-xl px-3 py-3 text-[13px]"
             style={{ background: 'var(--note)' }}
           >
             {flagged.map((c) => (
@@ -374,8 +370,7 @@ export function GoalEditor({
               setApplied(amounts);
               setAmounts((prev) => ({ ...prev, ...proposal }));
             }}
-            className="mt-1 min-h-11 rounded-full text-[15px] font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary mt-1 min-h-11 rounded-full text-[15px] font-semibold"
           >
             提案を当てはめる
           </button>
@@ -383,10 +378,10 @@ export function GoalEditor({
       ) : null}
       {applied !== null ? (
         <div
-          className="mt-2 flex items-center justify-between gap-2 rounded-[14px] py-1 pr-2 pl-4"
+          className="mt-2 flex items-center justify-between gap-2 rounded-xl py-1 pr-2 pl-4"
           style={{ background: 'var(--income-track)' }}
         >
-          <span className="text-[14px] font-semibold" style={{ color: 'var(--income)' }}>
+          <span className="text-[13px] font-semibold" style={{ color: 'var(--income)' }}>
             提案を当てはめました
           </span>
           <button
@@ -492,7 +487,7 @@ export function GoalEditor({
       </p>
       <div className="-mt-1 flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {dirty ? (
-          <p className="px-4 py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-4 py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             カテゴリを追加するには、先に上部の「保存」で編集を保存してください。
           </p>
         ) : (

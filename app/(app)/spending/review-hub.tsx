@@ -16,6 +16,7 @@ import type { DuplicateReviewView } from '@/features/transactions/duplicates-sto
 import { categoryHref } from '@/lib/category-nav';
 import { DuplicateList } from '../transactions/duplicates/duplicate-list';
 import { ReceiptResults } from '../transactions/receipt/receipt-results';
+import { useAiCheck } from './ai-check';
 import { AttentionFixer, REVIEW_HREF } from './attention-card';
 import { ClassifyButton } from './classify-button';
 import { MerchantNameResults } from './merchant-name-review';
@@ -53,6 +54,11 @@ export function ReviewHub({
   const router = useRouter();
   const jobs = useReceiptJobs();
   const [fixing, setFixing] = useState(false);
+  // 店名の表記ゆれとレシートの品目の読み取りミスを AI で探す(もとは明細のタイトルの上、ADR-120 → 131)。
+  const check = useAiCheck(() => {
+    router.refresh();
+    reloadVisibleMonth();
+  });
   const attention = useMemo(() => buildAttention(transactions, today), [transactions, today]);
   const queue = useMemo(
     () => groupAttentionQueue(transactions, attention),
@@ -155,6 +161,19 @@ export function ReviewHub({
           </p>
         </Section>
       ) : null}
+
+      <Section title="AIでチェック" sub="すべての月の店名のゆれと、レシートの読み取りミスを探す">
+        <button
+          type="button"
+          onClick={check.start}
+          className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left"
+          style={{ background: 'var(--surface)', color: 'var(--ink)' }}
+        >
+          <span className="text-[15px] font-semibold">店名とレシートをAIで確かめる</span>
+          <span aria-hidden>›</span>
+        </button>
+      </Section>
+      {check.sheet}
 
       <AttentionFixer
         open={fixing}

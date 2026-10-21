@@ -44,7 +44,7 @@ export function WatchCategories({ categories }: { categories: readonly WatchCate
   return (
     <section
       aria-label="気をつけたいカテゴリ"
-      className="flex flex-col rounded-[22px] pt-2"
+      className="flex flex-col rounded-2xl pt-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-center justify-between gap-2 pr-2 pl-4">
@@ -72,7 +72,7 @@ export function WatchCategories({ categories }: { categories: readonly WatchCate
             <GenreBadge name={c.name} size={36} />
             <span className="flex min-w-0 flex-1 flex-col gap-2">
               <span className="flex items-center justify-between gap-2">
-                <span className="truncate text-[16px] font-medium">{c.name}</span>
+                <span className="truncate text-[16px] font-semibold">{c.name}</span>
                 <span
                   className="shrink-0 rounded-full px-2 py-1 text-[12px] font-bold"
                   style={{ color: tone.color, background: tone.bg }}

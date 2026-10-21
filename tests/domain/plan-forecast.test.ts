@@ -145,9 +145,9 @@ describe('landingReport', () => {
   it('カテゴリごとの説明に、使った額と予定を目標の期間の数字で書く', () => {
     const report = landingReport({ remainingDays: 10, rows: [row], forecasts });
     const detail = report.forecasts[0]!.detail;
-    expect(detail).toContain('8,000 円使っている');
-    expect(detail).toContain('予定が 3,000 円');
-    expect(report.forecasts[0]!.advice).toContain('先々月 18,000 円、先月 21,000 円');
+    expect(detail).toContain('8,000円使っている');
+    expect(detail).toContain('予定が 3,000円');
+    expect(report.forecasts[0]!.advice).toContain('先々月 18,000円、先月 21,000円');
   });
 
   it('抑えてほしい額の合計は、判断できたカテゴリの額を足した値', () => {

@@ -20,7 +20,7 @@ export function SubscriptionsCard({ subscriptions }: { subscriptions: DetectedSu
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           定期支払い({subscriptions.length} 件)
         </p>
         <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
