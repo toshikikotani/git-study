@@ -6,8 +6,10 @@ import { DetailSheet } from '@/components/ui/detail-sheet';
 import { getCurrentAccount } from '@/features/auth/owner';
 import { getAppSettings } from '@/features/settings/store';
 import { backTargetOf } from '@/lib/back-target';
+import { getLineEnv } from '@/lib/env';
 import { loadPaydayState, PaydayPanel } from '../payday/payday-panel';
 import { AiSwitch } from './ai-switch';
+import { EveningCheckSetting } from './evening-check-setting';
 import { PasswordForm } from './password-form';
 import { SignOutButton } from './sign-out-button';
 
@@ -69,6 +71,14 @@ export default async function SettingsPage({
         <AiSwitch aiEnabled={settings?.aiEnabled ?? true} />
       </Group>
 
+      <Group title="LINE">
+        <EveningCheckSetting
+          enabled={settings?.eveningCheckEnabled ?? true}
+          at={settings?.eveningCheckAt ?? '21:00'}
+          lineReady={lineReady()}
+        />
+      </Group>
+
       <Group title="そのほか">
         <Row
           href="/welcome?from=/settings"
@@ -96,6 +106,15 @@ export default async function SettingsPage({
       <SignOutButton />
     </div>
   );
+}
+
+/** LINE の連携が設定してあるか(設定が壊れていても画面は落とさない)。 */
+function lineReady(): boolean {
+  try {
+    return getLineEnv() !== null;
+  } catch {
+    return false;
+  }
 }
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {

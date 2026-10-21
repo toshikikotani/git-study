@@ -6,7 +6,9 @@ import { listDuplicateReview } from '@/features/transactions/duplicates-store';
 import { listMerchantNameReviewGroups } from '@/features/transactions/merchant-name-store';
 import { todayJst } from '@/lib/date';
 import { loadSpendingMonthData } from '../month-data';
+import { countTodayCheck } from '../../_home/today-check-card';
 import { ReviewHub } from '../review-hub';
+import { TodayCheckLauncher } from '../today-check-launcher';
 import { SpendingMonthProvider } from '../spending-month-provider';
 
 // 片づけた直後の反映を常に見せる。App Router のキャッシュに乗せない。
@@ -17,8 +19,13 @@ export const dynamic = 'force-dynamic';
  * 確認・この月のカテゴリと差額・店名のゆれ・重複を、この画面だけで片づける。撮り終えたレシートも
  * ここで確かめて保存する。
  */
-export default async function ReviewPage() {
-  const [data, captures, records, duplicates, merchantNames, plan] = await Promise.all([
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ check?: string | string[] }>;
+} = {}) {
+  const { check } = (await searchParams) ?? {};
+  const [data, captures, records, duplicates, merchantNames, plan, checkCount] = await Promise.all([
     loadSpendingMonthData(),
     listOpenCaptures().catch(() => []),
     listPendingReviewRecords().catch(() => []),
@@ -33,6 +40,7 @@ export default async function ReviewPage() {
       () => ({ groups: [], error: '店名の確認を読み込めませんでした。' }),
     ),
     getCurrentPlan(todayJst()).catch(() => null),
+    countTodayCheck().catch(() => 0),
   ]);
   return (
     <div className="rise flex flex-col gap-4">
@@ -52,6 +60,10 @@ export default async function ReviewPage() {
         captures={data.captures}
       >
         <ReviewHub
+          todayCheck={
+            <TodayCheckLauncher count={checkCount} variant="review" autoOpen={check === 'today'} />
+          }
+          todayCheckCount={checkCount}
           hasGoal={plan !== null}
           captures={captures}
           records={records}

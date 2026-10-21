@@ -335,3 +335,14 @@ export function getOwnerEmail(): string | null {
   const v = process.env.OWNER_EMAIL?.trim().toLowerCase();
   return v ? v : null;
 }
+
+/**
+ * アプリの URL(LINE のボタン「1件ずつ見る」などで開く先、ADR-130)。APP_BASE_URL(GitHub Actions の
+ * 定期ジョブと同じ値)、無ければ Vercel の本番の URL。どちらも無ければ null(ボタンを出さない)。
+ */
+export function getAppBaseUrl(): string | null {
+  const explicit = process.env.APP_BASE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, '');
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return vercel ? `https://${vercel.replace(/\/+$/, '')}` : null;
+}

@@ -22,6 +22,7 @@ import {
   type StoredTransaction,
   type TransactionSource,
 } from '@/features/transactions/store';
+import { autoMergeSamePayments } from '@/features/transactions/payment-merge';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
 import { recordCorrection } from '@/features/genre/memory-store';
@@ -171,6 +172,11 @@ export async function saveImportBatchAction(
     }
   }
 
+  // レシートとカードの通知メールが同じ支払いなら、自動で1件にまとめる(ADR-129)。失敗しても保存は成功のまま。
+  if (meta.source === 'manual' && result.importedCount > 0) {
+    await mergeSamePaymentsForDates(preview.map((t) => t.occurredOn));
+  }
+
   return {
     imported: result.importedCount,
     duplicates: result.duplicateCount,
@@ -178,6 +184,17 @@ export async function saveImportBatchAction(
     splitWarnings,
     insertedIds: result.insertedTransactions.map((t) => t.id),
   };
+}
+
+async function mergeSamePaymentsForDates(dates: readonly string[]): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    await autoMergeSamePayments(supabase, auth.user.id, dates);
+  } catch {
+    // まとめられなくても、重複の候補として「確認が必要」に出る
+  }
 }
 
 export async function updateTransactionAction(

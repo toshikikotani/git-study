@@ -32,6 +32,10 @@ export type AppSettings = {
   sideIncomeSavingsRatio: number;
   /** 全AI機能の一括オフ(N1)。false でもアプリの基本機能はすべて使える。既定 true。 */
   aiEnabled: boolean;
+  /** LINE の夜の答え合わせを送るか(ADR-130)。既定 true。 */
+  eveningCheckEnabled: boolean;
+  /** 夜の答え合わせを送る時刻(日本時間、'21:00')。 */
+  eveningCheckAt: string;
 };
 
 export class SettingsStoreError extends AppError {}
@@ -80,6 +84,10 @@ export async function getAppSettingsAsAdmin(
     payday: Number(row.payday ?? 25),
     sideIncomeSavingsRatio: pickNumber(row, 'side_income_savings_ratio'),
     aiEnabled: typeof row.ai_enabled === 'boolean' ? row.ai_enabled : true,
+    eveningCheckEnabled:
+      typeof row.evening_check_enabled === 'boolean' ? row.evening_check_enabled : true,
+    eveningCheckAt:
+      typeof row.evening_check_at === 'string' ? row.evening_check_at.slice(0, 5) : '21:00',
   };
 }
 
@@ -122,6 +130,10 @@ export async function updateAppSettings(patch: AppSettingsPatch): Promise<AppSet
     row.side_income_savings_ratio = patch.sideIncomeSavingsRatio;
   }
   if (patch.aiEnabled !== undefined) row.ai_enabled = patch.aiEnabled;
+  if (patch.eveningCheckEnabled !== undefined) {
+    row.evening_check_enabled = patch.eveningCheckEnabled;
+  }
+  if (patch.eveningCheckAt !== undefined) row.evening_check_at = patch.eveningCheckAt;
 
   let { error } = await supabase.from('app_settings').update(row).eq('user_id', auth.user.id);
   if (error && isMissingColumnError(error)) {

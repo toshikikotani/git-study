@@ -1,14 +1,27 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import { importLineReceiptAsAdmin } from '@/features/import/line-receipt';
 import { ClaudeReceiptExtractor } from '@/features/import/receipt-ai';
-import { getLineChannelSecret, getLineEnv, getLineReceiptAccountId } from '@/lib/env';
+import { replyToPostback, replyToText, type LineContext } from '@/features/line/conversation';
+import {
+  getAppBaseUrl,
+  getLineChannelSecret,
+  getLineEnv,
+  getLineReceiptAccountId,
+} from '@/lib/env';
 import { readAnthropicApiKey } from '@/lib/env';
-import { fetchLineImageAsBase64, postLineMessage } from '@/lib/line';
+import {
+  fetchLineImageAsBase64,
+  lineText,
+  postLineMessage,
+  replyLineMessages,
+  type LineMessage,
+} from '@/lib/line';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { findOwner } from '@/lib/supabase/owner';
+import { findOwner, type OwnerUser } from '@/lib/supabase/owner';
+import { runAsOwner } from '@/lib/supabase/owner-session';
 
 /**
  * LINEでのレシート画像受信(受信 Webhook、本人発案)。
@@ -34,13 +47,24 @@ import { findOwner } from '@/lib/supabase/owner';
  * ── 分類はルールのみ ────────────────────────────────────────
  * app/api/cron/import-gmail/route.ts と同じ方針(ADR-019)。詳細は
  * features/import/line-receipt.ts のヘッダー参照。
+ *
+ * ── 文字とボタン(v4-2「LINEで完結」、ADR-130)──────────────────
+ * 文字(「ランチ 1200」「今日あといくら」「あと3000円使っていい？」「答え合わせ」、それ以外はAI)と、
+ * 返事に付けたボタン(ポストバック)にも答える。どれも、署名と送り主を確かめたあと、本人として
+ * (lib/supabase/owner-session.ts)アプリと同じ機能で処理し、返信トークンで返す。AIは時間がかかるので、
+ * LINE へはすぐ 200 を返し、返事は after() で送る。
  */
 
 export const runtime = 'nodejs';
+// AIの返事(数秒〜十数秒)を after() で送り切るため。
+export const maxDuration = 60;
 
 type LineWebhookEvent = {
   type: string;
-  message?: { type: string; id: string };
+  replyToken?: string;
+  webhookEventId?: string;
+  message?: { type: string; id: string; text?: string };
+  postback?: { data: string };
   source?: { type: string; userId?: string };
 };
 
@@ -83,19 +107,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'JSONとして読めませんでした' }, { status: 400 });
   }
 
-  const imageEvents = (payload.events ?? []).filter(
-    (event): event is LineWebhookEvent & { message: { type: 'image'; id: string } } =>
-      event.type === 'message' &&
-      event.message?.type === 'image' &&
-      event.source?.userId === lineEnv.LINE_USER_ID,
+  const mine = (payload.events ?? []).filter(
+    (event) => event.source?.userId === lineEnv.LINE_USER_ID,
   );
-  if (imageEvents.length === 0) {
+  const imageEvents = mine.filter(
+    (event): event is LineWebhookEvent & { message: { type: 'image'; id: string } } =>
+      event.type === 'message' && event.message?.type === 'image',
+  );
+  const talkEvents = mine.filter(
+    (event) =>
+      typeof event.replyToken === 'string' &&
+      ((event.type === 'message' && event.message?.type === 'text') ||
+        (event.type === 'postback' && typeof event.postback?.data === 'string')),
+  );
+  if (imageEvents.length === 0 && talkEvents.length === 0) {
     return NextResponse.json({ processed: 0 });
-  }
-
-  const anthropicApiKey = readAnthropicApiKey();
-  if (anthropicApiKey === null) {
-    return NextResponse.json({ skipped: true, reason: 'ANTHROPIC_API_KEY が未設定です' });
   }
 
   const admin = createAdminClient();
@@ -105,6 +131,18 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (!user) {
     return NextResponse.json({ skipped: true, reason: 'ユーザーが存在しません' });
+  }
+
+  if (talkEvents.length > 0) {
+    after(() => replyToTalk(admin, user, talkEvents, lineEnv.LINE_CHANNEL_ACCESS_TOKEN, accountId));
+  }
+  if (imageEvents.length === 0) {
+    return NextResponse.json({ processed: 0, talk: talkEvents.length });
+  }
+
+  const anthropicApiKey = readAnthropicApiKey();
+  if (anthropicApiKey === null) {
+    return NextResponse.json({ skipped: true, reason: 'ANTHROPIC_API_KEY が未設定です' });
   }
 
   const extractor = new ClaudeReceiptExtractor(anthropicApiKey);
@@ -159,4 +197,34 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
 
   return NextResponse.json({ processed });
+}
+
+/** 文字とボタンに、本人として答える(1件ずつ、返信トークンで返す)。 */
+async function replyToTalk(
+  admin: ReturnType<typeof createAdminClient>,
+  owner: OwnerUser,
+  events: readonly LineWebhookEvent[],
+  channelAccessToken: string,
+  accountId: string,
+): Promise<void> {
+  for (const event of events) {
+    const ctx: LineContext = {
+      messageId: event.message?.id ?? event.webhookEventId ?? String(Date.now()),
+      accountId,
+      appBaseUrl: getAppBaseUrl(),
+    };
+    let messages: LineMessage[];
+    try {
+      messages = await runAsOwner(admin, owner, () =>
+        event.type === 'postback'
+          ? replyToPostback(event.postback!.data, ctx)
+          : replyToText(event.message!.text ?? '', ctx),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      messages = [lineText(`うまく処理できませんでした: ${message}`)];
+    }
+    if (messages.length === 0) continue;
+    await replyLineMessages(channelAccessToken, event.replyToken!, messages).catch(() => {});
+  }
 }

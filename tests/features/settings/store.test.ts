@@ -52,6 +52,9 @@ describe('getAppSettingsAsAdmin', () => {
       payday: 25,
       sideIncomeSavingsRatio: 0.7,
       aiEnabled: false,
+      // 夜の答え合わせの列が無い(マイグレーション未適用)ときは既定値(ADR-130)
+      eveningCheckEnabled: true,
+      eveningCheckAt: '21:00',
     });
   });
 

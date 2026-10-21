@@ -18,6 +18,7 @@ import { resolveItemGenres } from '@/features/genre/item-genres';
 import { todayJst } from '@/lib/date';
 import { isMissingColumnError } from '@/lib/supabase/errors';
 import { AppError } from '@/lib/errors';
+import { classifyImportRows } from '@/features/classification/import-classify';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -149,7 +150,7 @@ export async function importTransactions(
 export async function importTransactionsAsAdmin(
   supabase: SupabaseClient<Database>,
   userId: string,
-  transactions: readonly StoredTransaction[],
+  input: readonly StoredTransaction[],
   meta: {
     fileName: string | null;
     source: TransactionSource;
@@ -158,6 +159,10 @@ export async function importTransactionsAsAdmin(
     receiptImagePath?: string | null;
   },
 ): Promise<ImportResult> {
+  // 自動で取り込む明細(CSV)は、カテゴリの無い行に覚えたお店のカテゴリを付け、自信が無ければ
+  // 答え合わせへ回す(ADR-129)。レシート・手入力は本人がカテゴリを選ぶので変えない。
+  const transactions =
+    meta.source === 'csv' ? await classifyImportRows(supabase, userId, input) : input;
   const batchBase = {
     user_id: userId,
     source: meta.source,

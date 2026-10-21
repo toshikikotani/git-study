@@ -2,6 +2,8 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
+import { classifyImportRows } from '@/features/classification/import-classify';
+import { autoMergeSamePayments } from '@/features/transactions/payment-merge';
 import { ClaudeEmailExtractor } from '@/features/import/email-ai';
 import { GMAIL_IMAP } from '@/features/import/mailbox';
 import { ImapMailSource } from '@/features/import/imap-source';
@@ -178,10 +180,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   let duplicateCount = 0;
 
   if (syncResult.transactions.length > 0) {
+    // 覚えたお店のカテゴリを付け、自信が無ければ答え合わせへ回す(ADR-129)。
+    const classified = await classifyImportRows(admin, user.id, syncResult.transactions);
     const { data: inserted, error: insertError } = await admin
       .from('transactions')
       .upsert(
-        syncResult.transactions.map((t) => ({
+        classified.map((t) => ({
           user_id: user.id,
           account_id: accountId,
           occurred_on: t.occurredOn,
@@ -217,6 +221,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     importedCount = inserted.length;
     duplicateCount = syncResult.transactions.length - importedCount;
+    // 先に入っていたレシートと同じ支払いなら、自動で1件にまとめる(ADR-129)。
+    if (importedCount > 0) {
+      await autoMergeSamePayments(
+        admin,
+        user.id,
+        classified.map((t) => t.occurredOn),
+      ).catch(() => 0);
+    }
   }
 
   await admin

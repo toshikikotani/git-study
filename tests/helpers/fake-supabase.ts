@@ -2,7 +2,8 @@
  * Supabase のクエリビルダの最小の代用(テスト用)。テーブルごとの行を持ち、
  * select / eq / gte / lte / lt / gt / in / order / range / limit / single / maybeSingle を
  * 順に適用して { data, error } を返す。データ取得の組み立て(列・ページ分け・並び)を
- * ネットワーク無しで通すためのもの。
+ * ネットワーク無しで通すためのもの。insert / update / upsert / delete は、絞り込みに当たった
+ * 行を tables の中で書き換える(書いた結果をテストで確かめるため)。
  */
 
 type Row = Record<string, unknown>;
@@ -22,6 +23,12 @@ export function fakeSupabase(
     const ops: Op[] = [];
     let selectCols = '*';
     let single: 'single' | 'maybe' | null = null;
+    let write:
+      | { kind: 'insert'; values: Row[] }
+      | { kind: 'update'; patch: Row }
+      | { kind: 'upsert'; values: Row[]; onConflict: string[] }
+      | { kind: 'delete' }
+      | null = null;
     const builder: Record<string, unknown> = {};
     const chain = (op: Op) => {
       ops.push(op);
@@ -62,10 +69,49 @@ export function fakeSupabase(
         single = 'maybe';
         return builder;
       },
+      insert: (values: Row | Row[]) => {
+        write = { kind: 'insert', values: Array.isArray(values) ? values : [values] };
+        return builder;
+      },
+      update: (patch: Row) => {
+        write = { kind: 'update', patch };
+        return builder;
+      },
+      upsert: (values: Row | Row[], o?: { onConflict?: string }) => {
+        write = {
+          kind: 'upsert',
+          values: Array.isArray(values) ? values : [values],
+          onConflict: (o?.onConflict ?? 'id').split(',').map((c) => c.trim()),
+        };
+        return builder;
+      },
+      delete: () => {
+        write = { kind: 'delete' };
+        return builder;
+      },
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => {
         const failure = failures[table];
         if (failure) return Promise.resolve({ data: null, error: failure }).then(resolve, reject);
         try {
+          if (write !== null) {
+            const all = (tables[table] ??= []);
+            if (write.kind === 'insert') all.push(...write.values.map((v) => ({ ...v })));
+            if (write.kind === 'upsert') {
+              const keys = write.onConflict;
+              for (const v of write.values) {
+                const hit = all.find((r) => keys.every((k) => r[k] === v[k]));
+                if (hit) Object.assign(hit, v);
+                else all.push({ ...v });
+              }
+            }
+            if (write.kind === 'update' || write.kind === 'delete') {
+              let hits = [...all];
+              for (const op of ops) hits = op(hits);
+              if (write.kind === 'update') for (const r of hits) Object.assign(r, write.patch);
+              else tables[table] = all.filter((r) => !hits.includes(r));
+            }
+            return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+          }
           let rows = [...(tables[table] ?? [])];
           for (const op of ops) rows = op(rows);
           // PostgREST は1回に最大1,000行しか返さない。

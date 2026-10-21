@@ -1,0 +1,28 @@
+name: Evening Check
+
+# 夜の答え合わせ(LINE、v4-2、ADR-130)。毎時呼び、設定の時刻(日本時間、既定 21:00)になったら、
+# 今日の片づけるものを LINE へ送る。0件の日・オフの日・もう送った日は route 側が送らない。
+# 送る時刻は設定画面で変えられるので、ここは毎時のまま。
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  evening-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/evening-check
+        run: |
+          status=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+            -X POST "${APP_BASE_URL}/api/cron/evening-check" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          cat /tmp/response.json
+          if [ "$status" -ge 300 ]; then
+            echo "::error::evening-check がステータス $status を返しました"
+            exit 1
+          fi
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

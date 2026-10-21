@@ -224,6 +224,8 @@ export type Database = {
           classification_model: string;
           created_at: string;
           discord_webhook_env_key: string;
+          evening_check_at: string;
+          evening_check_enabled: boolean;
           gmail_address_env_key: string;
           gmail_app_password_env_key: string;
           gmail_enabled: boolean;
@@ -254,6 +256,8 @@ export type Database = {
           classification_model?: string;
           created_at?: string;
           discord_webhook_env_key?: string;
+          evening_check_at?: string;
+          evening_check_enabled?: boolean;
           gmail_address_env_key?: string;
           gmail_app_password_env_key?: string;
           gmail_enabled?: boolean;
@@ -284,6 +288,8 @@ export type Database = {
           classification_model?: string;
           created_at?: string;
           discord_webhook_env_key?: string;
+          evening_check_at?: string;
+          evening_check_enabled?: boolean;
           gmail_address_env_key?: string;
           gmail_app_password_env_key?: string;
           gmail_enabled?: boolean;
@@ -1743,6 +1749,39 @@ export type Database = {
           per_week?: number;
           promised_on?: string;
           usual_yen?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      payment_merges: {
+        Row: {
+          kept_before: Json;
+          kept_transaction_id: string;
+          merged_at: string;
+          merged_before: Json;
+          merged_transaction_id: string;
+          moved_item_ids: string[];
+          moved_split_ids: string[];
+          user_id: string;
+        };
+        Insert: {
+          kept_before?: Json;
+          kept_transaction_id: string;
+          merged_at?: string;
+          merged_before?: Json;
+          merged_transaction_id: string;
+          moved_item_ids?: string[];
+          moved_split_ids?: string[];
+          user_id: string;
+        };
+        Update: {
+          kept_before?: Json;
+          kept_transaction_id?: string;
+          merged_at?: string;
+          merged_before?: Json;
+          merged_transaction_id?: string;
+          moved_item_ids?: string[];
+          moved_split_ids?: string[];
           user_id?: string;
         };
         Relationships: [];

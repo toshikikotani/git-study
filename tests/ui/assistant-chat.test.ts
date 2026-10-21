@@ -130,7 +130,7 @@ describe('「やばい？」に見通しの数字で答え、次の操作ボタ�
   });
 
   it('サーバーは simulate_spend をホームと同じ予測で計算し、カードを返事につける', () => {
-    const route = readFileSync('app/api/assistant/chat/route.ts', 'utf8');
+    const route = readFileSync('src/features/assistant/turn.ts', 'utf8');
     expect(route).toContain("name: 'simulate_spend'");
     expect(route).toContain('whatIf: found.whatIf');
     const tool = readFileSync('src/features/assistant/what-if-tool.ts', 'utf8');
