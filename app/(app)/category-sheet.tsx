@@ -270,8 +270,8 @@ export function CategorySheetBody({
       <div className="flex items-center gap-4 px-1 pt-1">
         <GenreBadge name={name} size={56} />
         <span className="tabular flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[24px] font-bold">{name}</span>
-          <span className="text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <span className="truncate text-[22px] font-bold">{name}</span>
+          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             これまで {yen(spent)}
             {scheduled > 0 ? ` · 予定 ${yen(scheduled)}` : ''}
             {outlook.lastMonthYen !== null ? ` · 先月 ${yen(outlook.lastMonthYen)}` : ''}
@@ -300,7 +300,7 @@ export function CategorySheetBody({
 
       <Heading>見通し</Heading>
       <section
-        className="flex flex-col rounded-[20px] px-4 pt-4 pb-3"
+        className="flex flex-col rounded-2xl px-4 pt-4 pb-3"
         style={{ background: 'var(--surface)' }}
       >
         {overYen !== null ? (
@@ -408,7 +408,7 @@ export function CategorySheetBody({
 
       {keep ? (
         <p
-          className="rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
+          className="rounded-2xl px-4 py-3 text-[13px] leading-relaxed"
           style={{ background: 'var(--surface)', color: 'var(--ink-secondary)' }}
         >
           目標はそのまま。このカテゴリは「こえた」と表示され続けます。
@@ -418,7 +418,7 @@ export function CategorySheetBody({
       )}
       {keep ? null : hasPlan ? (
         <section
-          className="flex flex-col gap-3 rounded-[20px] p-4"
+          className="flex flex-col gap-3 rounded-2xl p-4"
           style={{ background: 'var(--surface)' }}
         >
           <div className="flex items-center justify-between">
@@ -470,7 +470,7 @@ export function CategorySheetBody({
                   type="button"
                   aria-pressed={on}
                   onClick={() => setAmount(p.value)}
-                  className="tabular flex min-h-14 flex-col items-center justify-center rounded-[14px]"
+                  className="tabular flex min-h-14 flex-col items-center justify-center rounded-xl"
                   style={{
                     background: on ? 'var(--action)' : 'var(--plane)',
                     color: on ? 'var(--on-action)' : 'var(--ink)',
@@ -483,7 +483,7 @@ export function CategorySheetBody({
             })}
           </div>
           <p
-            className="tabular rounded-xl px-4 py-3 text-center text-[14px] leading-relaxed"
+            className="tabular rounded-xl px-4 py-3 text-center text-[13px] leading-relaxed"
             style={{ background: 'var(--note)', color: 'var(--ink-secondary)' }}
           >
             {left > 0
@@ -494,7 +494,7 @@ export function CategorySheetBody({
           </p>
           {over && totalAfter !== null ? (
             <p
-              className="tabular text-center text-[14px]"
+              className="tabular text-center text-[13px]"
               style={{ color: 'var(--ink-secondary)' }}
             >
               今期の目標の合計は {formatEstimate(totalAfter)} になります
@@ -503,7 +503,7 @@ export function CategorySheetBody({
         </section>
       ) : (
         <section
-          className="flex flex-col gap-2 rounded-[20px] p-4"
+          className="flex flex-col gap-2 rounded-2xl p-4"
           style={{ background: 'var(--surface)' }}
         >
           <p className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>

@@ -21,7 +21,7 @@ export function MerchantNameReview({
   return (
     <BottomSheet open={open} onClose={onClose} label="店名をまとめて直す">
       <BottomSheetHeader className="flex items-center justify-between gap-3">
-        <h2 className="text-[18px] font-semibold" style={{ color: 'var(--ink)' }}>
+        <h2 className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
           店名をまとめて直す
         </h2>
         <button
@@ -306,8 +306,7 @@ export function MerchantNameGroupEditor({
           type="button"
           disabled={busy || selectedEntries.length === 0 || name.trim() === ''}
           onClick={save}
-          className="min-h-11 w-full rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary min-h-11 w-full rounded-full px-4 py-2 text-sm font-semibold"
         >
           {busy ? '保存中…' : `選んだ${selectedEntries.length}件の店名を保存`}
         </button>

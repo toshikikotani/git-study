@@ -36,7 +36,7 @@ function labelFor(input: {
   scheduledYen: number;
 }): string {
   const scheduled =
-    input.scheduledYen > 0 ? `予定 ${input.scheduledYen.toLocaleString('ja-JP')} 円を含む。` : '';
+    input.scheduledYen > 0 ? `予定 ${input.scheduledYen.toLocaleString('ja-JP')}円を含む。` : '';
   if (input.verdict === 'unknown') return 'まだ判断できない。このカテゴリの支出が少ない。';
   if (input.verdict === 'unreachable') {
     return `届かない。使った額と予定だけで目標を超える。${scheduled}`;
@@ -46,7 +46,7 @@ function labelFor(input: {
   const rec =
     input.recommendedYen === null
       ? ''
-      : `70%で収まる額は ${input.recommendedYen.toLocaleString('ja-JP')} 円。`;
+      : `70%で収まる額は ${input.recommendedYen.toLocaleString('ja-JP')}円。`;
   if (input.verdict === 'on_track') return `このままで届きそう。${rec}${pct}${scheduled}`;
   if (input.verdict === 'tight')
     return `中央では届く。多めに使うと超える。${rec}${pct}${scheduled}`;
@@ -143,7 +143,7 @@ export function savingsAsk(input: {
       saveYen: Math.max(0, input.medianYen - input.targetYen),
       keepDailyYen: 0,
       keepUnderYen: input.committedYen,
-      text: '使った額と予定だけで上限を超えている。今日からの自由な支出は 0 円に抑えてほしい。',
+      text: '使った額と予定だけで上限を超えている。今日からの自由な支出は0円に抑えてほしい。',
     };
   }
   const floor =
@@ -158,7 +158,7 @@ export function savingsAsk(input: {
     saveYen,
     keepDailyYen,
     keepUnderYen,
-    text: `着地は ${yen(input.medianYen)} 円。目標は上限で、届かせない方が貯蓄になる。${yen(saveYen)} 円抑えて ${yen(keepUnderYen)} 円にしてほしい。残り ${input.remainingDays} 日は 1 日 ${yen(keepDailyYen)} 円。`,
+    text: `着地は ${yen(input.medianYen)}円。目標は上限で、届かせない方が貯蓄になる。${yen(saveYen)}円抑えて ${yen(keepUnderYen)}円にしてほしい。残り ${input.remainingDays} 日は 1 日 ${yen(keepDailyYen)}円。`,
   };
 }
 
@@ -179,7 +179,7 @@ export function twoMonthTendency(input: {
   if (input.priorYen <= 0 || input.previousYen <= 0) {
     const known = Math.max(input.priorYen, input.previousYen);
     return {
-      text: `2ヶ月そろっていない。記録がある月は ${known.toLocaleString('ja-JP')} 円。`,
+      text: `2ヶ月そろっていない。記録がある月は ${known.toLocaleString('ja-JP')}円。`,
       savedYen: null,
     };
   }
@@ -191,11 +191,11 @@ export function twoMonthTendency(input: {
     input.landingYen !== null && input.landingYen > lower ? input.landingYen - lower : null;
   const outcome =
     saved === null
-      ? `低い方の ${yen(lower)} 円に抑えると、その額が今月の上限になる。`
-      : `低い方の ${yen(lower)} 円に抑えると、今の着地より ${yen(saved)} 円残る。`;
+      ? `低い方の ${yen(lower)}円に抑えると、その額が今月の上限になる。`
+      : `低い方の ${yen(lower)}円に抑えると、今の着地より ${yen(saved)}円残る。`;
   return {
     savedYen: saved,
-    text: `先々月 ${yen(input.priorYen)} 円、先月 ${yen(input.previousYen)} 円。${direction}${outcome}`,
+    text: `先々月 ${yen(input.priorYen)}円、先月 ${yen(input.previousYen)}円。${direction}${outcome}`,
   };
 }
 
@@ -247,13 +247,13 @@ export function landingReport(input: {
         ? ''
         : `今の目標を超える確率は ${formatProbability(forecast.exceedance)}。`;
     const detail = [
-      `この期間にすでに ${yen(row.spentYen)} 円使っている。`,
+      `この期間にすでに ${yen(row.spentYen)}円使っている。`,
       row.scheduledYen > 0
-        ? `これから日付の入っている予定が ${yen(row.scheduledYen)} 円ある。`
+        ? `これから日付の入っている予定が ${yen(row.scheduledYen)}円ある。`
         : '日付の入っている予定は無い。',
       forecast.medianYen === null
         ? '支出のあった日が少なく、残りの着地はまだ置けない。'
-        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)} 円、10回中8回は少なくて〜多くて ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)} 円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)} 円。${probability}`,
+        : `残りの ${remainingDays} 日を確率で試すと、中央は ${yen(forecast.medianYen)}円、10回中8回は少なくて〜多くて ${yen(forecast.lowYen ?? forecast.medianYen)}〜${yen(forecast.highYen ?? forecast.medianYen)}円。70%で収まる額は ${yen(forecast.recommendedYen ?? forecast.medianYen)}円。${probability}`,
     ].join('');
     const ask = savingsAsk({
       verdict: forecast.verdict,
@@ -293,7 +293,7 @@ export function landingReport(input: {
     summary:
       known.length === 0
         ? 'まだ判断できるカテゴリがありません。支出のあった日が少ないものは、予定があるときだけ着地に入れています。'
-        : `抑えてほしい額の合計は ${yen(proposed)} 円。着地ではなく、この額を目標案にする。`,
+        : `抑えてほしい額の合計は ${yen(proposed)}円。着地ではなく、この額を目標案にする。`,
     proposedTotalYen: known.length === 0 ? null : proposed,
     forecasts,
   };

@@ -12,6 +12,7 @@ import type { CategoryDetailData } from '@/features/category/loader';
 import { actualSpentYen, buildCategoryLines, type CategoryLine } from '@/features/category/model';
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
+import { HeaderMenu } from '@/components/ui/header-menu';
 import { CONFIDENT, predictGenres, type GenrePrediction } from '@/domain/genre-prediction';
 import { suggestRule, type RuleSuggestion } from '@/domain/rule-match';
 import { hapticFor } from '@/lib/haptics';
@@ -379,37 +380,31 @@ function CategoryScreenInner({
         onBack={goBack}
         returnTo={returnTo}
         menu={
-          <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
+          // 選択・今期の目標を調整・設定は、右上の「…」1つにまとめる(戻るとタイトルのあいだに3つ並んで
+          // いた、ADR-131)。選んでいる間は「完了」だけを出す。
+          selectMode ? (
             <button
               type="button"
-              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              aria-pressed={selectMode}
-              className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
-              style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+              onClick={exitSelect}
+              className="flex min-h-11 items-center px-2 text-base font-semibold"
+              style={{ color: 'var(--accent)' }}
             >
-              {selectMode ? '完了' : '選択'}
+              完了
             </button>
-            {currentGenreId !== null ? (
-              <button
-                type="button"
-                onClick={() => openCategory(currentGenreId)}
-                className="min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold whitespace-nowrap"
-                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
-              >
-                今期の目標を調整
-              </button>
-            ) : null}
-            {currentGenreId !== null ? (
-              <Link
-                href={`/settings/categories/${currentGenreId}` as Route}
-                aria-label={`${data.genreName}の設定`}
-                className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold whitespace-nowrap"
-                style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
-              >
-                設定
-              </Link>
-            ) : null}
-          </div>
+          ) : (
+            <HeaderMenu
+              label={`${data.genreName}の操作`}
+              items={[
+                { label: '選択', onSelect: () => setSelectMode(true) },
+                ...(currentGenreId !== null
+                  ? [
+                      { label: '今期の目標を調整', onSelect: () => openCategory(currentGenreId) },
+                      { label: '設定', href: `/settings/categories/${currentGenreId}` },
+                    ]
+                  : []),
+              ]}
+            />
+          )
         }
       />
 
@@ -430,8 +425,7 @@ function CategoryScreenInner({
         <button
           type="button"
           onClick={() => void moveMany(confident)}
-          className="min-h-12 w-full rounded-2xl text-base font-semibold"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary min-h-12 w-full rounded-2xl text-base font-semibold"
         >
           すべて予測どおりに確定({confident.length}件)
         </button>

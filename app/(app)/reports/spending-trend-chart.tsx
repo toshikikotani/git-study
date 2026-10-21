@@ -15,7 +15,7 @@ import {
   Cell,
 } from 'recharts';
 
-import { formatYen } from '@/domain/money';
+import { formatCompactYen, formatYen } from '@/domain/money';
 import {
   SHORT_WINDOW,
   LONG_WINDOW,
@@ -81,7 +81,7 @@ export function SpendingTrendChart({
 
   if (result.points.length < 7) {
     return (
-      <section className="rounded-[22px] px-4 pt-5 pb-4" style={{ background: 'var(--surface)' }}>
+      <section className="rounded-2xl px-4 pt-5 pb-4" style={{ background: 'var(--surface)' }}>
         <h3 className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
           最近の支出の勢い
         </h3>
@@ -105,7 +105,7 @@ export function SpendingTrendChart({
 
   return (
     <section
-      className="space-y-3 rounded-[22px] px-4 pt-5 pb-4"
+      className="space-y-3 rounded-2xl px-4 pt-5 pb-4"
       style={{ background: 'var(--surface)' }}
       aria-label="最近の支出の勢い"
     >
@@ -135,13 +135,13 @@ export function SpendingTrendChart({
             />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
+              tick={{ fontSize: 11, fill: 'var(--ink-muted)' }}
               interval="preserveStartEnd"
               minTickGap={24}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
-              tickFormatter={(v) => (v >= 10000 ? `${(v / 10000).toFixed(1)}万` : v.toString())}
+              tick={{ fontSize: 11, fill: 'var(--ink-muted)' }}
+              tickFormatter={(v: number) => formatCompactYen(v)}
               width={40}
             />
             <Tooltip

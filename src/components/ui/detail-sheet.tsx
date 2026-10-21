@@ -36,7 +36,7 @@ export function DetailSheet({
           style={{ color: 'var(--ink)' }}
         >
           <span className="flex min-w-0 flex-col">
-            <span className="text-[15px] font-medium">{label}</span>
+            <span className="text-[15px] font-semibold">{label}</span>
             {sub ? (
               <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
                 {sub}
@@ -59,7 +59,7 @@ export function DetailSheet({
       )}
       <BottomSheet open={open} onClose={() => setOpen(false)} label={title} tall>
         <BottomSheetHeader className="flex items-center justify-between gap-3">
-          <h2 className="text-[18px] font-semibold" style={{ color: 'var(--ink)' }}>
+          <h2 className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
             {title}
           </h2>
           <button

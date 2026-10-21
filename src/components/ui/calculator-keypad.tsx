@@ -67,8 +67,7 @@ export function CalculatorKeypad({
         <button
           type="button"
           onClick={() => press('=')}
-          className="col-span-4 min-h-11 rounded-xl text-lg font-semibold"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary col-span-4 min-h-11 rounded-xl text-lg font-semibold"
         >
           =
         </button>

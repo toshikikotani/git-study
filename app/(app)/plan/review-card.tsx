@@ -34,7 +34,7 @@ export function ReviewCard({ planId, review }: { planId: string; review: GoalRev
       className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
         振り返り
       </p>
       <p className="tabular mt-1 text-sm" style={{ color: 'var(--ink)' }}>
@@ -46,16 +46,16 @@ export function ReviewCard({ planId, review }: { planId: string; review: GoalRev
         <caption className="sr-only">カテゴリごとの目標と実績</caption>
         <thead>
           <tr style={{ color: 'var(--ink-muted)' }}>
-            <th scope="col" className="pb-1 text-left font-medium">
+            <th scope="col" className="pb-1 text-left font-semibold">
               カテゴリ
             </th>
-            <th scope="col" className="pb-1 text-right font-medium">
+            <th scope="col" className="pb-1 text-right font-semibold">
               目標
             </th>
-            <th scope="col" className="pb-1 text-right font-medium">
+            <th scope="col" className="pb-1 text-right font-semibold">
               実績
             </th>
-            <th scope="col" className="pb-1 text-right font-medium">
+            <th scope="col" className="pb-1 text-right font-semibold">
               差
             </th>
           </tr>

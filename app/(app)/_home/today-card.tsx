@@ -34,9 +34,11 @@ export type TodayCardProps = {
   todayTopNames?: readonly string[];
   /** 「もし使ったら？」のボタン(押すと試算のシート、ADR-108)。 */
   whatIf?: React.ReactNode;
+  /** 今日の目安と今期の見通しのあいだに出すもの(今日やること、ADR-131)。 */
+  afterHero?: React.ReactNode;
 };
 
-const card = 'flex flex-col rounded-[22px]';
+const card = 'flex flex-col rounded-2xl';
 const cardStyle = { background: 'var(--surface)', color: 'var(--ink)' } as const;
 
 /**
@@ -56,6 +58,7 @@ export function TodayCard(props: TodayCardProps) {
         todayTopNames={props.todayTopNames ?? []}
         whatIf={props.whatIf ?? null}
       />
+      {props.afterHero}
       {outlook && probWithinBudget !== null ? (
         <OutlookCard outlook={outlook} probWithin={probWithinBudget} />
       ) : null}
@@ -102,7 +105,7 @@ function TodayHero({
   if (!today) {
     return (
       <section aria-label="今日の目安" className={`${card} gap-2 px-5 pt-6 pb-2`} style={cardStyle}>
-        <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <span className="text-[15px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
           今日の目安
         </span>
         <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -122,11 +125,12 @@ function TodayHero({
   }
   const left = today.kind === 'left';
   const pct = usualPercent(allowanceExplain);
-  const color = left ? 'var(--ink)' : 'var(--state-caution)';
+  // 今日の目安をこえた(超過)は赤、こえそう(注意)は黄(ADR-131)。
+  const color = left ? 'var(--ink)' : 'var(--over)';
   return (
     <section aria-label="今日の目安" className={`${card} px-5 pt-5 pb-5`} style={cardStyle}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[15px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <span className="text-[15px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
           今日の目安
         </span>
         {provisional ? (
@@ -155,10 +159,10 @@ function TodayHero({
       </p>
       {tomorrowYen !== null ? (
         <div
-          className="mt-4 flex items-center justify-between gap-2 rounded-[14px] px-4 py-3"
+          className="mt-4 flex items-center justify-between gap-2 rounded-xl px-4 py-3"
           style={{ background: 'var(--plane)' }}
         >
-          <span className="text-[14px]" style={{ color: 'var(--ink-secondary)' }}>
+          <span className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
             明日からの目安
           </span>
           <span className="tabular text-[17px] font-bold">1日 {formatEstimate(tomorrowYen)}</span>

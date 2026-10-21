@@ -51,7 +51,7 @@ export default async function GmailSettingsPage() {
               href="https://myaccount.google.com/apppasswords"
               target="_blank"
               rel="noreferrer"
-              className="underline underline-offset-4"
+              className="min-h-11 underline underline-offset-4"
               style={{ color: 'var(--accent)' }}
             >
               アプリパスワード
@@ -93,7 +93,7 @@ export default async function GmailSettingsPage() {
           : '自動取得を有効にするまでは'}
         {settings.gmailEnabled ? null : (
           <>
-            <Link href="/transactions/email" className="underline underline-offset-4">
+            <Link href="/transactions/email" className="min-h-11 underline underline-offset-4">
               メールから取り込む
             </Link>
             で個別に取り込めます。
@@ -103,7 +103,7 @@ export default async function GmailSettingsPage() {
 
       <Link
         href="/settings/rescued-emails"
-        className="inline-flex items-center gap-1 px-1 text-xs font-semibold"
+        className="min-h-11 inline-flex items-center gap-1 px-1 text-xs font-semibold"
         style={{ color: 'var(--accent)' }}
       >
         AI救済メールの見直し

@@ -47,8 +47,7 @@ export function PaydayAmountForm({ paydayOn }: { paydayOn: DateOnly }) {
         <button
           type="submit"
           disabled={pending}
-          className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="min-h-11 btn-primary shrink-0 rounded-full px-4 py-2 text-sm font-semibold"
         >
           {pending ? '作成中…' : '振り分ける'}
         </button>
@@ -87,7 +86,7 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
             <form action={toggleTransferRunItemAction.bind(null, item.id, !item.isDone)}>
               <button
                 type="submit"
-                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left"
+                className="min-h-11 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left"
                 style={{
                   background: item.isDone ? 'var(--accent-track)' : 'var(--plane)',
                   border: '1px solid var(--hairline)',
@@ -113,7 +112,7 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
                   {item.label}
                 </span>
                 <span
-                  className="tabular text-sm font-medium"
+                  className="tabular text-sm font-semibold"
                   style={{ color: 'var(--ink-secondary)' }}
                 >
                   {formatYen(item.plannedAmountYen, { sign: 'never' })}

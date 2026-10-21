@@ -42,7 +42,7 @@ export function ExpandableBudgetTile({
 
       {expanded ? (
         <div
-          className="pop-in mt-2 rounded-[22px] p-4"
+          className="pop-in mt-2 rounded-2xl p-4"
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           {transactions.length === 0 ? (
@@ -51,7 +51,7 @@ export function ExpandableBudgetTile({
             </p>
           ) : (
             <>
-              <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 今月の明細({transactions.length}件)
               </p>
               <ul className="mt-3 space-y-3">
@@ -62,7 +62,7 @@ export function ExpandableBudgetTile({
                     <li key={t.id}>
                       <div className="flex items-baseline justify-between gap-2 text-xs">
                         <span className="flex min-w-0 flex-col">
-                          <span className="truncate font-medium" style={{ color: 'var(--ink)' }}>
+                          <span className="truncate font-semibold" style={{ color: 'var(--ink)' }}>
                             {t.merchantName ?? t.description}
                           </span>
                           <span style={{ color: 'var(--ink-muted)' }}>
@@ -70,7 +70,7 @@ export function ExpandableBudgetTile({
                           </span>
                         </span>
                         <span
-                          className="tabular shrink-0 font-medium"
+                          className="tabular shrink-0 font-semibold"
                           style={{ color: isIncome ? 'var(--income)' : 'var(--ink)' }}
                         >
                           {formatYen(t.amountYen)}

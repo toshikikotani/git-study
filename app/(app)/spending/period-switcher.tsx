@@ -1,6 +1,7 @@
 'use client';
 
 import { SettingsLink } from '@/components/ui/settings-link';
+import { HEADER_ACTIONS_ID } from './ledger-selection-menu';
 import { addMonths, nthDayOfMonth, splitDateOnly } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -58,6 +59,8 @@ export function PeriodSwitcher({ title = '明細' }: { title?: string }) {
         ) : null}
       </div>
       <div className="flex items-center gap-2">
+        {/* 明細の一覧が「選択」をここへ出す(上部を1段に、ADR-131)。 */}
+        <div id={HEADER_ACTIONS_ID} className="flex items-center" />
         <div
           role="group"
           aria-label="表示する月"

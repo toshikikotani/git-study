@@ -12,7 +12,7 @@ export function AnalysisTabs({ current }: { current: 'goal' | 'month' }) {
     <nav
       aria-label="分析の種類"
       className="grid grid-cols-2"
-      style={{ background: 'var(--field)', borderRadius: 10, padding: 2, gap: 2 }}
+      style={{ background: 'var(--field)', borderRadius: 'var(--radius-full)', padding: 2, gap: 2 }}
     >
       {TABS.map((tab) => {
         const on = tab.key === current;
@@ -21,10 +21,10 @@ export function AnalysisTabs({ current }: { current: 'goal' | 'month' }) {
             key={tab.key}
             href={tab.href as Route}
             aria-current={on ? 'page' : undefined}
-            className={`flex min-h-11 items-center justify-center text-[14px] ${on ? 'font-semibold' : 'font-medium'}`}
+            className={`flex min-h-11 items-center justify-center text-[13px] ${on ? 'font-bold' : 'font-normal'}`}
             style={{
-              borderRadius: 8,
-              background: on ? 'var(--surface)' : 'transparent',
+              borderRadius: 'var(--radius-full)',
+              background: on ? 'var(--segment-on)' : 'transparent',
               color: on ? 'var(--ink)' : 'var(--ink-secondary)',
               boxShadow: on ? '0 1px 3px rgba(0, 0, 0, 0.12)' : 'none',
             }}

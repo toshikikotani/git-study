@@ -1,16 +1,14 @@
-import { formatYen } from '@/domain/money';
+import { formatCompactYen, formatYen } from '@/domain/money';
 import type { HabitRow } from './weekday-habit-data';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
-/** 濃さの段階ごとの accent の割合(0 は記録なし)。 */
-const MIX = [0, 12, 24, 45, 75, 100];
-
-/** 4,400 → 4.4k、10,000 → 10k、550 → 550 */
-function short(yen: number): string {
-  if (yen < 1000) return String(Math.round(yen));
-  const k = Math.round(yen / 100) / 10;
-  return `${k >= 10 ? Math.round(k) : k}k`;
-}
+/**
+ * 濃さの段階ごとの強調の塗り(--action)の割合(0 は記録なし)。中くらいの濃さは白い文字にも黒い文字にも
+ * 読めない(約1.2:1 だった)ので、淡い3段(文字は本文の色)と、塗りきり1段(文字は塗りの上の色)にする。
+ * どのテーマでも 4.5:1 以上(tests/color-presets.test.ts、ADR-131)。
+ */
+export const HABIT_MIX = [0, 12, 22, 34, 100] as const;
+const TOP = HABIT_MIX.length - 1;
 
 /**
  * 曜日のくせ(デザイン仕様書の「分析 › 目標」、ADR-091):今期のカテゴリ × 曜日の支出を濃さで並べ、
@@ -21,7 +19,7 @@ export function WeekdayHabit({ rows }: { rows: readonly HabitRow[] }) {
 
   const max = Math.max(1, ...rows.flatMap((g) => g.days));
   const level = (yen: number) =>
-    yen <= 0 ? 0 : Math.min(5, Math.max(1, Math.ceil((yen / max) * 5)));
+    yen <= 0 ? 0 : Math.min(TOP, Math.max(1, Math.ceil((yen / max) * TOP)));
   const dayTotals = WEEKDAYS.map((_, i) => rows.reduce((sum, g) => sum + g.days[i]!, 0));
   const topDay = dayTotals.indexOf(Math.max(...dayTotals));
   const topGenres = [...rows]
@@ -38,14 +36,14 @@ export function WeekdayHabit({ rows }: { rows: readonly HabitRow[] }) {
   return (
     <section
       aria-labelledby="weekday-habit"
-      className="flex flex-col rounded-[22px] px-4 pt-5 pb-4"
+      className="flex flex-col rounded-2xl px-4 pt-5 pb-4"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <h3 id="weekday-habit" className="text-[17px] font-semibold">
         曜日のくせ
       </h3>
       {sentence ? (
-        <p className="mt-1 text-[14px]" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
           {sentence}
         </p>
       ) : null}
@@ -76,16 +74,16 @@ export function WeekdayHabit({ rows }: { rows: readonly HabitRow[] }) {
                   key={WEEKDAYS[i]}
                   role="cell"
                   aria-label={`${g.name}・${WEEKDAYS[i]}曜 ${formatYen(yen, { sign: 'never' })}`}
-                  className={`flex h-8 items-center justify-center rounded-lg ${lv === 5 ? 'font-bold' : ''}`}
+                  className={`flex h-8 items-center justify-center rounded-lg ${lv === TOP ? 'font-bold' : ''}`}
                   style={{
                     background:
                       lv === 0
                         ? 'var(--note)'
-                        : `color-mix(in srgb, var(--accent) ${MIX[lv]}%, var(--note))`,
-                    color: lv >= 4 ? 'var(--on-accent)' : 'var(--ink)',
+                        : `color-mix(in srgb, var(--action) ${HABIT_MIX[lv]}%, var(--note))`,
+                    color: lv === TOP ? 'var(--on-action)' : 'var(--ink)',
                   }}
                 >
-                  {yen > 0 ? short(yen) : ''}
+                  {yen > 0 ? formatCompactYen(yen) : ''}
                 </span>
               );
             })}
@@ -98,11 +96,11 @@ export function WeekdayHabit({ rows }: { rows: readonly HabitRow[] }) {
         style={{ color: 'var(--ink-muted)' }}
       >
         少
-        {MIX.slice(1).map((m) => (
+        {HABIT_MIX.slice(1).map((m) => (
           <span
             key={m}
             className="size-3 rounded-sm"
-            style={{ background: `color-mix(in srgb, var(--accent) ${m}%, var(--note))` }}
+            style={{ background: `color-mix(in srgb, var(--action) ${m}%, var(--note))` }}
           />
         ))}
         多

@@ -208,7 +208,7 @@ export function ReceiptItemsPanel({
       {summary ? (
         <>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
               レシートの品目
             </p>
             <button
@@ -382,8 +382,7 @@ export function ReceiptItemsPanel({
               type="button"
               onClick={() => void saveEdit()}
               disabled={editSaving || !canSaveEdit}
-              className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold"
             >
               {editSaving ? '保存中…' : '保存'}
             </button>

@@ -92,7 +92,7 @@ export function InputAccountSelector({
   const { accounts, accountId, loading, creating, error } = inputAccount;
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+      <label htmlFor={id} className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
         口座
       </label>
       {loading ? (

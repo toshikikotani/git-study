@@ -22,8 +22,7 @@ export function WhatIfButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-11 items-center justify-center gap-1 rounded-full text-[15px] font-bold"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary flex min-h-11 items-center justify-center gap-1 rounded-full text-[15px] font-bold"
       >
         <svg
           aria-hidden
@@ -137,7 +136,7 @@ function WhatIfBody({
       </BottomSheetHeader>
 
       <section
-        className="flex flex-col items-center gap-3 rounded-[20px] px-4 pt-3 pb-4"
+        className="flex flex-col items-center gap-3 rounded-2xl px-4 pt-3 pb-4"
         style={{ background: 'var(--surface)' }}
       >
         <div className="flex w-full items-center justify-between gap-2">
@@ -145,7 +144,7 @@ function WhatIfBody({
             今日あと
           </span>
           <label
-            className="flex min-h-11 items-center rounded-full px-3 text-[14px] font-semibold"
+            className="flex min-h-11 items-center rounded-full px-3 text-[13px] font-semibold"
             style={{ background: 'var(--plane)' }}
           >
             <span className="sr-only">カテゴリ</span>
@@ -165,7 +164,7 @@ function WhatIfBody({
           </label>
         </div>
         <p className="tabular flex items-baseline gap-1">
-          <span className="text-[48px] leading-none font-bold">
+          <span className="text-[40px] leading-none font-bold">
             {picked.toLocaleString('ja-JP')}
           </span>
           <span className="text-[22px] font-semibold">円</span>
@@ -201,19 +200,19 @@ function WhatIfBody({
       <section
         aria-live="polite"
         aria-busy={loading}
-        className="flex flex-col rounded-[20px] px-4 py-2"
+        className="flex flex-col rounded-2xl px-4 py-2"
         style={{ background: 'var(--surface)' }}
       >
         {error ? (
-          <p role="alert" className="py-3 text-[14px]" style={{ color: 'var(--over)' }}>
+          <p role="alert" className="py-3 text-[13px]" style={{ color: 'var(--over)' }}>
             {error}
           </p>
         ) : loading && rows.length === 0 ? (
-          <p className="py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             見通しを計算しています…
           </p>
         ) : rows.length === 0 ? (
-          <p className="py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             今期の目標を決めると、見通しの変わり方を出せます。
           </p>
         ) : (
@@ -249,8 +248,7 @@ function WhatIfBody({
           onClose();
           openRecord?.({ amountYen: picked, genreId });
         }}
-        className="min-h-12 rounded-full text-[16px] font-bold"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary min-h-12 rounded-full text-[16px] font-bold"
       >
         予定に入れる
       </button>

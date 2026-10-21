@@ -229,7 +229,7 @@ function readAmount(
 
   if (outYen > 0 && inYen > 0) {
     throw new AdapterError(
-      `出金 ${outYen} 円と入金 ${inYen} 円が同じ行に入っています。列の指定が誤っている可能性があります。`,
+      `出金 ${outYen}円と入金 ${inYen}円が同じ行に入っています。列の指定が誤っている可能性があります。`,
     );
   }
 

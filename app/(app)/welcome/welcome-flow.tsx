@@ -151,7 +151,7 @@ export function WelcomeFlow({
                 inputMode="numeric"
                 value={takeHomeText}
                 onChange={(e) => setTakeHomeText(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-xl px-3 py-2 text-sm"
                 style={INPUT_STYLE}
                 aria-label="毎月の手取り(円)"
               />
@@ -160,7 +160,7 @@ export function WelcomeFlow({
               <select
                 value={payday}
                 onChange={(e) => setPayday(Number(e.target.value))}
-                className="w-full rounded-xl px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-xl px-3 py-2 text-sm"
                 style={INPUT_STYLE}
                 aria-label="給料日"
               >
@@ -182,7 +182,7 @@ export function WelcomeFlow({
                   role="radio"
                   aria-checked={preset === id}
                   onClick={() => setPreset(id)}
-                  className="rounded-full px-3 py-2 text-xs font-semibold"
+                  className="min-h-11 rounded-full px-3 py-2 text-xs font-semibold"
                   style={
                     preset === id
                       ? { background: 'var(--action)', color: 'var(--on-action)' }
@@ -221,7 +221,7 @@ export function WelcomeFlow({
                       value={r.text}
                       disabled={!r.on}
                       onChange={(e) => setEdited((v) => ({ ...v, [r.genreId]: e.target.value }))}
-                      className="tabular w-28 rounded-xl px-3 py-2 text-right text-sm disabled:opacity-40"
+                      className="tabular min-h-11 w-28 rounded-xl px-3 py-2 text-right text-sm disabled:opacity-40"
                       style={INPUT_STYLE}
                       aria-label={`${r.name}の目標(円)`}
                     />
@@ -284,7 +284,7 @@ export function WelcomeFlow({
                     value={goalTitle}
                     onChange={(e) => setGoalTitle(e.target.value)}
                     placeholder="旅行・引っ越し・もしものとき など"
-                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    className="min-h-11 w-full rounded-xl px-3 py-2 text-sm"
                     style={INPUT_STYLE}
                   />
                 </Field>
@@ -294,7 +294,7 @@ export function WelcomeFlow({
                     inputMode="numeric"
                     value={goalAmountText}
                     onChange={(e) => setGoalAmountText(e.target.value)}
-                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    className="min-h-11 w-full rounded-xl px-3 py-2 text-sm"
                     style={INPUT_STYLE}
                   />
                 </Field>
@@ -304,7 +304,7 @@ export function WelcomeFlow({
                     value={goalDate}
                     min={today}
                     onChange={(e) => setGoalDate(e.target.value)}
-                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    className="min-h-11 w-full rounded-xl px-3 py-2 text-sm"
                     style={INPUT_STYLE}
                   />
                 </Field>
@@ -329,7 +329,7 @@ export function WelcomeFlow({
               setStep(step === 3 ? 2 : 1);
             }}
             disabled={pending}
-            className="rounded-full px-4 py-3 text-sm font-medium disabled:opacity-40"
+            className="min-h-11 rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-40"
             style={{ color: 'var(--ink-muted)' }}
           >
             もどる
@@ -339,8 +339,7 @@ export function WelcomeFlow({
           <button
             type="button"
             onClick={next}
-            className="flex-1 rounded-full py-3 text-sm font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="min-h-11 btn-primary flex-1 rounded-full py-3 text-sm font-semibold"
           >
             つぎへ
           </button>
@@ -349,8 +348,7 @@ export function WelcomeFlow({
             type="button"
             onClick={() => finish(true)}
             disabled={pending}
-            className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="min-h-11 btn-primary flex-1 rounded-full py-3 text-sm font-semibold"
           >
             {pending ? '保存中…' : 'この内容ではじめる'}
           </button>
@@ -363,7 +361,7 @@ export function WelcomeFlow({
           type="button"
           onClick={() => finish(false)}
           disabled={pending}
-          className="w-full text-center text-xs font-medium disabled:opacity-40"
+          className="min-h-11 w-full text-center text-xs font-semibold disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
           貯金目標を保存せず、この内容ではじめる
@@ -387,7 +385,7 @@ export function WelcomeFlow({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+      <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </span>
       <div className="mt-1">{children}</div>

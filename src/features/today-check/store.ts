@@ -33,21 +33,34 @@ export async function listTodayCheck(
   userId: string,
   today: DateOnly,
 ): Promise<TodayCheckItem[]> {
-  const { data, error } = await client
-    .from('transactions')
-    .select(
-      'id, occurred_on, created_at, merchant_name, description, branch_name, amount_yen, genre_id, review_status, source, source_ref, is_transfer',
-    )
-    .eq('user_id', userId)
-    .in('review_status', ['auto_ok', 'pending'])
-    .in('source', ['gmail', 'csv', 'manual'])
-    .gte('occurred_on', checkWindowStart(today))
-    .lte('occurred_on', today)
-    .order('occurred_on', { ascending: false })
-    .limit(300);
+  const columns =
+    'id, occurred_on, created_at, merchant_name, description, branch_name, amount_yen, genre_id, review_status, source, source_ref, is_transfer';
+  // 直近の自動で入った記録と、いつの記録でもカテゴリの確認待ち(ADR-131)。
+  const [recent, pending] = await Promise.all([
+    client
+      .from('transactions')
+      .select(columns)
+      .eq('user_id', userId)
+      .in('review_status', ['auto_ok', 'pending'])
+      .in('source', ['gmail', 'csv', 'manual'])
+      .gte('occurred_on', checkWindowStart(today))
+      .lte('occurred_on', today)
+      .order('occurred_on', { ascending: false })
+      .limit(300),
+    client
+      .from('transactions')
+      .select(columns)
+      .eq('user_id', userId)
+      .eq('review_status', 'pending')
+      .lte('occurred_on', today)
+      .order('occurred_on', { ascending: false })
+      .limit(300),
+  ]);
+  const error = recent.error ?? pending.error;
   if (error) throw new TodayCheckError(`答え合わせの記録を読めませんでした: ${error.message}`);
+  const byId = new Map([...(recent.data ?? []), ...(pending.data ?? [])].map((r) => [r.id, r]));
 
-  const rows: CheckRow[] = (data ?? []).map((r) => ({
+  const rows: CheckRow[] = [...byId.values()].map((r) => ({
     id: r.id,
     occurredOn: r.occurred_on,
     createdAt: r.created_at,

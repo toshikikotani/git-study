@@ -693,7 +693,7 @@ export function TransactionRowWithSplit({
               <div className="min-w-0 flex-1">
                 {/* 1行目:正規化した店名(切れないように折り返す) */}
                 <p
-                  className="text-[16px] leading-snug font-medium break-words"
+                  className="text-[16px] leading-snug font-semibold break-words"
                   style={{ color: 'var(--ink)' }}
                 >
                   {display?.name ?? transaction.description}
@@ -873,8 +873,7 @@ export function TransactionRowWithSplit({
                 type="button"
                 onClick={() => void saveMemo()}
                 disabled={memoSaving}
-                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+                className="btn-primary min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold"
               >
                 {memoSaving ? '保存中…' : '保存'}
               </button>
@@ -971,12 +970,8 @@ export function TransactionRowWithSplit({
               <button
                 type="button"
                 onClick={() => void saveSimpleEdit()}
-                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold"
-                style={{
-                  background: 'var(--action)',
-                  color: 'var(--on-action)',
-                  opacity: saving ? 0.6 : 1,
-                }}
+                className="btn-primary min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold"
+                style={{ opacity: saving ? 0.6 : 1 }}
               >
                 {saving ? '保存中…' : simpleEditUnchanged ? '閉じる' : '保存'}
               </button>
@@ -1090,8 +1085,7 @@ export function TransactionRowWithSplit({
                 type="button"
                 onClick={() => void save()}
                 disabled={saving || !canSave}
-                className="min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+                className="btn-primary min-h-11 flex-1 rounded-full px-4 py-2 text-sm font-semibold"
               >
                 {saving ? '保存中…' : '保存'}
               </button>
@@ -1329,7 +1323,7 @@ export function TransactionRowWithSplit({
           </div>
 
           <div>
-            <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
               分類
             </p>
             {splits.length > 0 ? (
@@ -1359,7 +1353,7 @@ export function TransactionRowWithSplit({
 
           {items.length > 0 ? (
             <div>
-              <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+              <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
                 レシートの品目
               </p>
               <ul className="mt-1 space-y-1">

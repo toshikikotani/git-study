@@ -27,7 +27,7 @@ export function NewGoal() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-full py-3 text-sm font-semibold"
+        className="min-h-11 w-full rounded-full py-3 text-sm font-semibold"
         style={{ ...INPUT_STYLE, color: 'var(--accent)' }}
       >
         + 何のために貯めるか(任意)
@@ -76,15 +76,14 @@ export function NewGoal() {
           <button
             type="submit"
             disabled={pending}
-            className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="min-h-11 btn-primary flex-1 rounded-full py-3 text-sm font-semibold"
           >
             {pending ? '保存中…' : 'つくる'}
           </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="rounded-full px-4 py-3 text-sm font-medium"
+            className="min-h-11 rounded-full px-4 py-3 text-sm font-semibold"
             style={{ color: 'var(--ink-muted)' }}
           >
             やめる
@@ -98,7 +97,7 @@ export function NewGoal() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+      <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </span>
       <div className="mt-1">{children}</div>

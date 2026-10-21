@@ -57,7 +57,7 @@ export function WhyCard({
   return (
     <section
       aria-labelledby="why-card"
-      className="flex flex-col rounded-[22px] px-4 pt-5 pb-2"
+      className="flex flex-col rounded-2xl px-4 pt-5 pb-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <h2 id="why-card" className="text-[17px] font-semibold">
@@ -107,7 +107,7 @@ function Head({ color, title, value }: { color: string; title: string; value: st
 function Sub({ label, value }: { label: string; value: string }) {
   return (
     <div
-      className="tabular flex justify-between gap-3 pb-2 pl-5 text-[14px]"
+      className="tabular flex justify-between gap-3 pb-2 pl-5 text-[13px]"
       style={{ color: 'var(--ink-muted)' }}
     >
       <span className="min-w-0">{label}</span>

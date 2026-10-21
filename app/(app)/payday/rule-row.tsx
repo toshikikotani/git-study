@@ -73,7 +73,7 @@ export function RuleRow({
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="shrink-0 text-xs font-semibold"
+          className="min-h-11 shrink-0 text-xs font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           編集
@@ -94,7 +94,7 @@ export function RuleRow({
           <button
             type="submit"
             disabled={isFirst}
-            className="inline-flex items-center text-xs font-medium disabled:opacity-30"
+            className="min-h-11 inline-flex items-center text-xs font-semibold disabled:opacity-30"
             style={{ color: 'var(--ink-secondary)' }}
           >
             <MdKeyboardArrowUp aria-hidden /> 上へ
@@ -104,14 +104,14 @@ export function RuleRow({
           <button
             type="submit"
             disabled={isLast}
-            className="inline-flex items-center text-xs font-medium disabled:opacity-30"
+            className="min-h-11 inline-flex items-center text-xs font-semibold disabled:opacity-30"
             style={{ color: 'var(--ink-secondary)' }}
           >
             <MdKeyboardArrowDown aria-hidden /> 下へ
           </button>
         </form>
         <form action={deleteTransferRuleAction.bind(null, rule.id)} className="ml-auto">
-          <button type="submit" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <button type="submit" className="min-h-11 text-xs" style={{ color: 'var(--ink-muted)' }}>
             削除
           </button>
         </form>

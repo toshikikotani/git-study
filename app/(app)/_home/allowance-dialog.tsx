@@ -122,7 +122,7 @@ export function AllowanceExplainBody({
 
   const chip = (label: string, value: number, on: boolean) => (
     <span
-      className="tabular rounded-[10px] px-3 py-1 text-[15px]"
+      className="tabular rounded-xl px-3 py-1 text-[15px]"
       style={{
         background: on ? 'var(--note)' : 'var(--plane)',
         color: 'var(--ink)',
@@ -149,7 +149,7 @@ export function AllowanceExplainBody({
       </BottomSheetHeader>
 
       <section
-        className="flex flex-col gap-1 rounded-[20px] px-4 pt-4 pb-3"
+        className="flex flex-col gap-1 rounded-2xl px-4 pt-4 pb-3"
         style={{ background: 'var(--surface)' }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -176,7 +176,7 @@ export function AllowanceExplainBody({
           <span style={{ color: 'var(--ink-secondary)' }}>
             今日使った額 {yen(explain.spentTodayYen)}
           </span>
-          <strong style={{ color: over > 0 ? 'var(--state-caution)' : 'var(--income)' }}>
+          <strong style={{ color: over > 0 ? 'var(--over)' : 'var(--income)' }}>
             {over > 0 ? `${yen(over)} こえ` : `あと ${yen(-over)}`}
           </strong>
         </div>
@@ -188,7 +188,7 @@ export function AllowanceExplainBody({
           <span className="text-[15px]" style={{ color: 'var(--ink-secondary)' }}>
             目標の残り
           </span>
-          <span className="tabular text-[24px] font-bold">{yen(left)}</span>
+          <span className="tabular text-[22px] font-bold">{yen(left)}</span>
           <span
             className="tabular text-[13px] leading-normal"
             style={{ color: 'var(--ink-muted)' }}
@@ -242,7 +242,7 @@ export function AllowanceExplainBody({
 
       {tomorrow ? (
         <section
-          className="flex flex-col gap-3 rounded-[20px] px-4 pt-4 pb-3"
+          className="flex flex-col gap-3 rounded-2xl px-4 pt-4 pb-3"
           style={{ background: 'var(--surface)' }}
         >
           <span className="flex flex-col gap-1">
@@ -379,7 +379,7 @@ function Step({ n, last, children }: { n: number; last: boolean; children: React
     <li className="grid grid-cols-[32px_1fr] gap-3">
       <span className="flex flex-col items-center">
         <span
-          className="flex size-7 items-center justify-center rounded-full text-[14px] font-bold"
+          className="flex size-7 items-center justify-center rounded-full text-[13px] font-bold"
           style={{ background: 'var(--note)', color: 'var(--accent)' }}
         >
           {n}

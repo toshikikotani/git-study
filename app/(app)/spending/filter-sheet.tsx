@@ -169,8 +169,7 @@ export function FilterSheet({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="min-h-12 w-full rounded-2xl text-base font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-12 w-full rounded-2xl text-base font-semibold"
           >
             完了
           </button>

@@ -96,8 +96,7 @@ export function GoalTargetEdit({
               type="button"
               onClick={() => void confirm()}
               disabled={saving}
-              className="min-h-11 flex-1 rounded-full text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary min-h-11 flex-1 rounded-full text-sm font-semibold"
             >
               {saving ? '変更しています' : '変更する'}
             </button>
@@ -125,8 +124,7 @@ export function GoalTargetEdit({
           <button
             type="button"
             onClick={review}
-            className="min-h-11 rounded-xl px-4 text-sm font-semibold"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-11 rounded-xl px-4 text-sm font-semibold"
           >
             保存
           </button>

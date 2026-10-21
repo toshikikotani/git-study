@@ -203,7 +203,7 @@ describe('カードと入口', () => {
 
   it('今日の画面のカード、「確認が必要」のいちばん上、LINE の「1件ずつ見る」(?check=today)から開く', () => {
     const today = readFileSync('app/(app)/page.tsx', 'utf8');
-    expect(today).toContain("<TodayCheckCard autoOpen={check === 'today'} />");
+    expect(today).toContain("<TodayTodo autoOpen={check === 'today'} />");
     const review = readFileSync('app/(app)/spending/review/page.tsx', 'utf8');
     expect(review).toMatch(
       /<TodayCheckLauncher[\s\S]*variant="review"[\s\S]*autoOpen=\{check === 'today'\}/,

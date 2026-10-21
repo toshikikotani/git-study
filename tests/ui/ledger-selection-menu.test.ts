@@ -132,6 +132,8 @@ const fixtures = [
 ];
 const documentListeners = new Map<string, Set<(event: unknown) => void>>();
 const body = {};
+const header = { id: 'spending-header-actions' };
+const dom = vi.hoisted(() => ({ header: false }));
 class TestNode {}
 let menuProps: MenuProps;
 let fixedKeys: readonly string[];
@@ -217,8 +219,10 @@ beforeEach(() => {
     onSelectAll: vi.fn(),
     onClear: vi.fn(),
   };
+  dom.header = false;
   vi.stubGlobal('document', {
     body,
+    getElementById: (id: string) => (dom.header && id === header.id ? header : null),
     addEventListener: (type: string, handler: (event: unknown) => void) => {
       const listeners = documentListeners.get(type) ?? new Set();
       listeners.add(handler);
@@ -493,6 +497,20 @@ describe('右上固定の選択操作メニュー', () => {
     expect(button(selecting, '2件を選択')).toBeDefined();
     button(selecting, '完了').onClick!();
     expect(menuProps.onExit).toHaveBeenCalledOnce();
+  });
+
+  it('明細の見出しの行があれば、「選択」はその行に置く(上部を1段に、ADR-131)。選んでいる間は浮く操作', () => {
+    dom.header = true;
+    menuProps.selectMode = false;
+    const initial = renderMenu();
+    expect(state.portal).toHaveBeenLastCalledWith(header);
+    expect(renderToStaticMarkup(initial)).not.toContain('fixed');
+    expect(renderToStaticMarkup(initial)).not.toContain('AIでチェック');
+    button(initial, '選択').onClick!();
+    expect(menuProps.onStart).toHaveBeenCalledOnce();
+    menuProps.selectMode = true;
+    renderMenu();
+    expect(state.portal).toHaveBeenLastCalledWith(body);
   });
 
   it('件数を押して共通操作を開き、閉じても選択解除や終了を実行しない', () => {

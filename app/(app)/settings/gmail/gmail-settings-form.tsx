@@ -13,7 +13,7 @@ export function GmailSettingsForm({ settings }: { settings: GmailSettings }) {
   return (
     <form action={formAction} className="space-y-4">
       <label className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+        <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           自動取得を有効にする
         </span>
         <input
@@ -25,7 +25,7 @@ export function GmailSettingsForm({ settings }: { settings: GmailSettings }) {
       </label>
 
       <label className="block space-y-2">
-        <span className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+        <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
           差出人ドメイン(1行に1つ。空にすると全件が対象になります)
         </span>
         <textarea
@@ -43,7 +43,7 @@ export function GmailSettingsForm({ settings }: { settings: GmailSettings }) {
       </label>
 
       <label className="block space-y-2">
-        <span className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+        <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
           1回の取得件数上限(1〜1000)
         </span>
         <input
@@ -75,8 +75,7 @@ export function GmailSettingsForm({ settings }: { settings: GmailSettings }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-2xl py-3 text-sm font-medium text-white disabled:opacity-50"
-        style={{ background: 'var(--action)' }}
+        className="btn-primary min-h-11 w-full rounded-2xl py-3 text-sm font-semibold"
       >
         {pending ? '保存しています…' : '保存する'}
       </button>

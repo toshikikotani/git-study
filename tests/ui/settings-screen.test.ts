@@ -39,7 +39,6 @@ vi.mock('@/components/ui/bottom-sheet', async (importOriginal) => ({
 import { SettingsLink } from '@/components/ui/settings-link';
 import { ASSISTANT_SCREENS } from '@/features/assistant/screens';
 import { backTargetOf, knownBackTarget, SETTINGS_BACK } from '@/lib/back-target';
-import { PaydayCard } from '../../app/(app)/_home/payday-card';
 import InvestmentsPage from '../../app/(app)/investments/page';
 import JobChangePage from '../../app/(app)/job-change/page';
 import PaydayPage from '../../app/(app)/payday/page';
@@ -224,24 +223,6 @@ describe('設定は1画面', () => {
     for (const Page of [AiSettingsPage, PasswordSettingsPage, PaydayPage]) {
       expect(() => Page()).toThrow('REDIRECT /settings');
     }
-  });
-});
-
-describe('給料日は今日の画面のカード＋シート', () => {
-  it('給料日でない日は出さない', async () => {
-    state.payday = { kind: 'not_payday' };
-    expect(await PaydayCard()).toBeNull();
-    state.payday = null;
-    expect(await PaydayCard()).toBeNull();
-  });
-
-  it('給料日には「給料日です」と、入った額を入れるシート', async () => {
-    state.payday = { kind: 'needs_amount', paydayOn: '2026-10-25' };
-    const element = await PaydayCard();
-    const html = visible(renderToString(element!));
-    expect(html).toContain('給料日です');
-    expect(html).toContain('振り分ける');
-    expect(read('app/(app)/page.tsx')).toMatch(/<HomeBanners \/>[\s\S]*<PaydayCard \/>/);
   });
 });
 

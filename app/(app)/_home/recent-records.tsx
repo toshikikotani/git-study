@@ -63,7 +63,7 @@ export async function UpcomingPayments() {
       </h2>
       <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {upcoming.length === 0 ? (
-          <p className="px-4 py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-4 py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {AHEAD_DAYS}日先までの予定はありません。
           </p>
         ) : (
@@ -87,7 +87,7 @@ export async function UpcomingPayments() {
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span
-                        className="truncate text-[16px] font-medium"
+                        className="truncate text-[16px] font-semibold"
                         style={{ color: 'var(--ink)' }}
                       >
                         {t.label}
@@ -153,7 +153,7 @@ export async function TodayRecords() {
       </div>
       {todays.length === 0 ? (
         <p
-          className="rounded-2xl px-4 py-3 text-[14px]"
+          className="rounded-2xl px-4 py-3 text-[13px]"
           style={{ background: 'var(--surface)', color: 'var(--ink-muted)' }}
         >
           今日はまだ記録がありません。
@@ -179,7 +179,7 @@ export async function TodayRecords() {
                   <DirectRecordEditor transaction={t}>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span
-                        className="truncate text-[16px] font-medium"
+                        className="truncate text-[16px] font-semibold"
                         style={{ color: 'var(--ink)' }}
                       >
                         {t.label}

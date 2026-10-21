@@ -181,7 +181,7 @@ export default function ImportPage() {
       <Card>
         <Step n={1} title="ファイルを選ぶ" />
         <label
-          className="mt-3 block cursor-pointer rounded-2xl border border-dashed px-4 py-8 text-center"
+          className="min-h-11 mt-3 block cursor-pointer rounded-2xl border border-dashed px-4 py-8 text-center"
           style={{ borderColor: 'var(--hairline)' }}
         >
           <input
@@ -193,7 +193,7 @@ export default function ImportPage() {
               if (file) void onFile(file);
             }}
           />
-          <span className="text-sm font-medium" style={{ color: 'var(--accent)' }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>
             {loaded ? loaded.fileName : 'CSV ファイルを選ぶ'}
           </span>
           <span className="mt-1 block text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -365,7 +365,7 @@ export default function ImportPage() {
           {/* 1行の失敗で全体を止めない。何行目がなぜ落ちたかを出す */}
           {result.errors.length > 0 ? (
             <details className="mt-4">
-              <summary className="cursor-pointer text-xs" style={{ color: 'var(--over)' }}>
+              <summary className="min-h-11 cursor-pointer text-xs" style={{ color: 'var(--over)' }}>
                 読めなかった {result.errors.length} 行を見る
               </summary>
               <ul className="mt-2 space-y-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -382,8 +382,7 @@ export default function ImportPage() {
             type="button"
             onClick={() => void save()}
             disabled={preview.length === 0 || !accountId || saving}
-            className="mt-5 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="min-h-11 btn-primary mt-5 w-full rounded-full py-3 text-sm font-semibold"
           >
             {saving ? '取り込み中…' : `${preview.length} 件を取り込む`}
           </button>
@@ -421,8 +420,7 @@ function SavedResult({ imported, duplicates }: { imported: number; duplicates: n
 
         <Link
           href="/spending"
-          className="mt-5 block w-full rounded-full py-3 text-center text-sm font-semibold"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="min-h-11 btn-primary mt-5 block w-full rounded-full py-3 text-center text-sm font-semibold"
         >
           明細を見る
         </Link>
@@ -453,7 +451,7 @@ function Meta({ label, value }: { label: string; value: string }) {
       <dt className="inline" style={{ color: 'var(--ink-muted)' }}>
         {label}{' '}
       </dt>
-      <dd className="inline font-medium" style={{ color: 'var(--ink-secondary)' }}>
+      <dd className="inline font-semibold" style={{ color: 'var(--ink-secondary)' }}>
         {value}
       </dd>
     </div>

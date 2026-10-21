@@ -41,7 +41,7 @@ export function SavingsCard({ untilLabel, balance, monthlyTargetYen, nowYen }: S
       </h2>
       <Link
         href="/savings"
-        className="flex flex-col rounded-[22px] px-5 pt-5 pb-2"
+        className="min-h-11 flex flex-col rounded-2xl px-5 pt-5 pb-2"
         style={{ background: 'var(--surface)', color: 'var(--ink)' }}
       >
         {hasTarget ? (

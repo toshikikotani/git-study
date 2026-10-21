@@ -140,8 +140,7 @@ export function StatementCheck({
           type="button"
           onClick={() => void check()}
           disabled={!selectedAccount || announcedTotalYen === '' || checking}
-          className="mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold"
         >
           {checking ? '突き合わせています…' : '取り込んだ明細と突き合わせる'}
         </button>
@@ -162,7 +161,7 @@ export function StatementCheck({
 
       {result ? (
         <Card>
-          <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
             {formatDateJa(result.period.startOn)} 〜 {formatDateJa(result.period.endOn)}
           </p>
           <dl className="mt-3 space-y-1 text-sm">
@@ -182,7 +181,7 @@ export function StatementCheck({
 
           {result.hasDiscrepancy ? (
             <p
-              className="mt-4 rounded-2xl p-3 text-sm font-medium"
+              className="mt-4 rounded-2xl p-3 text-sm font-semibold"
               style={{ background: 'var(--over-track)', color: 'var(--over)' }}
             >
               差額 {formatYen(Math.abs(result.differenceYen))}
@@ -191,7 +190,7 @@ export function StatementCheck({
             </p>
           ) : (
             <p
-              className="mt-4 rounded-2xl p-3 text-sm font-medium"
+              className="mt-4 rounded-2xl p-3 text-sm font-semibold"
               style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
             >
               一致しています。取り込み漏れはありません。

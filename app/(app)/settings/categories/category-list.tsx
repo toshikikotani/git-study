@@ -4,9 +4,9 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { GenreBadge } from '@/components/ui/genre-badge';
 import { BackHeader } from '@/components/ui/back-header';
 import type { BackTarget } from '@/lib/back-target';
-import { genreSwatch } from '@/domain/genre-style';
 import { similarCategories } from '@/domain/genre-similarity';
 import { hapticFor } from '@/lib/haptics';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
@@ -138,8 +138,7 @@ export function CategoryList({
           <label className="flex min-h-14 items-center gap-3 px-4">
             <span
               aria-hidden
-              className="flex size-8 shrink-0 items-center justify-center rounded-full"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary flex size-8 shrink-0 items-center justify-center rounded-full"
             >
               <svg
                 width="16"
@@ -209,7 +208,6 @@ function Row({
   onMerge: (into: { id: string; name: string }) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const color = genreSwatch(category.name);
   return (
     <li
       className="flex flex-col"
@@ -221,13 +219,7 @@ function Row({
           className="flex min-h-13 min-w-0 flex-1 items-center gap-3"
           style={{ color: 'var(--ink)' }}
         >
-          <span
-            aria-hidden
-            className="flex size-8 shrink-0 items-center justify-center rounded-full text-[14px] font-bold"
-            style={{ background: `color-mix(in srgb, ${color} 18%, var(--surface))`, color }}
-          >
-            {category.name.charAt(0)}
-          </span>
+          <GenreBadge name={category.name} size={32} />
           <span className="min-w-0 flex-1 truncate text-[16px]">{category.name}</span>
           {sorting ? null : (
             <span aria-hidden style={{ color: 'var(--ink-muted)' }}>

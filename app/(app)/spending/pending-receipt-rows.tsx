@@ -81,7 +81,7 @@ function Thumb({ src }: { src: string | null }) {
 function Pill({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="flex min-h-9 shrink-0 items-center rounded-full px-4 text-[14px] font-semibold"
+      className="flex min-h-9 shrink-0 items-center rounded-full px-4 text-[13px] font-semibold"
       style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
     >
       {children}

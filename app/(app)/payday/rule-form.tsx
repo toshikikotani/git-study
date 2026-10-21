@@ -142,8 +142,7 @@ export function RuleForm({
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="min-h-11 btn-primary flex-1 rounded-full py-3 text-sm font-semibold"
         >
           {pending ? '保存中…' : submitLabel}
         </button>
@@ -151,7 +150,7 @@ export function RuleForm({
           <button
             type="button"
             onClick={onDone}
-            className="rounded-full px-4 py-3 text-sm font-medium"
+            className="min-h-11 rounded-full px-4 py-3 text-sm font-semibold"
             style={{ color: 'var(--ink-muted)' }}
           >
             やめる
@@ -173,7 +172,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+      <span className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </span>
       <div className="mt-1">{children}</div>

@@ -54,7 +54,7 @@ function SmallSpendHero({ view }: { view: AccumulationView }) {
       className="glass rounded-3xl p-6"
       style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
     >
-      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
         今月の小口支出({formatYen(view.thresholdYen, { sign: 'never' })}未満)
       </p>
       <p
@@ -117,7 +117,7 @@ function SmallSpendPile({ view }: { view: AccumulationView }) {
       className="glass rounded-2xl p-4"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
-      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+      <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
         小口の山
       </p>
 
@@ -173,7 +173,7 @@ function NoSpendCard({ view }: { view: AccumulationView }) {
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           使わなかった日
         </p>
         <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -219,7 +219,7 @@ function PaceCard({ view }: { view: AccumulationView }) {
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           先月の同じ日まで との比較
         </p>
         <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>

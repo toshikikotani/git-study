@@ -100,7 +100,7 @@ export function CategoryProgress({
                   <GenreBadge name={r.name} size={36} />
                   <span className="flex min-w-0 flex-1 flex-col gap-2">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[16px] font-medium">{r.name}</span>
+                      <span className="truncate text-[16px] font-semibold">{r.name}</span>
                       <span
                         className="shrink-0 rounded-full px-2 py-1 text-[12px] font-bold"
                         style={{ color: tone.color, background: tone.bg }}
@@ -138,7 +138,7 @@ export function CategoryProgress({
               >
                 <GenreBadge name={r.name} size={32} />
                 <span className="flex min-w-0 flex-1 flex-col gap-2">
-                  <span className="truncate text-[15px] font-medium">{r.name}</span>
+                  <span className="truncate text-[15px] font-semibold">{r.name}</span>
                   <Bar spentYen={r.spentYen} p50={r.p50} targetYen={r.targetYen} />
                 </span>
                 <span
@@ -165,7 +165,7 @@ export function CategoryProgress({
                 aria-label={`${r.name}、固定費。${yen(r.spentYen)} / 目標 ${yen(r.targetYen)}`}
               >
                 <GenreBadge name={r.name} size={32} />
-                <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{r.name}</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{r.name}</span>
                 <span
                   className="tabular shrink-0 text-right text-[12px] leading-snug"
                   style={{ color: 'var(--ink-muted)' }}
@@ -195,7 +195,7 @@ export function CategoryProgress({
                 className="flex min-h-13 w-full items-center gap-3 px-4 py-2 text-left"
               >
                 <GenreBadge name={r.name} size={32} />
-                <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{r.name}</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{r.name}</span>
                 <span
                   className="tabular shrink-0 text-[12px]"
                   style={{ color: 'var(--ink-muted)' }}
@@ -263,7 +263,7 @@ function Group({
   return (
     <section
       aria-label={title}
-      className="flex flex-col rounded-[22px] pt-4"
+      className="flex flex-col rounded-2xl pt-4"
       style={{ background: 'var(--surface)' }}
     >
       <div className="flex items-baseline justify-between gap-2 px-4 pb-2">

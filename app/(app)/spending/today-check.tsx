@@ -271,7 +271,7 @@ function SwipeCard({
   return (
     <article
       aria-label={`${item.storeName} ${formatYen(item.amountYen, { sign: 'never' })}`}
-      className="relative flex touch-none flex-col gap-2 rounded-[22px] px-5 py-5 select-none"
+      className="relative flex touch-none flex-col gap-2 rounded-2xl px-5 py-5 select-none"
       style={{
         background: 'var(--surface)',
         transform: `translate(${drag.x}px, ${Math.min(0, drag.y)}px) rotate(${drag.x / 24}deg)`,
@@ -486,7 +486,7 @@ function Finished({
         おつかれさまでした
       </p>
       <dl
-        className="flex flex-col rounded-[22px] px-4 py-2 text-[15px]"
+        className="flex flex-col rounded-2xl px-4 py-2 text-[15px]"
         style={{ background: 'var(--surface)' }}
       >
         <Row label="確かめた" value={`${done.length}件`} />
@@ -500,8 +500,7 @@ function Finished({
       <button
         type="button"
         onClick={onClose}
-        className="min-h-11 rounded-full py-3 text-[15px] font-semibold"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary min-h-11 rounded-full py-3 text-[15px] font-semibold"
       >
         閉じる
       </button>

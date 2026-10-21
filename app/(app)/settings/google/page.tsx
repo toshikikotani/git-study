@@ -54,8 +54,7 @@ export default async function GoogleSettingsPage() {
 
         <a
           href="/api/auth/google/start"
-          className="mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="min-h-11 btn-primary mt-4 block w-full rounded-full py-3 text-center text-sm font-semibold"
         >
           {connected ? 'Google と再連携する' : 'Google と連携する'}
         </a>
@@ -71,7 +70,7 @@ export default async function GoogleSettingsPage() {
               href="https://console.cloud.google.com/"
               target="_blank"
               rel="noreferrer"
-              className="underline underline-offset-4"
+              className="min-h-11 underline underline-offset-4"
               style={{ color: 'var(--accent)' }}
             >
               Google Cloud Console
@@ -114,7 +113,7 @@ export default async function GoogleSettingsPage() {
               href="https://myaccount.google.com/permissions"
               target="_blank"
               rel="noreferrer"
-              className="underline underline-offset-4"
+              className="min-h-11 underline underline-offset-4"
               style={{ color: 'var(--accent)' }}
             >
               Googleアカウントのアクセス権

@@ -279,8 +279,7 @@ export function EditForm({
         type="button"
         disabled={!dirty}
         onClick={() => void run(() => onSave(line, patch))}
-        className="min-h-12 w-full rounded-2xl text-base font-semibold disabled:opacity-40"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary min-h-12 w-full rounded-2xl text-base font-semibold"
       >
         {busy ? '保存しています…' : '保存する'}
       </button>

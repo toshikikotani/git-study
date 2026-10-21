@@ -122,56 +122,57 @@ function PresetButton({
   onChoose: () => void;
 }) {
   const { plane, surface, ink, accent } = preset.colors;
-  const accentText = preset.colors.accentText ?? accent;
   const onAccent = preset.colors.onAccent ?? surface;
   const sub = preset.colors.sub ?? accent;
   const subLine = preset.colors.subLine ?? sub;
-  const inkSub = preset.colors.inkSub ?? ink;
+  // 名前と説明は、いまの画面の文字色で書く(見本の色で書くと、暗い画面で明るい見本の名前が
+  // 読めなかった、ADR-131)。見本の色は上の小さな見本だけに出す。
   return (
     <button
       type="button"
       onClick={onChoose}
       aria-pressed={selected}
       aria-label={`${preset.label}(${preset.note})`}
-      className="glass min-h-11 w-full overflow-hidden rounded-2xl text-left"
+      className="min-h-11 w-full overflow-hidden rounded-2xl text-left"
       style={{
-        background: plane,
-        boxShadow: selected ? `0 0 0 3px ${accentText}` : 'var(--card-shadow)',
+        background: 'var(--surface)',
+        boxShadow: selected ? '0 0 0 3px var(--accent)' : 'var(--card-shadow)',
       }}
     >
       <span className="block p-3">
-        <span
-          aria-hidden
-          className="flex items-center justify-between rounded-xl px-3 py-2"
-          style={{ background: surface }}
-        >
-          <span className="text-base font-semibold" style={{ color: ink }}>
-            Aa
-          </span>
-          <span className="flex items-center gap-2">
-            <span
-              className="size-3 rounded-full"
-              style={{ background: sub, boxShadow: `inset 0 0 0 1.5px ${subLine}` }}
-            />
-            <span
-              className="rounded-full px-2 py-1 text-xs font-semibold"
-              style={{ background: accent, color: onAccent }}
-            >
-              記録
+        <span aria-hidden className="block rounded-xl p-2" style={{ background: plane }}>
+          <span
+            className="flex items-center justify-between rounded-lg px-3 py-2"
+            style={{ background: surface }}
+          >
+            <span className="text-base font-semibold" style={{ color: ink }}>
+              Aa
+            </span>
+            <span className="flex items-center gap-2">
+              <span
+                className="size-3 rounded-full"
+                style={{ background: sub, boxShadow: `inset 0 0 0 1.5px ${subLine}` }}
+              />
+              <span
+                className="rounded-full px-2 py-1 text-xs font-semibold"
+                style={{ background: accent, color: onAccent }}
+              >
+                記録
+              </span>
             </span>
           </span>
         </span>
         <span className="mt-2 flex items-center gap-1">
-          <span className="text-sm font-semibold" style={{ color: ink }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {preset.label}
           </span>
           {selected ? (
-            <span className="text-xs font-semibold" style={{ color: accentText }}>
+            <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
               選択中
             </span>
           ) : null}
         </span>
-        <span className="mt-1 block text-xs leading-snug" style={{ color: inkSub }}>
+        <span className="mt-1 block text-xs leading-snug" style={{ color: 'var(--ink-muted)' }}>
           {preset.note}
         </span>
       </span>

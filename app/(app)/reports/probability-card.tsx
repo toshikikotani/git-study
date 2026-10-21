@@ -88,7 +88,7 @@ export function ProbabilityCard({
   return (
     <section
       aria-labelledby="forecast-prob"
-      className="flex flex-col rounded-[22px] px-4 pt-5 pb-4"
+      className="flex flex-col rounded-2xl px-4 pt-5 pb-4"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -120,7 +120,7 @@ export function ProbabilityCard({
               type="button"
               aria-pressed={mode === value}
               onClick={() => setMode(value)}
-              className="min-h-10 rounded-full px-4 text-[13px] font-semibold"
+              className="min-h-11 rounded-full px-4 text-[13px] font-semibold"
               style={{
                 background: mode === value ? 'var(--surface)' : 'transparent',
                 color: mode === value ? 'var(--ink)' : 'var(--ink-muted)',

@@ -39,6 +39,11 @@ type ButtonAsLink = CommonProps & {
   type?: undefined;
 };
 
+const OFF_STYLE: React.CSSProperties = {
+  background: 'var(--action-off)',
+  color: 'var(--on-action-off)',
+};
+
 const VARIANT_STYLE: Record<Variant, React.CSSProperties> = {
   filled: { background: 'var(--action)', color: 'var(--on-action)' },
   tonal: { background: 'var(--accent-track)', color: 'var(--accent)' },
@@ -60,13 +65,15 @@ const VARIANT_STYLE: Record<Variant, React.CSSProperties> = {
 export function Button(props: ButtonAsButton | ButtonAsLink) {
   const { children, variant = 'filled', className, disabled } = props;
 
+  // 押せない主のボタンは、薄めた塗りではなく「押せない」の色(読める濃さ)にする(ADR-131)。
+  const off = disabled && variant === 'filled';
   const sharedClassName = `label-text active:scale-[0.96] inline-flex items-center justify-center gap-2 px-6 py-3 ${
-    disabled ? 'pointer-events-none opacity-40' : ''
+    disabled ? `pointer-events-none ${off ? '' : 'opacity-40'}` : ''
   } ${className ?? ''}`;
   const sharedStyle: React.CSSProperties = {
     borderRadius: 'var(--radius-full)',
     transition: `transform var(--duration-medium) var(--ease-spring), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard)`,
-    ...VARIANT_STYLE[variant],
+    ...(off ? OFF_STYLE : VARIANT_STYLE[variant]),
   };
 
   if (props.href !== undefined) {

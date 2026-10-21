@@ -201,7 +201,7 @@ export function PlanBuilder({
           onChange={setRange}
         />
         <div className="mt-3 pb-3">
-          <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
             改善の強さ(課題のあるカテゴリを、今回どこまで削るか)
           </p>
           <div className="mt-2 flex gap-2">

@@ -62,6 +62,26 @@ describe('出すもの', () => {
     expect(items.map((i) => i.id).sort()).toEqual(['ok', 'pending']);
   });
 
+  it('カテゴリの確認待ちは、7日より前でも・手入力やアプリのレシートでも出す(確認待ちを答え合わせに含める、ADR-131)', () => {
+    const items = pickCheckItems(
+      [
+        row({ id: 'old-pending', occurredOn: '2026-09-01', reviewStatus: 'pending' }),
+        row({ id: 'old-ok', occurredOn: '2026-09-01' }),
+        row({
+          id: 'hand-pending',
+          source: 'manual',
+          sourceRef: 'receipt-1',
+          reviewStatus: 'pending',
+        }),
+        row({ id: 'future-pending', occurredOn: '2026-10-25', reviewStatus: 'pending' }),
+      ],
+      today,
+      names,
+    );
+    expect(items.map((i) => i.id)).toEqual(['hand-pending', 'old-pending']);
+    expect(items[0]).toMatchObject({ source: 'app', sourceLabel: 'アプリ', unsure: true });
+  });
+
   it('今日の分を先に、前の日(直近7日)の片づけ残しをあとに続ける', () => {
     const items = pickCheckItems(
       [

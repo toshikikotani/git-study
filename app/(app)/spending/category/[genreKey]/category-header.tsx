@@ -144,15 +144,18 @@ export function CategoryHeader({
           swipe.current = null;
         }}
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="min-h-11 inline-flex items-center pr-3 text-sm font-semibold whitespace-nowrap"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
-          ‹ {returnTo?.startsWith('/reports') ? '月のふりかえり' : '明細'}
-        </button>
-        {menu}
+        {/* 戻る・右上の操作は1段に(ADR-131)。 */}
+        <div className="flex min-h-11 items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex min-h-11 items-center pr-3 text-base whitespace-nowrap"
+            style={{ color: 'var(--accent)' }}
+          >
+            ‹ {returnTo?.startsWith('/reports') ? '月のふりかえり' : '明細'}
+          </button>
+          {menu}
+        </div>
 
         <div ref={sentinel} className="mt-2 flex items-center gap-3">
           <SharedElement name={sharedName.icon(genreKey)}>

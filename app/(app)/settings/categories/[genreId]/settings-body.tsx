@@ -124,49 +124,64 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
   const styleChanged = icon !== current.icon || colorIndex !== (current.colorIndex ?? -1);
   const nameChanged = name.trim() !== data.genreName;
   const plan = data.goal?.plan ?? null;
+  // 名前・アイコンと色は、右上の「保存」1か所でまとめて保存する(項目ごとの保存ボタンをやめた、ADR-131)。
+  const canSave = !busy && (styleChanged || (nameChanged && name.trim() !== ''));
+  const saveLook = async () => {
+    if (!canSave) return;
+    if (styleChanged) {
+      const ok = await run(
+        () => saveCategoryStyleAction(genreId, { icon, colorIndex }),
+        'アイコンと色を変えました',
+      );
+      if (!ok) return;
+    }
+    if (nameChanged && name.trim() !== '') {
+      await run(
+        () => renameCategoryAction(genreId, name),
+        styleChanged ? '保存しました' : '名前を変えました',
+      );
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <GenreBadge name={data.genreName} size={40} />
-        <h1
-          className="min-w-0 flex-1 truncate text-lg font-semibold"
-          style={{ color: 'var(--ink)' }}
-        >
-          {data.genreName}
-        </h1>
-        <Link
-          href={`/spending/category/${genreId}` as Route}
-          className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold"
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h1 className="truncate text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
+            {data.genreName}
+          </h1>
+          <Link
+            href={`/spending/category/${genreId}` as Route}
+            className="inline-flex min-h-11 items-center self-start text-[13px] font-semibold"
+            style={{ color: 'var(--accent)' }}
+          >
+            明細を見る
+          </Link>
+        </div>
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={() => void saveLook()}
+          className="-mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 text-[17px] font-bold disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
-          明細を見る
-        </Link>
+          保存
+        </button>
       </div>
 
       <section aria-labelledby="cs-name" className="space-y-2">
         <h2 id="cs-name" className={sectionTitle}>
           名前
         </h2>
-        <div className="flex gap-2">
-          <input
-            aria-labelledby="cs-name"
-            value={name}
-            maxLength={20}
-            onChange={(e) => setName(e.target.value)}
-            className="min-h-11 min-w-0 flex-1 rounded-xl px-3 text-base"
-            style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
-          />
-          <button
-            type="button"
-            disabled={busy || !nameChanged || name.trim() === ''}
-            onClick={() => void run(() => renameCategoryAction(genreId, name), '名前を変えました')}
-            className="min-h-11 rounded-xl px-4 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-          >
-            保存
-          </button>
-        </div>
+        <input
+          aria-labelledby="cs-name"
+          value={name}
+          maxLength={20}
+          onChange={(e) => setName(e.target.value)}
+          className="min-h-11 w-full min-w-0 rounded-xl px-3 text-base"
+          style={{ background: 'var(--surface-raised)', color: 'var(--ink)' }}
+        />
         <p className={sectionNote} style={{ color: 'var(--ink-muted)' }}>
           これまでの明細はそのまま、新しい名前で表示されます。
         </p>
@@ -226,20 +241,6 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
             ? '空いている色がないので、同じ色も選べます。'
             : 'ほかのカテゴリが使っている色は選べません。'}
         </p>
-        <button
-          type="button"
-          disabled={busy || !styleChanged}
-          onClick={() =>
-            void run(
-              () => saveCategoryStyleAction(genreId, { icon, colorIndex }),
-              'アイコンと色を変えました',
-            )
-          }
-          className="min-h-11 rounded-xl px-4 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
-        >
-          保存
-        </button>
       </section>
 
       <section aria-labelledby="cs-money" className="space-y-2">
@@ -541,8 +542,7 @@ function MonthGuideEdit({
             type="button"
             onClick={() => void confirm()}
             disabled={saving}
-            className="min-h-11 flex-1 rounded-full text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-11 flex-1 rounded-full text-sm font-semibold"
           >
             {saving ? '変更しています' : '変更する'}
           </button>
@@ -566,8 +566,7 @@ function MonthGuideEdit({
         <button
           type="button"
           onClick={review}
-          className="min-h-11 rounded-xl px-4 text-sm font-semibold"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary min-h-11 rounded-xl px-4 text-sm font-semibold"
         >
           保存
         </button>

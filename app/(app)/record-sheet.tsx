@@ -2,10 +2,11 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
+import { GenreBadge } from '@/components/ui/genre-badge';
+import { GenreName } from '@/components/ui/genre-name';
 import { BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
-import { genreSwatch } from '@/domain/genre-style';
 import { comparableKey } from '@/domain/store-name';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import {
@@ -496,7 +497,7 @@ export function RecordSheet({
         <button
           type="button"
           onClick={save}
-          className="flex min-h-11 items-center justify-self-end text-[17px] font-bold"
+          className="-mr-2 flex min-h-11 min-w-11 items-center justify-center justify-self-end px-2 text-[17px] font-bold"
           style={{ color: 'var(--accent)', opacity: canSave ? 1 : 0.4 }}
         >
           {edit?.saveLabel ?? '保存'}
@@ -505,7 +506,7 @@ export function RecordSheet({
       {error ? (
         <p
           role="alert"
-          className="rounded-xl px-3 py-2 text-[14px] leading-normal"
+          className="rounded-xl px-3 py-2 text-[13px] leading-normal"
           style={{ background: 'var(--note)', color: 'var(--over)' }}
         >
           {error}
@@ -536,8 +537,7 @@ export function RecordSheet({
             <button
               type="button"
               onClick={onCamera}
-              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl px-4 text-[16px] font-semibold"
-              style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+              className="btn-primary flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl px-4 text-[16px] font-semibold"
             >
               {cameraIcon}
               レシートを撮る
@@ -577,7 +577,7 @@ export function RecordSheet({
       )}
 
       <section
-        className="flex flex-col items-center gap-2 rounded-[20px] px-4 pt-3 pb-4"
+        className="flex flex-col items-center gap-2 rounded-2xl px-4 pt-3 pb-4"
         style={{ background: 'var(--surface)' }}
       >
         {/* 種類は支出・収入の2つ。返金は「詳細」で(デザイン v3-4) */}
@@ -598,13 +598,13 @@ export function RecordSheet({
               setAmount(digits === '' ? '' : Number(digits).toLocaleString('ja-JP'));
             }}
             aria-label="金額(円)"
-            className="tabular w-56 bg-transparent text-right text-[48px] font-bold outline-none"
+            className="tabular w-56 bg-transparent text-right text-[40px] font-bold outline-none"
             style={{ color: 'var(--ink)' }}
           />
-          <span className="text-[24px] font-semibold">円</span>
+          <span className="text-[22px] font-semibold">円</span>
         </label>
         <label
-          className="relative flex min-h-11 items-center gap-2 rounded-full px-4 text-[14px]"
+          className="relative flex min-h-11 items-center gap-2 rounded-full px-4 text-[13px]"
           style={{ background: 'var(--plane)', color: 'var(--ink)' }}
         >
           {calendarIcon}
@@ -652,7 +652,7 @@ export function RecordSheet({
 
       {kind !== 'income' ? (
         <section
-          className="flex flex-col gap-2 rounded-[20px] px-3 py-3"
+          className="flex flex-col gap-2 rounded-2xl px-3 py-3"
           style={{ background: 'var(--surface)' }}
         >
           <div className="flex items-center justify-between gap-2 px-1">
@@ -674,7 +674,6 @@ export function RecordSheet({
           <div className="grid grid-cols-4 gap-2">
             {shownGenres.map((g) => {
               const on = g.id === genreId;
-              const color = genreSwatch(g.name);
               return (
                 <button
                   key={g.id}
@@ -684,7 +683,7 @@ export function RecordSheet({
                     genreTouched.current = true;
                     setGenreId(on ? null : g.id);
                   }}
-                  className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[14px] px-1 py-2"
+                  className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-xl px-1 py-2"
                   style={{
                     background: on ? 'var(--note)' : 'var(--surface)',
                     boxShadow: on
@@ -693,18 +692,10 @@ export function RecordSheet({
                     color: 'var(--ink)',
                   }}
                 >
-                  <span
-                    aria-hidden
-                    className="flex size-9 items-center justify-center rounded-full text-[15px] font-bold"
-                    style={{
-                      background: `color-mix(in srgb, ${color} 18%, var(--surface))`,
-                      color,
-                    }}
-                  >
-                    {g.name.charAt(0)}
-                  </span>
-                  <span className="line-clamp-2 text-center text-[12px] leading-tight">
-                    {g.name}
+                  {/* マークは明細・分析と同じ絵のアイコン(漢字1文字との2系統をやめた、ADR-131)。 */}
+                  <GenreBadge name={g.name} size={36} />
+                  <span className="line-clamp-2 text-center text-[12px] leading-tight break-keep">
+                    <GenreName name={g.name} />
                   </span>
                 </button>
               );
@@ -713,7 +704,7 @@ export function RecordSheet({
               <button
                 type="button"
                 onClick={() => setAdding(true)}
-                className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[14px]"
+                className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-xl"
                 style={{
                   border: '1.5px dashed var(--bar-quiet)',
                   background: 'var(--surface)',
@@ -760,8 +751,7 @@ export function RecordSheet({
                 type="button"
                 onClick={() => void addCategory()}
                 disabled={newName.trim() === ''}
-                className="min-h-11 rounded-xl px-4 text-[15px] font-semibold disabled:opacity-40"
-                style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+                className="btn-primary min-h-11 rounded-xl px-4 text-[15px] font-semibold"
               >
                 追加
               </button>

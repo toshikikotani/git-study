@@ -270,8 +270,7 @@ export function ReceiptFixEditor({
             type="button"
             disabled={locked || !fixed || chosen.length === 0}
             onClick={save}
-            className="min-h-11 w-full rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40"
-            style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+            className="btn-primary min-h-11 w-full rounded-full px-4 py-2 text-sm font-semibold"
           >
             {phase === 'saving' ? '保存中…' : `選んだ${chosen.length}件を直して保存`}
           </button>

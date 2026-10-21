@@ -19,7 +19,7 @@ import {
   type LabelProps,
 } from 'recharts';
 import { genreColorVar } from '@/domain/genre-style';
-import { formatYen } from '@/domain/money';
+import { formatCompactYen, formatYen } from '@/domain/money';
 
 export type BubblePoint = {
   genreId: string | null;
@@ -36,7 +36,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
   if (data.length === 0) {
     return (
       <div
-        className="glass rounded-[22px] p-5"
+        className="glass rounded-2xl p-5"
         style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -51,7 +51,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
 
   return (
     <div
-      className="glass rounded-[22px] p-5"
+      className="glass rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -80,7 +80,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
               unit="円"
               stroke="var(--ink-muted)"
               fontSize={11}
-              tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+              tickFormatter={(v: number) => formatCompactYen(v)}
             />
             <ZAxis type="number" dataKey="totalYen" range={[80, 280]} />
             <Tooltip
@@ -119,7 +119,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
                 <LabelList
                   dataKey="name"
                   position="bottom"
-                  fontSize={9}
+                  fontSize={11}
                   fill="var(--ink-secondary)"
                   offset={8}
                   content={(props: LabelProps & { index?: number }) => {
@@ -132,7 +132,7 @@ export function BubbleChart({ points }: { points: readonly BubblePoint[] }) {
                         x={x}
                         y={y + (isEven ? 14 : 26)}
                         textAnchor="middle"
-                        fontSize={9}
+                        fontSize={11}
                         fill="var(--ink-secondary)"
                       >
                         {props.value}

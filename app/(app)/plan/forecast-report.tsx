@@ -59,8 +59,7 @@ export function ForecastReport({
       {onApplyAll && rows.some((row) => row.recommendedYen !== null) ? (
         <button
           type="button"
-          className="min-h-11 w-full rounded-full px-4 text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+          className="btn-primary min-h-11 w-full rounded-full px-4 text-sm font-semibold"
           disabled={applying}
           onClick={onApplyAll}
         >
@@ -71,7 +70,7 @@ export function ForecastReport({
         {rows.map((row) => (
           <li
             key={row.genreId}
-            className="glass rounded-[22px] px-4 py-4"
+            className="glass rounded-2xl px-4 py-4"
             style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
           >
             <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>

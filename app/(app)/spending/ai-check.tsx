@@ -92,7 +92,7 @@ export function AiCheckSheet({
   return (
     <BottomSheet open={open} onClose={onClose} label="AIでチェック">
       <BottomSheetHeader className="flex items-center justify-between gap-3">
-        <h2 className="text-[18px] font-semibold" style={{ color: 'var(--ink)' }}>
+        <h2 className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
           AIでチェック
         </h2>
         <button

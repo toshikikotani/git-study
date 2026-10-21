@@ -23,7 +23,7 @@ export function NewRule({
       <button
         type="button"
         onClick={() => setAdding(true)}
-        className="w-full rounded-full py-3 text-sm font-semibold"
+        className="min-h-11 w-full rounded-full py-3 text-sm font-semibold"
         style={{
           background: 'var(--plane)',
           color: 'var(--accent)',

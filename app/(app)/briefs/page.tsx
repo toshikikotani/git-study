@@ -33,7 +33,7 @@ export default async function BriefsPage() {
       ) : (
         <div className="space-y-3">
           {briefs.map((brief) => (
-            <Link key={brief.id} href={`/briefs/${brief.id}`}>
+            <Link key={brief.id} href={`/briefs/${brief.id}`} className="block min-h-11">
               <Card>
                 <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                   {formatDateJa(brief.briefOn)}

@@ -31,7 +31,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
         {brief.items.map((item) => (
           <Card key={item.id}>
             <p
-              className="text-xs font-medium tracking-[0.08em] uppercase"
+              className="text-xs font-semibold tracking-[0.08em] uppercase"
               style={{ color: 'var(--ink-muted)' }}
             >
               {BRIEF_ITEM_KIND_LABELS[item.kind]}
@@ -50,7 +50,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
 
       {brief.excludedItems.length > 0 ? (
         <Card>
-          <p className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
             載せなかった項目(FR-31)
           </p>
           <ul className="mt-2 space-y-2">

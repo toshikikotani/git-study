@@ -30,14 +30,14 @@ export function Placeholder({
             aria-hidden
           />
           <span
-            className="text-xs font-medium tracking-[0.08em] uppercase"
+            className="text-xs font-semibold tracking-[0.08em] uppercase"
             style={{ color: 'var(--ink-muted)' }}
           >
             未実装
           </span>
         </div>
         <p className="mt-2 text-sm" style={{ color: 'var(--ink-secondary)' }}>
-          <span className="font-mono font-medium">{taskId}</span> で実装します(TASKS.md 参照)。
+          <span className="font-mono font-semibold">{taskId}</span> で実装します(TASKS.md 参照)。
         </p>
       </div>
     </div>

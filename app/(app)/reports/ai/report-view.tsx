@@ -49,7 +49,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           今月の傾向
         </p>
         <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -74,7 +74,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
               {input.savings.nextGoal.title}
             </p>
             {input.savings.nextGoal.remainingYen !== null ? (
-              <p className="tabular text-xs font-medium" style={{ color: 'var(--ink)' }}>
+              <p className="tabular text-xs font-semibold" style={{ color: 'var(--ink)' }}>
                 あと {formatYen(input.savings.nextGoal.remainingYen, { sign: 'never' })}
               </p>
             ) : null}
@@ -92,8 +92,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
         type="button"
         onClick={() => void run()}
         disabled={pending}
-        className="mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold disabled:opacity-40"
-        style={{ background: 'var(--action)', color: 'var(--on-action)' }}
+        className="btn-primary mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold"
       >
         {pending
           ? '作成しています…'

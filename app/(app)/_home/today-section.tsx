@@ -47,9 +47,12 @@ function dayLabel(date: string): string {
  */
 export async function TodaySection({
   savingsNowYen,
+  todo,
   upcoming,
 }: {
   savingsNowYen: number | null;
+  /** 今日の目安のすぐ下に出す「今日やること」(ADR-131)。 */
+  todo?: React.ReactNode;
   /** 今期の見通しと貯金のあいだに出す「これからの支払い」(デザイン v3-1)。 */
   upcoming?: React.ReactNode;
 }) {
@@ -112,6 +115,7 @@ export async function TodaySection({
         daysAfterToday={Math.max(0, daysBetween(today, periodTo))}
         todayTopNames={goalView?.todayTopSpends.map((s) => s.name) ?? []}
         whatIf={goal && forecast ? <WhatIfButton /> : null}
+        afterHero={todo}
       />
       {/* 気をつけたいカテゴリ:目標をこえた・こえそう・8割をこえたものを自動で最大3つ(ADR-117)。 */}
       {goal && goalView ? <WatchCategories categories={watchCategoriesOf(goalView)} /> : null}

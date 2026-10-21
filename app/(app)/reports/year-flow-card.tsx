@@ -54,7 +54,7 @@ export async function YearFlowCard() {
   return (
     <section
       aria-labelledby="year-flow"
-      className="flex flex-col rounded-[22px] px-4 pt-5 pb-4"
+      className="flex flex-col rounded-2xl px-4 pt-5 pb-4"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -185,7 +185,7 @@ export async function YearFlowCard() {
 function MonthlyTable({ rows }: { rows: IncomeExpenseTrend['rows'] }) {
   const yen = (v: number) => formatYen(v, { sign: 'never' });
   return (
-    <table className="tabular mt-1 w-full text-[14px]" style={{ color: 'var(--ink)' }}>
+    <table className="tabular mt-1 w-full text-[13px]" style={{ color: 'var(--ink)' }}>
       <thead>
         <tr className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
           <th scope="col" className="py-2 text-left font-normal">

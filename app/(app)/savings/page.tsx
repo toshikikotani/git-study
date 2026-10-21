@@ -38,6 +38,9 @@ export default async function SavingsPage({
 
   const [primary, ...older] = summary.goals;
   const target = settings?.monthlySavingsTargetYen ?? 0;
+  // 数え始めが今月なら「貯まった」と「今月の収支」は同じ額になる。そのときは1つだけ出す(ADR-131)。
+  const startedThisMonth =
+    summary.startOn !== null && summary.startOn.slice(0, 7) === today.slice(0, 7);
 
   return (
     <div className="rise space-y-4">
@@ -47,7 +50,7 @@ export default async function SavingsPage({
           くわしい内容(任意)。今日・貯金・AIは、どれもこの毎月の額で「あといくら」を出す。 */}
       <section
         aria-labelledby="savings-target"
-        className="flex flex-col gap-3 rounded-[22px] px-4 py-4"
+        className="flex flex-col gap-3 rounded-2xl px-4 py-4"
         style={{ background: 'var(--surface)', color: 'var(--ink)' }}
       >
         <h2 id="savings-target" className="text-[17px] font-semibold">
@@ -55,7 +58,11 @@ export default async function SavingsPage({
         </h2>
         <MonthlyTarget initialYen={target} />
         {primary ? <GoalCard progress={primary} today={today} /> : <NewGoal />}
-        {primary?.monthlyNeededYen != null && primary.monthlyNeededYen !== target ? (
+        {primary &&
+        !primary.reached &&
+        primary.monthlyNeededYen !== null &&
+        primary.monthlyNeededYen > 0 &&
+        primary.monthlyNeededYen !== target ? (
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
             期限に間に合わせるには、毎月 {formatYen(primary.monthlyNeededYen, { sign: 'never' })}{' '}
             ほど要ります。毎月の額に入れると、今日の画面とAIもこの額で見ます。
@@ -64,15 +71,17 @@ export default async function SavingsPage({
       </section>
 
       <section
-        className="glass rounded-[22px] px-4 py-4"
+        className="glass rounded-2xl px-4 py-4"
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
-        <div className="grid grid-cols-3 gap-3">
+        <div className={`grid gap-3 ${startedThisMonth ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <Stat
             label="貯まった"
             value={summary.startOn === null ? '—' : formatYen(summary.totalYen, { sign: 'never' })}
           />
-          <Stat label="今月の収支" value={formatYen(summary.thisMonthYen)} />
+          {startedThisMonth ? null : (
+            <Stat label="今月の収支" value={formatYen(summary.thisMonthYen)} />
+          )}
           <Stat
             label="いつもの月"
             value={summary.paceYen === null ? '—' : formatYen(summary.paceYen)}
@@ -88,7 +97,7 @@ export default async function SavingsPage({
       </section>
 
       {older.length > 0 ? (
-        <details className="rounded-[22px] px-4" style={{ background: 'var(--surface)' }}>
+        <details className="rounded-2xl px-4" style={{ background: 'var(--surface)' }}>
           <summary
             className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold"
             style={{ color: 'var(--accent)' }}
@@ -105,7 +114,7 @@ export default async function SavingsPage({
 
       <Link
         href="/assistant?context=savings"
-        className="flex min-h-11 items-center text-xs font-medium"
+        className="flex min-h-11 items-center text-xs font-semibold"
         style={{ color: 'var(--accent)' }}
       >
         AIに相談して目標を立てる →

@@ -17,7 +17,7 @@ export function InsightsSection({
   if (insights.length === 0) return null;
   return (
     <section aria-label="気づき" className="space-y-2">
-      <h2 className="text-xs font-medium" style={{ color: 'var(--ink-secondary)' }}>
+      <h2 className="text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
         気づき
       </h2>
       <ul className="space-y-2">

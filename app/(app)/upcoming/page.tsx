@@ -89,7 +89,7 @@ export default async function UpcomingPage({
       </h2>
       <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {view.scheduled.length === 0 ? (
-          <p className="px-4 py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-4 py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {jaDate(until)}までの予定はありません。日付を先にして記録すると、ここに出ます。
           </p>
         ) : (
@@ -107,7 +107,7 @@ export default async function UpcomingPage({
                   <span className="text-[20px] font-bold">{Number(p.date.slice(8, 10))}</span>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[16px] font-medium">{p.name}</span>
+                  <span className="truncate text-[16px] font-semibold">{p.name}</span>
                   <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                     {p.fixed ? '固定費' : '予定'} · {p.genreName ?? '未分類'} · あと
                     {daysBetween(today, p.date)}日
@@ -131,7 +131,7 @@ export default async function UpcomingPage({
       </div>
       <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {view.fixedItems.length === 0 && view.categoryFixed.length === 0 ? (
-          <p className="px-4 py-3 text-[14px]" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-4 py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             固定費はまだありません。記録するときに「毎月の固定費にする」をオンにすると、ここに出ます。
           </p>
         ) : null}
@@ -149,7 +149,7 @@ export default async function UpcomingPage({
             >
               <DirectRecordEditor transaction={transaction}>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[16px] font-medium">{f.name}</span>
+                  <span className="truncate text-[16px] font-semibold">{f.name}</span>
                   <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
                     {f.genreName ?? '未分類'}
                   </span>
@@ -180,7 +180,9 @@ export default async function UpcomingPage({
           >
             <CategoryMark genreId={c.genreId} name={c.genreName} />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[16px] font-medium">{c.genreName}(カテゴリごと)</span>
+              <span className="truncate text-[16px] font-semibold">
+                {c.genreName}(カテゴリごと)
+              </span>
               <span
                 className="truncate text-[13px]"
                 style={{ color: c.mixed ? 'var(--state-caution)' : 'var(--ink-muted)' }}

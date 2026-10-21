@@ -153,10 +153,10 @@ describe('R5 角丸は入れ子の関係を保つ(外側 = 内側 + 余白)', ()
     expect(card).toBe(inner + unit);
   });
 
-  it('セグメントの溝(角丸10・余白2)の中の選択面は、角丸8(デザイン仕様書、ADR-090)', () => {
+  it('セグメントの溝と選択面は、どちらも丸(ボタンは丸、ADR-131。入れ子でも形がそろう)', () => {
     const seg = readFileSync('src/components/ui/segmented.tsx', 'utf8');
-    expect(seg).toContain('borderRadius: 10, padding: 2');
-    expect(seg).toContain('borderRadius: 8');
+    expect(seg).toContain("borderRadius: 'var(--radius-full)', padding: 2");
+    expect(seg.match(/borderRadius: 'var\(--radius-full\)'/g)).toHaveLength(2);
   });
 });
 
