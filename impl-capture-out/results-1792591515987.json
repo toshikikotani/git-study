@@ -1,0 +1,245 @@
+[
+ {
+  "id": "home",
+  "path": "/",
+  "final": "/",
+  "status": 200,
+  "title": "今日10月21日 水曜日",
+  "height": 2295,
+  "errors": 0
+ },
+ {
+  "id": "plus-menu",
+  "path": "/",
+  "final": "/",
+  "status": 200,
+  "title": "今日10月21日 水曜日",
+  "height": 2295,
+  "errors": 0
+ },
+ {
+  "id": "plus-settings",
+  "path": "/",
+  "final": "/",
+  "status": 200,
+  "title": "今日10月21日 水曜日",
+  "height": 2295,
+  "errors": 0
+ },
+ {
+  "id": "record",
+  "path": "/",
+  "final": "/",
+  "status": 200,
+  "title": "今日10月21日 水曜日",
+  "height": 2295,
+  "errors": 0
+ },
+ {
+  "id": "camera-sheet",
+  "path": "/",
+  "final": "/",
+  "status": 200,
+  "title": "今日10月21日 水曜日",
+  "height": 2295,
+  "errors": 0
+ },
+ {
+  "id": "today-check",
+  "path": "/spending/review?check=today",
+  "final": "/spending/review",
+  "status": 200,
+  "title": "確認が必要",
+  "height": 1982,
+  "errors": 0
+ },
+ {
+  "id": "spending",
+  "path": "/spending",
+  "final": "/spending",
+  "status": 200,
+  "title": "明細",
+  "height": 2581,
+  "errors": 0
+ },
+ {
+  "id": "reports",
+  "path": "/reports",
+  "final": "/reports",
+  "status": 200,
+  "title": "分析",
+  "height": 3924,
+  "errors": 0
+ },
+ {
+  "id": "assistant",
+  "path": "/assistant",
+  "final": "/assistant",
+  "status": 200,
+  "title": "AI",
+  "height": 844,
+  "errors": 0
+ },
+ {
+  "id": "review",
+  "path": "/spending/review",
+  "final": "/spending/review",
+  "status": 200,
+  "title": "確認が必要",
+  "height": 1982,
+  "errors": 0
+ },
+ {
+  "id": "spending-category",
+  "path": "/spending/category/54b17f2d-f4c7-4535-b5a5-cfb70a755ce1",
+  "final": "/spending/category/54b17f2d-f4c7-4535-b5a5-cfb70a755ce1",
+  "status": 200,
+  "title": "外食",
+  "height": 4202,
+  "errors": 0
+ },
+ {
+  "id": "plan-edit",
+  "path": "/plan/edit",
+  "final": "/plan/edit",
+  "status": 200,
+  "title": "今期の目標",
+  "height": 2105,
+  "errors": 0
+ },
+ {
+  "id": "upcoming",
+  "path": "/upcoming",
+  "final": "/upcoming",
+  "status": 200,
+  "title": "予定と固定費",
+  "height": 844,
+  "errors": 0
+ },
+ {
+  "id": "savings",
+  "path": "/savings",
+  "final": "/savings",
+  "status": 200,
+  "title": "貯金",
+  "height": 1073,
+  "errors": 0
+ },
+ {
+  "id": "reports-month",
+  "path": "/reports/month",
+  "final": "/reports/month",
+  "status": 200,
+  "title": "分析",
+  "height": 2670,
+  "errors": 0
+ },
+ {
+  "id": "reports-ai",
+  "path": "/reports/ai",
+  "final": "/reports/ai",
+  "status": 200,
+  "title": "AIのレポート",
+  "height": 968,
+  "errors": 0
+ },
+ {
+  "id": "email",
+  "path": "/transactions/email",
+  "final": "/transactions/email",
+  "status": 200,
+  "title": "メールから取り込む",
+  "height": 1031,
+  "errors": 0
+ },
+ {
+  "id": "import",
+  "path": "/transactions/import",
+  "final": "/transactions/import",
+  "status": 200,
+  "title": "CSVを取り込む",
+  "height": 844,
+  "errors": 0
+ },
+ {
+  "id": "camera-page",
+  "path": "/camera",
+  "final": "/camera",
+  "status": 200,
+  "title": "レシートカメラ",
+  "height": 844,
+  "errors": 0
+ },
+ {
+  "id": "settings",
+  "path": "/settings",
+  "final": "/settings",
+  "status": 200,
+  "title": "設定",
+  "height": 1493,
+  "errors": 0
+ },
+ {
+  "id": "settings-categories",
+  "path": "/settings/categories",
+  "final": "/settings/categories",
+  "status": 200,
+  "title": "カテゴリ",
+  "height": 1782,
+  "errors": 0
+ },
+ {
+  "id": "settings-category",
+  "path": "/settings/categories/54b17f2d-f4c7-4535-b5a5-cfb70a755ce1",
+  "final": "/settings/categories/54b17f2d-f4c7-4535-b5a5-cfb70a755ce1",
+  "status": 200,
+  "title": "外食",
+  "height": 1796,
+  "errors": 0
+ },
+ {
+  "id": "settings-theme",
+  "path": "/settings/theme",
+  "final": "/settings/theme",
+  "status": 200,
+  "title": "色",
+  "height": 4656,
+  "errors": 0
+ },
+ {
+  "id": "accounts",
+  "path": "/accounts",
+  "final": "/accounts",
+  "status": 200,
+  "title": "口座",
+  "height": 1135,
+  "errors": 0
+ },
+ {
+  "id": "notifications",
+  "path": "/notifications",
+  "final": "/notifications",
+  "status": 200,
+  "title": "お知らせ",
+  "height": 844,
+  "errors": 0
+ },
+ {
+  "id": "welcome",
+  "path": "/welcome",
+  "final": "/welcome",
+  "status": 200,
+  "title": "まずは手取りと給料日",
+  "height": 844,
+  "errors": 0
+ },
+ {
+  "id": "login",
+  "path": "/login",
+  "final": "/login",
+  "status": 200,
+  "title": "ログイン",
+  "height": 844,
+  "errors": 0
+ }
+]

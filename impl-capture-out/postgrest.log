@@ -1,0 +1,7 @@
+21/Oct/2026:14:02:27 +0000: Starting PostgREST 12.2.3...
+21/Oct/2026:14:02:27 +0000: Listening on port 54998
+21/Oct/2026:14:02:27 +0000: Listening for notifications on the "pgrst" channel
+21/Oct/2026:14:02:27 +0000: Successfully connected to PostgreSQL 16.15 (Ubuntu 16.15-1.pgdg24.04+2) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+21/Oct/2026:14:02:27 +0000: Config reloaded
+21/Oct/2026:14:02:28 +0000: Schema cache queried in 8.0 milliseconds
+21/Oct/2026:14:02:28 +0000: Schema cache loaded 42 Relations, 71 Relationships, 3 Functions, 0 Domain Representations, 4 Media Type Handlers, 600 Timezones

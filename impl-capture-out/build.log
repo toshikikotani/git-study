@@ -1,0 +1,104 @@
+▲ Next.js 16.4.2 (Turbopack)
+✓ Running next.config.ts took 30ms
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+- Experiments (use with caution):
+  · staleTimes
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 15.7s
+  Running TypeScript ...
+  Finished TypeScript in 22.2s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/53) ...
+  Generating static pages using 3 workers (13/53) 
+  Generating static pages using 3 workers (26/53) 
+  Generating static pages using 3 workers (39/53) 
+✓ Generating static pages using 3 workers (53/53) in 689ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /accounts
+├ ƒ /advisor
+├ ƒ /api/accounts
+├ ƒ /api/assistant/apply
+├ ƒ /api/assistant/chat
+├ ƒ /api/auth/google/callback
+├ ƒ /api/auth/google/start
+├ ƒ /api/cron/detect-alerts
+├ ƒ /api/cron/evening-check
+├ ƒ /api/cron/import-gmail
+├ ƒ /api/cron/keepalive
+├ ƒ /api/cron/morning-brief
+├ ƒ /api/cron/sync-google
+├ ƒ /api/genres
+├ ƒ /api/import-adapters
+├ ƒ /api/import/email
+├ ƒ /api/import/receipt
+├ ƒ /api/import/receipt/upload
+├ ƒ /api/merchant-names/scan
+├ ƒ /api/receipts/check
+├ ƒ /api/webhooks/line
+├ ƒ /api/widget/today
+├ ƒ /assistant
+├ ƒ /briefs
+├ ƒ /briefs/[id]
+├ ƒ /camera
+├ ƒ /camera.webmanifest
+├ ƒ /investments
+├ ƒ /job-change
+├ ○ /login
+├ ○ /manifest.webmanifest
+├ ƒ /notifications
+├ ƒ /payday
+├ ƒ /plan
+├ ƒ /plan/edit
+├ ƒ /reports
+├ ƒ /reports/ai
+├ ƒ /reports/frequency
+├ ƒ /reports/genres
+├ ƒ /reports/month
+├ ƒ /reports/monthly
+├ ƒ /reports/more
+├ ○ /robots.txt
+├ ƒ /savings
+├ ƒ /settings
+├ ƒ /settings/ai
+├ ƒ /settings/categories
+├ ƒ /settings/categories/[genreId]
+├ ƒ /settings/gmail
+├ ƒ /settings/google
+├ ƒ /settings/password
+├ ƒ /settings/rescued-emails
+├ ƒ /settings/theme
+├ ƒ /side-hustle
+├ ƒ /spending
+├ ƒ /spending/category/[genreKey]
+├ ƒ /spending/pile
+├ ƒ /spending/review
+├ ƒ /transactions
+├ ƒ /transactions/capture-screenshot
+├ ƒ /transactions/capture-text
+├ ƒ /transactions/duplicates
+├ ƒ /transactions/email
+├ ƒ /transactions/import
+├ ƒ /transactions/new
+├ ƒ /transactions/paste
+├ ƒ /transactions/receipt
+├ ƒ /transactions/receipt/[id]
+├ ƒ /transactions/reconcile
+├ ƒ /upcoming
+└ ƒ /welcome
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
