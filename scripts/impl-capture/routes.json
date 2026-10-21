@@ -1,0 +1,219 @@
+[
+ {
+  "group": "main",
+  "id": "home",
+  "path": "/",
+  "action": null,
+  "title": "今日",
+  "file": "Impl2Home.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "plus-menu",
+  "path": "/",
+  "action": "plusMenu",
+  "title": "＋のメニュー",
+  "file": "Impl2PlusMenu.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "plus-settings",
+  "path": "/",
+  "action": "plusSettings",
+  "title": "＋のメニュー・長押しの設定",
+  "file": "Impl2PlusSettings.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "record",
+  "path": "/",
+  "action": "recordSheet",
+  "title": "記録する",
+  "file": "Impl2Record.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "camera-sheet",
+  "path": "/",
+  "action": "cameraOpen",
+  "title": "レシートを撮る",
+  "file": "Impl2CameraSheet.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "today-check",
+  "path": "/spending/review?check=today",
+  "action": null,
+  "title": "今日の答え合わせ",
+  "file": "Impl2TodayCheck.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "spending",
+  "path": "/spending",
+  "action": null,
+  "title": "明細",
+  "file": "Impl2Spending.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "reports",
+  "path": "/reports",
+  "action": null,
+  "title": "分析",
+  "file": "Impl2Reports.dc.html"
+ },
+ {
+  "group": "main",
+  "id": "assistant",
+  "path": "/assistant",
+  "action": null,
+  "title": "AI",
+  "file": "Impl2Assistant.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "review",
+  "path": "/spending/review",
+  "action": null,
+  "title": "確認が必要",
+  "file": "Impl2Review.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "spending-category",
+  "path": "/spending/category/__GAISHOKU__",
+  "action": null,
+  "title": "明細 › 外食",
+  "file": "Impl2SpendingCategory.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "plan-edit",
+  "path": "/plan/edit",
+  "action": null,
+  "title": "今期の目標",
+  "file": "Impl2PlanEdit.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "upcoming",
+  "path": "/upcoming",
+  "action": null,
+  "title": "予定と固定費",
+  "file": "Impl2Upcoming.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "savings",
+  "path": "/savings",
+  "action": null,
+  "title": "貯金",
+  "file": "Impl2Savings.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "reports-month",
+  "path": "/reports/month",
+  "action": null,
+  "title": "分析 › 月のふりかえり",
+  "file": "Impl2ReportsMonth.dc.html"
+ },
+ {
+  "group": "spend",
+  "id": "reports-ai",
+  "path": "/reports/ai",
+  "action": null,
+  "title": "AIレポート",
+  "file": "Impl2ReportsAi.dc.html"
+ },
+ {
+  "group": "entry",
+  "id": "email",
+  "path": "/transactions/email",
+  "action": null,
+  "title": "メールから取り込む",
+  "file": "Impl2Email.dc.html"
+ },
+ {
+  "group": "entry",
+  "id": "import",
+  "path": "/transactions/import",
+  "action": null,
+  "title": "CSVを取り込む",
+  "file": "Impl2Import.dc.html"
+ },
+ {
+  "group": "entry",
+  "id": "camera-page",
+  "path": "/camera",
+  "action": null,
+  "title": "レシートカメラ",
+  "file": "Impl2CameraPage.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "settings",
+  "path": "/settings",
+  "action": null,
+  "title": "設定",
+  "file": "Impl2Settings.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "settings-categories",
+  "path": "/settings/categories",
+  "action": null,
+  "title": "カテゴリ",
+  "file": "Impl2SettingsCategories.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "settings-category",
+  "path": "/settings/categories/__GAISHOKU__",
+  "action": null,
+  "title": "カテゴリ › 外食",
+  "file": "Impl2SettingsCategory.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "settings-theme",
+  "path": "/settings/theme",
+  "action": null,
+  "title": "色",
+  "file": "Impl2SettingsTheme.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "accounts",
+  "path": "/accounts",
+  "action": null,
+  "title": "口座",
+  "file": "Impl2Accounts.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "notifications",
+  "path": "/notifications",
+  "action": null,
+  "title": "お知らせ",
+  "file": "Impl2Notifications.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "welcome",
+  "path": "/welcome",
+  "action": null,
+  "title": "はじめての設定",
+  "file": "Impl2Welcome.dc.html"
+ },
+ {
+  "group": "settings",
+  "id": "login",
+  "path": "/login",
+  "action": null,
+  "title": "ログイン",
+  "file": "Impl2Login.dc.html",
+  "noCookie": true
+ }
+]
