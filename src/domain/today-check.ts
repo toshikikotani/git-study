@@ -15,24 +15,36 @@ import { addDays, type DateOnly } from '@/lib/date';
 /** 今日を含めて何日前までの片づけ残しを出すか。 */
 export const CHECK_WINDOW_DAYS = 7;
 
-export type CheckSource = 'gmail' | 'csv' | 'line_receipt' | 'line_text' | 'app';
+export type CheckSource = 'gmail' | 'csv' | 'line_receipt' | 'line_text' | 'iphone_receipt' | 'app';
 
 export const CHECK_SOURCE_LABEL: Record<CheckSource, string> = {
   gmail: 'カードの通知メール',
   csv: 'CSV',
   line_receipt: 'LINEのレシート',
   line_text: 'LINE',
+  iphone_receipt: 'iPhoneで撮ったレシート',
   app: 'アプリ',
 };
 
 /** LINE の文字から入れた記録の source_ref の頭(LINE のレシートは `line-<メッセージID>-<番号>`)。 */
 export const LINE_TEXT_REF_PREFIX = 'line-text-';
 
+/**
+ * iPhone アプリで撮ったレシートの source_ref の頭(`iphone-photo-<ID>-<番号>`、ADR-132)。確認の画面を
+ * 挟まずに記録するので、LINE のレシートと同じく答え合わせに出す。
+ */
+export const IPHONE_PHOTO_REF_PREFIX = 'iphone-photo-';
+
+/** iPhone アプリの「記録する」で入れた記録の source_ref の頭。本人が入れたので答え合わせには出さない。 */
+export const IPHONE_ENTRY_REF_PREFIX = 'iphone-entry-';
+
 /** 自動で入った記録か(そうならどこから)。手入力・アプリのレシートは null。 */
 export function checkSourceOf(source: string, sourceRef: string | null): CheckSource | null {
   if (source === 'gmail') return 'gmail';
   if (source === 'csv') return 'csv';
   if (source === 'manual' && sourceRef?.startsWith(LINE_TEXT_REF_PREFIX)) return 'line_text';
+  if (source === 'manual' && sourceRef?.startsWith(IPHONE_PHOTO_REF_PREFIX))
+    return 'iphone_receipt';
   if (source === 'manual' && sourceRef?.startsWith('line-')) return 'line_receipt';
   return null;
 }

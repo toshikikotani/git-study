@@ -18,12 +18,17 @@
  * /api/webhooks/* も対象外。LINE のサーバーがセッション cookie を持たずに
  * 直接叩いてくる経路のため(本人発案のレシート受信 Webhook)。X-Line-Signature
  * による検証は各 route.ts 側の責務にする(app/api/webhooks/line/route.ts)。
+ *
+ * /api/mobile/* は iPhone アプリの入口(ADR-132)。cookie の代わりに、アプリが送るログインの証明
+ * (`Authorization: Bearer <アクセストークン>`)を Supabase で確かめる。確かめられなければ、ほかの
+ * API と同じく 401。route 側(lib/supabase/bearer-session.ts)でも、もう一度確かめる。
  */
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { authGate, isPublicPath } from '@/lib/auth-gate';
 import { getPublicEnv } from '@/lib/env';
+import { bearerTokenOf } from '@/lib/bearer-token';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -53,9 +58,11 @@ export async function proxy(request: NextRequest) {
     },
   );
 
+  // iPhone アプリの入口は、アプリが送ったトークンで確かめる(Web の cookie は使わない)。
+  const bearer = pathname.startsWith('/api/mobile/') ? bearerTokenOf(request) : null;
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = bearer ? await supabase.auth.getUser(bearer) : await supabase.auth.getUser();
 
   const gate = authGate(pathname, user !== null);
   if (gate === 'unauthorized') {

@@ -12,14 +12,14 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 import { getPublicEnv } from '@/lib/env';
-import { ownerSessionClient } from './owner-session';
+import { sessionOverrideClient } from './session-override';
 import type { Database } from './types';
 
 export async function createClient() {
-  // LINE の受信など、送り主を確かめた経路が本人として動いている間は、そのセッションを使う
-  // (owner-session.ts、ADR-130)。本人の行だけが見える点は cookie のセッションと同じ。
-  const owner = ownerSessionClient();
-  if (owner) return owner as unknown as ReturnType<typeof createServerClient<Database>>;
+  // LINE の受信・iPhone アプリなど、本人を確かめた経路が本人として動いている間は、そのセッションを使う
+  // (session-override.ts、ADR-130・132)。本人の行だけが見える点は cookie のセッションと同じ。
+  const override = sessionOverrideClient();
+  if (override) return override as unknown as ReturnType<typeof createServerClient<Database>>;
 
   const cookieStore = await cookies();
   const env = getPublicEnv();

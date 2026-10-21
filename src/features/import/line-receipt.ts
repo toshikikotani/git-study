@@ -55,40 +55,100 @@ export async function importLineReceiptAsAdmin(
   imageBase64: string,
   messageId: string,
 ): Promise<LineReceiptImportResult> {
-  const extracted = await extractor.extract({ imageBase64, mediaType: 'image/jpeg' });
-
-  if (extracted.transactions.length === 0) {
+  const result = await importReceiptPhoto(admin, userId, {
+    accountId,
+    extractor,
+    imageBase64,
+    mediaType: 'image/jpeg',
+    sourceRefOf: (index) => `line-${messageId}-${index}`,
+    fileName: 'LINE',
+  });
+  if (result.preview.length === 0) {
     return {
       imported: 0,
       duplicates: 0,
-      summaryText: extracted.warnings[0] ?? 'レシートとして読み取れませんでした。',
+      summaryText: result.warnings[0] ?? 'レシートとして読み取れませんでした。',
+    };
+  }
+  return {
+    imported: result.imported,
+    duplicates: result.duplicates,
+    summaryText: buildSummaryText(
+      result.preview,
+      result.duplicates,
+      result.warnings,
+      result.merged,
+    ),
+  };
+}
+
+export type ReceiptPhotoImportResult = {
+  /** 読み取った明細(分類のあと)。読み取れなければ空。 */
+  preview: StoredTransaction[];
+  /** 入れた明細の ID と source_ref。 */
+  inserted: { id: string; sourceRef: string | null }[];
+  imported: number;
+  duplicates: number;
+  /** カードの通知メールと同じ支払いとして1件にまとめた件数。 */
+  merged: number;
+  warnings: string[];
+};
+
+/**
+ * レシートの写真1枚を読み取り、確認の画面を挟まずにそのまま記録する(LINE のレシートと、iPhone アプリで
+ * 撮ったレシート、ADR-132)。覚えたお店のカテゴリを付け、自信が無ければ答え合わせへ回す(ADR-129)。
+ * 先に入っていたカードの通知メールと同じ支払いなら1件にまとめる。
+ *
+ * `client` は管理クライアント(LINE)か本人のセッションのクライアント(iPhone、RLS のまま)。どちらでも
+ * 明示的な user_id で読み書きする。
+ */
+export async function importReceiptPhoto(
+  client: SupabaseClient<Database>,
+  userId: string,
+  input: {
+    accountId: string;
+    extractor: AiReceiptExtractor;
+    imageBase64: string;
+    mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+    /** 明細ごとの source_ref(取り込み元。答え合わせの対象かどうかもこれで決まる)。 */
+    sourceRefOf: (index: number) => string;
+    fileName: string;
+  },
+): Promise<ReceiptPhotoImportResult> {
+  const extracted = await input.extractor.extract({
+    imageBase64: input.imageBase64,
+    mediaType: input.mediaType,
+  });
+  if (extracted.transactions.length === 0) {
+    return {
+      preview: [],
+      inserted: [],
+      imported: 0,
+      duplicates: 0,
+      merged: 0,
+      warnings: extracted.warnings,
     };
   }
 
   const { path: receiptImagePath } = await uploadReceiptImage(
-    admin,
+    client,
     userId,
-    imageBase64,
-    'image/jpeg',
+    input.imageBase64,
+    input.mediaType,
   );
 
-  // 確認の画面が無い経路なので、覚えたお店のカテゴリを付け、自信が無ければ夜の答え合わせへ回す
+  // 確認の画面が無い経路なので、覚えたお店のカテゴリを付け、自信が無ければ答え合わせへ回す
   // (ADR-129)。
   const preview = await classifyImportRows(
-    admin,
+    client,
     userId,
-    buildPreview(
-      extracted.transactions,
-      accountId,
-      (index) => `line-${messageId}-${index}`,
-      'manual',
-    ),
+    buildPreview(extracted.transactions, input.accountId, input.sourceRefOf, 'manual'),
   );
 
-  const result = await importTransactionsAsAdmin(admin, userId, preview, {
-    fileName: 'LINE',
+  const result = await importTransactionsAsAdmin(client, userId, preview, {
+    fileName: input.fileName,
     source: 'manual',
-    accountId,
+    accountId: input.accountId,
     failedCount: extracted.warnings.length,
     receiptImagePath,
   });
@@ -97,16 +157,19 @@ export async function importLineReceiptAsAdmin(
   const merged =
     result.importedCount > 0
       ? await autoMergeSamePayments(
-          admin,
+          client,
           userId,
           preview.map((t) => t.occurredOn),
         ).catch(() => 0)
       : 0;
 
   return {
+    preview,
+    inserted: [...result.insertedTransactions],
     imported: result.importedCount,
     duplicates: result.duplicateCount,
-    summaryText: buildSummaryText(preview, result.duplicateCount, extracted.warnings, merged),
+    merged,
+    warnings: extracted.warnings,
   };
 }
 
