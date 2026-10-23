@@ -15,21 +15,16 @@
  * 管理キーそのものはここで読まない。
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-
-import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 import { getPublicEnv } from '@/lib/env';
 import type { createAdminClient } from './admin';
 import type { OwnerUser } from './owner';
+import { runWithSessionClient, sessionOverrideClient } from './session-override';
 import type { Database } from './types';
 
-const ownerSession = new AsyncLocalStorage<SupabaseClient<Database>>();
-
 /** 本人として動いている間の Supabase クライアント(それ以外は undefined)。 */
-export function ownerSessionClient(): SupabaseClient<Database> | undefined {
-  return ownerSession.getStore();
-}
+export const ownerSessionClient = sessionOverrideClient;
 
 export class OwnerSessionError extends Error {}
 
@@ -64,7 +59,7 @@ export async function runAsOwner<T>(
   }
 
   try {
-    return await ownerSession.run(client, fn);
+    return await runWithSessionClient(client, fn);
   } finally {
     await client.auth.signOut({ scope: 'local' }).catch(() => {});
   }

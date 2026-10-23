@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "資産形成",
+    "slug": "shisan",
+    "scheme": "shisan",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "レシートの写真を選んで、読み取って記録するために使います。",
+          "cameraPermission": "レシートを撮って、読み取って記録するために使います。",
+          "microphonePermission": false
+        }
+      ]
+    ]
+  }
+}

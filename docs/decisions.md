@@ -3910,3 +3910,40 @@ v4 の変更2。いまの Webhook(`app/api/webhooks/line`)は画像だけを受�
   ログイン・色の画面を明るい・暗いで見た。文書が勧める「デザインQA(scripts/design-qa)を全画面に広げる」のうち、
   44pt はテストで全画面に広げた。実ブラウザで全画面を撮る仕組みは、偽のサーバーのデータを全画面ぶん用意する必要が
   あるので、次に回す。iPhone 実機は未確認。
+
+## ADR-132:iPhone 版を Expo で作る(段階1:ログイン・今日・記録する・カメラ)
+
+日付:2026-10-21
+
+本人の希望:App Store で売りたい、Mac は無い、Web は不便(特にカメラ・写真と、遅い・固まる)。iPhone 専用に
+作り直す。Mac が要らないよう Expo(React Native)で作り、ビルドと提出は Expo のクラウド(EAS)にする。
+
+- Web 版は残す。サーバー(Supabase・AI・LINE・夜の答え合わせ・Gmail の取り込み)と計算(`src/domain`)は
+  そのまま使う。作り直すのは iPhone の画面だけ(`mobile/`)。
+- 数字はサーバーが Web 版と同じ関数で出す(`src/features/mobile/`、GET `/api/mobile/today` は
+  loadTodayForecasts と今日やることの数え方、ADR-131)。アプリは出すだけなので、Web 版と数字がずれない。
+  受け渡しの形は `src/features/mobile/contract.ts`(型だけ、アプリからも読む)。
+- ログインの証明:Web の画面はサーバーの関数を直接呼ぶ(Server Actions)が、iPhone からは呼べない。
+  アプリは Supabase にログインし、アクセストークンを `Authorization: Bearer` で `/api/mobile/*` に送る。
+  - 関所(`proxy.ts`):`/api/mobile/*` だけ、cookie の代わりにそのトークンを Supabase で確かめる。ほかの道は
+    いままでどおり cookie(トークンを付けても cookie で確かめる)。確かめられなければ 401。
+  - 入口(`src/lib/supabase/bearer-session.ts` の withMobileSession):もう一度確かめ、その処理のあいだだけ
+    `createClient()` が本人のセッション(RLS のまま)を返す。LINE の受信(ADR-130)と同じ仕組み
+    (`session-override.ts` に切り出した)。リフレッシュトークンは受け取らない(期限が近ければ 401、アプリが
+    更新して送り直す)。ログアウト(signOut)は呼ばない(呼ぶとアプリのセッションまで無効になる)。
+- 記録する:`POST /api/mobile/records` は Web の記録するシートと同じ形で1件(口座は記録するの既定)。
+  source_ref は `iphone-entry-…`(本人が入れたので答え合わせには出さない)。撮ったレシートは
+  `POST /api/mobile/receipts`:LINE のレシートと同じ取り込み(`importReceiptPhoto` に切り出して共用)で
+  読み取ってそのまま記録し、source_ref は `iphone-photo-…`(答え合わせに「iPhoneで撮ったレシート」として出す)。
+  「取り消す」(`/api/mobile/records/undo`)はアプリから入れた記録だけ。カードの通知メールと1件にまとめた
+  レシートは消さない(答え合わせの「分ける」で)。
+- アプリ(`mobile/`、Expo SDK 58・Expo Router):ログイン(端末に残す)、今日、記録する(撮る・写真から・
+  手で入れる)、設定。前に読んだ値を端末に残してすぐ出し、うしろで新しくする。色・文字・角丸・44pt は
+  Web 版の型(ADR-131)。答え合わせ・明細・分析などは、いまは Web 版を開く(段階2で作る)。
+- 共通のコード:アプリの `@/…` はリポジトリの `src/`(Metro に `src/` を見せる)。外の npm パッケージを
+  読まないもの(金額の書き方・約束の型)だけを読む。
+- Web 版への影響:画面と動きは変えない。Web 版の型チェック・lint から `mobile/` を外し、CI に
+  「mobile (typecheck / iOS bundle)」を足した。データベースは変えていない。
+- 確認:Web 側は型・lint・整形・テスト(トークンの確かめ・関所・記録・取り消し・今日の数字)・next build。
+  アプリは型・iOS 用のまとめ(expo export)・expo-doctor。iPhone の実機・Expo Go での動きは未確認
+  (この環境に Expo のトークンと iPhone が無い)。試し方は docs/mobile.md。

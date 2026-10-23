@@ -47,6 +47,36 @@ jobs:
           DISCORD_WEBHOOK_URL: https://discord.com/api/webhooks/0/dummy
           CRON_SECRET: dummy-cron-secret-for-build-only-0123456789
 
+  # iPhone 版(Expo、ADR-132)。型と、iPhone 用にまとめられるか(Web 版と共通の src/ も読めるか)を見る。
+  # 設定は公開してよい値の形だけのダミー(実値は Expo の Environment variables にある)。
+  mobile:
+    name: mobile (typecheck / iOS bundle)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: iOS bundle
+        run: npx expo export --platform ios --output-dir /tmp/expo-export
+        env:
+          CI: '1'
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+          EXPO_PUBLIC_API_BASE_URL: https://example.vercel.app
+
   schema:
     name: schema (constraints / functions / RLS)
     runs-on: ubuntu-latest

@@ -2,7 +2,8 @@ import coreWebVitals from 'eslint-config-next/core-web-vitals';
 import typescript from 'eslint-config-next/typescript';
 
 const config = [
-  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'] },
+  // mobile/ は iPhone 版(Expo)。型チェックとまとめ(バンドル)は CI の mobile の段で見る(ADR-132)。
+  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'mobile/**'] },
   ...coreWebVitals,
   ...typescript,
   {
