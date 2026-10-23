@@ -43,6 +43,7 @@ describe('保存前の重複確認結果', () => {
             occurred_on: probe.occurredOn,
             amount_yen: -500,
             review_status: 'auto_ok',
+            source: 'gmail',
           },
         ],
         error: null,
@@ -50,7 +51,15 @@ describe('保存前の重複確認結果', () => {
     );
     expect(await checkReceiptDuplicatesAction([probe])).toEqual({
       duplicates: {
-        receipt: [{ id: 'existing', occurredOn: probe.occurredOn, amountYen: -500 }],
+        receipt: [
+          {
+            id: 'existing',
+            occurredOn: probe.occurredOn,
+            amountYen: -500,
+            storeName: 'お店',
+            fromEmail: true,
+          },
+        ],
       },
       error: null,
     });

@@ -27,3 +27,21 @@ export async function fetchStoreGenres(): Promise<[string, string][]> {
   }
   return [...latest.entries()];
 }
+
+/** 最近使ったカテゴリ(新しい記録から、重ねずに limit 個)。カテゴリを選ぶシートの「最近使った」。 */
+export async function fetchRecentGenreIds(limit = 4): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('transactions')
+    .select('genre_id')
+    .lt('amount_yen', 0)
+    .not('genre_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  const ids: string[] = [];
+  for (const row of data ?? []) {
+    if (row.genre_id !== null && !ids.includes(row.genre_id)) ids.push(row.genre_id);
+    if (ids.length >= limit) break;
+  }
+  return ids;
+}

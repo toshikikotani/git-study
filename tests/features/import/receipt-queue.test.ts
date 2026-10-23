@@ -21,6 +21,8 @@ describe('queueReducer(撮影をブロックしない読み取りキュー)', ()
       warnings: [],
       classifications: [],
       parentGenreIds: {},
+      readyIds: null,
+      accountGuesses: {},
     });
     expect(s.map((j) => j.status)).toEqual(['ready', 'reading']);
   });
@@ -34,6 +36,8 @@ describe('queueReducer(撮影をブロックしない読み取りキュー)', ()
       warnings: ['認識できませんでした'],
       classifications: [],
       parentGenreIds: {},
+      readyIds: null,
+      accountGuesses: {},
     });
     expect(s[0]).toMatchObject({ status: 'error', error: '認識できませんでした' });
   });

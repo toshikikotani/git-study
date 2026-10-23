@@ -8,7 +8,8 @@ import { useMemo, useState } from 'react';
 import type { MerchantNameReviewGroup } from '@/domain/merchant-name-review';
 import { formatYen } from '@/domain/money';
 import { useReceiptJobs } from '@/features/import/receipt-queue';
-import type { CaptureView } from '@/features/receipt-captures/types';
+import type { CheckLevel } from '@/domain/receipt-questions';
+import type { CaptureView, ReadyReceiptView } from '@/features/receipt-captures/types';
 import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import { groupAttentionQueue } from '@/features/spending/attention-queue';
 import { buildAttention } from '@/features/spending/views';
@@ -35,6 +36,9 @@ export function ReviewHub({
   todayCheckCount = 0,
   hasGoal,
   captures,
+  ready = [],
+  checkLevel = 'normal',
+  openFirstReceipt = false,
   records,
   duplicates,
   merchantNameGroups,
@@ -45,6 +49,11 @@ export function ReviewHub({
   todayCheckCount?: number;
   hasGoal: boolean;
   captures: readonly CaptureView[];
+  /** 保存前のレシート(いちばん上に出す、ADR-133)。 */
+  ready?: readonly ReadyReceiptView[];
+  checkLevel?: CheckLevel;
+  /** 撮ったあとの「確かめる」から来た(保存前の1件めを開く)。 */
+  openFirstReceipt?: boolean;
   records: readonly LedgerTransaction[];
   duplicates: DuplicateReviewView;
   merchantNameGroups: readonly MerchantNameReviewGroup[];
@@ -68,6 +77,7 @@ export function ReviewHub({
   const nothing =
     todayCheckCount === 0 &&
     jobs.length === 0 &&
+    ready.length === 0 &&
     captures.length === 0 &&
     records.length === 0 &&
     queue.length === 0 &&
@@ -78,14 +88,14 @@ export function ReviewHub({
 
   return (
     <div className="flex flex-col gap-6" style={{ color: 'var(--ink)' }}>
+      {/* 保存前のレシートは、確認が必要のいちばん上に並べる(ADR-133)。 */}
+      <ReceiptResults ready={ready} checkLevel={checkLevel} openFirst={openFirstReceipt} />
       {todayCheck}
       {nothing ? (
         <p role="status" className="px-1 py-6 text-[15px]" style={{ color: 'var(--ink-muted)' }}>
           確認が必要なものはありません。
         </p>
       ) : null}
-
-      <ReceiptResults />
 
       {captures.length > 0 ? (
         <Section title="入力待ちのレシート" sub={`${captures.length}件・画像を見ながら入力`}>

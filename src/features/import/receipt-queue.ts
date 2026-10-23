@@ -5,16 +5,19 @@
  * 進める。利用者はそのまま次のレシートを撮れる。明細には「読み取り中」の仮の行が
  * 出て、終わると「確認する」に変わる(PendingReceiptRows)。
  *
- * 状態は画面をまたいで保つモジュール変数(SPA の遷移では消えない)。ページを
- * 再読み込みすると読み取り前後のジョブは消える——画像を IndexedDB に残す永続化は
- * していない(DECISIONS.md のフォールバック。保存前に離脱しても、撮り直せば済む)。
+ * 状態は画面をまたいで保つモジュール変数(SPA の遷移では消えない)。読み取れたレシートは、
+ * 読み取りの入口がそのまま「保存前」としてサーバーに残す(receipt_captures の status = 'ready'、
+ * ADR-133)ので、再読み込みしても消えない。保存は本人が「保存」を押したときだけ。
+ * 残せなかったとき(マイグレーション未適用など)だけ、いままでどおり画面の中にだけ持つ。
  *
  * 状態遷移は純粋な reducer(queueReducer)に分け、テストできるようにしてある。
  */
 
 import { useSyncExternalStore } from 'react';
 
+import type { AccountGuess } from '@/domain/receipt-account';
 import { judgeReadResult, needsManualInput, type ReceiptStatus } from '@/domain/receipt-capture';
+import type { ReceiptGenreGuess } from '@/domain/unsaved-receipt';
 import type { ParsedReceiptTransaction } from '@/features/import/receipt-ai';
 import { resizeToJpegBase64 } from '@/features/import/resize-image';
 import {
@@ -32,12 +35,7 @@ import {
  */
 export type ReceiptJobStatus = 'reading' | 'ready' | 'waiting' | 'needs_input' | 'error';
 
-export type JobClassification = {
-  key: string;
-  genreId: string;
-  confidence: number;
-  source?: string;
-};
+export type JobClassification = ReceiptGenreGuess;
 
 export type ReceiptJob = {
   id: string;
@@ -53,6 +51,10 @@ export type ReceiptJob = {
   /** needs_input のとき、入力待ちの id(手入力の画面へ進む)。 */
   captureId: string | null;
   receiptStatus: ReceiptStatus | null;
+  /** ready のとき、保存前として残した行の id(明細の順)。残せなかったら null(画面の中にだけ持つ)。 */
+  readyIds: string[] | null;
+  /** ready のとき、明細ごとの支払い(口座)の当て。 */
+  accountGuesses: Record<number, AccountGuess>;
 };
 
 export type QueueAction =
@@ -65,6 +67,8 @@ export type QueueAction =
       warnings: string[];
       classifications: JobClassification[];
       parentGenreIds: Record<number, string>;
+      readyIds: string[] | null;
+      accountGuesses: Record<number, AccountGuess>;
     }
   | { type: 'fail'; id: string; error: string }
   | { type: 'waiting'; id: string }
@@ -88,6 +92,8 @@ export function queueReducer(state: readonly ReceiptJob[], action: QueueAction):
               warnings: action.warnings,
               classifications: action.classifications,
               parentGenreIds: action.parentGenreIds,
+              readyIds: action.readyIds,
+              accountGuesses: action.accountGuesses,
               error:
                 action.parsed.length === 0
                   ? (action.warnings[0] ?? '読み取れませんでした。')
@@ -134,6 +140,8 @@ export function newJob(id: string, previewUrl: string, now: number): ReceiptJob 
     error: null,
     captureId: null,
     receiptStatus: null,
+    readyIds: null,
+    accountGuesses: {},
   };
 }
 
@@ -222,7 +230,7 @@ async function process(job: ReceiptJob, file: File): Promise<void> {
       response = await fetch('/api/import/receipt', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg' }),
+        body: JSON.stringify({ image: imageBase64, mediaType: 'image/jpeg', keep: true }),
       });
     } catch {
       // 通信できない(圏外・サーバーに届かない)。読み取りに失敗したのではなく、まだ読めていない。
@@ -235,10 +243,12 @@ async function process(job: ReceiptJob, file: File): Promise<void> {
       warnings: string[];
       classifications?: JobClassification[];
       parentGenreIds?: Record<number, string>;
+      readyIds?: string[] | null;
+      accountGuesses?: Record<number, AccountGuess>;
     } = { transactions: [], warnings: ['読み取りに失敗しました。'] };
     if (response.ok) result = await response.json();
 
-    // 全部読めていれば確認画面へ。読めなかった/一部だけなら、画像を残して入力待ちにする。
+    // 全部読めていれば保存前へ(サーバーに残っている)。読めなかった/一部だけなら、画像を残して入力待ちにする。
     if (!needsManualInput(judgeReadResult(result.transactions).receiptStatus)) {
       dispatch({
         type: 'ready',
@@ -248,6 +258,8 @@ async function process(job: ReceiptJob, file: File): Promise<void> {
         warnings: result.warnings,
         classifications: result.classifications ?? [],
         parentGenreIds: result.parentGenreIds ?? {},
+        readyIds: result.readyIds ?? null,
+        accountGuesses: result.accountGuesses ?? {},
       });
       await unpark(job.id);
       return;
@@ -349,4 +361,39 @@ export function enqueueReceiptFiles(files: readonly File[]): string[] {
 /** 読み取り中のジョブ数(ナビのバッジ・明細の仮の行)。 */
 export function countReading(jobs: readonly ReceiptJob[]): number {
   return jobs.filter((j) => j.status === 'reading').length;
+}
+
+/**
+ * 保存した・捨てた保存前のレシートの鍵(ADR-133)。サーバーの一覧を読み直すまでのあいだと、
+ * サーバーに残せず画面の中にだけあるものを、画面をまたいで出さないために持つ(再読み込みで消える)。
+ */
+let hidden: ReadonlySet<string> = new Set();
+const hiddenListeners = new Set<() => void>();
+
+function setHidden(next: ReadonlySet<string>): void {
+  hidden = next;
+  for (const l of hiddenListeners) l();
+}
+
+export function hideUnsavedReceipt(key: string): void {
+  setHidden(new Set([...hidden, key]));
+}
+
+export function unhideUnsavedReceipt(key: string): void {
+  const next = new Set(hidden);
+  next.delete(key);
+  setHidden(next);
+}
+
+const NONE: ReadonlySet<string> = new Set();
+
+export function useHiddenReceiptKeys(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    (listener) => {
+      hiddenListeners.add(listener);
+      return () => hiddenListeners.delete(listener);
+    },
+    () => hidden,
+    () => NONE,
+  );
 }

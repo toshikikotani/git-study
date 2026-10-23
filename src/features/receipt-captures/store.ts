@@ -8,12 +8,13 @@
 
 import type { CaptureField, ReadFields, ReceiptStatus } from '@/domain/receipt-capture';
 import { CAPTURE_FIELDS, parseDraft, type CaptureDraft } from '@/domain/receipt-capture';
+import { parseReadyPayload, readyPayloadToRaw, type ReadyPayload } from '@/domain/unsaved-receipt';
 import { createReceiptImageSignedUrl } from '@/features/import/receipt-storage';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { createClient } from '@/lib/supabase/server';
 import type { Json } from '@/lib/supabase/types';
-import type { CaptureView } from './types';
+import type { CaptureView, ReadyReceiptView } from './types';
 
 export class ReceiptCaptureError extends AppError {}
 
@@ -190,7 +191,8 @@ export async function setCaptureImage(id: string, path: string): Promise<void> {
   await patch(id, { image_path: path, edited_image_path: null });
 }
 
-export async function resolveCapture(id: string, transactionId: string): Promise<void> {
+/** 明細にした(保存前・入力待ちのどちらも)。同じ明細が既にあって増やさなかったときは transactionId なし。 */
+export async function resolveCapture(id: string, transactionId: string | null): Promise<void> {
   await patch(id, {
     status: 'resolved',
     transaction_id: transactionId,
@@ -203,11 +205,114 @@ export async function discardCapture(id: string): Promise<void> {
   await patch(id, { status: 'discarded', discarded_at: new Date().toISOString() });
 }
 
-export async function restoreCapture(id: string): Promise<void> {
+/** 破棄・保存を取り消して戻す(保存前は 'ready'、入力待ちは 'needs_input' に)。 */
+export async function restoreCapture(
+  id: string,
+  status: 'ready' | 'needs_input' = 'needs_input',
+): Promise<void> {
   await patch(id, {
-    status: 'needs_input',
+    status,
     discarded_at: null,
     transaction_id: null,
     resolved_at: null,
+  });
+}
+
+/**
+ * 読み取れたレシートを「保存前」として残す(ADR-133)。1枚の写真に2件以上写っていれば1件ずつの行にする
+ * (画像は同じものを指す)。作った行の id を、明細の順に返す。
+ */
+export async function createReadyCaptures(input: {
+  imagePath: string;
+  payloads: readonly ReadyPayload[];
+  capturedOn: string;
+}): Promise<string[]> {
+  if (input.payloads.length === 0) return [];
+  const userId = await requireUserId();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('receipt_captures')
+    .insert(
+      input.payloads.map((payload) => ({
+        user_id: userId,
+        status: 'ready',
+        receipt_status: 'parsed',
+        image_path: input.imagePath,
+        ocr_raw: readyPayloadToRaw(payload) as Json,
+        read_fields: {
+          amountYen: Math.abs(payload.parsed.amountYen),
+          occurredOn: payload.parsed.occurredOn,
+          storeName: payload.parsed.storeName ?? payload.parsed.description,
+        } as Json,
+        unread_fields: [],
+        captured_on: input.capturedOn,
+      })),
+    )
+    .select('id');
+  if (error) {
+    if (isMissingTableError(error)) throw new ReceiptCaptureError(NOT_AVAILABLE);
+    throw new ReceiptCaptureError(`保存前のレシートを残せませんでした: ${error.message}`);
+  }
+  return (data ?? []).map((r) => r.id);
+}
+
+/** 保存前のレシート(撮った順)。形の読めない行は出さない。 */
+export async function listReadyReceipts(): Promise<ReadyReceiptView[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('receipt_captures')
+    .select('id, image_path, edited_image_path, ocr_raw, captured_on, created_at')
+    .eq('status', 'ready')
+    .order('created_at', { ascending: true });
+  if (error) {
+    if (isMissingTableError(error)) return [];
+    throw new ReceiptCaptureError(`保存前のレシートを取得できませんでした: ${error.message}`);
+  }
+  const rows = data ?? [];
+  // 1枚の写真から分けた行は同じ画像なので、署名付きURLは画像ごとに1回だけ作る。
+  const urls = new Map<string, Promise<string | null>>();
+  const urlOf = (path: string) => {
+    if (!urls.has(path)) urls.set(path, createReceiptImageSignedUrl(supabase, path, 3600));
+    return urls.get(path)!;
+  };
+  const views = await Promise.all(
+    rows.map(async (row): Promise<ReadyReceiptView | null> => {
+      const payload = parseReadyPayload(row.ocr_raw);
+      if (payload === null) return null;
+      const imagePath = row.edited_image_path ?? row.image_path;
+      return {
+        ...payload,
+        id: row.id,
+        imagePath,
+        imageUrl: await urlOf(imagePath),
+        capturedOn: row.captured_on,
+        createdAt: row.created_at,
+      };
+    }),
+  );
+  return views.filter((v): v is ReadyReceiptView => v !== null);
+}
+
+/** 保存前のレシートの画像のパス(保存のときに明細へ付ける)。保存前でなければ null。 */
+export async function readyCaptureImagePath(id: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('receipt_captures')
+    .select('status, image_path, edited_image_path')
+    .eq('id', id)
+    .maybeSingle();
+  if (error || data === null || data.status !== 'ready') return null;
+  return data.edited_image_path ?? data.image_path;
+}
+
+/** 保存前のレシートの読み取り結果を差し替える(「次の画像とつなげる」で読み直したとき)。画像はそのまま。 */
+export async function replaceReadyCapture(id: string, payload: ReadyPayload): Promise<void> {
+  await patch(id, {
+    ocr_raw: readyPayloadToRaw(payload) as Json,
+    read_fields: {
+      amountYen: Math.abs(payload.parsed.amountYen),
+      occurredOn: payload.parsed.occurredOn,
+      storeName: payload.parsed.storeName ?? payload.parsed.description,
+    } as Json,
   });
 }

@@ -10,6 +10,7 @@ import { getLineEnv } from '@/lib/env';
 import { loadPaydayState, PaydayPanel } from '../payday/payday-panel';
 import { AiSwitch } from './ai-switch';
 import { EveningCheckSetting } from './evening-check-setting';
+import { ReceiptCheckSetting } from './receipt-check-setting';
 import { PasswordForm } from './password-form';
 import { SignOutButton } from './sign-out-button';
 
@@ -65,6 +66,10 @@ export default async function SettingsPage({
           sub="追加・名前・アイコンと色・目標額・固定費"
         />
         <Row href="/settings/theme" label="色" sub="背景・文字・強調を変える" />
+      </Group>
+
+      <Group title="レシート">
+        <ReceiptCheckSetting level={settings?.receiptCheckLevel ?? 'normal'} />
       </Group>
 
       <Group title="AI">

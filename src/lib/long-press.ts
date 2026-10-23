@@ -50,3 +50,22 @@ export function createLongPress(options: {
     },
   };
 }
+
+/**
+ * 「指を離したところで1回だけ」する印(長押しでカメラを選んだとき、ADR-133)。押している最中は
+ * ブラウザがカメラを開かせないので、長押しで印を付け、指を離したところで take() して開く。
+ */
+export function createReleaseFlag() {
+  let armed = false;
+  return {
+    arm() {
+      armed = true;
+    },
+    /** 印が付いていたら true(1回だけ)。 */
+    take(): boolean {
+      const was = armed;
+      armed = false;
+      return was;
+    },
+  };
+}

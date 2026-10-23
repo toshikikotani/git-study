@@ -104,6 +104,7 @@ const SETTINGS: AppSettings = {
   aiEnabled: true,
   eveningCheckEnabled: true,
   eveningCheckAt: '21:00',
+  receiptCheckLevel: 'normal',
 };
 const CTX: PlanContext = {
   genres: GENRES,

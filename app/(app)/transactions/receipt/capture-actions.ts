@@ -29,6 +29,7 @@ import {
   createCapture,
   discardCapture,
   getCapture,
+  readyCaptureImagePath,
   resolveCapture,
   restoreCapture,
   saveCaptureDraft,
@@ -136,9 +137,12 @@ export async function discardCaptureAction(id: string): Promise<{ error: string 
   }
 }
 
-export async function restoreCaptureAction(id: string): Promise<{ error: string | null }> {
+export async function restoreCaptureAction(
+  id: string,
+  status: 'ready' | 'needs_input' = 'needs_input',
+): Promise<{ error: string | null }> {
   try {
-    await restoreCapture(id);
+    await restoreCapture(id, status);
     revalidatePath('/spending');
     return { error: null };
   } catch (e) {
@@ -347,5 +351,29 @@ export async function loadCaptureAction(id: string): Promise<CaptureView | null>
     return await getCapture(id);
   } catch {
     return null;
+  }
+}
+
+/** 保存前のレシートの画像(保存のときに明細へ付ける)。保存前でなければ null。 */
+export async function readyImagePathAction(id: string): Promise<string | null> {
+  try {
+    return await readyCaptureImagePath(id);
+  } catch {
+    return null;
+  }
+}
+
+/** 保存前のレシートを明細にした(ADR-133)。同じ明細が既にあって増やさなかったときは transactionId なし。 */
+export async function resolveReadyCaptureAction(
+  id: string,
+  transactionId: string | null,
+): Promise<{ error: string | null }> {
+  try {
+    await resolveCapture(id, transactionId);
+    revalidatePath('/spending');
+    revalidatePath('/');
+    return { error: null };
+  } catch (e) {
+    return fail(e, '保存前の印を外せませんでした。');
   }
 }

@@ -12,6 +12,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { parseCheckLevel, type CheckLevel } from '@/domain/receipt-questions';
 import { AppError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { isMissingColumnError } from '@/lib/supabase/errors';
@@ -36,6 +37,8 @@ export type AppSettings = {
   eveningCheckEnabled: boolean;
   /** 夜の答え合わせを送る時刻(日本時間、'21:00')。 */
   eveningCheckAt: string;
+  /** レシートの確かめる細かさ(ADR-133)。既定は「ふつう」。 */
+  receiptCheckLevel: CheckLevel;
 };
 
 export class SettingsStoreError extends AppError {}
@@ -88,6 +91,7 @@ export async function getAppSettingsAsAdmin(
       typeof row.evening_check_enabled === 'boolean' ? row.evening_check_enabled : true,
     eveningCheckAt:
       typeof row.evening_check_at === 'string' ? row.evening_check_at.slice(0, 5) : '21:00',
+    receiptCheckLevel: parseCheckLevel(row.receipt_check_level),
   };
 }
 
@@ -134,6 +138,7 @@ export async function updateAppSettings(patch: AppSettingsPatch): Promise<AppSet
     row.evening_check_enabled = patch.eveningCheckEnabled;
   }
   if (patch.eveningCheckAt !== undefined) row.evening_check_at = patch.eveningCheckAt;
+  if (patch.receiptCheckLevel !== undefined) row.receipt_check_level = patch.receiptCheckLevel;
 
   let { error } = await supabase.from('app_settings').update(row).eq('user_id', auth.user.id);
   if (error && isMissingColumnError(error)) {

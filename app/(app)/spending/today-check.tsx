@@ -7,8 +7,7 @@ import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { formatYen } from '@/domain/money';
 import type { CheckUndo, TodayCheckItem } from '@/features/today-check/store';
 import { hapticFor } from '@/lib/haptics';
-import { fetchQuickEntryGenresAction } from '../transactions/new/actions';
-import { visibleGenres } from '../record-sheet';
+import { GenrePickerSheet } from '../genre-picker-sheet';
 import {
   applyTodayCheckAction,
   listTodayCheckAction,
@@ -195,14 +194,18 @@ export function TodayCheckSheet({ open, onClose }: { open: boolean; onClose: () 
                 分ける(レシートと支払いの2件にもどす)
               </button>
             ) : null}
-            {picking ? (
-              <GenrePicker
-                currentId={current.genreId}
-                onPick={(genreId) => void act('correct', genreId)}
-                onCancel={() => setPicking(false)}
-                disabled={busy}
-              />
-            ) : (
+            {/* 直す:アプリじゅうで同じ、カテゴリを選ぶシート(ADR-133)。選んだ瞬間に直して次へ。 */}
+            <GenrePickerSheet
+              open={picking}
+              onClose={() => setPicking(false)}
+              title="正しいカテゴリは？"
+              note="次から、同じお店はこのカテゴリにします。"
+              selectedId={current.genreId}
+              onPick={(genreId) => {
+                if (genreId !== null && !busy) void act('correct', genreId);
+              }}
+            />
+            {picking ? null : (
               <div className="grid grid-cols-3 gap-2">
                 <ActionButton
                   label="直す"
@@ -383,88 +386,6 @@ function ActionButton({
         {hint}
       </span>
     </button>
-  );
-}
-
-function GenrePicker({
-  currentId,
-  onPick,
-  onCancel,
-  disabled,
-}: {
-  currentId: string | null;
-  onPick: (genreId: string) => void;
-  onCancel: () => void;
-  disabled: boolean;
-}) {
-  const [genres, setGenres] = useState<{ id: string; name: string }[] | null>(null);
-  const [all, setAll] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    void fetchQuickEntryGenresAction()
-      .then((g) => {
-        if (alive) setGenres(g);
-      })
-      .catch(() => {
-        if (alive) setGenres([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  return (
-    <section aria-label="正しいカテゴリ" className="flex flex-col gap-2">
-      <p className="px-1 text-[15px] font-semibold">正しいカテゴリは？</p>
-      <p className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-        次から、同じお店はこのカテゴリにします。
-      </p>
-      {genres === null ? (
-        <p role="status" className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-          読み込んでいます
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-2">
-          {visibleGenres(genres, currentId, all).map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => onPick(g.id)}
-              aria-pressed={g.id === currentId}
-              className="min-h-11 rounded-xl px-3 py-2 text-left text-[15px] disabled:opacity-40"
-              style={{
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                border: g.id === currentId ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="min-h-11 px-1 text-[15px] font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          キャンセル
-        </button>
-        {genres && genres.length > 8 && !all ? (
-          <button
-            type="button"
-            onClick={() => setAll(true)}
-            className="min-h-11 px-1 text-[15px] font-semibold"
-            style={{ color: 'var(--accent)' }}
-          >
-            すべて
-          </button>
-        ) : null}
-      </div>
-    </section>
   );
 }
 

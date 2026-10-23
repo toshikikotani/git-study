@@ -55,6 +55,8 @@ describe('getAppSettingsAsAdmin', () => {
       // 夜の答え合わせの列が無い(マイグレーション未適用)ときは既定値(ADR-130)
       eveningCheckEnabled: true,
       eveningCheckAt: '21:00',
+      // 確かめる細かさの列が無いときは「ふつう」(ADR-133)
+      receiptCheckLevel: 'normal',
     });
   });
 

@@ -226,6 +226,7 @@ export type Database = {
           discord_webhook_env_key: string;
           evening_check_at: string;
           evening_check_enabled: boolean;
+          receipt_check_level: string;
           gmail_address_env_key: string;
           gmail_app_password_env_key: string;
           gmail_enabled: boolean;
@@ -258,6 +259,7 @@ export type Database = {
           discord_webhook_env_key?: string;
           evening_check_at?: string;
           evening_check_enabled?: boolean;
+          receipt_check_level?: string;
           gmail_address_env_key?: string;
           gmail_app_password_env_key?: string;
           gmail_enabled?: boolean;
@@ -290,6 +292,7 @@ export type Database = {
           discord_webhook_env_key?: string;
           evening_check_at?: string;
           evening_check_enabled?: boolean;
+          receipt_check_level?: string;
           gmail_address_env_key?: string;
           gmail_app_password_env_key?: string;
           gmail_enabled?: boolean;

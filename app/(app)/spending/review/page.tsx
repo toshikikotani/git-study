@@ -1,6 +1,7 @@
 import { BackHeader } from '@/components/ui/back-header';
 import { listPendingReviewRecords } from '@/features/home/pending';
-import { listOpenCaptures } from '@/features/receipt-captures/store';
+import { listOpenCaptures, listReadyReceipts } from '@/features/receipt-captures/store';
+import { getAppSettings } from '@/features/settings/store';
 import { getCurrentPlan } from '@/features/spending-plan/store';
 import { listDuplicateReview } from '@/features/transactions/duplicates-store';
 import { listMerchantNameReviewGroups } from '@/features/transactions/merchant-name-store';
@@ -15,33 +16,36 @@ import { SpendingMonthProvider } from '../spending-month-provider';
 export const dynamic = 'force-dynamic';
 
 /**
- * 確認が必要(明細から開く、提案書「確認を1画面に」、ADR-127)。読み取ったレシート・入力待ち・カテゴリの
+ * 確認が必要(明細から開く、提案書「確認を1画面に」、ADR-127)。保存前のレシート(いちばん上、ADR-133)・入力待ち・カテゴリの
  * 確認・この月のカテゴリと差額・店名のゆれ・重複を、この画面だけで片づける。撮り終えたレシートも
  * ここで確かめて保存する。
  */
 export default async function ReviewPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ check?: string | string[] }>;
+  searchParams?: Promise<{ check?: string | string[]; receipt?: string | string[] }>;
 } = {}) {
-  const { check } = (await searchParams) ?? {};
-  const [data, captures, records, duplicates, merchantNames, plan, checkCount] = await Promise.all([
-    loadSpendingMonthData(),
-    listOpenCaptures().catch(() => []),
-    listPendingReviewRecords().catch(() => []),
-    listDuplicateReview().catch(() => ({
-      candidates: [],
-      decided: [],
-      storage: 'account' as const,
-      hasBrowserDecisions: false,
-    })),
-    listMerchantNameReviewGroups().then(
-      (groups) => ({ groups, error: null }),
-      () => ({ groups: [], error: '店名の確認を読み込めませんでした。' }),
-    ),
-    getCurrentPlan(todayJst()).catch(() => null),
-    countTodayCheck().catch(() => 0),
-  ]);
+  const { check, receipt } = (await searchParams) ?? {};
+  const [data, captures, records, duplicates, merchantNames, plan, checkCount, ready, settings] =
+    await Promise.all([
+      loadSpendingMonthData(),
+      listOpenCaptures().catch(() => []),
+      listPendingReviewRecords().catch(() => []),
+      listDuplicateReview().catch(() => ({
+        candidates: [],
+        decided: [],
+        storage: 'account' as const,
+        hasBrowserDecisions: false,
+      })),
+      listMerchantNameReviewGroups().then(
+        (groups) => ({ groups, error: null }),
+        () => ({ groups: [], error: '店名の確認を読み込めませんでした。' }),
+      ),
+      getCurrentPlan(todayJst()).catch(() => null),
+      countTodayCheck().catch(() => 0),
+      listReadyReceipts().catch(() => []),
+      getAppSettings().catch(() => null),
+    ]);
   return (
     <div className="rise flex flex-col gap-4">
       <BackHeader
@@ -66,6 +70,9 @@ export default async function ReviewPage({
           todayCheckCount={checkCount}
           hasGoal={plan !== null}
           captures={captures}
+          ready={ready}
+          checkLevel={settings?.receiptCheckLevel ?? 'normal'}
+          openFirstReceipt={receipt === 'next'}
           records={records}
           duplicates={duplicates}
           merchantNameGroups={merchantNames.groups}

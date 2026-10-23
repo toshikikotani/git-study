@@ -5,8 +5,8 @@
  * カテゴリ格子の再取得(並べ替え・非表示の反映)と、「いつもの」予測を扱う。
  */
 
-import { fetchQuickEntryGenres, type QuickEntryGenre } from '@/features/genre/store';
-import { fetchStoreGenres } from '@/features/transactions/store-genres';
+import { fetchQuickEntryGenres, listGenres, type QuickEntryGenre } from '@/features/genre/store';
+import { fetchRecentGenreIds, fetchStoreGenres } from '@/features/transactions/store-genres';
 import { fetchUsualEntryHistory } from '@/features/transactions/usual-entries';
 import { suggestUsualEntries, type UsualEntryCandidate } from '@/domain/usual-entries';
 
@@ -30,4 +30,16 @@ export async function suggestUsualEntriesAction(
 /** 店名 → 前回のカテゴリ(記録するで、店名を入れたらそのカテゴリを先に選ぶ、ADR-108)。 */
 export async function fetchStoreGenresAction(): Promise<[string, string][]> {
   return fetchStoreGenres().catch(() => []);
+}
+
+/** カテゴリを選ぶシートの材料:すべてのカテゴリ(名前の並び)と、最近使った4つ(ADR-133)。 */
+export async function fetchGenreChoicesAction(): Promise<{
+  genres: { id: string; name: string }[];
+  recentIds: string[];
+}> {
+  const [genres, recentIds] = await Promise.all([
+    listGenres().catch(() => []),
+    fetchRecentGenreIds(4).catch(() => []),
+  ]);
+  return { genres: genres.map((g) => ({ id: g.id, name: g.name })), recentIds };
 }
