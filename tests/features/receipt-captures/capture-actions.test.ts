@@ -206,7 +206,10 @@ describe('破棄と元に戻す(受け入れ基準12)', () => {
     expect(await discardCaptureAction('cap-1')).toEqual({ error: null });
     expect(store.discardCapture).toHaveBeenCalledWith('cap-1');
     expect(await restoreCaptureAction('cap-1')).toEqual({ error: null });
-    expect(store.restoreCapture).toHaveBeenCalledWith('cap-1');
+    expect(store.restoreCapture).toHaveBeenCalledWith('cap-1', 'needs_input');
+    // 保存前のレシート(ADR-133)は、保存前に戻す
+    expect(await restoreCaptureAction('cap-2', 'ready')).toEqual({ error: null });
+    expect(store.restoreCapture).toHaveBeenCalledWith('cap-2', 'ready');
   });
 });
 

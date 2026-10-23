@@ -11,11 +11,15 @@ const s = vi.hoisted(() => ({
   check: 0,
   input: { count: 0, firstId: null as string | null },
   payday: null as unknown,
+  unsaved: 0,
 }));
 vi.mock('../../app/(app)/_home/today-check-card', () => ({
   countTodayCheck: async () => s.check,
 }));
-vi.mock('@/features/home/pending', () => ({ needsInputSummary: async () => s.input }));
+vi.mock('@/features/home/pending', () => ({
+  needsInputSummary: async () => s.input,
+  countReadyCaptures: async () => s.unsaved,
+}));
 vi.mock('../../app/(app)/payday/payday-panel', () => ({
   loadPaydayState: async () => s.payday,
   PaydayPanel: () => null,
@@ -33,11 +37,21 @@ beforeEach(() => {
   s.check = 0;
   s.input = { count: 0, firstId: null };
   s.payday = null;
+  s.unsaved = 0;
 });
 
 describe('今日やること', () => {
   it('片づけるものが無ければ出さない', async () => {
     expect(await TodayTodo({})).toBeNull();
+  });
+
+  it('保存前のレシートがあれば、いちばん上に「保存前のレシート N件」を出す(ADR-133)', async () => {
+    s.unsaved = 3;
+    s.check = 1;
+    const html = visible(renderToString(h('main', null, await TodayTodo({}))));
+    expect(html).toContain('保存前のレシート 3件');
+    expect(html).toContain('href="/spending/review"');
+    expect(html.indexOf('保存前のレシート')).toBeLessThan(html.indexOf('今日の答え合わせ'));
   });
 
   it('答え合わせ・入力待ち・給料日を1枚にまとめる(確認待ちは答え合わせの数に入る)', async () => {

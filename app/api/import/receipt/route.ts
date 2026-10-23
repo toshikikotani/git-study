@@ -11,6 +11,7 @@ import {
   type PipelineClassification,
 } from '@/features/genre/receipt-classify';
 import { loadClassificationMemory } from '@/features/genre/memory-store';
+import { keepReadyReceipts, replaceReadyReceipt } from '@/features/receipt-captures/keep-ready';
 import { apiKeyMissingMessage } from '@/lib/anthropic';
 import { readAnthropicApiKey } from '@/lib/env';
 
@@ -63,7 +64,21 @@ function isSupportedMediaType(value: unknown): value is ReceiptMediaType {
   );
 }
 
-type RequestBody = { image?: unknown; mediaType?: unknown };
+/**
+ * keep: 撮影のキューから。全部読めたら「保存前」として残す(ADR-133)。
+ * moreImages / replaceReadyId: 「次の画像とつなげる」。続きの画像もいっしょに1枚のレシートとして読み、
+ * その保存前のレシートを読み直した結果に差し替える。
+ */
+type RequestBody = {
+  image?: unknown;
+  mediaType?: unknown;
+  keep?: unknown;
+  moreImages?: unknown;
+  replaceReadyId?: unknown;
+};
+
+/** つなげられる画像の数(1枚め + 続き)。 */
+const MAX_JOINED_IMAGES = 3;
 
 export async function POST(request: Request): Promise<NextResponse> {
   let payload: RequestBody;
@@ -77,9 +92,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (image.trim() === '') {
     return NextResponse.json({ error: '画像がありません' }, { status: 400 });
   }
-  if (image.length > MAX_BASE64_CHARS) {
+  const moreImages = Array.isArray(payload.moreImages)
+    ? payload.moreImages.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+    : [];
+  if (moreImages.length > MAX_JOINED_IMAGES - 1) {
+    return NextResponse.json({ error: 'つなげられる画像は3枚までです' }, { status: 400 });
+  }
+  if ([image, ...moreImages].reduce((n, v) => n + v.length, 0) > MAX_BASE64_CHARS) {
     return NextResponse.json({ error: '画像が大きすぎます' }, { status: 413 });
   }
+  const replaceReadyId = typeof payload.replaceReadyId === 'string' ? payload.replaceReadyId : null;
   if (!isSupportedMediaType(payload.mediaType)) {
     return NextResponse.json(
       { error: `対応していない画像形式です(${SUPPORTED_RECEIPT_MEDIA_TYPES.join(' / ')} のみ)` },
@@ -105,6 +127,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const result = await new ClaudeReceiptExtractor(apiKey).extract({
     imageBase64: image,
     mediaType: payload.mediaType,
+    ...(moreImages.length > 0 ? { moreImages } : {}),
   });
 
   // ジャンル分類:利用者のルール → 個人の履歴 → 品目辞書 → AI(決まらなかったものだけ)。
@@ -124,10 +147,35 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
+  // 撮影のキューから来たら、全部読めたレシートを保存前として残す(閉じても消えない、ADR-133)。
+  const kept =
+    payload.keep === true
+      ? await keepReadyReceipts({
+          imageBase64: image,
+          transactions: result.transactions,
+          warnings,
+          classifications,
+          parentGenreIds,
+        })
+      : null;
+
+  // つなげて読み直したら、その保存前のレシートを差し替える(画像は1枚めのまま)。
+  const replaced =
+    replaceReadyId !== null
+      ? await replaceReadyReceipt(replaceReadyId, {
+          transactions: result.transactions,
+          warnings,
+          classifications,
+          parentGenreIds,
+        })
+      : null;
+
   return NextResponse.json({
     transactions: result.transactions,
     warnings,
     classifications,
     parentGenreIds,
+    readyIds: kept?.readyIds ?? (replaced !== null ? [replaceReadyId] : null),
+    accountGuesses: kept?.accountGuesses ?? replaced ?? {},
   });
 }

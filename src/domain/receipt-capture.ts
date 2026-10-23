@@ -17,7 +17,7 @@ import type { ParsedReceiptTransaction } from '@/features/import/receipt-ai';
 import { addMonths, assertDateOnly, type DateOnly } from '@/lib/date';
 
 export type ReceiptStatus = 'parsed' | 'partial' | 'failed' | 'manual';
-export type CaptureStatus = 'needs_input' | 'resolved' | 'discarded';
+export type CaptureStatus = 'ready' | 'needs_input' | 'resolved' | 'discarded';
 
 /** 手入力の対象になる項目(入力の順番どおり)。 */
 export const CAPTURE_FIELDS = ['amountYen', 'occurredOn', 'storeName'] as const;

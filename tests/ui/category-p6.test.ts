@@ -11,7 +11,16 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/spending/category/dining',
 }));
 
-import { CategoryPicker } from '../../app/(app)/spending/category/[genreKey]/category-picker';
+vi.mock('@/components/ui/bottom-sheet', () => ({
+  BottomSheet: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? h('div', { role: 'dialog' }, children) : null,
+  BottomSheetHeader: ({ children }: { children: React.ReactNode }) => h('div', null, children),
+}));
+vi.mock('../../app/(app)/transactions/new/actions', () => ({
+  fetchGenreChoicesAction: async () => ({ genres: [], recentIds: [] }),
+}));
+
+import { GenrePickerSheet, primeGenreChoices } from '../../app/(app)/genre-picker-sheet';
 import { EditForm } from '../../app/(app)/spending/category/[genreKey]/edit-sheet';
 import { CategoryTransactionRow } from '../../app/(app)/spending/category/[genreKey]/transaction-row';
 import { monthRange } from '@/domain/ledger';
@@ -77,7 +86,6 @@ const form = (t: CategoryTx, full = false) =>
     renderToString(
       h(EditForm, {
         line: lineOf(t),
-        genres,
         suggestedGenreId: 'cafe',
         full,
         onSave: () => {},
@@ -123,24 +131,30 @@ describe('P6 編集シート', () => {
   });
 });
 
-describe('P6 カテゴリの格子(1タップで移す)', () => {
-  it('いまのカテゴリは出さず、いつもの移動先を先頭に置いて目立たせる。未分類へ戻せる', () => {
+describe('P6 カテゴリを移す(アプリじゅうで同じシート、ADR-133)', () => {
+  it('いつもの移動先をおすすめに出し、すべてをグループで並べる。未分類へ戻せる', () => {
+    primeGenreChoices({ genres: [...genres], recentIds: ['cafe'] });
     const html = visible(
       renderToString(
-        h(CategoryPicker, {
-          genres,
-          currentId: 'dining',
-          suggestedId: 'hobby',
-          includeUncategorized: true,
+        h(GenrePickerSheet, {
+          open: true,
+          onClose: () => {},
+          title: 'カテゴリを移す',
+          selectedId: 'dining',
+          suggestions: [{ genreId: 'hobby', reason: 'いつもの移動先' }],
+          allowNone: true,
           onPick: () => {},
         }),
       ),
     );
-    expect(html).not.toContain('aria-label="外食へ移す');
-    expect(html.indexOf('娯楽へ移す')).toBeLessThan(html.indexOf('カフェへ移す'));
-    expect(html).toContain('aria-label="娯楽へ移す(いつもの移動先)"');
-    expect(html).toContain('未分類へ戻す');
+    expect(html).toContain('おすすめ');
+    expect(html).toContain('いつもの移動先');
+    expect(html.indexOf('おすすめ')).toBeLessThan(html.indexOf('最近使った'));
+    expect(html).toContain('すべて(3)');
+    expect(html).toContain('未分類にする');
     expect(html).toContain('grid-cols-4');
+    // いまのカテゴリは選んだ印を付ける
+    expect(html).toMatch(/aria-pressed="true"[^>]*aria-label="外食"/);
   });
 });
 

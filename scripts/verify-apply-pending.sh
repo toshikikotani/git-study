@@ -49,6 +49,7 @@ PENDING=(
   20261017000100_duplicate_pair_decisions.sql
   20261018000100_split_payment_requests.sql
   20261021000100_today_check_line.sql
+  20261023000100_receipt_captures_ready.sql
 )
 
 WORK="$(mktemp -d)"

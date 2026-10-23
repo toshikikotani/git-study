@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -15,7 +15,7 @@ import {
 } from './record-sheet';
 import { parseDateOnlyOr, todayJst } from '@/lib/date';
 import { useKeyboard } from '@/lib/keyboard';
-import { createLongPress } from '@/lib/long-press';
+import { createLongPress, createReleaseFlag } from '@/lib/long-press';
 import { UndoToastHost } from '@/components/ui/undo-toast';
 import { Fab } from '@/components/ui/fab';
 import { NavigationProgress } from '@/components/ui/navigation-progress';
@@ -24,7 +24,8 @@ import { PullToRefresh } from '@/components/ui/pull-to-refresh';
 import { useIsClient } from '@/components/ui/use-is-client';
 import { ReceiptEntryMenu } from './receipt-entry-menu';
 import { readReceiptQuickAction } from '@/lib/receipt-quick-action';
-import { ReceiptCamera } from '@/components/receipt/receipt-camera';
+import { CameraCaptureInput, type CameraCaptureHandle } from '@/components/receipt/camera-capture';
+import { CaptureSheet } from './capture-sheet';
 import {
   configureReceiptQueue,
   countReading,
@@ -205,20 +206,26 @@ function BottomBar({
   }, []);
   const router = useRouter();
   const [entryMenuOpen, setEntryMenuOpen] = useState(false);
-  const [cameraOpen, setCameraOpen] = useState(false);
+  // レシートを撮るは iPhone のカメラをそのまま開く(v5 変更1、ADR-133)。押したときの処理の中で開く。
+  const camera = useRef<CameraCaptureHandle>(null);
+  const openCamera = useCallback(() => camera.current?.open(), []);
+  /** カメラから戻ったところのシート(もう1枚撮る・確かめる)と、この回に撮った枚数。 */
+  const [capture, setCapture] = useState<{ mode: 'start' | 'after'; count: number } | null>(null);
   const setFabMenuOpen = useCallback(
     (open: boolean) => (open ? onOpenRecord() : onCloseRecord()),
     [onOpenRecord, onCloseRecord],
   );
+  // 長押しでカメラを選んだときは、指を離したところで開く(押している最中はブラウザが開かせない)。
+  const cameraOnRelease = useMemo(() => createReleaseFlag(), []);
   const longPress = useMemo(
     () =>
       createLongPress({
         onLongPress: () => {
           if (readReceiptQuickAction() === 'manual') onOpenRecord();
-          else setCameraOpen(true);
+          else cameraOnRelease.arm();
         },
       }),
-    [onOpenRecord],
+    [onOpenRecord, cameraOnRelease],
   );
   // 写真から選んだ・撮り終えたレシートは、読み取り結果の画面で確かめる(デザイン v3-13)。
   const readFiles = useCallback(
@@ -229,8 +236,17 @@ function BottomBar({
     [router],
   );
   useEffect(() => () => longPress.end(), [longPress]);
+  // 読み取れたレシートが保存前としてサーバーに残ったら、今日・明細の「保存前のレシート N件」を読み直す。
+  const keptCount = jobs.reduce((n, j) => n + (j.readyIds?.length ?? 0), 0);
+  useEffect(() => {
+    if (keptCount > 0) router.refresh();
+  }, [keptCount, router]);
   const reading = countReading(jobs);
   const waiting = jobs.filter((j) => j.status === 'ready' || j.status === 'error').length;
+  const checkCaptured = () => {
+    setCapture(null);
+    router.push('/spending/review?receipt=next');
+  };
   const offlineWaiting = jobs.filter((j) => j.status === 'waiting').length;
   const needInput = jobs.filter((j) => j.status === 'needs_input').length;
   useEffect(() => {
@@ -238,13 +254,12 @@ function BottomBar({
     if (url.searchParams.get('capture') !== '1') return;
     url.searchParams.delete('capture');
     window.history.replaceState(null, '', url.pathname + url.search);
-    if (typeof navigator.mediaDevices?.getUserMedia === 'function') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
-      setCameraOpen(true);
-    }
+    // 押す操作なしではカメラを開けないので、大きな「撮る」を1つだけ出す。
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- URLからの一度きりの起動
+    setCapture({ mode: 'start', count: 0 });
   }, []);
   // 右の＋は、押すと「撮る・写真から・手で記録する」のメニュー(デザイン v3-11、ADR-125 → 126)。
-  // 長押しは、設定に従ってカメラか手入力をすぐ開く。カメラはこの場で開く(画面を移らない)。
+  // 長押しは、設定に従ってカメラ(指を離したところで iPhone のカメラ)か手入力をすぐ開く(ADR-133)。
   const fab = (
     <Fab
       label="記録する"
@@ -277,7 +292,7 @@ function BottomBar({
           {[
             reading > 0 ? `読み取り中 ${reading}件` : '',
             offlineWaiting > 0 ? `読み取り待ち ${offlineWaiting}件` : '',
-            waiting > 0 ? `確認待ち ${waiting}件` : '',
+            waiting > 0 ? `保存前 ${waiting}件` : '',
             needInput > 0 ? `入力待ち ${needInput}件` : '',
           ]
             .filter((t) => t !== '')
@@ -285,21 +300,25 @@ function BottomBar({
           <span aria-hidden> →</span>
         </Link>
       ) : null}
-      {cameraOpen ? (
-        <ReceiptCamera
-          onCapture={(files) => enqueueReceiptFiles(files)}
-          onClose={() => setCameraOpen(false)}
-          onDone={() => {
-            setCameraOpen(false);
-            router.push('/spending/review');
-          }}
-          onManual={() => onOpenRecord()}
-        />
-      ) : null}
+      <CameraCaptureInput
+        ref={camera}
+        onFiles={(files) => {
+          enqueueReceiptFiles(files);
+          setCapture((prev) => ({ mode: 'after', count: (prev?.count ?? 0) + files.length }));
+        }}
+      />
+      <CaptureSheet
+        mode={capture?.mode ?? null}
+        count={capture?.count ?? 0}
+        reading={reading}
+        onClose={() => setCapture(null)}
+        onShoot={openCamera}
+        onCheck={checkCaptured}
+      />
       <ReceiptEntryMenu
         open={entryMenuOpen}
         onClose={() => setEntryMenuOpen(false)}
-        onCamera={() => setCameraOpen(true)}
+        onCamera={openCamera}
         onFiles={readFiles}
         onManual={() => onOpenRecord()}
       />
@@ -315,7 +334,7 @@ function BottomBar({
           onClose={() => setFabMenuOpen(false)}
           onCamera={() => {
             setFabMenuOpen(false);
-            setCameraOpen(true);
+            openCamera();
           }}
           onFiles={(files) => {
             setFabMenuOpen(false);
@@ -371,8 +390,14 @@ function BottomBar({
           className="shrink-0"
           onPointerDown={(e) => longPress.start(e.clientX, e.clientY)}
           onPointerMove={(e) => longPress.move(e.clientX, e.clientY)}
-          onPointerUp={longPress.end}
-          onPointerCancel={longPress.end}
+          onPointerUp={() => {
+            longPress.end();
+            if (cameraOnRelease.take()) openCamera();
+          }}
+          onPointerCancel={() => {
+            longPress.end();
+            cameraOnRelease.take();
+          }}
           onContextMenu={(e) => e.preventDefault()}
           onClickCapture={(e) => {
             if (longPress.consumeClick()) {

@@ -6,7 +6,7 @@ import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Yen } from '@/components/ui/money';
 import type { TxPatch } from '@/features/category/edits';
 import type { CategoryLine } from '@/features/category/model';
-import { CategoryPicker } from './category-picker';
+import { GenrePickerSheet } from '../../../genre-picker-sheet';
 
 type EditResult = boolean | void | Promise<boolean | void>;
 type EditCallbacks = {
@@ -19,12 +19,11 @@ type EditCallbacks = {
 /**
  * 取引の編集シート。高さと見出しの位置は固定し、本文だけスクロールする。
  * レシート付きの取引は、上部に画像を出す(ピンチ・ダブルタップでズーム)。金額・日付・店名・
- * メモ・品目を編集でき、カテゴリは格子から1タップで移せる。品目は1つだけ別のカテゴリへ移せる。
+ * メモ・品目を編集でき、カテゴリはカテゴリを選ぶシート(ADR-133)から1タップで移せる。品目は1つだけ別のカテゴリへ移せる。
  * キーボードに合わせて入力欄を見せるのはブラウザに任せる。
  */
 export function EditSheet({
   line,
-  genres,
   suggestedGenreId,
   error = null,
   onClose,
@@ -34,7 +33,6 @@ export function EditSheet({
   onDelete,
 }: {
   line: CategoryLine | null;
-  genres: readonly { id: string; name: string }[];
   suggestedGenreId: string | null;
   error?: string | null;
   onClose: () => void;
@@ -58,7 +56,6 @@ export function EditSheet({
         <EditForm
           key={line.txId}
           line={line}
-          genres={genres}
           suggestedGenreId={suggestedGenreId}
           error={error}
           full
@@ -74,7 +71,6 @@ export function EditSheet({
 
 export function EditForm({
   line,
-  genres,
   suggestedGenreId,
   error = null,
   full,
@@ -84,7 +80,6 @@ export function EditForm({
   onDelete,
 }: {
   line: CategoryLine;
-  genres: readonly { id: string; name: string }[];
   suggestedGenreId: string | null;
   error?: string | null;
   full: boolean;
@@ -206,27 +201,14 @@ export function EditForm({
         <p className="mb-1 text-xs font-semibold" style={{ color: 'var(--ink-secondary)' }}>
           カテゴリ
         </p>
-        {picking !== null && picking.itemId === null ? (
-          <CategoryPicker
-            genres={genres}
-            currentId={tx.genreId}
-            suggestedId={suggestedGenreId}
-            includeUncategorized
-            onPick={(g) => {
-              setPicking(null);
-              void run(() => onMove(line, g));
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setPicking({ itemId: null })}
-            className="min-h-11 rounded-full px-4 text-sm font-semibold"
-            style={{ border: '1px solid var(--hairline)', color: 'var(--ink)' }}
-          >
-            {tx.genreName ?? '未分類'} ・ カテゴリを移す →
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setPicking({ itemId: null })}
+          className="min-h-11 rounded-full px-4 text-sm font-semibold"
+          style={{ border: '1px solid var(--hairline)', color: 'var(--ink)' }}
+        >
+          {tx.genreName ?? '未分類'} ・ カテゴリを移す →
+        </button>
       </div>
 
       {tx.items.length > 0 ? (
@@ -257,18 +239,6 @@ export function EditForm({
                     </button>
                   </span>
                 </div>
-                {picking?.itemId === item.id ? (
-                  <div className="pb-2">
-                    <CategoryPicker
-                      genres={genres}
-                      currentId={item.genreId ?? tx.genreId}
-                      onPick={(g) => {
-                        setPicking(null);
-                        void run(() => onMoveItem(line, item.id, g));
-                      }}
-                    />
-                  </div>
-                ) : null}
               </li>
             ))}
           </ul>
@@ -284,6 +254,35 @@ export function EditForm({
         {busy ? '保存しています…' : '保存する'}
       </button>
       <DeleteRow onDelete={() => void run(() => onDelete(line))} />
+
+      {/* カテゴリを移す:アプリじゅうで同じ、カテゴリを選ぶシート(ADR-133)。 */}
+      <GenrePickerSheet
+        open={picking !== null}
+        onClose={() => setPicking(null)}
+        title={
+          picking?.itemId
+            ? `「${tx.items.find((i) => i.id === picking.itemId)?.name ?? ''}」のカテゴリを移す`
+            : 'カテゴリを移す'
+        }
+        selectedId={
+          picking?.itemId
+            ? (tx.items.find((i) => i.id === picking.itemId)?.genreId ?? tx.genreId)
+            : tx.genreId
+        }
+        suggestions={
+          picking?.itemId === null && suggestedGenreId
+            ? [{ genreId: suggestedGenreId, reason: 'いつもの移動先' }]
+            : []
+        }
+        allowNone={picking?.itemId === null}
+        onPick={(g) => {
+          const target = picking;
+          setPicking(null);
+          if (target === null) return;
+          if (target.itemId === null) void run(() => onMove(line, g));
+          else if (g !== null) void run(() => onMoveItem(line, target.itemId!, g));
+        }}
+      />
     </fieldset>
   );
 }

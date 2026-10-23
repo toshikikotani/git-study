@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { GenreBadge } from '@/components/ui/genre-badge';
-import { GenreName } from '@/components/ui/genre-name';
+import { shortGenreName } from '@/domain/genre-groups';
+import { forgetGenreChoices, GenrePickerSheet, useGenreChoices } from './genre-picker-sheet';
 import { BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
@@ -274,13 +275,20 @@ export function RecordSheet({
       return;
     }
     const next = await fetchQuickEntryGenresAction();
+    forgetGenreChoices();
     setGenres(next);
     setGenreId(next.find((g) => g.name === name)?.id ?? null);
     setNewName('');
     setAdding(false);
   };
 
-  const selectedGenre = kind === 'income' ? undefined : genres.find((g) => g.id === genreId);
+  // カテゴリを選ぶシートは、記録するの格子で隠したカテゴリも選べる。選んだら格子にも出す。
+  const choices = useGenreChoices();
+  const pickable = useMemo(
+    () => [...genres, ...(choices?.genres ?? []).filter((g) => !genres.some((x) => x.id === g.id))],
+    [genres, choices],
+  );
+  const selectedGenre = kind === 'income' ? undefined : pickable.find((g) => g.id === genreId);
   /** レシート名が空のときに入る名前(入力欄の薄い文字にも出す)。 */
   const fallbackName =
     kind === 'income'
@@ -476,7 +484,9 @@ export function RecordSheet({
 
   // カテゴリは、よく使う8個と「すべて」(23個が全部並んで選びにくかった、本人の指摘、デザイン v3-4)。
   // 選んだカテゴリが8個に無ければ、8個目と入れかえて見せる。
-  const shownGenres = visibleGenres(genres, genreId, allGenres);
+  // 「すべて」は、アプリじゅうで同じカテゴリを選ぶシートで開く(ADR-133)。
+  const shownGenres = visibleGenres(pickable, genreId, false);
+  const rememberedGenre = storeGenreCache?.get(comparableKey(name.trim())) ?? null;
   const detailSummary = [kind === 'expense' || kind === 'refund' ? '割り勘・返金' : null, 'メモ']
     .filter((x): x is string => x !== null)
     .join('・');
@@ -657,17 +667,17 @@ export function RecordSheet({
         >
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
-              {allGenres ? `すべてのカテゴリ · ${genres.length}` : 'よく使うカテゴリ'}
+              よく使うカテゴリ
             </span>
             {genres.length > TOP_GENRES ? (
               <button
                 type="button"
-                onClick={() => setAllGenres(!allGenres)}
-                aria-expanded={allGenres}
+                onClick={() => setAllGenres(true)}
+                aria-haspopup="dialog"
                 className="min-h-11 px-1 text-[13px] font-semibold"
                 style={{ color: 'var(--accent)' }}
               >
-                {allGenres ? 'たたむ' : `すべて（${genres.length}）`}
+                {`すべて（${genres.length}）`}
               </button>
             ) : null}
           </div>
@@ -694,13 +704,13 @@ export function RecordSheet({
                 >
                   {/* マークは明細・分析と同じ絵のアイコン(漢字1文字との2系統をやめた、ADR-131)。 */}
                   <GenreBadge name={g.name} size={36} />
-                  <span className="line-clamp-2 text-center text-[12px] leading-tight break-keep">
-                    <GenreName name={g.name} />
+                  <span className="w-full truncate text-center text-[12px] leading-tight">
+                    {shortGenreName(g.name)}
                   </span>
                 </button>
               );
             })}
-            {allGenres || genres.length <= TOP_GENRES ? (
+            {genres.length <= TOP_GENRES ? (
               <button
                 type="button"
                 onClick={() => setAdding(true)}
@@ -757,9 +767,34 @@ export function RecordSheet({
               </button>
             </div>
           ) : null}
+          {genres.length > TOP_GENRES && !adding ? (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="min-h-11 self-start px-1 text-[13px] font-semibold"
+              style={{ color: 'var(--accent)' }}
+            >
+              ＋ カテゴリを足す
+            </button>
+          ) : null}
           <span className="px-1 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
             よく使う順。店名を入れると、前回のカテゴリを先に選びます。
           </span>
+          <GenrePickerSheet
+            open={allGenres}
+            onClose={() => setAllGenres(false)}
+            title="カテゴリを選ぶ"
+            selectedId={genreId}
+            suggestions={
+              rememberedGenre && rememberedGenre !== genreId
+                ? [{ genreId: rememberedGenre, reason: 'このお店は前回このカテゴリ' }]
+                : []
+            }
+            onPick={(picked) => {
+              genreTouched.current = true;
+              setGenreId(picked);
+            }}
+          />
         </section>
       ) : null}
 

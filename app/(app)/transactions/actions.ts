@@ -22,7 +22,12 @@ import {
   type StoredTransaction,
   type TransactionSource,
 } from '@/features/transactions/store';
-import { autoMergeSamePayments } from '@/features/transactions/payment-merge';
+import {
+  autoMergeSamePayments,
+  keptIdsOfMerged,
+  mergeReceiptIntoPayment,
+  splitMergedPayment,
+} from '@/features/transactions/payment-merge';
 import { replaceSplits } from '@/features/transactions/splits-store';
 import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
 import { recordCorrection } from '@/features/genre/memory-store';
@@ -108,6 +113,8 @@ export async function saveImportBatchAction(
     accountId: string;
     failedCount: number;
     receiptImagePath?: string | null;
+    /** 本人が「別の記録にする」を選んだ(同じ支払いでも自動で1件にまとめない、ADR-133)。 */
+    keepSeparate?: boolean;
   },
   receiptSplits: readonly ReceiptSplitInput[] = [],
   receiptItems: readonly ReceiptItemsInput[] = [],
@@ -173,7 +180,7 @@ export async function saveImportBatchAction(
   }
 
   // レシートとカードの通知メールが同じ支払いなら、自動で1件にまとめる(ADR-129)。失敗しても保存は成功のまま。
-  if (meta.source === 'manual' && result.importedCount > 0) {
+  if (meta.source === 'manual' && result.importedCount > 0 && !meta.keepSeparate) {
     await mergeSamePaymentsForDates(preview.map((t) => t.occurredOn));
   }
 
@@ -331,13 +338,22 @@ export async function setExpenseSubtypeAction(
   return { error: null };
 }
 
+export type ReceiptDuplicateHit = {
+  id: string;
+  occurredOn: string;
+  amountYen: number;
+  storeName: string;
+  /** カードの通知メールから入った記録。 */
+  fromEmail: boolean;
+};
+
 export async function checkReceiptDuplicatesAction(
   probes: readonly { key: string; storeName: string; occurredOn: string; amountYen: number }[],
 ): Promise<{
-  duplicates: Record<string, { id: string; occurredOn: string; amountYen: number }[]>;
+  duplicates: Record<string, ReceiptDuplicateHit[]>;
   error: string | null;
 }> {
-  const result: Record<string, { id: string; occurredOn: string; amountYen: number }[]> = {};
+  const result: Record<string, ReceiptDuplicateHit[]> = {};
   const unavailable = '重複を確認できませんでした。内容を確認してから保存することもできます。';
   try {
     const dates = [...new Set(probes.map((p) => assertDateOnly(p.occurredOn)))];
@@ -351,7 +367,7 @@ export async function checkReceiptDuplicatesAction(
       };
     const { data, error } = await supabase
       .from('transactions')
-      .select('id, occurred_on, description, merchant_name, amount_yen, review_status')
+      .select('id, occurred_on, description, merchant_name, amount_yen, review_status, source')
       .in('occurred_on', dates)
       .neq('review_status', 'ignored');
     if (error || !data) return { duplicates: result, error: unavailable };
@@ -360,7 +376,9 @@ export async function checkReceiptDuplicatesAction(
       storeName: r.merchant_name ?? r.description,
       occurredOn: r.occurred_on,
       amountYen: r.amount_yen,
+      source: r.source,
     }));
+    const sourceOf = new Map(existing.map((e) => [e.id, e.source]));
     for (const probe of probes) {
       const hits = findReceiptDuplicates(
         {
@@ -375,6 +393,8 @@ export async function checkReceiptDuplicatesAction(
           id: h.id,
           occurredOn: h.occurredOn,
           amountYen: h.amountYen,
+          storeName: h.storeName,
+          fromEmail: sourceOf.get(h.id) === 'gmail',
         }));
       }
     }
@@ -399,12 +419,38 @@ export async function recordGenreCorrectionAction(input: {
   }
 }
 
+/** 保存したレシートを、本人が選んだ記録と1件にまとめる(「同じ支払いかも」→「1件にまとめる」、ADR-133)。 */
+export async function mergeReceiptIntoPaymentAction(
+  receiptId: string,
+  paymentId: string,
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) return { error: 'ログイン状態を確認できませんでした' };
+    const merged = await mergeReceiptIntoPayment(supabase, auth.user.id, receiptId, paymentId);
+    revalidatePath('/spending');
+    return {
+      error: merged ? null : '1件にまとめられませんでした(どちらかがもうまとめてあります)。',
+    };
+  } catch (error) {
+    return { error: describeUserError(error, '1件にまとめられませんでした。') };
+  }
+}
+
 export async function undoReceiptSaveAction(
   ids: readonly string[],
 ): Promise<{ error: string | null }> {
   if (ids.length === 0) return { error: null };
   try {
     const supabase = await createClient();
+    // 支払いの知らせと1件にまとめていたら、先に分けて(品目・画像をレシートへ戻して)から消す。
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      for (const kept of await keptIdsOfMerged(supabase, auth.user.id, ids)) {
+        await splitMergedPayment(supabase, auth.user.id, kept);
+      }
+    }
     const { error } = await supabase
       .from('transactions')
       .delete()

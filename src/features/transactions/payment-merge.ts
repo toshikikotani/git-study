@@ -119,6 +119,73 @@ export async function autoMergeSamePayments(
   return merged;
 }
 
+/**
+ * 本人が「1件にまとめる」を選んだとき(レシートの確認の「同じ支払いかも」、ADR-133)。保存したレシートを、
+ * 選んだ記録(支払いの知らせなど)にまとめる。どちらかがもうまとめてあれば何もしない(false)。
+ */
+export async function mergeReceiptIntoPayment(
+  client: Client,
+  userId: string,
+  receiptId: string,
+  paymentId: string,
+): Promise<boolean> {
+  if (receiptId === paymentId) return false;
+  const existing = await client
+    .from('payment_merges')
+    .select('kept_transaction_id, merged_transaction_id')
+    .eq('user_id', userId);
+  if (existing.error) {
+    if (isMissingTableError(existing.error)) return false;
+    throw new PaymentMergeError(`まとめの記録を読めませんでした: ${existing.error.message}`);
+  }
+  const taken = new Set(
+    existing.data.flatMap((m) => [m.kept_transaction_id, m.merged_transaction_id]),
+  );
+  if (taken.has(receiptId) || taken.has(paymentId)) return false;
+
+  const { data, error } = await client
+    .from('transactions')
+    .select(
+      'id, occurred_on, amount_yen, merchant_name, description, source, import_batch_id, genre_id, classified_by, review_status',
+    )
+    .eq('user_id', userId)
+    .in('id', [receiptId, paymentId]);
+  if (error) throw new PaymentMergeError(`明細を読めませんでした: ${error.message}`);
+  const rows = (data ?? []) as Row[];
+  const receipt = rows.find((r) => r.id === receiptId);
+  const payment = rows.find((r) => r.id === paymentId);
+  if (!receipt || !payment) return false;
+
+  let withImage = new Set<string>();
+  if (receipt.import_batch_id !== null) {
+    const { data: batch } = await client
+      .from('import_batches')
+      .select('id, receipt_image_path')
+      .eq('user_id', userId)
+      .eq('id', receipt.import_batch_id)
+      .maybeSingle();
+    if (batch?.receipt_image_path) withImage = new Set([batch.id]);
+  }
+  await mergePair(client, userId, payment, receipt, withImage);
+  return true;
+}
+
+/** まとめた側(レシート)の id から、残した側の id を引く(保存の取り消しで「分ける」ため)。 */
+export async function keptIdsOfMerged(
+  client: Client,
+  userId: string,
+  mergedIds: readonly string[],
+): Promise<string[]> {
+  if (mergedIds.length === 0) return [];
+  const { data, error } = await client
+    .from('payment_merges')
+    .select('kept_transaction_id')
+    .eq('user_id', userId)
+    .in('merged_transaction_id', [...mergedIds]);
+  if (error) return [];
+  return (data ?? []).map((m) => m.kept_transaction_id);
+}
+
 async function mergePair(
   client: Client,
   userId: string,

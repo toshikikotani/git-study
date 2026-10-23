@@ -102,6 +102,12 @@ export type ParsedReceiptItem = {
 };
 
 export type ReceiptFieldConfidence = { store: number; date: number; total: number };
+/** 店名・日付・合計の、レシート画像上の縦位置(0〜1)。問いのカードでその部分を切り出す。 */
+export type ReceiptFieldPosition = {
+  store: number | null;
+  date: number | null;
+  total: number | null;
+};
 
 export type ParsedReceiptTransaction = {
   occurredOn: DateOnly;
@@ -131,6 +137,9 @@ export type ParsedReceiptTransaction = {
   /** 照合結果(draft から計算した値。画面は draft から再計算する)。 */
   reconcile?: ReconcileResult | undefined;
   fieldConfidence?: ReceiptFieldConfidence;
+  fieldY?: ReceiptFieldPosition;
+  /** レシートに印字されたカードの末尾4けた(支払いの口座を当てる)。無ければ null。 */
+  cardLast4?: string | null;
 };
 
 export type ReceiptParseResult = {
@@ -142,6 +151,11 @@ export type ReceiptParseResult = {
 export type AiReceiptExtractInput = {
   imageBase64: string;
   mediaType: ReceiptMediaType;
+  /**
+   * 続きの画像(長いレシートを分けて撮ったとき、上から順に)。あれば全部を1枚のレシートとして読む
+   * (確認画面の「次の画像とつなげる」、ADR-133)。
+   */
+  moreImages?: readonly string[];
 };
 
 export interface AiReceiptExtractor {
@@ -227,6 +241,17 @@ const rowSchema = z.object({
   store_confidence: z.number().describe('店名の読み取りの自信(0〜1)。'),
   date_confidence: z.number().describe('日付の読み取りの自信(0〜1)。'),
   total_confidence: z.number().describe('支払額の読み取りの自信(0〜1)。'),
+  store_y_ratio: z.number().describe('店名が写っている画像上の縦位置。上端が 0、下端が 1。'),
+  date_y_ratio: z.number().describe('日付が写っている画像上の縦位置。上端が 0、下端が 1。'),
+  total_y_ratio: z
+    .number()
+    .describe('支払額(合計)が写っている画像上の縦位置。上端が 0、下端が 1。'),
+  card_last4: z
+    .string()
+    .describe(
+      'クレジットカード・デビットカードで払ったとき、印字されたカード番号の末尾4けた' +
+        '(「************1234」なら 1234)。書かれていなければ空文字。',
+    ),
   expense_subtype: z
     .string()
     .describe(
@@ -260,6 +285,10 @@ type NewRowFields = Pick<
   | 'store_confidence'
   | 'date_confidence'
   | 'total_confidence'
+  | 'store_y_ratio'
+  | 'date_y_ratio'
+  | 'total_y_ratio'
+  | 'card_last4'
 >;
 type ItemInput = { name: string; amount_yen: number; product_type: string } & Partial<
   Pick<ExtractionRowFull['items'][number], 'tax_rate' | 'is_discount' | 'confidence' | 'y_ratio'>
@@ -303,6 +332,8 @@ const SYSTEM_PROMPT = [
   '  実際の支払額(カード・現金で払った額)。',
   '- 各行の confidence(0〜1)と y_ratio(画像上の縦位置、上端0〜下端1)、',
   '  store_confidence / date_confidence / total_confidence も返す。',
+  '- 店名・日付・支払額が写っている縦位置を store_y_ratio / date_y_ratio / total_y_ratio で返す。',
+  '- カードで払っていてカード番号の末尾4けたが印字されていれば card_last4 に入れる。',
   '- 1枚に複数のレシート・振込明細・通知・注文が写っていれば、すべて返す。',
   '- 上のどれでもない画像(無関係な写真、読み取れないほど不鮮明な画像など)は',
   '  is_recognized を false にして transactions を空にする。',
@@ -341,9 +372,18 @@ export class ClaudeReceiptExtractor implements AiReceiptExtractor {
               type: 'image',
               source: { type: 'base64', media_type: input.mediaType, data: input.imageBase64 },
             },
+            ...(input.moreImages ?? []).map((data) => ({
+              type: 'image' as const,
+              source: { type: 'base64' as const, media_type: input.mediaType, data },
+            })),
             {
               type: 'text',
-              text: `今日の日付は ${todayJst()} です。上の画像から支払い明細を書き写してください。`,
+              text:
+                (input.moreImages ?? []).length > 0
+                  ? `今日の日付は ${todayJst()} です。上の${(input.moreImages ?? []).length + 1}枚は、1枚の長いレシートを` +
+                    '上から順に分けて撮った写真です。重なって写っている行は1回だけ数え、1件のレシートとして書き写してください' +
+                    '(y_ratio は1枚めの上端を 0、最後の1枚の下端を 1 とした位置)。'
+                  : `今日の日付は ${todayJst()} です。上の画像から支払い明細を書き写してください。`,
             },
           ],
         },
@@ -436,6 +476,12 @@ export function buildFromAiRows(rows: readonly ExtractionRow[]): ReceiptParseRes
         date: clamp01(row.date_confidence, 0.8),
         total: clamp01(row.total_confidence, 0.8),
       },
+      fieldY: {
+        store: row.store_y_ratio === undefined ? null : clamp01(row.store_y_ratio, 0),
+        date: row.date_y_ratio === undefined ? null : clamp01(row.date_y_ratio, 0),
+        total: row.total_y_ratio === undefined ? null : clamp01(row.total_y_ratio, 0),
+      },
+      cardLast4: /^\d{4}$/.test((row.card_last4 ?? '').trim()) ? row.card_last4!.trim() : null,
     });
   }
 

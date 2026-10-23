@@ -48,11 +48,10 @@ describe('色はアプリのテーマに合わせる(紫の固定をやめる)',
     expect(css).toContain('color: var(--ink)');
   });
 
-  it('カメラは黒・白・灰色だけ。テーマの色(--action)を紫で上書きしない', () => {
-    const css = read('src/components/receipt/receipt-camera.css');
-    expect(css).not.toMatch(PURPLE);
-    expect(css).not.toContain('--action');
-    expect(css).not.toContain('--receipt-purple');
+  it('自前のカメラはやめた(iPhone のカメラをそのまま開く、ADR-133)', () => {
+    expect(existsSync('src/components/receipt/receipt-camera.tsx')).toBe(false);
+    expect(existsSync('src/components/receipt/receipt-camera.css')).toBe(false);
+    expect(existsSync('src/features/import/document-detect.ts')).toBe(false);
   });
 });
 
@@ -86,30 +85,43 @@ describe('増えていた画面をなくす', () => {
   it('写真を選ぶための自前の画面(/photos・写真一覧)はなくし、端末の写真選択をすぐ開く', () => {
     expect(existsSync('app/(app)/photos/page.tsx')).toBe(false);
     expect(existsSync('src/components/receipt/photo-library.tsx')).toBe(false);
-    const camera = read('src/components/receipt/receipt-camera.tsx');
-    expect(camera).not.toContain("from './photo-library'");
-    expect(camera).not.toContain('receipt-camera__library');
-    expect(camera).toContain('const openPhotos = () => photoInput.current?.click();');
-    expect(camera).toContain('すべての写真');
+  });
+});
+
+describe('レシートを撮るは iPhone のカメラをそのまま開く(v5 変更1、ADR-133)', () => {
+  it('カメラを開くのは、ファイルの選び方の「カメラで撮る」(capture="environment")', () => {
+    const capture = read('src/components/receipt/camera-capture.tsx');
+    expect(capture).toContain('accept="image/*"');
+    expect(capture).toContain('capture="environment"');
+    expect(capture).toContain('input.current?.click()');
   });
 
-  it('カメラのページは説明を挟まず、すぐカメラを開く(閉じたら前の画面へ)', () => {
-    const entry = read('app/(app)/camera/camera-entry.tsx');
-    expect(entry).not.toContain('ホーム画面からすぐ撮影');
-    expect(entry).not.toContain('<main');
-    expect(entry).not.toContain('<h1');
-    // 撮り終えたら「確認が必要」で読み取ったレシートを確かめる(ADR-127)。
-    expect(entry).toContain("onDone={() => router.replace('/spending/review')}");
-    expect(entry).toContain('router.back()');
-  });
-
-  it('＋・長押し・記録するシートからは、その場でカメラを開く。撮り終えたら「確認が必要」へ', () => {
+  it('＋・長押し・記録するシートからは、押したその場でカメラを開く(画面を移らない)', () => {
     const shell = read('app/(app)/app-shell.tsx');
     expect(shell).not.toContain("router.push('/camera')");
-    expect(shell).toContain('onCamera={() => setCameraOpen(true)}');
-    expect(shell).toContain("router.push('/spending/review');");
+    expect(shell).toContain('onCamera={openCamera}');
+    expect(shell).toContain('openCamera();');
+    // 長押しは指を離したところで開く(押している最中はブラウザがカメラを開かせない)。
+    expect(shell).toContain('if (cameraOnRelease.take()) openCamera();');
     const sheet = read('app/(app)/record-sheet.tsx');
     expect(sheet).not.toContain('href="/camera"');
     expect(sheet).not.toContain('href="/photos"');
+  });
+
+  it('撮って戻ると「もう1枚撮る」「確かめる」。確かめるは保存前のレシートの1件めを開く', () => {
+    const sheet = read('app/(app)/capture-sheet.tsx');
+    expect(sheet).toContain('もう1枚撮る');
+    expect(sheet).toContain('確かめる');
+    const shell = read('app/(app)/app-shell.tsx');
+    expect(shell).toContain("router.push('/spending/review?receipt=next')");
+  });
+
+  it('ホーム画面のアイコン(/camera)は、大きな「撮る」ボタンが1つだけの画面', () => {
+    const entry = read('app/(app)/camera/camera-entry.tsx');
+    expect(entry).not.toContain('<main');
+    expect(entry).not.toContain('<h1');
+    expect(entry).toContain('CameraCaptureInput');
+    expect(entry).toContain("'撮る'");
+    expect(entry).toContain("router.replace('/spending/review?receipt=next')");
   });
 });

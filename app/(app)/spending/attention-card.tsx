@@ -48,8 +48,10 @@ export function AttentionCard({
 }) {
   const { transactions, captures, today } = useSpendingMonth();
   const jobs = useReceiptJobs();
+  // 保存前(読み取れたもの)は、上の「保存前のレシート N件」で数える(ADR-133)。
   const shownJobs = jobs.filter(
     (job) =>
+      job.status !== 'ready' &&
       !(job.status === 'needs_input' && captures.some((capture) => capture.id === job.captureId)),
   );
   const attention = useMemo(() => buildAttention(transactions, today), [transactions, today]);
@@ -65,7 +67,7 @@ export function AttentionCard({
   const count =
     queue.length + inputCount + categoryCount + duplicateCount + nameCount + shownJobs.length;
   const summaries = [
-    shownJobs.length > 0 ? `読み取り・保存待ち ${shownJobs.length}件` : '',
+    shownJobs.length > 0 ? `読み取り中・読み取り待ち ${shownJobs.length}件` : '',
     inputCount > 0 ? `入力待ち ${inputCount}件` : '',
     categoryCount > 0 ? `カテゴリ確認 ${categoryCount}件` : '',
     attention.uncategorized.count > 0

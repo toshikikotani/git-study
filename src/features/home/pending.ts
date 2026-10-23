@@ -57,3 +57,17 @@ export async function countNeedsInputCaptures(): Promise<number> {
     return 0;
   }
 }
+
+/** 保存前のレシート(読み取れた。本人が「保存」を押すまで明細にしない、ADR-133)の件数。数えられなければ 0。 */
+export async function countReadyCaptures(): Promise<number> {
+  try {
+    const supabase = await createClient();
+    const { count, error } = await supabase
+      .from('receipt_captures')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'ready');
+    return error ? 0 : (count ?? 0);
+  } catch {
+    return 0;
+  }
+}

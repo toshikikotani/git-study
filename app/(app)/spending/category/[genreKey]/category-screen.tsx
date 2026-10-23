@@ -25,7 +25,7 @@ import { categoryVoiceOverLabel, useOnline } from '@/features/category/a11y';
 import { CategoryChart, type ChartMode } from './category-chart';
 import { CategoryHeader } from './category-header';
 import { CategoryLandingCard, WeekdayCard } from './category-landing';
-import { CategoryPicker } from './category-picker';
+import { GenrePickerSheet } from '../../../genre-picker-sheet';
 import { CategoryTabs, type CategoryTab } from './category-tabs';
 import { EditSheet } from './edit-sheet';
 import { GoalTargetEdit } from './goal-target-edit';
@@ -535,7 +535,6 @@ function CategoryScreenInner({
 
       <EditSheet
         line={openLine}
-        genres={data.genres}
         suggestedGenreId={quickDestination?.id ?? null}
         error={banner}
         onClose={() => setOpenLine(null)}
@@ -561,27 +560,22 @@ function CategoryScreenInner({
         }}
       />
 
-      {/* 左スワイプの「カテゴリを移す」:格子から1タップ */}
-      <BottomSheet open={movePicker !== null} onClose={() => setMovePicker(null)} role="dialog">
-        <div className="space-y-2 px-3 pb-3">
-          <BottomSheetHeader>
-            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-              {movePicker?.label} のカテゴリを移す
-            </p>
-          </BottomSheetHeader>
-          <CategoryPicker
-            genres={data.genres}
-            currentId={currentGenreId}
-            suggestedId={quickDestination?.id ?? null}
-            includeUncategorized
-            onPick={(to) => {
-              const line = movePicker;
-              setMovePicker(null);
-              if (line) void moveWithRule([line], to);
-            }}
-          />
-        </div>
-      </BottomSheet>
+      {/* 左スワイプの「カテゴリを移す」:アプリじゅうで同じ、カテゴリを選ぶシート(ADR-133) */}
+      <GenrePickerSheet
+        open={movePicker !== null}
+        onClose={() => setMovePicker(null)}
+        title={`${movePicker?.label ?? ''} のカテゴリを移す`}
+        selectedId={currentGenreId}
+        suggestions={
+          quickDestination ? [{ genreId: quickDestination.id, reason: 'いつもの移動先' }] : []
+        }
+        allowNone
+        onPick={(to) => {
+          const line = movePicker;
+          setMovePicker(null);
+          if (line && to !== currentGenreId) void moveWithRule([line], to);
+        }}
+      />
 
       {/* まとめて修正:選択モードのあいだ、下部に固定(選択件数・合計・操作) */}
       {selectMode ? (
@@ -630,27 +624,23 @@ function CategoryScreenInner({
         </div>
       ) : null}
 
-      <BottomSheet open={bulkPicker} onClose={() => setBulkPicker(false)} role="dialog">
-        <div className="space-y-2 px-3 pb-3">
-          <BottomSheetHeader>
-            <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-              {selectedLines.length}件のカテゴリを移す
-            </p>
-          </BottomSheetHeader>
-          <CategoryPicker
-            genres={data.genres}
-            currentId={currentGenreId}
-            suggestedId={quickDestination?.id ?? null}
-            includeUncategorized
-            onPick={(to) => {
-              const targets = selectedLines;
-              setBulkPicker(false);
-              exitSelect();
-              void moveWithRule(targets, to).then((ok) => ok && hapticFor('bulkComplete'));
-            }}
-          />
-        </div>
-      </BottomSheet>
+      <GenrePickerSheet
+        open={bulkPicker}
+        onClose={() => setBulkPicker(false)}
+        title={`${selectedLines.length}件のカテゴリを移す`}
+        selectedId={currentGenreId}
+        suggestions={
+          quickDestination ? [{ genreId: quickDestination.id, reason: 'いつもの移動先' }] : []
+        }
+        allowNone
+        onPick={(to) => {
+          const targets = selectedLines;
+          setBulkPicker(false);
+          exitSelect();
+          if (to === currentGenreId) return;
+          void moveWithRule(targets, to).then((ok) => ok && hapticFor('bulkComplete'));
+        }}
+      />
 
       <BottomSheet open={confirmDelete} onClose={() => setConfirmDelete(false)} role="dialog">
         <div className="space-y-3 px-3 pb-3">

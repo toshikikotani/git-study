@@ -306,6 +306,8 @@ create table public.app_settings (
   -- 夜の答え合わせ(LINE、v4-2、ADR-130)。自動で入った今日の記録を、夜にLINEで確かめる。
   evening_check_enabled               boolean      not null default true,
   evening_check_at                    time         not null default '21:00',
+  -- レシートの確かめる細かさ(ADR-133):thorough(しっかり)/ normal(ふつう)/ light(少なめ)
+  receipt_check_level                 text         not null default 'normal',
 
   -- Gmail 自動取得(ADR-018)。資格情報は環境変数に置き、ここには条件だけを持つ。
   -- gmail_enabled が false でも設定は残す。止めたい月に消す必要はない。
@@ -346,6 +348,8 @@ create table public.app_settings (
        and monthly_savings_target_yen >= 0),
   constraint ck_app_settings_inactivity
     check (inactivity_alert_days between 1 and 30),
+  constraint ck_app_settings_receipt_check_level
+    check (receipt_check_level in ('thorough', 'normal', 'light')),
   constraint ck_app_settings_gmail_limit
     check (gmail_fetch_limit between 1 and 1000),
   -- 秘密情報が誤って値ごと入るのを防ぐ。ここに入るのは環境変数名だけ。
@@ -1502,8 +1506,8 @@ create unique index ux_genre_memory_key
 create index ix_genre_memory_user on public.genre_memory (user_id);
 
 -- -----------------------------------------------------------------------------
--- 3.33 receipt_captures — 読み取りに失敗したレシートの「入力待ち」(F7)
---   撮影した画像とAIの生の読み取り結果を残し、手で入力して明細にするまでの記録。
+-- 3.33 receipt_captures — 保存前のレシートと、読み取りに失敗したレシートの「入力待ち」(F7、ADR-133)
+--   撮影した画像とAIの生の読み取り結果を残し、本人が保存する(読めなかったら手で入力する)までの記録。
 --   transactions とは別に持つので、入力が終わるまで集計・目標には入らない。
 --   元の画像は破棄しても消さない(status='discarded' にするだけ。Undo できる)。
 -- -----------------------------------------------------------------------------
@@ -1511,6 +1515,7 @@ create table public.receipt_captures (
   id                uuid        primary key default gen_random_uuid(),
   user_id           uuid        not null references auth.users(id) on delete cascade,
 
+  -- ready      : 読み取れた。本人が確かめて「保存」を押すまでの「保存前」(ADR-133)
   -- needs_input: 手で入力する必要がある(明細・要確認に「入力待ち」と出る)
   -- resolved   : 明細として保存済み(transaction_id が入る)
   -- discarded  : 破棄した(Undo できるよう行は消さず、画像も残す)
@@ -1539,7 +1544,7 @@ create table public.receipt_captures (
   discarded_at      timestamptz,
 
   constraint ck_receipt_captures_status
-    check (status in ('needs_input', 'resolved', 'discarded')),
+    check (status in ('ready', 'needs_input', 'resolved', 'discarded')),
   constraint ck_receipt_captures_receipt_status
     check (receipt_status in ('parsed', 'partial', 'failed', 'manual'))
 );

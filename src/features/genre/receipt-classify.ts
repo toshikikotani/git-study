@@ -4,6 +4,7 @@ import {
   type ClassificationMemory,
   type ClassificationSource,
 } from '@/domain/classification-pipeline';
+import { CATEGORY_SOURCE_CONFIDENCE } from '@/domain/receipt-questions';
 import { normalizeStoreName } from '@/domain/store-name';
 import type { ParsedReceiptTransaction } from '@/features/import/receipt-ai';
 import { ClaudeGenreClassifier, type GenreClassifiable, type GenreOption } from './genre-ai';
@@ -146,7 +147,12 @@ export async function classifyReceiptPipeline(
     const parentIndex = Number(target.id.split(':')[0]);
     const genreId = parentGenreIds.get(parentIndex);
     if (genreId !== undefined) {
-      classifications.push({ key: target.id, genreId, confidence: 0.5, source: 'store_type' });
+      classifications.push({
+        key: target.id,
+        genreId,
+        confidence: CATEGORY_SOURCE_CONFIDENCE.store_type,
+        source: 'store_type',
+      });
     }
   }
 
