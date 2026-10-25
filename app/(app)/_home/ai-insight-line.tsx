@@ -1,16 +1,15 @@
 import Link from 'next/link';
 
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
-import { loadMonthlyReport } from '@/features/ai-report/store';
-import { todayJst } from '@/lib/date';
+import { loadCurrentMonthlyReport } from '@/features/ai-report/store';
 
 /**
- * 今日の画面の「AIの気づき」1行(提案書「AIレポートは分析の気づきと今日の1行に」、ADR-127)。今月の
+ * 今日の画面の「AIの気づき」1行(提案書「AIレポートは分析の気づきと今日の1行に」、ADR-127)。今期(目標が無ければ今月)の
  * AIの分析のいちばん上の気づきだけを出し、押すとAIのレポート(気づき・アドバイス・タイプ診断・日次、ADR-128)。
  * まだ分析していなければ何も出さない。
  */
 export async function AiInsightLine() {
-  const report = await loadMonthlyReport(todayJst().slice(0, 7)).catch(() => null);
+  const report = await loadCurrentMonthlyReport().catch(() => null);
   const first = report?.insights[0];
   if (!first) return null;
   return (

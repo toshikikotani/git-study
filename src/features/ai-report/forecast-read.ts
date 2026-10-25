@@ -1,6 +1,6 @@
 /**
  * AIの読み(ADR-072)のデータアクセス。根拠に使う事実(目立つ明細・メモ・品目・予定)を集め、
- * 過去のAIの読みを月末の実際の着地と比べて当たり具合を数え、読みを保存・読み込む。
+ * 過去のAIの読みを期間の終わり(今期の目標の終わり、無ければ月末)の実際の着地と比べて当たり具合を数え、読みを保存・読み込む。
  *
  * ai_forecast_reads が本番に未適用の間は、保存を飛ばし、過去の読みは無いものとして扱う
  * (AIの読みは「半分だけ効かせる」既定で出る)。
@@ -15,6 +15,7 @@ import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import { addDays, addMonths, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
+import { listPlanRanges } from '@/features/spending-plan/store';
 import { createClient } from '@/lib/supabase/server';
 import type { MonthlyReportEvidence } from './monthly-report-ai';
 
@@ -145,46 +146,50 @@ const READ_COLUMNS =
   'month, as_of, known_yen, stat_p10_yen, stat_p50_yen, stat_p90_yen, ai_percent, trust, adjusted_p50_yen, reason, evidence, created_at';
 
 /**
- * 過去の月のAIの読み(月ごとに最初の1回)と、その月の実際の着地。月の初めの読みほど
- * 当てるのが難しく、役に立つので、最初の読みで比べる(月末に作り直した読みで甘く数えない)。
+ * 過去の期間のAIの読み(期間ごとに最初の1回)と、その期間の実際の着地。期間の初めの読みほど
+ * 当てるのが難しく、役に立つので、最初の読みで比べる(終わりに作り直した読みで甘く数えない)。
+ * 読みは期間の始まりの日で残す(暦の月なら1日、今期の目標ならその始まり、ADR-135)。終わりは、
+ * その日に始まる目標があればその終わり、無ければその月の末日。
  */
 export async function loadScoredReads(
-  monthStart: DateOnly,
+  periodStart: DateOnly,
   today: DateOnly,
 ): Promise<{ reads: ScoredRead[]; trust: AiTrust }> {
-  const from = addMonths(monthStart, -PAST_MONTHS);
+  const from = addMonths(periodStart, -PAST_MONTHS);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('ai_forecast_reads')
     .select(READ_COLUMNS)
     .gte('month', from)
-    .lt('month', monthStart)
+    .lt('month', periodStart)
     .order('created_at', { ascending: true });
   if (error) {
     if (isMissingTableError(error)) return { reads: [], trust: aiTrust([]) };
     throw new ForecastReadStoreError(`AIの読みを取得できませんでした: ${error.message}`);
   }
-  const firstByMonth = new Map<string, ReadRow>();
+  const firstByPeriod = new Map<string, ReadRow>();
   for (const row of data as ReadRow[]) {
-    if (!firstByMonth.has(row.month)) firstByMonth.set(row.month, row);
+    if (!firstByPeriod.has(row.month)) firstByPeriod.set(row.month, row);
   }
-  if (firstByMonth.size === 0) return { reads: [], trust: aiTrust([]) };
+  if (firstByPeriod.size === 0) return { reads: [], trust: aiTrust([]) };
 
-  const { transactions } = await loadLedgerTransactions(
-    { from, to: addDays(monthStart, -1) },
-    today,
-  );
+  const [{ transactions }, plans] = await Promise.all([
+    loadLedgerTransactions({ from, to: addDays(periodStart, -1) }, today),
+    listPlanRanges().catch(() => []),
+  ]);
+  const endOf = (start: DateOnly) =>
+    plans.find((p) => p.periodStart === start)?.periodEnd ?? addDays(addMonths(start, 1), -1);
   const source = toForecastSource(transactions);
-  const reads = [...firstByMonth.values()].map((row): ScoredRead => ({
-    month: row.month.slice(0, 7),
-    percent: row.ai_percent,
-    statP50Yen: row.stat_p50_yen,
-    adjustedP50Yen: row.adjusted_p50_yen,
-    actualYen: actualTotalForPeriod(source, {
-      from: row.month,
-      to: addDays(addMonths(row.month, 1), -1),
-    }),
-  }));
+  const reads = [...firstByPeriod.values()].map((row): ScoredRead => {
+    const to = endOf(row.month);
+    return {
+      month: to.slice(0, 7),
+      percent: row.ai_percent,
+      statP50Yen: row.stat_p50_yen,
+      adjustedP50Yen: row.adjusted_p50_yen,
+      actualYen: actualTotalForPeriod(source, { from: row.month, to }),
+    };
+  });
   return { reads, trust: aiTrust(reads) };
 }
 
@@ -221,13 +226,13 @@ function viewOf(row: ReadRow): ForecastReadView {
   };
 }
 
-/** 今月の最新のAIの読み。無ければ(テーブル未作成も含めて)null。 */
-export async function loadLatestRead(monthStart: DateOnly): Promise<ForecastReadView | null> {
+/** その期間(始まりの日)の最新のAIの読み。無ければ(テーブル未作成も含めて)null。 */
+export async function loadLatestRead(periodStart: DateOnly): Promise<ForecastReadView | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('ai_forecast_reads')
     .select(READ_COLUMNS)
-    .eq('month', monthStart)
+    .eq('month', periodStart)
     .order('created_at', { ascending: false })
     .limit(1);
   if (error) {
@@ -240,7 +245,8 @@ export async function loadLatestRead(monthStart: DateOnly): Promise<ForecastRead
 
 /** AIの読みを1行足す(上書きしない)。テーブル未作成なら保存せず、計算した値だけ返す。 */
 export async function saveForecastRead(input: {
-  monthStart: DateOnly;
+  /** 期間の始まりの日(暦の月なら1日、今期の目標ならその始まり)。 */
+  periodStart: DateOnly;
   asOf: DateOnly;
   knownYen: number;
   stat: { p10: number; p50: number; p90: number };
@@ -256,7 +262,7 @@ export async function saveForecastRead(input: {
     weight: input.trust,
   });
   const row: ReadRow = {
-    month: input.monthStart,
+    month: input.periodStart,
     as_of: input.asOf,
     known_yen: input.knownYen,
     stat_p10_yen: input.stat.p10,

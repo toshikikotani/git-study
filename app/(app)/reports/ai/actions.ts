@@ -46,7 +46,7 @@ export async function generateMonthlyAiReportAction(): Promise<GenerateMonthlyRe
       const read =
         report.forecastRead !== null && input.forecast !== null
           ? await saveForecastRead({
-              monthStart: `${input.monthKey}-01`,
+              periodStart: input.period.from,
               asOf: input.forecast.asOf,
               knownYen: input.forecast.knownYen,
               stat: { p10: input.forecast.p10, p50: input.forecast.p50, p90: input.forecast.p90 },

@@ -45,8 +45,10 @@ export type DailyReportInput = {
   averageDailySpendYen: number;
   wasteItems: readonly DailyReportItem[];
   necessaryItems: readonly DailyReportItem[];
-  /** 今月の着地の見込み(確率予測 v2)。作れなければ null。 */
+  /** 着地の見込み(確率予測 v2)。今期の目標があればその期間、無ければ今月(ADR-135)。作れなければ null。 */
   monthLanding: {
+    /** 「今期(10/25〜11/24)」「今月」。 */
+    periodLabel?: string;
     p10: number;
     p50: number;
     p90: number;
@@ -135,7 +137,7 @@ function buildUserContent(input: DailyReportInput): string {
   if (input.monthLanding !== null) {
     const m = input.monthLanding;
     lines.push(
-      `今月の着地の見込み(統計): 中央 ${m.p50}円 ・ 下振れ ${m.p10}円 〜 上振れ ${m.p90}円(10回中8回)` +
+      `${m.periodLabel ?? '今月'}の着地の見込み(統計): 中央 ${m.p50}円 ・ 下振れ ${m.p10}円 〜 上振れ ${m.p90}円(10回中8回)` +
         (m.remainingPerDayYen !== null
           ? ` ・ 残りの1日あたりの見込み ${m.remainingPerDayYen}円`
           : ''),

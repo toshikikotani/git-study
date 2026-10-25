@@ -2,14 +2,15 @@ import type { Route } from 'next';
 import Link from 'next/link';
 
 import { BackHeader } from '@/components/ui/back-header';
+import { loadReportPeriod, periodLabel } from '@/features/ai-report/period';
 import {
   listMonthlyReportMonths,
   loadDailyAiReportView,
   loadMonthlyAiReportView,
   loadMonthlyReport,
 } from '@/features/ai-report/store';
+import { listPlanRanges } from '@/features/spending-plan/store';
 import { backTargetOf } from '@/lib/back-target';
-import { monthStartJst } from '@/lib/date';
 import { withMinDuration } from '@/lib/min-loading-duration';
 import { monthReviewHref, resolveCalendarMonthStart } from '@/lib/period-nav';
 import { DailyReportCard } from './daily-report-view';
@@ -22,7 +23,10 @@ import { MonthlyReportCard, SavedMonthlyReportCard } from './report-view';
  * 分析 › 目標の「AIの気づき」、月のふりかえり、今日の1行から開く。
  *
  * 浪費傾向のタイプ判定(persona)は月次レポートだけが持つ(ADR-032:1日分のデータでは判定のノイズが大きい)。
- * 今月以外は、その月に保存したレポートの文章だけを出す(今の貯金・予測を混ぜない)。
+ * いまの期間以外は、その期間に保存したレポートの文章だけを出す(今の貯金・予測を混ぜない)。
+ *
+ * 期間は今期の目標の期間(無ければ暦の1か月、ADR-135)。レポートは期間の終わりの月で残すので、
+ * ?month= はその月('YYYY-MM')。その月に終わる目標があれば、その期間の名前で出す。
  */
 export const dynamic = 'force-dynamic';
 // 着地の見込み(確率予測)と、初回だけ過去の月での検証を含むため、余裕を持たせる。
@@ -38,12 +42,26 @@ export default async function AiReportPage({
   searchParams?: Promise<{ month?: string | string[]; from?: string | string[] }>;
 } = {}) {
   const now = new Date();
-  const currentMonthStart = monthStartJst(0, now);
-  const currentKey = currentMonthStart.slice(0, 7);
+  const [current, plans] = await Promise.all([
+    loadReportPeriod(now),
+    listPlanRanges().catch(() => []),
+  ]);
+  const currentKey = current.key;
   const { month, from } = (await searchParams) ?? {};
-  const monthStart = resolveCalendarMonthStart(month, currentMonthStart);
-  const monthKey = monthStart.slice(0, 7);
-  const isCurrentMonth = monthStart === currentMonthStart;
+  // 何も指定が無ければ、いまの期間(今期の目標、無ければ今月)。
+  const monthKey =
+    month === undefined
+      ? currentKey
+      : resolveCalendarMonthStart(month, `${currentKey}-01`).slice(0, 7);
+  const isCurrentMonth = monthKey === currentKey;
+  /** その月に終わる目標があればその期間、無ければ「2026年10月」。 */
+  const titleOf = (key: string) => {
+    if (key === currentKey && current.goal !== null) return current.label;
+    const plan = plans
+      .filter((p) => p.periodEnd.slice(0, 7) === key)
+      .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+    return plan ? periodLabel({ from: plan.periodStart, to: plan.periodEnd }) : jaMonth(key);
+  };
   const [dailyView, monthlyView, savedReport, savedMonths] = await withMinDuration(
     Promise.all([
       isCurrentMonth ? loadDailyAiReportView(now) : null,
@@ -61,7 +79,7 @@ export default async function AiReportPage({
       <BackHeader
         back={backTargetOf(from, { href: monthReviewHref(monthKey), label: '月のふりかえり' })}
         title="AIのレポート"
-        sub={`${jaMonth(monthKey)}の傾向・気づき・アドバイス`}
+        sub={`${titleOf(monthKey)}の傾向・気づき・アドバイス`}
       />
 
       {dailyView !== null ? <DailyReportCard view={dailyView} /> : null}
@@ -70,13 +88,17 @@ export default async function AiReportPage({
         <MonthlyReportCard key={monthKey} view={monthlyView} />
       ) : (
         <>
-          <SavedMonthlyReportCard monthKey={monthKey} report={savedReport} />
+          <SavedMonthlyReportCard
+            monthKey={monthKey}
+            title={titleOf(monthKey)}
+            report={savedReport}
+          />
           <Link
             href={hrefOf(currentKey)}
             className="flex min-h-11 items-center text-sm font-semibold"
             style={{ color: 'var(--accent)' }}
           >
-            今日・今月のレポートを見る・作る
+            今日・いまの期間のレポートを見る・作る
           </Link>
         </>
       )}
@@ -87,13 +109,13 @@ export default async function AiReportPage({
           className="px-1 text-[15px] font-semibold"
           style={{ color: 'var(--ink-muted)' }}
         >
-          前の月のレポート
+          前のレポート
         </h2>
         {pastMonths.length === 0 ? (
           <p className="px-1 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
             {savedMonths.length === 0
-              ? '保存したレポートはまだありません。今月のレポートを作ると、月ごとに残ります。'
-              : 'ほかの月に保存したレポートはありません。'}
+              ? '保存したレポートはまだありません。いまの期間のレポートを作ると、期間ごとに残ります。'
+              : 'ほかの期間に保存したレポートはありません。'}
           </p>
         ) : (
           <ul
@@ -106,7 +128,7 @@ export default async function AiReportPage({
                   href={hrefOf(key)}
                   className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 text-[15px]"
                 >
-                  {jaMonth(key)}のレポート
+                  {titleOf(key)}のレポート
                   <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
                     ›
                   </span>
