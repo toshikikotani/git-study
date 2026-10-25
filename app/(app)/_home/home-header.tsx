@@ -14,19 +14,15 @@ export async function HomeHeader() {
   const today = todayJst();
   const unread = await countUnread().catch(() => 0);
   return (
-    <header className="hm-page__header">
+    <header className="flex items-center justify-between gap-2 px-1 pt-2 pb-1">
       <h1
         className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-[34px] leading-tight font-bold"
         style={{ color: 'var(--ink)' }}
       >
         今日
-        <time
-          dateTime={today}
-          className="text-[15px] font-medium"
-          style={{ color: 'var(--ink-secondary)' }}
-        >
+        <span className="text-[17px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
           {homeDateLine(today)}
-        </time>
+        </span>
       </h1>
       <div className="flex items-center gap-2">
         <Link

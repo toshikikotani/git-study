@@ -21,7 +21,7 @@ export default async function GoogleSettingsPage() {
   const connected = getGoogleEnv() !== null;
 
   return (
-    <div className="rise hm-page space-y-4">
+    <div className="rise space-y-4">
       <BackHeader back={{ href: '/settings', label: '設定' }} title="Google 連携" />
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -29,7 +29,7 @@ export default async function GoogleSettingsPage() {
         Googleスプレッドシートへ自動でバックアップします。
       </p>
 
-      <Card className="hm-panel">
+      <Card>
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -60,7 +60,7 @@ export default async function GoogleSettingsPage() {
         </a>
       </Card>
 
-      <Card className="hm-panel">
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           設定手順
         </h2>
@@ -97,7 +97,7 @@ export default async function GoogleSettingsPage() {
         </ol>
       </Card>
 
-      <Card className="hm-panel">
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           安全のために
         </h2>

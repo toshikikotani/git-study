@@ -84,10 +84,10 @@ export function GoalStatusCard({
   return (
     <section
       aria-label="いまの状況"
-      className="hm-panel flex min-w-0 flex-col"
+      className="flex flex-col rounded-2xl px-5 pt-5 pb-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
-      <div className="hm-section__header flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <span className="tabular flex flex-col">
           <span className="text-[17px] font-semibold">
             今期の目標 {formatEstimate(status.budgetYen, { approx: false })}
@@ -104,7 +104,7 @@ export function GoalStatusCard({
           編集
         </Link>
       </div>
-      <div className="tabular mt-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="tabular mt-4 flex items-end justify-between gap-2">
         <span className="flex flex-col">
           <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             着地見込み

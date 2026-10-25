@@ -1,6 +1,5 @@
 import type { Route } from 'next';
 import Link from 'next/link';
-import { FiChevronRight } from 'react-icons/fi';
 
 import { BackHeader } from '@/components/ui/back-header';
 import { DetailSheet } from '@/components/ui/detail-sheet';
@@ -35,81 +34,79 @@ export default async function SettingsPage({
   ]);
 
   return (
-    <div className="rise hm-page flex flex-col gap-6" style={{ color: 'var(--ink)' }}>
+    <div className="rise flex flex-col gap-6" style={{ color: 'var(--ink)' }}>
       <BackHeader
         back={backTargetOf(from)}
         title="設定"
         {...(account.email ? { sub: `${account.email} でログイン中` } : {})}
       />
 
-      <div className="hm-settings-grid">
-        <Group title="お金">
-          <DetailSheet
-            row
-            label="給料日の振り分け"
-            sub="入った額を入れて、振り分けを確かめる"
-            title="給料日の振り分け"
-          >
-            <PaydayPanel state={payday} />
-          </DetailSheet>
-          <Row href="/savings?from=/settings" label="貯金" sub="貯金目標と貯まり具合" />
-          <Row href="/accounts" label="口座" sub="残高・締め日・資産の推移" />
-          <Row
-            href="/upcoming?from=/settings"
-            label="予定と固定費"
-            sub="これからの支払いと毎月の固定費"
-          />
-        </Group>
+      <Group title="お金">
+        <DetailSheet
+          row
+          label="給料日の振り分け"
+          sub="入った額を入れて、振り分けを確かめる"
+          title="給料日の振り分け"
+        >
+          <PaydayPanel state={payday} />
+        </DetailSheet>
+        <Row href="/savings?from=/settings" label="貯金" sub="貯金目標と貯まり具合" />
+        <Row href="/accounts" label="口座" sub="残高・締め日・資産の推移" />
+        <Row
+          href="/upcoming?from=/settings"
+          label="予定と固定費"
+          sub="これからの支払いと毎月の固定費"
+        />
+      </Group>
 
-        <Group title="表示と分類">
-          <Row
-            href="/settings/categories"
-            label="カテゴリ"
-            sub="追加・名前・アイコンと色・目標額・固定費"
-          />
-          <Row href="/settings/theme" label="色" sub="背景・文字・強調を変える" />
-        </Group>
+      <Group title="表示と分類">
+        <Row
+          href="/settings/categories"
+          label="カテゴリ"
+          sub="追加・名前・アイコンと色・目標額・固定費"
+        />
+        <Row href="/settings/theme" label="色" sub="背景・文字・強調を変える" />
+      </Group>
 
-        <Group title="レシート">
-          <ReceiptCheckSetting level={settings?.receiptCheckLevel ?? 'normal'} />
-        </Group>
+      <Group title="レシート">
+        <ReceiptCheckSetting level={settings?.receiptCheckLevel ?? 'normal'} />
+      </Group>
 
-        <Group title="AI">
-          <AiSwitch aiEnabled={settings?.aiEnabled ?? true} />
-        </Group>
+      <Group title="AI">
+        <AiSwitch aiEnabled={settings?.aiEnabled ?? true} />
+      </Group>
 
-        <Group title="LINE">
-          <EveningCheckSetting
-            enabled={settings?.eveningCheckEnabled ?? true}
-            at={settings?.eveningCheckAt ?? '21:00'}
-            lineReady={lineReady()}
-          />
-        </Group>
+      <Group title="LINE">
+        <EveningCheckSetting
+          enabled={settings?.eveningCheckEnabled ?? true}
+          at={settings?.eveningCheckAt ?? '21:00'}
+          lineReady={lineReady()}
+        />
+      </Group>
 
-        <Group title="そのほか">
-          <Row
-            href="/welcome?from=/settings"
-            label="はじめての設定"
-            sub="手取り・今日からの目標・貯金目標"
-          />
-          <Row href="/notifications" label="お知らせ" />
-          <DetailSheet row label="パスワード" title="パスワードを設定">
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              次回からはメールを開かずに、このパスワードでログインできます。
-            </p>
-            <PasswordForm />
-          </DetailSheet>
-        </Group>
+      <Group title="そのほか">
+        <Row
+          href="/welcome?from=/settings"
+          label="はじめての設定"
+          sub="手取り・今日からの目標・貯金目標"
+        />
+        <Row href="/notifications" label="お知らせ" />
+        <DetailSheet row label="パスワード" title="パスワードを設定">
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            次回からはメールを開かずに、このパスワードでログインできます。
+          </p>
+          <PasswordForm />
+        </DetailSheet>
+      </Group>
 
-        {account.isOwner ? (
-          <Group title="連携">
-            <Row href="/settings/gmail" label="Gmail連携" />
-            <Row href="/settings/google" label="Google連携" />
-            <Row href="/settings/rescued-emails" label="読み取れなかったメール" />
-            <Row href="/briefs" label="朝配信" />
-          </Group>
-        ) : null}
-      </div>
+      {account.isOwner ? (
+        <Group title="連携">
+          <Row href="/settings/gmail" label="Gmail連携" />
+          <Row href="/settings/google" label="Google連携" />
+          <Row href="/settings/rescued-emails" label="読み取れなかったメール" />
+          <Row href="/briefs" label="朝配信" />
+        </Group>
+      ) : null}
 
       <SignOutButton />
     </div>
@@ -127,18 +124,12 @@ function lineReady(): boolean {
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section
-      aria-label={title}
-      className="hm-settings-group hm-section flex min-w-0 flex-col gap-2"
-    >
-      <h2
-        className="hm-section__header px-4 pt-4 text-[15px] font-semibold"
-        style={{ color: 'var(--ink-secondary)' }}
-      >
+    <section aria-label={title} className="flex flex-col gap-2">
+      <h2 className="px-2 text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
         {title}
       </h2>
       <div
-        className="hm-list flex flex-col overflow-hidden [&>*+*]:border-t [&>*+*]:border-[var(--hairline)]"
+        className="flex flex-col overflow-hidden [&>*+*]:border-t [&>*+*]:border-[var(--hairline)]"
         style={{ borderRadius: 'var(--radius-inner)', background: 'var(--surface)' }}
       >
         {children}
@@ -152,7 +143,7 @@ function Row({ href, label, sub }: { href: string; label: string; sub?: string }
     <Link
       href={href as Route}
       prefetch={false}
-      className="flex min-h-11 items-center justify-between gap-3 px-4 py-4 active:opacity-60"
+      className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 active:opacity-60"
     >
       <span className="flex min-w-0 flex-col">
         <span className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
@@ -164,12 +155,9 @@ function Row({ href, label, sub }: { href: string; label: string; sub?: string }
           </span>
         ) : null}
       </span>
-      <FiChevronRight
-        aria-hidden
-        style={{ color: 'var(--ink-muted)' }}
-        className="shrink-0"
-        size={18}
-      />
+      <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+        ›
+      </span>
     </Link>
   );
 }

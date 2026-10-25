@@ -24,17 +24,20 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
   if (!brief) notFound();
 
   return (
-    <div className="hm-page">
+    <div className="rise space-y-4">
       <BackHeader back={{ href: '/briefs', label: '朝配信' }} title={formatDateJa(brief.briefOn)} />
 
-      <div className="hm-section">
+      <div className="space-y-3">
         {brief.items.map((item) => (
-          <Card key={item.id} className="hm-panel">
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              {item.title}
-            </h2>
-            <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>
+          <Card key={item.id}>
+            <p
+              className="text-xs font-semibold tracking-[0.08em] uppercase"
+              style={{ color: 'var(--ink-muted)' }}
+            >
               {BRIEF_ITEM_KIND_LABELS[item.kind]}
+            </p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+              {item.title}
             </p>
             {item.summary ? (
               <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -56,7 +59,7 @@ export default async function BriefDetailPage({ params }: { params: Promise<{ id
                 <span style={{ color: 'var(--ink)' }}>{item.title}</span>
                 <span style={{ color: 'var(--ink-muted)' }}>
                   {' '}
-                  ：{BRIEF_EXCLUSION_REASON_LABELS[item.reason]}
+                  — {BRIEF_EXCLUSION_REASON_LABELS[item.reason]}
                 </span>
               </li>
             ))}

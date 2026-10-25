@@ -53,25 +53,29 @@ export async function UpcomingPayments() {
     .slice(0, UPCOMING_COUNT);
 
   return (
-    <section aria-labelledby="home-upcoming" className="hm-section">
+    <section aria-labelledby="home-upcoming" className="flex flex-col gap-2">
       <h2
         id="home-upcoming"
-        className="hm-section__header text-[17px] font-semibold"
+        className="px-1 pt-3 text-[22px] font-bold"
         style={{ color: 'var(--ink)' }}
       >
         予定と固定費
       </h2>
-      <div className="flex min-w-0 flex-col">
+      <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {upcoming.length === 0 ? (
-          <p className="py-3 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+          <p className="px-4 py-3 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {AHEAD_DAYS}日先までの予定はありません。
           </p>
         ) : (
-          <ul className="hm-list">
-            {upcoming.map((t) => {
+          <ul>
+            {upcoming.map((t, i) => {
               const days = daysBetween(today, t.occurredOn);
               return (
-                <li key={t.id} className="flex items-center gap-3 py-3">
+                <li
+                  key={t.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                  style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+                >
                   <DirectRecordEditor transaction={t}>
                     <span className="tabular flex w-11 shrink-0 flex-col items-center">
                       <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
@@ -106,7 +110,7 @@ export async function UpcomingPayments() {
         )}
         <Link
           href="/upcoming"
-          className="flex min-h-12 items-center justify-between text-[15px] font-semibold"
+          className="flex min-h-12 items-center justify-between px-4 text-[15px] font-semibold"
           style={{ color: 'var(--accent)', borderTop: '1px solid var(--hairline)' }}
         >
           すべて見る
@@ -130,11 +134,11 @@ export async function TodayRecords() {
   );
 
   return (
-    <section aria-labelledby="home-today-records" className="hm-section">
-      <div className="hm-section__header">
+    <section aria-labelledby="home-today-records" className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between px-1 pt-3">
         <h2
           id="home-today-records"
-          className="text-[20px] font-semibold"
+          className="text-[22px] font-bold"
           style={{ color: 'var(--ink)' }}
         >
           今日の記録
@@ -149,14 +153,14 @@ export async function TodayRecords() {
       </div>
       {todays.length === 0 ? (
         <p
-          className="hm-panel text-[15px] leading-relaxed"
+          className="rounded-2xl px-4 py-3 text-[13px]"
           style={{ background: 'var(--surface)', color: 'var(--ink-muted)' }}
         >
           今日はまだ記録がありません。
         </p>
       ) : (
-        <ul className="hm-list" style={{ background: 'var(--surface)' }}>
-          {todays.map((t) => {
+        <ul className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
+          {todays.map((t, i) => {
             const genre = t.genreName ?? '未分類';
             const firstItem = (items.get(t.id) as { name: string }[] | undefined)?.[0]?.name;
             const sub = isFixed(t)
@@ -167,7 +171,10 @@ export async function TodayRecords() {
             const income = t.amountYen > 0;
             return (
               <li key={t.id}>
-                <div className="flex items-center gap-3 py-3 pr-4 pl-2">
+                {i > 0 ? (
+                  <div className="ml-16 h-px" style={{ background: 'var(--hairline)' }} />
+                ) : null}
+                <div className="flex items-center gap-3 py-2 pr-4 pl-2">
                   <CategoryMark genreId={t.genreId} name={t.genreName} />
                   <DirectRecordEditor transaction={t}>
                     <span className="flex min-w-0 flex-1 flex-col">

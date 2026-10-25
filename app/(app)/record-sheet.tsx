@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { FiChevronRight } from 'react-icons/fi';
 
 import { GenreBadge } from '@/components/ui/genre-badge';
 import { shortGenreName } from '@/domain/genre-groups';
@@ -493,8 +492,8 @@ export function RecordSheet({
     .join('・');
 
   return (
-    <div className="hm-page hm-record-form flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
-      <BottomSheetHeader className="hm-page__header grid grid-cols-[1fr_auto_1fr] items-center">
+    <div className="flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
+      <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center">
         <button
           type="button"
           onClick={onClose}
@@ -543,7 +542,7 @@ export function RecordSheet({
       {/* いちばん上に大きい「レシートを撮る」と、写真から読み取るボタン(デザイン v3-4)。
           写真のボタンは、端末の写真を選ぶ画面をすぐ開く。直すときは出さない。 */}
       {edit || (onCamera === undefined && onFiles === undefined) ? null : (
-        <div className="hm-toolbar flex gap-2">
+        <div className="flex gap-2">
           {onCamera ? (
             <button
               type="button"
@@ -588,7 +587,7 @@ export function RecordSheet({
       )}
 
       <section
-        className="hm-form-section hm-record-amount flex flex-col items-center gap-3 rounded-2xl px-4 pt-4 pb-5"
+        className="flex flex-col items-center gap-2 rounded-2xl px-4 pt-3 pb-4"
         style={{ background: 'var(--surface)' }}
       >
         {/* 種類は支出・収入の2つ。返金は「詳細」で(デザイン v3-4) */}
@@ -644,7 +643,7 @@ export function RecordSheet({
       </section>
 
       <label
-        className="hm-form-section flex min-h-13 items-center gap-3 rounded-2xl px-4"
+        className="flex min-h-13 items-center gap-3 rounded-2xl px-4"
         style={{ background: 'var(--surface)' }}
       >
         <span className="shrink-0 text-[16px]">レシート名</span>
@@ -663,7 +662,7 @@ export function RecordSheet({
 
       {kind !== 'income' ? (
         <section
-          className="hm-form-section flex flex-col gap-2 rounded-2xl px-4 py-4"
+          className="flex flex-col gap-2 rounded-2xl px-3 py-3"
           style={{ background: 'var(--surface)' }}
         >
           <div className="flex items-center justify-between gap-2 px-1">
@@ -799,7 +798,7 @@ export function RecordSheet({
         </section>
       ) : null}
 
-      <div className="hm-list flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
+      <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
         {kind === 'expense' && !edit ? (
           <label className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
             <span className="flex flex-col">
@@ -840,7 +839,7 @@ export function RecordSheet({
               transition: 'transform 150ms',
             }}
           >
-            <FiChevronRight aria-hidden size={18} />
+            ›
           </span>
         </button>
         {more ? (

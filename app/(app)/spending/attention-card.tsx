@@ -1,5 +1,4 @@
 'use client';
-import { FiChevronRight } from 'react-icons/fi';
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -123,7 +122,9 @@ export function AttentionCard({
           {count}
         </span>
       ) : null}
-      <FiChevronRight aria-hidden style={{ color: 'var(--ink-muted)' }} />
+      <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+        ›
+      </span>
     </Link>
   );
 }

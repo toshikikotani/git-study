@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FiChevronRight } from 'react-icons/fi';
 import { useEffect, useRef, useState } from 'react';
 
 import type { AskUserQuestion } from '@/features/assistant/plan';
@@ -186,14 +185,12 @@ export function AssistantChat({
       ref={layerRef}
       data-no-pull={variant === 'page' ? true : undefined}
       className={
-        variant === 'sheet'
-          ? 'hm-assistant flex h-[84dvh] flex-col gap-3'
-          : 'rise hm-assistant flex flex-col gap-3 px-4'
+        variant === 'sheet' ? 'flex h-[84dvh] flex-col gap-2' : 'rise flex flex-col gap-2 px-4'
       }
       style={variant === 'sheet' ? { color: 'var(--ink)' } : pageStyle(keyboard)}
     >
       {variant === 'page' ? (
-        <header className="hm-page__header flex items-center justify-between gap-2 px-1">
+        <header className="flex items-center justify-between gap-2 px-1">
           {/* キーボードが出ているあいだは題を小さくし、会話の見える行をふやす。 */}
           <h1 className={docked ? 'text-[17px] font-semibold' : 'text-[34px] font-bold'}>AI</h1>
           <div className="flex items-center gap-2">
@@ -302,10 +299,8 @@ export function AssistantChat({
         style={{
           scrollbarWidth: 'none',
           touchAction: 'pan-x',
-          maskImage:
-            'linear-gradient(to right, var(--hm-mask-ink) calc(100% - 40px), var(--hm-mask-clear))',
-          WebkitMaskImage:
-            'linear-gradient(to right, var(--hm-mask-ink) calc(100% - 40px), var(--hm-mask-clear))',
+          maskImage: 'linear-gradient(to right, #000 calc(100% - 40px), transparent)',
+          WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 40px), transparent)',
         }}
       >
         {SUGGESTIONS.map((q) => (
@@ -336,8 +331,8 @@ export function AssistantChat({
         }}
         className={
           docked
-            ? 'hm-assistant-composer flex items-end gap-2'
-            : 'hm-assistant-composer flex items-end gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+            ? 'flex items-end gap-2'
+            : 'flex items-end gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]'
         }
       >
         {speech.supported ? (
@@ -350,7 +345,7 @@ export function AssistantChat({
             className="flex size-11 shrink-0 items-center justify-center rounded-full"
             style={{
               background: speech.listening ? 'var(--over)' : 'var(--surface)',
-              color: speech.listening ? 'var(--hm-media-ink)' : 'var(--accent)',
+              color: speech.listening ? '#fff' : 'var(--accent)',
             }}
           >
             <MicIcon />
@@ -500,7 +495,7 @@ export function Bubble({
                 style={{ background: 'var(--plane)', color: 'var(--accent)' }}
               >
                 {l.label}を開く
-                <FiChevronRight aria-hidden size={16} />
+                <span aria-hidden>›</span>
               </button>
             ))}
           </div>
@@ -671,12 +666,12 @@ function ProposalCard({
               </span>
               <span style={{ color: 'var(--ink-secondary)' }}>
                 {r.change.target}
-                <span style={{ color: 'var(--ink-muted)' }}>: {r.change.detail}</span>
+                <span style={{ color: 'var(--ink-muted)' }}> — {r.change.detail}</span>
               </span>
             </li>
           ) : (
             <li key={i} className="text-[13px]" style={{ color: 'var(--over)' }}>
-              {r.target}: {r.error}
+              {r.target} — {r.error}
             </li>
           ),
         )}
@@ -689,7 +684,7 @@ function ProposalCard({
       className="space-y-2 rounded-2xl p-3"
       style={{ background: 'var(--plane)', opacity: status === 'cancelled' ? 0.5 : 1 }}
     >
-      <p className="text-[13px] font-semibold">確認({changes.length}件):反映するものにチェック</p>
+      <p className="text-[13px] font-semibold">確認({changes.length}件)— 反映するものにチェック</p>
       <ul className="space-y-2">
         {changes.map((c, i) => (
           <li key={i} className="rounded-xl" style={{ background: 'var(--surface)' }}>

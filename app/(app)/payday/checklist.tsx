@@ -23,7 +23,7 @@ export function PaydayAmountForm({ paydayOn }: { paydayOn: DateOnly }) {
   );
 
   return (
-    <Card className="hm-panel">
+    <Card>
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
         給料日({formatDateJa(paydayOn)})が来ました
       </h2>
@@ -31,13 +31,13 @@ export function PaydayAmountForm({ paydayOn }: { paydayOn: DateOnly }) {
         いくら入金されましたか?この金額をもとに、下のルールで振り分けます。
       </p>
 
-      <form action={formAction} className="hm-toolbar mt-4">
+      <form action={formAction} className="mt-3 flex items-center gap-2">
         <input
           type="text"
           inputMode="numeric"
           name="sourceAmountYen"
           placeholder="300000"
-          className="min-h-11 min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
+          className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
           style={{
             background: 'var(--plane)',
             color: 'var(--ink)',
@@ -47,7 +47,7 @@ export function PaydayAmountForm({ paydayOn }: { paydayOn: DateOnly }) {
         <button
           type="submit"
           disabled={pending}
-          className="min-h-11 btn-primary shrink-0 rounded-full px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hm-focus-color)] active:translate-y-px motion-reduce:transform-none disabled:cursor-not-allowed disabled:bg-[var(--action-off)] disabled:text-[var(--on-action-off)]"
+          className="min-h-11 btn-primary shrink-0 rounded-full px-4 py-2 text-sm font-semibold"
         >
           {pending ? '作成中…' : '振り分ける'}
         </button>
@@ -67,8 +67,8 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
   const doneCount = run.items.filter((i) => i.isDone).length;
 
   return (
-    <Card className="hm-panel">
-      <div className="hm-section__header">
+    <Card>
+      <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           給料日チェックリスト({formatDateJa(run.runOn)})
         </h2>
@@ -80,16 +80,16 @@ export function PaydayChecklist({ run }: { run: TransferRun }) {
         入金額 {formatYen(run.sourceAmountYen, { sign: 'never' })}。上から順に済ませてください。
       </p>
 
-      <ul className="hm-list mt-4">
+      <ul className="mt-3 space-y-2">
         {run.items.map((item) => (
           <li key={item.id}>
             <form action={toggleTransferRunItemAction.bind(null, item.id, !item.isDone)}>
               <button
                 type="submit"
-                className="min-h-11 flex w-full items-center gap-3 px-3 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hm-focus-color)] active:translate-y-px motion-reduce:transform-none"
+                className="min-h-11 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left"
                 style={{
-                  background: item.isDone ? 'var(--accent-track)' : 'transparent',
-                  border: 'none',
+                  background: item.isDone ? 'var(--accent-track)' : 'var(--plane)',
+                  border: '1px solid var(--hairline)',
                 }}
               >
                 <span

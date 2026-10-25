@@ -7,7 +7,6 @@ import { CalendarHeatmap } from './calendar-heatmap';
 import { saveCalendarOpen, useCalendarOpen } from './calendar-prefs';
 import { FilterSheet } from './filter-sheet';
 import { useSpendingMonth } from './spending-month-provider';
-import styles from './spending.module.css';
 
 /**
  * 検索・絞り込み・カレンダーを1行にまとめる。カレンダーは既定で出し、横のボタンで隠せる。出す / 隠すと
@@ -26,10 +25,10 @@ export function LedgerSearchControls({
   const calendarId = useId();
 
   return (
-    <div className={`hm-toolbar ${styles.searchRegion}`}>
-      <div className={styles.searchRow}>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
         <div
-          className={`flex min-w-0 flex-1 items-center rounded-xl ${styles.searchField}`}
+          className="flex min-w-0 flex-1 items-center rounded-xl"
           style={{ background: 'var(--field)', color: 'var(--ink-muted)' }}
         >
           <label className="flex h-11 min-w-0 flex-1 items-center gap-2 pl-3">

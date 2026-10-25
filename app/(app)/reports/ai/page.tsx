@@ -1,4 +1,3 @@
-import { FiChevronRight } from 'react-icons/fi';
 import type { Route } from 'next';
 import Link from 'next/link';
 
@@ -109,7 +108,7 @@ export default async function AiReportPage({
                 >
                   {jaMonth(key)}のレポート
                   <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
-                    <FiChevronRight aria-hidden />
+                    ›
                   </span>
                 </Link>
               </li>

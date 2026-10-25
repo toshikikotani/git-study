@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FiChevronRight } from 'react-icons/fi';
 
 import { ReceiptImageViewer } from '@/components/receipt/receipt-image-viewer';
 import { GenreBadge } from '@/components/ui/genre-badge';
@@ -219,7 +218,7 @@ export function ReceiptCheck({
     itemSheet === null ? null : (state.draft?.lines.find((l) => l.id === itemSheet) ?? null);
 
   return (
-    <div className="hm-page flex flex-col" style={{ color: 'var(--ink)' }}>
+    <div className="flex flex-col" style={{ color: 'var(--ink)' }}>
       <BottomSheetHeader>
         <div className="flex min-h-11 items-center justify-between gap-2 py-1">
           <p className="text-[17px] font-semibold">
@@ -244,7 +243,7 @@ export function ReceiptCheck({
         </div>
       </BottomSheetHeader>
 
-      <div className="hm-section flex flex-col gap-4 pb-4">
+      <div className="flex flex-col gap-4 pb-4">
         {/* 1. 画像:細長い帯。押すと全画面で拡大できる。 */}
         {receipt.imageUrl ? (
           <button
@@ -252,13 +251,13 @@ export function ReceiptCheck({
             onClick={() => setViewer(true)}
             aria-label="レシートの画像を大きく見る"
             className="relative h-[120px] min-h-11 w-full overflow-hidden rounded-2xl"
-            style={{ background: 'var(--hm-media-canvas)' }}
+            style={{ background: '#111' }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={receipt.imageUrl} alt="" className="size-full object-cover object-top" />
             <span
               className="absolute right-2 bottom-2 rounded-full px-3 py-1 text-[12px] font-semibold"
-              style={{ background: 'var(--hm-media-overlay)', color: 'var(--hm-media-ink)' }}
+              style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
             >
               押すと大きく
             </span>
@@ -683,7 +682,7 @@ export function ReceiptCheck({
         className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         style={{
           background: 'var(--sheet-background, var(--plane))',
-          boxShadow: 'var(--hm-sticky-shadow)',
+          boxShadow: '0 -12px 24px -20px rgba(0, 0, 0, 0.35)',
         }}
       >
         {undo ? (
@@ -837,7 +836,7 @@ function SummaryRow({
         >
           {value}
           <span aria-hidden className="ml-2" style={{ color: 'var(--ink-muted)' }}>
-            <FiChevronRight aria-hidden size={18} className="inline-block align-middle" />
+            ›
           </span>
         </span>
       </button>
@@ -970,7 +969,7 @@ function QuestionCard({
       {receipt.imageUrl && question.yRatio !== null ? (
         <div
           className="h-[72px] w-full overflow-hidden rounded-xl"
-          style={{ background: 'var(--hm-media-canvas)' }}
+          style={{ background: '#111' }}
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1239,7 +1238,7 @@ function ItemSheet({
                   {genreName ? <GenreBadge name={genreName} size={24} /> : null}
                   {genreName ?? '未選択'}
                   <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
-                    <FiChevronRight aria-hidden size={18} className="inline-block align-middle" />
+                    ›
                   </span>
                 </span>
               </button>

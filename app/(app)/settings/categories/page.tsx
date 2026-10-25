@@ -17,7 +17,7 @@ export default async function CategoriesSettingsPage({
 }) {
   const [{ from }, genres] = await Promise.all([searchParams, listGenres()]);
   return (
-    <div className="rise hm-page flex flex-col gap-3">
+    <div className="rise flex flex-col gap-3">
       <CategoryList
         categories={genres.map((g) => ({ id: g.id, name: g.name }))}
         back={backTargetOf(from, SETTINGS_BACK)}

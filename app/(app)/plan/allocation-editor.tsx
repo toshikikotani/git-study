@@ -178,7 +178,7 @@ export function AllocationEditor({
             }}
             aria-label="目標の総額(円)"
             aria-invalid={totalDraft !== null && parseYen(totalDraft) === null}
-            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 tabular w-28 rounded-lg px-2 py-1 text-right font-semibold"
+            className="tabular w-28 rounded-lg px-2 py-1 text-right font-semibold"
             style={{
               background: 'var(--surface-raised)',
               color: 'var(--ink)',
@@ -197,7 +197,7 @@ export function AllocationEditor({
       </p>
       <details open={!compact || !allValid || !canSave} className="space-y-3">
         <summary
-          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 cursor-pointer py-3 text-sm font-semibold"
+          className="min-h-11 cursor-pointer py-3 text-sm font-semibold"
           style={{ color: 'var(--accent)' }}
         >
           カテゴリへの配分を調整 · {rows.length}件
@@ -214,7 +214,7 @@ export function AllocationEditor({
             checked={lockTotal}
             onChange={toggleLock}
             aria-label="総額を固定する"
-            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 size-5 shrink-0"
+            className="size-5 shrink-0"
           />
         </label>
         <p
@@ -256,7 +256,7 @@ export function AllocationEditor({
                     type="button"
                     aria-label={`${row.genreName}を${STEP_YEN}円減らす`}
                     onClick={() => setYen(row.genreId, (parsed[i] ?? 0) - STEP_YEN, true)}
-                    className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 size-8 rounded-full text-base font-semibold"
+                    className="min-h-11 size-8 rounded-full text-base font-semibold"
                     style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                   >
                     −
@@ -272,7 +272,7 @@ export function AllocationEditor({
                     }}
                     aria-label={`${row.genreName}の目標額(円)`}
                     aria-invalid={parsed[i] === null}
-                    className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 tabular w-20 rounded-lg px-2 py-1 text-right text-sm"
+                    className="tabular w-20 rounded-lg px-2 py-1 text-right text-sm"
                     style={{
                       background: 'var(--surface-raised)',
                       color: 'var(--ink)',
@@ -283,7 +283,7 @@ export function AllocationEditor({
                     type="button"
                     aria-label={`${row.genreName}を${STEP_YEN}円増やす`}
                     onClick={() => setYen(row.genreId, (parsed[i] ?? 0) + STEP_YEN, true)}
-                    className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 size-8 rounded-full text-base font-semibold"
+                    className="min-h-11 size-8 rounded-full text-base font-semibold"
                     style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
                   >
                     ＋
@@ -358,7 +358,7 @@ export function AllocationEditor({
           </span>
           <button
             type="button"
-            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 shrink-0 font-semibold"
+            className="min-h-11 shrink-0 font-semibold"
             style={{ color: 'var(--accent)' }}
             onClick={() => {
               setYen(notice.genreId, notice.previous, true);

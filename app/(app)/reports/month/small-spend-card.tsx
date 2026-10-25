@@ -22,7 +22,7 @@ export async function SmallSpendCard() {
   return (
     <section
       aria-labelledby="small-spend"
-      className="hm-panel flex min-w-0 flex-col gap-2"
+      className="flex flex-col gap-1 rounded-2xl px-4 pt-4 pb-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-baseline justify-between gap-2">

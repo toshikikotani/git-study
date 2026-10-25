@@ -1,5 +1,4 @@
 'use client';
-import { FiArrowRight } from 'react-icons/fi';
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
@@ -260,7 +259,7 @@ export function SplitPaymentForm({ transactions, onClose }: Props) {
                   className="inline-flex min-h-11 items-center font-semibold"
                   style={{ color: 'var(--accent)' }}
                 >
-                  今日の画面で受取を確認 <FiArrowRight aria-hidden className="ml-2" />
+                  今日の画面で受取を確認 →
                 </Link>
               </div>
             ) : (

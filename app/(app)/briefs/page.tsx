@@ -23,7 +23,7 @@ export default async function BriefsPage() {
   const briefs = await withMinDuration(listDailyBriefs());
 
   return (
-    <div className="hm-page">
+    <div className="rise space-y-4">
       <BackHeader back={{ href: '/settings', label: '設定' }} title="朝配信" />
 
       {briefs.length === 0 ? (
@@ -31,10 +31,10 @@ export default async function BriefsPage() {
           まだ配信がありません。
         </p>
       ) : (
-        <div className="hm-list" style={{ background: 'var(--surface)' }}>
+        <div className="space-y-3">
           {briefs.map((brief) => (
             <Link key={brief.id} href={`/briefs/${brief.id}`} className="block min-h-11">
-              <Card variant="filled">
+              <Card>
                 <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                   {formatDateJa(brief.briefOn)}
                 </p>

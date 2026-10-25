@@ -26,60 +26,54 @@ export default async function NotificationsPage() {
   const items = await listInbox().catch(() => []);
   const unread = items.filter((item) => !item.read).length;
   return (
-    <div className="hm-page">
+    <div className="rise space-y-4">
       <BackHeader
         back={{ href: '/', label: '今日' }}
         title="お知らせ"
         action={unread > 0 ? <MarkReadButton /> : undefined}
       />
-      <div className="hm-dashboard">
-        <div className="hm-dashboard__primary">
-          {items.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
-              この60日のお知らせはありません。
-            </p>
-          ) : (
-            <ul className="hm-list" style={{ background: 'var(--surface)' }}>
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="space-y-2 p-5"
-                  style={{ background: 'var(--surface)' }}
+      {items.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--ink-secondary)' }}>
+          この60日のお知らせはありません。
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="glass space-y-1 rounded-2xl p-4"
+              style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+            >
+              <p
+                className="flex items-center gap-2 text-xs"
+                style={{ color: 'var(--ink-secondary)' }}
+              >
+                {item.read ? null : (
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: 'var(--action)' }}
+                    aria-label="未読"
+                  />
+                )}
+                <span className="font-semibold">{SEVERITY_LABEL[item.severity]}</span>
+                <span className="tabular">{formatWhen(item.triggeredAt)}</span>
+              </p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                {item.title}
+              </p>
+              {item.body ? (
+                <p
+                  className="text-sm leading-relaxed whitespace-pre-line"
+                  style={{ color: 'var(--ink-secondary)' }}
                 >
-                  <p
-                    className="flex items-center gap-2 text-xs"
-                    style={{ color: 'var(--ink-secondary)' }}
-                  >
-                    {item.read ? null : (
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ background: 'var(--action)' }}
-                        aria-label="未読"
-                      />
-                    )}
-                    <span className="font-semibold">{SEVERITY_LABEL[item.severity]}</span>
-                    <span className="tabular">{formatWhen(item.triggeredAt)}</span>
-                  </p>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                    {item.title}
-                  </p>
-                  {item.body ? (
-                    <p
-                      className="text-sm leading-relaxed whitespace-pre-line"
-                      style={{ color: 'var(--ink-secondary)' }}
-                    >
-                      {item.body}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="hm-dashboard__secondary">
-          <RiskyRulesCard />
-        </div>
-      </div>
+                  {item.body}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <RiskyRulesCard />
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function MarkReadButton() {
             setError(result.error);
           })
         }
-        className="min-h-11 rounded-full px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-[var(--action-off)] disabled:text-[var(--on-action-off)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hm-focus-color)] active:translate-y-px motion-reduce:transform-none"
+        className="min-h-11 rounded-full px-4 text-sm font-semibold disabled:opacity-60"
         style={{ background: 'var(--surface)', color: 'var(--ink)' }}
       >
         {pending ? '既読にしています…' : 'すべて既読にする'}

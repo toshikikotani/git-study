@@ -34,8 +34,8 @@ export default async function AnalysisGoalPage() {
           ? 'ended'
           : 'active';
   return (
-    <div className="hm-page">
-      <header className="hm-page__header">
+    <div className="rise flex flex-col gap-3">
+      <header className="flex items-center justify-between gap-2 px-1 pt-2">
         <h1 className="text-[34px] leading-tight font-bold" style={{ color: 'var(--ink)' }}>
           分析
         </h1>

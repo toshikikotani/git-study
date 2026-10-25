@@ -196,34 +196,30 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
   const ahead = Math.max(0, b.totalYen - decided);
 
   return (
-    <div className="hm-dashboard">
-      <section className="hm-dashboard__primary hm-section">
-        <GroupHeading>いまの状況</GroupHeading>
+    <>
+      <GroupHeading>いまの状況</GroupHeading>
+      <GoalStatusCard
+        status={{
+          budgetYen,
+          p10: forecast.total.p10,
+          p50: forecast.total.p50,
+          p90: forecast.total.p90,
+          probWithin: forecast.probWithinBudget,
+          days,
+          spentYen,
+          provisional: forecast.provisional,
+        }}
+        periodLabel={`${md(period.from)}〜${md(period.to)} · 残り${remainingDays}日`}
+        endLabel={dayLabel(period.to)}
+        remainingDays={remainingDays}
+      />
 
-        <GoalStatusCard
-          status={{
-            budgetYen,
-            p10: forecast.total.p10,
-            p50: forecast.total.p50,
-            p90: forecast.total.p90,
-            probWithin: forecast.probWithinBudget,
-            days,
-            spentYen,
-            provisional: forecast.provisional,
-          }}
-          periodLabel={`${md(period.from)}〜${md(period.to)} · 残り${remainingDays}日`}
-          endLabel={dayLabel(period.to)}
-          remainingDays={remainingDays}
-        />
-      </section>
-      <section className="hm-dashboard__secondary hm-section">
-        <GroupHeading>どこで使っているか</GroupHeading>
+      <GroupHeading>どこで使っているか</GroupHeading>
+      <CategoryProgress rows={progress} untargeted={untargeted} />
+      <WeekdayHabit rows={habit} />
 
-        <CategoryProgress rows={progress} untargeted={untargeted} />
-        <WeekdayHabit rows={habit} />
-      </section>
       {today >= period.from ? (
-        <section className="hm-dashboard__primary hm-section">
+        <>
           <GroupHeading>ペース</GroupHeading>
           <SpendingTrendChart
             daySpend={daySpend}
@@ -240,88 +236,84 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
                 : null
             }
           />
-        </section>
+        </>
       ) : null}
-      <section className="hm-dashboard__secondary hm-section">
-        <GroupHeading>次にできること</GroupHeading>
 
-        {forecast.suggestion ? (
-          <NextStepCard suggestion={forecast.suggestion} variant="goal" />
-        ) : null}
-        <AiCard
-          asOfLabel={report ? updatedLabel(report.createdAt, today) : null}
-          bullets={bullets}
-          analyzed={report !== null}
-        />
-      </section>
-      <section className="hm-section" style={{ gridColumn: '1 / -1' }}>
-        <GroupHeading>くわしく</GroupHeading>
+      <GroupHeading>次にできること</GroupHeading>
+      {forecast.suggestion ? (
+        <NextStepCard suggestion={forecast.suggestion} variant="goal" />
+      ) : null}
+      <AiCard
+        asOfLabel={report ? updatedLabel(report.createdAt, today) : null}
+        bullets={bullets}
+        analyzed={report !== null}
+      />
 
-        <DetailRows
-          rows={[
-            {
-              key: 'why',
-              // 値は下の行に(右に並べると「なぜ約20.6万円？」が2行に折れた、本人の指摘、ADR-108)。
-              title: 'なぜこの見込み？',
-              sub: `${formatEstimate(b.totalYen)} = 決まった分 ${man(decided)} + これから ${man(ahead)}`,
-              // 予測の確かさ(過去の月での当たり具合)もここで見る(もとは「そのほかの分析」、ADR-127)。
-              content: (
-                <div className="flex flex-col gap-3">
-                  <WhyCard forecast={forecast} closedGenreIds={closed} />
-                  <VerificationCard
-                    verification={loaded.forecast?.verification ?? null}
-                    monthStart={period.from}
-                  />
-                </div>
-              ),
-            },
-            ...(forecast.probWithinBudget !== null
-              ? [
-                  {
-                    key: 'probability',
-                    title: '確率の分布',
-                    value: `${man(forecast.total.p10)}〜${man(forecast.total.p90)}`,
-                    content: (
-                      <ProbabilityCard
-                        distribution={forecast.distribution}
-                        p50={forecast.total.p50}
-                        budgetYen={budgetYen}
-                        provisional={forecast.provisional}
-                      />
-                    ),
-                  },
-                ]
-              : []),
-            ...(fixedRows.length > 0
-              ? [
-                  {
-                    key: 'fixed',
-                    title: '固定費',
-                    sub: '見込みに含めて計算',
-                    value: formatYen(fixedYen, { sign: 'never' }),
-                    content: (
-                      <ul
-                        className="flex flex-col rounded-2xl"
-                        style={{ background: 'var(--surface)', color: 'var(--ink)' }}
-                      >
-                        {fixedRows.map((row, i) => (
-                          <li
-                            key={row.genreId}
-                            className="tabular flex min-h-12 items-center justify-between px-4 text-[16px]"
-                            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
-                          >
-                            <span>{row.name}</span>
-                            <span>{formatYen(row.p50, { sign: 'never' })}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ),
-                  },
-                ]
-              : []),
-          ]}
-        />
-      </section>
-    </div>
+      <GroupHeading>くわしく</GroupHeading>
+      <DetailRows
+        rows={[
+          {
+            key: 'why',
+            // 値は下の行に(右に並べると「なぜ約20.6万円？」が2行に折れた、本人の指摘、ADR-108)。
+            title: 'なぜこの見込み？',
+            sub: `${formatEstimate(b.totalYen)} = 決まった分 ${man(decided)} + これから ${man(ahead)}`,
+            // 予測の確かさ(過去の月での当たり具合)もここで見る(もとは「そのほかの分析」、ADR-127)。
+            content: (
+              <div className="flex flex-col gap-3">
+                <WhyCard forecast={forecast} closedGenreIds={closed} />
+                <VerificationCard
+                  verification={loaded.forecast?.verification ?? null}
+                  monthStart={period.from}
+                />
+              </div>
+            ),
+          },
+          ...(forecast.probWithinBudget !== null
+            ? [
+                {
+                  key: 'probability',
+                  title: '確率の分布',
+                  value: `${man(forecast.total.p10)}〜${man(forecast.total.p90)}`,
+                  content: (
+                    <ProbabilityCard
+                      distribution={forecast.distribution}
+                      p50={forecast.total.p50}
+                      budgetYen={budgetYen}
+                      provisional={forecast.provisional}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(fixedRows.length > 0
+            ? [
+                {
+                  key: 'fixed',
+                  title: '固定費',
+                  sub: '見込みに含めて計算',
+                  value: formatYen(fixedYen, { sign: 'never' }),
+                  content: (
+                    <ul
+                      className="flex flex-col rounded-2xl"
+                      style={{ background: 'var(--surface)', color: 'var(--ink)' }}
+                    >
+                      {fixedRows.map((row, i) => (
+                        <li
+                          key={row.genreId}
+                          className="tabular flex min-h-12 items-center justify-between px-4 text-[16px]"
+                          style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+                        >
+                          <span>{row.name}</span>
+                          <span>{formatYen(row.p50, { sign: 'never' })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
+    </>
   );
 }

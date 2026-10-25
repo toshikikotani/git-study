@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react';
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { monthSpendingText } from '@/domain/month-spending-text';
 import { useSpendingMonth } from './spending-month-provider';
-import styles from './spending.module.css';
 
 /**
  * 表示中の月の支出を、文字でコピーする(本人「1ヶ月分の支出を出力する機能欲しい」、ADR-134)。
@@ -50,7 +49,7 @@ export function MonthCopy() {
           setOpen(true);
         }}
         disabled={loading}
-        className={`flex min-h-11 items-center gap-2 text-[13px] font-semibold disabled:opacity-40 ${styles.copyAction}`}
+        className="flex min-h-11 items-center gap-2 self-end px-1 text-[13px] font-semibold disabled:opacity-40"
         style={{ color: 'var(--accent)' }}
       >
         <svg

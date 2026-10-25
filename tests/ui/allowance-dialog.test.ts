@@ -85,10 +85,7 @@ describe('なぜこの額？(簡単版)', () => {
 
   it('こえた分は明日からに回る:明日から19日の目安(休日・平日)と日ごとの棒', () => {
     expect(text).toContain('こえた分は、明日からに回ります');
-    // 日数と休日・平日の額は、それぞれの行に表示しても同じ事実を保つ。
-    expect(text).toContain('明日から19日の目安');
-    expect(text).toContain('休日 約810円');
-    expect(text).toContain('平日 約360円');
+    expect(text).toContain('明日から19日の目安 · 休日 約810円 · 平日 約360円');
     expect(text).toContain('祝');
     expect(text).toContain('11/1');
     expect(text).toContain('計算式を見る');

@@ -29,30 +29,25 @@ export default async function AccountsPage() {
   );
 
   return (
-    <div className="hm-page">
+    <div className="rise space-y-4">
       <BackHeader back={{ href: '/settings', label: '設定' }} title="口座" />
 
-      <div className="hm-dashboard">
-        <div className="hm-dashboard__primary">
-          {accounts.length === 0 ? (
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              まだ登録されていません。下のボタンから追加してください。
-            </p>
-          ) : (
-            <div className="hm-section">
-              {accounts.map((account) => (
-                <AccountRow key={account.id} account={account} />
-              ))}
-            </div>
-          )}
+      {accounts.length === 0 ? (
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          まだ登録されていません。下のボタンから追加してください。
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {accounts.map((account) => (
+            <AccountRow key={account.id} account={account} />
+          ))}
+        </div>
+      )}
 
-          <NewAccount />
-        </div>
-        <div className="hm-dashboard__secondary">
-          <NetWorthChart points={netWorth} />
-          <PurposeBalanceCard balances={balances} />
-        </div>
-      </div>
+      <NewAccount />
+
+      <NetWorthChart points={netWorth} />
+      <PurposeBalanceCard balances={balances} />
     </div>
   );
 }

@@ -170,15 +170,15 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="rise hm-page space-y-4">
+    <div className="rise space-y-4">
       <BackHeader back={{ href: '/spending', label: '明細', cancel: true }} title="CSVを取り込む" />
 
-      <Card className="hm-panel">
+      <Card>
         <InputAccountSelector inputAccount={inputAccount} />
       </Card>
 
       {/* 2. ファイル */}
-      <Card className="hm-panel">
+      <Card>
         <Step n={1} title="ファイルを選ぶ" />
         <label
           className="min-h-11 mt-3 block cursor-pointer rounded-2xl border border-dashed px-4 py-8 text-center"
@@ -218,7 +218,7 @@ export default function ImportPage() {
 
       {/* 3. 列の対応 */}
       {loaded ? (
-        <Card className="hm-panel">
+        <Card>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             日付: {adapter.dateColumn || '未設定'} / 摘要: {adapter.descriptionColumn || '未設定'} /
             金額:{' '}
@@ -308,7 +308,7 @@ export default function ImportPage() {
 
       {/* 3. プレビュー */}
       {result && 'error' in result ? (
-        <Card className="hm-panel">
+        <Card>
           <p className="text-sm" style={{ color: 'var(--over)' }}>
             {result.error}
           </p>
@@ -316,7 +316,7 @@ export default function ImportPage() {
       ) : null}
 
       {result && !('error' in result) ? (
-        <Card className="hm-panel">
+        <Card>
           <Step n={2} title="確認して保存する" />
 
           <div className="mt-3 flex gap-2">
@@ -406,7 +406,7 @@ function SavedResult({ imported, duplicates }: { imported: number; duplicates: n
         取り込みました
       </h1>
 
-      <Card className="hm-panel">
+      <Card>
         <div className="flex gap-2">
           <Count label="取り込んだ" value={imported} tone="accent" />
           <Count label="重複で除いた" value={duplicates} tone="accent" />

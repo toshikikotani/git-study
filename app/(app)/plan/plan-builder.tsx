@@ -144,8 +144,8 @@ export function PlanBuilder({
   return (
     <details
       open={!reserving}
-      className="hm-panel hm-section"
-      style={{ background: 'var(--surface)' }}
+      className="glass rounded-2xl p-4"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <summary
         className="min-h-11 cursor-pointer list-none text-sm font-semibold"
@@ -163,11 +163,7 @@ export function PlanBuilder({
         提案は目安なので、あとから自由に直せます。
       </p>
 
-      <div
-        className="hm-toolbar mt-3 flex flex-wrap gap-2"
-        role="group"
-        aria-label="期間のプリセット"
-      >
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="期間のプリセット">
         {PLAN_PRESET_ORDER.map((id) => (
           <button
             key={id}
@@ -180,8 +176,8 @@ export function PlanBuilder({
             }}
             className="min-h-11 rounded-full px-3 py-1 text-xs font-semibold"
             style={{
-              background: preset === id ? 'var(--action)' : 'var(--plane)',
-              color: preset === id ? 'var(--on-action)' : 'var(--ink-secondary)',
+              background: preset === id ? 'var(--accent)' : 'var(--accent-track)',
+              color: preset === id ? 'var(--on-accent)' : 'var(--accent)',
             }}
           >
             {PLAN_PRESET_LABELS[id]}
@@ -191,8 +187,8 @@ export function PlanBuilder({
 
       <details
         open={overlapError !== null || start === null || end === null}
-        className="hm-section mt-3 border-t pt-3"
-        style={{ borderColor: 'var(--hairline)' }}
+        className="mt-3 rounded-xl px-3"
+        style={{ background: 'var(--plane)' }}
       >
         <summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold">
           期間・改善の強さを調整 · {STEP_LABELS[step]}({step}%)
