@@ -1,4 +1,5 @@
 'use client';
+import { FiChevronRight } from 'react-icons/fi';
 
 import type { Route } from 'next';
 import Link from 'next/link';
@@ -24,6 +25,7 @@ import { MerchantNameResults } from './merchant-name-review';
 import { CaptureRow } from './pending-receipt-rows';
 import { PendingReviewRecords } from './pending-review-records';
 import { useSpendingMonth } from './spending-month-provider';
+import styles from './spending.module.css';
 
 /**
  * 明細の「確認が必要」の画面の中身(提案書「確認を1画面に」、ADR-127)。読み取ったレシート・入力待ち・
@@ -87,7 +89,7 @@ export function ReviewHub({
     !merchantNameError;
 
   return (
-    <div className="flex flex-col gap-6" style={{ color: 'var(--ink)' }}>
+    <div className="hm-section" style={{ color: 'var(--ink)' }}>
       {/* 保存前のレシートは、確認が必要のいちばん上に並べる(ADR-133)。 */}
       <ReceiptResults ready={ready} checkLevel={checkLevel} openFirst={openFirstReceipt} />
       {todayCheck}
@@ -128,7 +130,7 @@ export function ReviewHub({
                   {queue.length}件・1件ずつ確認
                 </span>
               </span>
-              <span aria-hidden>›</span>
+              <FiChevronRight aria-hidden />
             </button>
           ) : null}
           {attention.uncategorized.count > 0 ? (
@@ -144,7 +146,7 @@ export function ReviewHub({
                   {hasGoal ? '・目標に未反映' : ''}
                 </span>
               </span>
-              <span aria-hidden>›</span>
+              <FiChevronRight aria-hidden />
             </Link>
           ) : null}
           {attention.uncategorized.count > 0 ? <ClassifyButton /> : null}
@@ -180,7 +182,7 @@ export function ReviewHub({
           style={{ background: 'var(--surface)', color: 'var(--ink)' }}
         >
           <span className="text-[15px] font-semibold">店名とレシートをAIで確かめる</span>
-          <span aria-hidden>›</span>
+          <FiChevronRight aria-hidden />
         </button>
       </Section>
       {check.sheet}
@@ -208,8 +210,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-2">
-      <div className="px-1">
+    <section aria-label={title} className={`hm-section ${styles.reviewSection}`}>
+      <div className="hm-section__header">
         <h2 className="text-[17px] font-semibold">{title}</h2>
         {sub ? (
           <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>

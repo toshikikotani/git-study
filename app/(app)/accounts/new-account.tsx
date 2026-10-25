@@ -28,7 +28,7 @@ export function NewAccount() {
   }
 
   return (
-    <Card>
+    <Card className="hm-panel">
       <AccountForm
         action={createAccountAction}
         submitLabel="登録する"

@@ -4,6 +4,7 @@ import { SettingsLink } from '@/components/ui/settings-link';
 import { HEADER_ACTIONS_ID } from './ledger-selection-menu';
 import { addMonths, nthDayOfMonth, splitDateOnly } from '@/lib/date';
 import { useSpendingMonth } from './spending-month-provider';
+import styles from './spending.module.css';
 
 /** カレンダーで移動できる範囲(今日から前後何か月まで。actions.ts と揃える)。 */
 const MONTHS_BACK = 120;
@@ -42,7 +43,7 @@ export function PeriodSwitcher({ title = '明細' }: { title?: string }) {
   const yearPrefix = year !== currentYear ? `${year}年` : '';
 
   return (
-    <header className="flex items-end justify-between gap-2 px-1 pt-2">
+    <header className={`hm-page__header ${styles.periodHeader}`}>
       <div className="flex flex-col">
         <h1 className="text-[34px] leading-tight font-bold" style={{ color: 'var(--ink)' }}>
           {title}
@@ -58,13 +59,13 @@ export function PeriodSwitcher({ title = '明細' }: { title?: string }) {
           </button>
         ) : null}
       </div>
-      <div className="flex items-center gap-2">
+      <div className={styles.periodControls}>
         {/* 明細の一覧が「選択」をここへ出す(上部を1段に、ADR-131)。 */}
         <div id={HEADER_ACTIONS_ID} className="flex items-center" />
         <div
           role="group"
           aria-label="表示する月"
-          className="flex h-11 items-center rounded-full"
+          className={`flex h-11 items-center rounded-full ${styles.monthControl}`}
           style={{ background: 'var(--surface)' }}
         >
           <button

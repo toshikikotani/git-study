@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { FiArrowRight } from 'react-icons/fi';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ImageEditor } from '@/components/receipt/image-editor';
@@ -336,7 +337,8 @@ export function CaptureEntry({
             className="inline-flex min-h-11 items-center px-4 text-sm font-semibold"
             style={{ color: 'var(--ink)' }}
           >
-            {target.href === '/spending/review' ? '次の入力待ちへ' : target.label} →
+            {target.href === '/spending/review' ? '次の入力待ちへ' : target.label}{' '}
+            <FiArrowRight aria-hidden className="ml-1 inline-block" size={16} />
           </Link>
         </div>
         {message ? (

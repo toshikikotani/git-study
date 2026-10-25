@@ -92,3 +92,7 @@ iPhoneはSafariの共有 →「ホーム画面に追加」、Androidはブラウ
 Webからは端末の最近の写真を並べられないため、カメラには「すべての写真」のボタンだけを出します。
 ＋を押すと撮影・写真・手入力・メールから取り込む・CSVを取り込む・長押し設定のメニューが開きます。長押しは設定した撮影または手入力へ直接進みます。
 設定は、どのタブでも右上の歯車から開きます。
+
+## HallmarkによるUI制作・監査
+
+[Hallmark](https://github.com/Nutlope/hallmark) v2をプロジェクト内に導入。共通デザインは [`design.md`](design.md)、実行方法と導入元は [`docs/hallmark/README.md`](docs/hallmark/README.md)。`npm run design:lint` でアプリ向けの静的監査、`-- --render --url <URL>` でブラウザ監査を実行できる。

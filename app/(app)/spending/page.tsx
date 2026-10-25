@@ -24,6 +24,7 @@ import { MonthCopy } from './month-copy';
 import { MonthSummary } from './month-summary';
 import { PeriodSwitcher } from './period-switcher';
 import { SpendingMonthProvider } from './spending-month-provider';
+import styles from './spending.module.css';
 
 /**
  * 明細(デザイン仕様書の「明細」、ADR-090)。上から次の順に並べる:
@@ -75,7 +76,7 @@ export default async function SpendingPage({
   const plan = await getCurrentPlan(today).catch(() => null);
 
   return (
-    <div className="rise flex flex-col gap-4">
+    <div className={`hm-page ${styles.page}`}>
       <SpendingMonthProvider
         today={today}
         currentMonthStart={data.ledger.period.from}
@@ -87,8 +88,10 @@ export default async function SpendingPage({
         captures={data.captures}
       >
         <PeriodSwitcher />
-        <MonthSummary />
-        <MonthCopy />
+        <div className={styles.monthRegion}>
+          <MonthSummary />
+          <MonthCopy />
+        </div>
         <LedgerSearch
           initialCalendarView={parseCalendarView(jar.get(CALENDAR_VIEW_COOKIE)?.value)}
           initialCalendarOpen={parseCalendarOpen(jar.get(CALENDAR_OPEN_COOKIE)?.value)}

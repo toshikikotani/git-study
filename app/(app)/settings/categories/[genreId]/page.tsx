@@ -15,7 +15,7 @@ export default async function CategorySettingsPage({
   const data = await loadCategorySettings(genreId);
   if (data === null) notFound();
   return (
-    <div className="rise space-y-4">
+    <div className="rise hm-page space-y-4">
       <BackLink back={{ href: '/settings/categories', label: 'カテゴリ' }} />
       <div
         className="glass rounded-2xl p-5"

@@ -66,66 +66,70 @@ export async function TodaySection({
   const capYen = goalView ? todayCapYen(goalView) : 0;
 
   return (
-    <>
-      <TodayCard
-        today={
-          forecast && goal
-            ? todayAllowance({
-                capYen,
-                spentTodayYen: goalView?.todaySpentYen ?? 0,
-              })
-            : null
-        }
-        allowanceExplain={
-          forecast && goal
-            ? {
-                budgetYen: goal.budgetYen,
-                spentYen: forecast.breakdown.actualYen,
-                spentTodayYen: goalView?.todaySpentYen ?? 0,
-                remainingDays: forecast.remainingDays,
-                capYen,
-                probWithinBudget: forecast.probWithinBudget,
-                remainingDayOffs: cal?.dayOffs,
-                dayOffPerDayYen: goalView?.dayOffPerDayYen ?? null,
-                weekdayPerDayYen: goalView?.weekdayPerDayYen ?? null,
-                dailyLimit: goalView?.dailyLimit ?? null,
-                tomorrowLimit: goalView?.tomorrowLimit ?? null,
-                scheduledYen: forecast.committed?.scheduledYen ?? 0,
-                fixedYen: forecast.committed?.fixedYen ?? 0,
-                today,
-                days: daysAfter(today, periodTo),
-              }
-            : null
-        }
-        outlook={
-          goal && forecast
-            ? {
-                periodLabel: `${shortDate(goal.period.from)}〜${shortDate(goal.period.to)} · 残り${Math.max(0, daysBetween(today, goal.period.to) + 1)}日`,
-                spentYen: forecast.breakdown.actualYen,
-                p10: forecast.total.p10,
-                p50: forecast.total.p50,
-                p90: forecast.total.p90,
-                budgetYen: goal.budgetYen,
-              }
-            : null
-        }
-        probWithinBudget={forecast?.probWithinBudget ?? null}
-        provisional={forecast?.provisional ?? false}
-        tomorrowYen={goalView?.tomorrowLimit?.todayLimitYen ?? null}
-        daysAfterToday={Math.max(0, daysBetween(today, periodTo))}
-        todayTopNames={goalView?.todayTopSpends.map((s) => s.name) ?? []}
-        whatIf={goal && forecast ? <WhatIfButton /> : null}
-        afterHero={todo}
-      />
-      {/* 気をつけたいカテゴリ:目標をこえた・こえそう・8割をこえたものを自動で最大3つ(ADR-117)。 */}
-      {goal && goalView ? <WatchCategories categories={watchCategoriesOf(goalView)} /> : null}
-      {upcoming}
-      <SavingsCard
-        untilLabel={`${dayLabel(monthPeriod.to)}まで`}
-        balance={balance ? { p50: balance.p50, incomeYen: balance.incomeYen } : null}
-        monthlyTargetYen={monthlySavingsTargetYen}
-        nowYen={savingsNowYen}
-      />
-    </>
+    <div className="hm-dashboard">
+      <div className="hm-dashboard__primary">
+        <TodayCard
+          today={
+            forecast && goal
+              ? todayAllowance({
+                  capYen,
+                  spentTodayYen: goalView?.todaySpentYen ?? 0,
+                })
+              : null
+          }
+          allowanceExplain={
+            forecast && goal
+              ? {
+                  budgetYen: goal.budgetYen,
+                  spentYen: forecast.breakdown.actualYen,
+                  spentTodayYen: goalView?.todaySpentYen ?? 0,
+                  remainingDays: forecast.remainingDays,
+                  capYen,
+                  probWithinBudget: forecast.probWithinBudget,
+                  remainingDayOffs: cal?.dayOffs,
+                  dayOffPerDayYen: goalView?.dayOffPerDayYen ?? null,
+                  weekdayPerDayYen: goalView?.weekdayPerDayYen ?? null,
+                  dailyLimit: goalView?.dailyLimit ?? null,
+                  tomorrowLimit: goalView?.tomorrowLimit ?? null,
+                  scheduledYen: forecast.committed?.scheduledYen ?? 0,
+                  fixedYen: forecast.committed?.fixedYen ?? 0,
+                  today,
+                  days: daysAfter(today, periodTo),
+                }
+              : null
+          }
+          outlook={
+            goal && forecast
+              ? {
+                  periodLabel: `${shortDate(goal.period.from)}〜${shortDate(goal.period.to)} · 残り${Math.max(0, daysBetween(today, goal.period.to) + 1)}日`,
+                  spentYen: forecast.breakdown.actualYen,
+                  p10: forecast.total.p10,
+                  p50: forecast.total.p50,
+                  p90: forecast.total.p90,
+                  budgetYen: goal.budgetYen,
+                }
+              : null
+          }
+          probWithinBudget={forecast?.probWithinBudget ?? null}
+          provisional={forecast?.provisional ?? false}
+          tomorrowYen={goalView?.tomorrowLimit?.todayLimitYen ?? null}
+          daysAfterToday={Math.max(0, daysBetween(today, periodTo))}
+          todayTopNames={goalView?.todayTopSpends.map((s) => s.name) ?? []}
+          whatIf={goal && forecast ? <WhatIfButton /> : null}
+          afterHero={todo}
+        />
+      </div>
+      <div className="hm-dashboard__secondary">
+        {/* 気をつけたいカテゴリ:目標をこえた・こえそう・8割をこえたものを自動で最大3つ(ADR-117)。 */}
+        {goal && goalView ? <WatchCategories categories={watchCategoriesOf(goalView)} /> : null}
+        {upcoming}
+        <SavingsCard
+          untilLabel={`${dayLabel(monthPeriod.to)}まで`}
+          balance={balance ? { p50: balance.p50, incomeYen: balance.incomeYen } : null}
+          monthlyTargetYen={monthlySavingsTargetYen}
+          nowYen={savingsNowYen}
+        />
+      </div>
+    </div>
   );
 }

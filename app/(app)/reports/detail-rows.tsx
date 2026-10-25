@@ -25,7 +25,10 @@ export function DetailRows({ rows }: { rows: readonly DetailRow[] }) {
   const current = rows.find((r) => r.key === open) ?? null;
   return (
     <>
-      <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
+      <div
+        className="hm-list flex min-w-0 flex-col overflow-hidden rounded-2xl"
+        style={{ background: 'var(--surface)' }}
+      >
         {rows.map((r, i) => (
           <button
             key={r.key}

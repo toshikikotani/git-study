@@ -1,3 +1,7 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: full
+ * nav: existing task tabs · signature: allowance and ledger · states: existing · v2.0.0 */
+/* Hallmark · pre-emit critique: role tokens and functional controls remain; the workbench adds hierarchy. */
+/* Hallmark · waive 39b · Existing two-line ledger and settings information rows · The ledger rows retain merchant and category labels with large tap targets; forcing them into a single-line control would hide financial context. */
 @import 'tailwindcss';
 
 /* =============================================================================
@@ -366,11 +370,11 @@
   --gutter: 16px;
 
   /* 文字の段階(上の @theme と同じ5つ)。 */
-  --font-title: 2rem;
-  --font-amount: calc(40 / 17 * 1rem);
-  --font-heading: 1rem;
-  --font-body: calc(15 / 17 * 1rem);
-  --font-caption: calc(13 / 17 * 1rem);
+  --type-title: 2rem;
+  --type-amount: calc(40 / 17 * 1rem);
+  --type-heading: 1rem;
+  --type-body: calc(15 / 17 * 1rem);
+  --type-caption: calc(13 / 17 * 1rem);
 
   /* 一覧・文中の金額の「円」は、数字と同じ大きさ・太さで、空白を入れない(「6,000円」、ADR-131)。
      明細だけ「円」を小さく(9pt)していたので、同じ記録でも画面ごとに見た目が変わっていた。
@@ -467,18 +471,16 @@ body {
    押せる高さ(44pt)は縮めない。視差効果を減らす設定では動かさず切り替える。 */
 .tabbar {
   max-width: 28rem;
-  transition:
-    max-width var(--motion-medium, 300ms) var(--ease-standard, ease),
-    padding var(--motion-medium, 300ms) var(--ease-standard, ease);
+  transition: transform var(--motion-medium, 300ms) var(--ease-standard, ease);
 }
 .tabbar[data-compact='true'] {
   max-width: 21rem;
 }
 .tabbar[data-compact='true'] .tabbar-pill {
-  padding: 4px;
+  padding: var(--space-1);
 }
 .tabbar-pill {
-  transition: padding var(--motion-medium, 300ms) var(--ease-standard, ease);
+  transition: transform var(--motion-medium, 300ms) var(--ease-standard, ease);
 }
 @media (prefers-reduced-motion: reduce) {
   .tabbar,
@@ -515,7 +517,7 @@ body {
    本文の既存サイズ指定(Tailwind の text-*)はそのまま。Button・Fab・Chip・
    ナビのラベルなど、強調した短いラベルに使う。 */
 .label-text {
-  font-size: var(--font-body);
+  font-size: var(--type-body);
   line-height: 22px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -528,7 +530,7 @@ body {
 input,
 select,
 textarea {
-  font-size: var(--font-heading);
+  font-size: var(--type-heading);
 }
 
 /* iOS Safari は button 内のテキストもデフォルトでは選択対象になる。
@@ -550,7 +552,7 @@ button {
   a[href]:active,
   [role='button']:active,
   label.cursor-pointer:active {
-    opacity: 0.6;
+    transform: translateY(1px);
   }
 }
 
@@ -721,6 +723,7 @@ button {
   background: var(--action-off);
   color: var(--on-action-off);
   opacity: 1;
+  cursor: not-allowed;
 }
 
 /* 金額の「円」(components/ui/money.tsx)。数字と同じ大きさ・太さで、間をあけない(ADR-131)。 */
@@ -802,14 +805,9 @@ button {
   overflow: hidden;
 }
 
-/* グラフの棒:単位を切り替えると、位置・幅・高さがスプリングで変形する。 */
+/* グラフの値と形は即時反映し、不透明度だけを状態遷移する。 */
 .chart-bar {
-  transition:
-    left var(--motion-spring-duration) var(--motion-spring),
-    width var(--motion-spring-duration) var(--motion-spring),
-    height var(--motion-spring-duration) var(--motion-spring),
-    bottom var(--motion-spring-duration) var(--motion-spring),
-    opacity var(--motion-small) var(--motion-ease-out);
+  transition: opacity var(--motion-spring-duration) var(--motion-spring);
 }
 
 /* 共有要素の遷移(行のアイコン・名前・金額 → 詳細のヘッダー)。スプリングで動く。 */
@@ -884,6 +882,11 @@ button {
   .nav-progress::before {
     width: 100%;
     animation: none;
-    opacity: 0.6;
+    transform: translateY(1px);
   }
+}
+
+:focus-visible {
+  outline: 2px solid var(--hm-focus-color, var(--accent));
+  outline-offset: 3px;
 }

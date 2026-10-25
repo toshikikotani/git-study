@@ -47,7 +47,7 @@ export function Meter({
       aria-label={label}
     >
       <div
-        className="h-full rounded-r-[4px] transition-[width] duration-700 ease-out"
+        className="h-full rounded-r-[4px] transition-opacity duration-700 ease-out"
         style={{
           width: `${percent}%`,
           background: isOver ? 'var(--over)' : 'var(--accent)',
@@ -89,7 +89,7 @@ export function ProgressGauge({
         aria-label={label}
       >
         <div
-          className="h-full rounded-r-[4px] transition-[width] duration-1000 ease-out"
+          className="h-full rounded-r-[4px] transition-opacity duration-1000 ease-out"
           style={{ width: `${percent}%`, background: 'var(--accent)' }}
         />
 

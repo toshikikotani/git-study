@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export default function ThemeSettingsPage() {
   return (
-    <div className="rise space-y-4">
+    <div className="rise hm-page space-y-4">
       <BackHeader
         back={{ href: '/settings', label: '設定' }}
         title="色"

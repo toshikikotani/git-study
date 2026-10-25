@@ -169,10 +169,7 @@ export function CategoryHeader({
         </div>
 
         {/* 合計金額が主役。期間の切り替えとは横に並べず、金額を左揃えで大きく置く */}
-        <p
-          className="mt-3 leading-none font-semibold"
-          style={{ fontSize: 'min(var(--text-4xl), 10vw)' }}
-        >
+        <p className="mt-3 leading-none font-semibold" style={{ fontSize: 'var(--type-amount)' }}>
           <SharedElement name={sharedName.amount(genreKey)}>
             <span>
               <RollingNumber value={totalYen} />

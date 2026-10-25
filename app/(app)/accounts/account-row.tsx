@@ -15,7 +15,7 @@ export function AccountRow({ account }: { account: Account }) {
 
   if (editing) {
     return (
-      <Card>
+      <Card className="hm-panel">
         <AccountForm
           action={updateAccountAction.bind(null, account.id)}
           initial={account}
@@ -27,8 +27,8 @@ export function AccountRow({ account }: { account: Account }) {
   }
 
   return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
+    <Card className="hm-panel">
+      <div className="hm-section__header items-start">
         <div>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {account.name}
@@ -48,7 +48,7 @@ export function AccountRow({ account }: { account: Account }) {
         </button>
       </div>
 
-      <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+      <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-xs">
         <Stat
           label="残高"
           value={formatYen(account.currentBalanceYen)}
@@ -74,11 +74,11 @@ export function AccountRow({ account }: { account: Account }) {
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <dt className="inline" style={{ color: 'var(--ink-muted)' }}>
+      <dt className="block" style={{ color: 'var(--ink-muted)' }}>
         {label}{' '}
       </dt>
       <dd
-        className="tabular inline font-semibold"
+        className="tabular mt-1 block text-sm font-semibold"
         style={{ color: color ?? 'var(--ink-secondary)' }}
       >
         {value}

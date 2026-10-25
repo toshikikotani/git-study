@@ -8,7 +8,7 @@
   height: 100%;
   padding: 0;
   border: 0;
-  background: rgba(10, 16, 32, 0.35);
+  background: var(--hm-menu-overlay);
   cursor: default;
   touch-action: none;
   animation: fade 150ms ease-out;
@@ -19,15 +19,15 @@
   right: max(1rem, calc((100vw - 36rem) / 2));
   bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 5rem);
   z-index: 2;
-  width: min(17.25rem, calc(100vw - 2rem));
+  width: min(17.25rem, calc(100% - 2rem));
   max-height: calc(100dvh - max(1rem, env(safe-area-inset-bottom)) - 6rem);
   overflow: auto;
   overscroll-behavior: contain;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: 16px;
   background: var(--surface-raised);
   color: var(--ink);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--hm-menu-shadow);
   font-size: 17px;
   line-height: 1.4;
   animation: enter 150ms ease-out;
@@ -88,7 +88,7 @@
 
 .badge {
   flex-shrink: 0;
-  padding: 2px 7px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: var(--plane);
   color: var(--ink-secondary);
@@ -100,7 +100,7 @@
 /* 設定の行は、ほかの3つと少し離す。 */
 .settingsRow {
   border-top: 6px solid var(--plane);
-  padding-block: 6px;
+  padding-block: 8px;
 }
 
 .preference {
@@ -129,7 +129,7 @@
   width: 100%;
   min-height: 46px;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 0 16px;
   border: 0;
   border-top: 1px solid var(--hairline);
@@ -160,7 +160,7 @@
 
 .error {
   margin: 0;
-  padding: 10px 16px 12px;
+  padding: 12px 16px;
   color: var(--over);
   font-size: 13px;
 }

@@ -37,12 +37,15 @@ export function LoginForm() {
   const [tab, setTab] = useState<Tab>('password');
 
   return (
-    <div className="rise">
-      <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
+    <div className="rise hm-page">
+      <h1
+        className="hm-page__header text-xl font-semibold tracking-tight"
+        style={{ color: 'var(--ink)' }}
+      >
         ログイン
       </h1>
 
-      <div className="mt-5 flex gap-2">
+      <div className="hm-toolbar mt-5 flex gap-2">
         <TabButton active={tab === 'password'} onClick={() => setTab('password')}>
           パスワード
         </TabButton>
@@ -76,7 +79,7 @@ function PasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="hm-form-section space-y-4">
       <Field
         label="メールアドレス"
         type="email"
@@ -96,7 +99,7 @@ function PasswordForm() {
       />
 
       {status === 'error' ? (
-        <p className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
+        <p role="alert" className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
           メールアドレスまたはパスワードが違います。初めての場合は「新規登録」から
           アカウントを作れます。
         </p>
@@ -156,7 +159,7 @@ function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="hm-form-section space-y-4">
       <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         メールアドレスとパスワードで、自分のアカウントを作れます。家計簿のデータは、あなただけが
         見られます(ほかの人には見えません)。
@@ -189,7 +192,7 @@ function RegisterForm() {
         placeholder="もう一度入れる"
       />
       {status === 'error' ? (
-        <p className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
+        <p role="alert" className="text-xs leading-relaxed" style={{ color: 'var(--over)' }}>
           {errorMessage}
         </p>
       ) : null}
@@ -237,7 +240,7 @@ function Field({
   ...input
 }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <label className="flex flex-col gap-1">
+    <label className="flex flex-col gap-2">
       <span className="px-1 text-[13px] font-semibold" style={{ color: 'var(--ink-secondary)' }}>
         {label}
       </span>

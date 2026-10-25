@@ -54,7 +54,7 @@ export async function YearFlowCard() {
   return (
     <section
       aria-labelledby="year-flow"
-      className="flex flex-col rounded-2xl px-4 pt-5 pb-4"
+      className="hm-panel flex min-w-0 flex-col gap-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-baseline justify-between gap-2">

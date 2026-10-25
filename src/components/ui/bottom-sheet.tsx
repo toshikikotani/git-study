@@ -42,7 +42,10 @@ export function BottomSheet({
       repositionInputs={false}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-[rgba(10,16,32,0.45)]" />
+        <Drawer.Overlay
+          className="fixed inset-0 z-40"
+          style={{ background: 'var(--hm-overlay)' }}
+        />
         <Drawer.Content
           role={role}
           aria-describedby={undefined}

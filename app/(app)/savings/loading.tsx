@@ -3,8 +3,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 /** /savings への切り替え直後に出す。データを待つあいだ画面を止めない。 */
 export default function SavingsLoading() {
   return (
-    <div className="space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
+    <div className="hm-page">
+      <header className="hm-page__header">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           貯金
         </h1>

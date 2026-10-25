@@ -1,3 +1,5 @@
+/* Hallmark · shape: app screen · theme: brand · nav: existing task tabs · redesign: full · v2.0.0 */
+/* Hallmark · pre-emit critique: the navigation stays familiar and takes its depth from shared tokens. */
 /* デザイン仕様書のボトムナビ(ADR-090):白い不透明に近いカプセル(高さ64・角丸32)に3つのタブ、
    選択中は薄い面(--accent-track)と accent の文字。右に記録する(＋)の丸。 */
 .tabbar {
@@ -11,9 +13,7 @@
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.1),
-    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--hm-chrome-shadow);
 }
 .tabbar[data-compact='true'] .liquid-capsule {
   padding: 4px;
@@ -37,15 +37,11 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .liquid-capsule {
-    box-shadow:
-      0 8px 24px rgba(0, 0, 0, 0.46),
-      0 0 0 0.5px rgba(255, 255, 255, 0.12);
+    box-shadow: var(--hm-chrome-shadow-dark);
   }
 }
 :root[data-theme='dark'] .liquid-capsule {
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.46),
-    0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  box-shadow: var(--hm-chrome-shadow-dark);
 }
 @media (prefers-reduced-transparency: reduce) {
   .liquid-capsule {

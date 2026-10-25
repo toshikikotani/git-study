@@ -3,8 +3,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 /** /briefs への切り替え直後に出す。データを待つあいだ画面を止めない。 */
 export default function BriefsLoading() {
   return (
-    <div className="space-y-4">
-      <header>
+    <div className="hm-page">
+      <header className="hm-page__header">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           朝配信
         </h1>

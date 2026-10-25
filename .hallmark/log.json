@@ -1,0 +1,42 @@
+[
+  {
+    "date": "2026-10-25",
+    "mode": "redesign",
+    "depth": "full",
+    "scope": "app",
+    "theme": "brand",
+    "shape": "app screen",
+    "axes": [
+      "quiet neutral surfaces",
+      "existing Japanese sans fonts",
+      "restrained lavender default with existing theme overrides"
+    ],
+    "nav": "existing four task tabs and receipt action",
+    "signature": "daily allowance and transaction ledger",
+    "sections": [
+      "today",
+      "spending",
+      "reports and goals",
+      "settings and input",
+      "supporting account and planning screens"
+    ],
+    "imagery": "actual app renders only",
+    "photos": [],
+    "waived": ["39b: multi-line information/navigation rows retain context and large tap targets"],
+    "prompt": "家計簿全体のUIも改善",
+    "entry": "app/layout.tsx",
+    "fingerprint": "hallmark-app-workbench-2026-10-25",
+    "verification": {
+      "tests": 2602,
+      "baseline_floor": 45,
+      "render_floor": 0,
+      "kept_links": 57,
+      "kept_fields": 18,
+      "kept_handlers": 376,
+      "finish_review": "ship"
+    },
+    "limitations": [
+      "browser data uses existing local QA fixtures; real-device camera/photo permissions were not retested in this redesign"
+    ]
+  }
+]

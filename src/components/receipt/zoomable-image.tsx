@@ -31,7 +31,7 @@ export function ZoomableImage({
   };
 
   return (
-    <div className={`relative ${className ?? ''}`} style={{ background: '#111' }}>
+    <div className={`relative ${className ?? ''}`} style={{ background: 'var(--hm-media-canvas)' }}>
       <div
         ref={scroller}
         className="size-full overflow-auto"
@@ -93,7 +93,7 @@ export function ZoomableImage({
             aria-label={`画像を${b.label}`}
             onClick={b.next}
             className="min-h-11 flex size-9 items-center justify-center rounded-full text-lg font-semibold"
-            style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+            style={{ background: 'rgba(0,0,0,0.6)', color: 'var(--hm-media-ink)' }}
           >
             {b.text}
           </button>

@@ -74,7 +74,7 @@ export function AccountForm({
   );
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="hm-form">
       <Field label="口座名">
         <TextInput name="name" defaultValue={initial?.name} required />
       </Field>
@@ -169,11 +169,11 @@ export function AccountForm({
         </p>
       ) : null}
 
-      <div className="flex gap-2 pt-1">
+      <div className="hm-toolbar pt-2">
         <button
           type="submit"
           disabled={pending}
-          className="min-h-11 btn-primary flex-1 rounded-full py-3 text-sm font-semibold"
+          className="min-h-11 btn-primary flex-1 rounded-full py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hm-focus-color)] active:translate-y-px motion-reduce:transform-none disabled:cursor-not-allowed disabled:bg-[var(--action-off)] disabled:text-[var(--on-action-off)]"
         >
           {pending ? '保存中…' : submitLabel}
         </button>

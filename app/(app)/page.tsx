@@ -38,7 +38,7 @@ export default async function HomePage({
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="hm-page">
       <HomeHeader />
       <Suspense fallback={<TodaySkeleton />}>
         <TodaySection
@@ -74,7 +74,7 @@ function TodaySkeleton() {
     <section
       aria-label="今日使える目安"
       aria-busy="true"
-      className="rounded-2xl px-5 pt-6 pb-6"
+      className="hm-panel hm-section"
       style={{ background: 'var(--surface)' }}
     >
       <p className="text-[15px] font-semibold" style={{ color: 'var(--ink-muted)' }}>

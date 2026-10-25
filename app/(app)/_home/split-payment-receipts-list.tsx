@@ -503,16 +503,16 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
   return (
     <section
       aria-labelledby="home-split-receipts"
-      className="flex flex-col gap-2"
+      className="hm-section"
       style={{ color: 'var(--ink)' }}
     >
-      <h2 id="home-split-receipts" className="px-1 pt-3 text-[22px] font-bold">
+      <h2 id="home-split-receipts" className="hm-section__header text-[20px] font-semibold">
         割り勘の受取待ち
       </h2>
       {error ? (
         <div
           role="alert"
-          className="rounded-2xl px-4 py-3 text-[13px]"
+          className="hm-panel text-[13px]"
           style={{ background: 'var(--surface)', color: 'var(--over)' }}
         >
           <p>{error}</p>
@@ -544,9 +544,9 @@ export function SplitPaymentReceiptList({ initial }: { initial: TrackingListResu
           </button>
         </div>
       ) : null}
-      {pending.length > 0 ? <ul className="space-y-2">{pending.map(receiptRow)}</ul> : null}
+      {pending.length > 0 ? <ul className="space-y-4">{pending.map(receiptRow)}</ul> : null}
       {completed.length > 0 ? (
-        <details className="rounded-2xl" style={{ background: 'var(--surface)' }}>
+        <details className="border-t" style={{ borderColor: 'var(--hairline)' }}>
           <summary
             className="min-h-12 cursor-pointer content-center px-4 text-[15px] font-semibold"
             style={{ color: 'var(--ink-secondary)' }}

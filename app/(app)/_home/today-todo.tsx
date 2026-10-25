@@ -28,19 +28,11 @@ export async function TodayTodo({ autoOpen = false }: { autoOpen?: boolean }) {
   }
 
   return (
-    <section
-      aria-labelledby="today-todo"
-      className="flex flex-col overflow-hidden rounded-2xl"
-      style={{ background: 'var(--surface)', color: 'var(--ink)' }}
-    >
-      <h2
-        id="today-todo"
-        className="px-4 pt-3 text-[13px] font-semibold"
-        style={{ color: 'var(--ink-muted)' }}
-      >
+    <section aria-labelledby="today-todo" className="hm-section" style={{ color: 'var(--ink)' }}>
+      <h2 id="today-todo" className="hm-section__header text-[17px] font-semibold">
         今日やること
       </h2>
-      <div className="flex flex-col [&>*+*]:border-t [&>*+*]:border-[var(--hairline)]">
+      <div className="hm-list flex flex-col [&>*+*]:border-t [&>*+*]:border-[var(--hairline)]">
         {unsaved > 0 ? <UnsavedReceiptsRow count={unsaved} /> : null}
         <TodayCheckLauncher count={checkCount} variant="row" autoOpen={autoOpen} />
         {captures.count > 0 ? (

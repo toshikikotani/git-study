@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/Nutlope/hallmark",
+  "commit": "7ec868225c6caa040558c321ee0fefa0e73f83a8",
+  "version": "2.0.0",
+  "installed": "2026-10-25",
+  "scope": "project",
+  "path": ".agents/skills/hallmark",
+  "license": "MIT"
+}
