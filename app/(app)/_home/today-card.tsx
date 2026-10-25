@@ -38,7 +38,7 @@ export type TodayCardProps = {
   afterHero?: React.ReactNode;
 };
 
-const card = 'flex flex-col rounded-2xl';
+const card = 'hm-panel flex flex-col';
 const cardStyle = { background: 'var(--surface)', color: 'var(--ink)' } as const;
 
 /**
@@ -104,10 +104,8 @@ function TodayHero({
 }) {
   if (!today) {
     return (
-      <section aria-label="今日の目安" className={`${card} gap-2 px-5 pt-6 pb-2`} style={cardStyle}>
-        <span className="text-[15px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
-          今日の目安
-        </span>
+      <section aria-label="今日の目安" className={`${card} gap-3`} style={cardStyle}>
+        <h2 className="hm-metric__label font-semibold">今日の目安</h2>
         <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           目標(カテゴリごとの額)を決めると、今日使える目安を出せます。
         </p>
@@ -128,11 +126,11 @@ function TodayHero({
   // 今日の目安をこえた(超過)は赤、こえそう(注意)は黄(ADR-131)。
   const color = left ? 'var(--ink)' : 'var(--over)';
   return (
-    <section aria-label="今日の目安" className={`${card} px-5 pt-5 pb-5`} style={cardStyle}>
+    <section aria-label="今日の目安" className={card} style={cardStyle}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[15px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
+        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--ink-secondary)' }}>
           今日の目安
-        </span>
+        </h2>
         {provisional ? (
           <span
             className="rounded-full px-2 py-1 text-[12px] font-semibold"
@@ -142,7 +140,10 @@ function TodayHero({
           </span>
         ) : null}
       </div>
-      <p className="tabular mt-1 flex flex-wrap items-baseline gap-x-2" style={{ color }}>
+      <p
+        className="hm-metric__value tabular mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1"
+        style={{ color }}
+      >
         <span className="text-[56px] leading-none font-bold tracking-[-0.02em]">
           {(left ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
         </span>
@@ -159,8 +160,8 @@ function TodayHero({
       </p>
       {tomorrowYen !== null ? (
         <div
-          className="mt-4 flex items-center justify-between gap-2 rounded-xl px-4 py-3"
-          style={{ background: 'var(--plane)' }}
+          className="mt-5 flex flex-wrap items-baseline justify-between gap-2 pt-4"
+          style={{ borderTop: '1px solid var(--hairline)' }}
         >
           <span className="text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
             明日からの目安
@@ -169,7 +170,7 @@ function TodayHero({
         </div>
       ) : null}
       {whatIf || allowanceExplain ? (
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="hm-toolbar mt-4 [&>button]:flex-1">
           {whatIf}
           {allowanceExplain ? <AllowanceDialog explain={allowanceExplain} /> : null}
         </div>
@@ -196,16 +197,16 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
     <Link
       href="/reports"
       aria-label={`今期の見通し。${formatEstimate(outlook.p50)}、目標 ${formatEstimate(outlook.budgetYen, { approx: false })}。分析で見る`}
-      className={`${card} min-h-11 px-5 pt-5 pb-2`}
+      className={`${card} min-h-11`}
       style={cardStyle}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex flex-col">
-          <span className="text-[17px] font-semibold">今期の見通し</span>
+      <div className="hm-section__header">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-[17px] font-semibold">今期の見通し</h2>
           <span className="tabular text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {outlook.periodLabel}
           </span>
-        </span>
+        </div>
         <span
           className="shrink-0 rounded-full px-3 py-1 text-[13px] font-semibold whitespace-nowrap"
           style={
@@ -217,8 +218,8 @@ function OutlookCard({ outlook, probWithin }: { outlook: TodayOutlook; probWithi
           {overYen > 0 ? `${formatEstimate(overYen)} こえそう` : '目標内の見込み'}
         </span>
       </div>
-      <p className="tabular mt-4 flex flex-wrap items-baseline gap-2">
-        <span className="text-[34px] leading-tight font-bold tracking-[-0.01em]">
+      <p className="hm-metric__value tabular mt-4 flex flex-wrap items-baseline gap-2">
+        <span className="text-[28px] leading-tight font-bold tracking-[-0.01em]">
           {formatEstimate(outlook.p50)}
         </span>
         <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>

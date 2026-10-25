@@ -7,8 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 export default function BriefDetailLoading() {
   return (
-    <div className="space-y-4">
-      <header className="flex items-baseline justify-between gap-3">
+    <div className="hm-page">
+      <header className="hm-page__header">
         <Skeleton className="h-7 w-32" />
       </header>
       <div className="space-y-3">

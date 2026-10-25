@@ -31,17 +31,17 @@ export function SavingsCard({ untilLabel, balance, monthlyTargetYen, nowYen }: S
     hasTarget && projected !== null ? Math.min(1, Math.max(0, projected / monthlyTargetYen)) : 0;
   const shortYen = hasTarget && projected !== null ? monthlyTargetYen - projected : null;
   return (
-    <section aria-labelledby="home-savings" className="flex flex-col gap-2">
+    <section aria-labelledby="home-savings" className="hm-section">
       <h2
         id="home-savings"
-        className="px-1 pt-3 text-[22px] font-bold"
+        className="hm-section__header text-[17px] font-semibold"
         style={{ color: 'var(--ink)' }}
       >
         貯金
       </h2>
       <Link
         href="/savings"
-        className="min-h-11 flex flex-col rounded-2xl px-5 pt-5 pb-2"
+        className="hm-panel min-h-11 flex flex-col"
         style={{ background: 'var(--surface)', color: 'var(--ink)' }}
       >
         {hasTarget ? (
@@ -70,20 +70,16 @@ export function SavingsCard({ untilLabel, balance, monthlyTargetYen, nowYen }: S
             {untilLabel}
           </span>
         )}
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <span className="flex flex-col">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-              いま
-            </span>
-            <span className="tabular text-[20px] font-bold">
+        <dl className="mt-4 grid grid-cols-2 gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <dt className="hm-metric__label">いま</dt>
+            <dd className="tabular text-[20px] font-bold">
               {nowYen === null ? '—' : formatSignedEstimate(nowYen)}
-            </span>
-          </span>
-          <span className="flex flex-col">
-            <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-              月末の見込み
-            </span>
-            <span
+            </dd>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <dt className="hm-metric__label">月末の見込み</dt>
+            <dd
               className="tabular text-[20px] font-bold"
               style={{
                 color:
@@ -95,9 +91,9 @@ export function SavingsCard({ untilLabel, balance, monthlyTargetYen, nowYen }: S
               }}
             >
               {projected === null ? '—' : formatSignedEstimate(projected)}
-            </span>
-          </span>
-        </div>
+            </dd>
+          </div>
+        </dl>
         <span
           className="tabular mt-2 text-[13px] leading-normal"
           style={{ color: 'var(--ink-muted)' }}

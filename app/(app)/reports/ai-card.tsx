@@ -1,5 +1,6 @@
 'use client';
 
+import { FiChevronRight } from 'react-icons/fi';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -39,7 +40,7 @@ export function AiCard({
   return (
     <section
       aria-labelledby="ai-card"
-      className="flex flex-col rounded-2xl px-4 pt-5 pb-4"
+      className="hm-panel flex min-w-0 flex-col gap-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -76,17 +77,17 @@ export function AiCard({
           type="button"
           onClick={() => void run()}
           disabled={busy}
-          className="min-h-11 rounded-full px-5 text-[15px] font-semibold disabled:opacity-40"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 rounded-full px-5 text-[15px] font-semibold disabled:opacity-40"
           style={{ background: 'var(--button-quiet)', color: 'var(--ink)' }}
         >
           {busy ? '分析しています…' : analyzed ? 'もう一度分析する' : 'AIに分析させる'}
         </button>
         <Link
           href="/reports/ai?from=/reports"
-          className="flex min-h-11 items-center text-[15px] font-semibold"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-11 items-center gap-2 text-[15px] font-semibold"
           style={{ color: 'var(--accent)' }}
         >
-          くわしいレポート ›
+          くわしいレポート <FiChevronRight aria-hidden />
         </Link>
       </div>
     </section>

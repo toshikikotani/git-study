@@ -1,4 +1,5 @@
 'use client';
+import { FiArrowRight, FiChevronDown, FiChevronRight } from 'react-icons/fi';
 
 import { useCallback, useMemo, useState } from 'react';
 
@@ -30,6 +31,7 @@ import { CompactTransactionSummary } from './compact-transaction-summary';
 import { SelectionCopySheet } from './selection-copy-sheet';
 import { SplitPaymentSheet } from './split-payment-sheet';
 import { useSpendingMonth } from './spending-month-provider';
+import styles from './spending.module.css';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -128,7 +130,7 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
   const active = isFilterActive(filter);
 
   return (
-    <section id="ledger" aria-label="明細" className="scroll-mt-16 flex flex-col gap-3">
+    <section id="ledger" aria-label="明細" className={`hm-section scroll-mt-16 ${styles.ledger}`}>
       <ActiveFilterChips goalRange={goalRange} />
       {filter.pendingOnly ? <PendingReceiptRows /> : null}
 
@@ -341,14 +343,14 @@ export function DaySection({
       ) : null}
       {!forceOpen ? (
         <span aria-hidden className="shrink-0 text-[13px]">
-          {isOpen ? '⌄' : '›'}
+          {isOpen ? <FiChevronDown /> : <FiChevronRight />}
         </span>
       ) : null}
     </>
   );
   const rows = (
     <ul
-      className="divider-list overflow-hidden rounded-2xl"
+      className={`hm-list divider-list ${styles.dayRows}`}
       style={{ background: 'var(--surface)' }}
     >
       {transactions.map((t) =>
@@ -389,9 +391,9 @@ export function DaySection({
   );
   if (forceOpen) {
     return (
-      <section aria-label={heading} className="flex flex-col gap-1">
+      <section aria-label={heading} className={`flex flex-col gap-1 ${styles.dayGroup}`}>
         <div
-          className="flex min-h-11 items-center gap-2 px-2"
+          className={`flex min-h-11 items-center gap-2 ${styles.dayHeader}`}
           style={{ color: 'var(--ink-muted)' }}
         >
           {header}
@@ -406,11 +408,10 @@ export function DaySection({
       open={expanded}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
       aria-label={heading}
-      className="rounded-2xl"
-      style={{ background: expanded ? undefined : 'var(--surface)' }}
+      className={styles.dayGroup}
     >
       <summary
-        className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-3 py-3 [&::-webkit-details-marker]:hidden"
+        className={`flex min-h-14 cursor-pointer list-none items-center gap-2 py-3 [&::-webkit-details-marker]:hidden ${styles.dayHeader}`}
         style={{ color: expanded ? 'var(--ink-muted)' : 'var(--ink-secondary)' }}
       >
         {header}
@@ -487,21 +488,21 @@ function ListSkeleton() {
           style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
         >
           <div
-            className="size-8 animate-pulse rounded-full"
+            className="size-8 animate-pulse motion-reduce:animate-none rounded-full"
             style={{ background: 'var(--hairline)' }}
           />
           <div className="flex-1 space-y-2">
             <div
-              className="h-3 w-1/2 animate-pulse rounded-lg"
+              className="h-3 w-1/2 animate-pulse motion-reduce:animate-none rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
             <div
-              className="h-3 w-1/3 animate-pulse rounded-lg"
+              className="h-3 w-1/3 animate-pulse motion-reduce:animate-none rounded-lg"
               style={{ background: 'var(--hairline)' }}
             />
           </div>
           <div
-            className="h-3 w-14 animate-pulse rounded-lg"
+            className="h-3 w-14 animate-pulse motion-reduce:animate-none rounded-lg"
             style={{ background: 'var(--hairline)' }}
           />
         </div>
@@ -514,7 +515,7 @@ function EmptyState() {
   return (
     <div className="space-y-3">
       <div
-        className="glass rounded-3xl p-6"
+        className={`hm-panel ${styles.emptyState}`}
         style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
       >
         <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -525,11 +526,11 @@ function EmptyState() {
         <div className="mt-4 flex flex-wrap gap-2">
           <Button href="/spending/review" variant="filled">
             レシートを撮る
-            <span aria-hidden>→</span>
+            <FiArrowRight aria-hidden />
           </Button>
           <Button href="/transactions/import" variant="outlined">
             CSV を取り込む
-            <span aria-hidden>→</span>
+            <FiArrowRight aria-hidden />
           </Button>
         </div>
       </div>

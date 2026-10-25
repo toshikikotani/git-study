@@ -22,7 +22,7 @@ export function ReceiptImageViewer({ src, onClose }: { src: string; onClose: () 
       aria-modal="true"
       aria-label="レシート画像"
       className="fixed inset-0 z-[80] flex flex-col"
-      style={{ background: '#000' }}
+      style={{ background: 'var(--hm-mask-ink)' }}
     >
       <div className="flex justify-end px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
         <button
@@ -30,7 +30,7 @@ export function ReceiptImageViewer({ src, onClose }: { src: string; onClose: () 
           aria-label="閉じる"
           onClick={onClose}
           className="flex size-11 items-center justify-center rounded-full"
-          style={{ background: 'rgba(255,255,255,0.18)', color: '#fff' }}
+          style={{ background: 'rgba(255,255,255,0.18)', color: 'var(--hm-media-ink)' }}
         >
           <MdClose aria-hidden size={22} />
         </button>

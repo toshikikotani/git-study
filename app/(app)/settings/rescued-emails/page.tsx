@@ -27,7 +27,7 @@ export default async function RescuedEmailsPage() {
   }
 
   return (
-    <div className="rise space-y-4">
+    <div className="rise hm-page space-y-4">
       <BackHeader back={{ href: '/settings', label: '設定' }} title="読み取れなかったメール" />
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

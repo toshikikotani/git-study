@@ -3,6 +3,8 @@ import { Inter, M_PLUS_2 } from 'next/font/google';
 
 import { THEME_BOOT } from '@/lib/color-theme';
 import './globals.css';
+import './hallmark-tokens.css';
+import './hallmark.css';
 
 const inter = Inter({
   subsets: ['latin'],

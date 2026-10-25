@@ -119,12 +119,12 @@ export function ImageEditor({
     >
       <div
         className="flex min-h-0 flex-1 items-center justify-center p-4"
-        style={{ background: '#111' }}
+        style={{ background: 'var(--hm-media-canvas)' }}
       >
         {image ? (
           <canvas ref={canvasRef} className="max-h-full max-w-full" aria-label="補正のプレビュー" />
         ) : (
-          <p className="text-xs" style={{ color: '#fff' }}>
+          <p className="text-xs" style={{ color: 'var(--hm-media-ink)' }}>
             {error ?? '読み込んでいます…'}
           </p>
         )}

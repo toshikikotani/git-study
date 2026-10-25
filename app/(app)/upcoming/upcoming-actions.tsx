@@ -151,7 +151,7 @@ export function DetectedPayments({ detected }: { detected: readonly Detected[] }
     }
   };
   return (
-    <div className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
+    <div className="hm-list flex flex-col" style={{ background: 'var(--surface)' }}>
       {error ? (
         <p role="alert" className="px-4 pt-3 text-[13px]" style={{ color: 'var(--over)' }}>
           {error}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 import { CalculatorKeypad } from '@/components/ui/calculator-keypad';
 import { GenreBadge } from '@/components/ui/genre-badge';
@@ -186,7 +187,7 @@ export function ManualEntryForm({
             className="min-h-11 min-w-11 shrink-0 text-lg"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            ‹
+            <FiChevronLeft aria-hidden size={18} />
           </button>
           <input
             id={`${id}-date`}
@@ -205,7 +206,7 @@ export function ManualEntryForm({
             className="min-h-11 min-w-11 shrink-0 text-lg"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            ›
+            <FiChevronRight aria-hidden size={18} />
           </button>
         </div>
         <div className="mt-1 flex gap-2">

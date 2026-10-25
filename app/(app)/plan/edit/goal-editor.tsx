@@ -178,11 +178,14 @@ export function GoalEditor({
   const overYen = landing ? landing.p50 - savedTotal : 0;
 
   return (
-    <div className="rise flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
-      <div className="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center">
+    <div className="hm-page" style={{ color: 'var(--ink)' }}>
+      <div
+        className="hm-page__header grid min-h-11 grid-cols-[1fr_auto_1fr] items-center"
+        style={{ display: 'grid' }}
+      >
         <Link
           href="/reports"
-          className="flex min-h-11 items-center justify-self-start text-[17px]"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-11 items-center justify-self-start text-[17px]"
           style={{ color: 'var(--accent)' }}
         >
           キャンセル
@@ -192,7 +195,7 @@ export function GoalEditor({
           type="button"
           onClick={() => void save()}
           disabled={!dirty || saving}
-          className="-mr-2 flex min-h-11 min-w-11 items-center justify-center justify-self-end px-2 text-[17px] font-bold disabled:opacity-40"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 -mr-2 flex min-h-11 min-w-11 items-center justify-center justify-self-end px-2 text-[17px] font-bold disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
           {saving ? '保存中' : '保存'}
@@ -207,8 +210,14 @@ export function GoalEditor({
         </p>
       ) : null}
 
-      <section aria-live="polite" className="btn-primary flex flex-col gap-1 rounded-2xl px-5 py-4">
-        <span className="text-[13px] opacity-85">この目標で着地すると</span>
+      <section
+        aria-live="polite"
+        className="hm-panel hm-section"
+        style={{ background: 'var(--surface)', color: 'var(--ink)' }}
+      >
+        <span className="hm-metric__label text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+          この目標で着地すると
+        </span>
         {dirty || landing === null ? (
           <>
             <div className="tabular flex items-baseline justify-between gap-2">
@@ -244,7 +253,7 @@ export function GoalEditor({
         <button
           type="button"
           onClick={() => setPeriodOpen(true)}
-          className="flex min-h-13 w-full items-center gap-2 px-4 text-left"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-13 w-full items-center gap-2 px-4 text-left"
         >
           <span className="tabular flex-1 text-[16px]">
             {period.start ? dayLabel(period.start) : '開始日を選択'}〜
@@ -288,7 +297,7 @@ export function GoalEditor({
                 if (Number.isFinite(v) && totalText !== null) setTotal(v);
                 setTotalText(null);
               }}
-              className="tabular w-40 bg-transparent text-right text-[34px] font-bold outline-none"
+              className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 tabular w-40 bg-transparent text-right text-[34px] font-bold outline-none"
               style={{ color: 'var(--ink)' }}
             />
             <span className="text-[20px] font-semibold">円</span>
@@ -370,7 +379,7 @@ export function GoalEditor({
               setApplied(amounts);
               setAmounts((prev) => ({ ...prev, ...proposal }));
             }}
-            className="btn-primary mt-1 min-h-11 rounded-full text-[15px] font-semibold"
+            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 btn-primary mt-1 min-h-11 rounded-full text-[15px] font-semibold"
           >
             提案を当てはめる
           </button>
@@ -390,7 +399,7 @@ export function GoalEditor({
               setAmounts(applied);
               setApplied(null);
             }}
-            className="min-h-11 px-3 text-[15px] font-semibold"
+            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 px-3 text-[15px] font-semibold"
             style={{ color: 'var(--accent)' }}
           >
             元に戻す
@@ -447,7 +456,7 @@ export function GoalEditor({
             key={c.genreId}
             type="button"
             onClick={() => setEditing(c.genreId)}
-            className="flex min-h-14 items-center gap-3 px-4 py-2 text-left"
+            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-14 items-center gap-3 px-4 py-2 text-left"
             style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
           >
             <span className="flex min-w-0 flex-1 flex-col">
@@ -496,7 +505,7 @@ export function GoalEditor({
         <Divider />
         <Link
           href="/settings/categories?from=/plan/edit"
-          className="flex min-h-13 items-center gap-2 px-4"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-13 items-center gap-2 px-4"
         >
           <span className="flex-1 text-[16px]">カテゴリの設定</span>
           <span className="text-[15px]" style={{ color: 'var(--ink-muted)' }}>
@@ -516,7 +525,7 @@ export function GoalEditor({
             setReserving(false);
             setReserveNote(result.error ?? `${dayLabel(next.start)}からの目標を予約しました。`);
           }}
-          className="flex min-h-13 items-center gap-2 px-4 text-left disabled:opacity-60"
+          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-13 items-center gap-2 px-4 text-left disabled:opacity-60"
         >
           <span className="flex flex-1 flex-col py-2">
             <span className="text-[16px]">次の期間の目標を予約</span>
@@ -549,7 +558,7 @@ export function GoalEditor({
             <button
               type="button"
               onClick={() => setPeriodOpen(false)}
-              className="flex min-h-11 items-center justify-self-start text-[17px]"
+              className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex min-h-11 items-center justify-self-start text-[17px]"
               style={{ color: 'var(--accent)' }}
             >
               閉じる
@@ -642,7 +651,7 @@ export function RoundButton({
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      className="flex size-11 min-h-11 shrink-0 items-center justify-center rounded-full disabled:opacity-35"
+      className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 flex size-11 min-h-11 shrink-0 items-center justify-center rounded-full disabled:opacity-35"
       style={{ background: 'var(--plane)', color: 'var(--ink)' }}
     >
       <svg

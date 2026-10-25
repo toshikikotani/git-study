@@ -1,5 +1,6 @@
 'use client';
 
+import { FiChevronRight } from 'react-icons/fi';
 import { useState } from 'react';
 
 import { nextPlanRange } from '@/domain/spending-plan';
@@ -108,10 +109,10 @@ export function RangeCalendar({
       <button
         type="button"
         onClick={() => setExtra((e) => e + 1)}
-        className="min-h-11 text-sm font-semibold"
+        className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold"
         style={{ color: 'var(--ink-secondary)' }}
       >
-        さらに先の月を表示 →
+        さらに先の月を表示 <FiChevronRight aria-hidden />
       </button>
     </div>
   );

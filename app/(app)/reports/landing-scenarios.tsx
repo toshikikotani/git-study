@@ -57,7 +57,7 @@ export function LandingScenarios({
                 style={{ background: 'var(--plane)' }}
               >
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full"
                   style={{
                     width: `${Math.max(2, pct)}%`,
                     background: s.color,

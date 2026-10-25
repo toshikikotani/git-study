@@ -47,10 +47,7 @@ export function StatTile({
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        <span
-          className="text-xs font-semibold tracking-[0.08em] uppercase"
-          style={{ color: 'var(--ink-muted)' }}
-        >
+        <span className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
           {label}
         </span>
         {note ? <ToneBadge tone={resolvedTone} text={note} /> : null}

@@ -1,0 +1,324 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: full
+ * paper: role tokens · accent: user choice · display: Inter/M PLUS 2 · body: same
+ * nav: existing task tabs · signature: the ledger and daily allowance · states: existing
+ * posture: restrained · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V3 · weakest: V, familiar task tabs are retained for a working finance app. */
+/* Hallmark · answered F1 · The receipt-check className attributes are JSX syntax rather than prose; changing their quote glyphs would break the receipt UI. */
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  background: var(--plane);
+  color: var(--ink);
+  font-synthesis: none;
+}
+
+.hm-shell {
+  width: min(100%, var(--hm-container));
+  margin-inline: auto;
+  min-height: 100dvh;
+}
+
+.hm-content {
+  min-width: 0;
+  padding-inline: var(--hm-page-gutter);
+  padding-top: max(40px, calc(var(--space-6) + env(safe-area-inset-top)));
+  padding-bottom: calc(var(--hm-bottom-clearance) + env(safe-area-inset-bottom));
+}
+
+.hm-page,
+.hm-section,
+.hm-dashboard__primary,
+.hm-dashboard__secondary,
+.hm-form {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-section-gap);
+}
+
+.hm-page {
+  gap: var(--hm-page-gap);
+}
+
+.hm-page__header,
+.hm-section__header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.hm-page__header h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--hm-text-title);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.hm-page h1,
+.hm-page h2,
+.hm-page h3,
+.hm-page__header h1 {
+  min-width: 0;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.hm-page p {
+  text-wrap: pretty;
+}
+
+.hm-panel {
+  min-width: 0;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-panel);
+  background: var(--surface);
+  color: var(--ink);
+  padding: var(--hm-panel-padding);
+  box-shadow: var(--card-shadow);
+}
+
+.hm-panel .hm-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.hm-dashboard,
+.hm-settings-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hm-page-gap);
+  align-items: start;
+}
+
+.hm-dashboard > *,
+.hm-settings-grid > * {
+  min-width: 0;
+}
+
+.hm-toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hm-metric {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.hm-metric > * {
+  min-width: 0;
+}
+
+.hm-metric__label {
+  margin-bottom: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--hm-text-meta);
+  line-height: 1.5;
+}
+
+.hm-metric__value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  font-size: var(--type-amount);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.hm-list {
+  min-width: 0;
+  overflow: clip;
+  border-radius: var(--hm-radius-panel);
+}
+
+.hm-list > * + * {
+  border-top: 1px solid var(--divider);
+}
+
+.hm-form-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-block: var(--space-5);
+}
+
+.hm-form-section + .hm-form-section {
+  border-top: 1px solid var(--hm-border);
+}
+
+.hm-auth {
+  width: min(100%, 420px);
+  margin-inline: auto;
+}
+
+.hm-settings-group {
+  min-width: 0;
+  overflow: clip;
+  border-radius: var(--hm-radius-panel);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.hm-assistant {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-page-gap);
+}
+
+.hm-assistant-composer {
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-panel);
+  background: var(--surface);
+  color: var(--ink);
+  padding: var(--space-3);
+}
+
+.hm-content
+  :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea),
+.hm-form
+  :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea),
+.hm-auth :where(input, select, textarea) {
+  min-height: var(--hm-control-height);
+  border: 1px solid var(--hm-field-border);
+  border-radius: var(--hm-radius-control);
+  color: var(--ink);
+  caret-color: var(--action);
+  transition: border-color var(--hm-duration) var(--hm-ease);
+}
+
+.hm-content :where(input, textarea)::placeholder,
+.hm-auth :where(input, textarea)::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--hm-focus-color);
+  outline-offset: 3px;
+}
+
+.hm-content :where(button, a, summary),
+.hm-chrome :where(button, a) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hm-content :where(button, a)[aria-busy='true'] {
+  cursor: progress;
+}
+
+.hm-content :where(button:disabled, [aria-disabled='true']) {
+  cursor: not-allowed;
+}
+
+.hm-content .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.hm-chrome .tabbar {
+  transition: none;
+}
+
+.hm-chrome .tabbar-pill {
+  border: 1px solid var(--hm-border);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+}
+
+.hm-chrome .liquid-tab.is-active {
+  background: var(--hm-soft-fill);
+  color: var(--ink);
+}
+
+.hm-chrome .liquid-tab,
+.hm-chrome .liquid-tab::before,
+.hm-chrome .liquid-tab::after {
+  transition:
+    transform var(--hm-duration) var(--hm-ease),
+    opacity var(--hm-duration) var(--hm-ease);
+}
+
+@media (min-width: 960px) {
+  .hm-content {
+    padding-top: max(48px, calc(var(--space-8) + env(safe-area-inset-top)));
+  }
+
+  .hm-dashboard {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .hm-settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hm-section + .hm-section {
+    margin-top: var(--space-1);
+  }
+}
+
+@media (max-width: 480px) {
+  .hm-metric {
+    gap: var(--space-3);
+  }
+
+  .hm-metric__value {
+    font-size: var(--type-heading);
+    font-weight: 700;
+    letter-spacing: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-content *,
+  .hm-chrome *,
+  .hm-auth * {
+    animation: none;
+    transition: none;
+    scroll-behavior: auto;
+  }
+}
+
+.hm-shell :focus-visible,
+.hm-chrome :focus-visible,
+.hm-auth :focus-visible,
+.hm-switch:has(input:focus-visible) {
+  outline: 2px solid var(--hm-focus-color);
+  outline-offset: 3px;
+}
+.hm-shell .status-blur {
+  display: none;
+}
+.hm-switch:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.hm-content header.touch-pan-y {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+.hm-content [aria-label='サマリー'] {
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-panel);
+  padding: var(--hm-panel-padding);
+}

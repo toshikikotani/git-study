@@ -1,6 +1,6 @@
 'use client';
 
-/** iOS のスイッチの形(51×31)。 */
+/** A familiar switch with a 44px hit target and a separate visual track. */
 export function Switch({
   checked,
   onChange,
@@ -11,19 +11,21 @@ export function Switch({
   label: string;
 }) {
   return (
-    <span
-      className="relative h-8 w-13 shrink-0 rounded-full transition-colors"
-      style={{ background: checked ? 'var(--switch-on)' : 'var(--field)' }}
-    >
+    <span className="hm-switch relative inline-flex min-h-11 w-13 shrink-0 items-center">
       <span
         aria-hidden
-        className="absolute top-0.5 size-7 rounded-full transition-[left]"
-        style={{
-          left: checked ? 22 : 2,
-          background: '#ffffff',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-        }}
-      />
+        className="relative h-8 w-full rounded-full transition-colors motion-reduce:transition-none"
+        style={{ background: checked ? 'var(--switch-on)' : 'var(--field)' }}
+      >
+        <span
+          className="absolute top-0.5 left-0.5 size-7 rounded-full transition-transform motion-reduce:transition-none"
+          style={{
+            transform: checked ? 'translateX(20px)' : 'none',
+            background: 'var(--hm-switch-thumb)',
+            boxShadow: 'var(--hm-switch-shadow)',
+          }}
+        />
+      </span>
       <input
         type="checkbox"
         role="switch"

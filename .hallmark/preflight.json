@@ -1,0 +1,31 @@
+{
+  "scanned": "2026-10-25",
+  "base_commit": "e1225e5",
+  "scope": "app",
+  "routes": {
+    "authenticated_page_files": 48,
+    "public_pages": ["/login"]
+  },
+  "findings": {
+    "fonts": "Inter and M PLUS 2 via next/font in app/layout.tsx",
+    "palette": "Role tokens in app/globals.css; saved theme tokens in src/lib/color-theme.ts override defaults",
+    "motion": "Existing motion scale; new UI animates transform/opacity and supports reduced motion",
+    "spacing": "4px spacing, 44px hit targets, integer-yen tabular figures",
+    "framework": "Next.js16.3.4 App Router / React19 / Tailwind4",
+    "runtime": "Real app on a local QA server backed by fake Supabase; no production data used"
+  },
+  "preserve": [
+    "routes and URL parameters",
+    "money/date logic",
+    "data reads and writes",
+    "form fields and handlers",
+    "selected colour themes",
+    "camera and photo workflow"
+  ],
+  "introduce": [
+    "project-local pinned Hallmark skill",
+    "locked design.md",
+    "shared workbench tokens and layouts",
+    "source and browser design audits"
+  ]
+}

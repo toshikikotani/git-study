@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { MdChevronRight } from 'react-icons/md';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CategorySheetProvider } from './category-sheet';
@@ -121,12 +122,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <CategorySheetProvider>
       <OpenRecordProvider value={openRecord}>
-        <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
+        <div className="hm-shell mx-auto flex min-h-dvh w-full flex-col">
           <div aria-hidden className="status-blur" />
           <NavigationProgress />
           <PullToRefresh>
             <main
-              className="flex-1 px-4 pt-[max(5.5rem,calc(3.5rem+env(safe-area-inset-top)))] pb-[calc(11rem+env(safe-area-inset-bottom))]"
+              className="hm-content flex-1 pb-[calc(11rem+env(safe-area-inset-bottom))]"
               aria-busy={navigating}
             >
               {children}
@@ -273,7 +274,7 @@ function BottomBar({
     </Fab>
   );
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="hm-chrome fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {!keyboard.open && reading + waiting + offlineWaiting + needInput > 0 ? (
         <Link
           href="/spending/review"
@@ -297,7 +298,9 @@ function BottomBar({
           ]
             .filter((t) => t !== '')
             .join(' ・ ')}
-          <span aria-hidden> →</span>
+          <span aria-hidden>
+            <MdChevronRight size={18} />
+          </span>
         </Link>
       ) : null}
       <CameraCaptureInput

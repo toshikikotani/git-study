@@ -36,7 +36,7 @@ export function WeekdayHabit({ rows }: { rows: readonly HabitRow[] }) {
   return (
     <section
       aria-labelledby="weekday-habit"
-      className="flex flex-col rounded-2xl px-4 pt-5 pb-4"
+      className="hm-panel flex min-w-0 flex-col gap-2"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <h3 id="weekday-habit" className="text-[17px] font-semibold">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FiArrowRight } from 'react-icons/fi';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { SwipeableRow } from '@/components/ui/swipeable-row';
@@ -1169,7 +1170,8 @@ export function TransactionRowWithSplit({
             className="min-h-11 text-sm font-semibold"
             style={{ color: 'var(--ink-secondary)' }}
           >
-            ほかのカテゴリから選ぶ →
+            ほかのカテゴリから選ぶ{' '}
+            <FiArrowRight aria-hidden className="ml-1 inline-block" size={16} />
           </button>
         </div>
       </BottomSheet>

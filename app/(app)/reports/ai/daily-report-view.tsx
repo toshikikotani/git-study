@@ -63,7 +63,7 @@ export function DailyReportCard({ view }: { view: DailyAiReportView }) {
         type="button"
         onClick={() => void run()}
         disabled={pending}
-        className="btn-primary mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold"
+        className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 btn-primary mt-4 min-h-11 w-full rounded-full py-3 text-sm font-semibold disabled:cursor-wait"
       >
         {pending
           ? '作成しています…'

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
+import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { formatProbability } from '@/domain/forecast/format';
 import type { DailyLimitResult } from '@/features/forecast/daily-limit';
 
@@ -76,7 +77,7 @@ export function AllowanceDialog({ explain }: { explain: AllowanceExplain }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-11 w-full items-center justify-center rounded-full text-[15px] font-semibold"
+        className="flex min-h-11 w-full items-center justify-center rounded-full text-[15px] font-semibold whitespace-nowrap"
         style={{ background: 'var(--plane)', color: 'var(--ink)' }}
       >
         なぜこの額？
@@ -249,11 +250,19 @@ export function AllowanceExplainBody({
             <span className="text-[15px] font-bold">
               {over > 0 ? 'こえた分は、明日からに回ります' : '残った分は、明日からに回ります'}
             </span>
-            <span className="tabular text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-              明日から
-              {days.length || tomorrow.input.remainingDayOffs + tomorrow.input.remainingWeekdays}
-              日の目安 · 休日 約{num(Math.round(tomorrow.dayOffAllocYen / 10) * 10)}円 · 平日 約
-              {num(Math.round(tomorrow.weekdayAllocYen / 10) * 10)}円
+            <span
+              className="tabular flex flex-col gap-1 text-[13px]"
+              style={{ color: 'var(--ink-muted)' }}
+            >
+              <span>
+                明日から
+                {days.length || tomorrow.input.remainingDayOffs + tomorrow.input.remainingWeekdays}
+                日の目安
+              </span>
+              <span className="flex flex-wrap gap-x-4 gap-y-1">
+                <span>休日 約{num(Math.round(tomorrow.dayOffAllocYen / 10) * 10)}円</span>
+                <span>平日 約{num(Math.round(tomorrow.weekdayAllocYen / 10) * 10)}円</span>
+              </span>
             </span>
           </span>
           {days.length > 0 ? (
@@ -331,7 +340,7 @@ export function AllowanceExplainBody({
                 transition: 'transform 150ms',
               }}
             >
-              ›
+              <ChevronRightIcon />
             </span>
           </button>
           {showFormula ? (

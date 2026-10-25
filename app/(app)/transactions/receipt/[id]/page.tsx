@@ -31,7 +31,7 @@ export default async function CapturePage({
   ]);
 
   return (
-    <div className="rise space-y-4">
+    <div className="rise hm-page space-y-4">
       <BackHeader back={target} title="レシートを入力" />
       {capture.status === 'resolved' ? (
         <p className="py-8 text-center text-sm" style={{ color: 'var(--ink-secondary)' }}>
