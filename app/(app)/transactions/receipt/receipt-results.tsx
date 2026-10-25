@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { FiArrowRight, FiChevronRight } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -465,8 +464,8 @@ export function ReceiptResults({
     return null;
 
   return (
-    <section aria-label="保存前のレシート" className="hm-section flex flex-col gap-4">
-      <div className="hm-section__header flex flex-col gap-1 px-1">
+    <section aria-label="保存前のレシート" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1 px-1">
         <h2 className="text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
           保存前のレシート{receipts.length > 0 ? ` ${receipts.length}件` : ''}
         </h2>
@@ -498,7 +497,7 @@ export function ReceiptResults({
       {/* そろっているものが2件以上:押す前に、保存する店名と金額を見せる。 */}
       {complete.length >= 2 ? (
         <div
-          className="hm-panel flex flex-col gap-3 rounded-2xl px-4 py-4"
+          className="flex flex-col gap-2 rounded-2xl px-4 py-3"
           style={{ background: 'var(--surface)', color: 'var(--ink)' }}
         >
           <p className="text-[15px] font-semibold">確かめる所がないレシート {complete.length}件</p>
@@ -524,16 +523,13 @@ export function ReceiptResults({
         </div>
       ) : null}
 
-      <ul
-        className="hm-list hm-receipt-list flex flex-col overflow-hidden [&>li+li]:border-t [&>li+li]:border-[var(--hairline)]"
-        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-card)' }}
-      >
+      <ul className="flex flex-col gap-2">
         {reading.map((job) => (
           <li
             key={job.id}
             role="status"
             aria-label="読み取り中"
-            className="flex min-h-16 items-center gap-3 px-4 py-4"
+            className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3"
             style={{ background: 'var(--surface)' }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -544,7 +540,7 @@ export function ReceiptResults({
             />
             <span className="flex min-w-0 flex-1 flex-col gap-2">
               <span
-                className="h-3 w-2/3 animate-pulse rounded-lg motion-reduce:animate-none"
+                className="h-3 w-2/3 animate-pulse rounded-lg"
                 style={{ background: 'var(--hairline)' }}
               />
               <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
@@ -562,7 +558,7 @@ export function ReceiptResults({
           return (
             <li
               key={r.key}
-              className="flex items-center gap-2 pr-3"
+              className="flex items-center gap-2 rounded-2xl pr-3"
               style={{ background: 'var(--surface)' }}
             >
               <button
@@ -609,7 +605,9 @@ export function ReceiptResults({
                   {saving.has(r.key) ? '保存中…' : '保存'}
                 </button>
               ) : (
-                <FiChevronRight aria-hidden style={{ color: 'var(--ink-muted)' }} size={18} />
+                <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+                  ›
+                </span>
               )}
             </li>
           );
@@ -623,7 +621,7 @@ export function ReceiptResults({
           <li
             key={job.id}
             role="alert"
-            className="flex min-h-16 items-center gap-3 px-4 py-4"
+            className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3"
             style={{ background: 'var(--surface)', color: 'var(--ink)' }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -703,7 +701,7 @@ export function ReceiptResults({
 function ParkedJobCard({ job }: { job: ReceiptJob }) {
   return (
     <li
-      className="flex min-h-16 items-center gap-3 px-4 py-4"
+      className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -727,7 +725,7 @@ function ParkedJobCard({ job }: { job: ReceiptJob }) {
           className="min-h-11 shrink-0 px-2 text-[13px] font-semibold"
           style={{ color: 'var(--ink)' }}
         >
-          今すぐ読み取る <FiArrowRight aria-hidden className="inline-block" size={16} />
+          今すぐ読み取る →
         </button>
       ) : (
         <Link
@@ -736,7 +734,7 @@ function ParkedJobCard({ job }: { job: ReceiptJob }) {
           className="flex min-h-11 shrink-0 items-center px-2 text-[13px] font-semibold"
           style={{ color: 'var(--ink)' }}
         >
-          入力する <FiArrowRight aria-hidden className="ml-1" size={16} />
+          入力する →
         </Link>
       )}
     </li>

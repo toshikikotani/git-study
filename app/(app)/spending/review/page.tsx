@@ -47,7 +47,7 @@ export default async function ReviewPage({
       getAppSettings().catch(() => null),
     ]);
   return (
-    <div className="hm-page">
+    <div className="rise flex flex-col gap-4">
       <BackHeader
         back={{ href: '/spending', label: '明細' }}
         title="確認が必要"

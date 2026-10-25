@@ -36,14 +36,18 @@ export function AnalysisSummary() {
     },
   ];
   return (
-    <section aria-label="この月の合計" className="hm-panel hm-metric tabular">
+    <section aria-label="この月の合計" className="tabular grid grid-cols-3 gap-2">
       {cards.map((c) => (
-        <div key={c.key} className="flex min-w-0 flex-col gap-2">
-          <span className="hm-metric__label text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+        <div
+          key={c.key}
+          className="flex flex-col gap-1 rounded-2xl px-3 py-4"
+          style={{ background: 'var(--surface)' }}
+        >
+          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
             {c.label}
           </span>
           <span
-            className={`${c.value.length > 9 ? 'text-[15px]' : 'text-[17px]'} font-bold break-words`}
+            className={`${c.value.length > 9 ? 'text-[15px]' : 'text-[17px]'} font-bold whitespace-nowrap`}
             style={{ color: c.color }}
           >
             {c.value}

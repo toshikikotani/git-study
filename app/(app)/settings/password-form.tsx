@@ -11,48 +11,38 @@ export function PasswordForm() {
   const [state, formAction, pending] = useActionState(setPasswordAction, INITIAL_STATE);
 
   return (
-    <form action={formAction} className="hm-form-section space-y-4">
-      <label className="flex flex-col gap-2">
-        <span className="text-[13px] font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-          新しいパスワード
-        </span>
-        <input
-          type="password"
-          name="password"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          autoComplete="new-password"
-          placeholder={`新しいパスワード(${MIN_PASSWORD_LENGTH}文字以上)`}
-          className="glass min-h-11 w-full rounded-2xl px-4 py-3 text-sm outline-none"
-          style={{
-            background: 'var(--surface)',
-            color: 'var(--ink)',
-            boxShadow: 'var(--card-shadow)',
-          }}
-        />
-      </label>
-      <label className="flex flex-col gap-2">
-        <span className="text-[13px] font-semibold" style={{ color: 'var(--ink-secondary)' }}>
-          確認のため再入力
-        </span>
-        <input
-          type="password"
-          name="passwordConfirmation"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          autoComplete="new-password"
-          placeholder="確認のため再入力"
-          className="glass min-h-11 w-full rounded-2xl px-4 py-3 text-sm outline-none"
-          style={{
-            background: 'var(--surface)',
-            color: 'var(--ink)',
-            boxShadow: 'var(--card-shadow)',
-          }}
-        />
-      </label>
+    <form action={formAction} className="space-y-3">
+      <input
+        type="password"
+        name="password"
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        autoComplete="new-password"
+        placeholder={`新しいパスワード(${MIN_PASSWORD_LENGTH}文字以上)`}
+        className="glass w-full rounded-2xl px-4 py-3 text-sm outline-none"
+        style={{
+          background: 'var(--surface)',
+          color: 'var(--ink)',
+          boxShadow: 'var(--card-shadow)',
+        }}
+      />
+      <input
+        type="password"
+        name="passwordConfirmation"
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        autoComplete="new-password"
+        placeholder="確認のため再入力"
+        className="glass w-full rounded-2xl px-4 py-3 text-sm outline-none"
+        style={{
+          background: 'var(--surface)',
+          color: 'var(--ink)',
+          boxShadow: 'var(--card-shadow)',
+        }}
+      />
 
       {state.error ? (
-        <p role="alert" className="text-xs" style={{ color: 'var(--over)' }}>
+        <p className="text-xs" style={{ color: 'var(--over)' }}>
           {state.error}
         </p>
       ) : null}

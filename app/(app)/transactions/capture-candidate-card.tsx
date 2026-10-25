@@ -5,8 +5,6 @@
  * 共通。信頼度の低い項目は黄色でハイライトする(本人要件)。
  */
 
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-
 import { formatYen } from '@/domain/money';
 import { addDays, type DateOnly } from '@/lib/date';
 
@@ -104,7 +102,7 @@ export function CaptureCandidateCard({
           className="min-h-11 min-w-11 text-base"
           style={{ color: 'var(--ink-secondary)' }}
         >
-          <FiChevronLeft aria-hidden size={18} />
+          ‹
         </button>
         <input
           type="date"
@@ -120,7 +118,7 @@ export function CaptureCandidateCard({
           className="min-h-11 min-w-11 text-base"
           style={{ color: 'var(--ink-secondary)' }}
         >
-          <FiChevronRight aria-hidden size={18} />
+          ›
         </button>
       </div>
 

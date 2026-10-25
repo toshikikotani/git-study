@@ -18,9 +18,7 @@
     "test:watch": "vitest",
     "verify:schema": "./scripts/verify-schema.sh",
     "verify:migrations": "./scripts/verify-migrations.sh",
-    "eval:forecast": "tsx scripts/forecast-eval/run.ts",
-    "design:lint": "node scripts/hallmark/check.mjs",
-    "design:refs": "node .agents/skills/hallmark/scripts/refcheck.mjs --errors"
+    "eval:forecast": "tsx scripts/forecast-eval/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -47,7 +45,6 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.4",
     "prettier": "^3.6.2",
-    "puppeteer-core": "25.16.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",

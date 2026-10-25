@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { FiArrowRight } from 'react-icons/fi';
 import { useEffect, useMemo, useState } from 'react';
 
 import { saveImportBatchAction } from '../actions';
@@ -154,7 +153,7 @@ export default function EmailImportPage() {
   };
 
   return (
-    <div className="rise hm-page space-y-4">
+    <div className="rise space-y-4">
       <BackHeader
         back={{ href: '/spending', label: '明細' }}
         title="メールから取り込む"
@@ -177,12 +176,12 @@ export default function EmailImportPage() {
           style={{ color: 'var(--accent)' }}
         >
           自動取得を設定する
-          <FiArrowRight aria-hidden size={16} />
+          <span aria-hidden>→</span>
         </Link>
       </div>
 
       {saved ? (
-        <Card className="hm-panel">
+        <Card>
           <p className="text-sm" style={{ color: 'var(--ink)' }}>
             {saved.imported} 件を取り込みました
             {saved.duplicates > 0 ? `(重複 ${saved.duplicates} 件を除外)` : ''}
@@ -197,12 +196,15 @@ export default function EmailImportPage() {
       ) : null}
 
       {/* 口座(M6-2) */}
-      <Card className="hm-panel">
+      <Card>
         <InputAccountSelector inputAccount={inputAccount} />
       </Card>
 
-      <Card className="hm-panel">
-        <label className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
+      <Card>
+        <label
+          className="text-xs font-semibold tracking-[0.08em] uppercase"
+          style={{ color: 'var(--ink-muted)' }}
+        >
           メール本文
         </label>
         <textarea

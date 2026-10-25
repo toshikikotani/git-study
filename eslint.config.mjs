@@ -3,17 +3,7 @@ import typescript from 'eslint-config-next/typescript';
 
 const config = [
   // mobile/ は iPhone 版(Expo)。型チェックとまとめ(バンドル)は CI の mobile の段で見る(ADR-132)。
-  {
-    ignores: [
-      '.next/**',
-      'node_modules/**',
-      'next-env.d.ts',
-      'mobile/**',
-      '.agents/**',
-      '.claude/skills/**',
-      '.hallmark/**',
-    ],
-  },
+  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'mobile/**'] },
   ...coreWebVitals,
   ...typescript,
   {

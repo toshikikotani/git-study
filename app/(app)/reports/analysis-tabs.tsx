@@ -11,14 +11,8 @@ export function AnalysisTabs({ current }: { current: 'goal' | 'month' }) {
   return (
     <nav
       aria-label="分析の種類"
-      className="hm-toolbar grid grid-cols-2"
-      style={{
-        display: 'grid',
-        background: 'var(--field)',
-        borderRadius: 'var(--radius-full)',
-        padding: 2,
-        gap: 2,
-      }}
+      className="grid grid-cols-2"
+      style={{ background: 'var(--field)', borderRadius: 'var(--radius-full)', padding: 2, gap: 2 }}
     >
       {TABS.map((tab) => {
         const on = tab.key === current;
@@ -32,7 +26,7 @@ export function AnalysisTabs({ current }: { current: 'goal' | 'month' }) {
               borderRadius: 'var(--radius-full)',
               background: on ? 'var(--segment-on)' : 'transparent',
               color: on ? 'var(--ink)' : 'var(--ink-secondary)',
-              boxShadow: on ? 'var(--card-shadow)' : 'none',
+              boxShadow: on ? '0 1px 3px rgba(0, 0, 0, 0.12)' : 'none',
             }}
           >
             {tab.label}
@@ -46,7 +40,7 @@ export function AnalysisTabs({ current }: { current: 'goal' | 'month' }) {
 /** 分析のまとまりの見出し(「いまの状況」など、22px)。 */
 export function GroupHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="hm-section__header text-[22px] font-bold" style={{ color: 'var(--ink)' }}>
+    <h2 className="mx-1 mt-4 text-[22px] font-bold" style={{ color: 'var(--ink)' }}>
       {children}
     </h2>
   );

@@ -16,12 +16,12 @@ export async function AiInsightLine() {
   return (
     <Link
       href="/reports/ai?from=/"
-      className="hm-panel flex min-h-14 items-center gap-3"
+      className="flex min-h-14 items-center gap-3 rounded-2xl px-4 py-3"
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
-          AIの気づき
+          ✦ AIの気づき
         </span>
         <span className="text-[15px] leading-snug">{first}</span>
       </span>

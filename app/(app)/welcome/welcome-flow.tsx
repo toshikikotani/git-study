@@ -121,19 +121,19 @@ export function WelcomeFlow({
   }
 
   return (
-    <div className="hm-page hm-auth">
-      <header className="hm-section">
-        <p role="status" className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+    <div className="rise space-y-4">
+      <header>
+        <p className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
           はじめての設定 {step}/3
         </p>
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
           {step === 1
             ? 'まずは手取りと給料日'
             : step === 2
               ? '今日からの目標'
               : 'この内容ではじめる'}
         </h1>
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
           {step === 1
             ? '使える額と、給料日までの期間を出すのに使います。あとから設定で変えられます。'
             : step === 2
@@ -142,9 +142,9 @@ export function WelcomeFlow({
         </p>
       </header>
 
-      <Card className="hm-panel">
+      <Card>
         {step === 1 ? (
-          <div className="hm-form">
+          <div className="space-y-4">
             <Field label="毎月の手取り(円)">
               <input
                 type="text"
@@ -173,7 +173,7 @@ export function WelcomeFlow({
             </Field>
           </div>
         ) : step === 2 ? (
-          <div className="hm-form">
+          <div className="space-y-4">
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="期間">
               {PRESETS.map((id) => (
                 <button
@@ -237,7 +237,7 @@ export function WelcomeFlow({
             </p>
           </div>
         ) : (
-          <div className="hm-form">
+          <div className="space-y-4">
             <dl className="space-y-2 text-sm" style={{ color: 'var(--ink)' }}>
               <div className="flex justify-between gap-3">
                 <dt>毎月の手取り</dt>
@@ -277,7 +277,7 @@ export function WelcomeFlow({
               <p className="mb-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
                 空欄のままでも、下の「この内容ではじめる」で完了できます。
               </p>
-              <div className="hm-form">
+              <div className="space-y-4">
                 <Field label="何のために">
                   <input
                     type="text"
@@ -320,7 +320,7 @@ export function WelcomeFlow({
         </p>
       ) : null}
 
-      <div className="hm-toolbar">
+      <div className="flex gap-2">
         {step > 1 ? (
           <button
             type="button"

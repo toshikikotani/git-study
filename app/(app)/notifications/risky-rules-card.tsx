@@ -17,19 +17,19 @@
 export function RiskyRulesCard() {
   return (
     <div
-      className="hm-panel hm-section"
+      className="rounded-2xl p-5"
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
         危ない支払い方の見張り
       </h2>
-      <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+      <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         {/* 言葉の途中で折れないように(「キャッシ／ング」と折れていた)。 */}
         <span className="whitespace-nowrap">リボ払い</span>・
         <span className="whitespace-nowrap">キャッシング</span>・
         <span className="whitespace-nowrap">分割払い</span>を見つけたら知らせます。
       </p>
-      <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+      <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
         見逃すと困るので、いつも決まった方法で探します(ここや会話からは変えられません)。
       </p>
     </div>

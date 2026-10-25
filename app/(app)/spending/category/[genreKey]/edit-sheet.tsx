@@ -1,5 +1,4 @@
 'use client';
-import { FiArrowRight } from 'react-icons/fi';
 
 import { useState } from 'react';
 import { ZoomableImage } from '@/components/receipt/zoomable-image';
@@ -208,8 +207,7 @@ export function EditForm({
           className="min-h-11 rounded-full px-4 text-sm font-semibold"
           style={{ border: '1px solid var(--hairline)', color: 'var(--ink)' }}
         >
-          {tx.genreName ?? '未分類'} ・ カテゴリを移す{' '}
-          <FiArrowRight aria-hidden className="ml-1 inline" />
+          {tx.genreName ?? '未分類'} ・ カテゴリを移す →
         </button>
       </div>
 
@@ -313,7 +311,7 @@ function DeleteRow({ onDelete }: { onDelete: () => void }) {
       type="button"
       onClick={onDelete}
       className="min-h-12 w-full rounded-2xl text-base font-semibold"
-      style={{ background: 'var(--over)', color: 'var(--plane)' }}
+      style={{ background: 'var(--over)', color: '#fff' }}
     >
       本当に削除する
     </button>

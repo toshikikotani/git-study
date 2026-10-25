@@ -1,5 +1,4 @@
 'use client';
-import { MdChevronRight } from 'react-icons/md';
 
 import { useState } from 'react';
 
@@ -44,7 +43,9 @@ export function DetailSheet({
               </span>
             ) : null}
           </span>
-          <MdChevronRight aria-hidden size={18} style={{ color: 'var(--ink-muted)' }} />
+          <span aria-hidden style={{ color: 'var(--ink-muted)' }}>
+            ›
+          </span>
         </button>
       ) : (
         <button

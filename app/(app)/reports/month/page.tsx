@@ -33,7 +33,7 @@ export default async function MonthReviewPage({
   const initialMonth = resolveCalendarMonthStart(month, data.ledger.period.from);
 
   return (
-    <div className="hm-page">
+    <div className="rise flex flex-col gap-4">
       <SpendingMonthProvider
         today={data.ledger.period.to}
         currentMonthStart={data.ledger.period.from}
@@ -49,20 +49,14 @@ export default async function MonthReviewPage({
         <AnalysisTabs current="month" />
         <AnalysisSummary />
         <AiReportLink />
-        <div className="hm-dashboard">
-          <div className="hm-dashboard__primary">
-            <GenreBreakdown />
-            <FrequencyCard />
-          </div>
-          <div className="hm-dashboard__secondary">
-            <Suspense fallback={null}>
-              <MerchantRanking />
-            </Suspense>
-            <Suspense fallback={null}>
-              <SmallSpendCard />
-            </Suspense>
-          </div>
-        </div>
+        <GenreBreakdown />
+        <FrequencyCard />
+        <Suspense fallback={null}>
+          <MerchantRanking />
+        </Suspense>
+        <Suspense fallback={null}>
+          <SmallSpendCard />
+        </Suspense>
         <Suspense fallback={null}>
           <div className="space-y-2">
             <p className="px-1 text-[13px]" style={{ color: 'var(--ink-muted)' }}>

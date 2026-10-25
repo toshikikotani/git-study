@@ -38,7 +38,10 @@ export function GoalCard({
   }
 
   return (
-    <div className="hm-section border-t pt-4" style={{ borderColor: 'var(--hairline)' }}>
+    <div
+      className="glass rounded-2xl p-5"
+      style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+    >
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           {goal.title}
@@ -62,7 +65,7 @@ export function GoalCard({
             aria-label={`${goal.title} ${percent}%`}
           >
             <div
-              className="h-full rounded-full"
+              className="h-full rounded-full transition-[width] duration-500 ease-out"
               style={{ width: `${percent}%`, background: 'var(--accent)' }}
             />
           </div>
@@ -100,7 +103,7 @@ export function GoalCard({
             type="button"
             onClick={() => run(achieveGoalAction)}
             disabled={isPending}
-            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 min-h-11 rounded-full px-4 text-[13px] font-semibold disabled:opacity-50"
+            className="min-h-11 rounded-full px-4 text-[13px] font-semibold disabled:opacity-50"
             style={{ background: 'var(--accent-track)', color: 'var(--accent)' }}
           >
             達成にする
@@ -110,7 +113,7 @@ export function GoalCard({
           type="button"
           onClick={() => run(abandonGoalAction)}
           disabled={isPending}
-          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] active:opacity-80 -mr-2 ml-auto min-h-11 min-w-11 px-2 text-[13px] disabled:opacity-50"
+          className="-mr-2 ml-auto min-h-11 min-w-11 px-2 text-[13px] disabled:opacity-50"
           style={{ color: 'var(--ink-muted)' }}
         >
           見送る

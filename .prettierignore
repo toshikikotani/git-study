@@ -12,9 +12,3 @@ tests/domain/fixtures/
 
 # Markdown は表の桁揃えを手で管理しているため対象外
 *.md
-
-# 導入元のHallmarkを改変・再整形しない
-.agents/skills/hallmark/
-.claude/skills/hallmark/
-.hallmark/before/
-.hallmark/shots/

@@ -1,4 +1,3 @@
-import { FiChevronRight } from 'react-icons/fi';
 import Link from 'next/link';
 
 import { BackHeader } from '@/components/ui/back-header';
@@ -44,14 +43,14 @@ export default async function SavingsPage({
     summary.startOn !== null && summary.startOn.slice(0, 7) === today.slice(0, 7);
 
   return (
-    <div className="hm-page">
+    <div className="rise space-y-4">
       <BackHeader back={backTargetOf(from)} title="貯金" />
 
       {/* 貯金目標は1つ(提案書、ADR-127):毎月の額が目標。「何のために・いくら・いつまでに」はその目標の
           くわしい内容(任意)。今日・貯金・AIは、どれもこの毎月の額で「あといくら」を出す。 */}
       <section
         aria-labelledby="savings-target"
-        className="hm-panel hm-section"
+        className="flex flex-col gap-3 rounded-2xl px-4 py-4"
         style={{ background: 'var(--surface)', color: 'var(--ink)' }}
       >
         <h2 id="savings-target" className="text-[17px] font-semibold">
@@ -71,7 +70,10 @@ export default async function SavingsPage({
         ) : null}
       </section>
 
-      <section className="hm-panel" style={{ background: 'var(--surface)' }}>
+      <section
+        className="glass rounded-2xl px-4 py-4"
+        style={{ background: 'var(--surface-raised)', boxShadow: 'var(--card-shadow)' }}
+      >
         <div className={`grid gap-3 ${startedThisMonth ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <Stat
             label="貯まった"
@@ -95,7 +97,7 @@ export default async function SavingsPage({
       </section>
 
       {older.length > 0 ? (
-        <details className="hm-panel hm-list" style={{ background: 'var(--surface)' }}>
+        <details className="rounded-2xl px-4" style={{ background: 'var(--surface)' }}>
           <summary
             className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold"
             style={{ color: 'var(--accent)' }}
@@ -112,10 +114,10 @@ export default async function SavingsPage({
 
       <Link
         href="/assistant?context=savings"
-        className="flex min-h-11 items-center gap-2 text-xs font-semibold"
+        className="flex min-h-11 items-center text-xs font-semibold"
         style={{ color: 'var(--accent)' }}
       >
-        AIに相談して目標を立てる <FiChevronRight aria-hidden />
+        AIに相談して目標を立てる →
       </Link>
     </div>
   );

@@ -44,10 +44,10 @@ export function WatchCategories({ categories }: { categories: readonly WatchCate
   return (
     <section
       aria-label="気をつけたいカテゴリ"
-      className="hm-section"
-      style={{ color: 'var(--ink)' }}
+      className="flex flex-col rounded-2xl pt-2"
+      style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
-      <div className="hm-section__header">
+      <div className="flex items-center justify-between gap-2 pr-2 pl-4">
         <h2 className="text-[17px] font-semibold">気をつけたいカテゴリ</h2>
         <Link
           href="/reports"
@@ -65,7 +65,7 @@ export function WatchCategories({ categories }: { categories: readonly WatchCate
             key={c.genreId}
             type="button"
             onClick={() => open(c.genreId)}
-            className="flex min-h-14 w-full gap-3 py-3 text-left"
+            className="flex min-h-14 w-full gap-3 px-4 py-3 text-left"
             style={{ borderTop: '1px solid var(--hairline)' }}
             aria-label={`${c.name}、${tone.label}。${yen(c.spentYen)} / 目標 ${yen(c.targetYen)}`}
           >

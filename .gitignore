@@ -15,13 +15,3 @@ supabase/.temp/
 
 # Vercel CLI のプロジェクトリンク情報(vercel link/deploy で自動生成)
 .vercel
-
-# Hallmarkのローカル描画結果・操作記録（導入元と実行ログは追跡）
-.hallmark/before/
-.hallmark/shots/
-.hallmark/before.json
-.hallmark/before.txt
-.hallmark/compare.html
-.hallmark/audit-*.txt
-
-.hallmark/qa/

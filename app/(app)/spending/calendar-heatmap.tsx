@@ -10,7 +10,6 @@ import { formatDateJa, splitDateOnly, weekdayOf } from '@/lib/date';
 import { useOpenRecord } from '../record-sheet';
 import { saveCalendarView, useCalendarView } from './calendar-prefs';
 import { useSpendingMonth } from './spending-month-provider';
-import styles from './spending.module.css';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 /** 面の濃さ。文字色と背景色の混合なので、明暗どちらのテーマでも段階が分かる。 */
@@ -106,7 +105,7 @@ export function CalendarHeatmap({
                   aria-selected={selected}
                   aria-current={isToday ? 'date' : undefined}
                   onClick={() => setFilter({ date: selected ? null : date })}
-                  className={`flex h-13 min-h-11 flex-col items-center justify-center gap-1 rounded-xl ${styles.calendarDay}`}
+                  className="flex h-13 min-h-11 flex-col items-center justify-center gap-1 rounded-xl"
                   style={{
                     background:
                       level > 0
@@ -120,6 +119,8 @@ export function CalendarHeatmap({
                       : future
                         ? 'inset 0 0 0 1px var(--hairline)'
                         : 'none',
+                    outline: selected ? '2px solid var(--accent)' : 'none',
+                    outlineOffset: '1px',
                     opacity: inMonth ? 1 : 0.4,
                   }}
                 >

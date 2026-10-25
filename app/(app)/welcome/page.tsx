@@ -29,7 +29,7 @@ export default async function WelcomePage({
   });
 
   return (
-    <div className="hm-page">
+    <>
       {back ? <BackLink back={{ ...back, cancel: true }} /> : null}
       <WelcomeFlow
         today={todayJst()}
@@ -37,6 +37,6 @@ export default async function WelcomePage({
         initialPayday={income.payday}
         starters={starters}
       />
-    </div>
+    </>
   );
 }

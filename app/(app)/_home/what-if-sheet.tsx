@@ -22,7 +22,7 @@ export function WhatIfButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn-primary flex min-h-11 items-center justify-center gap-1 rounded-full px-2 text-[15px] font-bold whitespace-nowrap"
+        className="btn-primary flex min-h-11 items-center justify-center gap-1 rounded-full text-[15px] font-bold"
       >
         <svg
           aria-hidden

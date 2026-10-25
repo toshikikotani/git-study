@@ -21,7 +21,7 @@ export function Placeholder({
       </p>
       <div
         className="rounded-2xl p-5"
-        style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
+        style={{ background: 'var(--surface)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
       >
         <div className="flex items-center gap-2">
           <span
@@ -29,7 +29,10 @@ export function Placeholder({
             style={{ background: 'var(--ink-muted)' }}
             aria-hidden
           />
-          <span className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
+          <span
+            className="text-xs font-semibold tracking-[0.08em] uppercase"
+            style={{ color: 'var(--ink-muted)' }}
+          >
             未実装
           </span>
         </div>

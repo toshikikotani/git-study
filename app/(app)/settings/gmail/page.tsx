@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { FiArrowRight } from 'react-icons/fi';
 
 import { BackHeader } from '@/components/ui/back-header';
 import { requireOwner } from '@/features/auth/owner';
@@ -22,7 +21,7 @@ export default async function GmailSettingsPage() {
   const settings = await withMinDuration(getGmailSettings());
 
   return (
-    <div className="rise hm-page space-y-4">
+    <div className="rise space-y-4">
       <BackHeader back={{ href: '/settings', label: '設定' }} title="Gmail 自動取得" />
 
       <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
@@ -30,7 +29,7 @@ export default async function GmailSettingsPage() {
         キャッシングを月末を待たずにその日のうちに検知できます。
       </p>
 
-      <Card className="hm-panel">
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           設定
         </h2>
@@ -39,7 +38,7 @@ export default async function GmailSettingsPage() {
         </div>
       </Card>
 
-      <Card className="hm-panel">
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           設定手順
         </h2>
@@ -76,7 +75,7 @@ export default async function GmailSettingsPage() {
         </div>
       </Card>
 
-      <Card className="hm-panel">
+      <Card>
         <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           安全のために
         </h2>
@@ -108,7 +107,7 @@ export default async function GmailSettingsPage() {
         style={{ color: 'var(--accent)' }}
       >
         AI救済メールの見直し
-        <FiArrowRight aria-hidden size={16} />
+        <span aria-hidden>→</span>
       </Link>
     </div>
   );

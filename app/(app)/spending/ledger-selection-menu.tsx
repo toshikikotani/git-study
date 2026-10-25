@@ -86,7 +86,7 @@ export function LedgerSelectionMenu({
         type="button"
         disabled={!ready || availableCount === 0}
         onClick={onStart}
-        className="flex min-h-11 shrink-0 items-center px-2 text-[17px] whitespace-nowrap disabled:opacity-40"
+        className="flex min-h-11 items-center px-2 text-[17px] disabled:opacity-40"
         style={{ color: 'var(--accent)' }}
       >
         選択
@@ -141,7 +141,7 @@ export function LedgerSelectionMenu({
               type="button"
               disabled={!ready || availableCount === 0}
               onClick={onStart}
-              className="min-h-11 shrink-0 px-4 text-[15px] font-semibold whitespace-nowrap disabled:opacity-40"
+              className="min-h-11 px-4 text-[15px] font-semibold disabled:opacity-40"
             >
               選択
             </button>

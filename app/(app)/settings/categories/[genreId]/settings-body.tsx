@@ -617,7 +617,7 @@ function SwitchRow({
         style={{ background: checked ? 'var(--action)' : 'var(--hairline)' }}
       >
         <span
-          className="absolute top-1 h-5 w-5 rounded-full transition-transform motion-reduce:transition-none"
+          className="absolute top-1 h-5 w-5 rounded-full transition-all"
           style={{ left: checked ? '1.5rem' : '0.25rem', background: 'var(--surface)' }}
         />
       </span>
