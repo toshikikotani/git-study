@@ -20,6 +20,7 @@ import { UnsavedReceiptsRow } from '../_home/today-todo';
 import { AttentionCard } from './attention-card';
 import { LedgerList, LedgerSearch } from './ledger-list';
 import { loadSpendingMonthData } from './month-data';
+import { MonthCopy } from './month-copy';
 import { MonthSummary } from './month-summary';
 import { PeriodSwitcher } from './period-switcher';
 import { SpendingMonthProvider } from './spending-month-provider';
@@ -27,7 +28,7 @@ import { SpendingMonthProvider } from './spending-month-provider';
 /**
  * 明細(デザイン仕様書の「明細」、ADR-090)。上から次の順に並べる:
  *   1. 見出しと月の切り替え(‹ 10月 ›)
- *   2. 支出・収入・差額
+ *   2. 支出・収入・差額と、この月の支出を文字でコピー(ADR-134)
  *   3. 検索・絞り込み・カレンダー(既定で出す。出す / 隠す と 週 ↔ 月 は覚えておく、ADR-093/116/121)
  *   4. 保存前のレシート N件(あるときだけ、ADR-133)と、確認が必要なものをまとめたカード(あるときだけ)
  *   5. これからの予定1行 → 日付ごとの明細(固定費も払った日に含める)
@@ -87,6 +88,7 @@ export default async function SpendingPage({
       >
         <PeriodSwitcher />
         <MonthSummary />
+        <MonthCopy />
         <LedgerSearch
           initialCalendarView={parseCalendarView(jar.get(CALENDAR_VIEW_COOKIE)?.value)}
           initialCalendarOpen={parseCalendarOpen(jar.get(CALENDAR_OPEN_COOKIE)?.value)}

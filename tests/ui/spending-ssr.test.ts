@@ -33,6 +33,7 @@ import { LedgerList } from '../../app/(app)/spending/ledger-list';
 import { PeriodSwitcher } from '../../app/(app)/spending/period-switcher';
 import { SpendingMonthProvider } from '../../app/(app)/spending/spending-month-provider';
 import { LedgerSearch } from '../../app/(app)/spending/ledger-list';
+import { MonthCopy } from '../../app/(app)/spending/month-copy';
 import { MonthSummary } from '../../app/(app)/spending/month-summary';
 import { budgetSpokenLabel } from '@/domain/budget-state';
 import { GenreBudgetRow } from '@/components/ui/genre-budget-row';
@@ -124,6 +125,7 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
         children: [
           h(PeriodSwitcher, { key: 'p' }),
           h(MonthSummary, { key: 's' }),
+          h(MonthCopy, { key: 'c' }),
           h(LedgerSearch, { key: 'q' }),
           h(AttentionCard, { key: 'at', hasGoal: true }),
           h(LedgerList, { key: 'l', goalRange: null, duplicateCount: 0 }),
@@ -165,6 +167,11 @@ describe('家計簿の画面(サーバー描画のスモークテスト)', () =>
     );
     expect(hidden).toMatch(/aria-label="カレンダー" aria-expanded="false"/);
     expect(hidden).not.toContain('aria-label="日付ごとの支出"');
+  });
+
+  it('合計の下に「この月の支出をコピー」(1か月分を文字で出す、ADR-134)', () => {
+    expect(html).toContain('この月の支出をコピー');
+    expect(html.indexOf('この月の合計')).toBeLessThan(html.indexOf('この月の支出をコピー'));
   });
 
   it('合計は 支出・収入・収支 の3列(収入−支出はどの画面でも「収支」、ADR-127)', () => {
