@@ -51,7 +51,10 @@ export type MonthlyReportCategory = {
 };
 
 export type MonthlyReportInput = {
+  /** 保存の鍵(期間の終わりの月 'YYYY-MM'、ADR-135)。 */
   monthKey: string;
+  /** レポートの期間。今期の目標があればその期間、無ければ暦の1か月(ADR-135)。 */
+  period: { from: string; to: string; label: string; isGoal: boolean };
   totalSpentYen: number;
   totalIncomeYen: number;
   wasteYen: number;
@@ -267,8 +270,15 @@ export class ClaudeMonthlyReportAnalyzer implements MonthlyReportAnalyzer {
   }
 }
 
-function buildUserContent(input: MonthlyReportInput): string {
-  const lines: string[] = [`${input.monthKey} の家計データ:`, ''];
+/** AI に渡す家計データの文(テストで期間の書き方を確かめる)。 */
+export function buildUserContent(input: MonthlyReportInput): string {
+  const p = input.period;
+  const lines: string[] = [
+    p.isGoal
+      ? `今期の目標の期間 ${p.from}〜${p.to} の家計データ(「着地」はこの期間の終わり ${p.to} の見込み):`
+      : `${input.monthKey} の家計データ:`,
+    '',
+  ];
 
   lines.push(
     `変動費の総支出(固定費を除く): ${input.totalSpentYen}円 / 総収入: ${input.totalIncomeYen}円`,
@@ -401,7 +411,7 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   if (e.weekdayAvgYen !== null || e.dayOffAvgYen !== null) {
     lines.push(
       '',
-      '今月の休み日・平日別支出(固定費を除いた全明細から計算、休み日=土日祝):',
+      `${input.period.isGoal ? 'この期間' : '今月'}の休み日・平日別支出(固定費を除いた全明細から計算、休み日=土日祝):`,
       `- 平日の1日あたり: ${e.weekdayAvgYen !== null ? yenOf(e.weekdayAvgYen) : '—'}`,
       `- 休み日の1日あたり: ${e.dayOffAvgYen !== null ? yenOf(e.dayOffAvgYen) : '—'}`,
     );
@@ -417,7 +427,10 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
   }
 
   if (e.notable.length > 0) {
-    lines.push('', '今月の目立つ明細(固定費を除いた、金額の大きいもの・メモのあるもの):');
+    lines.push(
+      '',
+      `${input.period.isGoal ? 'この期間' : '今月'}の目立つ明細(固定費を除いた、金額の大きいもの・メモのあるもの):`,
+    );
     for (const n of e.notable) {
       const items = n.items.length > 0 ? ` 品目: ${n.items.join('、')}` : '';
       const memo = n.memo ? ` メモ: ${n.memo}` : '';
@@ -443,7 +456,7 @@ function appendForecastSection(lines: string[], input: MonthlyReportInput): void
         (c.seasons.length > 0 ? ` ・ 時期: ${c.seasons.join('、')}` : ''),
     );
   }
-  lines.push('', '過去のAIの読みの当たり外れ(月末の実際の着地と比べたもの):');
+  lines.push('', '過去のAIの読みの当たり外れ(期間の終わりの実際の着地と比べたもの):');
   if (e.pastReads.length === 0) lines.push('- まだ無い');
   for (const r of e.pastReads) {
     const better =

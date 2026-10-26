@@ -3,7 +3,7 @@ import { remainingOfTotal } from '@/domain/forecast/remaining';
 import { formatYen } from '@/domain/money';
 import { periodDays } from '@/domain/period';
 import { reportInsights } from '@/domain/report-insights';
-import { loadMonthlyReport } from '@/features/ai-report/store';
+import { loadCurrentMonthlyReport } from '@/features/ai-report/store';
 import { buildCategoryLines, UNCATEGORIZED_KEY } from '@/features/category/model';
 import { buildCumulative, linesForGoal } from '@/features/category/pace';
 import { loadCategoryOutlooks } from '@/features/goals/category-outlook';
@@ -62,7 +62,7 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
   const period = { from: plan.periodStart, to: plan.periodEnd };
   const [loaded, report, trend] = await Promise.all([
     loadCategoryOutlooks({ plan, today }),
-    loadMonthlyReport(today.slice(0, 7)).catch(() => null),
+    loadCurrentMonthlyReport().catch(() => null),
     loadCategorySpendingTrend().catch(() => null),
   ]);
   const forecast = loaded.forecast?.forecast ?? null;

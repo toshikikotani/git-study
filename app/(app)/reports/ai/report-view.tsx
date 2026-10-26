@@ -50,7 +50,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
     >
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>
-          今月の傾向
+          {input.period.isGoal ? `今期(${input.period.label})の傾向` : '今月の傾向'}
         </p>
         <p className="tabular text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           {formatYen(input.totalSpentYen, { sign: 'never' })}
@@ -59,7 +59,8 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 
       {report === null ? (
         <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          今月の家計データから、支出傾向のタイプ・気づき・アドバイスをAIがまとめます。
+          {input.period.isGoal ? '今期の目標の期間' : '今月'}
+          の家計データから、支出傾向のタイプ・気づき・アドバイスをAIがまとめます。
         </p>
       ) : (
         <MonthlyReportBody report={report} monthKey={input.monthKey} forecast={input.forecast} />
@@ -96,9 +97,7 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
       >
         {pending
           ? '作成しています…'
-          : report === null
-            ? '今月のレポートを作る'
-            : '今月のレポートを更新する'}
+          : `${input.period.isGoal ? '今期' : '今月'}のレポートを${report === null ? '作る' : '更新する'}`}
       </button>
 
       {warnings.length > 0 ? (
@@ -121,9 +120,12 @@ export function MonthlyReportCard({ view }: { view: MonthlyAiReportView }) {
 /** 過去月には、現在の貯金・予測などを混ぜず、実際に保存された文章だけを表示する。 */
 export function SavedMonthlyReportCard({
   monthKey,
+  title,
   report,
 }: {
   monthKey: string;
+  /** 「2026年10月」「10/25〜11/24」(その月に終わる目標があれば、その期間、ADR-135)。 */
+  title: string;
   report: MonthlyAiReport | null;
 }) {
   return (
@@ -132,11 +134,11 @@ export function SavedMonthlyReportCard({
       style={{ background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-        {Number(monthKey.slice(0, 4))}年{Number(monthKey.slice(5, 7))}月の月次レポート
+        {title}のレポート
       </h2>
       {report === null ? (
         <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          この月のAIレポートは保存されていません。今月以外は保存済みのレポートを表示します。
+          この期間のAIレポートは保存されていません。いまの期間以外は保存済みのレポートを表示します。
         </p>
       ) : (
         <>

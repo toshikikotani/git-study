@@ -17,7 +17,7 @@ import {
 import { summarizeLedger } from '@/domain/ledger';
 import { loadLedgerTransactions } from '@/features/spending/entries';
 import { toLedgerEntries } from '@/features/spending/views';
-import { monthStartJst, todayJst } from '@/lib/date';
+import { monthStartJst, todayJst, type DateOnly } from '@/lib/date';
 import { AppError } from '@/lib/errors';
 import { isMissingTableError } from '@/lib/supabase/errors';
 import { resolveItemGenres } from '@/features/genre/item-genres';
@@ -218,10 +218,13 @@ export type SpendingDiagnosisView = {
  */
 export async function loadSpendingDiagnosisView(
   now: Date = new Date(),
+  /** 「今」として数える期間の始まり(AIのレポートは今期の目標の始まり、ADR-135)。既定は今月の1日。 */
+  options: { currentFrom?: DateOnly } = {},
 ): Promise<SpendingDiagnosisView> {
-  const monthStart = monthStartJst(0, now);
+  const monthStart = options.currentFrom ?? monthStartJst(0, now);
   const today = todayJst(now);
-  const rangeStart = monthStartJst(-(TREND_MONTHS_BACK - 1), now);
+  const trendStart = monthStartJst(-(TREND_MONTHS_BACK - 1), now);
+  const rangeStart = monthStart < trendStart ? monthStart : trendStart;
   const monthKeys = Array.from({ length: TREND_MONTHS_BACK }, (_, i) =>
     monthStartJst(-(TREND_MONTHS_BACK - 1) + i, now).slice(0, 7),
   );

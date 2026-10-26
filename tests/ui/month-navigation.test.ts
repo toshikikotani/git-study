@@ -131,7 +131,7 @@ describe('AIのレポート', () => {
     expect(store.monthlyReport).toHaveBeenCalledWith('2026-09');
     expect(store.monthlyView).not.toHaveBeenCalled();
     expect(store.dailyView).not.toHaveBeenCalled();
-    expect(html).toContain('この月のAIレポートは保存されていません');
+    expect(html).toContain('この期間のAIレポートは保存されていません');
     expect(html).toContain('href="/reports/month?month=2026-09"');
     expect(html).toContain('href="/reports/ai?month=2026-10"');
     expect(html).not.toContain('今日の支出');
@@ -148,7 +148,7 @@ describe('AIのレポート', () => {
       forecastRead: null,
     });
     const html = await page({ month: '2026-09' });
-    expect(html).toContain('2026年9月の月次レポート');
+    expect(html).toContain('2026年9月のレポート');
     expect(html).toContain('支出傾向のタイプ');
     expect(html).toContain('9月は使うところを選べました。');
     expect(html).toContain('9月の外食の記録です。');
@@ -156,15 +156,17 @@ describe('AIのレポート', () => {
     expect(html).toContain('2026年9月30日に作成した内容です。');
     expect(html).toContain('href="/spending?month=2026-09"');
     expect(html).not.toContain('今月のレポートを更新する');
+    expect(html).not.toContain('今期のレポートを更新する');
   });
 
   it('前の月のレポートを一覧から開く(開いている月と今月は除く)', async () => {
     store.months.mockResolvedValue(['2026-10', '2026-09', '2026-08', '2026-07']);
     const html = await page({ month: '2026-09' });
-    expect(html).toContain('前の月のレポート');
+    expect(html).toContain('前のレポート');
     expect(html).toContain('href="/reports/ai?month=2026-08"');
     expect(html).toContain('2026年7月のレポート');
-    expect(html).not.toContain('2026年9月のレポート');
+    // 開いている月はカードの見出しだけ(一覧に出さない)。今の期間も一覧に出さない。
+    expect(html.match(/2026年9月のレポート/g)).toHaveLength(1);
     expect(html).not.toContain('2026年10月のレポート');
   });
 
