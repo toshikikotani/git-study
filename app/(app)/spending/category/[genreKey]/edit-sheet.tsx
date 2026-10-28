@@ -311,7 +311,7 @@ function DeleteRow({ onDelete }: { onDelete: () => void }) {
       type="button"
       onClick={onDelete}
       className="min-h-12 w-full rounded-2xl text-base font-semibold"
-      style={{ background: 'var(--over)', color: '#fff' }}
+      style={{ background: 'var(--over)', color: 'var(--on-accent)' }}
     >
       本当に削除する
     </button>

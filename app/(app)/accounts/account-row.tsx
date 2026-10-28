@@ -30,9 +30,9 @@ export function AccountRow({ account }: { account: Account }) {
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             {account.name}
-          </h3>
+          </h2>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-muted)' }}>
             {account.institutionName ? `${account.institutionName} ・ ` : ''}
             {ACCOUNT_KIND_LABELS[account.kind]} ・ {ACCOUNT_PURPOSE_LABELS[account.purpose]}

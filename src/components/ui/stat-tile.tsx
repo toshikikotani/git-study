@@ -43,7 +43,7 @@ export function StatTile({
       style={{
         borderRadius: 'var(--radius-card)',
         background: 'var(--surface)',
-        boxShadow: 'var(--shadow-1)',
+        boxShadow: 'var(--card-shadow)',
       }}
     >
       <div className="flex items-center justify-between gap-2">

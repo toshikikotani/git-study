@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { AiIcon } from '@/components/ui/nav-icons';
+
 import { classifyGenresAction } from './classify-actions';
 import { useSpendingMonth } from './spending-month-provider';
 
@@ -59,10 +61,11 @@ export function ClassifyButton() {
         type="button"
         onClick={() => void run()}
         disabled={busy}
-        className="flex min-h-11 w-full items-center justify-center rounded-full px-4 text-[15px] font-semibold disabled:opacity-40"
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold disabled:opacity-40"
         style={{ background: 'var(--plane)', color: 'var(--accent)' }}
       >
-        {busy ? 'AIが分けています…' : '✦ AIでカテゴリの案をつける'}
+        {busy ? null : <AiIcon size={16} />}
+        {busy ? 'AIが分けています…' : 'AIでカテゴリの案をつける'}
       </button>
       {message ? (
         <p

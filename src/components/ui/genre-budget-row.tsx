@@ -14,6 +14,7 @@ import {
   budgetState,
 } from '@/domain/budget-state';
 import { genreBarColor } from '@/domain/genre-style';
+import { useGenreOverride } from './genre-style-context';
 import { formatYen } from '@/domain/money';
 
 /**
@@ -62,6 +63,7 @@ export function GenreBudgetRow({
   /** 行の下に足す補足(目標画面の一言など)。 */
   children?: React.ReactNode;
 }) {
+  const override = useGenreOverride(name === '未分類' ? null : name);
   const state = budgetState({ spentYen, budgetYen, idealYen, scheduledYen });
   const hasBudget = state !== 'none';
   const freeYen = hasBudget ? Math.max(budgetYen! - scheduledYen - spentYen, 0) : 0;
@@ -131,7 +133,7 @@ export function GenreBudgetRow({
           className="h-full rounded-full"
           style={{
             width: `${ratio * 100}%`,
-            background: genreBarColor(name === '未分類' ? null : name),
+            background: genreBarColor(name === '未分類' ? null : name, override),
           }}
         />
         {scheduledRatio > 0 ? (

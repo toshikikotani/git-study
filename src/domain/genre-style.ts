@@ -151,6 +151,17 @@ function defaultGenreStyle(name: string): GenreStyle {
   return { colorIndex: (hash(name) % GENRE_COLOR_COUNT) + 1, icon: 'other' };
 }
 
+/**
+ * 利用者が設定で選んだ色の番号(1〜10)。選んでいなければ null(名前から決まる系統の色、genreSwatch)。
+ * 名前からの既定の番号(FIXED)は含めない:既定のマークは系統の色で描くので、番号は見た目と合わない。
+ */
+export function chosenColorIndex(override?: GenreStyleOverride | null): number | null {
+  const index = override?.colorIndex;
+  return index != null && Number.isInteger(index) && index >= 1 && index <= GENRE_COLOR_COUNT
+    ? index
+    : null;
+}
+
 /** CSS の色。未分類は灰。 */
 export function genreColorVar(name: string | null, override?: GenreStyleOverride | null): string {
   const { colorIndex } = genreStyle(name, override);
@@ -280,13 +291,18 @@ export function genreSwatchHex(name: string | null): string {
   return FAMILIES[familyIndex(name)]!.pastel;
 }
 
-export function genreSwatch(name: string | null): string {
+/**
+ * カテゴリの色(マーク・帯・グラフで共通)。設定で色を選んでいればその色(--genre-N)、
+ * 選んでいなければ名前から決まる系統の色。設定で選んだ色がマークに出ていなかった(Impeccable の点検)。
+ */
+export function genreSwatch(name: string | null, override?: GenreStyleOverride | null): string {
   if (name === null || name === '' || name === '未分類') return 'var(--ink-muted)';
+  const chosen = chosenColorIndex(override);
+  if (chosen !== null) return `var(--genre-${chosen})`;
   const family = FAMILIES[familyIndex(name)]!;
   return `light-dark(color-mix(in srgb, ${family.pastel} 84%, var(--accent)), color-mix(in srgb, ${family.vivid} 82%, var(--accent)))`;
 }
 
-export function genreBarColor(name: string | null, _override?: GenreStyleOverride | null): string {
-  void _override;
-  return genreSwatch(name);
+export function genreBarColor(name: string | null, override?: GenreStyleOverride | null): string {
+  return genreSwatch(name, override);
 }

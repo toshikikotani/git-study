@@ -190,18 +190,33 @@ export function MerchantNameGroupEditor({
   }
 
   return (
+    // 面は白+細い線:確認が必要の画面(灰の地)でもシート(白の地)でも、1件のまとまりに見える
+    // (灰の面だと画面の地と同じ色になり、ブラウザの「▶」だけが浮いていた)。
     <details
-      className="rounded-2xl px-3"
-      style={{ background: 'var(--plane)', color: 'var(--ink)' }}
+      className="group rounded-2xl px-3"
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--hairline)',
+        color: 'var(--ink)',
+      }}
     >
-      <summary className="min-h-16 cursor-pointer py-3">
-        <span className="text-[15px] font-semibold">
-          {group.label}
-          {group.branchName ? ` ${group.branchName}` : ''}
+      <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1">
+          <span className="text-[15px] font-semibold">
+            {group.label}
+            {group.branchName ? ` ${group.branchName}` : ''}
+          </span>
+          <span className="mt-1 block text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+            {reason}・{group.entries.length}件
+            {group.suggestedName ? ` → ${group.suggestedName}` : '・店名を入力'}
+          </span>
         </span>
-        <span className="mt-1 block text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-          {reason}・{group.entries.length}件
-          {group.suggestedName ? ` → ${group.suggestedName}` : '・店名を入力'}
+        <span
+          aria-hidden
+          className="shrink-0 transition-transform group-open:rotate-90"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          ›
         </span>
       </summary>
       <div className="space-y-3 pb-4">

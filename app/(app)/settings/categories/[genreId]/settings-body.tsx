@@ -11,7 +11,9 @@ import { useGenreOverride, useGenreOverrides } from '@/components/ui/genre-style
 import {
   ICON_LABELS,
   SELECTABLE_ICONS,
+  chosenColorIndex,
   genreStyle,
+  genreSwatch,
   selectableColorIndexes,
   type GenreIconKey,
 } from '@/domain/genre-style';
@@ -47,17 +49,19 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
   const override = useGenreOverride(data.genreName);
   const overrides = useGenreOverrides();
   const current = genreStyle(data.genreName, override);
+  // 設定で選んだ色だけを「選んだ色」として扱う。選んでいなければ名前から決まる色(null)。
+  const chosen = chosenColorIndex(override);
   const colors = selectableColorIndexes();
   const taken = new Set(
     data.genres
       .filter((g) => g.name !== data.genreName)
-      .map((g) => genreStyle(g.name, overrides[g.name]).colorIndex)
+      .map((g) => chosenColorIndex(overrides[g.name]))
       .filter((i): i is number => i !== null),
   );
   const allowReuse = colors.every((i) => taken.has(i));
   const [name, setName] = useState(data.genreName);
   const [icon, setIcon] = useState<GenreIconKey>(current.icon);
-  const [colorIndex, setColorIndex] = useState<number>(current.colorIndex ?? colors[0] ?? 1);
+  const [colorIndex, setColorIndex] = useState<number | null>(chosen);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [rules, setRules] = useState<Rule[] | null>(null);
@@ -121,7 +125,7 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
       });
   };
 
-  const styleChanged = icon !== current.icon || colorIndex !== (current.colorIndex ?? -1);
+  const styleChanged = icon !== current.icon || colorIndex !== chosen;
   const nameChanged = name.trim() !== data.genreName;
   const plan = data.goal?.plan ?? null;
   // 名前・アイコンと色は、右上の「保存」1か所でまとめて保存する(項目ごとの保存ボタンをやめた、ADR-131)。
@@ -146,7 +150,7 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <GenreBadge name={data.genreName} size={40} />
+        <GenreBadge name={data.genreName} size={40} override={{ icon, colorIndex }} />
         <div className="flex min-w-0 flex-1 flex-col">
           <h1 className="truncate text-[17px] font-semibold" style={{ color: 'var(--ink)' }}>
             {data.genreName}
@@ -214,8 +218,21 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
           ))}
         </div>
         <div role="group" aria-label="色" className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={colorIndex === null}
+            aria-label={`名前から決まる色${colorIndex === null ? '(選択中)' : ''}`}
+            onClick={() => {
+              hapticFor('tabChange');
+              setColorIndex(null);
+            }}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-full"
+            style={{ background: genreSwatch(data.genreName), color: 'var(--on-action)' }}
+          >
+            {colorIndex === null ? <MdCheck aria-hidden size={20} /> : null}
+          </button>
           {colors.map((i) => {
-            const used = taken.has(i) && i !== current.colorIndex;
+            const used = taken.has(i) && i !== chosen;
             const blocked = used && !allowReuse;
             return (
               <button
@@ -237,9 +254,10 @@ export function SettingsBody({ data, genreId }: { data: CategorySettingsData; ge
           })}
         </div>
         <p className={sectionNote} style={{ color: 'var(--ink-muted)' }}>
+          いちばん左は、名前から決まる色です。
           {allowReuse
             ? '空いている色がないので、同じ色も選べます。'
-            : 'ほかのカテゴリが使っている色は選べません。'}
+            : 'ほかのカテゴリが選んだ色は選べません。'}
         </p>
       </section>
 
