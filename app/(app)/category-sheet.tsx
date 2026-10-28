@@ -137,7 +137,13 @@ export function CategoryMark({
   size?: number;
 }) {
   const open = useOpenCategory();
-  if (genreId === null) return <GenreBadge name={name} size={size} />;
+  // 未分類(押せない)も、押せるマークと同じ幅に置く(行ごとに名前の位置がずれていた)。
+  if (genreId === null)
+    return (
+      <span className="flex min-h-11 min-w-11 shrink-0 items-center justify-center">
+        <GenreBadge name={name} size={size} />
+      </span>
+    );
   return (
     <button
       type="button"

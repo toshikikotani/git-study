@@ -345,7 +345,7 @@ export function AssistantChat({
             className="flex size-11 shrink-0 items-center justify-center rounded-full"
             style={{
               background: speech.listening ? 'var(--over)' : 'var(--surface)',
-              color: speech.listening ? '#fff' : 'var(--accent)',
+              color: speech.listening ? 'var(--on-accent)' : 'var(--accent)',
             }}
           >
             <MicIcon />

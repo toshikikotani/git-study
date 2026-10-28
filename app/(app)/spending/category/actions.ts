@@ -570,7 +570,7 @@ export async function renameCategoryAction(
 /** P8: アイコンと色を変える(色は、コントラストを満たす候補だけ)。 */
 export async function saveCategoryStyleAction(
   genreId: string,
-  style: { icon: string; colorIndex: number },
+  style: { icon: string; colorIndex: number | null },
 ): Promise<{ error: string | null }> {
   try {
     await saveGenreStyle(genreId, style);

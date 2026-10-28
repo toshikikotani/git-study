@@ -111,7 +111,9 @@ describe('P8 カテゴリ設定', () => {
         children: h(GenreBadge, { name: '外食' }),
       }),
     );
-    expect(html).toContain('light-dark');
+    // 設定で選んだ色(--genre-7)がマークに出る。選んでいなければ名前から決まる系統の色。
+    expect(html).toContain('var(--genre-7)');
+    expect(html).not.toContain('light-dark');
     expect(renderToString(h(GenreBadge, { name: '外食' }))).toContain('light-dark');
   });
 });

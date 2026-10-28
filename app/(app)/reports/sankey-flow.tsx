@@ -1,6 +1,7 @@
 'use client';
 
-import { genreColorVar } from '@/domain/genre-style';
+import { useGenreOverrides } from '@/components/ui/genre-style-context';
+import { genreSwatch } from '@/domain/genre-style';
 import { formatYen } from '@/domain/money';
 
 export type SankeyGenre = {
@@ -25,6 +26,7 @@ export function SankeyFlow({
   incomeYen: number;
   genres: readonly SankeyGenre[];
 }) {
+  const overrides = useGenreOverrides();
   const positive = genres.filter((g) => g.spentYen > 0);
   const totalSpent = positive.reduce((sum, g) => sum + g.spentYen, 0);
 
@@ -54,7 +56,7 @@ export function SankeyFlow({
   const targets: { name: string; value: number; color: string }[] = top.map((g) => ({
     name: g.name || '未分類',
     value: g.spentYen,
-    color: genreColorVar(g.name),
+    color: genreSwatch(g.name || null, g.name ? overrides[g.name] : null),
   }));
   if (restYen > 0) {
     targets.push({ name: 'その他', value: restYen, color: 'var(--ink-muted)' });

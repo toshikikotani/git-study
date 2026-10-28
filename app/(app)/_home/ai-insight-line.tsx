@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { ChevronRightIcon } from '@/components/ui/nav-icons';
+import { AiIcon, ChevronRightIcon } from '@/components/ui/nav-icons';
 import { loadCurrentMonthlyReport } from '@/features/ai-report/store';
 
 /**
@@ -19,8 +19,12 @@ export async function AiInsightLine() {
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
-          ✦ AIの気づき
+        <span
+          className="flex items-center gap-1 text-[13px] font-semibold"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          <AiIcon size={14} />
+          AIの気づき
         </span>
         <span className="text-[15px] leading-snug">{first}</span>
       </span>

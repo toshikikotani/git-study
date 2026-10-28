@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Segmented } from '@/components/ui/segmented';
 import { formatEstimate } from '@/domain/forecast/format';
+import { useGenreOverride } from '@/components/ui/genre-style-context';
 import { genreSwatch } from '@/domain/genre-style';
 import { pickAxisLabels } from '@/features/category/axis';
 import {
@@ -86,6 +87,7 @@ export function CategoryChart({
   budgetYen: number | null;
 }) {
   const plot = useRef<HTMLDivElement>(null);
+  const override = useGenreOverride(genreName);
   const fontScale = useFontScale();
   const plotPx = plotHeightFor(fontScale);
   // 文字が大きいとき、点の横には収まらない。グラフの上の固定の置き場に、折り返してよい形で出す。
@@ -98,7 +100,7 @@ export function CategoryChart({
   const themeColor = genreName === '全体' || genreName === '変えられる支出';
   const barColor = themeColor
     ? 'var(--accent)'
-    : genreSwatch(genreName === '未分類' ? null : genreName);
+    : genreSwatch(genreName === '未分類' ? null : genreName, override);
   const forecastEnd = cumulative.days.filter((day) => day.forecastYen !== null).at(-1);
   const forecastLow = forecastEnd?.forecastLowYen ?? 0;
   const forecastMid = forecastEnd?.forecastYen ?? 0;

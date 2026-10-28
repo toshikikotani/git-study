@@ -71,16 +71,18 @@ export async function renameGenre(id: string, newName: string): Promise<void> {
 
 export async function saveGenreStyle(
   id: string,
-  style: { icon: string; colorIndex: number },
+  style: { icon: string; colorIndex: number | null },
 ): Promise<void> {
   if (!SELECTABLE_ICONS.includes(style.icon as never)) {
     throw new GenreStyleError('選べないアイコンです');
   }
+  // null は「名前から決まる色」(設定で選んだ色を外す)。
   if (
-    !Number.isInteger(style.colorIndex) ||
-    style.colorIndex < 1 ||
-    style.colorIndex > GENRE_COLOR_COUNT ||
-    !selectableColorIndexes().includes(style.colorIndex)
+    style.colorIndex !== null &&
+    (!Number.isInteger(style.colorIndex) ||
+      style.colorIndex < 1 ||
+      style.colorIndex > GENRE_COLOR_COUNT ||
+      !selectableColorIndexes().includes(style.colorIndex))
   ) {
     throw new GenreStyleError('選べない色です');
   }

@@ -87,7 +87,7 @@ export function GenreBadge({
   override?: GenreStyleOverride | null | undefined;
 }) {
   const fromContext = useGenreOverride(name);
-  const color = genreSwatch(name);
+  const color = genreSwatch(name, override ?? fromContext);
   return (
     <span
       aria-hidden

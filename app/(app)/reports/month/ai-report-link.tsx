@@ -3,7 +3,7 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 
-import { ChevronRightIcon } from '@/components/ui/nav-icons';
+import { AiIcon, ChevronRightIcon } from '@/components/ui/nav-icons';
 import { useSpendingMonth } from '../../spending/spending-month-provider';
 
 /**
@@ -19,7 +19,10 @@ export function AiReportLink() {
       style={{ background: 'var(--surface)', color: 'var(--ink)' }}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[17px] font-semibold">✦ AIのレポート</span>
+        <span className="flex items-center gap-2 text-[17px] font-semibold">
+          <AiIcon size={18} />
+          AIのレポート
+        </span>
         <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
           {isCurrentMonth
             ? '今日・今月の気づき・アドバイス・タイプ診断・見込みの読み'

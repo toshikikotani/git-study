@@ -5,7 +5,8 @@
  * インラインで書いていた。同じ見た目を1箇所に集約する。
  *
  * variant は3種:
- *   elevated(既定)  影で浮かせる。ページの主要なブロック
+ *   elevated(既定)  白い面。ページの主要なブロック。影は仕様書どおり明るい画面では付けない
+ *                    (--card-shadow。主要な画面のカードと同じ見た目、ADR-136)
  *   filled           塗り面のみ。elevated ほど強調しない付随情報
  *   outlined         輪郭線のみ。フォームの入力枠など
  *
@@ -23,7 +24,7 @@ export function Card({
   variant?: 'elevated' | 'filled' | 'outlined';
 }) {
   const variantStyle: Record<typeof variant, React.CSSProperties> = {
-    elevated: { background: 'var(--surface)', boxShadow: 'var(--shadow-1)' },
+    elevated: { background: 'var(--surface)', boxShadow: 'var(--card-shadow)' },
     filled: { background: 'var(--surface-fill)' },
     outlined: { background: 'var(--plane)', border: '1px solid var(--hairline)' },
   };
