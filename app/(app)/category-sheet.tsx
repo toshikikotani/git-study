@@ -10,6 +10,8 @@ import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { Switch } from '@/components/ui/switch';
 import { formatEstimate } from '@/domain/forecast/format';
 import type { CumulativeDay } from '@/features/category/pace';
+import type { CategorySheetLine } from '@/features/category/sheet-lines';
+import { weekdayOf } from '@/lib/date';
 import {
   loadCategorySheetAction,
   saveCategoryTargetAction,
@@ -31,6 +33,9 @@ function roundUp(value: number, step: number): number {
 function md(date: string): string {
   return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 }
+
+/** 今期の明細を、はじめに何件出すか(残りは「残りN件を見る」で同じ場所に出す)。 */
+const FIRST_LINES = 5;
 
 type OpenCategory = (genreId: string) => void;
 const CategorySheetContext = createContext<OpenCategory>(() => undefined);
@@ -365,6 +370,10 @@ export function CategorySheetBody({
         </div>
       </section>
 
+      {data.lines ? (
+        <SheetLines lines={data.lines} genreId={outlook.genreId} onLeave={onCancel} />
+      ) : null}
+
       {over && hasPlan ? (
         <>
           <Heading>どうしますか？</Heading>
@@ -578,6 +587,104 @@ export function CategorySheetBody({
     </div>
   );
 }
+
+/**
+ * 今期の明細(本人「カテゴリを見た時に明細一覧がない」、ADR-138)。実績は新しい順、そのあとに予定。
+ * はじめは5件、「残りN件を見る」で同じ場所に全部出す。直す・探すのはカテゴリの画面で。
+ */
+function SheetLines({
+  lines,
+  genreId,
+  onLeave,
+}: {
+  lines: readonly CategorySheetLine[];
+  genreId: string;
+  onLeave: () => void;
+}) {
+  const [all, setAll] = useState(false);
+  const shown = all ? lines : lines.slice(0, FIRST_LINES);
+  const rest = lines.length - shown.length;
+  return (
+    <>
+      <Heading>今期の明細 · {lines.length}件</Heading>
+      {lines.length === 0 ? (
+        <p
+          className="rounded-2xl px-4 py-3 text-[15px]"
+          style={{ background: 'var(--surface)', color: 'var(--ink-muted)' }}
+        >
+          今期の記録はまだありません。
+        </p>
+      ) : (
+        <section className="flex flex-col rounded-2xl" style={{ background: 'var(--surface)' }}>
+          <ul aria-label="今期の明細">
+            {shown.map((l, i) => {
+              const sub = [
+                l.scheduled ? '予定' : null,
+                l.refund ? '返金' : null,
+                l.receiptTotalYen !== null ? `レシート ${yen(l.receiptTotalYen)}のうち` : null,
+              ]
+                .filter((x) => x !== null)
+                .join(' · ');
+              return (
+                <li
+                  key={`${l.id}:${i}`}
+                  className="flex min-h-14 items-center gap-3 px-4 py-2"
+                  style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+                >
+                  <span
+                    className="tabular w-16 shrink-0 text-[13px]"
+                    style={{ color: 'var(--ink-muted)' }}
+                  >
+                    {md(l.occurredOn)}({WEEKDAY_JA[weekdayOf(l.occurredOn)]})
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[15px]">{l.label}</span>
+                    {sub ? (
+                      <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                        {sub}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    className="tabular shrink-0 text-[15px] font-semibold"
+                    style={{ color: l.scheduled ? 'var(--ink-secondary)' : 'var(--ink)' }}
+                  >
+                    {l.spentYen < 0 ? `−${yen(-l.spentYen)}` : yen(l.spentYen)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {rest > 0 ? (
+            <button
+              type="button"
+              onClick={() => setAll(true)}
+              className="flex min-h-12 items-center justify-center text-[15px] font-semibold"
+              style={{ borderTop: '1px solid var(--hairline)', color: 'var(--accent)' }}
+            >
+              残り{rest}件を見る
+            </button>
+          ) : null}
+          <Link
+            href={`/spending/category/${genreId}` as Route}
+            onClick={onLeave}
+            className="flex min-h-12 items-center gap-2 px-4"
+            style={{ borderTop: '1px solid var(--hairline)' }}
+          >
+            <span className="flex-1 text-[15px]" style={{ color: 'var(--accent)' }}>
+              明細を直す・探すときはカテゴリの画面へ
+            </span>
+            <span style={{ color: 'var(--ideal)' }}>
+              <ChevronRightIcon />
+            </span>
+          </Link>
+        </section>
+      )}
+    </>
+  );
+}
+
+const WEEKDAY_JA = '日月火水木金土';
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
@@ -805,7 +912,8 @@ export function CategoryChart({
       <text x={x0} y="166" fontSize="11" fill="var(--ink-muted)">
         {md(days[0]!.date)}
       </text>
-      {last > 0 && last < n - 1 ? (
+      {/* 今日の日付は、始まり・終わりの日付と重ならないときだけ(期間のはじめの数日は重なっていた)。 */}
+      {last > 0 && last < n - 1 && x(last) - x0 > 40 && x1 - x(last) > 40 ? (
         <text x={x(last)} y="166" fontSize="11" fill="var(--ink-muted)" textAnchor="middle">
           {md(days[last]!.date)}
         </text>

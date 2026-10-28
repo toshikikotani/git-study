@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { categorySheetLines, type CategorySheetLine } from '@/features/category/sheet-lines';
 import { loadCategoryOutlooks, type CategoryOutlook } from '@/features/goals/category-outlook';
 import { addPlanGenre } from '@/features/spending-plan/membership';
 import { getCurrentPlan, updatePlanTargets } from '@/features/spending-plan/store';
@@ -21,6 +22,8 @@ export type CategorySheetData = {
   isFixed: boolean;
   /** 今期の目標の合計(目標が無ければ null)。目標を上げたときの合計を出す。 */
   planTotalYen: number | null;
+  /** 今期の明細(実績は新しい順、そのあと予定)。今期の目標(⑥)の中から開いたときは無し(ADR-138)。 */
+  lines?: readonly CategorySheetLine[];
 };
 
 /** カテゴリのシートを開くときに読む(どの画面のマークから開いても同じ)。 */
@@ -51,6 +54,12 @@ export async function loadCategorySheetAction(
         planTotalYen: plan
           ? plan.items.reduce((sum, i) => sum + Math.max(0, i.targetYen), 0)
           : null,
+        lines: categorySheetLines(
+          loaded.transactions.map((tx) => ({ ...tx, items: [] })),
+          genreId,
+          loaded.period,
+          today,
+        ),
       },
       error: null,
     };
