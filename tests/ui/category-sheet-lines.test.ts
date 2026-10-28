@@ -21,6 +21,21 @@ vi.mock('../../app/(app)/upcoming/actions', () => ({
   releaseCategoryFixedAction: vi.fn(),
   restoreCategoryFixedAction: vi.fn(),
 }));
+// 記録を開く部品は、押すと記録のシートを開くボタン(中身はここでは見ない)。
+vi.mock('../../app/(app)/transactions/direct-record-editor', () => ({
+  DirectRecordEditor: ({
+    transaction,
+    children,
+  }: {
+    transaction: { id: string; label: string };
+    children: React.ReactNode;
+  }) =>
+    h(
+      'button',
+      { type: 'button', 'data-record': transaction.id, 'aria-label': `${transaction.label}を開く` },
+      children,
+    ),
+}));
 
 import { CategorySheetBody } from '../../app/(app)/category-sheet';
 import type { CategorySheetData } from '../../app/(app)/category-sheet-actions';
@@ -50,6 +65,11 @@ const range = { from: '2026-10-25', to: '2026-11-24' };
 const today = '2026-10-28';
 
 describe('今期の明細の行', () => {
+  it('行には押すと開く記録を持たせる', () => {
+    const [line] = categorySheetLines([tx('2026-10-26', -800)], 'dining', range, today);
+    expect(line?.transaction.id).toBe(line?.id);
+  });
+
   it('実績は新しい順、そのあとに予定(近い順)。ほかのカテゴリ・振替・期間の外は入れない', () => {
     const lines = categorySheetLines(
       [
@@ -139,6 +159,10 @@ describe('シートの「今期の明細」', () => {
     receiptTotalYen: i === 1 ? 5000 : null,
     scheduled: false,
     refund: false,
+    transaction: tx(`2026-10-${String(28 - i).padStart(2, '0')}`, -(1000 + i), {
+      id: `l${i}`,
+      label: `お店${i}`,
+    }),
   }));
 
   it('件数と、はじめの5件・残りを見るボタン・カテゴリの画面への入口を出す', () => {
@@ -156,6 +180,18 @@ describe('シートの「今期の明細」', () => {
     expect(html).toContain('1,000円');
     expect(html).toContain('レシート 5,000円のうち');
     expect(html).toContain('href="/spending/category/dining"');
+    expect(html).toContain('探す・並べ替えるときはカテゴリの画面へ');
+  });
+
+  it('行を押すと、その記録(詳しいところ)を開く', () => {
+    const html = visible(
+      renderToString(
+        h(CategorySheetBody, { data: { ...base, lines }, onCancel: () => {}, onDone: () => {} }),
+      ),
+    );
+    expect(html).toContain('data-record="l0"');
+    expect(html).toContain('aria-label="お店0を開く"');
+    expect(html.match(/data-record=/g)).toHaveLength(5);
   });
 
   it('記録が無ければ、まだ無いと言う', () => {

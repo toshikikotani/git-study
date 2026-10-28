@@ -12,6 +12,7 @@ import { formatEstimate } from '@/domain/forecast/format';
 import type { CumulativeDay } from '@/features/category/pace';
 import type { CategorySheetLine } from '@/features/category/sheet-lines';
 import { weekdayOf } from '@/lib/date';
+import { DirectRecordEditor } from './transactions/direct-record-editor';
 import {
   loadCategorySheetAction,
   saveCategoryTargetAction,
@@ -69,6 +70,12 @@ export function CategorySheetProvider({ children }: { children: React.ReactNode 
     });
   }, []);
   const open = useCallback((id: string) => load(id), [load]);
+  /** 記録を直したあと、開いたまま中身(明細・見通し)を読み直す(待つあいだも今の中身を出したまま)。 */
+  const refresh = useCallback((id: string) => {
+    void loadCategorySheetAction(id).then((result) => {
+      if (result.data) setData(result.data);
+    });
+  }, []);
   const close = () => {
     setGenreId(null);
     setData(null);
@@ -84,6 +91,7 @@ export function CategorySheetProvider({ children }: { children: React.ReactNode 
             data={data}
             {...(retryAmount !== undefined ? { amountYen: retryAmount } : {})}
             error={error}
+            onRecordSaved={() => refresh(data.outlook.genreId)}
             onCancel={close}
             onDone={(amount) => {
               const target = data.outlook.targetYen;
@@ -173,10 +181,13 @@ export function CategorySheetBody({
   amountYen,
   saving = false,
   error = null,
+  onRecordSaved,
   onCancel,
   onDone,
 }: {
   data: CategorySheetData;
+  /** 今期の明細から記録を直したとき(シートの中身を読み直す)。 */
+  onRecordSaved?: () => void;
   /** 今の額(⑥の中で変えている途中の額)。無ければ保存されている目標額。 */
   amountYen?: number;
   saving?: boolean;
@@ -231,7 +242,9 @@ export function CategorySheetBody({
     [outlook.targetYen, outlook.p90, floor],
   );
   const left = amount - floor;
-  const overYen = outlook.p50 !== null ? outlook.p50 - amount : null;
+  // 「こえそう/収まりそう」は今の目標で言う。下で変えている途中の額(こえたときは見直しの案)で言うと、
+  // もうこえているのに「収まりそう」と出ていた(本人「目標の位置違う」、ADR-139)。
+  const overYen = outlook.p50 !== null && target !== null ? outlook.p50 - target : null;
   const atFloor = amount <= floor;
   const keep = over && choice === 'keep';
   const totalAfter = data.planTotalYen !== null ? data.planTotalYen + amount - (target ?? 0) : null;
@@ -332,7 +345,8 @@ export function CategorySheetBody({
         ) : null}
         <CategoryChart
           days={outlook.days}
-          target={hasPlan ? amount : null}
+          target={hasPlan ? target : null}
+          draft={hasPlan && !keep && amount !== target ? amount : null}
           name={name}
           endLabel={md(data.periodEnd)}
           p50={outlook.p50}
@@ -371,7 +385,12 @@ export function CategorySheetBody({
       </section>
 
       {data.lines ? (
-        <SheetLines lines={data.lines} genreId={outlook.genreId} onLeave={onCancel} />
+        <SheetLines
+          lines={data.lines}
+          genreId={outlook.genreId}
+          onLeave={onCancel}
+          {...(onRecordSaved ? { onRecordSaved } : {})}
+        />
       ) : null}
 
       {over && hasPlan ? (
@@ -590,16 +609,19 @@ export function CategorySheetBody({
 
 /**
  * 今期の明細(本人「カテゴリを見た時に明細一覧がない」、ADR-138)。実績は新しい順、そのあとに予定。
- * はじめは5件、「残りN件を見る」で同じ場所に全部出す。直す・探すのはカテゴリの画面で。
+ * はじめは5件、「残りN件を見る」で同じ場所に全部出す。行を押すと、その記録の詳しいところ(品目・メモ)を
+ * 開いて直せる(本人「カテゴリからその明細の詳細が見れない」、ADR-139)。探す・並べ替えはカテゴリの画面で。
  */
 function SheetLines({
   lines,
   genreId,
   onLeave,
+  onRecordSaved,
 }: {
   lines: readonly CategorySheetLine[];
   genreId: string;
   onLeave: () => void;
+  onRecordSaved?: () => void;
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? lines : lines.slice(0, FIRST_LINES);
@@ -628,29 +650,37 @@ function SheetLines({
               return (
                 <li
                   key={`${l.id}:${i}`}
-                  className="flex min-h-14 items-center gap-3 px-4 py-2"
                   style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
                 >
-                  <span
-                    className="tabular w-16 shrink-0 text-[13px]"
-                    style={{ color: 'var(--ink-muted)' }}
+                  <DirectRecordEditor
+                    transaction={l.transaction}
+                    className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left"
+                    {...(onRecordSaved ? { onSaved: onRecordSaved } : {})}
                   >
-                    {md(l.occurredOn)}({WEEKDAY_JA[weekdayOf(l.occurredOn)]})
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[15px]">{l.label}</span>
-                    {sub ? (
-                      <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-                        {sub}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span
-                    className="tabular shrink-0 text-[15px] font-semibold"
-                    style={{ color: l.scheduled ? 'var(--ink-secondary)' : 'var(--ink)' }}
-                  >
-                    {l.spentYen < 0 ? `−${yen(-l.spentYen)}` : yen(l.spentYen)}
-                  </span>
+                    <span
+                      className="tabular w-16 shrink-0 text-[13px]"
+                      style={{ color: 'var(--ink-muted)' }}
+                    >
+                      {md(l.occurredOn)}({WEEKDAY_JA[weekdayOf(l.occurredOn)]})
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-[15px]">{l.label}</span>
+                      {sub ? (
+                        <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+                          {sub}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className="tabular shrink-0 text-[15px] font-semibold"
+                      style={{ color: l.scheduled ? 'var(--ink-secondary)' : 'var(--ink)' }}
+                    >
+                      {l.spentYen < 0 ? `−${yen(-l.spentYen)}` : yen(l.spentYen)}
+                    </span>
+                    <span aria-hidden className="shrink-0" style={{ color: 'var(--ideal)' }}>
+                      <ChevronRightIcon />
+                    </span>
+                  </DirectRecordEditor>
                 </li>
               );
             })}
@@ -672,7 +702,7 @@ function SheetLines({
             style={{ borderTop: '1px solid var(--hairline)' }}
           >
             <span className="flex-1 text-[15px]" style={{ color: 'var(--accent)' }}>
-              明細を直す・探すときはカテゴリの画面へ
+              探す・並べ替えるときはカテゴリの画面へ
             </span>
             <span style={{ color: 'var(--ideal)' }}>
               <ChevronRightIcon />
@@ -748,13 +778,19 @@ export function RoundButton({
 export function CategoryChart({
   days,
   target,
+  draft = null,
   name,
   endLabel,
   p50,
 }: {
   days: readonly CumulativeDay[];
-  /** 目標額。目標が無ければ null(目標の線を描かない)。 */
+  /** 今の目標額(保存してある額)。目標が無ければ null(目標の線を描かない)。 */
   target: number | null;
+  /**
+   * 下で変えている途中の目標額(今の目標と違うときだけ)。「変更後」の線で別に描く。
+   * 以前はこの額を「目標」として描いていたので、こえたときの見直しの案が目標に見えていた(ADR-139)。
+   */
+  draft?: number | null;
   name: string;
   endLabel: string;
   p50: number | null;
@@ -770,6 +806,7 @@ export function CategoryChart({
   for (let i = 0; i < n; i += 1) if (days[i]!.actualYen !== null) last = i;
   const peak = Math.max(
     target ?? 0,
+    draft ?? 0,
     ...days.map((d) => Math.max(d.actualYen ?? 0, d.forecastHighYen ?? 0)),
     1,
   );
@@ -802,6 +839,12 @@ export function CategoryChart({
           .join(' L')}`
       : null;
   const ty = target !== null ? y(target) : null;
+  const dy = draft !== null ? y(draft) : null;
+  /** 「目標までのペース」は、変えている途中ならその額へ。 */
+  const goal = draft ?? target;
+  // 「変更後」の文字は、「目標」の文字と重なるときは少しずらす。
+  const draftLabelY =
+    dy === null ? null : ty !== null && Math.abs(dy - ty) < 13 ? (dy < ty ? ty - 13 : ty + 13) : dy;
   const man = (v: number) => formatEstimate(v, { approx: false }).replace('円', '');
 
   return (
@@ -809,7 +852,7 @@ export function CategoryChart({
       viewBox={`0 0 ${W} 172`}
       width="100%"
       role="img"
-      aria-label={`${name}はこれまで${yen(spent)}。${p50 !== null ? `いまのペースだと${endLabel}に${formatEstimate(p50)}。` : ''}${target !== null ? `目標は${yen(target)}。` : ''}`}
+      aria-label={`${name}はこれまで${yen(spent)}。${p50 !== null ? `いまのペースだと${endLabel}に${formatEstimate(p50)}。` : ''}${target !== null ? `目標は${yen(target)}。` : ''}${draft !== null ? `変更後は${yen(draft)}。` : ''}`}
       className="mt-3"
       style={{ overflow: 'visible' }}
     >
@@ -834,7 +877,8 @@ export function CategoryChart({
             stroke="var(--caution-mark)"
             strokeWidth="2"
           />
-          {ty === null || Math.abs(y(end.forecastYen) - ty) > 12 ? (
+          {(ty === null || Math.abs(y(end.forecastYen) - ty) > 12) &&
+          (draftLabelY === null || Math.abs(y(end.forecastYen) - draftLabelY) > 12) ? (
             <text
               x="296"
               y={y(end.forecastYen) + 4}
@@ -863,12 +907,34 @@ export function CategoryChart({
           </text>
         </>
       ) : null}
-      {ty !== null && target !== null && last >= 0 && last < n - 1 && target > spent ? (
+      {dy !== null && draftLabelY !== null ? (
+        <>
+          <line
+            x1={x0}
+            y1={dy}
+            x2={x1}
+            y2={dy}
+            stroke="var(--accent)"
+            strokeWidth="1.4"
+            strokeDasharray="8 4"
+          />
+          <text
+            x="296"
+            y={Math.max(draftLabelY + 4, 12)}
+            fontSize="11"
+            fill="var(--accent)"
+            fontWeight="700"
+          >
+            変更後
+          </text>
+        </>
+      ) : null}
+      {goal !== null && last >= 0 && last < n - 1 && goal > spent ? (
         <line
           x1={x(last)}
           y1={y(spent)}
           x2={x1}
-          y2={ty}
+          y2={y(goal)}
           stroke="var(--accent)"
           strokeWidth="2"
           strokeDasharray="1.5 4"

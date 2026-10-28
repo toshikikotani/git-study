@@ -4,6 +4,7 @@
  * 分けたレシートはこのカテゴリの分だけ。シートへ渡すので、画面に要る値だけにする。
  */
 
+import type { LedgerTransaction } from '@/features/spending/ledger-types';
 import type { DateOnly } from '@/lib/date';
 import { buildCategoryLines, keyOfGenreId, type CategoryTx } from './model';
 
@@ -17,6 +18,8 @@ export type CategorySheetLine = {
   receiptTotalYen: number | null;
   scheduled: boolean;
   refund: boolean;
+  /** 押すと開く記録(分けたレシートはレシート全体)。 */
+  transaction: LedgerTransaction;
 };
 
 /** 実績は新しい順、そのあとに予定(近い順)。 */
@@ -34,6 +37,7 @@ export function categorySheetLines(
     receiptTotalYen: l.receiptTotalYen,
     scheduled: l.status === 'scheduled',
     refund: l.refund,
+    transaction: l.tx,
   }));
   const actual = lines
     .filter((l) => !l.scheduled)
