@@ -632,7 +632,11 @@ export function TransactionRowWithSplit({
   if (removed) return null;
 
   return (
-    <li className="py-1" style={display?.scheduled ? { opacity: 0.85 } : undefined}>
+    <li
+      data-row-id={transaction.id}
+      className="py-1"
+      style={display?.scheduled ? { opacity: 0.85 } : undefined}
+    >
       <SwipeableRow
         onSwipeRight={() => setGenreSheetOpen(true)}
         onLongPress={() => setMenuOpen(true)}

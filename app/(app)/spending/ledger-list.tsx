@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LedgerAmount, Yen } from '@/components/ui/money';
 import { GenreBadge } from '@/components/ui/genre-badge';
+import { NewRows } from '@/components/ui/new-rows';
 import { ledgerRowPresentation } from '@/domain/ledger-row-presentation';
 import { MAX_YEN } from '@/domain/money';
 import { isSplitPaymentEligible } from '@/domain/split-payment-request';
@@ -171,7 +172,8 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
           </button>
         </div>
       ) : (
-        <>
+        // 記録したら、増えた行だけ開いて色が引く(ADR-140)。
+        <NewRows ids={filtered.map((t) => t.id)}>
           {model.scheduled.length > 0 ? (
             <DaySection
               key="scheduled"
@@ -202,7 +204,7 @@ export function LedgerListContent({ goalRange, fixedKeys = [] }: LedgerListProps
               ? `${filtered.length}件 / この月 ${transactions.length}件`
               : `${transactions.length}件`}
           </p>
-        </>
+        </NewRows>
       )}
       <LedgerSelectionMenu
         selectMode={selectMode}

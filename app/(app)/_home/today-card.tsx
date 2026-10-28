@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
+import { RollingNumber } from '@/components/ui/rolling-number';
 import { formatEstimate, formatProbability } from '@/domain/forecast/format';
 import type { TodayAllowance } from '@/domain/forecast/today';
 import { AllowanceDialog, type AllowanceExplain } from './allowance-dialog';
@@ -143,9 +144,12 @@ function TodayHero({
         ) : null}
       </div>
       <p className="tabular mt-1 flex flex-wrap items-baseline gap-x-2" style={{ color }}>
-        <span className="text-[56px] leading-none font-bold tracking-[-0.02em]">
-          {(left ? today.leftYen : today.overYen).toLocaleString('ja-JP')}
-        </span>
+        {/* 記録して額が変わったとき、数字が桁ごとに回る(ADR-140)。 */}
+        <RollingNumber
+          value={left ? today.leftYen : today.overYen}
+          unit={false}
+          className="text-[56px] leading-none font-bold tracking-[-0.02em]"
+        />
         <span className="text-[20px] font-bold">{left ? '円 使えます' : '円 こえています'}</span>
       </p>
       <p className="mt-3 text-[15px] leading-normal" style={{ color: 'var(--ink-secondary)' }}>

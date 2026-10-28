@@ -1,8 +1,7 @@
 'use client';
 
+import { RollingNumber } from '@/components/ui/rolling-number';
 import { useSpendingMonth } from './spending-month-provider';
-
-const yen = (v: number) => `${v.toLocaleString('ja-JP')}円`;
 
 /**
  * 月の合計(デザイン仕様書の「明細」、ADR-090):支出・収入・差額の3列。数字は domain/ledger.ts の
@@ -23,7 +22,9 @@ export function MonthSummary() {
         <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
           支出
         </span>
-        <span className="text-[17px] font-bold">{waiting ? '—' : yen(totals.spentYen)}</span>
+        <span className="text-[17px] font-bold">
+          {waiting ? '—' : <RollingNumber value={totals.spentYen} />}
+        </span>
       </div>
       <div
         className={cell}
@@ -35,7 +36,9 @@ export function MonthSummary() {
         <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
           収入
         </span>
-        <span className="text-[17px] font-bold">{waiting ? '—' : yen(totals.incomeYen)}</span>
+        <span className="text-[17px] font-bold">
+          {waiting ? '—' : <RollingNumber value={totals.incomeYen} />}
+        </span>
       </div>
       <div className={cell}>
         <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>
@@ -45,7 +48,14 @@ export function MonthSummary() {
           className="text-[17px] font-bold"
           style={{ color: diff >= 0 ? 'var(--income)' : 'var(--state-caution)' }}
         >
-          {waiting ? '—' : `${diff >= 0 ? '+' : '−'}${yen(Math.abs(diff))}`}
+          {waiting ? (
+            '—'
+          ) : (
+            <>
+              {diff >= 0 ? '+' : null}
+              <RollingNumber value={diff} />
+            </>
+          )}
         </span>
       </div>
     </section>
