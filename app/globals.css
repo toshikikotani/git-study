@@ -792,20 +792,7 @@ button {
   animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
 }
 
-/* 金額の数字が桁ごとに回転する(components/ui/rolling-number.tsx)。 */
-@keyframes digit-roll {
-  from {
-    transform: translateY(calc(var(--digit-from) * -1em));
-  }
-  to {
-    transform: translateY(calc(var(--digit-to) * -1em));
-  }
-}
-.digit-roll {
-  animation-name: digit-roll;
-  animation-timing-function: var(--motion-ease-out);
-  animation-fill-mode: both;
-}
+/* 金額の数字が桁ごとに回転する動きは GSAP(components/ui/rolling-number.tsx、ADR-140)。 */
 
 /* 一覧の行が消える/入る:高さと透明度を同時に変える(250ms)。
    使い方: <div class="row-shell" data-state="removed"><div class="row-shell-inner">…</div></div> */
@@ -849,8 +836,7 @@ button {
   .pop-in,
   .row-flash,
   .row-insert,
-  .bar-grow,
-  .digit-roll {
+  .bar-grow {
     animation: motion-fade var(--motion-small) var(--motion-ease-out) both;
   }
   .row-shell {

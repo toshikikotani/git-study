@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cache } from 'react';
 
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
+import { NewRows } from '@/components/ui/new-rows';
 import { subscriptionKeyOf } from '@/domain/subscriptions';
 import { listReceiptItemsForTransactionIds } from '@/features/receipts/items-store';
 import { loadLedgerTransactions } from '@/features/spending/entries';
@@ -151,57 +152,63 @@ export async function TodayRecords() {
           すべて
         </Link>
       </div>
-      {todays.length === 0 ? (
-        <p
-          className="rounded-2xl px-4 py-3 text-[13px]"
-          style={{ background: 'var(--surface)', color: 'var(--ink-muted)' }}
-        >
-          今日はまだ記録がありません。
-        </p>
-      ) : (
-        <ul className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
-          {todays.map((t, i) => {
-            const genre = t.genreName ?? '未分類';
-            const firstItem = (items.get(t.id) as { name: string }[] | undefined)?.[0]?.name;
-            const sub = isFixed(t)
-              ? `${genre} · 固定費`
-              : firstItem
-                ? `${genre} · ${firstItem}`
-                : genre;
-            const income = t.amountYen > 0;
-            return (
-              <li key={t.id}>
-                {i > 0 ? (
-                  <div className="ml-16 h-px" style={{ background: 'var(--hairline)' }} />
-                ) : null}
-                <div className="flex items-center gap-3 py-2 pr-4 pl-2">
-                  <CategoryMark genreId={t.genreId} name={t.genreName} />
-                  <DirectRecordEditor transaction={t}>
-                    <span className="flex min-w-0 flex-1 flex-col">
+      {/* 記録したら、増えた行だけ開いて色が引く(ADR-140)。 */}
+      <NewRows ids={todays.map((t) => t.id)}>
+        {todays.length === 0 ? (
+          <p
+            className="rounded-2xl px-4 py-3 text-[13px]"
+            style={{ background: 'var(--surface)', color: 'var(--ink-muted)' }}
+          >
+            今日はまだ記録がありません。
+          </p>
+        ) : (
+          <ul className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface)' }}>
+            {todays.map((t, i) => {
+              const genre = t.genreName ?? '未分類';
+              const firstItem = (items.get(t.id) as { name: string }[] | undefined)?.[0]?.name;
+              const sub = isFixed(t)
+                ? `${genre} · 固定費`
+                : firstItem
+                  ? `${genre} · ${firstItem}`
+                  : genre;
+              const income = t.amountYen > 0;
+              return (
+                <li key={t.id} data-row-id={t.id}>
+                  {i > 0 ? (
+                    <div className="ml-16 h-px" style={{ background: 'var(--hairline)' }} />
+                  ) : null}
+                  <div className="flex items-center gap-3 py-2 pr-4 pl-2">
+                    <CategoryMark genreId={t.genreId} name={t.genreName} />
+                    <DirectRecordEditor transaction={t}>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span
+                          className="truncate text-[16px] font-semibold"
+                          style={{ color: 'var(--ink)' }}
+                        >
+                          {t.label}
+                        </span>
+                        <span
+                          className="truncate text-[13px]"
+                          style={{ color: 'var(--ink-muted)' }}
+                        >
+                          {sub}
+                        </span>
+                      </span>
                       <span
-                        className="truncate text-[16px] font-semibold"
-                        style={{ color: 'var(--ink)' }}
+                        className="tabular shrink-0 text-[16px] font-semibold"
+                        style={{ color: income ? 'var(--income)' : 'var(--ink)' }}
                       >
-                        {t.label}
+                        {income ? '+' : ''}
+                        {yen(t.amountYen)}
                       </span>
-                      <span className="truncate text-[13px]" style={{ color: 'var(--ink-muted)' }}>
-                        {sub}
-                      </span>
-                    </span>
-                    <span
-                      className="tabular shrink-0 text-[16px] font-semibold"
-                      style={{ color: income ? 'var(--income)' : 'var(--ink)' }}
-                    >
-                      {income ? '+' : ''}
-                      {yen(t.amountYen)}
-                    </span>
-                  </DirectRecordEditor>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                    </DirectRecordEditor>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </NewRows>
     </section>
   );
 }

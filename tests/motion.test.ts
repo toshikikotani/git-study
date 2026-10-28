@@ -60,14 +60,7 @@ describe('P1 視差効果を減らす(受け入れ基準12)', () => {
     ].map((m) => m[1]!);
     const joined = blocks.join('\n');
     // 新しい動きのクラスがクロスフェードに置き換わる
-    for (const cls of [
-      '.rise',
-      '.pop-in',
-      '.row-flash',
-      '.row-insert',
-      '.bar-grow',
-      '.digit-roll',
-    ]) {
+    for (const cls of ['.rise', '.pop-in', '.row-flash', '.row-insert', '.bar-grow']) {
       expect(joined, cls).toContain(cls);
     }
     expect(joined).toContain('animation: motion-fade var(--motion-small)');

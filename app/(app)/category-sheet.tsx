@@ -2,16 +2,19 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 import { BottomSheet, BottomSheetHeader } from '@/components/ui/bottom-sheet';
 import { GenreBadge } from '@/components/ui/genre-badge';
+import { RollingNumber } from '@/components/ui/rolling-number';
 import { ChevronRightIcon } from '@/components/ui/nav-icons';
 import { Switch } from '@/components/ui/switch';
 import { formatEstimate } from '@/domain/forecast/format';
 import type { CumulativeDay } from '@/features/category/pace';
 import type { CategorySheetLine } from '@/features/category/sheet-lines';
 import { weekdayOf } from '@/lib/date';
+import { GSAP_DURATION, GSAP_EASE, gsap, useGSAP } from '@/lib/gsap';
+import { prefersReducedMotion } from '@/lib/motion';
 import { DirectRecordEditor } from './transactions/direct-record-editor';
 import {
   loadCategorySheetAction,
@@ -249,6 +252,27 @@ export function CategorySheetBody({
   const keep = over && choice === 'keep';
   const totalAfter = data.planTotalYen !== null ? data.planTotalYen + amount - (target ?? 0) : null;
 
+  // 読み込めた中身は、上から順にふわっと出る(パッと差し替わらない、ADR-140)。見出しは動かさない。
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useGSAP(
+    () => {
+      const parts = [...(bodyRef.current?.children ?? [])].filter(
+        (el) => !el.hasAttribute('data-sheet-header'),
+      );
+      if (parts.length === 0) return;
+      const reduced = prefersReducedMotion();
+      gsap.from(parts, {
+        opacity: 0,
+        ...(reduced ? {} : { y: 8 }),
+        duration: reduced ? GSAP_DURATION.fade : GSAP_DURATION.row,
+        ease: GSAP_EASE,
+        stagger: reduced ? 0 : 0.03,
+        clearProps: 'opacity,transform',
+      });
+    },
+    { scope: bodyRef },
+  );
+
   const toggle = async (
     next: boolean,
     set: (v: boolean) => void,
@@ -264,7 +288,7 @@ export function CategorySheetBody({
   };
 
   return (
-    <div className="flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
+    <div ref={bodyRef} className="flex flex-col gap-3" style={{ color: 'var(--ink)' }}>
       <BottomSheetHeader className="grid grid-cols-[1fr_auto_1fr] items-center">
         <button
           type="button"
@@ -463,9 +487,11 @@ export function CategorySheetBody({
               minus
             />
             <span className="tabular flex items-baseline gap-1">
-              <span className="text-[40px] font-bold tracking-[-0.01em]">
-                {amount.toLocaleString('ja-JP')}
-              </span>
+              <RollingNumber
+                value={amount}
+                unit={false}
+                className="text-[40px] font-bold tracking-[-0.01em]"
+              />
               <span className="text-[20px] font-semibold">円</span>
             </span>
             <RoundButton label={`${STEP}円ふやす`} onClick={() => setAmount(amount + STEP)} />
@@ -795,6 +821,42 @@ export function CategoryChart({
   endLabel: string;
   p50: number | null;
 }) {
+  // 開いたとき、使った額の線が左から今日まで描かれ、そのあと見込み・目標までのペースが出る(ADR-140)。
+  const svgRef = useRef<SVGSVGElement>(null);
+  useGSAP(
+    () => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const later = svg.querySelectorAll('[data-reveal="later"]');
+      if (prefersReducedMotion()) {
+        gsap.from(svg, { opacity: 0, duration: GSAP_DURATION.fade, clearProps: 'opacity' });
+        return;
+      }
+      const line = svg.querySelector<SVGPathElement>('[data-reveal="draw"]');
+      const tl = gsap.timeline({ defaults: { ease: GSAP_EASE } });
+      if (line) {
+        const length = line.getTotalLength();
+        tl.fromTo(
+          line,
+          { strokeDasharray: length, strokeDashoffset: length },
+          {
+            strokeDashoffset: 0,
+            duration: GSAP_DURATION.reveal,
+            clearProps: 'strokeDasharray,strokeDashoffset',
+          },
+        );
+      }
+      if (later.length > 0) {
+        tl.from(
+          later,
+          { opacity: 0, duration: GSAP_DURATION.row, stagger: 0.06, clearProps: 'opacity' },
+          line ? '-=0.25' : 0,
+        );
+      }
+    },
+    { scope: svgRef },
+  );
+
   const W = 326;
   const top = 14;
   const bottom = 150;
@@ -849,6 +911,7 @@ export function CategoryChart({
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${W} 172`}
       width="100%"
       role="img"
@@ -857,9 +920,10 @@ export function CategoryChart({
       style={{ overflow: 'visible' }}
     >
       <line x1={x0} y1={bottom} x2={x1} y2={bottom} stroke="var(--bar-quiet)" />
-      {band ? <path d={band} fill="var(--band-outer)" /> : null}
+      {band ? <path data-reveal="later" d={band} fill="var(--band-outer)" /> : null}
       {median ? (
         <path
+          data-reveal="later"
           d={median}
           fill="none"
           stroke="var(--caution-mark)"
@@ -868,7 +932,7 @@ export function CategoryChart({
         />
       ) : null}
       {end && end.forecastYen !== null ? (
-        <>
+        <g data-reveal="later">
           <circle
             cx={x(end.index)}
             cy={y(end.forecastYen)}
@@ -889,7 +953,7 @@ export function CategoryChart({
               {man(end.forecastYen)}
             </text>
           ) : null}
-        </>
+        </g>
       ) : null}
       {ty !== null ? (
         <>
@@ -931,6 +995,7 @@ export function CategoryChart({
       ) : null}
       {goal !== null && last >= 0 && last < n - 1 && goal > spent ? (
         <line
+          data-reveal="later"
           x1={x(last)}
           y1={y(spent)}
           x2={x1}
@@ -959,6 +1024,7 @@ export function CategoryChart({
       {actual ? (
         <>
           <path
+            data-reveal="draw"
             d={actual}
             fill="none"
             stroke="var(--accent)"
@@ -966,6 +1032,7 @@ export function CategoryChart({
             strokeLinecap="round"
           />
           <circle
+            data-reveal="later"
             cx={x(last)}
             cy={y(spent)}
             r="5"
