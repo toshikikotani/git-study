@@ -1,0 +1,125 @@
+/**
+ * AI とつなぐ(MCP)の入口(ADR-142):鍵が無い・違うときは何も読まずに 401。合えば MCP の決まりどおりに
+ * 答える(initialize → tools/list → tools/call)。道具は読むだけで、本人のセッションの中で読む。
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('server-only', () => ({}));
+
+const s = vi.hoisted(() => ({ ran: 0, today: vi.fn(), search: vi.fn() }));
+
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({}) }));
+vi.mock('@/features/mcp/tokens', () => ({
+  verifyMcpToken: async (_admin: unknown, token: string) =>
+    token === 'kkb_good' ? { id: 'me', email: 'me@example.com', created_at: '' } : null,
+}));
+vi.mock('@/lib/supabase/owner-session', () => ({
+  runAsOwner: (_admin: unknown, _owner: unknown, fn: () => Promise<unknown>) => {
+    s.ran += 1;
+    return fn();
+  },
+}));
+vi.mock('@/features/mcp/data', async (original) => ({
+  ...(await original<typeof import('@/features/mcp/data')>()),
+  todayData: (...args: unknown[]) => s.today(...args),
+  searchData: (...args: unknown[]) => s.search(...args),
+}));
+
+import { GET, POST } from '../../app/api/mcp/route';
+
+const rpc = (body: unknown, token: string | null = 'kkb_good') =>
+  new Request('https://kakeibo.example/api/mcp', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const call = async (method: string, params: unknown = {}) => {
+  const response = await POST(rpc({ jsonrpc: '2.0', id: 1, method, params }));
+  expect(response.status).toBe(200);
+  return (await response.json()) as { result?: Record<string, unknown>; error?: unknown };
+};
+
+beforeEach(() => {
+  s.ran = 0;
+  s.today.mockReset().mockResolvedValue({ todayAllowance: { status: 'can_spend', yen: 2888 } });
+  s.search.mockReset().mockResolvedValue({ count: 0, rows: [] });
+});
+
+describe('MCP の入口', () => {
+  it('鍵が無い・違うときは 401 で、何も読まない', async () => {
+    const none = await POST(rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, null));
+    expect(none.status).toBe(401);
+    expect(none.headers.get('www-authenticate')).toContain('Bearer');
+    const wrong = await POST(
+      rpc(
+        { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_today' } },
+        'kkb_bad',
+      ),
+    );
+    expect(wrong.status).toBe(401);
+    expect(s.today).not.toHaveBeenCalled();
+    expect(s.ran).toBe(0);
+  });
+
+  it('initialize に家計簿の名前と使い方を返す', async () => {
+    const { result } = await call('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '1' },
+    });
+    expect(result?.serverInfo).toMatchObject({ name: 'kakeibo' });
+    expect(String(result?.instructions)).toContain('記録・保存はできません');
+  });
+
+  it('道具は6つで、どれも読むだけ', async () => {
+    const { result } = await call('tools/list');
+    const tools = result?.tools as { name: string; annotations: { readOnlyHint: boolean } }[];
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'get_categories',
+      'get_month_summary',
+      'get_needs_check',
+      'get_today',
+      'get_upcoming',
+      'search_transactions',
+    ]);
+    expect(tools.every((t) => t.annotations.readOnlyHint)).toBe(true);
+  });
+
+  it('道具を呼ぶと、本人のセッションの中で読んで JSON の文字で返す', async () => {
+    const { result } = await call('tools/call', { name: 'get_today', arguments: {} });
+    expect(s.ran).toBe(1);
+    expect(s.today).toHaveBeenCalledWith('me');
+    const [content] = result?.content as { type: string; text: string }[];
+    expect(JSON.parse(content!.text)).toEqual({
+      todayAllowance: { status: 'can_spend', yen: 2888 },
+    });
+  });
+
+  it('引数は確かめてから渡し、読めなければ理由を返す', async () => {
+    await call('tools/call', {
+      name: 'search_transactions',
+      arguments: { query: 'ライフ', minYen: 1000 },
+    });
+    expect(s.search).toHaveBeenCalledWith({ query: 'ライフ', minYen: 1000 });
+
+    const bad = await call('tools/call', {
+      name: 'search_transactions',
+      arguments: { from: '10月1日' },
+    });
+    expect(JSON.stringify(bad)).toMatch(/isError|error/);
+
+    s.today.mockRejectedValueOnce(new Error('目標がありません'));
+    const failed = await call('tools/call', { name: 'get_today', arguments: {} });
+    expect(failed.result).toMatchObject({ isError: true });
+    expect(JSON.stringify(failed.result)).toContain('目標がありません');
+  });
+
+  it('状態を持たない形なので GET は 405', () => {
+    expect(GET().status).toBe(405);
+  });
+});

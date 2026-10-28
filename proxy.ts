@@ -19,6 +19,10 @@
  * 直接叩いてくる経路のため(本人発案のレシート受信 Webhook)。X-Line-Signature
  * による検証は各 route.ts 側の責務にする(app/api/webhooks/line/route.ts)。
  *
+ * /api/mcp も対象外。AI とつなぐ(MCP)の入口で、MCP クライアントは cookie を持たない。route が
+ * 最初に本人が発行した鍵(`Authorization: Bearer kkb_…`)を確かめ、合わなければ 401(ADR-142、
+ * app/api/mcp/route.ts)。
+ *
  * /api/mobile/* は iPhone アプリの入口(ADR-132)。cookie の代わりに、アプリが送るログインの証明
  * (`Authorization: Bearer <アクセストークン>`)を Supabase で確かめる。確かめられなければ、ほかの
  * API と同じく 401。route 側(lib/supabase/bearer-session.ts)でも、もう一度確かめる。
@@ -82,5 +86,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|api/cron|api/webhooks).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|api/cron|api/webhooks|api/mcp).*)',
+  ],
 };
