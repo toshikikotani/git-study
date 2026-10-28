@@ -61,13 +61,27 @@ export type MobileRecordResult = { record: MobileRecord | null; error: string | 
 /** POST /api/mobile/receipts(撮ったレシートの写真。JPEG の base64)。 */
 export type MobileReceiptInput = { image: string };
 
-/** 撮ったレシートは、LINE のレシートと同じく読み取ってそのまま記録する(答え合わせで確かめる)。 */
+/** 保存前に残したレシート1件。 */
+export type MobileKeptReceipt = {
+  id: string;
+  storeName: string;
+  occurredOn: string;
+  /** 支払った額(正の円)。 */
+  amountYen: number;
+  /** 当てたカテゴリ(決まらなければ null。確かめるときに選ぶ)。 */
+  genreName: string | null;
+};
+
+/**
+ * 撮ったレシートは読み取って「保存前」に残す。明細にはしない(本人が確かめて「保存」を押したときだけ記録、
+ * ADR-141)。確かめるのは Web の「確認が必要」(checkPath を API の URL につなげて開く)。
+ */
 export type MobileReceiptResult = {
-  records: MobileRecord[];
-  /** 取り込み済みだったので入れなかった件数。 */
-  duplicates: number;
-  /** カードの通知メールと同じ支払いとして1件にまとめた件数。 */
-  merged: number;
+  ready: MobileKeptReceipt[];
+  /** 読めなかった所があり、入力待ち(写真を見ながら入れる)にした。 */
+  needsInput: boolean;
+  /** 確かめる画面のパス(`/spending/review?receipt=…` など)。 */
+  checkPath: string;
   warnings: string[];
   error: string | null;
 };

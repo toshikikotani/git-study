@@ -1,9 +1,11 @@
 /**
  * 記録する(下から出る画面、ADR-132)。いちばん上に「レシートを撮る」「写真から」:撮ったレシートは
- * 読み取ってそのまま記録し(LINE のレシートと同じ。答え合わせで確かめる)、結果と「取り消す」を出す。
+ * 読み取って「保存前」に残すだけ(明細にはしない、ADR-141)。読み取った内容と「確かめて保存」(Web の
+ * 確認が必要のそのレシートを開く)を出す。
  * 手で入れるときは金額とカテゴリ(よく使う順)、お店・メモと日付は任意。保存は右上(ADR-131)。
  */
 import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -23,10 +25,10 @@ import type {
   MobileGenre,
   MobileReceiptResult,
   MobileRecordResult,
-  MobileUndoResult,
 } from '@/features/mobile/contract';
 import { Card, PrimaryButton, Row, TextButton } from '~/components/ui';
 import { api, ApiError } from '~/lib/api';
+import { env } from '~/lib/env';
 import { formatYen } from '~/lib/format';
 import { pickReceiptPhoto } from '~/lib/receipt-photo';
 import { radius, type, usePalette } from '~/lib/theme';
@@ -38,7 +40,7 @@ const TOP_GENRES = 8;
 type Photo =
   | { kind: 'idle' }
   | { kind: 'reading' }
-  | { kind: 'done'; result: MobileReceiptResult; undone: boolean }
+  | { kind: 'done'; result: MobileReceiptResult }
   | { kind: 'error'; message: string };
 
 export default function Record() {
@@ -103,31 +105,12 @@ export default function Record() {
         return;
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPhoto({ kind: 'done', result, undone: false });
+      setPhoto({ kind: 'done', result });
     } catch (e) {
       setPhoto({
         kind: 'error',
         message:
           e instanceof ApiError ? e.message : '読み取れませんでした。もう一度撮ってください。',
-      });
-    }
-  };
-
-  const undo = async (ids: string[]) => {
-    try {
-      const result = await api<MobileUndoResult>('/api/mobile/records/undo', {
-        method: 'POST',
-        body: { ids },
-      });
-      if (result.error) {
-        setPhoto({ kind: 'error', message: result.error });
-        return;
-      }
-      setPhoto((p) => (p.kind === 'done' ? { ...p, undone: true } : p));
-    } catch (e) {
-      setPhoto({
-        kind: 'error',
-        message: e instanceof ApiError ? e.message : '取り消せませんでした。',
       });
     }
   };
@@ -170,7 +153,7 @@ export default function Record() {
             </Pressable>
           </View>
 
-          <PhotoResult photo={photo} onUndo={(ids) => void undo(ids)} />
+          <PhotoResult photo={photo} />
 
           <Card style={styles.amountCard}>
             <Text style={[styles.fieldLabel, { color: c.inkMuted }]}>手で入れる</Text>
@@ -266,7 +249,7 @@ export default function Record() {
   );
 }
 
-function PhotoResult({ photo, onUndo }: { photo: Photo; onUndo: (ids: string[]) => void }) {
+function PhotoResult({ photo }: { photo: Photo }) {
   const c = usePalette();
   if (photo.kind === 'idle') return null;
   if (photo.kind === 'reading') {
@@ -284,46 +267,35 @@ function PhotoResult({ photo, onUndo }: { photo: Photo; onUndo: (ids: string[]) 
       </Card>
     );
   }
-  const { result, undone } = photo;
-  const ids = result.records.map((r) => r.id);
+  const { result } = photo;
+  const check = () => void Linking.openURL(`${env.apiBaseUrl}${result.checkPath}`);
   return (
     <Card>
       <Text style={[styles.photoTitle, { color: c.ink }]}>
-        {undone ? '取り消しました' : 'レシートを記録しました'}
+        {result.needsInput ? '読めなかった所があります' : '読み取りました(まだ保存していません)'}
       </Text>
-      {result.records.map((r, i) => (
+      {result.ready.map((r, i) => (
         <Row
           key={r.id}
           divider={i > 0}
-          title={r.label}
-          sub={`${r.genreName ?? '未分類'} · 夜の答え合わせで確かめます`}
+          title={r.storeName}
+          sub={`${r.occurredOn.slice(5).replace('-', '/')} · ${r.genreName ?? 'カテゴリは確かめるときに選ぶ'}`}
           right={
             <Text style={[styles.photoAmount, { color: c.ink }]}>
-              {formatYen(Math.abs(r.amountYen), { sign: 'never' })}
+              {formatYen(r.amountYen, { sign: 'never' })}
             </Text>
           }
         />
       ))}
-      {result.merged > 0 ? (
-        <Text style={[styles.photoNote, { color: c.inkMuted }]}>
-          カードの通知メールと同じ支払いなので、1件にまとめました。
-        </Text>
-      ) : null}
-      {result.duplicates > 0 ? (
-        <Text style={[styles.photoNote, { color: c.inkMuted }]}>
-          {result.duplicates}件は取り込み済みだったので入れませんでした。
-        </Text>
-      ) : null}
-      {!undone && ids.length > 0 && result.merged === 0 ? (
-        <View style={styles.photoActions}>
-          <TextButton label="取り消す" onPress={() => onUndo(ids)} />
-          <TextButton label="閉じる" bold onPress={() => router.back()} />
-        </View>
-      ) : (
-        <View style={styles.photoActions}>
-          <TextButton label="閉じる" bold onPress={() => router.back()} />
-        </View>
-      )}
+      <Text style={[styles.photoNote, { color: c.inkMuted }]}>
+        {result.needsInput
+          ? '写真を見ながら入れてから保存してください。'
+          : '確かめて「保存」を押すと記録します。'}
+      </Text>
+      <View style={styles.photoActions}>
+        <TextButton label="あとで" onPress={() => router.back()} />
+        <TextButton label={result.needsInput ? '入力する' : '確かめて保存'} bold onPress={check} />
+      </View>
     </Card>
   );
 }

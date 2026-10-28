@@ -38,7 +38,7 @@ export function ReviewHub({
   captures,
   ready = [],
   checkLevel = 'normal',
-  openFirstReceipt = false,
+  openReceipt = null,
   records,
   duplicates,
   merchantNameGroups,
@@ -52,8 +52,8 @@ export function ReviewHub({
   /** 保存前のレシート(いちばん上に出す、ADR-133)。 */
   ready?: readonly ReadyReceiptView[];
   checkLevel?: CheckLevel;
-  /** 撮ったあとの「確かめる」から来た(保存前の1件めを開く)。 */
-  openFirstReceipt?: boolean;
+  /** 開いたときに確かめる保存前のレシート('next' は1件め、ほかは id)。 */
+  openReceipt?: string | null;
   records: readonly LedgerTransaction[];
   duplicates: DuplicateReviewView;
   merchantNameGroups: readonly MerchantNameReviewGroup[];
@@ -89,7 +89,7 @@ export function ReviewHub({
   return (
     <div className="flex flex-col gap-6" style={{ color: 'var(--ink)' }}>
       {/* 保存前のレシートは、確認が必要のいちばん上に並べる(ADR-133)。 */}
-      <ReceiptResults ready={ready} checkLevel={checkLevel} openFirst={openFirstReceipt} />
+      <ReceiptResults ready={ready} checkLevel={checkLevel} openReceipt={openReceipt} />
       {todayCheck}
       {nothing ? (
         <p role="status" className="px-1 py-6 text-[15px]" style={{ color: 'var(--ink-muted)' }}>

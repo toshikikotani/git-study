@@ -8,6 +8,8 @@ const s = vi.hoisted(() => ({
   runAsOwner: vi.fn(),
   text: vi.fn(),
   postback: vi.fn(),
+  keep: vi.fn(),
+  pushes: [] as unknown[][],
 }));
 
 vi.mock('next/server', async (original) => ({
@@ -40,6 +42,23 @@ vi.mock('@/lib/line', async (original) => ({
   replyLineMessages: async (_token: string, replyToken: string, messages: unknown[]) => {
     s.replies.push({ token: replyToken, messages });
   },
+  pushLineMessages: async (_token: string, _to: string, messages: unknown[]) => {
+    s.pushes.push(messages);
+  },
+  fetchLineImageAsBase64: async () => 'aW1hZ2U=',
+}));
+vi.mock('@/features/receipt-captures/keep-photo', async (original) => ({
+  ...(await original<typeof import('@/features/receipt-captures/keep-photo')>()),
+  keepReceiptPhotoForCheck: (...args: unknown[]) => s.keep(...args),
+}));
+// 写真から明細を入れる関数は呼ばれない(呼ばれたら落とす)。
+vi.mock('@/features/transactions/store', () => ({
+  importTransactions: () => {
+    throw new Error('レシートを自動で記録しようとした');
+  },
+  importTransactionsAsAdmin: () => {
+    throw new Error('レシートを自動で記録しようとした');
+  },
 }));
 
 import { POST } from '../../app/api/webhooks/line/route';
@@ -70,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   s.after = [];
   s.replies = [];
+  s.pushes = [];
   process.env.LINE_CHANNEL_ACCESS_TOKEN = 't'.repeat(60);
   process.env.LINE_USER_ID = ME;
   process.env.LINE_CHANNEL_SECRET = SECRET;
@@ -77,6 +97,21 @@ beforeEach(() => {
   process.env.APP_BASE_URL = 'https://kakeibo.example/';
   s.text.mockResolvedValue([{ type: 'text', text: '記録しました' }]);
   s.postback.mockResolvedValue([{ type: 'text', text: 'OK' }]);
+  process.env.ANTHROPIC_API_KEY = 'sk-test';
+  s.keep.mockResolvedValue({
+    ready: [
+      {
+        id: 'cap-1',
+        storeName: 'ライフ',
+        occurredOn: '2026-10-27',
+        amountYen: 1800,
+        genreName: '食料品',
+      },
+    ],
+    needsInputId: null,
+    warnings: [],
+    error: null,
+  });
 });
 
 describe('LINE の受信', () => {
@@ -138,5 +173,39 @@ describe('LINE の受信', () => {
       expect.objectContaining({ messageId: 'ev-1' }),
     );
     expect(s.replies).toHaveLength(1);
+  });
+});
+
+describe('LINE で送ったレシートの写真(ADR-141)', () => {
+  const image = (userId: string) => ({
+    type: 'message',
+    replyToken: 'r-img',
+    message: { type: 'image', id: 'img-1' },
+    source: { type: 'user', userId },
+  });
+
+  it('記録はせず、本人として保存前に残し、読み取った内容と「確かめて保存」を返す', async () => {
+    const response = await POST(request([image(ME)]));
+    expect(response.status).toBe(200);
+    expect(s.runAsOwner).toHaveBeenCalledWith(expect.objectContaining({ id: 'me' }));
+    expect(s.keep).toHaveBeenCalledWith(expect.objectContaining({ imageBase64: 'aW1hZ2U=' }));
+    const [message] = s.pushes[0] as {
+      text: string;
+      quickReply: { items: { action: { label: string; uri: string } }[] };
+    }[];
+    expect(message!.text).toContain('まだ保存していません');
+    expect(message!.text).toContain('10/27 ライフ 1,800円(食料品)');
+    expect(message!.text).not.toContain('保存しました');
+    expect(message!.quickReply.items[0]!.action).toEqual({
+      type: 'uri',
+      label: '確かめて保存',
+      uri: 'https://kakeibo.example/spending/review?receipt=cap-1',
+    });
+  });
+
+  it('本人以外の写真は読み取らない', async () => {
+    await POST(request([image(SOMEONE)]));
+    expect(s.keep).not.toHaveBeenCalled();
+    expect(s.pushes).toEqual([]);
   });
 });

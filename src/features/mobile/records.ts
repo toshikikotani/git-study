@@ -1,6 +1,7 @@
 /**
  * iPhone アプリの「記録する」と「レシートを撮る」(POST /api/mobile/records・receipts・records/undo、
- * ADR-132)。Web の記録するシート・LINE のレシートと同じ関数で保存する。
+ * ADR-132)。手で入れた記録は Web の記録するシートと同じ関数で保存する。撮ったレシートは保存前に残すだけ
+ * (Web で撮ったとき・LINE と同じ、ADR-141)。
  *
  * 本人のセッション(アプリのトークン)の間に呼ぶ。口座は記録するの既定(現金 → 電子マネー → 1つめ)。
  */
@@ -9,8 +10,8 @@ import { randomUUID } from 'node:crypto';
 
 import { IPHONE_ENTRY_REF_PREFIX, IPHONE_PHOTO_REF_PREFIX } from '@/domain/today-check';
 import { getOrCreateDefaultAccount } from '@/features/accounts/store';
-import { importReceiptPhoto } from '@/features/import/line-receipt';
 import { ClaudeReceiptExtractor } from '@/features/import/receipt-ai';
+import { checkPathOf, keepReceiptPhotoForCheck } from '@/features/receipt-captures/keep-photo';
 import { importTransactions, TransactionStoreError } from '@/features/transactions/store';
 import { fingerprintOf, type StoredTransaction } from '@/features/transactions/types';
 import { addDays, todayJst } from '@/lib/date';
@@ -18,12 +19,10 @@ import { readAnthropicApiKey } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import type {
   MobileReceiptResult,
-  MobileRecord,
   MobileRecordInput,
   MobileRecordResult,
   MobileUndoResult,
 } from './contract';
-import { withGenreNames } from './today';
 
 /** 1件で記録できる上限(円)。 */
 const MAX_RECORD_YEN = 10_000_000;
@@ -143,12 +142,12 @@ export async function recordExpense(
   };
 }
 
-/** 撮ったレシートを読み取って、そのまま記録する(LINE のレシートと同じ。答え合わせで確かめる)。 */
-export async function recordReceiptPhoto(
-  userId: string,
-  imageBase64: string,
-): Promise<MobileReceiptResult> {
-  const empty = { records: [], duplicates: 0, merged: 0, warnings: [] };
+/**
+ * 撮ったレシートを読み取って「保存前」に残す(明細にはしない、ADR-141)。読めなかった所があれば入力待ち。
+ * どちらも Web の「確認が必要」で確かめて「保存」を押したときだけ記録になる。
+ */
+export async function keepReceiptPhoto(imageBase64: string): Promise<MobileReceiptResult> {
+  const empty = { ready: [], needsInput: false, checkPath: '/spending/review', warnings: [] };
   if (imageBase64.trim() === '') return { ...empty, error: '写真がありません。' };
   if (imageBase64.length > MAX_PHOTO_BASE64_CHARS) {
     return { ...empty, error: '写真が大きすぎます。' };
@@ -157,47 +156,17 @@ export async function recordReceiptPhoto(
   if (apiKey === null)
     return { ...empty, error: 'いまはレシートを読み取れません(AIの設定がありません)。' };
 
-  const supabase = await createClient();
-  const account = await getOrCreateDefaultAccount();
-  const photoId = randomUUID();
-  const result = await importReceiptPhoto(supabase, userId, {
-    accountId: account.id,
+  const kept = await keepReceiptPhotoForCheck({
+    apiKey,
     extractor: new ClaudeReceiptExtractor(apiKey),
     imageBase64,
-    mediaType: 'image/jpeg',
-    sourceRefOf: (index) => `${IPHONE_PHOTO_REF_PREFIX}${photoId}-${index}`,
-    fileName: 'iPhone',
-  });
-  if (result.preview.length === 0) {
-    return {
-      ...empty,
-      warnings: result.warnings,
-      error: result.warnings[0] ?? 'レシートとして読み取れませんでした。',
-    };
-  }
-
-  const byRef = new Map(result.inserted.map((t) => [t.sourceRef, t.id]));
-  const records: MobileRecord[] = result.preview.flatMap((t) => {
-    const id = t.sourceRef ? byRef.get(t.sourceRef) : undefined;
-    return id
-      ? [
-          {
-            id,
-            occurredOn: t.occurredOn,
-            label: (t.merchantName ?? '').trim() || t.description,
-            amountYen: t.amountYen,
-            genreId: t.genreId,
-            genreName: t.genreName,
-          },
-        ]
-      : [];
   });
   return {
-    records: await withGenreNames(userId, records),
-    duplicates: result.duplicates,
-    merged: result.merged,
-    warnings: result.warnings,
-    error: null,
+    ready: kept.ready,
+    needsInput: kept.needsInputId !== null,
+    checkPath: checkPathOf(kept),
+    warnings: kept.warnings,
+    error: kept.error,
   };
 }
 

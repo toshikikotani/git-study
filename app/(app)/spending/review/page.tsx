@@ -72,7 +72,7 @@ export default async function ReviewPage({
           captures={captures}
           ready={ready}
           checkLevel={settings?.receiptCheckLevel ?? 'normal'}
-          openFirstReceipt={receipt === 'next'}
+          openReceipt={typeof receipt === 'string' && receipt !== '' ? receipt : null}
           records={records}
           duplicates={duplicates}
           merchantNameGroups={merchantNames.groups}
