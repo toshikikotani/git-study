@@ -110,13 +110,16 @@ async function imageBase64Of(receipt: UnsavedReceipt): Promise<string | null> {
 export function ReceiptResults({
   ready = [],
   checkLevel = 'normal',
-  openFirst = false,
+  openReceipt = null,
 }: {
   /** サーバーに残っている保存前のレシート。 */
   ready?: readonly ReadyReceiptView[];
   checkLevel?: CheckLevel;
-  /** 撮ったあとの「確かめる」から来たら、1件めを開く。 */
-  openFirst?: boolean;
+  /**
+   * 開いたときに確かめるレシート。'next' は1件め(撮ったあとの「確かめる」)、それ以外は保存前の id
+   * (LINE・iPhone アプリの「確かめて保存」、ADR-141)。見つからなければ1件め。
+   */
+  openReceipt?: string | null;
 }) {
   const router = useRouter();
   const jobs = useReceiptJobs();
@@ -182,12 +185,12 @@ export function ReceiptResults({
   );
   const duplicates = useDuplicateHits(probes);
 
-  // 撮ったあとの「確かめる」から来たら、1件めを開く(1回だけ)。
+  // 「確かめる」「確かめて保存」から来たら、そのレシート(無ければ1件め)を開く(1回だけ)。
   useEffect(() => {
-    if (!openFirst || openedFirst.current || receipts.length === 0) return;
+    if (openReceipt === null || openedFirst.current || receipts.length === 0) return;
     openedFirst.current = true;
-    setOpenKey(receipts[0]!.key);
-  }, [openFirst, receipts]);
+    setOpenKey((receipts.find((r) => r.key === openReceipt) ?? receipts[0]!).key);
+  }, [openReceipt, receipts]);
 
   const change = (r: UnsavedReceipt) => (update: (s: CheckState) => CheckState) =>
     setStates((prev) => new Map(prev).set(r.key, update(prev.get(r.key) ?? stateOf(r))));

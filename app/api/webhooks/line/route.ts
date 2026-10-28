@@ -2,8 +2,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { after, NextResponse } from 'next/server';
 
-import { importLineReceiptAsAdmin } from '@/features/import/line-receipt';
+import { lineReceiptReply } from '@/features/import/line-receipt';
 import { ClaudeReceiptExtractor } from '@/features/import/receipt-ai';
+import { keepReceiptPhotoForCheck } from '@/features/receipt-captures/keep-photo';
 import { replyToPostback, replyToText, type LineContext } from '@/features/line/conversation';
 import {
   getAppBaseUrl,
@@ -16,6 +17,7 @@ import {
   fetchLineImageAsBase64,
   lineText,
   postLineMessage,
+  pushLineMessages,
   replyLineMessages,
   type LineMessage,
 } from '@/lib/line';
@@ -44,9 +46,10 @@ import { runAsOwner } from '@/lib/supabase/owner-session';
  * 「複数レシート送信」(本人発案)に自然に対応できる。1画像=1バッチの原則
  * (features/import/receipt-storage.ts ヘッダー参照)もそのまま保たれる。
  *
- * ── 分類はルールのみ ────────────────────────────────────────
- * app/api/cron/import-gmail/route.ts と同じ方針(ADR-019)。詳細は
- * features/import/line-receipt.ts のヘッダー参照。
+ * ── 記録はしない(保存前に残す)─────────────────────────────
+ * 読み取ったレシートは「保存前」に残し、読み取った内容と「確かめて保存」のボタンを返す。明細にするのは、
+ * 本人がアプリで確かめて「保存」を押したときだけ(ADR-141。もとはそのまま記録していた)。本人として
+ * (lib/supabase/owner-session.ts)Web で撮ったときと同じ読み取り・カテゴリの当て方で残す。
  *
  * ── 文字とボタン(v4-2「LINEで完結」、ADR-130)──────────────────
  * 文字(「ランチ 1200」「今日あといくら」「あと3000円使っていい？」「答え合わせ」、それ以外はAI)と、
@@ -157,27 +160,21 @@ export async function POST(request: Request): Promise<NextResponse> {
         lineEnv.LINE_CHANNEL_ACCESS_TOKEN,
         messageId,
       );
-      const result = await importLineReceiptAsAdmin(
-        admin,
-        user.id,
-        accountId,
-        extractor,
-        imageBase64,
-        messageId,
+      const result = await runAsOwner(admin, user, () =>
+        keepReceiptPhotoForCheck({ apiKey: anthropicApiKey, extractor, imageBase64 }),
       );
-      await postLineMessage(
-        lineEnv.LINE_CHANNEL_ACCESS_TOKEN,
-        lineEnv.LINE_USER_ID,
-        result.summaryText,
-      ).catch(() => {});
-      processed += 1;
+      await pushLineMessages(lineEnv.LINE_CHANNEL_ACCESS_TOKEN, lineEnv.LINE_USER_ID, [
+        lineReceiptReply(result, getAppBaseUrl()),
+      ]).catch(() => {});
+      if (result.error === null) processed += 1;
+      else errors.push(result.error);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(message);
       await postLineMessage(
         lineEnv.LINE_CHANNEL_ACCESS_TOKEN,
         lineEnv.LINE_USER_ID,
-        `レシートの取り込みに失敗しました: ${message}`,
+        `レシートを読み取れませんでした: ${message}`,
       ).catch(() => {});
     }
   }
