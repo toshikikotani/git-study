@@ -19,7 +19,7 @@ import { NextStepCard } from './next-step-card';
 import { ProbabilityCard } from './probability-card';
 import { SpendingTrendChart } from './spending-trend-chart';
 import { WeekdayHabit } from './weekday-habit';
-import { weekdayHabitRows } from './weekday-habit-data';
+import { weekdayHabit } from './weekday-habit-data';
 import { VerificationCard } from './verification-card';
 import { WhyCard } from './why-card';
 
@@ -140,7 +140,7 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
         tone: fixed ? 'fixed' : (tone ?? 'ok'),
       };
     });
-  const habit = weekdayHabitRows(loaded.transactions, {
+  const habit = weekdayHabit(loaded.transactions, {
     from: period.from,
     to: today < period.to ? today : period.to,
   });
@@ -216,7 +216,7 @@ export async function GoalAnalysis({ plan, today }: { plan: SpendingPlan; today:
 
       <GroupHeading>どこで使っているか</GroupHeading>
       <CategoryProgress rows={progress} untargeted={untargeted} />
-      <WeekdayHabit rows={habit} />
+      <WeekdayHabit data={habit} />
 
       {today >= period.from ? (
         <>
