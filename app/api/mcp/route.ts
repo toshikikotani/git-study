@@ -21,7 +21,8 @@ import { runAsOwner } from '@/lib/supabase/owner-session';
  * 鍵は本人(オーナー)の鍵だけで、道具は本人のセッション(runAsOwner、RLS のまま)の中で読む。
  *
  * ── 形 ──────────────────────────────────────────────────────
- * Streamable HTTP の、状態を持たない形(1回の POST に JSON で1回答える)。道具はどれも読むだけ。
+ * Streamable HTTP の、状態を持たない形(1回の POST に JSON で1回答える)。書く道具は、本人がチャットで
+ * 許可したときに呼ばれる(ADR-144)。
  */
 
 export const runtime = 'nodejs';

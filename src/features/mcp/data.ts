@@ -1,5 +1,5 @@
 /**
- * AI とつなぐ(MCP)の道具が返す中身(ADR-142)。どれも読むだけ。数字は家計簿の画面と同じ関数で数える
+ * AI とつなぐ(MCP)の読む道具が返す中身(ADR-142。書く道具は write.ts)。数字は家計簿の画面と同じ関数で数える
  * (今日の目安は iPhone 版と同じ loadMobileToday、カテゴリは「カテゴリ」⑦と同じ loadCategoryOutlooks、
  * 月の合計は明細と同じ summarizeLedger)。本人のセッションの中で呼ぶ。
  *
@@ -27,6 +27,8 @@ export const MAX_ROWS = 100;
 export const MAX_RANGE_DAYS = 400;
 
 export type RecordRow = {
+  /** 明細の id(カテゴリを直す・取り消すときに渡す)。 */
+  id: string;
   date: string;
   store: string;
   /** 正の円。 */
@@ -45,6 +47,7 @@ export function isListed(t: LedgerTransaction): boolean {
 
 export function toRow(t: LedgerTransaction, today: string): RecordRow {
   return {
+    id: t.id,
     date: t.occurredOn,
     store: t.label,
     yen: Math.abs(t.amountYen),

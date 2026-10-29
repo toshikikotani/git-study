@@ -1,9 +1,12 @@
 /**
- * 家計簿の MCP サーバー(AI とつなぐ、ADR-142)。読むだけの道具を6つ並べる。書く道具は置かない
- * (記録・保存は、本人がアプリで確かめて押したときだけ、ADR-141)。
+ * 家計簿の MCP サーバー(AI とつなぐ、ADR-142・144)。読む道具6つと、書く道具5つ(記録する・レシートを
+ * 入れる・カテゴリを直す・目標を変える・取り消す)。書く道具は、本人がチャットで内容を見て許可したときに
+ * 呼ばれる(本人「チャットで確かめる」。ChatGPT・Claude は書く道具の前に許可を聞く。説明でも、内容を
+ * 見せてからはっきり頼まれたときだけ呼ぶよう AI に頼む)。
  *
- * 道具の中身は data.ts。ここでは名前・説明・引数の形を決め、呼ばれたら `run` の中(本人のセッション)で
- * 読んで JSON の文字で返す。読めなければ isError で理由を返す(AI がそのまま伝えられるように)。
+ * 道具の中身は data.ts(読む)と write.ts(書く)。ここでは名前・説明・引数の形を決め、呼ばれたら `run` の中
+ * (本人のセッション)で動かして JSON の文字で返す。できなければ isError で理由を返す(AI がそのまま伝え、
+ * 直して呼び直せるように)。
  */
 import 'server-only';
 
@@ -21,24 +24,27 @@ import {
   todayData,
   upcomingData,
 } from './data';
+import { addReceipt, addRecord, MAX_YEN, setCategory, setTarget, undoRecord } from './write';
 
 export const MCP_SERVER_NAME = 'kakeibo';
 
 const INSTRUCTIONS = [
-  '日本円の家計簿(本人1人分)を読む道具です。金額はすべて正の円で、type が expense(支出)・income(収入)・',
+  '日本円の家計簿(本人1人分)の道具です。金額はすべて正の円で、type が expense(支出)・income(収入)・',
   'refund(返金)を表します。scheduled が true の明細は今日より先の予定で、使った額には入りません。',
   '「今期」は本人が決めた目標の期間(無ければ今月)です。日付は日本時間の YYYY-MM-DD です。',
-  'この道具では記録・保存はできません。記録や保存前のレシートの保存は、本人がアプリで確かめて行います。',
+  '書く道具(add_record・add_receipt・set_category・set_target・undo_record)は、本人にはっきり頼まれたときだけ、',
+  '呼ぶ前に内容(日付・お店・金額・カテゴリ)を本人に見せてから使ってください。カテゴリの名前は get_categories にある',
+  '名前を使います。「同じ支払いかも」が返ったら、本人に聞いてから allowDuplicate: true で呼び直します。',
 ].join('');
 
 /** 道具を呼んだ結果を MCP の形にする。 */
-async function answer(read: () => Promise<unknown>): Promise<CallToolResult> {
+async function answer(run: () => Promise<unknown>, failed: string): Promise<CallToolResult> {
   try {
-    const data = await read();
+    const data = await run();
     return { content: [{ type: 'text', text: JSON.stringify(data, null, 1) }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { isError: true, content: [{ type: 'text', text: `読めませんでした: ${message}` }] };
+    return { isError: true, content: [{ type: 'text', text: `${failed}: ${message}` }] };
   }
 }
 
@@ -48,6 +54,16 @@ const date = z
   .describe('YYYY-MM-DD(日本時間)');
 
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false } as const;
+/** 足す・変える(消さない)。クライアントは使う前に本人に許可を聞く。 */
+const writes = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
+
+const yen = z.number().int().min(1).max(MAX_YEN);
+const categoryName = z.string().min(1).max(40).describe('カテゴリの名前(get_categories の名前)');
+const allowDuplicate = z
+  .boolean()
+  .optional()
+  .describe('「同じ支払いかも」と返ったあと、本人が別の支払いだと言ったときだけ true');
+const confirmFirst = '呼ぶ前に、内容を本人に見せて確かめること。';
 
 export function createKakeiboMcpServer(ctx: {
   userId: string;
@@ -58,7 +74,9 @@ export function createKakeiboMcpServer(ctx: {
     { name: MCP_SERVER_NAME, version: '1.0.0' },
     { instructions: INSTRUCTIONS },
   );
-  const call = (read: () => Promise<unknown>) => answer(() => ctx.run(read));
+  const call = (read: () => Promise<unknown>) => answer(() => ctx.run(read), '読めませんでした');
+  const change = (write: () => Promise<unknown>) =>
+    answer(() => ctx.run(write), 'できませんでした');
 
   server.registerTool(
     'get_today',
@@ -145,6 +163,95 @@ export function createKakeiboMcpServer(ctx: {
       annotations: readOnly,
     },
     () => call(() => needsCheckData(ctx.userId)),
+  );
+
+  server.registerTool(
+    'add_record',
+    {
+      title: '記録する',
+      description: `本人が言った支出・収入・返金を1件記録する(例「ランチ 1200円」「昨日コンビニ 540円」)。支出と返金はカテゴリが要る。${confirmFirst}`,
+      inputSchema: {
+        type: z.enum(['expense', 'income', 'refund']).describe('支出・収入・返金'),
+        amountYen: yen.describe('金額(正の円)'),
+        date: date.optional().describe('YYYY-MM-DD。省くと今日'),
+        store: z.string().max(60).optional().describe('お店・名前。省くとカテゴリの名前'),
+        category: categoryName.optional(),
+        memo: z.string().max(200).optional(),
+        account: z.string().max(40).optional().describe('支払った口座の名前。省くといつもの口座'),
+        allowDuplicate,
+      },
+      annotations: writes,
+    },
+    (input) => change(() => addRecord(input)),
+  );
+
+  server.registerTool(
+    'add_receipt',
+    {
+      title: 'レシートを入れる',
+      description: `本人が見せたレシート(写真など)から読んだお店・日付・合計・品目を1件記録する。品目が2つ以上なら品目ごとのカテゴリで分ける。品目の合計が合計と少し違えば「調整」の行を足す(大きく違えば断る)。読めない所は推測せず本人に聞くこと。${confirmFirst}`,
+      inputSchema: {
+        store: z.string().min(1).max(60).describe('お店の名前(支店名は省く)'),
+        date: date.describe('レシートの日付'),
+        totalYen: yen.describe('支払った合計(税込み・値引き後)'),
+        items: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(60),
+              yen: yen.describe('税込みの金額'),
+              category: categoryName
+                .optional()
+                .describe('品目のカテゴリ(省くとレシート全体のカテゴリ)'),
+            }),
+          )
+          .max(100)
+          .optional(),
+        category: categoryName.optional().describe('レシート全体のカテゴリ'),
+        account: z.string().max(40).optional().describe('支払った口座の名前。省くといつもの口座'),
+        allowDuplicate,
+      },
+      annotations: writes,
+    },
+    (input) => change(() => addReceipt(input)),
+  );
+
+  server.registerTool(
+    'set_category',
+    {
+      title: 'カテゴリを直す',
+      description: `明細のカテゴリを変える。id は search_transactions の結果の id。次から同じお店はそのカテゴリになりやすくなる。${confirmFirst}`,
+      inputSchema: {
+        id: z.string().min(1).max(64).describe('明細の id'),
+        category: categoryName,
+      },
+      annotations: { ...writes, idempotentHint: true },
+    },
+    (input) => change(() => setCategory(input)),
+  );
+
+  server.registerTool(
+    'set_target',
+    {
+      title: '目標を変える',
+      description: `今期の目標の、カテゴリの目標額を変える(目標に無いカテゴリは足す)。使った額と予定の合計より下にはできない。${confirmFirst}`,
+      inputSchema: {
+        category: categoryName,
+        targetYen: z.number().int().min(0).max(MAX_YEN).describe('新しい目標額(円)'),
+      },
+      annotations: { ...writes, idempotentHint: true },
+    },
+    (input) => change(() => setTarget(input)),
+  );
+
+  server.registerTool(
+    'undo_record',
+    {
+      title: '記録を取り消す',
+      description: `add_record・add_receipt で入れた記録を取り消す(ほかの記録は消せない)。id は記録したときの結果の id。${confirmFirst}`,
+      inputSchema: { id: z.string().min(1).max(64).describe('記録の id') },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+    },
+    (input) => change(() => undoRecord(input)),
   );
 
   return server;

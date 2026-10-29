@@ -12,7 +12,8 @@ export const dynamic = 'force-dynamic';
 /**
  * AI のアプリに家計簿を読ませてよいかの同意画面(OAuth の認可、ADR-143)。ChatGPT・Claude のアプリで
  * 「家計簿」を足すと、ここが開く。ログインしていなければ、ログインのあとここへ戻る(proxy.ts)。
- * 許可できるのは持ち主だけ。許可したアプリは、読むだけの道具を使える(記録・保存はできない)。
+ * 許可できるのは持ち主だけ。許可したアプリは、読む道具と、チャットで本人が許可したときの記録・カテゴリ・
+ * 目標の変更を使える(ADR-144)。
  */
 export default async function AuthorizePage({
   searchParams,
@@ -60,7 +61,7 @@ export default async function AuthorizePage({
         <>
           <div className="flex flex-col gap-2">
             <h1 className="text-xl font-semibold">
-              「{parsed.request.client.name}」に家計簿を読ませますか？
+              「{parsed.request.client.name}」と家計簿をつなぎますか？
             </h1>
             <p className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
               {`許可すると ${new URL(parsed.request.redirectUri).host} へ戻ります。${account.email ? `${account.email} の家計簿です。` : ''}`}
@@ -74,9 +75,13 @@ export default async function AuthorizePage({
             <p style={{ color: 'var(--ink-secondary)' }}>
               今日の目安・今期の見通し・カテゴリごとの今期・月の合計・明細・これからの予定・確かめること
             </p>
+            <p className="font-semibold">チャットで許可したときだけ</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>
+              記録する・レシートを入れる・カテゴリを直す・目標を変える・AI で入れた記録を取り消す
+            </p>
             <p className="font-semibold">できないこと</p>
             <p style={{ color: 'var(--ink-secondary)' }}>
-              記録・保存・変更・削除(保存はアプリで本人が確かめて行います)
+              AI で入れた記録のほかを消す・設定や口座を変える
             </p>
           </div>
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>

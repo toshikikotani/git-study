@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 /**
  * 設定 › AI とつなぐ(MCP、ADR-142・143)。ChatGPT・Claude のアプリは URL を入れてログインと同意でつなぐ
  * (つないだアプリの一覧・外す)。Claude Code・デスクトップ版などは個人用の鍵を発行してつなぐ。
- * どちらも読むだけ(記録・保存はアプリで本人がする)。持ち主だけが開ける。
+ * 書く道具(記録・レシート・カテゴリ・目標)は、チャットで本人が許可したときだけ(ADR-144)。持ち主だけが開ける。
  */
 export default async function McpSettingsPage() {
   await requireOwner();
@@ -36,7 +36,7 @@ export default async function McpSettingsPage() {
 
       <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         {
-          'ChatGPT や Claude などの AI から、今日の目安・カテゴリ・月の合計・明細・予定を読めるようにします。読むだけで、記録や保存はできません(保存はアプリで確かめて行います)。'
+          'ChatGPT や Claude などの AI から、家計簿を読んだり、話して記録したりできるようにします。記録・カテゴリ・目標の変更は、AI が内容を見せてチャットで許可したときだけです。'
         }
       </p>
 
@@ -68,6 +68,8 @@ export default async function McpSettingsPage() {
           <li>カテゴリごとの今期(目標・使った額・見込み)</li>
           <li>月の合計(支出・収入・カテゴリごと)</li>
           <li>明細をさがす(期間・お店・カテゴリ・金額)</li>
+          <li>記録する(「ランチ 1200円」)・レシートを入れる(写真を見せる)</li>
+          <li>カテゴリを直す・目標を変える・AI で入れた記録を取り消す</li>
           <li>これからの予定と固定費</li>
           <li>確かめること(答え合わせ・保存前のレシート)</li>
         </ul>
