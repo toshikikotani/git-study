@@ -10,8 +10,8 @@ import { issueMcpTokenAction, revokeMcpTokenAction } from './actions';
 const dayOf = (iso: string) => iso.slice(0, 10).replaceAll('-', '/');
 
 /**
- * 鍵の一覧・発行・取り消し(ADR-142)。発行した鍵は、この画面にいる間だけ1回出す(閉じると二度と出ない)。
- * 一緒に、Claude Code とデスクトップ版の設定の書き方を、鍵を入れた形で出す(そのままコピーできる)。
+ * 鍵の一覧・発行・取り消し(ADR-142)。ログインの画面を出せない AI 用(ふだんは URL と OAuth でつながる、
+ * ADR-143)。発行した鍵は、この画面にいる間だけ1回出す(閉じると二度と出ない)。
  */
 export function McpKeys({
   tokens: initial,
@@ -138,22 +138,8 @@ export function McpKeys({
   );
 }
 
-/** 発行した鍵と、そのまま貼れる設定。鍵はここでしか見られない。 */
+/** 発行した鍵。鍵はここでしか見られない。 */
 function IssuedToken({ token, name, endpoint }: { token: string; name: string; endpoint: string }) {
-  const claudeCode = `claude mcp add --transport http kakeibo ${endpoint} --header "Authorization: Bearer ${token}"`;
-  const desktop = JSON.stringify(
-    {
-      mcpServers: {
-        kakeibo: {
-          command: 'npx',
-          args: ['-y', 'mcp-remote', endpoint, '--header', 'Authorization:${KAKEIBO_AUTH}'],
-          env: { KAKEIBO_AUTH: `Bearer ${token}` },
-        },
-      },
-    },
-    null,
-    2,
-  );
   return (
     <Card>
       <h2 className="text-[15px] font-semibold">「{name}」の鍵を発行しました</h2>
@@ -163,10 +149,8 @@ function IssuedToken({ token, name, endpoint }: { token: string; name: string; e
         }
       </p>
       <Snippet label="鍵" text={token} />
-      <Snippet label="Claude Code(ターミナルで実行)" text={claudeCode} />
-      <Snippet label="Claude のデスクトップ版(claude_desktop_config.json)" text={desktop} />
       <p className="mt-3 text-[12px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        ほかの AI では、URL に {endpoint}、ヘッダーに「Authorization: Bearer(鍵)」を設定します。
+        {`AI の設定で、URL に ${endpoint}、ヘッダーに「Authorization: Bearer(鍵)」を入れます。`}
       </p>
     </Card>
   );
