@@ -1,8 +1,9 @@
 /**
- * 家計簿の MCP サーバー(AI とつなぐ、ADR-142・144)。読む道具6つと、書く道具5つ(記録する・レシートを
- * 入れる・カテゴリを直す・目標を変える・取り消す)。書く道具は、本人がチャットで内容を見て許可したときに
+ * 家計簿の MCP サーバー(AI とつなぐ、ADR-142・144・146)。読む道具6つと、書く道具(記録する・レシート・
+ * カテゴリを直す・目標を変える・取り消す)。書く道具は、本人がチャットで内容を見て許可したときに
  * 呼ばれる(本人「チャットで確かめる」。ChatGPT・Claude は書く道具の前に許可を聞く。説明でも、内容を
- * 見せてからはっきり頼まれたときだけ呼ぶよう AI に頼む)。
+ * 見せてからはっきり頼まれたときだけ呼ぶよう AI に頼む)。レシートは「これでいいですか」の画面を出し、
+ * 本人が「はい」を押すと登録する(MCP Apps、receipt-ui.ts)。
  *
  * 道具の中身は data.ts(読む)と write.ts(書く)。ここでは名前・説明・引数の形を決め、呼ばれたら `run` の中
  * (本人のセッション)で動かして JSON の文字で返す。できなければ isError で理由を返す(AI がそのまま伝え、
@@ -10,6 +11,11 @@
  */
 import 'server-only';
 
+import {
+  RESOURCE_MIME_TYPE,
+  registerAppResource,
+  registerAppTool,
+} from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -24,7 +30,16 @@ import {
   todayData,
   upcomingData,
 } from './data';
-import { addReceipt, addRecord, MAX_YEN, setCategory, setTarget, undoRecord } from './write';
+import { RECEIPT_UI_URI, receiptConfirmHtml, SAVE_RECEIPT_TOOL } from './receipt-ui';
+import {
+  addReceipt,
+  addRecord,
+  MAX_YEN,
+  previewReceipt,
+  setCategory,
+  setTarget,
+  undoRecord,
+} from './write';
 
 export const MCP_SERVER_NAME = 'kakeibo';
 
@@ -32,16 +47,26 @@ const INSTRUCTIONS = [
   '日本円の家計簿(本人1人分)の道具です。金額はすべて正の円で、type が expense(支出)・income(収入)・',
   'refund(返金)を表します。scheduled が true の明細は今日より先の予定で、使った額には入りません。',
   '「今期」は本人が決めた目標の期間(無ければ今月)です。日付は日本時間の YYYY-MM-DD です。',
-  '書く道具(add_record・add_receipt・set_category・set_target・undo_record)は、本人にはっきり頼まれたときだけ、',
+  'レシートを登録するときは preview_receipt を呼びます。本人に「これでいいですか」の画面が出て、本人が「はい」を',
+  '押すと登録されます(呼んだあとに、チャットで改めて許可を聞かなくてよい)。',
+  'ほかの書く道具(add_record・add_receipt・set_category・set_target・undo_record)は、本人にはっきり頼まれたときだけ、',
   '呼ぶ前に内容(日付・お店・金額・カテゴリ)を本人に見せてから使ってください。カテゴリの名前は get_categories にある',
   '名前を使います。「同じ支払いかも」が返ったら、本人に聞いてから allowDuplicate: true で呼び直します。',
 ].join('');
 
 /** 道具を呼んだ結果を MCP の形にする。 */
-async function answer(run: () => Promise<unknown>, failed: string): Promise<CallToolResult> {
+async function answer(
+  run: () => Promise<unknown>,
+  failed: string,
+  structured = false,
+): Promise<CallToolResult> {
   try {
     const data = await run();
-    return { content: [{ type: 'text', text: JSON.stringify(data, null, 1) }] };
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data, null, 1) }],
+      // 確かめの画面(receipt-ui.ts)はこちらを読む。
+      ...(structured ? { structuredContent: data as Record<string, unknown> } : {}),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { isError: true, content: [{ type: 'text', text: `${failed}: ${message}` }] };
@@ -65,6 +90,25 @@ const allowDuplicate = z
   .describe('「同じ支払いかも」と返ったあと、本人が別の支払いだと言ったときだけ true');
 const confirmFirst = '呼ぶ前に、内容を本人に見せて確かめること。';
 
+/** レシート(お店・日付・合計・品目)。preview_receipt・save_receipt・add_receipt で同じ形。 */
+const receiptInput = {
+  store: z.string().min(1).max(60).describe('お店の名前(支店名は省く)'),
+  date: date.describe('レシートの日付'),
+  totalYen: yen.describe('支払った合計(税込み・値引き後)'),
+  items: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(60),
+        yen: yen.describe('税込みの金額'),
+        category: categoryName.optional().describe('品目のカテゴリ(省くとレシート全体のカテゴリ)'),
+      }),
+    )
+    .max(100)
+    .optional(),
+  category: categoryName.optional().describe('レシート全体のカテゴリ'),
+  account: z.string().max(40).optional().describe('支払った口座の名前。省くといつもの口座'),
+};
+
 export function createKakeiboMcpServer(ctx: {
   userId: string;
   /** 本人のセッションの中で動かす。 */
@@ -74,9 +118,10 @@ export function createKakeiboMcpServer(ctx: {
     { name: MCP_SERVER_NAME, version: '1.0.0' },
     { instructions: INSTRUCTIONS },
   );
-  const call = (read: () => Promise<unknown>) => answer(() => ctx.run(read), '読めませんでした');
-  const change = (write: () => Promise<unknown>) =>
-    answer(() => ctx.run(write), 'できませんでした');
+  const call = (read: () => Promise<unknown>, structured = false) =>
+    answer(() => ctx.run(read), '読めませんでした', structured);
+  const change = (write: () => Promise<unknown>, structured = false) =>
+    answer(() => ctx.run(write), 'できませんでした', structured);
 
   server.registerTool(
     'get_today',
@@ -185,31 +230,60 @@ export function createKakeiboMcpServer(ctx: {
     (input) => change(() => addRecord(input)),
   );
 
+  // レシート:preview_receipt で「これでいいですか」の画面を出し、本人が「はい」を押すと save_receipt
+  // (画面からだけ呼べる)で登録する(本人「これでいいですかで、はいボタンを押したら登録」、ADR-146)。
+  // add_receipt は、画面を出せない AI のため(本人がチャットで「はい」と言ったら呼ぶ)。
+  registerAppTool(
+    server,
+    'preview_receipt',
+    {
+      title: 'レシートを確かめて登録',
+      description:
+        '本人が見せたレシート(写真など)から読んだお店・日付・合計・品目で、本人に「これでいいですか」の画面(はい・やめる)を出す。本人が「はい」を押すと登録される。まだ登録はしない。カテゴリは分かれば get_categories の名前で入れ、分からなければ省く(アプリが当てて「推定」と出す)。読めない所は推測せず本人に聞くこと。',
+      inputSchema: receiptInput,
+      annotations: readOnly,
+      _meta: { ui: { resourceUri: RECEIPT_UI_URI } },
+    },
+    (input) => call(() => previewReceipt(input), true),
+  );
+
+  registerAppTool(
+    server,
+    SAVE_RECEIPT_TOOL,
+    {
+      title: 'レシートを登録(確かめの画面の「はい」)',
+      description:
+        '確かめの画面で本人が「はい」を押したときに、画面から呼ばれる。AI からは呼ばない(preview_receipt を使う)。',
+      inputSchema: { ...receiptInput, allowDuplicate },
+      annotations: writes,
+      _meta: { ui: { resourceUri: RECEIPT_UI_URI, visibility: ['app'] } },
+    },
+    (input) => change(() => addReceipt(input), true),
+  );
+
+  registerAppResource(
+    server,
+    'レシートの確認',
+    RECEIPT_UI_URI,
+    { description: 'レシートの「これでいいですか」と「はい」ボタン' },
+    async () => ({
+      contents: [
+        {
+          uri: RECEIPT_UI_URI,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: receiptConfirmHtml(),
+          _meta: { ui: { prefersBorder: true } },
+        },
+      ],
+    }),
+  );
+
   server.registerTool(
     'add_receipt',
     {
-      title: 'レシートを入れる',
-      description: `本人が見せたレシート(写真など)から読んだお店・日付・合計・品目を1件記録する。品目が2つ以上なら品目ごとのカテゴリで分ける。品目の合計が合計と少し違えば「調整」の行を足す(大きく違えば断る)。読めない所は推測せず本人に聞くこと。${confirmFirst}`,
-      inputSchema: {
-        store: z.string().min(1).max(60).describe('お店の名前(支店名は省く)'),
-        date: date.describe('レシートの日付'),
-        totalYen: yen.describe('支払った合計(税込み・値引き後)'),
-        items: z
-          .array(
-            z.object({
-              name: z.string().min(1).max(60),
-              yen: yen.describe('税込みの金額'),
-              category: categoryName
-                .optional()
-                .describe('品目のカテゴリ(省くとレシート全体のカテゴリ)'),
-            }),
-          )
-          .max(100)
-          .optional(),
-        category: categoryName.optional().describe('レシート全体のカテゴリ'),
-        account: z.string().max(40).optional().describe('支払った口座の名前。省くといつもの口座'),
-        allowDuplicate,
-      },
+      title: 'レシートを入れる(画面を出せないとき)',
+      description: `確かめの画面を出せない AI のときだけ使う(ふつうは preview_receipt)。本人が見せたレシートから読んだお店・日付・合計・品目を1件記録する。品目が2つ以上なら品目ごとのカテゴリで分ける。品目の合計が合計と少し違えば「調整」の行を足す(大きく違えば断る)。読めない所は推測せず本人に聞くこと。${confirmFirst}`,
+      inputSchema: { ...receiptInput, allowDuplicate },
       annotations: writes,
     },
     (input) => change(() => addReceipt(input)),

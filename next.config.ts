@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   // 明細には店名が含まれる。ソースマップを本番に出さない(NFR-04)
   productionBrowserSourceMaps: false,
   typedRoutes: true,
+  // AI とつなぐ のレシートの確かめの画面は、MCP Apps の部品を HTML の中に入れて返す(実行時に読む。ADR-146)。
+  outputFileTracingIncludes: {
+    '/api/mcp': ['./node_modules/@modelcontextprotocol/ext-apps/dist/src/app-with-deps.js'],
+  },
   // AI のアプリとつなぐ同意画面は、ほかのサイトの枠の中に出させない(押させる罠を防ぐ、ADR-143)。
   async headers() {
     return [

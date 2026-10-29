@@ -16,7 +16,8 @@ import { findReceiptDuplicates } from '@/domain/receipt-duplicate';
 import { comparableKey } from '@/domain/store-name';
 import { getOrCreateDefaultAccount, listAccounts } from '@/features/accounts/store';
 import { loadCategoryOutlooks } from '@/features/goals/category-outlook';
-import { recordCorrection } from '@/features/genre/memory-store';
+import { loadClassificationMemory, recordCorrection } from '@/features/genre/memory-store';
+import { classifyReceiptPipeline } from '@/features/genre/receipt-classify';
 import { listGenres } from '@/features/genre/store';
 import type { ParsedReceiptTransaction } from '@/features/import/receipt-ai';
 import { buildReceiptSavePlan } from '@/features/import/receipt-save';
@@ -68,8 +69,11 @@ function assertDate(value: string): void {
   }
 }
 
-async function accountIdOf(name: string | undefined): Promise<string> {
-  if (name === undefined || name.trim() === '') return (await getOrCreateDefaultAccount()).id;
+async function accountOf(name: string | undefined): Promise<{ id: string; name: string }> {
+  if (name === undefined || name.trim() === '') {
+    const account = await getOrCreateDefaultAccount();
+    return { id: account.id, name: account.name };
+  }
   const accounts = await listAccounts();
   const key = comparableKey(name);
   const hit =
@@ -80,7 +84,7 @@ async function accountIdOf(name: string | undefined): Promise<string> {
       `支払い「${name}」の口座がありません。次から選んでください:${accounts.map((a) => a.name).join('、')}`,
     );
   }
-  return hit.id;
+  return { id: hit.id, name: hit.name };
 }
 
 export type DuplicateCandidate = { id: string; date: string; store: string; yen: number };
@@ -188,7 +192,7 @@ export async function addRecord(input: AddRecordInput): Promise<Saved | Held> {
       return { status: 'not_recorded_possible_duplicate', candidates, note: heldNote };
     }
   }
-  const accountId = await accountIdOf(input.account);
+  const accountId = (await accountOf(input.account)).id;
   const memo = input.memo?.trim() ? input.memo.trim().slice(0, 200) : null;
   const preview: StoredTransaction = {
     id: 'mcp-0',
@@ -240,72 +244,231 @@ export type AddReceiptInput = {
 /** 品目の合計と支払った額の差がこれ以内なら、差を「調整(税・値引き)」の行にする。 */
 const ADJUST_RATIO = 0.2;
 
-/** AI が読んだレシート(お店・日付・合計・品目)を1件入れる。品目が2つ以上ならカテゴリごとに分ける。 */
-export async function addReceipt(input: AddReceiptInput): Promise<Saved | Held> {
+type ReceiptLine = { name: string; yen: number; genre: Genre | null; guessed: boolean };
+
+/** 保存の前に決めたレシート(確かめの画面に出すものと、保存するもの)。DB には書かない。 */
+type PreparedReceipt = {
+  store: string;
+  date: string;
+  totalYen: number;
+  account: { id: string; name: string };
+  parentGenre: Genre | null;
+  parentGuessed: boolean;
+  /** 品目(差があれば最後に「調整」の行)。 */
+  lines: ReceiptLine[];
+  genres: Genre[];
+};
+
+/** 名前から決める。決まらなければ null(アプリが当てる)。 */
+function genreOrNull(genres: readonly Genre[], name: string | undefined): Genre | null {
+  if (name === undefined || name.trim() === '') return null;
+  try {
+    return resolveGenre(genres, name);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * AI が読んだレシートを確かめ、カテゴリを決める。AI がカテゴリを言わなかったか、無い名前だったところは、
+ * 写真で撮ったときと同じ当て方(本人のルール → 履歴 → 品目の辞書 → お店の種類)で当てる(AI には聞かない)。
+ */
+async function prepareReceipt(input: AddReceiptInput): Promise<PreparedReceipt> {
   assertYen(input.totalYen, '合計');
   assertDate(input.date);
   const store = input.store.trim().slice(0, 60);
   if (store === '') throw new Error('お店の名前が要ります。');
   const genres = await listGenres();
-  const parentGenre = input.category ? resolveGenre(genres, input.category) : null;
+  let parentGenre = genreOrNull(genres, input.category);
+  let parentGuessed = false;
 
-  const items = (input.items ?? []).map((item) => {
+  const lines: ReceiptLine[] = (input.items ?? []).map((item) => {
     assertYen(item.yen, `品目「${item.name}」の金額`);
     return {
       name: item.name.trim().slice(0, 60) || '品目',
       yen: item.yen,
-      genre: item.category ? resolveGenre(genres, item.category) : null,
+      genre: genreOrNull(genres, item.category),
+      guessed: false,
     };
   });
-  const sum = items.reduce((n, i) => n + i.yen, 0);
-  if (items.length > 0 && sum !== input.totalYen) {
+  const sum = lines.reduce((n, i) => n + i.yen, 0);
+
+  const undecided = lines.length === 0 ? parentGenre === null : lines.some((l) => !l.genre);
+  if (undecided) {
+    const memory = await loadClassificationMemory().catch(() => new Map());
+    const outcome = await classifyReceiptPipeline(
+      null,
+      [parsedOf(store, input.date, input.totalYen, lines)],
+      genres,
+      memory,
+    );
+    const guessed = new Map(outcome.classifications.map((c) => [c.key, c.genreId]));
+    const byId = (id: string | undefined) => genres.find((g) => g.id === id) ?? null;
+    lines.forEach((line, j) => {
+      if (line.genre) return;
+      line.genre = byId(guessed.get(`0:${j}`));
+      line.guessed = line.genre !== null;
+    });
+    if (parentGenre === null) {
+      parentGenre = byId(
+        (lines.length === 0 ? guessed.get('0') : undefined) ?? outcome.parentGenreIds.get(0),
+      );
+      parentGuessed = parentGenre !== null;
+    }
+  }
+
+  if (lines.length > 0 && sum !== input.totalYen) {
     const diff = input.totalYen - sum;
     if (Math.abs(diff) > input.totalYen * ADJUST_RATIO) {
       throw new Error(
         `品目の合計(${sum.toLocaleString('ja-JP')}円)と合計(${input.totalYen.toLocaleString('ja-JP')}円)が合いません。品目を確かめてください。`,
       );
     }
-    items.push({ name: diff > 0 ? '調整(税など)' : '調整(値引きなど)', yen: diff, genre: null });
+    // 全体のカテゴリが無ければ、いちばん大きい品目のカテゴリに入れる(「未分類」を作らない)。
+    const largest = [...lines].sort((a, b) => b.yen - a.yen).find((l) => l.genre);
+    lines.push({
+      name: diff > 0 ? '調整(税など)' : '調整(値引きなど)',
+      yen: diff,
+      genre: parentGenre ? null : (largest?.genre ?? null),
+      guessed: false,
+    });
   }
-  if (parentGenre === null && !items.some((i) => i.genre !== null)) {
+  if (parentGenre === null && !lines.some((l) => l.genre !== null)) {
     throw new Error(
       `カテゴリが要ります(レシート全体か品目ごと)。次から選んでください:${genres.map((g) => g.name).join('、')}`,
     );
   }
+  const account = await accountOf(input.account);
+  return {
+    store,
+    date: input.date,
+    totalYen: input.totalYen,
+    account,
+    parentGenre,
+    parentGuessed,
+    lines,
+    genres,
+  };
+}
 
-  const signed = -input.totalYen;
-  if (!input.allowDuplicate) {
-    const candidates = await findPossibleDuplicates(input.date, store, signed);
-    if (candidates.length > 0) {
-      return { status: 'not_recorded_possible_duplicate', candidates, note: heldNote };
-    }
-  }
-
-  const accountId = await accountIdOf(input.account);
-  const parsed: ParsedReceiptTransaction = {
-    occurredOn: input.date,
+function parsedOf(
+  store: string,
+  date: string,
+  totalYen: number,
+  lines: readonly { name: string; yen: number }[],
+): ParsedReceiptTransaction {
+  return {
+    occurredOn: date,
     description: store,
     storeName: store,
-    amountYen: signed,
+    amountYen: -totalYen,
     paymentMethod: 'one_time',
-    items: items.map((item, i) => ({
-      description: item.name,
-      amountYen: -item.yen,
+    items: lines.map((line, i) => ({
+      description: line.name,
+      amountYen: -line.yen,
       productType: null,
       lineId: `l${i}`,
     })),
     expenseSubtype: null,
   } as ParsedReceiptTransaction;
+}
+
+export type ReceiptPreview = {
+  status: 'ready' | 'possible_duplicate';
+  receipt: {
+    store: string;
+    date: string;
+    totalYen: number;
+    account: string;
+    category: string | null;
+    /** カテゴリごとの合計(多い順)。 */
+    byCategory: { category: string; yen: number }[];
+    items: { name: string; yen: number; category: string | null; guessed: boolean }[];
+    /** アプリが当てたカテゴリがある。 */
+    guessed: boolean;
+  };
+  candidates: DuplicateCandidate[];
+  /** 「はい」で save_receipt にそのまま渡す内容(当てたカテゴリも決めた名前で入れてある)。 */
+  saveInput: AddReceiptInput;
+  note: string;
+};
+
+const previewNote =
+  'まだ登録していません。本人に「これでいいですか」の画面(はい・やめる)を出しました。本人が「はい」を押すと登録されます。画面が出ていない場合は、この内容を本人に見せて聞き、「はい」と言われたら add_receipt を saveInput の内容で呼んでください。';
+
+/** 登録する前に、確かめの画面に出す内容を作る(保存しない)。 */
+export async function previewReceipt(input: AddReceiptInput): Promise<ReceiptPreview> {
+  const p = await prepareReceipt(input);
+  const candidates = await findPossibleDuplicates(p.date, p.store, -p.totalYen);
+  const fallback = p.parentGenre?.name ?? null;
+  const items = p.lines.map((l) => ({
+    name: l.name,
+    yen: l.yen,
+    category: l.genre?.name ?? fallback,
+    guessed: l.guessed || (l.genre === null && p.parentGuessed),
+  }));
+  const totals = new Map<string, number>();
+  for (const item of items.length > 0 ? items : [{ category: fallback, yen: p.totalYen }]) {
+    const key = item.category ?? '未分類';
+    totals.set(key, (totals.get(key) ?? 0) + item.yen);
+  }
+  const adjusted = p.lines.at(-1)?.name.startsWith('調整') === true;
+  return {
+    status: candidates.length > 0 ? 'possible_duplicate' : 'ready',
+    receipt: {
+      store: p.store,
+      date: p.date,
+      totalYen: p.totalYen,
+      account: p.account.name,
+      category: fallback,
+      byCategory: [...totals]
+        .map(([category, yen]) => ({ category, yen }))
+        .sort((a, b) => b.yen - a.yen),
+      items,
+      guessed: p.parentGuessed || p.lines.some((l) => l.guessed),
+    },
+    candidates,
+    saveInput: {
+      store: p.store,
+      date: p.date,
+      totalYen: p.totalYen,
+      ...(p.parentGenre ? { category: p.parentGenre.name } : {}),
+      account: p.account.name,
+      ...(p.lines.length > 0
+        ? {
+            items: (adjusted ? p.lines.slice(0, -1) : p.lines).map((l) => ({
+              name: l.name,
+              yen: l.yen,
+              ...(l.genre ? { category: l.genre.name } : {}),
+            })),
+          }
+        : {}),
+    },
+    note: previewNote,
+  };
+}
+
+/** AI が読んだレシート(お店・日付・合計・品目)を1件入れる。品目が2つ以上ならカテゴリごとに分ける。 */
+export async function addReceipt(input: AddReceiptInput): Promise<Saved | Held> {
+  const p = await prepareReceipt(input);
+  const signed = -p.totalYen;
+  if (!input.allowDuplicate) {
+    const candidates = await findPossibleDuplicates(p.date, p.store, signed);
+    if (candidates.length > 0) {
+      return { status: 'not_recorded_possible_duplicate', candidates, note: heldNote };
+    }
+  }
+
   const sourceRef = `${MCP_REF_PREFIX}${randomUUID()}`;
   const plan = buildReceiptSavePlan({
-    parsed,
-    accountId,
-    parentGenreId: parentGenre?.id ?? null,
-    genreByLineId: new Map(items.map((item, i) => [`l${i}`, item.genre?.id ?? null])),
+    parsed: parsedOf(p.store, p.date, p.totalYen, p.lines),
+    accountId: p.account.id,
+    parentGenreId: p.parentGenre?.id ?? null,
+    genreByLineId: new Map(p.lines.map((line, i) => [`l${i}`, line.genre?.id ?? null])),
     kind: 'normal',
     sourceRef,
   });
-  const saved = await insert({ ...plan.transaction, sourceRef }, accountId);
+  const saved = await insert({ ...plan.transaction, sourceRef }, p.account.id);
   if ('duplicate' in saved) throw new Error('同じ記録がもうあります(日付・金額・お店が同じ)。');
   const warnings: string[] = [];
   if (plan.splits)
@@ -321,11 +484,11 @@ export async function addReceipt(input: AddReceiptInput): Promise<Saved | Held> 
     status: 'recorded',
     record: {
       id: saved.id,
-      date: input.date,
-      store,
-      yen: input.totalYen,
+      date: p.date,
+      store: p.store,
+      yen: p.totalYen,
       type: 'expense',
-      category: genres.find((g) => g.id === categoryId)?.name ?? null,
+      category: p.genres.find((g) => g.id === categoryId)?.name ?? null,
     },
     note: [savedNote(saved.id), ...warnings].join(' '),
   };
