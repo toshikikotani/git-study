@@ -42,10 +42,21 @@ export default async function McpSettingsPage() {
 
       <McpGrants grants={grants} endpoint={endpoint} />
 
-      <h2 className="px-1 pt-2 text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
-        Claude Code・デスクトップ版など(鍵でつなぐ)
-      </h2>
-      <McpKeys tokens={tokens} endpoint={endpoint} />
+      {/* ログインの画面を出せない AI だけが使う。ふだんは URL だけでつながるので、たたんでおく。 */}
+      <details className="group" open={tokens.length > 0}>
+        <summary
+          className="flex min-h-11 cursor-pointer list-none items-center justify-between px-1 text-[13px] font-semibold [&::-webkit-details-marker]:hidden"
+          style={{ color: 'var(--ink-muted)' }}
+        >
+          ログインの画面が出せない AI 用の鍵
+          <span aria-hidden className="transition-transform group-open:rotate-90">
+            ›
+          </span>
+        </summary>
+        <div className="mt-2 flex flex-col gap-4">
+          <McpKeys tokens={tokens} endpoint={endpoint} />
+        </div>
+      </details>
 
       <Card>
         <h2 className="text-[15px] font-semibold">AI で使える道具</h2>

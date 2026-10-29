@@ -44,10 +44,10 @@ export function McpGrants({
 
   return (
     <Card>
-      <h2 className="text-[15px] font-semibold">ChatGPT・Claude のアプリから</h2>
+      <h2 className="text-[15px] font-semibold">MCP サーバーの URL</h2>
       <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         {
-          'アプリのコネクタ(つなぐ先)の追加で、次の URL を入れます。家計簿のログインと「許可する」の画面が開き、許可するとつながります。鍵のコピーは要りません。'
+          'AI のコネクタ(つなぐ先)にこの URL を入れるだけです。家計簿のログインと「許可する」の画面が開き、許可するとつながります。'
         }
       </p>
       <div className="mt-2 flex items-center gap-2">
@@ -70,10 +70,9 @@ export function McpGrants({
         className="mt-2 flex flex-col gap-1 text-[12px] leading-relaxed"
         style={{ color: 'var(--ink-muted)' }}
       >
-        <li>
-          ChatGPT:設定のコネクタ(アプリ)から、自分のコネクタを作る(開発者モードが要ることがあります)
-        </li>
-        <li>Claude:設定 › コネクタ › カスタムコネクタを追加</li>
+        <li>Claude(アプリ・デスクトップ版):設定 › コネクタ › カスタムコネクタを追加</li>
+        <li>ChatGPT:設定のコネクタ(アプリ)から作成(開発者モードが要ることがあります)</li>
+        <li>Claude Code:claude mcp add --transport http kakeibo(URL)のあと /mcp でログイン</li>
       </ul>
 
       <h3 className="mt-4 text-[13px] font-semibold">つないだアプリ</h3>
