@@ -81,6 +81,8 @@ describe('MCP の入口', () => {
     });
     expect(result?.serverInfo).toMatchObject({ name: 'kakeibo' });
     expect(String(result?.instructions)).toContain('本人にはっきり頼まれたときだけ');
+    // 支出・レシートは聞き返さずに確かめの画面を出す(ADR-146 追補)
+    expect(String(result?.instructions)).toContain('聞き返さずに');
   });
 
   it('読む道具6つと書く道具。読む道具は readOnly、書く道具は許可が要る印', async () => {

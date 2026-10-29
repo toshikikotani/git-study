@@ -233,7 +233,8 @@ export async function addRecord(input: AddRecordInput): Promise<Saved | Held> {
 
 export type AddReceiptInput = {
   store: string;
-  date: string;
+  /** 省くと今日。 */
+  date?: string | undefined;
   totalYen: number;
   items?: { name: string; yen: number; category?: string | undefined }[] | undefined;
   category?: string | undefined;
@@ -275,7 +276,8 @@ function genreOrNull(genres: readonly Genre[], name: string | undefined): Genre 
  */
 async function prepareReceipt(input: AddReceiptInput): Promise<PreparedReceipt> {
   assertYen(input.totalYen, '合計');
-  assertDate(input.date);
+  const date = input.date ?? todayJst();
+  assertDate(date);
   const store = input.store.trim().slice(0, 60);
   if (store === '') throw new Error('お店の名前が要ります。');
   const genres = await listGenres();
@@ -298,7 +300,7 @@ async function prepareReceipt(input: AddReceiptInput): Promise<PreparedReceipt> 
     const memory = await loadClassificationMemory().catch(() => new Map());
     const outcome = await classifyReceiptPipeline(
       null,
-      [parsedOf(store, input.date, input.totalYen, lines)],
+      [parsedOf(store, date, input.totalYen, lines)],
       genres,
       memory,
     );
@@ -334,6 +336,11 @@ async function prepareReceipt(input: AddReceiptInput): Promise<PreparedReceipt> 
     });
   }
   if (parentGenre === null && !lines.some((l) => l.genre !== null)) {
+    // 当てられなければ「その他」に入れる(画面に「推定」と出て、本人が直せる)。
+    parentGenre = genres.find((g) => g.name === 'その他') ?? null;
+    parentGuessed = parentGenre !== null;
+  }
+  if (parentGenre === null && !lines.some((l) => l.genre !== null)) {
     throw new Error(
       `カテゴリが要ります(レシート全体か品目ごと)。次から選んでください:${genres.map((g) => g.name).join('、')}`,
     );
@@ -341,7 +348,7 @@ async function prepareReceipt(input: AddReceiptInput): Promise<PreparedReceipt> 
   const account = await accountOf(input.account);
   return {
     store,
-    date: input.date,
+    date,
     totalYen: input.totalYen,
     account,
     parentGenre,

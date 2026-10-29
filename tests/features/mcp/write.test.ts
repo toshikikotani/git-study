@@ -21,6 +21,8 @@ const s = vi.hoisted(() => ({
   added: [] as unknown[],
   /** アプリが当てるカテゴリ(品目のキー `0:j`・明細 `0` → カテゴリ id)と、お店の種類のカテゴリ。 */
   guess: {} as Record<string, string>,
+  /** カテゴリに「その他」もあるか。 */
+  withOther: false,
   storeGuess: null as string | null,
   plan: null as null | {
     id: string;
@@ -41,6 +43,7 @@ vi.mock('@/features/genre/store', () => ({
     { id: 'dining', name: '外食' },
     { id: 'daily', name: '日用品' },
     { id: 'cafe', name: 'カフェ・飲料' },
+    ...(s.withOther ? [{ id: 'other', name: 'その他' }] : []),
   ],
 }));
 vi.mock('@/features/accounts/store', () => ({
@@ -146,6 +149,7 @@ beforeEach(() => {
   s.added = [];
   s.guess = {};
   s.storeGuess = null;
+  s.withOther = false;
   s.plan = {
     id: 'plan-1',
     periodStart: '2026-10-25',
@@ -394,6 +398,23 @@ describe('レシートの「これでいいですか」(ADR-146)', () => {
       byCategory: [{ category: '食料品', yen: 1800 }],
     });
     expect(p.saveInput.category).toBe('食料品');
+  });
+
+  it('「コンビニ 150円」の一言でも出せる:日付は今日、当てられなければ「その他」(推定)', async () => {
+    s.withOther = true;
+    const p = await previewReceipt({ store: 'コンビニ', totalYen: 150 });
+    expect(p.receipt).toMatchObject({
+      store: 'コンビニ',
+      date: '2026-10-27',
+      totalYen: 150,
+      category: 'その他',
+      guessed: true,
+      byCategory: [{ category: 'その他', yen: 150 }],
+    });
+    expect(p.saveInput).toMatchObject({ date: '2026-10-27', category: 'その他' });
+    const r = await addReceipt({ store: 'コンビニ', totalYen: 150 });
+    expect(r).toMatchObject({ status: 'recorded', record: { date: '2026-10-27' } });
+    expect(s.imported[0]).toMatchObject({ occurredOn: '2026-10-27', genreId: 'other' });
   });
 
   it('金額・日付・品目の合計がおかしければ、画面を出す前に断る', async () => {

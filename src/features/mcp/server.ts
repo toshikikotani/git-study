@@ -59,8 +59,12 @@ const INSTRUCTIONS = [
   '個々の支払いを見るときは search_transactions、何をいくらで買ったか(品目・値段の推移・どの店が安いか)は',
   'get_receipt_items、分析の前にデータの範囲・口座・カテゴリを知るには get_overview。数字は家計簿の画面と同じ',
   '数え方なので、AI が明細を足し直すより analyze_spending の結果を使ってください。',
-  'レシートを登録するときは preview_receipt を呼びます。本人に「これでいいですか」の画面が出て、本人が「はい」を',
-  '押すと登録されます(呼んだあとに、チャットで改めて許可を聞かなくてよい)。',
+  '支出やレシートの登録を頼まれたら(レシートの写真でも、「コンビニ 150円」のような一言でも)、聞き返さずに',
+  'まず preview_receipt を呼びます。お店は言われたまま(「コンビニ」でよい)、日付は省くと今日、カテゴリは分からなければ',
+  '省きます(アプリが当てて「推定」と出す)。本人に「これでいいですか」の画面(はい・やめる)が出て、本人が「はい」を',
+  '押すと登録されます。チャットで先に確かめたり、呼んだあとに改めて許可を聞いたりしないでください。本人が直したい所を',
+  'チャットで言ったら、直した内容で preview_receipt を呼び直します。画面を出せない AI のときだけ、内容を見せて本人に',
+  '聞いてから add_receipt を使います。',
   'ほかの書く道具(add_record・add_receipt・set_category・set_target・undo_record)は、本人にはっきり頼まれたときだけ、',
   '呼ぶ前に内容(日付・お店・金額・カテゴリ)を本人に見せてから使ってください。カテゴリの名前は get_categories にある',
   '名前を使います。「同じ支払いかも」が返ったら、本人に聞いてから allowDuplicate: true で呼び直します。',
@@ -105,7 +109,7 @@ const confirmFirst = '呼ぶ前に、内容を本人に見せて確かめるこ�
 /** レシート(お店・日付・合計・品目)。preview_receipt・save_receipt・add_receipt で同じ形。 */
 const receiptInput = {
   store: z.string().min(1).max(60).describe('お店の名前(支店名は省く)'),
-  date: date.describe('レシートの日付'),
+  date: date.optional().describe('日付(YYYY-MM-DD)。省くと今日'),
   totalYen: yen.describe('支払った合計(税込み・値引き後)'),
   items: z
     .array(
@@ -295,8 +299,8 @@ export function createKakeiboMcpServer(ctx: {
   server.registerTool(
     'add_record',
     {
-      title: '記録する',
-      description: `【1件記録する】本人が言った支出・収入・返金を1件記録する(例「ランチ 1200円」「昨日コンビニ 540円」)。支出と返金はカテゴリが要る(get_categories の名前)。レシートの写真なら preview_receipt を使う。${confirmFirst}`,
+      title: '収入・返金を記録する',
+      description: `【収入・返金を記録する】本人が言った収入・返金を1件記録する(例「給料 28万円」「返品で 980円戻った」)。支出は preview_receipt(確かめの画面)を使う。画面を出せない AI のときだけ、支出もこれで記録してよい(カテゴリが要る、get_categories の名前)。${confirmFirst}`,
       inputSchema: {
         type: z.enum(['expense', 'income', 'refund']).describe('支出・収入・返金'),
         amountYen: yen.describe('金額(正の円)'),
@@ -319,9 +323,9 @@ export function createKakeiboMcpServer(ctx: {
     server,
     'preview_receipt',
     {
-      title: 'レシートを確かめて登録',
+      title: '支出・レシートを確かめて登録',
       description:
-        '本人が見せたレシート(写真など)から読んだお店・日付・合計・品目で、本人に「これでいいですか」の画面(はい・やめる)を出す。本人が「はい」を押すと登録される。まだ登録はしない。カテゴリは分かれば get_categories の名前で入れ、分からなければ省く(アプリが当てて「推定」と出す)。読めない所は推測せず本人に聞くこと。',
+        '【支出を登録する(ふつうはこれ)】レシートの写真から読んだ内容でも、「コンビニ 150円」「ランチ 1200円」のような一言でも、聞き返さずにまずこれを呼ぶ。本人に「これでいいですか」の画面(お店・日付・合計・カテゴリ・品目と、はい・やめる)が出て、本人が「はい」を押すと登録される(これを呼んだだけでは登録しない)。お店は言われたまま(「コンビニ」でよい)、日付は省くと今日、品目は分かる分だけ、カテゴリは分かれば get_categories の名前・分からなければ省く(アプリが当てて「推定」と出す)。写真で読めない数字だけは推測せず本人に聞く。直したいと言われたら直した内容で呼び直す。',
       inputSchema: receiptInput,
       annotations: readOnly,
       _meta: { ui: { resourceUri: RECEIPT_UI_URI } },
