@@ -93,9 +93,12 @@ describe('MCP の入口', () => {
     expect([...byName.keys()].sort()).toEqual([
       'add_receipt',
       'add_record',
+      'analyze_spending',
       'get_categories',
       'get_month_summary',
       'get_needs_check',
+      'get_overview',
+      'get_receipt_items',
       'get_today',
       'get_upcoming',
       'preview_receipt',
@@ -112,6 +115,9 @@ describe('MCP の入口', () => {
       'search_transactions',
       'get_upcoming',
       'get_needs_check',
+      'analyze_spending',
+      'get_receipt_items',
+      'get_overview',
     ]) {
       expect(byName.get(name)?.readOnlyHint, name).toBe(true);
     }
