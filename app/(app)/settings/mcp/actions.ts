@@ -8,6 +8,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { isCurrentUserOwner } from '@/features/auth/owner';
+import { revokeGrant } from '@/features/mcp/oauth';
 import { issueMcpToken, revokeMcpToken, type McpTokenView } from '@/features/mcp/tokens';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -44,5 +45,18 @@ export async function revokeMcpTokenAction(id: string): Promise<{ error: string 
     return { error: null };
   } catch (error) {
     return { error: messageOf(error, '鍵を取り消せませんでした。') };
+  }
+}
+
+/** ChatGPT・Claude のアプリとのつながりを外す(OAuth、ADR-143)。 */
+export async function revokeGrantAction(id: string): Promise<{ error: string | null }> {
+  const userId = await ownerId();
+  if (userId === null) return { error: '家計簿の持ち主だけが外せます。' };
+  try {
+    await revokeGrant(createAdminClient(), userId, id);
+    revalidatePath('/settings/mcp');
+    return { error: null };
+  } catch (error) {
+    return { error: messageOf(error, '外せませんでした。') };
   }
 }

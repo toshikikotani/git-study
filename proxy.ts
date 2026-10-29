@@ -23,6 +23,11 @@
  * 最初に本人が発行した鍵(`Authorization: Bearer kkb_…`)を確かめ、合わなければ 401(ADR-142、
  * app/api/mcp/route.ts)。
  *
+ * /.well-known/*(認可サーバー・保護リソースの案内)と /api/oauth/*(クライアントの登録・トークン)も
+ * 対象外。ChatGPT・Claude のアプリのサーバーが cookie を持たずに呼ぶ OAuth の入口で、案内には秘密が無く、
+ * 登録・トークンは route がコードと PKCE・署名を確かめる(ADR-143)。同意画面 /oauth/authorize は
+ * 対象のまま(ログインが要る。ログインのあと同意画面へ戻す)。
+ *
  * /api/mobile/* は iPhone アプリの入口(ADR-132)。cookie の代わりに、アプリが送るログインの証明
  * (`Authorization: Bearer <アクセストークン>`)を Supabase で確かめる。確かめられなければ、ほかの
  * API と同じく 401。route 側(lib/supabase/bearer-session.ts)でも、もう一度確かめる。
@@ -33,6 +38,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authGate, isPublicPath } from '@/lib/auth-gate';
 import { getPublicEnv } from '@/lib/env';
 import { bearerTokenOf } from '@/lib/bearer-token';
+import { safeLoginNext } from '@/lib/login-next';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -76,9 +82,17 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = gate === 'to-login' ? '/login' : '/';
     url.search = '';
-    if (gate === 'to-login' && pathname === '/camera') url.searchParams.set('next', '/camera');
-    if (gate === 'to-home' && request.nextUrl.searchParams.get('next') === '/camera')
-      url.pathname = '/camera';
+    // ログインのあと、来た画面へ戻す(カメラ・AI とつなぐ同意画面だけ。lib/login-next.ts)。
+    if (gate === 'to-login') {
+      const next = safeLoginNext(
+        pathname === '/camera' ? pathname : `${pathname}${request.nextUrl.search}`,
+      );
+      if (next !== null) url.searchParams.set('next', next);
+    }
+    if (gate === 'to-home') {
+      const next = safeLoginNext(request.nextUrl.searchParams.get('next'));
+      if (next !== null) return NextResponse.redirect(new URL(next, request.url));
+    }
     return NextResponse.redirect(url);
   }
 
@@ -87,6 +101,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|api/cron|api/webhooks|api/mcp).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|api/cron|api/webhooks|api/mcp|api/oauth|.well-known).*)',
   ],
 };

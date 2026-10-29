@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 
+import { safeLoginNext } from '@/lib/login-next';
 import { createClient } from '@/lib/supabase/client';
 
 import { signUpAction } from './actions';
@@ -25,9 +26,10 @@ type Tab = 'password' | 'register';
  * ログイン画面に戻らないよう replace にする。
  */
 function openHome() {
-  const next = new URLSearchParams(window.location.search).get('next');
-  if (next === '/camera') {
-    window.location.replace('/camera');
+  // カメラ・AI とつなぐ同意画面から来たら、そこへ戻す(lib/login-next.ts)。
+  const next = safeLoginNext(new URLSearchParams(window.location.search).get('next'));
+  if (next !== null) {
+    window.location.replace(next);
   } else {
     window.location.replace('/');
   }

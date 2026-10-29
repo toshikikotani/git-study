@@ -80,14 +80,21 @@ export function toView(t: StoredMcpToken): McpTokenView {
   return { id: t.id, name: t.name, hint: t.hint, createdAt: t.createdAt };
 }
 
-async function ownerTokens(
+/** 本人(オーナー)と、その app_metadata(鍵・つないだアプリを置く所)。 */
+export async function loadOwnerMetadata(
   admin: Admin,
-): Promise<{ owner: OwnerUser; metadata: Record<string, unknown>; tokens: StoredMcpToken[] }> {
+): Promise<{ owner: OwnerUser; metadata: Record<string, unknown> }> {
   const { user: owner, error } = await findOwner(admin);
   if (error || !owner) throw new Error('家計簿の持ち主が見つかりませんでした。');
   const { data, error: getError } = await admin.auth.admin.getUserById(owner.id);
   if (getError || !data.user) throw new Error('鍵を読めませんでした。');
-  const metadata = (data.user.app_metadata ?? {}) as Record<string, unknown>;
+  return { owner, metadata: (data.user.app_metadata ?? {}) as Record<string, unknown> };
+}
+
+async function ownerTokens(
+  admin: Admin,
+): Promise<{ owner: OwnerUser; metadata: Record<string, unknown>; tokens: StoredMcpToken[] }> {
+  const { owner, metadata } = await loadOwnerMetadata(admin);
   return { owner, metadata, tokens: storedTokensOf(metadata) };
 }
 

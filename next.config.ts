@@ -4,6 +4,18 @@ const nextConfig: NextConfig = {
   // 明細には店名が含まれる。ソースマップを本番に出さない(NFR-04)
   productionBrowserSourceMaps: false,
   typedRoutes: true,
+  // AI のアプリとつなぐ同意画面は、ほかのサイトの枠の中に出させない(押させる罠を防ぐ、ADR-143)。
+  async headers() {
+    return [
+      {
+        source: '/oauth/authorize',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+        ],
+      },
+    ];
+  },
   // 本人発案(ADR-029):一度読み込んだ画面はそのまま表示し続け、
   // 明示的に下へ引っ張ったとき(src/components/ui/pull-to-refresh.tsx)
   // だけ最新化する。既定の staleTimes.dynamic は0秒(戻る・タブ切り替えの

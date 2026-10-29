@@ -1,25 +1,34 @@
+import { headers } from 'next/headers';
+
 import { BackHeader } from '@/components/ui/back-header';
 import { Card } from '@/components/ui/card';
 import { requireOwner } from '@/features/auth/owner';
+import { originOf } from '@/features/mcp/http';
+import { listGrants, oauthUrls } from '@/features/mcp/oauth';
 import { listMcpTokens } from '@/features/mcp/tokens';
-import { getAppBaseUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { McpGrants } from './mcp-grants';
 import { McpKeys } from './mcp-keys';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * 設定 › AI とつなぐ(MCP、ADR-142)。Claude Code・Claude のデスクトップ版などから家計簿を読むための
- * 個人用の鍵を発行・取り消す。読むだけ(記録・保存はアプリで本人がする)。持ち主だけが開ける。
+ * 設定 › AI とつなぐ(MCP、ADR-142・143)。ChatGPT・Claude のアプリは URL を入れてログインと同意でつなぐ
+ * (つないだアプリの一覧・外す)。Claude Code・デスクトップ版などは個人用の鍵を発行してつなぐ。
+ * どちらも読むだけ(記録・保存はアプリで本人がする)。持ち主だけが開ける。
  */
 export default async function McpSettingsPage() {
   await requireOwner();
   const { data } = await (await createClient()).auth.getUser();
-  const tokens = data.user
-    ? await listMcpTokens(createAdminClient(), data.user.id).catch(() => [])
-    : [];
-  const base = getAppBaseUrl() ?? 'https://(家計簿のURL)';
+  const admin = createAdminClient();
+  const [tokens, grants] = data.user
+    ? await Promise.all([
+        listMcpTokens(admin, data.user.id).catch(() => []),
+        listGrants(admin, data.user.id).catch(() => []),
+      ])
+    : [[], []];
+  const endpoint = oauthUrls(originOf(await headers())).mcp;
 
   return (
     <div className="rise flex flex-col gap-4" style={{ color: 'var(--ink)' }}>
@@ -27,11 +36,16 @@ export default async function McpSettingsPage() {
 
       <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
         {
-          'Claude などの AI から、今日の目安・カテゴリ・月の合計・明細・予定を読めるようにします。読むだけで、記録や保存はできません(保存はアプリで確かめて行います)。'
+          'ChatGPT や Claude などの AI から、今日の目安・カテゴリ・月の合計・明細・予定を読めるようにします。読むだけで、記録や保存はできません(保存はアプリで確かめて行います)。'
         }
       </p>
 
-      <McpKeys tokens={tokens} endpoint={`${base}/api/mcp`} />
+      <McpGrants grants={grants} endpoint={endpoint} />
+
+      <h2 className="px-1 pt-2 text-[13px] font-semibold" style={{ color: 'var(--ink-muted)' }}>
+        Claude Code・デスクトップ版など(鍵でつなぐ)
+      </h2>
+      <McpKeys tokens={tokens} endpoint={endpoint} />
 
       <Card>
         <h2 className="text-[15px] font-semibold">AI で使える道具</h2>
