@@ -22,6 +22,7 @@ export function fakeSupabase(
   function from(table: string) {
     const ops: Op[] = [];
     let selectCols = '*';
+    let countOptions: { count?: 'exact'; head?: boolean } | null = null;
     let single: 'single' | 'maybe' | null = null;
     let write:
       | { kind: 'insert'; values: Row[] }
@@ -37,8 +38,9 @@ export function fakeSupabase(
     const cmp = (col: string, test: (v: never) => boolean) =>
       chain((rows) => rows.filter((r) => r[col] !== undefined && test(r[col] as never)));
     Object.assign(builder, {
-      select: (cols: string) => {
+      select: (cols: string, options?: { count?: 'exact'; head?: boolean }) => {
         selectCols = cols;
+        countOptions = options ?? null;
         calls.push({ table, select: cols });
         return builder;
       },
@@ -114,6 +116,12 @@ export function fakeSupabase(
           }
           let rows = [...(tables[table] ?? [])];
           for (const op of ops) rows = op(rows);
+          // select('id', { count: 'exact', head: true }):件数だけ。
+          if (countOptions?.count) {
+            const count = rows.length;
+            const data = countOptions.head ? null : rows.slice(0, 1000);
+            return Promise.resolve({ data, count, error: null }).then(resolve, reject);
+          }
           // PostgREST は1回に最大1,000行しか返さない。
           if (single === null) rows = rows.slice(0, 1000);
           const cols = selectCols === '*' ? null : selectCols.split(',').map((c) => c.trim());

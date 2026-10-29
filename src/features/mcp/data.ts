@@ -21,6 +21,37 @@ import { listConfirmedFixedCostKeys } from '@/features/subscriptions/fixed-cost-
 import { addDays, daysBetween, todayJst } from '@/lib/date';
 import { getAppBaseUrl } from '@/lib/env';
 
+/** 1回の問い合わせで返る行の上限(Supabase の既定)。これに届いた月は、抜けがあるかもしれない。 */
+const QUERY_ROW_CAP = 1000;
+
+/** 期間を月ごとに分けて読み、つなげる。 */
+export async function loadRange(
+  from: string,
+  to: string,
+  today: string,
+): Promise<{ transactions: LedgerTransaction[]; truncatedMonths: string[] }> {
+  const chunks: { from: string; to: string }[] = [];
+  for (let start = from; start <= to;) {
+    const end = monthRange(start.slice(0, 7)).to;
+    chunks.push({ from: start, to: end < to ? end : to });
+    start = addDays(end, 1);
+  }
+  const transactions: LedgerTransaction[] = [];
+  const truncatedMonths: string[] = [];
+  // 同時に読むのは3か月ずつ(データベースに負担をかけすぎない)。
+  for (let i = 0; i < chunks.length; i += 3) {
+    const results = await Promise.all(
+      chunks.slice(i, i + 3).map((c) => loadLedgerTransactions(c, today)),
+    );
+    results.forEach((r, j) => {
+      transactions.push(...r.transactions);
+      if (r.transactions.length >= QUERY_ROW_CAP)
+        truncatedMonths.push(chunks[i + j]!.from.slice(0, 7));
+    });
+  }
+  return { transactions, truncatedMonths };
+}
+
 /** 1回に返す明細の上限。 */
 export const MAX_ROWS = 100;
 /** さがせる期間の上限(日)。 */
@@ -213,8 +244,16 @@ export async function monthData(month?: string) {
 export async function searchData(input: SearchInput) {
   const today = todayJst();
   const range = searchRange(input, today);
-  const { transactions } = await loadLedgerTransactions(range, today);
-  return { range, ...filterRecords(transactions, input, today) };
+  const { transactions, truncatedMonths } = await loadRange(range.from, range.to, today);
+  return {
+    range,
+    ...filterRecords(transactions, input, today),
+    ...(truncatedMonths.length > 0
+      ? {
+          warning: `明細が多い月(${truncatedMonths.join('・')})は一部しか読めていないかもしれません。`,
+        }
+      : {}),
+  };
 }
 
 /** これからの予定と固定費(明日から days 日先まで、近い順)。 */
