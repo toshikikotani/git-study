@@ -19,6 +19,9 @@ const s = vi.hoisted(() => ({
   corrections: [] as unknown[],
   planTargets: [] as unknown[],
   added: [] as unknown[],
+  /** アプリが当てるカテゴリ(品目のキー `0:j`・明細 `0` → カテゴリ id)と、お店の種類のカテゴリ。 */
+  guess: {} as Record<string, string>,
+  storeGuess: null as string | null,
   plan: null as null | {
     id: string;
     periodStart: string;
@@ -78,9 +81,22 @@ vi.mock('@/features/receipts/items-store', () => ({
   },
 }));
 vi.mock('@/features/genre/memory-store', () => ({
+  loadClassificationMemory: async () => new Map(),
   recordCorrection: async (input: unknown) => {
     s.corrections.push(input);
   },
+}));
+vi.mock('@/features/genre/receipt-classify', () => ({
+  classifyReceiptPipeline: async () => ({
+    parentGenreIds: new Map(s.storeGuess ? [[0, s.storeGuess]] : []),
+    classifications: Object.entries(s.guess).map(([key, genreId]) => ({
+      key,
+      genreId,
+      confidence: 0.8,
+      source: 'dictionary',
+    })),
+    warnings: [],
+  }),
 }));
 vi.mock('@/features/spending-plan/store', () => ({
   getCurrentPlan: async () => s.plan,
@@ -101,6 +117,7 @@ import {
   addReceipt,
   addRecord,
   MCP_REF_PREFIX,
+  previewReceipt,
   resolveGenre,
   setCategory,
   setTarget,
@@ -127,6 +144,8 @@ beforeEach(() => {
   s.corrections = [];
   s.planTargets = [];
   s.added = [];
+  s.guess = {};
+  s.storeGuess = null;
   s.plan = {
     id: 'plan-1',
     periodStart: '2026-10-25',
@@ -283,10 +302,103 @@ describe('レシートを入れる', () => {
     ).rejects.toThrow(/合いません/);
   });
 
-  it('カテゴリが1つも無ければ断る', async () => {
+  it('カテゴリを言わなかったところはアプリが当てる。当てられなければ断る', async () => {
     await expect(
       addReceipt({ store: 'ライフ', date: '2026-10-27', totalYen: 500 }),
     ).rejects.toThrow(/カテゴリが要ります/);
+    s.storeGuess = 'food';
+    const r = await addReceipt({ store: 'ライフ', date: '2026-10-27', totalYen: 500 });
+    expect(r).toMatchObject({ status: 'recorded', record: { category: '食料品' } });
+  });
+});
+
+describe('レシートの「これでいいですか」(ADR-146)', () => {
+  const receipt = {
+    store: 'マツモトキヨシ',
+    date: '2026-10-26',
+    totalYen: 1400,
+    items: [
+      { name: 'ティッシュ', yen: 400 },
+      { name: '水', yen: 940, category: '食料品' },
+    ],
+  };
+
+  it('保存せずに、カテゴリごとの合計・品目・当てたカテゴリと、「はい」で渡す内容を返す', async () => {
+    s.guess = { '0:0': 'daily' };
+    s.storeGuess = 'daily';
+    const p = await previewReceipt(receipt);
+    expect(s.imported).toEqual([]);
+    expect(p.status).toBe('ready');
+    expect(p.receipt).toMatchObject({
+      store: 'マツモトキヨシ',
+      totalYen: 1400,
+      account: '現金',
+      category: '日用品',
+      guessed: true,
+      byCategory: [
+        { category: '食料品', yen: 940 },
+        { category: '日用品', yen: 460 },
+      ],
+    });
+    expect(p.receipt.items).toEqual([
+      { name: 'ティッシュ', yen: 400, category: '日用品', guessed: true },
+      { name: '水', yen: 940, category: '食料品', guessed: false },
+      { name: '調整(税など)', yen: 60, category: '日用品', guessed: true },
+    ]);
+    // 「はい」で渡す内容は、当てたカテゴリも名前で入れてある(調整の行は保存のときに付け直す)
+    expect(p.saveInput).toEqual({
+      store: 'マツモトキヨシ',
+      date: '2026-10-26',
+      totalYen: 1400,
+      category: '日用品',
+      account: '現金',
+      items: [
+        { name: 'ティッシュ', yen: 400, category: '日用品' },
+        { name: '水', yen: 940, category: '食料品' },
+      ],
+    });
+  });
+
+  it('「はい」で渡す内容で登録すると、見せたとおりに分かれる(調整は全体か、いちばん大きい品目のカテゴリ)', async () => {
+    s.guess = { '0:0': 'daily' };
+    const p = await previewReceipt(receipt);
+    expect(p.receipt.byCategory).toEqual([
+      { category: '食料品', yen: 1000 },
+      { category: '日用品', yen: 400 },
+    ]);
+    s.guess = {};
+    const r = await addReceipt(p.saveInput);
+    expect(r.status).toBe('recorded');
+    const splits = (s.splits[0] as [string, { genreId: string; amountYen: number }[]])[1];
+    expect(splits.map((x) => [x.genreId, x.amountYen])).toEqual([
+      ['daily', -400],
+      ['food', -940],
+      ['food', -60],
+    ]);
+  });
+
+  it('無いカテゴリの名前はアプリが当て直す。同じ支払いかもしれなければそう返す', async () => {
+    s.storeGuess = 'food';
+    s.existing = [ledger({ id: 'card-1', label: 'ﾗｲﾌ', amountYen: -1800 })];
+    const p = await previewReceipt({
+      store: 'ライフ',
+      date: '2026-10-27',
+      totalYen: 1800,
+      category: '食費',
+    });
+    expect(p.status).toBe('possible_duplicate');
+    expect(p.candidates).toEqual([{ id: 'card-1', date: '2026-10-27', store: 'ﾗｲﾌ', yen: 1800 }]);
+    expect(p.receipt).toMatchObject({
+      category: '食料品',
+      guessed: true,
+      byCategory: [{ category: '食料品', yen: 1800 }],
+    });
+    expect(p.saveInput.category).toBe('食料品');
+  });
+
+  it('金額・日付・品目の合計がおかしければ、画面を出す前に断る', async () => {
+    await expect(previewReceipt({ ...receipt, date: '10/26' })).rejects.toThrow(/YYYY-MM-DD/);
+    await expect(previewReceipt({ ...receipt, totalYen: 5000 })).rejects.toThrow(/合いません/);
   });
 });
 

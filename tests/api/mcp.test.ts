@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const s = vi.hoisted(() => ({ ran: 0, today: vi.fn(), search: vi.fn() }));
+const s = vi.hoisted(() => ({ ran: 0, today: vi.fn(), search: vi.fn(), preview: vi.fn() }));
 
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({}) }));
 vi.mock('@/features/mcp/tokens', () => ({
@@ -18,6 +18,10 @@ vi.mock('@/lib/supabase/owner-session', () => ({
     s.ran += 1;
     return fn();
   },
+}));
+vi.mock('@/features/mcp/write', async (original) => ({
+  ...(await original<typeof import('@/features/mcp/write')>()),
+  previewReceipt: (...args: unknown[]) => s.preview(...args),
 }));
 vi.mock('@/features/mcp/data', async (original) => ({
   ...(await original<typeof import('@/features/mcp/data')>()),
@@ -79,7 +83,7 @@ describe('MCP の入口', () => {
     expect(String(result?.instructions)).toContain('本人にはっきり頼まれたときだけ');
   });
 
-  it('読む道具6つと書く道具5つ。読む道具は readOnly、書く道具は許可が要る印', async () => {
+  it('読む道具6つと書く道具。読む道具は readOnly、書く道具は許可が要る印', async () => {
     const { result } = await call('tools/list');
     const tools = result?.tools as {
       name: string;
@@ -94,6 +98,8 @@ describe('MCP の入口', () => {
       'get_needs_check',
       'get_today',
       'get_upcoming',
+      'preview_receipt',
+      'save_receipt',
       'search_transactions',
       'set_category',
       'set_target',
@@ -109,7 +115,14 @@ describe('MCP の入口', () => {
     ]) {
       expect(byName.get(name)?.readOnlyHint, name).toBe(true);
     }
-    for (const name of ['add_record', 'add_receipt', 'set_category', 'set_target', 'undo_record']) {
+    for (const name of [
+      'add_record',
+      'add_receipt',
+      'save_receipt',
+      'set_category',
+      'set_target',
+      'undo_record',
+    ]) {
       expect(byName.get(name)?.readOnlyHint, name).toBe(false);
     }
     expect(byName.get('undo_record')?.destructiveHint).toBe(true);
@@ -142,6 +155,39 @@ describe('MCP の入口', () => {
     const failed = await call('tools/call', { name: 'get_today', arguments: {} });
     expect(failed.result).toMatchObject({ isError: true });
     expect(JSON.stringify(failed.result)).toContain('目標がありません');
+  });
+
+  it('レシートは「これでいいですか」の画面を出し、「はい」の道具は画面からだけ呼べる(ADR-146)', async () => {
+    const { result } = await call('tools/list');
+    const tools = result?.tools as {
+      name: string;
+      annotations: { readOnlyHint: boolean };
+      _meta?: { ui?: { resourceUri?: string; visibility?: string[] } };
+    }[];
+    const preview = tools.find((t) => t.name === 'preview_receipt')!;
+    const save = tools.find((t) => t.name === 'save_receipt')!;
+    expect(preview.annotations.readOnlyHint).toBe(true);
+    expect(preview._meta?.ui?.resourceUri).toBe('ui://kakeibo/receipt-confirm.html');
+    expect(save._meta?.ui).toEqual({
+      resourceUri: 'ui://kakeibo/receipt-confirm.html',
+      visibility: ['app'],
+    });
+
+    const read = await call('resources/read', { uri: 'ui://kakeibo/receipt-confirm.html' });
+    const [content] = read.result?.contents as { mimeType: string; text: string }[];
+    expect(content!.mimeType).toBe('text/html;profile=mcp-app');
+    expect(content!.text).toContain('これでいいですか？');
+
+    s.preview.mockResolvedValue({ status: 'ready', receipt: { store: 'ライフ' } });
+    const shown = await call('tools/call', {
+      name: 'preview_receipt',
+      arguments: { store: 'ライフ', date: '2026-10-29', totalYen: 1340 },
+    });
+    expect(s.preview).toHaveBeenCalledWith({ store: 'ライフ', date: '2026-10-29', totalYen: 1340 });
+    expect(shown.result?.structuredContent).toEqual({
+      status: 'ready',
+      receipt: { store: 'ライフ' },
+    });
   });
 
   it('状態を持たない形なので GET は 405', () => {
