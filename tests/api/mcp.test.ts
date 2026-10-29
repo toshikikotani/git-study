@@ -76,21 +76,43 @@ describe('MCP の入口', () => {
       clientInfo: { name: 'test', version: '1' },
     });
     expect(result?.serverInfo).toMatchObject({ name: 'kakeibo' });
-    expect(String(result?.instructions)).toContain('記録・保存はできません');
+    expect(String(result?.instructions)).toContain('本人にはっきり頼まれたときだけ');
   });
 
-  it('道具は6つで、どれも読むだけ', async () => {
+  it('読む道具6つと書く道具5つ。読む道具は readOnly、書く道具は許可が要る印', async () => {
     const { result } = await call('tools/list');
-    const tools = result?.tools as { name: string; annotations: { readOnlyHint: boolean } }[];
-    expect(tools.map((t) => t.name).sort()).toEqual([
+    const tools = result?.tools as {
+      name: string;
+      annotations: { readOnlyHint: boolean; destructiveHint?: boolean };
+    }[];
+    const byName = new Map(tools.map((t) => [t.name, t.annotations]));
+    expect([...byName.keys()].sort()).toEqual([
+      'add_receipt',
+      'add_record',
       'get_categories',
       'get_month_summary',
       'get_needs_check',
       'get_today',
       'get_upcoming',
       'search_transactions',
+      'set_category',
+      'set_target',
+      'undo_record',
     ]);
-    expect(tools.every((t) => t.annotations.readOnlyHint)).toBe(true);
+    for (const name of [
+      'get_today',
+      'get_categories',
+      'get_month_summary',
+      'search_transactions',
+      'get_upcoming',
+      'get_needs_check',
+    ]) {
+      expect(byName.get(name)?.readOnlyHint, name).toBe(true);
+    }
+    for (const name of ['add_record', 'add_receipt', 'set_category', 'set_target', 'undo_record']) {
+      expect(byName.get(name)?.readOnlyHint, name).toBe(false);
+    }
+    expect(byName.get('undo_record')?.destructiveHint).toBe(true);
   });
 
   it('道具を呼ぶと、本人のセッションの中で読んで JSON の文字で返す', async () => {
