@@ -1,5 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 
+import { originOf } from '@/features/mcp/http';
+import { isAccessToken, oauthUrls, verifyAccessToken } from '@/features/mcp/oauth';
 import { createKakeiboMcpServer } from '@/features/mcp/server';
 import { verifyMcpToken } from '@/features/mcp/tokens';
 import { bearerTokenOf } from '@/lib/bearer-token';
@@ -7,8 +9,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { runAsOwner } from '@/lib/supabase/owner-session';
 
 /**
- * 家計簿の MCP サーバーの入口(AI とつなぐ、ADR-142)。Claude Code・Claude のデスクトップ版などの
- * MCP クライアントが `Authorization: Bearer kkb_…`(設定 › AI とつなぐ で発行した個人用の鍵)で呼ぶ。
+ * 家計簿の MCP サーバーの入口(AI とつなぐ、ADR-142・143)。2通りの鍵で呼べる:
+ *   - `Authorization: Bearer kkb_…`:設定 › AI とつなぐ で発行した個人用の鍵(Claude Code など)。
+ *   - `Authorization: Bearer kka_…`:OAuth で本人が許可したアプリ(ChatGPT・Claude のアプリ)。
+ * 鍵が無い・違うときの 401 には、認可サーバーの案内の場所(resource_metadata)を付ける。アプリはそれを
+ * 見て、登録 → 本人のログインと同意 → トークン、と進む。
  *
  * ── 認証 ────────────────────────────────────────────────────
  * proxy.ts はこのパスを対象外にしている(MCP クライアントはセッション cookie を持たない。cron・
@@ -37,22 +42,33 @@ function takeSlot(now = Date.now()): boolean {
   return true;
 }
 
-const unauthorized = () =>
-  Response.json(
-    { error: '鍵が違うか、取り消されています。家計簿の 設定 › AI とつなぐ で発行してください。' },
-    { status: 401, headers: { 'WWW-Authenticate': 'Bearer realm="kakeibo"' } },
-  );
-
 export async function POST(request: Request): Promise<Response> {
+  const urls = oauthUrls(originOf(request.headers, request.url));
+  const unauthorized = (invalid: boolean) =>
+    Response.json(
+      {
+        error:
+          '鍵が違うか、取り消されています。つなぎ直すか、設定 › AI とつなぐ で発行してください。',
+      },
+      {
+        status: 401,
+        headers: {
+          'WWW-Authenticate': `Bearer realm="kakeibo", resource_metadata="${urls.resourceMetadata}"${invalid ? ', error="invalid_token"' : ''}`,
+        },
+      },
+    );
+
   const token = bearerTokenOf(request);
-  if (!token) return unauthorized();
+  if (!token) return unauthorized(false);
   if (!takeSlot()) {
     return Response.json({ error: '呼び出しが多すぎます。少し待ってください。' }, { status: 429 });
   }
 
   const admin = createAdminClient();
-  const owner = await verifyMcpToken(admin, token).catch(() => null);
-  if (!owner) return unauthorized();
+  const owner = await (
+    isAccessToken(token) ? verifyAccessToken(admin, token, urls.mcp) : verifyMcpToken(admin, token)
+  ).catch(() => null);
+  if (!owner) return unauthorized(true);
 
   const server = createKakeiboMcpServer({
     userId: owner.id,

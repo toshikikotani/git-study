@@ -54,7 +54,10 @@ describe('MCP の入口', () => {
   it('鍵が無い・違うときは 401 で、何も読まない', async () => {
     const none = await POST(rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, null));
     expect(none.status).toBe(401);
-    expect(none.headers.get('www-authenticate')).toContain('Bearer');
+    // 401 には認可サーバーの案内の場所を付ける(ChatGPT・Claude のアプリがそこからつなぐ、ADR-143)
+    expect(none.headers.get('www-authenticate')).toContain(
+      'resource_metadata="https://kakeibo.example/.well-known/oauth-protected-resource/api/mcp"',
+    );
     const wrong = await POST(
       rpc(
         { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_today' } },

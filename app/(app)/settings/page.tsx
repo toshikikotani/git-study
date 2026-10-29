@@ -105,7 +105,11 @@ export default async function SettingsPage({
           <Row href="/settings/google" label="Google連携" />
           <Row href="/settings/rescued-emails" label="読み取れなかったメール" />
           <Row href="/briefs" label="朝配信" />
-          <Row href="/settings/mcp" label="AI とつなぐ(MCP)" sub="Claude などから家計簿を読む鍵" />
+          <Row
+            href="/settings/mcp"
+            label="AI とつなぐ(MCP)"
+            sub="ChatGPT・Claude などから家計簿を読む"
+          />
         </Group>
       ) : null}
 
