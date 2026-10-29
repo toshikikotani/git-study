@@ -20,6 +20,7 @@ import {
   forgetOwnerSessionsForTest,
   MAX_AGE_MS,
   MAX_ATTEMPTS,
+  setAcceptWaitsForTest,
   ownerSessionClient,
   runAsOwner,
 } from '@/lib/supabase/owner-session';
@@ -61,6 +62,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key-anon-key-anon-key';
   s.gotrue = createFakeGoTrue({ 'me@example.com': 'me', 'you@example.com': 'you' });
   forgetOwnerSessionsForTest();
+  setAcceptWaitsForTest([1, 1, 1]);
   vi.spyOn(Math, 'random').mockReturnValue(0);
 });
 
@@ -235,6 +237,30 @@ describe('本人として動く', () => {
     await expect(runAsOwner(admin(), { id: 'me', created_at: '' }, vi.fn())).rejects.toThrow(
       '本人のメールアドレスが分かりません',
     );
+  });
+});
+
+describe('データベースの時計が遅れているとき(JWT issued at future、ADR-145 追補)', () => {
+  it('作ったばかりのトークンが受け付けられるまで待ってから使う(道具は1回だけ動く)', async () => {
+    s.gotrue.state.futureRejects = 2;
+    const fn = vi.fn(whoAmI);
+    expect((await runAsOwner(admin(), owner, fn)).userId).toBe('me');
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(s.gotrue.state.queries).toBe(3);
+    // 使い回すときは確かめ直さない
+    await runAsOwner(admin(), owner, whoAmI);
+    expect(s.gotrue.state.queries).toBe(3);
+  });
+
+  it('待っても受け付けられなければ、そのセッションは無効にして止め、次の呼び出しで作り直す', async () => {
+    s.gotrue.state.futureRejects = 10;
+    const fn = vi.fn();
+    await expect(runAsOwner(admin(), owner, fn)).rejects.toThrow(/JWT issued at future/);
+    expect(fn).not.toHaveBeenCalled();
+    expect(s.gotrue.state.signedOut).toBe(1);
+    s.gotrue.state.futureRejects = 0;
+    expect((await runAsOwner(admin(), owner, whoAmI)).userId).toBe('me');
+    expect(s.gotrue.state.generated).toBe(2);
   });
 });
 

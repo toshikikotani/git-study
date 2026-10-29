@@ -110,6 +110,7 @@ async function createOwnerSession(admin: Admin, owner: OwnerUser): Promise<LiveS
       token_hash: tokenHash,
     });
     if (!verifyError && verified.user?.id === owner.id) {
+      await waitUntilAccepted(client);
       return { client, createdAt: Date.now(), inFlight: 0, retired: false };
     }
     if (!verifyError) {
@@ -125,6 +126,45 @@ async function createOwnerSession(admin: Admin, owner: OwnerUser): Promise<LiveS
     break;
   }
   throw new OwnerSessionError(`本人として読めませんでした: ${lastMessage}`);
+}
+
+/** データベースの側の時計が遅れているとき、作ったばかりのトークンが受け付けられるまで待つ間(合わせて約40秒)。 */
+let acceptWaitsMs = [1000, 2000, 4000, 8000, 8000, 8000, 8000];
+
+/** 「未来に発行された」として断られた(発行した側とデータベースの側の時計のずれ。30秒までは許される)。 */
+export function isIssuedInFuture(error: { message?: string | undefined } | null): boolean {
+  return /issued at future/i.test(error?.message ?? '');
+}
+
+/**
+ * 作ったばかりのセッションで、データベースが受け付けるかを1回だけ確かめる。Supabase Auth の時計がデータベース
+ * (PostgREST)より30秒以上進んでいると、発行した直後のトークンは「JWT issued at future」で断られる(本番で、
+ * デプロイ直後の最初の呼び出しが失敗した。ADR-145 追補)。断られている間は少しずつ待って確かめ直す。
+ * ほかの失敗(つながらない等)はここでは止めず、本当の呼び出しに任せる。
+ */
+async function waitUntilAccepted(client: SupabaseClient<Database>): Promise<void> {
+  for (let i = 0; ; i += 1) {
+    let error: { message?: string } | null = null;
+    try {
+      ({ error } = await client.from('genres').select('id').limit(1));
+    } catch {
+      return;
+    }
+    if (!isIssuedInFuture(error)) return;
+    const wait = acceptWaitsMs[i];
+    if (wait === undefined) {
+      await client.auth.signOut({ scope: 'local' }).catch(() => {});
+      throw new OwnerSessionError(
+        '本人として読めませんでした: JWT issued at future(データベースの時計が遅れています。少し待ってもう一度)',
+      );
+    }
+    await sleep(wait);
+  }
+}
+
+/** テスト用:受け付けられるまで待つ間を短くする。 */
+export function setAcceptWaitsForTest(waits: number[]): void {
+  acceptWaitsMs = waits;
 }
 
 /** 待つ長さ(回を重ねるほど長く、サーバーどうしで同じにならないようばらつかせる)。 */

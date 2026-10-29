@@ -14,6 +14,11 @@ export type FakeSession = { user: { id: string }; alive: boolean };
 export type FakeAuthClient = {
   marker: 'owner';
   session: FakeSession | null;
+  from: (table: string) => {
+    select: (cols: string) => {
+      limit: (n: number) => Promise<{ data: unknown[]; error: { message: string } | null }>;
+    };
+  };
   auth: {
     verifyOtp: (input: { type: string; token_hash: string }) => Promise<unknown>;
     getSession: () => Promise<{ data: { session: FakeSession | null }; error: null }>;
@@ -38,6 +43,10 @@ export function createFakeGoTrue(users: Record<string, string> = { 'me@example.c
     generateError: null as string | null,
     /** 発行したリンクを、別のサーバーがすぐ上書きする(いつもぶつかる)。 */
     alwaysOverwritten: false,
+    /** データベースが「未来に発行された」と断る回数(時計のずれ)。 */
+    futureRejects: 0,
+    /** データベースへの問い合わせの回数。 */
+    queries: 0,
   };
   let seq = 0;
 
@@ -56,6 +65,18 @@ export function createFakeGoTrue(users: Record<string, string> = { 'me@example.c
     const client: FakeAuthClient = {
       marker: 'owner',
       session: null,
+      from: () => ({
+        select: () => ({
+          limit: async () => {
+            state.queries += 1;
+            if (state.futureRejects > 0) {
+              state.futureRejects -= 1;
+              return { data: [], error: { message: 'JWT issued at future' } };
+            }
+            return { data: [], error: null };
+          },
+        }),
+      }),
       auth: {
         verifyOtp: async ({ token_hash }) => {
           await tick(state.verifyMs);
